@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import type { SearchData, TenantConfig } from "./types";
 import type { AutomationPolicy } from "./tenant/models";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export interface ServiceAccountKey {
   client_email: string;
@@ -156,6 +156,7 @@ export async function queryGscTotals(
   token: string,
   startDate: string,
   endDate: string,
+  requireData = false,
 ): Promise<GscTotals | null> {
   const endpoint = `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(
     property,
@@ -188,6 +189,7 @@ export async function queryGscTotals(
 
   const totalRow: { clicks?: number; impressions?: number; ctr?: number; position?: number } | undefined =
     totalsData.rows?.[0];
+  if (requireData && !totalRow && !queryRows.length) return null;
   const clicks = totalRow ? num(totalRow.clicks) : queryRows.reduce((s, r) => s + r.clicks, 0);
   const impressions = totalRow ? num(totalRow.impressions) : queryRows.reduce((s, r) => s + r.impressions, 0);
   const ctr = totalRow
@@ -204,13 +206,15 @@ export async function queryGscTotals(
   return { clicks, impressions, ctr, position, topQueries };
 }
 
-export async function fetchSearchData(
+export async function fetchSearchDataWithStatus(
   siteUrl: string,
   days = 7,
-  tenantConfig?: TenantConfig | null
-): Promise<SearchData> {
+  tenantConfig?: TenantConfig | null,
+  requireData = true,
+): Promise<{ status: "available" | "unreachable"; data: SearchData }> {
+  const empty = () => ({ status: "unreachable" as const, data: { ...EMPTY_DATA, fetchedAt: new Date().toISOString() } });
   const key = getServiceAccountCredential(tenantConfig);
-  if (!key) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
+  if (!key) return empty();
 
   try {
     const token = await getAccessToken(key);
@@ -222,17 +226,23 @@ export async function fetchSearchData(
       token,
       start.toISOString().slice(0, 10),
       end.toISOString().slice(0, 10),
+      requireData,
     );
-    if (!totals) return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
+    if (!totals) return empty();
 
-    return {
+    return { status: "available", data: {
       queries: totals.topQueries,
       totalClicks: totals.clicks,
       totalImpressions: totals.impressions,
       fetchedAt: new Date().toISOString(),
-    };
+    } };
   } catch (err) {
     console.error("Search Console fetch failed:", err);
-    return { ...EMPTY_DATA, fetchedAt: new Date().toISOString() };
+    return empty();
   }
+}
+
+/** Compatibility API: flags-off cron and storefront consumers retain the exact data shape. */
+export async function fetchSearchData(siteUrl: string, days = 7, tenantConfig?: TenantConfig | null): Promise<SearchData> {
+  return (await fetchSearchDataWithStatus(siteUrl, days, tenantConfig, false)).data;
 }

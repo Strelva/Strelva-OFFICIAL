@@ -1,11 +1,13 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Google Connection API - Get status and disconnect
  */
 
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
-import { getConnection, deleteConnection } from "@/lib/connections";
+import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
+import { getConnection } from "@/lib/connections";
+import { disconnectTenantProvider } from "@/lib/provider-disconnect";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -15,6 +17,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const connection = await getConnection(tenant, "google");
 
@@ -38,9 +41,9 @@ export async function DELETE() {
     const permissionDenied = await requireTenantPermission(tenant, "settings:write");
     if (permissionDenied) return permissionDenied;
 
-    await deleteConnection(tenant, "google");
+    const receipt = await disconnectTenantProvider({ tenantId: tenant, provider: "google", actorUserId: await getAuthUserId() });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, revocationOutcome: receipt.revocationOutcome, revocationErrorCode: receipt.revocationErrorCode });
   } catch (err) {
     console.error("[google DELETE]", err);
     return NextResponse.json({ error: "Failed to disconnect" }, { status: 500 });

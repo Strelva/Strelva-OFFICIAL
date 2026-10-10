@@ -18,6 +18,21 @@ async function mount(element: ReturnType<typeof createElement>) {
 }
 function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!; }
 describe("website rebuild review", () => {
+  it("keeps skipped source paths and their reasons visible after checkpoints are pruned", async () => {
+    const record = fixtureRebuild();
+    const skippedPaths = [{ url: "https://attymooney.com/blocked", reason: "robots" as const }, { url: "https://attymooney.com/app", reason: "javascript_only" as const }, { url: "https://attymooney.com/missing", reason: "unreachable" as const }];
+    const at = "2026-10-01T20:00:00.000Z";
+    const view = parseRebuildView({ workId: record.workId, workspaceId: record.workspaceId, rebuild: { version: 2, revision: 1, title: record.title, input: { requestId: "skipped-request", url: "https://attymooney.com" }, status: "review_ready", stages: [], checkpoint: null, skippedPaths, candidate: { revision: 1, contentHash: "a".repeat(64), document: fixtureSiteDocument, previewHref: `/api/websites/${record.workId}/preview` }, approvedCandidateRevision: null, tenantId: null, launch: { receipt: null, readBack: null }, lastError: null, createdBy: "owner", createdAt: at, history: [] } });
+    expect(view.skippedPaths).toEqual(skippedPaths);
+    await mount(createElement(RebuildExperience, { workspaceId: view.workspaceId, initialRecord: view }));
+    const panel = container.querySelector('[aria-labelledby="rebuild-skipped-heading"]')!;
+    expect(panel.textContent).toContain("robots.txt blocks");
+    expect(panel.textContent).toContain("needs a browser");
+    expect(panel.textContent).toContain("could not be opened");
+    expect(panel.textContent).toContain("business description instead");
+    for (const page of skippedPaths) expect(panel.textContent).toContain(page.url);
+    expect(rebuildViewSchema.parse({ ...record, skippedPaths: undefined }).skippedPaths).toEqual([]);
+  });
   it("blocks approval while a supported sensitive claim awaits confirmation", async () => {
     const record = fixtureRebuild();
     delete record.candidate!.facts.uncertain;
@@ -48,7 +63,7 @@ describe("website rebuild review", () => {
     const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate: async () => record };
     await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
     expect(container.querySelector('[role="alert"]')?.textContent).toContain(domain!.error);
-    expect(container.textContent).toContain("Published, but we could not confirm it yet");
+    expect(container.textContent).toContain("Published, but readback failed.");
     expect(container.textContent).toContain("no real inquiry, booking or visibility measurements");
   });
   it("sends the exact candidate identity through fact corrections", async () => {
@@ -95,9 +110,23 @@ describe("website rebuild review", () => {
     expect(container.textContent).toContain("Monthly website report");
     expect(container.textContent).toContain("Your website");
   });
-  it("retains v1 creation while rebuild release is off", async () => {
+  it("shows owner publication separately from operator domain authority on managed native work", async () => {
+    const record = fixtureRebuild(); record.status = "approved"; record.approved = true; record.candidate!.facts = {};
+    await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true }));
+    expect(button("Publish approved website")).toBeUndefined();
+    expect(button("Choose forms")).toBeUndefined();
+    await act(async () => root!.render(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true, canPublish: true })));
+    expect(button("Publish approved website").disabled).toBe(false);
+    expect(button("Choose forms").disabled).toBe(false);
+    expect(container.querySelector('input[placeholder="your-business.com"]')).toBeNull();
+    await act(async () => root!.render(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true, canPublish: true, readOnly: true })));
+    expect(button("Publish approved website").disabled).toBe(true);
+    expect(button("Choose forms").disabled).toBe(true);
+  });
+  it("stops new creation while rebuild release is off and opens native intake when enabled", async () => {
     await mount(createElement(WebsiteExperience, { workspaceId: fixtureRebuild().workspaceId }));
-    expect(container.textContent).toContain("Business name");
+    expect(container.textContent).toContain("Website creation is unavailable");
+    expect(container.textContent).not.toContain("Business name");
     expect(container.textContent).not.toContain("Your current website");
     await act(async () => root!.render(createElement(WebsiteExperience, { workspaceId: fixtureRebuild().workspaceId, rebuildEnabled: true })));
     expect(container.textContent).toContain("Your current website");

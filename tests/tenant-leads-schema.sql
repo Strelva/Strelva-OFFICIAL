@@ -97,8 +97,45 @@ begin
   perform pg_temp.tl_assert((public.record_tenant_lead('lead-site-renamed', pg_temp.tl_lead('lead_w1', 'w1', '2026-10-06T09:00:00Z'), 'dual_write')->>'workspaceId') = v_ws::text, 'new lead lands in the workspace');
 end $$;
 
--- Deprovisioning the tenant deletes its leads and nothing else.
+-- Unlinking a converted tenant clears workspace_id on its leads for that
+-- business only, keeps every lead row, and a reconversion attaches them again.
+do $$
+declare v_receipt jsonb; v_ws uuid;
+begin
+  if to_regprocedure('public.unlink_tenant_from_business(text,text,uuid,uuid,text)') is null then
+    raise notice 'unlink absent; lead detach is checked once the business record migration exists';
+    return;
+  end if;
+  insert into public.users(id, email, verified_at) values ('cf000000-0000-4000-8000-0000000000e5', 'lead-unlink-operator@strelva.example.test', now());
+  insert into public.super_admins(user_id, email) values ('cf000000-0000-4000-8000-0000000000e5', 'lead-unlink-operator@strelva.example.test');
+  v_receipt := public.convert_tenant_to_business('lead-unlink-operator@strelva.example.test', 'other-lead-site',
+    '{"tenantId":"other-lead-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000b2","workspaceName":"Other Lead Business","billing":null,"account":null,"patch":{},"contacts":[]}',
+    'cf000000-0000-4000-8000-0000000000e6', repeat('b', 64));
+  v_ws := (v_receipt->>'workspaceId')::uuid;
+  perform pg_temp.tl_assert((select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2' and workspace_id = v_ws) = 1, 'conversion attached the lead');
+  v_receipt := public.unlink_tenant_from_business('lead-unlink-operator@strelva.example.test', 'other-lead-site', v_ws,
+    'cf000000-0000-4000-8000-0000000000e7', repeat('c', 64));
+  perform pg_temp.tl_assert(v_receipt->>'leadsDetached' = '1' and v_receipt->>'workspaceDeleted' = 'true', 'unlink detached one lead and removed the empty business');
+  perform pg_temp.tl_assert((select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2' and workspace_id is null) = 1, 'lead row kept, unattached');
+  perform pg_temp.tl_assert((select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1' and workspace_id is not null) >= 3, 'other tenant leads still attached to their business');
+  perform pg_temp.tl_assert((public.record_tenant_lead('other-lead-site', pg_temp.tl_lead('lead_u9', 'u9', '2026-10-07T09:00:00Z'), 'dual_write')->'workspaceId') = 'null'::jsonb, 'new lead after unlink is unattached');
+  v_receipt := public.convert_tenant_to_business('lead-unlink-operator@strelva.example.test', 'other-lead-site',
+    '{"tenantId":"other-lead-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000b2","workspaceName":"Other Lead Business","billing":null,"account":null,"patch":{},"contacts":[]}',
+    'cf000000-0000-4000-8000-0000000000e6', repeat('b', 64));
+  perform pg_temp.tl_assert(v_receipt->>'alreadyConverted' = 'false'
+    and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2' and workspace_id = (v_receipt->>'workspaceId')::uuid) = 2, 'reconversion reattached both leads');
+end $$;
+
+-- Deprovisioning the tenant touches only that tenant's leads. Before
+-- 20261007110000 they cascade away; after it they are kept and stamped.
 delete from public.tenants where id = 'other-lead-site';
-select pg_temp.tl_assert((select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2') = 0
-  and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1') >= 3, 'deprovision removes only that tenant');
+select pg_temp.tl_assert(case when exists (select 1 from information_schema.columns where table_schema = 'public'
+    and table_name = 'tenant_leads' and column_name = 'tenant_deleted_at')
+  then (select count(*) > 0 and bool_and(to_jsonb(l)->>'tenant_deleted_at' is not null) from public.tenant_leads l
+    where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2')
+  else (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2') = 0 end
+  and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1') >= 3
+  and (select bool_and(to_jsonb(l)->>'tenant_deleted_at' is null) from public.tenant_leads l
+    where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1'),
+  'deprovision acts only on that tenant');
 rollback;

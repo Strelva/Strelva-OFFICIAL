@@ -6,12 +6,16 @@
  *   • guidance  — one plain paragraph: "how we sound"
  *   • templates — an example reply per review type, the AI mirrors the voice of
  *
- * Stored as one JSON blob in Redis (`reb:reply-voice:{tenant}`, same pattern as
- * the operator CRM / leads — internal per-tenant metadata, no DB migration).
- * Degrades to a safe default (mode "approve", no templates) without Redis.
+ * Stored under the selected tenant_settings authority; the frozen Redis key
+ * (`reb:reply-voice:{tenant}`) remains a best-effort cache after durable cutover.
+ * The Redis-authoritative path keeps its safe default without Redis.
  */
 
-import { getRedis } from "../redis";
+import { mirrorRecord, readSetting, durableRecordAuthority, writeDurableRecord } from "../client-records";
+import { getRedis } from "@/platform/infra/redis";
+// The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
+// port src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "../workspace-ports";
 
 export type ReplyMode = "off" | "approve" | "auto";
 
@@ -46,7 +50,22 @@ function key(tenantId: string): string {
   return `reb:reply-voice:${tenantId}`;
 }
 
-export async function getReplyVoice(tenantId: string): Promise<ReplyVoice> {
+/**
+ * The voice, with its mode from `decision_policies` (`review.reply`) when the
+ * tenant is linked to a business, the release is on and the setting has
+ * moved there (src/platform/needs-you/tenant-settings.ts). "off" (draft
+ * nothing) is not a route and stays with the selected settings blob, as do
+ * the guidance and templates.
+ */
+export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
+  const voice = await readSetting(tenantId, "reply_voice", () => readRedisVoice(tenantId), defaultReplyVoice());
+  if (voice.mode === "off") return voice;
+  const policy = await workspacePorts().tenantPolicy();
+  const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
+  return route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice;
+}
+
+async function readRedisVoice(tenantId: string): Promise<ReplyVoice> {
   const redis = getRedis();
   if (!redis) return defaultReplyVoice();
   try {
@@ -70,11 +89,46 @@ const VALID_KINDS = new Set<ReplyTemplateKey>(REPLY_TEMPLATE_KINDS.map((k) => k.
 
 /** Validate + persist a voice. Trims and caps free text; drops unknown template
  *  kinds and empty examples so the store can't be poisoned by request input. */
+export interface ReplyVoiceWriter {
+  actor: { userId: string; verifiedEmail: string };
+  /** "owner" for the client's own choice; "strelva" for an operator. */
+  layer: TenantPolicyLayer;
+}
+
+/**
+ * With a writer, an "approve" or "auto" mode is written to decision_policies
+ * first when the tenant is linked (a refusal throws and nothing is saved).
+ * The selected setting authority is written next. Qualified durable saves
+ * refresh Redis only afterward. The returned mode is the one in force.
+ */
 export async function saveReplyVoice(
   tenantId: string,
   input: { mode?: ReplyMode; guidance?: string; templates?: { key?: string; example?: string }[] },
+  writer: ReplyVoiceWriter | null = null,
+  options: BridgeOptions = {},
 ): Promise<ReplyVoice> {
-  const redis = getRedis();
+  const requested: ReplyMode =
+    input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
+  let inForce: ReplyMode = requested;
+  const durable = await durableRecordAuthority("tenant_settings");
+  if (writer && requested !== "off") {
+    const policy = await workspacePorts().tenantPolicy();
+    const result = await policy.writeTenantPolicySetting({
+      tenantId, actor: writer.actor, layer: writer.layer, kind: "review.reply",
+      todayValue: (await readRedisVoice(tenantId)).mode, via: writer.layer === "owner" ? "owner_save" : "operator_save",
+      plan: () => policy.planReplyMode(requested, writer.layer),
+    }, options);
+    if (result.stored === "decision_policies") inForce = policy.replyModeFromRoute(result.route);
+  }
+  const saved = await saveStoredVoice(tenantId, { ...input, mode: requested }, durable);
+  return { ...saved, mode: inForce };
+}
+
+async function saveStoredVoice(
+  tenantId: string,
+  input: { mode?: ReplyMode; guidance?: string; templates?: { key?: string; example?: string }[] },
+  durable: boolean,
+): Promise<ReplyVoice> {
   const mode: ReplyMode =
     input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
   const guidance = (input.guidance ?? "").trim().slice(0, MAX_GUIDANCE);
@@ -88,7 +142,17 @@ export async function saveReplyVoice(
     templates.push({ key: k, example });
   }
   const voice: ReplyVoice = { mode, guidance, templates, updatedAt: new Date().toISOString() };
-  if (redis) await redis.set(key(tenantId), voice);
+  if (durable) {
+    const status = await writeDurableRecord("tenant_settings", tenantId, "reply_voice", { value: voice }, voice.updatedAt ?? undefined);
+    if (status === "kept") throw new Error("Reply voice update was superseded by a newer change.");
+    try { const redis = getRedis(); if (redis) await redis.set(key(tenantId), voice); } catch { /* Durable voice already saved; Redis is a cache. */ }
+    return voice;
+  }
+  const redis = getRedis();
+  if (redis) {
+    await redis.set(key(tenantId), voice);
+    await mirrorRecord("tenant_settings", tenantId, "reply_voice", { value: voice });
+  }
   return voice;
 }
 

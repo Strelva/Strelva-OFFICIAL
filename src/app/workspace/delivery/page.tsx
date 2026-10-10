@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import type { Metadata } from "next";
@@ -13,7 +14,7 @@ export default async function DeliveryQueuePage({ searchParams }: { searchParams
   const count = [query.businessId, query.providerWorkspaceId, query.providerKind].filter(value => value !== undefined).length;
   if (count !== 1) notFound();
   let scope: DeliveryQueueScope;
-  if (query.providerKind === "strelva") scope = { providerKind: "strelva" };
+  if (query.providerKind === "strelva") return <StrelvaShell title="Provider work"><div className="mx-auto w-full max-w-4xl p-6"><p>This historical provider inbox has retired. Existing requests and acceptance receipts remain in their business workspace.</p><Link href="/workspace">Open a business or agency workspace</Link></div></StrelvaShell>;
   else if (query.businessId) { const id = z.string().uuid().safeParse(query.businessId); if (!id.success) notFound(); scope = { businessId: id.data }; }
   else { const id = z.string().uuid().safeParse(query.providerWorkspaceId); if (!id.success) notFound(); scope = { providerWorkspaceId: id.data }; }
   return <StrelvaShell title="Delivery work"><div className="mx-auto w-full max-w-4xl p-6"><ServiceDeliveryQueue scope={scope} /></div></StrelvaShell>;

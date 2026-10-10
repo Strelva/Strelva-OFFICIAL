@@ -9,6 +9,7 @@ import { sameAppHref } from "./workspace-discovery";
 import { WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { WorkspacePayerTransition } from "./WorkspacePayerTransition";
+import { DecisionPolicySettings } from "./DecisionPolicySettings";
 
 type ManagedSettingsDestination = "business" | "connections" | "domains" | "subscription";
 export type SiteAssignmentState = "known" | "loading" | "unavailable";
@@ -52,6 +53,8 @@ export function WorkspaceBusinessSettings({
   onRetryWebsiteAssignments,
   managedWorkUnavailable = false,
   accountHref,
+  needsYouReleased = false,
+  assistantConnectionsReleased = false,
 }: {
   workspace?: WorkspaceSummary;
   sites: readonly ManagedWorkSummary[];
@@ -62,8 +65,11 @@ export function WorkspaceBusinessSettings({
   onRetryWebsiteAssignments?: () => void;
   managedWorkUnavailable?: boolean;
   accountHref: string;
+  /** STRELVA_NEEDS_YOU_RELEASE: off renders this page exactly as before. */
+  needsYouReleased?: boolean;
+  assistantConnectionsReleased?: boolean;
 }) {
-  const readOnly = workspace?.access === "delegated_read";
+  const readOnly = workspace?.access === "delegated_read" || workspace?.access === "provider_seat";
   const business = workspace?.kind === "customer";
   const assignmentState: WorkspaceOfferingState = offerings ?? {
     status: "unavailable",
@@ -75,13 +81,13 @@ export function WorkspaceBusinessSettings({
       <p className="text-sm font-medium text-accent-text">{workspace?.name || "Current workspace"}</p>
       <h1 className="mt-4 font-display text-4xl font-normal text-warm-black">Business details</h1>
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">What Strelva knows about this business and the websites it runs. Your sign-in identity stays in your personal account.</p>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">Hours, services and prices are still edited on each website. Changing them once here and having every place update is not built yet.</p>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">Business details hold shared facts such as hours and services. Each System declares which facts it reads; connected sites and independently edited content need their own update.</p>
     </header>
 
     <section className="border-b border-gray-border py-8" aria-labelledby="business-settings-heading">
       <h2 id="business-settings-heading" className="text-base font-medium text-warm-black">Business</h2>
       {managedWorkUnavailable ? <p className="mt-4 text-sm text-gray-muted" role="status">Some website settings could not be loaded. No business setting was changed.</p> : null}
-      {!business ? <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">Choose a customer business workspace to manage business information, people, work, and website relationships.</p> : <div className="mt-6 space-y-8">
+      {!business ? <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">Choose your business workspace to manage business information, people, work, and website relationships.</p> : <div className="mt-6 space-y-8">
         <section aria-labelledby="business-information-heading">
           <h3 id="business-information-heading" className="text-sm font-medium text-warm-black">Business information</h3>
           <dl className="mt-4 grid gap-4 border-y border-gray-border py-4 sm:grid-cols-2">
@@ -129,7 +135,12 @@ export function WorkspaceBusinessSettings({
       </div>}
     </section>
 
-    <section id="workspace-usage" className="border-b border-gray-border py-8" aria-labelledby="workspace-usage-heading">
+    {assistantConnectionsReleased && business && workspace ? <section className="border-b border-gray-border py-8" aria-labelledby="assistant-settings-heading"><h2 id="assistant-settings-heading" className="text-base font-medium text-warm-black">Connected assistants</h2><p className="mt-3 text-sm text-gray-muted">Read business facts and prepare website changes from Claude or Codex. The business owner controls access.</p><Link href={`/connect?workspaceId=${encodeURIComponent(workspace.id)}`} className="mt-4 inline-flex min-h-11 items-center text-sm text-accent-text underline underline-offset-4">Manage assistant connections</Link></section> : null}
+
+    {workspace && (workspace.kind === "customer" || workspace.kind === "agency") ? <section className="space-y-3"><h2 className="text-sm font-semibold">Units</h2><p className="text-sm text-gray-muted">Businesses grouped under this organization. Your membership controls what you can change.</p><Link href={`/workspace/units?${new URLSearchParams({ workspaceId: workspace.id })}`} className="text-sm underline underline-offset-4">Open units</Link></section> : null}
+    {needsYouReleased && business && workspace && !readOnly ? <DecisionPolicySettings workspaceId={workspace.id} /> : null}
+
+    <section id="workspace-usage"className="border-b border-gray-border py-8" aria-labelledby="workspace-usage-heading">
       <h2 id="workspace-usage-heading" className="text-base font-medium text-warm-black">Usage and limits</h2>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Recorded operational allowances appear here when this business has one. They are separate from website subscription billing.</p>
       <div className="mt-5"><WorkspaceAllowanceSummary businessId={workspace?.id || ""} enabled={Boolean(business && workspace && !readOnly)} /></div>

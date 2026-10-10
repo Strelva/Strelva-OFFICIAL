@@ -1,0 +1,172 @@
+"use client";
+
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
+import { ArrowRight, Check } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
+import type { ItemNotice, NeedsYouState } from "./useNeedsYou";
+import { decisionCount, decisionPresentation } from "./needs-you-presentation";
+import styles from "./business-home.module.css";
+
+const TIME = new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
+
+function when(value: string): string {
+  const at = Date.parse(value);
+  return Number.isFinite(at) ? TIME.format(new Date(at)) : "";
+}
+
+interface NeedsYouProps {
+  state: NeedsYouState;
+  pending: string | null;
+  notices: Record<string, ItemNotice>;
+  onDecide: (item: OwnerDecision, decision: "approve" | "not_yet") => void;
+  onRetry: () => void;
+  /** Other asks Home already knows about (saved work that needs a decision). */
+  extra?: ReactNode;
+  extraCount?: number;
+  appBase?: string;
+  /**
+   * `rows` (Home's "Your side"): one row per decision with one primary action.
+   * `deck` (the Needs you place): one card per decision, shaped for it.
+   */
+  variant?: "rows" | "deck";
+  /** Shown instead of disappearing when nothing needs the owner. Without it the section is gone. */
+  empty?: ReactNode;
+  /** Mounted caller heading when the section heading is hidden or the complete empty section disappears. */
+  retryFocusTarget?: RefObject<HTMLElement | null>;
+}
+
+/**
+ * Needs you: only the owner's decisions, oldest first, with the same Approve
+ * and Not yet the email carries. Gone after a complete empty read. A member sees the asks but
+ * can't decide them; asks that need editing open their own page.
+ */
+export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget }: NeedsYouProps) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const recovery = useRef<FocusRecovery | null>(null);
+  useEffect(() => {
+    const pending = recovery.current;
+    if (!pending) return;
+    recovery.current = null;
+    if (state.status === "ready" || state.status === "error") pending.recover(retryButton.current ?? retryFocusTarget?.current ?? heading.current);
+    else pending.cancel();
+  }, [state, retryFocusTarget]);
+  useEffect(() => () => recovery.current?.cancel(), []);
+  const retry = () => {
+    recovery.current?.cancel();
+    recovery.current = beginFocusRecovery(retryButton.current);
+    onRetry();
+  };
+  const outcomes = Object.entries(notices).filter(([id]) => state.status !== "ready" || !state.items.some(item => item.id === id));
+  if (state.status === "disabled") return null;
+  const nothing = state.status === "ready" && state.complete && state.items.length === 0 && extraCount === 0;
+  if (nothing && outcomes.length === 0 && !empty) return null;
+  const count = (state.status === "ready" ? state.items.length : 0) + extraCount;
+  const canDecide = state.status === "ready" && state.role !== "member";
+  const deck = variant === "deck";
+  return <section className={deck ? styles.deckSection : styles.section} aria-labelledby="home-attention">
+    <header className={deck ? styles.srOnly : styles.sideHeader}>
+      <h2 ref={heading} tabIndex={-1} id="home-attention" className={styles.eyebrow} data-tone="clay"><span className={styles.dot} aria-hidden="true" />Needs you{state.status === "ready" && count > 0 ? <span className={styles.count}>{count}</span> : null}</h2>
+      {!deck && state.status === "ready" && state.complete && count > 0 ? <p className={styles.sideTitle}>{decisionCount(count)} waiting on {state.role === "member" ? "the owner" : "you"}.</p> : null}
+    </header>
+    {state.status === "loading" ? <p role="status" className={styles.muted}>Checking what needs you…</p> : null}
+    {state.status === "error" ? <p role="status" className={styles.notice}>{state.message} <Button ref={retryButton} type="button" variant="secondary" size="sm" onClick={retry}>Check again</Button></p> : null}
+    {state.status === "ready" && !state.complete ? <p role="status" className={styles.notice}>Some decisions could not be checked. <Button ref={retryButton} type="button" variant="secondary" size="sm" onClick={retry}>Check again</Button></p> : null}
+    {nothing && empty ? empty : null}
+    {state.status === "ready" && state.role === "member" && state.items.length ? <p className={styles.muted}>Only the owner can decide these. You can see what is waiting.</p> : null}
+    {state.status === "ready" && (state.items.length || extra) ? <ul className={deck ? styles.deck : styles.decisions}>
+      {state.items.map((item, index) => {
+        const busy = pending === item.id;
+        const notice = notices[item.id];
+        const openHref = item.openHref ? `${appBase}${item.openHref}` : null;
+        const look = decisionPresentation(item);
+        const Icon = look.icon;
+        const actor = actorPresentation(item.actor);
+        const noteActor = actorPresentation(item.noteActor?.kind === "operator" ? item.noteActor : { kind: "operator" });
+        const effects = <small className={styles.effects}>Approve: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}{item.operatorNote ? ` ${noteActor.name ?? "Support"}: ${item.operatorNote}` : ""}</small>;
+        const attribution = actor.name ? <small>{actor.name}{actor.credit ? ` · ${actor.credit}` : ""}</small> : null;
+        const status = notice ? <small role="status" className={notice.tone === "error" ? styles.decisionError : styles.decisionNotice}>{notice.text}</small> : null;
+        // A source with a separate review is decided only where every value shows.
+        const decidable = canDecide && item.review !== null;
+        const review = item.review?.length ? <ul className={styles.reviewLines} aria-label="Every change you approve">
+          {item.review.map((line, row) => <li key={row}>{line}</li>)}
+        </ul> : null;
+        const detail = review ?? (item.detail ? look.shape === "message" ? <blockquote className={styles.quote}>{item.detail}</blockquote> : <p>{item.detail}</p> : null);
+        const unavailable = canDecide && item.review === null ? <small role="status" className={styles.decisionNotice}>This changed or couldn&apos;t be loaded. Refresh to see the latest before deciding.</small> : null;
+        const actions = decidable ? <div className={styles.decisionActions}>
+          <Button size="sm" loading={busy} disabled={Boolean(pending)} onClick={() => onDecide(item, "approve")} aria-label={`${look.verb}: ${item.title}`}>{look.verb}</Button>
+          <button type="button" className={styles.quietPill} disabled={Boolean(pending)} onClick={() => onDecide(item, "not_yet")} aria-label={`Not yet: ${item.title}`}>Not yet</button>
+          {openHref ? <a className={styles.decisionLink} href={openHref}>Open<ArrowRight size={14} aria-hidden="true" /></a> : null}
+        </div> : openHref ? <div className={styles.decisionActions}><a className={styles.decisionLink} href={openHref}>Open<ArrowRight size={14} aria-hidden="true" /></a></div> : null;
+        if (deck) return <li key={item.id} className={styles.decisionCard} data-shape={look.shape} style={{ "--i": index } as CSSProperties}>
+          {look.shape === "live" ? <div className={styles.cardVisual} aria-hidden="true"><Icon size={28} strokeWidth={1.4} /></div> : null}
+          <div className={styles.cardBody}>
+            <p className={styles.cardMeta}><span className={styles.dot} aria-hidden="true" />{look.source}<span>{item.urgent ? "Someone is waiting · " : ""}{when(item.openedAt)}</span></p>
+            {look.amount ? <p className={styles.amount}>{look.amount}</p> : null}
+            <h3>{item.title}</h3>
+            {detail}
+            {attribution}
+            {effects}
+            {unavailable}
+            {status}
+          </div>
+          {actions}
+        </li>;
+        return <li key={item.id} className={styles.decision} style={{ "--i": index } as CSSProperties}>
+          <span className={styles.decisionIcon} aria-hidden="true"><Icon size={18} strokeWidth={1.6} /></span>
+          <div className={styles.decisionBody}>
+            <strong>{item.title}</strong>
+            {review ?? (item.detail ? <p>{item.detail}</p> : null)}
+            {attribution}
+            {effects}
+            {unavailable}
+            {status}
+          </div>
+          {actions}
+        </li>;
+      })}
+      {extra}
+    </ul> : null}
+    {outcomes.length ? <ul className={styles.outcomes} aria-live="polite">{outcomes.map(([id, notice]) => <li key={id} className={notice.tone === "error" ? styles.decisionError : undefined}>{notice.tone === "error" ? null : <Check size={14} aria-hidden="true" />}{notice.text}</li>)}</ul> : null}
+  </section>;
+}
+
+interface HandledProps {
+  state: NeedsYouState;
+  pending: string | null;
+  notices: Record<string, ItemNotice>;
+  onUndo: (receipt: HandledReceipt) => void;
+  /** Finished requests, shown when there are no receipts this week. */
+  fallback?: ReactNode;
+}
+
+/** What changed: the last 7 days of recorded changes, with honest undo. */
+export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback }: HandledProps) {
+  if (state.status === "disabled") return null;
+  const canUndo = state.status === "ready" && state.role !== "member";
+  return <section className={styles.handled} aria-labelledby="home-handled">
+    <header className={styles.handledHeader}><h2 id="home-handled">{STRELVA_HANDLED_LABEL}</h2><span>This week</span></header>
+    {state.status === "loading" ? <p role="status" className={styles.muted}>Checking recent changes…</p>
+      : state.status === "error" ? <p role="status" className={styles.muted}>This week’s changes could not be loaded.</p>
+      : !state.handledAvailable ? <p role="status" className={styles.muted}>This week’s changes could not be loaded. Nothing about it changed.</p>
+      : state.handled.length ? <ul className={styles.list}>{state.handled.map(receipt => {
+        const notice = notices[receipt.id];
+        const actor = actorPresentation(receipt.actor);
+        return <li key={receipt.id} className={styles.receipt}>
+          <div className={styles.decisionBody}>
+            <strong>{receipt.sentence}</strong>
+            {actor.credit ? <small>{actor.credit}</small> : null}
+            <small>{when(receipt.at)}{receipt.changed ? ` · ${receipt.changed}` : ""}{receipt.evidence ? receipt.evidence.readBack === "verified" ? " · Confirmed live" : receipt.evidence.readBack === "not_verified" ? " · Done, not yet confirmed" : " · Accepted" : ""}</small>
+            {receipt.undo.state === "undo_needs_review" || receipt.undo.state === "not_undoable" ? <small>{receipt.undo.reason}</small> : receipt.undo.state === "undone" ? <small>Undone.</small> : null}
+            {notice && receipt.undo.state !== "undone" ? <small role="status" className={notice.tone === "error" ? styles.decisionError : undefined}>{notice.text}</small> : null}
+          </div>
+          {receipt.undo.state === "undo" && canUndo ? <div className={styles.decisionActions}><Button size="sm" variant="ghost" loading={pending === receipt.id} disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${receipt.sentence}`}>Undo</Button></div> : null}
+        </li>;
+      })}</ul>
+      : fallback ?? <p className={styles.muted}>Nothing this week. When something changes for you, it shows here with what changed.</p>}
+  </section>;
+}

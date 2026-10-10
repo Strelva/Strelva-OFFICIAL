@@ -11,8 +11,8 @@ import type { ContentSection, ContentMap } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { setContent } from "./content-store";
 import { setDraftContent } from "./draft-store";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 export interface ContentVersion {
   id: string;
@@ -67,6 +67,26 @@ async function pgInsertVersion(v: ContentVersion, tenant: string): Promise<void>
   if (error) throw error;
 }
 
+/**
+ * A published content version moves the converted business's website System
+ * to an observed revision naming it (observe_tenant_content in
+ * 20261008130000_system_possibilities.sql), so a Possibility built on the
+ * old content goes back to Exploring in the same transaction. Only while
+ * Systems is released; best effort, so it can never fail the content write.
+ */
+export async function observeTenantContentVersion(tenant: string, versionId: string): Promise<void> {
+  const mode = process.env.STRELVA_SYSTEMS_RELEASE?.trim();
+  if (mode !== "1" && mode !== "workspace") return;
+  try {
+    const db = getSupabase() as unknown as { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ error: { message?: string } | null }> } | null;
+    if (!db) return;
+    const { error } = await db.rpc("observe_tenant_content", { p_tenant_id: tenant, p_version_ref: versionId });
+    if (error) console.warn("[versions] System revision not observed", { tenant, versionId, error: error.message });
+  } catch (error) {
+    console.warn("[versions] System revision not observed", { tenant, versionId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 async function pgListVersions(
   section: string,
   tenant: string,
@@ -109,6 +129,7 @@ export async function appendVersion(
 
   if (dataSourceIsPostgres()) {
     await pgInsertVersion(version, tenant);
+    await observeTenantContentVersion(tenant, version.id);
   }
 
   if (!dataSourceIsPostgres()) {
@@ -138,6 +159,34 @@ export async function getVersions(
   const store = await readDevContent(tenant);
   const key = `__versions:${section}`;
   return (store[key] as ContentVersion[]) ?? [];
+}
+
+/**
+ * The tenant's most recent content versions across every section, newest
+ * first. Read-only; used by the website System's one History list.
+ */
+export async function getRecentVersions(
+  tenant: string = DEFAULT_TENANT,
+  limit = 30,
+): Promise<ContentVersion[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  if (dataSourceIsPostgres()) {
+    const db = versionDb(`list recent ${tenant}`);
+    const { data, error } = await db
+      .from("content_versions")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("created_at", { ascending: false })
+      .limit(safeLimit);
+    if (error) throw error;
+    return (data ?? []).map(mapPgVersionRow);
+  }
+  const store = await readDevContent(tenant);
+  return Object.entries(store)
+    .filter(([key]) => key.startsWith("__versions:"))
+    .flatMap(([, value]) => (Array.isArray(value) ? value as ContentVersion[] : []))
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, safeLimit);
 }
 
 export async function restoreVersion(

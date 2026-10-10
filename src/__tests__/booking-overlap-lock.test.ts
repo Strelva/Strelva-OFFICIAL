@@ -28,7 +28,7 @@ const mockRedis = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => mockRedis),
 }));
 
@@ -79,7 +79,7 @@ function nextWednesdayDate(): string {
 const DATE = nextWednesdayDate();
 
 async function loadStore() {
-  return import("@/lib/storage/booking-store");
+  return import("@/platform/bookings/legacy-store");
 }
 
 /** Build a booking payload, computing endTime from startTime + duration. */

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationDraftEditor } from "@/experience/applications/ApplicationDraftEditor";
 import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
 import { APP_TEMPLATES, templateDraft, validateApplicationDraft, type AppTemplate, type ApplicationDraftSpec } from "@/experience/applications/app-templates";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import styles from "./template-library.module.css";
 
@@ -40,12 +41,19 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const listTrigger = useRef<string | null>(null);
   useEffect(() => {
-    const restore = () => setSelected(selectedTemplate());
+    const restore = () => {
+      const template = selectedTemplate();
+      if (template) listTrigger.current = template.id;
+      setSelected(template);
+    };
     const frame = window.requestAnimationFrame(restore);
     window.addEventListener("popstate", restore);
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("popstate", restore); };
   }, []);
-  useEffect(() => { if (selected) heading.current?.focus({ preventScroll: true }); }, [selected]);
+  useEffect(() => {
+    if (selected) heading.current?.focus({ preventScroll: true });
+    else if (listTrigger.current) document.getElementById(`template-${listTrigger.current}`)?.focus({ preventScroll: true });
+  }, [selected]);
   function select(template: AppTemplate | null) {
     setSelected(template);
     const url = new URL(window.location.href);
@@ -53,20 +61,19 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       listTrigger.current = template.id;
       url.searchParams.set("template", template.id);
     } else url.searchParams.delete("template");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    if (!template) window.requestAnimationFrame(() => document.getElementById(`template-${listTrigger.current}`)?.focus());
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
   if (selected) return <div className={styles.library}>
-    <Button variant="ghost" onClick={() => select(null)}><ArrowLeft size={16} aria-hidden="true" />All apps &amp; templates</Button>
+    <Button variant="ghost" onClick={() => select(null)}><ArrowLeft size={16} aria-hidden="true" />All templates</Button>
     <header className={styles.heading}><p>{props.businessName} · Private app</p><h2 ref={heading} tabIndex={-1}>{selected.name}</h2><p>{selected.description}</p></header>
     <TemplateSession key={`${props.actorEmail}:${props.workspaceId}:${selected.id}`} {...props} template={selected} />
   </div>;
   const normalized = query.trim().toLocaleLowerCase();
   const visible = APP_TEMPLATES.filter(template => (category === "All" || template.category === category) && `${template.name} ${template.description}`.toLocaleLowerCase().includes(normalized));
   return <section className={styles.library} aria-labelledby="template-library-title">
-    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Make it yours.</h1><p>Start with a working app. Adjust the fields, try it, then save a private copy to your business.</p></header>
+    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Make it yours.</h1><p>Start with a working tool. Adjust the fields, try it, then save a private copy to your business.</p></header>
     <div className={styles.filterbar}>
-      <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search app templates</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find an app template…" /></label>
+      <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search templates</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a template…" /></label>
       <div className={styles.categories} aria-label="Template categories">{categories.map(item => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>
     </div>
     <p className={styles.resultCount} role="status">{visible.length} {visible.length === 1 ? "template" : "templates"}</p>
@@ -76,12 +83,12 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       <div className={styles.fieldPreview} aria-hidden="true">{template.fields.slice(0, 3).map(field => <span key={field.id}>{field.label}<i /></span>)}</div>
       <span className={styles.open}>Preview &amp; customize<ArrowRight size={16} aria-hidden="true" /></span>
     </button>)}</div>
-    {!visible.length ? <div className={styles.empty}><h2>No matching templates</h2><p>Try another search, or describe the app you need.</p><Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button></div> : null}
-    <div className={styles.custom}><div><h2>Need a different starting point?</h2><p>Describe the work. Review a proposed app before anything is created.</p></div><Button variant="secondary" disabled={!props.canCreate} onClick={() => props.onRequest("Create a private application for our business.")}>Describe an app<ArrowRight size={16} aria-hidden="true" /></Button></div>
+    {!visible.length ? <div className={styles.empty}><h2>No matching templates</h2><p>Try another search, or describe the tool you need.</p><Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button></div> : null}
+    <div className={styles.custom}><div><h2>Need a different starting point?</h2><p>Describe the work. Review a proposed tool before anything is created.</p></div><Button variant="secondary" disabled={!props.canCreate} onClick={() => props.onRequest("Create a private application for our business.")}>Describe a tool<ArrowRight size={16} aria-hidden="true" /></Button></div>
   </section>;
 }
 
-function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onCreated, template }: WorkspaceTemplateLibraryProps & { template: AppTemplate }) {
+function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onCreated, onRequest, template }: WorkspaceTemplateLibraryProps & { template: AppTemplate }) {
   const transport = useWorkspaceRequest();
   const [draft, setDraft] = useState<ApplicationDraftSpec>(() => templateDraft(template));
   const [ready, setReady] = useState(false);
@@ -91,6 +98,9 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [checkedSavedWork, setCheckedSavedWork] = useState(false);
   const [error, setError] = useState("");
+  // Only Strelva or a delegated agency makes tools (make_systems). Everyone
+  // else gets "Ask Strelva to build this" and can file the tool as a Request.
+  const [askStrelva, setAskStrelva] = useState(false);
   const mutation = useRef(false);
   const mounted = useRef(true);
   const storageKey = `strelva:template-draft:v1:${encodeURIComponent(actorEmail.toLowerCase())}:${workspaceId}:${template.id}`;
@@ -117,7 +127,7 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   }
   function edit(spec: ApplicationDraftSpec) {
     setDraft(spec); setError("");
-    if (!remember(spec, "editing")) setError("Your changes are available in this tab, but browser storage is unavailable. Allow session storage before saving the app.");
+    if (!remember(spec, "editing")) setError("Your changes are available in this tab, but browser storage is unavailable. Allow session storage before saving it.");
   }
   const invalid = validateApplicationDraft(draft);
   const workHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=work`;
@@ -148,26 +158,31 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
       if (!response.ok) {
         // This existing create endpoint has no idempotency contract. Never blindly retry an ambiguous write.
         if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) { setState("editing"); remember(draft, "editing"); }
-        const detail = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "The app could not be confirmed.";
+        const detail = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "The tool could not be confirmed.";
+        if (response.status === 403 && body && typeof body === "object" && "code" in body && body.code === "make_systems_required") {
+          setAskStrelva(true);
+          return;
+        }
         throw new Error(detail);
       }
       const result = savedApplicationSchema.safeParse(body);
-      if (!result.success || result.data.workspaceId !== workspaceId) throw new Error("The app returned an unconfirmed result.");
+      if (!result.success || result.data.workspaceId !== workspaceId) throw new Error("The tool returned an unconfirmed result.");
       remember(draft, "created", result.data.id); setWorkId(result.data.id); setState("created");
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The app could not be confirmed. Check saved work before creating another copy."); }
+    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The tool could not be confirmed. Check saved work before creating another copy."); }
     finally { mutation.current = false; if (mounted.current) setBusy(false); }
   }
   if (!ready) return <p role="status">Opening your template…</p>;
   return <>
     <div className={styles.mobileViews} role="group" aria-label="Template view"><Button type="button" variant={mobileView === "edit" ? "secondary" : "ghost"} aria-pressed={mobileView === "edit"} onClick={() => setMobileView("edit")}>Edit fields</Button><Button type="button" variant={mobileView === "preview" ? "secondary" : "ghost"} aria-pressed={mobileView === "preview"} onClick={() => setMobileView("preview")}>Try preview</Button></div>
-    <div className={styles.editorGrid} data-mobile-view={mobileView}><div className={styles.editor}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /></div><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this app.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
+    <div className={styles.editorGrid} data-mobile-view={mobileView}><div className={styles.editor}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /></div><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this tool.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
     <div className={styles.savebar}>
-      <div><strong>{state === "created" ? "Your private app is ready." : `Save to ${businessName}`}</strong><p>{state === "created" ? "Open it to check, publish, and choose who can use it." : "Starts with no records. Nothing is published or shared."}</p></div>
-      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open app<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open app<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" disabled={!canCreate} onClick={startAnother}>Start another app</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private app</Button>}
+      <div><strong>{state === "created" ? "Your private tool is ready." : `Save to ${businessName}`}</strong><p>{state === "created" ? "Open it to check, publish, and choose who can use it." : "Starts with no records. Nothing is published or shared."}</p></div>
+      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open it<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open it<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" disabled={!canCreate} onClick={startAnother}>Start another</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private tool</Button>}
     </div>
-    {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this app. The preview is still available.</p> : null}
+    {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this tool. The preview is still available.</p> : null}
     {invalid && state === "editing" ? <p role="status" className={styles.notice}>Check the proposed fields: {invalid}</p> : null}
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
-    {state === "unconfirmed" && !busy ? <div role="status" className={styles.notice}><strong>Check whether the app was saved.</strong><p>Your draft is retained. This attempt is not automatically repeated because it could create another app.</p><a href={workHref} target="_blank" rel="noreferrer">Open saved work in another tab</a><label className="mt-4 flex min-h-11 items-center gap-3"><input type="checkbox" checked={checkedSavedWork} onChange={event => setCheckedSavedWork(event.target.checked)} />I checked saved work and need another attempt.</label><p>A new attempt may create another copy if the first save completed.</p><Button type="button" variant="secondary" disabled={!canCreate || !checkedSavedWork} onClick={() => { if (!checkedSavedWork || !canCreate) return; remember(draft, "editing"); setState("editing"); setError(""); setCheckedSavedWork(false); }}>Allow a new attempt</Button></div> : null}
+    {askStrelva ? <div role="status" className={styles.notice}><strong>Ask Strelva to build this.</strong><p>Strelva builds and changes tools for your business. Send this one as a request and it shows up in Requests with its stage.</p><Button type="button" variant="secondary" onClick={() => onRequest(`Build this tool for us: ${draft.title}. Fields: ${draft.fields.map(field => field.label).join(", ")}.`)}>Ask Strelva to build this<ArrowRight size={16} aria-hidden="true" /></Button></div> : null}
+    {state === "unconfirmed" && !busy ? <div role="status" className={styles.notice}><strong>Check whether it was saved.</strong><p>Your draft is retained. This attempt is not automatically repeated because it could create another copy.</p><a href={workHref} target="_blank" rel="noreferrer">Open saved work in another tab</a><label className="mt-4 flex min-h-11 items-center gap-3"><input type="checkbox" checked={checkedSavedWork} onChange={event => setCheckedSavedWork(event.target.checked)} />I checked saved work and need another attempt.</label><p>A new attempt may create another copy if the first save completed.</p><Button type="button" variant="secondary" disabled={!canCreate || !checkedSavedWork} onClick={() => { if (!checkedSavedWork || !canCreate) return; remember(draft, "editing"); setState("editing"); setError(""); setCheckedSavedWork(false); }}>Allow a new attempt</Button></div> : null}
   </>;
 }

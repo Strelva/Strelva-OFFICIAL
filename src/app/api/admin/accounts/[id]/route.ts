@@ -1,5 +1,6 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import {
@@ -19,10 +20,11 @@ import {
  *   { unlinkTenant: "<tenantId>" }  -> detach a site
  * DELETE removes the account (its sites become standalone again). Audit-logged.
  */
-async function guard(id: string) {
+async function guard(id: string, auditRead = false) {
   if (!(await isSuperAdmin())) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
+  if (auditRead) await authorizeAdminOperatorRead("admin.accounts.read");
   const account = await getAccount(id);
   if (!account) {
     return { error: NextResponse.json({ error: "Account not found" }, { status: 404 }) };
@@ -32,7 +34,7 @@ async function guard(id: string) {
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const g = await guard(id);
+  const g = await guard(id, true);
   if (g.error) return g.error;
   return NextResponse.json({ account: g.account });
 }

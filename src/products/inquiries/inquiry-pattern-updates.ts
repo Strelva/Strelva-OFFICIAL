@@ -21,6 +21,7 @@ import {
   time,
 } from "./inquiry-engine-operations";
 import { formatDuration, planFor } from "./inquiry-engine-support";
+import { collectChangedPaths } from "@/platform/system-versions/compare";
 
 /**
  * The pattern projection is deliberately smaller than a capability
@@ -405,25 +406,17 @@ function shapeValue(shape: InquiryPatternShape, path: string): JsonValue | null 
 function objectLike(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+// Version is carried separately as the source pin. A version bump is the
+// reason to build a proposal, not a field to merge into the definition.
+const PATTERN_IGNORED_PATHS: ReadonlySet<string> = new Set(["version"]);
+
+/**
+ * Field and option lists are merged as one reusable shape value; the shared
+ * System Version comparator treats arrays as whole values, so a list both
+ * sides changed becomes one explicit conflict.
+ */
 function changedPaths(before: unknown, after: unknown, path: string, output: string[]): void {
-  if (equal(before, after)) return;
-  // Field and option lists are merged as one reusable shape value. Treating
-  // an array index as a writable object path would either reject an added
-  // field or leave a removed field behind, so the whole list becomes an
-  // explicit conflict when both sides changed it.
-  if (Array.isArray(before) || Array.isArray(after)) {
-    output.push(path);
-    return;
-  }
-  // Version is carried separately as the source pin. A version bump is the
-  // reason to build a proposal, not a field to merge into the definition.
-  if (path === "version") return;
-  if (objectLike(before) && objectLike(after)) {
-    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-    for (const key of keys) changedPaths(before[key], after[key], path ? `${path}.${key}` : key, output);
-    return;
-  }
-  output.push(path);
+  collectChangedPaths(before, after, path, output, PATTERN_IGNORED_PATHS);
 }
 
 function applyShapeToDefinition(
@@ -881,7 +874,6 @@ function shapeForPatternUpdate(
 
 /** Stage a resolved definition as ordinary inquiry work and a normal receipt. */
 export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternUpdateInput): StagePatternUpdateResult {
-  const actorId = actor(input.actorId);
   assertResolvedPatternUpdate(input.proposal, input.resolution);
   if (input.proposal.sourceVersion <= input.proposal.baseSourceVersion || input.proposal.status === "up_to_date") {
     throw new Error("Only a newer pattern version can be staged.");
@@ -893,18 +885,25 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
   if (!installation.pendingUpdate || installation.pendingUpdate.proposalId !== input.proposal.id || installation.pendingUpdate.sourceVersion !== input.proposal.sourceVersion || installation.pendingUpdate.targetVersion !== input.proposal.targetVersion) {
     throw new Error("This pattern update is stale. Refresh the installation before staging it.");
   }
-  const target = clone(input.resolution.definition);
+  return stagePatternDefinition(host,{definition:input.resolution.definition,capabilityId:input.proposal.capabilityId,baseTargetVersion:input.proposal.baseTargetVersion,actorId:input.actorId,now:input.now});
+}
+
+/** Stages a complete destination-owned shape atomically so form and record
+ * fields remain equal. Source installation pins are untouched by local work. */
+export function stagePatternDefinition(host:InquiryEngineHost,input:{definition:InquiryCapabilityDefinition;capabilityId:string;baseTargetVersion:number;actorId:string;now?:string}):StagePatternUpdateResult {
+  const actorId=actor(input.actorId);
+  const target = clone(input.definition);
   ensureDefinition(target, host.businessId);
-  if (target.id !== input.proposal.capabilityId || target.version !== input.proposal.targetVersion) {
+  if (target.id !== input.capabilityId || target.version !== input.baseTargetVersion + 1) {
     throw new Error("The staged pattern definition does not match the proposed capability version.");
   }
-  const capability = host._capability(input.proposal.capabilityId);
+  const capability = host._capability(input.capabilityId);
   const currentWork = capability.activeRequestId ? host._request(capability.activeRequestId) : null;
   if (currentWork && ["publishing", "live_unverified"].includes(currentWork.state)) {
     throw new Error("Reconcile the current live boundary before staging a pattern update.");
   }
-  const currentDefinition = currentWork?.draft ?? capability.live ?? input.proposal.currentDefinition;
-  if (!currentDefinition || currentDefinition.version !== input.proposal.baseTargetVersion) {
+  const currentDefinition = currentWork?.draft ?? capability.live ?? input.definition;
+  if (!currentDefinition || currentDefinition.version !== input.baseTargetVersion) {
     throw new Error("This pattern update is stale. Refresh the current draft before staging it.");
   }
   const now = time(host, input.now);
@@ -915,7 +914,7 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
       const next: InquiryWork = {
         id: requestId,
         businessId: host.businessId,
-        capabilityId: input.proposal.capabilityId,
+        capabilityId: input.capabilityId,
         actorId,
         intent: `Update ${currentDefinition.name}`,
         shape: shapeForPatternUpdate(target, requestId, actorId, now),
@@ -978,9 +977,9 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
     responsibilityId: null,
     actor: { kind: "person", id: actorId },
     action: "stage_pattern_update",
-    what: `Staged inquiry pattern update version ${target.version}.`,
-    why: "A source update is staged as ordinary inquiry work after explicit conflict choices; local edits remain visible in the receipt.",
-    lookedAt: ["source pattern version", "local edits", `version ${target.version}`],
+    what: `Staged this business's inquiry draft version ${target.version}.`,
+    why: "Reusable shape and local choices are staged as ordinary inquiry work; publication still requires exact rehearsal and owner approval.",
+    lookedAt: ["current destination draft", "local edits", `version ${target.version}`],
     outcome: "recorded",
     evidence: ["explicit local/source conflict choices", "requires a new exact-version rehearsal"],
     createdAt: now,

@@ -2,13 +2,16 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
+import { privateSourceNativeReceipt, runPrivateSourceNativeProof, runPrivateSourceInverseDriftProof, runPrivateSourcePopulatedInverseProof } from "./support/private-source-native-proof";
+import { observeBrowserRead } from "./support/observed-browser-read";
+import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and database.");
-test.setTimeout(120_000);
-
-async function post(request: APIRequestContext, body: unknown, expectedStatus = 200) {
-  const response = await request.post("/api/bounded-work", { headers: { origin: localEnvironment().app }, data: body });
-  expect(response.status(), await response.text()).toBe(expectedStatus);
+test.setTimeout(180_000);
+async function post(request: APIRequestContext, path: string, body: unknown, status = 200) {
+  const response = await request.post(path, { headers: { origin: localEnvironment().app }, data: body });
+  expect(response.status(), await response.text()).toBe(status);
   return response.json();
 }
 async function read(request: APIRequestContext, workId: string) {
@@ -17,70 +20,323 @@ async function read(request: APIRequestContext, workId: string) {
   return response.json();
 }
 async function command(request: APIRequestContext, workId: string, input: unknown) {
-  return post(request, { action: "command", productId: "applications", workId, command: input });
-}
-async function publish(request: APIRequestContext, workId: string) {
-  let app = await read(request, workId);
-  app = await command(request, workId, { kind: "rehearse", expectedDesignRevision: app.payload.designRevision });
-  return command(request, workId, { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: app.payload.release?.version ?? null });
+  return post(request, "/api/bounded-work", { action: "command", productId: "applications", workId, command: input });
 }
 
-test("independently owned businesses install and update definitions without copying customer records", async ({ browser }) => {
+test("independently owned businesses install and update definitions without copying customer records", async ({ browser }, info) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const builder = await signedInContext(browser, admin, "reuse-builder");
   const customer = await signedInContext(browser, admin, "reuse-customer");
+  let reviewer: Awaited<ReturnType<typeof configuredPackageReviewer>> | undefined;
   try {
-    for (const person of [builder, customer]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    const sourceSpace = randomUUID();
-    const customerSpace = randomUUID();
-    const spaces = await admin.from("workspaces").insert([
-      { id: sourceSpace, kind: "customer", name: "Source repair business", created_by: builder.userId },
-      { id: customerSpace, kind: "customer", name: "Harbor repair business", created_by: customer.userId },
-    ]);
-    expect(spaces.error).toBeNull();
-    const memberships = await admin.from("workspace_memberships").insert([
-      { workspace_id: sourceSpace, user_id: builder.userId, role: "owner", created_by: builder.userId },
-      { workspace_id: customerSpace, user_id: customer.userId, role: "owner", created_by: customer.userId },
-      { workspace_id: customerSpace, user_id: builder.userId, role: "admin", created_by: customer.userId },
-    ]);
-    expect(memberships.error).toBeNull();
-    let source = await post(builder.context.request, { action: "create", productId: "applications", workspaceId: sourceSpace, input: {
-      title: "Repair requests", fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
-      components: [{ kind: "form", fields: ["problem"] }, { kind: "list", fields: ["problem"] }],
-    } }, 201);
-    source = await publish(builder.context.request, source.id);
-    source = await command(builder.context.request, source.id, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "source-private", values: { problem: "Private source business record" } } });
-    let installed = await post(builder.context.request, { action: "from_source", productId: "applications", workspaceId: customerSpace, sourceWorkId: source.id }, 201);
+    const customerSpace = await ordinaryCustomerBusiness(customer, "Harbor repair business");
+    const sourceSpace = await ordinaryCustomerBusiness(builder, "Source repair business");
+    const maker = await ordinaryAgencyMaker(browser, admin, customer, customerSpace, builder);
+    const created = await post(builder.context.request, "/api/workspace/version-sources", { action: "create", workspaceId: maker.agencyId,
+      name: "Repair requests reusable definition", commandId: randomUUID() },201);
+    const source = created.source;
+    let definition = { kind: "internal_app", title: "Repair requests",
+      fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
+      components: [{ kind: "form", fields: ["problem"] }, { kind: "list", fields: ["problem"] }] };
+    let expectedRevision=0;
+    async function publishSource() {
+      const revision = await post(builder.context.request, "/api/workspace/version-sources", { action: "publish", workspaceId: maker.agencyId,
+        systemId: source.systemId, commandId: randomUUID(), expectedRevision, definition, summary: "Reviewed reusable repair definition" },201);
+      expectedRevision=revision.source.number;
+      const checks = await post(builder.context.request, "/api/workspace/packages", { action: "qualify", workspaceId: maker.agencyId, revisionId: revision.source.revisionId });
+      if(!reviewer){
+        await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId:customerSpace,shared:true});
+        await post(customer.context.request,"/api/workspace/version-sources",{action:"install",workspaceId:customerSpace,source:revision.source,name:"Pending-review installation",commandId:randomUUID()},400);
+        await post(builder.context.request,"/api/workspace/packages",{action:"review",workspaceId:maker.agencyId,revisionId:revision.source.revisionId,approve:true,note:"Ordinary agency is not a platform reviewer."},403);
+        const refusedWorks=await admin.from("saved_product_work").select("id").eq("workspace_id",customerSpace).eq("product_id","applications");
+        expect(refusedWorks.error).toBeNull();expect(refusedWorks.data).toEqual([]);
+        reviewer=await configuredPackageReviewer(browser,admin);
+      }
+      const reviewed = await post(reviewer.context.request, "/api/workspace/packages", { action: "review", workspaceId: maker.agencyId, revisionId: revision.source.revisionId,
+        approve: true, note: "Checked repair definition and actual isolated native rehearsal under the configured local review policy." });
+      expect(checks.revisionId).toBe(revision.source.revisionId);
+      expect(checks.evidence.every((item:{status:string})=>item.status==="passed")).toBe(true);
+      expect(reviewed.status).toBe("qualified");
+      expect(reviewed.humanReview.state).toBe("approved");
+      expect(reviewed.humanReview.reviewerId).toBe(reviewer.userId);
+      await info.attach(`private-source-revision-${revision.source.number}-local-review`,{contentType:"application/json",body:Buffer.from(JSON.stringify({
+        localFictionalPolicy:true,productionQualification:false,source:revision.source,definition:revision.definition,checks,review:reviewed,
+        reviewer:{userId:reviewer.userId,policyVersion:reviewer.policyVersion}},null,2))});
+      return revision;
+    }
+    const first = await publishSource();
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1")await info.attach("private-source-only-populated-inverse",
+      {contentType:"application/json",body:Buffer.from(runPrivateSourcePopulatedInverseProof("source-only"))});
+
+    for(const businessId of [sourceSpace,customerSpace])await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId,shared:true});
+    await post(builder.context.request,"/api/workspace/version-sources",{action:"install",workspaceId:customerSpace,
+      source:first.source,name:"Maker without exact owner grant",commandId:randomUUID()},403);
+    await post(builder.context.request,"/api/workspace/versions/manage",{action:"create",agencyWorkspaceId:maker.agencyId,
+      workspaceId:customerSpace,source:first.source,context:{kind:"agency_client",label:"Generic route missing private grant"},
+      name:"Generic route missing private grant",commandId:randomUUID()},403);
+    const noGrantWorks=await admin.from("saved_product_work").select("id").eq("workspace_id",customerSpace).eq("product_id","applications");
+    expect(noGrantWorks.error).toBeNull();expect(noGrantWorks.data).toEqual([]);
+    // Optional root-owned native window, inside this same real Auth identity.
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1"){
+      for(const mode of ["withdrawal","expiry"] as const){
+        const raceCommandId=randomUUID();
+        const raceGrant=await post(customer.context.request,"/api/workspace/version-sources",{action:"grant_install",workspaceId:customerSpace,
+          agencyWorkspaceId:maker.agencyId,revisionId:first.source.revisionId,commandId:raceCommandId,
+          expiresAt:new Date(Date.now()+(mode==="expiry"?20_000:3_600_000)).toISOString()});
+        const path=await privateSourceNativeReceipt(admin,{source:first.source,sourceUserId:builder.userId,sourceEmail:builder.email,
+          businessId:customerSpace,makerUserId:builder.userId,makerEmail:builder.email,grantId:raceGrant.grantId,
+          commandId:raceCommandId,name:"Native race repair definition",mode});
+        const proof=runPrivateSourceNativeProof(path,mode);
+        await info.attach(`private-source-${mode}-native-proof`,{contentType:"application/x-ndjson",body:Buffer.from(proof)});
+        // Withdrawal race ends with share withdrawn; restore through real HTTP authority.
+        await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,
+          systemId:source.systemId,businessId:customerSpace,shared:true});
+      }
+      await info.attach("private-source-inverse-drift-native-proof",{contentType:"application/x-ndjson",body:Buffer.from(runPrivateSourceInverseDriftProof())});
+    }
+    async function install(request: APIRequestContext, workspaceId: string) {
+      const installed = await post(request, "/api/workspace/version-sources", { action: "install", workspaceId, source: first.source,
+        name: "Repair requests", commandId: randomUUID() }, 201);
+      const person = workspaceId === sourceSpace ? builder : customer;
+      const native = await admin.rpc("read_version_native_runtime", { p_workspace_id: workspaceId, p_user_id: person.userId,
+        p_verified_email: person.email, p_version_id: installed.versionId });
+      expect(native.error).toBeNull();
+      expect(native.data.kind).toBe("internal_app");
+      return { ...installed, workId: native.data.workId as string };
+    }
+    const approvedDecisions=new Map<string,{id:string;revisionHash:string}>();
+    async function releaseVersion(request:APIRequestContext,version:{workspaceId:string;systemId:string;versionId:string;workId:string}){
+      const response=await request.get(`/api/workspace/versions?workspaceId=${version.workspaceId}&systemId=${version.systemId}`);
+      expect(response.status(),await response.text()).toBe(200);
+      const current=await response.json();
+      const prepared=await post(request,"/api/workspace/versions/manage",{action:"prepare_release",workspaceId:version.workspaceId,systemId:version.systemId,versionId:version.versionId,rowRevision:current.rowRevision});
+      expect(prepared.outcome).toBe("prepared");
+      const needs=await request.get(`/api/workspace/needs-you?workspaceId=${version.workspaceId}`);
+      expect(needs.status(),await needs.text()).toBe(200);
+      const item=(await needs.json()).items.find((item:{id:string})=>item.id===prepared.receipt.decisionId);
+      expect(item).toBeTruthy();
+      approvedDecisions.set(version.versionId,{id:item.id,revisionHash:item.revisionHash});
+      const done=await post(request,"/api/workspace/needs-you",{workspaceId:version.workspaceId,itemId:item.id,revision:item.revisionHash,decision:"approve"});
+      expect(done.status).toBe("done");
+      return read(request,version.workId);
+    }
+    const sourceInstall = await install(builder.context.request, sourceSpace);
+    let sourceApp = await releaseVersion(builder.context.request, sourceInstall);
+    sourceApp = await command(builder.context.request, sourceApp.id, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "source-private", values: { problem: "Private source business record" } } });
+    const commandId=randomUUID();
+    const grant=await post(customer.context.request,"/api/workspace/version-sources",{action:"grant_install",workspaceId:customerSpace,agencyWorkspaceId:maker.agencyId,revisionId:first.source.revisionId,commandId,expiresAt:new Date(Date.now()+3_600_000).toISOString()});
+    const installedVersion=await post(builder.context.request,"/api/workspace/version-sources",{action:"install",workspaceId:customerSpace,source:first.source,name:"Harbor repairs",commandId},201);
+    const nativeTarget=await admin.rpc("read_version_native_runtime",{p_workspace_id:customerSpace,p_user_id:customer.userId,p_verified_email:customer.email,p_version_id:installedVersion.versionId});
+    expect(nativeTarget.error).toBeNull();
+    const target={...installedVersion,workId:nativeTarget.data.workId as string};
+    expect(grant.commandId).toBe(commandId);
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1")await info.attach("private-marked-grant-populated-inverse",
+      {contentType:"application/json",body:Buffer.from(runPrivateSourcePopulatedInverseProof("marked-grant"))});
+
+    let installed = await read(customer.context.request, target.workId);
     expect(installed.workspaceId).toBe(customerSpace);
     expect(installed.payload.records).toEqual([]);
-    expect(installed.payload.installation).toMatchObject({ sourceWorkId: source.id, sourceVersion: 1 });
     expect(JSON.stringify(installed)).not.toContain("Private source business record");
-    expect((await customer.context.request.get(`/api/bounded-work?productId=applications&workId=${source.id}`)).status()).toBe(403);
-    installed = await publish(customer.context.request, installed.id);
-    installed = await command(customer.context.request, installed.id, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "customer-record", values: { problem: "Customer business record" } } });
-    installed = await command(customer.context.request, installed.id, { kind: "revise", expectedDesignRevision: installed.payload.designRevision, spec: { ...installed.payload.spec, title: "Harbor repairs" } });
-    source = await command(builder.context.request, source.id, { kind: "revise", expectedDesignRevision: source.payload.designRevision, spec: { ...source.payload.spec, fields: [{ ...source.payload.spec.fields[0], label: "Repair detail" }] } });
-    source = await publish(builder.context.request, source.id);
-    installed = await command(builder.context.request, installed.id, { kind: "adopt_update", expectedRevision: installed.payload.revision, sourceVersion: source.payload.release.version });
-    expect(installed.payload.spec.title).toBe("Harbor repairs");
-    expect(installed.payload.spec.fields[0].label).toBe("Repair detail");
+    expect((await customer.context.request.get(`/api/bounded-work?productId=applications&workId=${sourceApp.id}`)).status()).toBe(403);
+    // Real provider-created, never-released target: exact draft controls only.
+    const makerPage = await builder.context.newPage();
+    await makerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`);
+    await expect(makerPage.getByRole("tab", { name: "Edit", exact: true })).toBeVisible();
+    const makerApplication = makerPage.getByRole("tab", { name: "Edit", exact: true }).locator("xpath=ancestor::section[1]");
+    await expect(makerApplication.getByText("Edit proposed app", { exact: true })).toBeVisible();
+    await expect(makerApplication.getByRole("button", { name: "Check proposed change", exact: true })).toBeVisible();
+    await expect(makerApplication.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    await expect(makerApplication.getByRole("tab", { name: "Sharing", exact: true })).toHaveCount(0);
+    installed = await releaseVersion(customer.context.request, target);
+    installed = await command(customer.context.request, target.workId, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "customer-record", values: { problem: "Customer business record" } } });
+    // Customer manages its Version; this does not grant general app authoring.
+    const versionPath = `/api/workspace/versions?workspaceId=${customerSpace}&systemId=${target.systemId}`;
+    async function view() {
+      const response = await customer.context.request.get(versionPath);
+      expect(response.status(), await response.text()).toBe(200);
+      return response.json();
+    }
+    let current = await view();
+    await post(builder.context.request,"/api/workspace/versions/manage",{action:"override",workspaceId:customerSpace,systemId:target.systemId,versionId:target.versionId,rowRevision:current.rowRevision,path:"title",value:"Agency draft label"});
+    current=await view();
+    expect(current.workingDefinition.title).toBe("Agency draft label");
+    expect((await read(customer.context.request,target.workId)).payload.release.spec.title).toBe("Repair requests");
+    await post(customer.context.request, "/api/workspace/versions/manage", { action: "override", workspaceId: customerSpace,
+      systemId: target.systemId, versionId: target.versionId, rowRevision: current.rowRevision, path: "title", value: "Harbor repairs" });
+    definition = { ...definition, fields: [{ id: "problem", label: "Repair detail", type: "text", required: true }] };
+    const second = await publishSource();
+    current = await view();
+    const providerPrepared=await post(builder.context.request, "/api/workspace/versions", { action: "adopt", workspaceId: customerSpace,
+      systemId: target.systemId, versionId: target.versionId, rowRevision: current.rowRevision, revision: second.source.number });
+    expect(providerPrepared.outcome).toBe("prepared");
+    expect(providerPrepared.receipt).toBeTruthy();
+    expect(providerPrepared.receipt.workspaceId).toBe(customerSpace);
+    expect(providerPrepared.receipt.versionId).toBe(target.versionId);
+    const pendingNeeds=await customer.context.request.get("/api/workspace/needs-you?workspaceId="+customerSpace);
+    expect(pendingNeeds.status(),await pendingNeeds.text()).toBe(200);
+    const pendingB=(await pendingNeeds.json()).items.find((item:{id:string})=>item.id===providerPrepared.receipt.decisionId);
+    expect(pendingB.sourceLifecycle).toBe("version_release");expect(pendingB.sourceId).toBe(target.versionId);
+    const oldA=approvedDecisions.get(target.versionId)!;
+    expect(pendingB.id).not.toBe(oldA.id);
+    expect(pendingB.revisionHash).not.toBe(oldA.revisionHash);
+    const beforeOldDecision=await read(customer.context.request,target.workId);
+    const replayA=await customer.context.request.post("/api/workspace/needs-you",{headers:{origin:localEnvironment().app},
+      data:{workspaceId:customerSpace,itemId:oldA.id,revision:oldA.revisionHash,decision:"approve"}});
+    expect([200,409]).toContain(replayA.status());
+    const replayResult=await replayA.json();
+    expect(["done","already_handled"]).toContain(replayResult.status);
+    expect(await read(customer.context.request,target.workId)).toEqual(beforeOldDecision);
+    await info.attach("maker-prepared-B-owner-release-boundary",{contentType:"application/json",body:Buffer.from(JSON.stringify({
+      sameWorkId:target.workId,sourceRevision:second.source.number,providerPrepared,
+      pendingOwnerDecision:{id:pendingB.id,revisionHash:pendingB.revisionHash},
+      previousADecision:oldA,oldDecisionReplayStatus:replayResult.status,runtimeUnchangedBeforeOwnerBApproval:true,
+      productionQualification:false},null,2))});
+    current=await view();
+    expect(current.workingDefinition.title).toBe("Harbor repairs");
+    expect(current.workingDefinition.fields[0].label).toBe("Repair detail");
+    installed = await read(customer.context.request, target.workId);
     expect(installed.payload.release.version).toBe(1);
+    expect(installed.payload.release.spec.fields[0].label).toBe("Problem");
     expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
-    installed = await publish(customer.context.request, installed.id);
-    expect(installed.payload.release.version).toBe(2);
-    expect(installed.payload.records).toHaveLength(1);
     expect(JSON.stringify(installed)).not.toContain("Private source business record");
+    // Review the pending native Version B before its single owner approval.
+    // The application keeps A live until that exact Version decision releases B.
+    const ownerPage = await customer.context.newPage();
+    async function readOwnerSystem() {
+      const isOwnerWorkUrl = (value: string) => {
+        const url = new URL(value);
+        return url.origin === new URL(env.app).origin
+          && url.pathname === "/api/bounded-work"
+          && url.searchParams.get("productId") === "applications"
+          && url.searchParams.get("workId") === target.workId;
+      };
+      // The retained failure dispatched the exact read after workspace hydration,
+      // then ended with both Strict Mode requests pending. Bound arrival and the
+      // actual response separately; keep the original 180-second whole-job cap.
+      const observed = observeBrowserRead(ownerPage, request => request.method() === "GET" && isOwnerWorkUrl(request.url()), { arrivalMs: 10_000, responseMs: 10_000 });
+      // The Version sidebar reads independently of the application. The retained
+      // failure had this exact read pending after the application returned 200.
+      const versionObserved = observeBrowserRead(ownerPage, request => {
+        const url = new URL(request.url());
+        return request.method() === "GET" && url.origin === new URL(env.app).origin
+          && url.pathname === "/api/workspace/versions"
+          && url.searchParams.get("workspaceId") === customerSpace
+          && url.searchParams.get("systemId") === target.systemId;
+      }, { arrivalMs: 10_000, responseMs: 10_000 });
+      let actualRead: Awaited<typeof observed.promise>;
+      let actualVersionRead: Awaited<typeof versionObserved.promise>;
+      try {
+        [actualRead, actualVersionRead] = await Promise.all([
+          observed.promise,
+          versionObserved.promise,
+          ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
+        ]);
+      } finally { observed.cancel(); versionObserved.cancel(); }
+      const ownerWork = actualRead.response;
+      const ownerVersion = actualVersionRead.response;
+      expect(ownerVersion.request()).toBe(actualVersionRead.request);
+      expect(ownerVersion.status(), "The owner's exact Version browser read must succeed before comparing its prepared alternative.").toBe(200);
+      const versionView = await ownerVersion.json();
+      expect(versionView).toMatchObject({ workspaceId: customerSpace, systemId: target.systemId, versionId: target.versionId });
+      expect(ownerWork.request()).toBe(actualRead.request);
+      expect(ownerWork.status(), "The owner's exact application browser read must succeed before checking its controls.").toBe(200);
+      await info.attach(`owner-system-read-${randomUUID()}`, { contentType: "application/json", body: Buffer.from(JSON.stringify({
+        exactWorkId: target.workId, status: ownerWork.status(), requestArrivalMs: actualRead.arrivalMs,
+        responseAfterArrivalMs: actualRead.responseMs,
+        exactVersionRead: { versionId: versionView.versionId, workspaceId: versionView.workspaceId, systemId: versionView.systemId,
+          rowRevision: versionView.rowRevision, status: ownerVersion.status(), requestArrivalMs: actualVersionRead.arrivalMs,
+          responseAfterArrivalMs: actualVersionRead.responseMs }, originalCaseBudgetMs: 180_000,
+        productionQualification: false,
+      })) });
+      return { work: await ownerWork.json(), version: versionView };
+    }
+    const { work: ownerBeforeB, version: ownerVersionBeforeB } = await readOwnerSystem();
+    expect(ownerVersionBeforeB).toMatchObject({ rowRevision: current.rowRevision, pendingRelease: {
+      rowRevision: current.rowRevision, decisionRevision: pendingB.revisionHash,
+      makeReal: { kind: "version_release", versionId: target.versionId },
+    } });
+    expect(ownerBeforeB.payload.release).toEqual(installed.payload.release);
+    expect(ownerBeforeB.payload.records).toEqual(installed.payload.records);
+    const pendingVersion = ownerPage.getByLabel("Version possibilities", { exact: true });
+    await expect(pendingVersion.getByText("Compare the release and alternative", { exact: true })).toBeVisible();
+    await pendingVersion.getByText("Compare the release and alternative", { exact: true }).click({ timeout: 5_000 });
+    await expect(pendingVersion.getByLabel("Current release preview", { exact: true })).toContainText("Repair requests");
+    await expect(pendingVersion.getByLabel("Current release preview", { exact: true })).toContainText("Problem");
+    await expect(pendingVersion.getByLabel("Prepared alternative preview", { exact: true })).toContainText("Harbor repairs");
+    await expect(pendingVersion.getByLabel("Prepared alternative preview", { exact: true })).toContainText("Repair detail");
+    await expect(pendingVersion.getByRole("button", { name: "Make real", exact: true })).toBeEnabled();
+    expect(await read(customer.context.request, target.workId)).toEqual(installed);
+    const [ownerBResponse] = await Promise.all([
+      ownerPage.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === "POST"
+          && url.origin === new URL(env.app).origin
+          && url.pathname === "/api/workspace/needs-you";
+      }, { timeout: 5_000 }),
+      pendingVersion.getByRole("button", { name: "Make real", exact: true }).click({ timeout: 5_000 }),
+    ]);
+    expect(ownerBResponse.request().postDataJSON()).toEqual({ workspaceId: customerSpace,
+      itemId: pendingB.id, revision: pendingB.revisionHash, decision: "approve" });
+    expect(ownerBResponse.status(), await ownerBResponse.text()).toBe(200);
+    const ownerBDecision = await ownerBResponse.json();
+    expect(ownerBDecision.status).toBe("done");
+    expect(ownerBDecision.item).toMatchObject({ id: pendingB.id, revisionHash: pendingB.revisionHash,
+      workspaceId: customerSpace, systemId: target.systemId, sourceLifecycle: "version_release",
+      sourceId: target.versionId, state: "approved", outcome: "done" });
+    expect(ownerBDecision.item.receiptRef).toMatch(new RegExp(`^version_release:${target.versionId}:`));
+    approvedDecisions.set(target.versionId, { id: pendingB.id, revisionHash: pendingB.revisionHash });
+    installed = await read(customer.context.request, target.workId);
+    expect(installed.payload.release.version).toBe(2);
+    expect(installed.payload.release.spec.title).toBe("Harbor repairs");
+    expect(installed.payload.release.spec.fields[0].label).toBe("Repair detail");
+    expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
+    expect(installed.payload.candidate.spec).toEqual(installed.payload.release.spec);
+    // A live B has no pending application change to approve a second time.
+    const { work: ownerAfterB, version: ownerVersionAfterB } = await readOwnerSystem();
+    expect(ownerVersionAfterB.pendingRelease).toBeNull();
+    expect(ownerAfterB.payload.release).toEqual(installed.payload.release);
+    expect(ownerAfterB.payload.records).toEqual(installed.payload.records);
+    await expect(ownerPage.getByText("Release 2 is what people use now.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("tab", { name: "Review", exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("tab", { name: "Sharing", exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
+    await ownerPage.getByRole("tab", { name: "Review", exact: true }).click();
+    const ownerApplication = ownerPage.getByRole("tab", { name: "Review", exact: true }).locator("xpath=ancestor::section[1]");
+    await expect(ownerApplication.getByText("Review changes", { exact: true })).toHaveCount(0);
+    await expect(ownerApplication.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    await expect(ownerApplication.getByText("Edit proposed app", { exact: true })).toHaveCount(0);
+    await expect(ownerApplication.getByRole("button", { name: /^(Check proposed change|Run checks again|Check source release)$/ })).toHaveCount(0);
+    await expect(ownerApplication.getByText("Source design and updates", { exact: true })).toHaveCount(0);
+    await ownerApplication.getByText("Restore a release from History", { exact: true }).click();
+    await expect(ownerApplication.getByRole("button", { name: "Restore release from History", exact: true })).toBeVisible();
+    await expect(ownerApplication.getByRole("button", { name: "Restore release from History", exact: true })).toBeDisabled();
+    // Publication ends implicit creator access; native Version authority remains separate.
+    await makerPage.reload();
+    await expect(makerPage.getByText("Working definition and local changes", { exact: true })).toBeVisible();
+    await expect(makerPage.getByRole("tablist", { name: "Application workspace", exact: true })).toHaveCount(0);
+    await expect(makerPage.getByRole("tab", { name: /^(Edit|Review|Sharing)$/ })).toHaveCount(0);
+    await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=applications`);
+    await expect(ownerPage.getByText("Ask your agency to create or copy an internal tool.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("form", { name: "Application setup", exact: true })).toHaveCount(0);
+    await expect(ownerPage.getByText("Start from an existing app", { exact: true })).toHaveCount(0);
 
-    source = await command(builder.context.request, source.id, { kind: "revise", expectedDesignRevision: source.payload.designRevision, spec: { ...source.payload.spec, title: "Source changed its name" } });
-    source = await publish(builder.context.request, source.id);
-    await post(builder.context.request, { action: "command", productId: "applications", workId: installed.id, command: { kind: "adopt_update", expectedRevision: installed.payload.revision, sourceVersion: source.payload.release.version } }, 409);
-    const unchanged = await read(customer.context.request, installed.id);
-    expect(unchanged.payload.release.version).toBe(2);
-    expect(unchanged.payload.spec.title).toBe("Harbor repairs");
-    expect(unchanged.payload.records).toHaveLength(1);
-  } finally {
-    await builder.context.close();
-    await customer.context.close();
-  }
+    definition = { ...definition, title: "Source changed its name" };
+    const third = await publishSource();
+    current = await view();
+    const before = await read(customer.context.request, target.workId);
+    await post(customer.context.request, "/api/workspace/versions", { action: "adopt", workspaceId: customerSpace,
+      systemId: target.systemId, versionId: target.versionId, rowRevision: current.rowRevision, revision: third.source.number }, 409);
+    expect(await read(customer.context.request, target.workId)).toEqual(before);
+    // Explicit source withdrawal is current authority, not a cached grant.
+    await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId:customerSpace,shared:false});
+    await post(customer.context.request, "/api/workspace/version-sources", { action: "install", workspaceId: customerSpace,
+      source: third.source, name: "Withdrawn package", commandId: randomUUID() }, 403);
+    await post(builder.context.request,"/api/workspace/versions/manage",{action:"override",workspaceId:customerSpace,
+      systemId:target.systemId,versionId:target.versionId,rowRevision:current.rowRevision,path:"title",value:"Withdrawn maker write"},403);
+    expect(await read(customer.context.request, target.workId)).toEqual(before);
+    expect((await builder.context.request.get(`/api/bounded-work?productId=applications&workId=${target.workId}`)).status()).toBe(403);
+  } finally { await reviewer?.context.close(); await builder.context.close(); await customer.context.close(); }
 });

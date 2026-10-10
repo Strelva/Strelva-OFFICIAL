@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, CircleAlert, ExternalLink, Globe, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput, SelectInput } from "@/components/ui/TextInput";
 import { createWebsiteRequestId } from "./contracts";
-import { serverRebuildTransport, parseRebuildView, type RebuildTransport, type RebuildView } from "./rebuild-transport";
+import { serverRebuildTransport, RebuildUnconfirmedError, RebuildTransportError, parseRebuildView, type RebuildTransport, type RebuildView } from "./rebuild-transport";
+import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import { WebsiteConnectionSelector } from "./WebsiteConnections";
 import { WebsiteRebuildReport } from "./WebsiteRebuildReport";
 import { WebsiteRebuildSharing } from "./WebsiteRebuildSharing";
+import { normalizeWebsiteRebuildUrl, type WebsiteCutoverUndoReceipt } from "@/products/websites/client";
+import { WebsiteCutoverUndo, WebsiteDomainRequest } from "./WebsiteRecoveryControls";
+import { SITES_PATH_ORIGIN } from "@/platform/infra/brand";
+import { WebsiteArchivedVersions } from "./WebsiteArchivedVersions";
+import { useWebsiteAttempt } from "./website-attempt";
 import styles from "./rebuild-experience.module.css";
 
 export interface RebuildExperienceProps {
@@ -16,22 +22,141 @@ export interface RebuildExperienceProps {
   workId?: string;
   readOnly?: boolean;
   managed?: boolean;
+  /** Intake supplies business facts; it never grants editing or publication authority. */
+  allowIntake?: boolean;
   operator?: boolean;
+  /** Current business owner; the publication endpoint still checks exact authority. */
+  canPublish?: boolean;
   agency?: boolean;
   initialRequest?: string;
   initialRecord?: RebuildView;
   transport?: RebuildTransport;
   onSaved?: (workId: string) => void;
+  /** Current accepted view, including reads; reporting does not navigate or grant authority. */
+  onCurrentRecord?: (record: RebuildView) => void;
+  /** Known work revision for this exact entry; candidate revisions are independent. */
+  minimumRecordRevision?: number;
 }
 export function flaggedFacts(record: RebuildView) {
   return Object.entries(record.candidate?.facts ?? {}).filter(([, fact]) => fact.origin !== "owner_confirmed" && (fact.highRisk || !fact.verification?.supported));
 }
-export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, operator = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
+const skippedReason = {
+  robots: "The site's robots.txt blocks reading this page.",
+  external: "This page belongs to another website.",
+  limit: "This page is beyond the rebuild's page, size or time limit.",
+  unreachable: "This page could not be opened.",
+  javascript_only: "This page needs a browser to read.",
+  not_html: "This address is a file rather than a website page.",
+};
+function WebsiteFactEditor({ text, origin, disabled, onSave, onRemove }: {
+  text: string; origin: string; disabled: boolean; onSave(text: string): Promise<boolean>; onRemove?: () => Promise<boolean>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(text);
+  const [focusAttempt, setFocusAttempt] = useState(0);
+  const editRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  const articleRef = useRef<HTMLElement>(null);
+  const pendingFocus = useRef<FocusRecovery | null>(null);
+  const focusSettled = useRef(false);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const wasEditing = useRef(false);
+  const lastFocusAttempt = useRef(0);
+  useEffect(() => () => pendingFocus.current?.cancel(), []);
+  useEffect(() => {
+    if (disabled) return;
+    if (pendingFocus.current) {
+      if (!focusSettled.current) return;
+      pendingFocus.current.recover(editing ? inputRef.current : (wasEditing.current ? editRef.current : removeRef.current), true);
+      pendingFocus.current = null;
+    } else if (editing && (!wasEditing.current || focusAttempt !== lastFocusAttempt.current)) inputRef.current?.focus();
+    else if (!editing && wasEditing.current) editRef.current?.focus();
+    wasEditing.current = editing;
+    lastFocusAttempt.current = focusAttempt;
+  }, [disabled, editing, focusAttempt]);
+  const removeButton = onRemove ? <Button ref={removeRef} type="button" size="sm" variant="danger" disabled={disabled} onClick={async () => {
+    if (disabled) return;
+    pendingFocus.current?.cancel();
+    pendingFocus.current = beginFocusRecovery(articleRef.current);
+    focusSettled.current = false;
+    const removed = await onRemove();
+    focusSettled.current = true;
+    if (!removed) setFocusAttempt(value => value + 1);
+  }}>Remove contact</Button> : null;
+  return <article ref={articleRef} className={styles.fact} aria-label={text}>
+    <p className={styles.tag}>{origin === "owner_confirmed" ? "Confirmed in review" : origin === "owner_stated" ? "Provided by the business" : "From the website source"}</p>
+    {editing ? <form onSubmit={async event => {
+      event.preventDefault();
+      if (disabled || !draft.trim() || draft.trim() === text) return;
+      pendingFocus.current?.cancel();
+      pendingFocus.current = beginFocusRecovery(articleRef.current);
+      focusSettled.current = false;
+      const saved = await onSave(draft.trim());
+      focusSettled.current = true;
+      if (saved) setEditing(false);
+      setFocusAttempt(value => value + 1);
+    }}>
+      <TextArea ref={inputRef} label="Corrected fact" value={draft} onChange={event => setDraft(event.target.value)} maxLength={500} required disabled={disabled} helperText="Saving creates a new private preview. Review and approve it before publishing." />
+      <div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !draft.trim() || draft.trim() === text}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setEditing(false)}>Cancel</Button>{removeButton}</div>
+    </form> : <><p className={styles.factText}>{text}</p><Button ref={editRef} type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => { setDraft(text); setEditing(true); }}>Edit fact</Button>{removeButton}</>}
+  </article>;
+}
+export function RebuildExperience(props: RebuildExperienceProps) {
+  return <ScopedRebuildExperience key={`${props.workspaceId}:${props.workId ?? props.initialRecord?.workId ?? "new"}`} {...props} />;
+}
+function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved, onCurrentRecord, minimumRecordRevision }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
+  const acceptedRecord = useRef(initialRecord ?? null);
+  const guardedCurrentRecords = minimumRecordRevision !== undefined;
+  const knownMinimum = useRef(minimumRecordRevision ?? -1);
+  useEffect(() => { knownMinimum.current = Math.max(knownMinimum.current, minimumRecordRevision ?? -1); }, [minimumRecordRevision]);
+  const setCurrentRecord = useCallback((next: RebuildView, mutation = false) => {
+    const expectedWorkId = workId ?? acceptedRecord.current?.workId;
+    const minimum = Math.max(knownMinimum.current, acceptedRecord.current?.revision ?? -1);
+    if (next.workspaceId !== workspaceId || (expectedWorkId && next.workId !== expectedWorkId) || next.revision < minimum) {
+      if (mutation) throw new RebuildUnconfirmedError("The current saved website could not be confirmed.");
+      throw new Error("The current saved website could not be confirmed. Reload again to check it.");
+    }
+    acceptedRecord.current = next;
+    setRecord(next);
+  }, [workspaceId, workId]);
+
+  const connectionOwner = useRef({ workspaceId, workId: record?.workId });
+  connectionOwner.current = { workspaceId, workId: record?.workId };
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const websiteAttempt = useWebsiteAttempt<Parameters<RebuildTransport["start"]>[0]>(`${readOnly}:${canPublish}:${operator}:${allowIntake}:${managed}`);
+  const { busy, setBusy, inFlight, unresolved, mounted, needsReload, command: creationAttempt } = websiteAttempt;
+  const intakeUrlRef = useRef<HTMLInputElement | null>(null);
+  const [cutoverBlocked, setCutoverBlocked] = useState(false);
+  const cutoverBlockedRef = useRef(false);
+  const [domainRequestBlocked, setDomainRequestBlocked] = useState(false);
+  const domainRequestBlockedRef = useRef(false);
+  const [domainRequestRetained, setDomainRequestRetained] = useState(false);
+  const cutoverRestored = useRef<WebsiteCutoverUndoReceipt | null>(null);
+  const [restoredReceipt, setRestoredReceipt] = useState<WebsiteCutoverUndoReceipt | null>(null);
+  type ErrorSource = "action" | "progress-read" | "domain-read";
+  const [errorState, setErrorState] = useState<{ message: string; source: ErrorSource }>({ message: "", source: "action" });
+  const error = errorState.message;
+  const setError = useCallback((message: string) => setErrorState({ message, source: "action" }), []);
+  const reportPollError = useCallback((source: ErrorSource, message: string) => {
+    if (!guardedCurrentRecords) { setError(message); return; }
+    setErrorState(current => current.message && current.source !== source ? current : { message, source });
+  }, [guardedCurrentRecords, setError]);
+  const clearPollError = useCallback((source: ErrorSource) => {
+    setErrorState(current => current.source === source ? { message: "", source: "action" } : current);
+  }, []);
+  const [connectionReadRevision, setConnectionReadRevision] = useState(0);
+  const requireReload = (value: boolean) => {
+    websiteAttempt.requireReload(value);
+    if (value) { decisionFocus.current?.cancel(); decisionFocus.current = null; removedContactFocus.current?.cancel(); removedContactFocus.current = null; }
+  };
+  const recoveryRootRef = useRef<HTMLElement>(null);
+  const reloadRef = useRef<HTMLButtonElement>(null);
+  const reloadFocus = useRef<FocusRecovery | null>(null);
+  const connectionAttemptRevision = useRef<number | null>(null);
+
   const [notice, setNotice] = useState("");
+  const [allowAgencyPublish, setAllowAgencyPublish] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [descriptionMode, setDescriptionMode] = useState(Boolean(initialRequest));
   const [url, setUrl] = useState("");
@@ -45,28 +170,41 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const [previewFailed, setPreviewFailed] = useState(false);
   const [previewAttempt, setPreviewAttempt] = useState(0);
   const previewRef = useRef<HTMLIFrameElement>(null);
-  const requestId = useRef(createWebsiteRequestId());
-  const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const factsSummaryRef = useRef<HTMLElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const removedContactFocus = useRef<FocusRecovery | null>(null);
+  const connectionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const connectionFocus = useRef<FocusRecovery | null>(null);
+  const decisionFocus = useRef<FocusRecovery | null>(null);
+  const decisionsRef = useRef<HTMLElement>(null);
+  const flaggedInputRef = useRef<HTMLTextAreaElement>(null);
+  const flaggedEditButtons = useRef(new Map<string, HTMLButtonElement>());
+  const lastFlaggedEditing = useRef<string | null>(null);
+  const cancelledFlaggedEdit = useRef<string | null>(null);
+  const decisionEditRecovery = useRef(false);
+  useEffect(() => () => { connectionFocus.current?.cancel(); decisionFocus.current?.cancel(); removedContactFocus.current?.cancel(); reloadFocus.current?.cancel(); }, []);
+  useEffect(() => {
+    if (record && record.workspaceId === workspaceId && (!workId || record.workId === workId)) onCurrentRecord?.(record);
+  }, [record, workspaceId, workId, onCurrentRecord]);
   useEffect(() => {
     if (!workId || initialRecord) return;
     const controller = new AbortController();
     setLoading(true);
-    transport.read(workspaceId, workId, controller.signal).then(next => { if (!controller.signal.aborted) { setRecord(next); setError(""); } }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "This website could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    transport.read(workspaceId, workId, controller.signal).then(next => { if (!controller.signal.aborted) { setCurrentRecord(next); setError(""); } }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "This website could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [attempt, initialRecord, transport, workId, workspaceId]);
+  }, [attempt, initialRecord, transport, workId, workspaceId, setCurrentRecord, setError]);
   useEffect(() => {
     if (!record || record.status !== "building") return;
     const controller = new AbortController();
-    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) setRecord(next); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Progress could not be refreshed."); }); }, 2500);
+    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) { if (!inFlight.current && !unresolved.current) setCurrentRecord(next); if (guardedCurrentRecords) clearPollError("progress-read"); } }).catch(cause => { if (!controller.signal.aborted) reportPollError("progress-read", cause instanceof Error ? cause.message : "Progress could not be refreshed."); }); }, 2500);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [record, transport, workspaceId]);
+  }, [record, transport, workspaceId, setCurrentRecord, guardedCurrentRecords, clearPollError, reportPollError, inFlight, unresolved]);
   useEffect(() => {
     if (!record || !record.publishedUrl || !record.domain || record.domain.status === "verified") return;
     const controller = new AbortController();
-    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) setRecord(next); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Domain status could not be refreshed."); }); }, 60000);
+    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) { if (!inFlight.current && !unresolved.current) setCurrentRecord(next); if (guardedCurrentRecords) clearPollError("domain-read"); } }).catch(cause => { if (!controller.signal.aborted) reportPollError("domain-read", cause instanceof Error ? cause.message : "Domain status could not be refreshed."); }); }, 60000);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [record, transport, workspaceId]);
+  }, [record, transport, workspaceId, setCurrentRecord, guardedCurrentRecords, clearPollError, reportPollError, inFlight, unresolved]);
   useEffect(() => {
     const renderedHash = previewRef.current?.contentDocument?.querySelector('meta[name="strelva-site-hash"]')?.getAttribute("content");
     const loaded = Boolean(renderedHash);
@@ -78,42 +216,143 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
     const timer = setTimeout(() => setPreviewFailed(true), 15000);
     return () => clearTimeout(timer);
   }, [record?.candidate, previewLoaded, previewAttempt]);
-  async function run(operation: () => Promise<RebuildView>, success: string) {
-    if (busy || readOnly) return;
-    setBusy(true); setError(""); setNotice("");
-    try { const next = await operation(); if (mounted.current) { setRecord(next); setNotice(success); setEditing(null); onSaved?.(next.workId); } }
-    catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved."); }
-    finally { if (mounted.current) setBusy(false); }
+  async function run(operation: () => Promise<RebuildView>, success: string, publishes = false, submitted?: Parameters<RebuildTransport["start"]>[0], checkCreation = false) {
+    const ticket = websiteAttempt.begin(!cutoverBlockedRef.current && !domainRequestBlockedRef.current && !readOnly && !loading, checkCreation, submitted);
+    if (!ticket) return false;
+    const recovery = beginFocusRecovery(recoveryRootRef.current);
+    setError(""); setNotice("");
+    try {
+      const next = await operation();
+      if (websiteAttempt.current(ticket)) {
+        setCurrentRecord(next, true); websiteAttempt.accept(ticket); creationAttempt.current = null; if (checkCreation) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } else recovery.cancel(); if (publishes && next.status === "published") { cutoverRestored.current = null; setRestoredReceipt(null); } setNotice(success); setEditing(null); onCurrentRecord?.(next); onSaved?.(next.workId); return true; }
+      if (mounted.current) { requireReload(true); setError("Access changed while saving. Reload the current saved state before continuing."); reloadFocus.current?.cancel(); reloadFocus.current = recovery; }
+      else recovery.cancel();
+      return false;
+    }
+    catch (cause) {
+      if (mounted.current) {
+        const creationRefused = submitted && cause instanceof RebuildTransportError && cause.status === 401 && websiteAttempt.refuse(ticket);
+        if ((!record && !creationRefused) || cause instanceof RebuildUnconfirmedError || !websiteAttempt.current(ticket)) { requireReload(true); reloadFocus.current?.cancel(); reloadFocus.current = recovery; }
+        else recovery.cancel();
+        setError(!record && !creationRefused ? `${websiteAttempt.current(ticket) ? "" : "Your access changed. "}Your website request could not be confirmed. Check this same request before starting another.` : cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved.");
+      } else recovery.cancel();
+      return false;
+    }
+    finally { websiteAttempt.finish(); }
+  }
+  async function startWebsite(check = false) {
+    if (!check) {
+      if (inFlight.current || unresolved.current || readOnly || loading || cutoverBlockedRef.current || domainRequestBlockedRef.current) return;
+      if (!descriptionMode) {
+        try { normalizeWebsiteRebuildUrl(url); }
+        catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Enter a valid public website address.");
+          intakeUrlRef.current?.focus();
+          return;
+        }
+      }
+    }
+    const submitted = check ? creationAttempt.current : { workspaceId, requestId: createWebsiteRequestId(), ...(descriptionMode ? { businessName: businessName.trim(), description: description.trim() } : { url: url.trim() }) };
+    if (!submitted) return;
+    await run(() => transport.start(structuredClone(submitted)), "Website work saved. Follow its progress below.", false, submitted, check);
+  }
+  async function reloadCurrentState() {
+    if (!record || loading) return;
+    const work = { workspaceId: record.workspaceId, workId: record.workId };
+    if (work.workspaceId !== workspaceId || (workId && work.workId !== workId)) return;
+    const ticket = websiteAttempt.begin(true, true);
+    if (!ticket) return;
+    reloadFocus.current?.cancel();
+    reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
+    setNotice("");
+    try {
+      const next = await transport.read(work.workspaceId, work.workId);
+      if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed. Reload again to check it.");
+      if (websiteAttempt.current(ticket)) { setCurrentRecord(next); setConnectionReadRevision(value => value + 1); websiteAttempt.accept(ticket); if (cutoverRestored.current) { cutoverBlockedRef.current = false; setCutoverBlocked(false); } setError(""); setEditing(null); setNotice(domainRequestBlockedRef.current ? "The saved website was refreshed. The domain request still needs its exact saved request checked." : cutoverBlockedRef.current ? "The saved website was refreshed. The routing undo still needs its exact command receipt." : cutoverRestored.current ? "Saved preview and history refreshed. The previous website remains restored." : "Saved state refreshed. Review the current preview before continuing."); }
+    } catch {
+      if (websiteAttempt.current(ticket)) setError("The current saved website could not be loaded. Reload again to check what was saved.");
+    } finally {
+      websiteAttempt.finish();
+      if (!websiteAttempt.current(ticket)) { reloadFocus.current?.cancel(); reloadFocus.current = null; }
+    }
+  }
+  useEffect(() => {
+    if (busy) return;
+    connectionFocus.current?.recover(connectionHeadingRef.current);
+    connectionFocus.current = null;
+    decisionFocus.current?.recover(decisionEditRecovery.current && editing ? flaggedInputRef.current : reviewHeadingRef.current, decisionEditRecovery.current);
+    decisionFocus.current = null;
+    decisionEditRecovery.current = false;
+    if (removedContactFocus.current) {
+      removedContactFocus.current.recover(factsSummaryRef.current ?? reviewHeadingRef.current);
+      removedContactFocus.current = null;
+    }
+    reloadFocus.current?.recover(needsReload ? reloadRef.current : reviewHeadingRef.current, true);
+    reloadFocus.current = null;
+  }, [record, busy, editing, needsReload]);
+  function resolveDecision(factId: string, action: "confirm" | "remove" | "edit") {
+    if (!record || inFlight.current || cutoverBlockedRef.current || domainRequestBlockedRef.current || busy || readOnly || loading || unresolved.current) return;
+    const recovery = beginFocusRecovery(decisionsRef.current);
+    decisionFocus.current = recovery;
+    decisionEditRecovery.current = action === "edit";
+    void run(() => transport.mutate(record, action, { factId, ...(action === "edit" ? { text: editedText.trim() } : {}) }), action === "confirm" ? "Fact confirmed in a new revision." : action === "remove" ? "Fact removed in a new revision." : "Fact updated in a new revision. Review the changed preview.");
   }
   const decisions = record ? flaggedFacts(record) : [];
+  const decisionIds = new Set(decisions.map(([id]) => id));
+  const ordinaryFacts = Object.entries(record?.candidate?.facts ?? {}).filter(([id]) => !decisionIds.has(id));
   const startReady = descriptionMode ? Boolean(businessName.trim() && description.trim()) : Boolean(url.trim());
-  const disabled = busy || readOnly;
+  const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const canConnectForms = !managed || operator || canPublish;
+  const baseDisabled = !ready || busy || readOnly || loading || needsReload || record?.status === "building";
+  const disabled = baseDisabled || cutoverBlocked || domainRequestBlocked;
+  useEffect(() => {
+    if (cancelledFlaggedEdit.current) {
+      const editButton = flaggedEditButtons.current.get(cancelledFlaggedEdit.current);
+      (editButton && !editButton.disabled ? editButton : reviewHeadingRef.current)?.focus();
+      cancelledFlaggedEdit.current = null;
+    } else {
+      if (disabled) return;
+      if (editing && editing !== lastFlaggedEditing.current) flaggedInputRef.current?.focus();
+    }
+    lastFlaggedEditing.current = editing;
+  }, [editing, disabled]);
+
   const candidate = record?.candidate;
+  const retainedPublicationRestored = Boolean(record?.status === "published" && restoredReceipt && candidate && restoredReceipt.revision === candidate.revision && restoredReceipt.contentHash === candidate.contentHash);
+  const agencyPermission = record?.agencyPublishPermission;
+  const pathHosted = Boolean(SITES_PATH_ORIGIN && record?.publishedUrl?.startsWith(`${SITES_PATH_ORIGIN}/sites/`));
+  useEffect(() => { setAllowAgencyPublish(false); }, [record?.workId, agencyPermission?.agencyWorkspaceId]);
   const previewHref = candidate?.previewHref;
   const safePreview = Boolean(previewHref?.startsWith("/") && !previewHref.startsWith("//"));
   const previousDocuments = record?.documentRevisions.filter(item => item.revision < (candidate?.revision ?? 0)).sort((a, b) => b.revision - a.revision) ?? [];
-  const canCreate = !managed || operator;
-  return <section className={styles.root} aria-label="Website rebuild" aria-busy={busy || loading || undefined}>
+  const canCreate = !managed || operator || allowIntake;
+  return <section ref={recoveryRootRef} className={styles.root} aria-label="Website rebuild" aria-busy={busy || loading || undefined}>
     <header className={styles.header}>
       <p className={styles.eyebrow}>{operator ? "Managed delivery" : "Website"}</p>
-      <h1 className="font-display">{record?.title ?? (managed && !operator ? "Your website, taken care of" : "Your business. A new website.")}</h1>
-      <p>{record ? "Review the preview and the decisions below. Every saved change clears the earlier approval." : managed && !operator ? "Strelva handles setup, testing and delivery. Your preview will appear here when it is ready for your judgment." : "Start with your current website. We read its content, compose a new site and show you what needs your judgment."}</p>
+      <h1 className="font-display">{record?.title ?? (managed && !operator ? "Your website preview" : "Your business. A new website.")}</h1>
+      <p>{record ? "Review the preview and the decisions below. Every saved change clears the earlier approval." : managed && !operator ? allowIntake ? "Share your current website or describe your business to prepare a private preview. Review it before authorizing publication." : "Your preview will appear here when it is ready for your judgment. Delivery requires a separately authorized provider." : "Start with your current website. We read its content, compose a new site and show you what needs your judgment."}</p>
     </header>
     {readOnly ? <p className={styles.notice}><ShieldCheck size={18} aria-hidden="true" />You have read-only access. An owner or authorized operator can make changes.</p> : null}
-    {error ? <div className={styles.error} role="alert"><CircleAlert size={18} aria-hidden="true" /><div>{error}<p>Your inputs and saved work remain available.</p></div></div> : null}
+    {error ? <div className={styles.error} role="alert"><CircleAlert size={18} aria-hidden="true" /><div>{error}<p>Your inputs and saved work remain available.</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" disabled={busy || loading} loading={busy} onClick={() => void reloadCurrentState()}>Reload current state</Button> : needsReload && creationAttempt.current ? <Button ref={reloadRef} type="button" variant="secondary" disabled={busy || readOnly || loading} loading={busy} onClick={() => void startWebsite(true)}>Check this website request</Button> : null}</div></div> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
+    {cutoverBlocked && !restoredReceipt ? <p className={styles.notice} role="status">The routing undo is not yet confirmed. Other website changes are paused until its exact receipt is confirmed.<Button type="button" variant="secondary" disabled={busy || loading} onClick={() => void reloadCurrentState()}>Reload saved preview and history</Button></p> : null}
+    {domainRequestBlocked ? <p className={styles.notice} role="status">The domain request is not yet confirmed. Other website changes are paused until the exact saved request is checked. Domain preparation requires operator access; the check uses your current account access.<Button type="button" variant="secondary" disabled={busy || loading} onClick={() => void reloadCurrentState()}>Reload saved preview and history</Button></p> : null}
+    {restoredReceipt ? <p className={styles.notice} role="status">The previous website was restored for version {restoredReceipt.revision}. The rebuilt preview and history remain saved; their earlier publication receipt does not describe the current routing.</p> : null}
     {loading ? <p className={styles.notice} role="status"><Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" />Opening the saved website…</p>
       : workId && !record ? <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Try loading again</Button>
-      : !record ? canCreate ? <form className={styles.intake} onSubmit={event => { event.preventDefault(); if (startReady) void run(() => transport.start({ workspaceId, requestId: requestId.current, ...(descriptionMode ? { businessName: businessName.trim(), description: description.trim() } : { url: url.trim() }) }), "Website work saved. Follow its progress below."); }}>
-        {descriptionMode ? <><TextInput label="Business name" value={businessName} onChange={event => setBusinessName(event.target.value)} required maxLength={160} disabled={disabled} /><TextArea label="Describe your business" helperText="Tell us what you do and how customers should reach you. These details will be marked as provided by you." value={description} onChange={event => setDescription(event.target.value)} maxLength={4000} required disabled={disabled} /></>
-          : <TextInput label="Your current website" inputMode="url" autoComplete="url" placeholder="https://your-business.com" value={url} onChange={event => setUrl(event.target.value)} required maxLength={2048} disabled={disabled} />}
-        <div className={styles.actions}><Button type="submit" loading={busy} disabled={disabled || !startReady} icon={<Globe size={18} />}>Build a private preview</Button><Button type="button" variant="ghost" disabled={busy} onClick={() => setDescriptionMode(value => !value)}>{descriptionMode ? "Use an existing website" : "No site yet? Describe your business"}</Button></div>
+      : !record ? canCreate ? <form className={styles.intake} onSubmit={event => { event.preventDefault(); if (startReady) void startWebsite(); }}>
+        {descriptionMode ? <><TextInput label="Business name" value={businessName} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setBusinessName(event.target.value); }} required maxLength={160} disabled={disabled} /><TextArea label="Describe your business" helperText="Tell us what you do and how customers should reach you. These details will be marked as provided by you." value={description} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setDescription(event.target.value); }} maxLength={4000} required disabled={disabled} /></>
+          : <TextInput ref={intakeUrlRef} label="Your current website" inputMode="url" autoComplete="url" placeholder="https://your-business.com" value={url} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setUrl(event.target.value); }} required maxLength={2048} disabled={disabled} />}
+        <div className={styles.actions}><Button type="submit" loading={busy} disabled={disabled || !startReady} icon={<Globe size={18} />}>Build a private preview</Button><Button type="button" variant="ghost" disabled={disabled} onClick={() => { if (!inFlight.current && !unresolved.current && !readOnly) setDescriptionMode(value => !value); }}>{descriptionMode ? "Use an existing website" : "No site yet? Describe your business"}</Button></div>
         <p className={styles.meta}>Your preview stays private. Publishing requires an owner&apos;s approval.</p>
-      </form> : <p className={styles.notice}>No website preview is waiting for review. Contact Strelva with your website request.</p>
+      </form> : <p className={styles.notice}>No website preview is waiting for review. Choose an agency with an active provider seat to request website work.</p>
       : <>
+        <WebsiteArchivedVersions record={record} />
+        {record.historyUnavailable || record.domainUnavailable ? <div className={styles.notice} role="status"><p>{record.historyUnavailable ? "Saved History is unavailable here. Your accepted website change remains saved." : "Domain status is unavailable here. Your accepted website change remains saved."}</p><Button type="button" variant="secondary" disabled={busy || loading} onClick={() => void reloadCurrentState()}>{record.historyUnavailable ? "Reload saved History" : "Reload domain status"}</Button></div> : null}
         <ol className={styles.progress} aria-label="Website build progress" aria-live="polite">
           {record.stages.map(stage => <li key={stage.stage} data-status={stage.status}><span className={styles.stageIcon}>{stage.status === "completed" ? <Check size={16} aria-label="Completed" /> : stage.status === "running" ? <Loader2 size={16} className="motion-safe:animate-spin" aria-label="Running" /> : stage.status === "failed" ? <CircleAlert size={16} aria-label="Failed" /> : <span aria-label="Pending">○</span>}</span><div><strong>{stage.stage.replace(/_/g, " ")}</strong><p>{stage.message ?? stage.status}</p></div></li>)}
         </ol>
+        {record.skippedPaths.length ? <section className={styles.domain} aria-labelledby="rebuild-skipped-heading"><h2 id="rebuild-skipped-heading">Pages we could not read</h2><p>These pages are absent from the preview. Add their missing business details, or start a request with your business description instead.</p><ul className="grid gap-3 break-all text-sm">{record.skippedPaths.map((page, index) => <li key={`${page.url}:${page.reason}:${index}`}><strong>{page.url}</strong><p>{skippedReason[page.reason]}</p></li>)}</ul></section> : null}
         {record.status === "failed" ? <div className={styles.error} role="alert"><div><p>{record.error ?? "The last stage needs attention. Earlier stages are saved."}</p><Button variant="secondary" disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "retry"), "Retry requested. Earlier stages are retained.")}>Retry failed stage</Button></div></div> : null}
         {candidate ? <div className={styles.reviewLayout}>
           <section className={styles.preview} aria-label="Private website preview">
@@ -126,31 +365,46 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
               } catch { setPreviewFailed(true); setPreviewLoaded(true); }
             }} onError={() => setPreviewFailed(true)} />{!previewLoaded ? <p className={styles.meta} role="status">Loading the private preview…</p> : null}{previewFailed ? <div className={styles.error} role="alert"><p>The preview has not opened. Your review decisions are saved.</p><Button variant="secondary" onClick={() => setPreviewAttempt(value => value + 1)}>Reload preview</Button></div> : null}</> : <p className={styles.notice}>The preview address is unavailable. Refresh the saved website before approving.</p>}
           </section>
-          <aside className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} decisions need you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
-            {decisions.length === 0 ? <p className={styles.notice}><Check size={18} aria-hidden="true" />All flagged facts have been resolved. Review the full site before approving.</p> : decisions.map(([id, fact]) => <article key={id} className={styles.fact}><p className={styles.tag}>{fact.highRisk ? "Sensitive claim · confirmation required" : "Could not confirm"}</p><p className={styles.factText}>{fact.text}</p><div className={styles.source}><strong>Source</strong>{fact.sources.length ? fact.sources.map((source, index) => <blockquote key={index}>“{source.quote}”<span>{source.sourceId.split("#sha256=")[0]}</span></blockquote>) : <p>No source found.</p>}</div>
-              {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) void run(() => transport.mutate(record, "edit", { factId: id, text: editedText.trim() }), "Fact updated in a new revision. Review the changed preview."); }}><TextArea label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div></form>
-                : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "confirm", { factId: id }), "Fact confirmed in a new revision.")}>Confirm</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "remove", { factId: id }), "Fact removed in a new revision.")}>Remove</Button></div>}
+          <aside ref={decisionsRef} className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 ref={reviewHeadingRef} tabIndex={-1} id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} ${decisions.length === 1 ? "decision needs" : "decisions need"} you` : retainedPublicationRestored ? "Saved preview and publication history" : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
+            {decisions.length === 0 ? <p className={styles.notice}><Check size={18} aria-hidden="true" />{retainedPublicationRestored ? "All flagged facts have been resolved. This saved preview remains available; the previous website is restored." : "All flagged facts have been resolved. Review the full site before approving."}</p> : decisions.map(([id, fact]) => <article key={id} className={styles.fact}><p className={styles.tag}>{fact.highRisk ? "Sensitive claim · confirmation required" : "Could not confirm"}</p><p className={styles.factText}>{fact.text}</p><div className={styles.source}><strong>Source</strong>{fact.sources.length ? fact.sources.map((source, index) => <blockquote key={index}>“{source.quote}”<span>{source.sourceId.split("#sha256=")[0]}</span></blockquote>) : <p>No source found.</p>}</div>
+              {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) resolveDecision(id, "edit"); }}><TextArea ref={flaggedInputRef} label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { if (busy || inFlight.current) return; cancelledFlaggedEdit.current = id; setEditing(null); }}>Cancel</Button></div></form>
+                : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => resolveDecision(id, "confirm")}>Confirm</Button><Button ref={node => { if (node) flaggedEditButtons.current.set(id, node); else flaggedEditButtons.current.delete(id); }} size="sm" variant="ghost" disabled={disabled} onClick={() => { if (disabled || inFlight.current) return; setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => resolveDecision(id, "remove")}>Remove</Button></div>}
             </article>)}
-            {candidate.unmappedPages.length ? <div className={styles.fact}><h3>Old pages not carried over</h3><ul>{candidate.unmappedPages.map(path => <li key={path}>{path}</li>)}</ul><p>Review these pages with Strelva before launch.</p></div> : null}
-            <div className={styles.approval}><p>{record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>
-              {!record.approved && record.status !== "published" ? <Button disabled={disabled || decisions.length > 0 || !safePreview || previewFailed || !previewLoaded || record.status === "building"} loading={busy} onClick={() => void run(() => transport.mutate(record, "approve"), "This exact preview is approved.")}>Approve this preview</Button> : null}
-              {record.approved && record.status !== "published" && (!managed || operator) ? <Button disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "launch"), "Publish result saved. Check its verification below.")}>Publish approved website</Button> : null}
-              {record.approved && managed && !operator && record.status !== "published" ? <p>Strelva will handle launch and your domain.</p> : null}
+            {candidate.unmappedPages.length ? <div className={styles.fact}><h3>Old pages not carried over</h3><ul>{candidate.unmappedPages.map(path => <li key={path}>{path}</li>)}</ul><p>Review these pages before authorizing publication.</p></div> : null}
+            <div className={styles.approval}><p>{needsReload ? "Check the current saved website before reviewing its approval or publication." : retainedPublicationRestored ? "Earlier publication receipt retained. The previous website is restored." : record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>
+              {agencyPermission && !agencyPermission.granted && record.status !== "published" ? <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={allowAgencyPublish} disabled={disabled} onChange={event => setAllowAgencyPublish(event.target.checked)} /><span>Allow {agencyPermission.agencyName} to publish this website after I approve each change.<span className="mt-1 block text-gray-muted">Each new preview still needs your approval. This does not authorize domain changes.</span></span></label> : null}
+              {agencyPermission?.granted ? <p>{agencyPermission.agencyName} can publish this website after you approve each exact preview.</p> : null}
+              {(!record.approved || (allowAgencyPublish && agencyPermission && !agencyPermission.granted)) && record.status !== "published" ? <Button disabled={disabled || decisions.length > 0 || !safePreview || previewFailed || !previewLoaded || record.status === "building"} loading={busy} onClick={() => void run(() => transport.mutate(record, "approve", allowAgencyPublish && agencyPermission ? { allowAgencyPublish: true, agencyWorkspaceId: agencyPermission.agencyWorkspaceId } : undefined), allowAgencyPublish && agencyPermission ? `This exact preview is approved. ${agencyPermission.agencyName} may publish this website after your approval of each change.` : "This exact preview is approved.")}>{record.approved ? "Approve preview and allow agency publishing" : "Approve this preview"}</Button> : null}
+              {record.approved && record.status !== "published" && (!managed || operator || canPublish) ? <Button disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "launch"), "Publish result saved. Check its verification below.", true)}>Publish approved website</Button> : null}
+              {!needsReload && record.approved && managed && !operator && !canPublish && record.status !== "published" ? <p>{agencyPermission ? agencyPermission.granted ? `${agencyPermission.agencyName} can publish this approved preview.` : `Authorize ${agencyPermission.agencyName} above if you want them to publish this website.` : "No agency publication authority is shown here. Choose and authorize an agency before requesting delivery. Domain changes require separate permission."}</p> : null}
               <a className={styles.link} href={`/api/websites/${encodeURIComponent(record.workId)}/export?${new URLSearchParams({ workspaceId, revision: String(candidate.revision), contentHash: candidate.contentHash })}`}>Export website and evidence</a>
               {operator ? <a className={styles.link} href={`/workspace?${new URLSearchParams({ workspaceId, view: "websites", work: record.workId })}`}>Owner review link</a> : null}
             </div>
           </aside>
         </div> : <p className={styles.notice} role="status">Your preview will appear here after the saved build stages finish.</p>}
-        {candidate && (!managed || operator) && transport === serverRebuildTransport ? <WebsiteConnectionSelector key={`${record.workId}:${record.revision}`} workspaceId={workspaceId} workId={record.workId} revision={record.revision} selected={record.capabilitySelection} hasForms={candidate.hasForms} hosted disabled={disabled} onBusyChange={setBusy} onSaved={value => { const next = parseRebuildView(value); setRecord(next); setNotice("Visitor forms saved in a new preview. Review and approve it before publishing."); onSaved?.(next.workId); }} /> : null}
+        {candidate && ordinaryFacts.length ? <details className={styles.domain}>
+          <summary ref={factsSummaryRef} className="min-h-11 cursor-pointer py-3 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Edit website facts</summary>
+          <p>Change the wording in this website without changing what is live. Each saved correction needs a new preview approval. Removing a contact changes this private preview and needs approval too.</p>
+          {ordinaryFacts.map(([id, fact]) => <WebsiteFactEditor key={id} text={fact.text} origin={fact.origin} disabled={disabled} onSave={text => run(() => transport.mutate(record, "edit", { factId: id, text }), "Fact updated in a new revision. Review the changed preview before approving.")} onRemove={fact.kind === "contact" ? () => run(async () => {
+            const recovery = beginFocusRecovery(factsSummaryRef.current?.closest("details") ?? null);
+            removedContactFocus.current = recovery;
+            try { return await transport.mutate(record, "remove", { factId: id }); }
+            catch (cause) { recovery.cancel(); removedContactFocus.current = null; throw cause; }
+          },"Contact removed in a new private preview. Review and approve it before publishing.") : undefined} />)}
+        </details> : null}
+        {candidate && (canConnectForms || busy || needsReload) && transport === serverRebuildTransport ? <div hidden={!canConnectForms}><WebsiteConnectionSelector key={`${record.workId}:${record.revision}:${connectionReadRevision}`} headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} workspaceId={workspaceId} workId={record.workId} revision={record.revision} version={2} candidateRevision={candidate.revision} candidateContentHash={candidate.contentHash} selected={record.capabilitySelection} readOnly={readOnly || !canConnectForms} onUnconfirmed={recovery => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} hasForms={candidate.hasForms} hosted canWrite={() => !cutoverBlockedRef.current && !domainRequestBlockedRef.current && !inFlight.current && !unresolved.current} disabled={disabled} onBusyChange={value => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; if (value) connectionAttemptRevision.current = websiteAttempt.permission.current.revision; setBusy(value); }} onSaved={value => { if (!mounted.current || connectionAttemptRevision.current === null || connectionAttemptRevision.current !== websiteAttempt.permission.current.revision) throw new Error("Access changed while saving visitor forms."); const next = parseRebuildView(value); setCurrentRecord(next, true); setNotice("Visitor forms saved in a new preview. Review and approve it before publishing."); onSaved?.(next.workId); }} /></div> : null}
         {record.audit ? <section className={styles.domain} aria-labelledby="rebuild-audit-heading"><h2 id="rebuild-audit-heading">Before and after</h2><p>HTML checks compare the original homepage with the planned rebuilt homepage. Checked {new Date(record.audit.checkedAt).toLocaleString()}.</p><div className={styles.records}><table><caption>HTML scores out of 100 · original → rebuilt</caption><thead><tr><th>Category</th><th>Scores</th><th aria-label="Change">+/−</th></tr></thead><tbody>{record.audit.after.categories.map(after => { const before = record.audit!.before.categories.find(item => item.slug === after.slug); const change = before ? after.score - before.score : null; return <tr key={after.slug}><th scope="row">{after.name}</th><td className="whitespace-nowrap">{before?.score ?? "Unavailable"} → {after.score}</td><td>{change === null ? "Unavailable" : change > 0 ? `+${change}` : change}</td></tr>; })}</tbody></table></div><div className="mt-4 space-y-3">{record.audit.after.categories.map(after => <details key={after.slug}><summary className="cursor-pointer py-2 text-sm text-warm-black">{after.name} · item by item</summary><ul className="mt-3 divide-y divide-gray-border">{after.checks.map((check, index) => { const before = record.audit!.before.categories.find(item => item.slug === after.slug)?.checks.find(item => item.name === check.name); return <li key={`${check.name}:${index}`} className="py-3 text-sm text-gray-muted"><strong className="text-warm-black">{check.name}</strong><p>{before?.status ?? "Not measured"} → {check.status}</p><p>{check.message}</p></li>; })}</ul></details>)}</div><p>These HTML results do not establish a complete live-site audit. Not measured here:</p><ul className="list-disc space-y-2 pl-5 text-sm text-gray-muted">{record.audit.unavailable.map(item => <li key={item}>{item}</li>)}</ul></section> : null}
         {operator && candidate ? <details className={styles.domain}><summary className="cursor-pointer py-2 text-base font-medium text-warm-black">All recorded fact checks</summary><p className={styles.meta}>Recorded confidence describes source support. It does not independently prove a claim.</p><ul className="mt-4 divide-y divide-gray-border">{Object.entries(candidate.facts).map(([id, fact]) => <li key={id} className="py-3 text-sm text-gray-muted"><p className="text-warm-black">{fact.text}</p><p>{fact.origin.replace(/_/g, " ")} · {fact.highRisk ? "Sensitive claim" : "Ordinary fact"} · {fact.verification ? `${fact.verification.supported ? "Source supported" : "Flagged"}, confidence ${fact.verification.confidence.toFixed(2)}` : "No verification recorded"}</p></li>)}</ul></details> : null}
         {record.history.length ? <section className={styles.domain} aria-labelledby="rebuild-history-heading"><h2 id="rebuild-history-heading">Revision history</h2><ol className="mt-4 divide-y divide-gray-border">{record.history.slice().reverse().map((entry, index) => <li key={`${entry.revision}:${entry.kind}:${index}`} className="py-3 text-sm text-gray-muted">Revision {entry.revision} · {entry.kind.replace(/_/g, " ")} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></li>)}</ol></section> : null}
         {agency && candidate && record.status !== "published" ? <WebsiteRebuildSharing workId={record.workId} readOnly={readOnly} /> : null}
         {record.publishedUrl ? <WebsiteRebuildReport key={record.workId} workId={record.workId} fixture={transport !== serverRebuildTransport} /> : null}
-        {record.publishedUrl ? <section className={styles.domain} aria-labelledby="rebuild-domain-heading"><h2 id="rebuild-domain-heading">Your website</h2>{record.publishedUrl ? <a className={styles.link} href={record.publishedUrl} target="_blank" rel="noopener noreferrer">{record.publishedUrl} <ExternalLink size={16} aria-hidden="true" /></a> : null}<p>{record.readBack === "verified" ? "The published document was verified." : record.readBack === "failed" ? "Published, but we could not confirm it yet. Strelva will check it; this does not republish the site." : "Publication recorded. Verification is pending."}</p>
+        {transport === serverRebuildTransport ? <div hidden={operator}><WebsiteCutoverUndo key={`${record.workspaceId}:${record.workId}`} record={record} available={Boolean(!pathHosted || record.domain)} readOnly={readOnly || operator} disabled={baseDisabled || domainRequestBlocked} canSubmit={() => !domainRequestBlockedRef.current && !inFlight.current && !unresolved.current} onBlockedChange={value => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; cutoverBlockedRef.current = value; setCutoverBlocked(value); }} onRestored={receipt => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; cutoverRestored.current = receipt; setRestoredReceipt(receipt); requireReload(true); setError("The previous website is restored. Reload the saved preview and history before making another website change."); }} /></div> : null}
+        {(record.publishedUrl || domainRequestRetained) && transport === serverRebuildTransport ? <section hidden={!operator && !domainRequestRetained} className={styles.domain}><WebsiteDomainRequest key={`${record.workspaceId}:${record.workId}`} workId={record.workId} workspaceId={record.workspaceId} readOnly={readOnly || !operator} canPrepare={() => Boolean(record.publishedUrl) && !cutoverBlockedRef.current && !domainRequestBlockedRef.current && !inFlight.current && !unresolved.current} onBlockedChange={value => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; domainRequestBlockedRef.current = value; setDomainRequestBlocked(value); if (value) setDomainRequestRetained(true); }} disabled={baseDisabled || cutoverBlocked || !record.publishedUrl} /></section> : null}
+        {!needsReload && !cutoverBlocked && !domainRequestBlocked && !restoredReceipt && record.publishedUrl ? <section className={styles.domain} aria-labelledby="rebuild-domain-heading"><h2 id="rebuild-domain-heading">Your website</h2>{record.publishedUrl ? <a className={styles.link} href={record.publishedUrl} target="_blank" rel="noopener noreferrer">{record.publishedUrl} <ExternalLink size={16} aria-hidden="true" /></a> : null}<p>{record.readBack === "verified" ? "The published document was verified." : record.readBack === "failed" ? "Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site." : "Publication recorded. Verification is pending."}</p>
           {record.domain ? <><h3>{record.domain.hostname}</h3><p>Status: {record.domain.status} · Last checked: {record.domain.checkedAt ? new Date(record.domain.checkedAt).toLocaleString() : "Not checked yet"}</p>{record.domain.error ? <div role="alert" className={styles.error}>{record.domain.error}</div> : null}{record.domain.records.length ? <div className={styles.records}><table className={styles.dns}><caption>DNS records returned by the domain provider</caption><thead><tr><th>Type</th><th>Name</th><th>Value</th></tr></thead><tbody>{record.domain.records.map((dns, index) => <tr key={index}><td>{dns.type}</td><td>{dns.name}</td><td>{dns.value}</td></tr>)}</tbody></table></div> : <p>No DNS records have been returned yet.</p>}</> : null}
-          {(!managed || operator) && !readOnly ? <form className={styles.domainForm} onSubmit={event => { event.preventDefault(); if (domain.trim() || record.domain) void run(() => transport.mutate(record, "domain", { domain: domain.trim() || record.domain?.hostname }), "Domain status refreshed."); }}><TextInput label="Your domain" placeholder="your-business.com" value={domain} onChange={event => setDomain(event.target.value)} disabled={busy} /><Button type="submit" variant="secondary" disabled={busy || (!domain.trim() && !record.domain)} loading={busy}>{record.domain ? "Check domain status" : "Connect domain"}</Button></form> : <p>Strelva handles your domain setup and verification.</p>}
-          {(!managed || operator) && !readOnly && previousDocuments.length ? <div className={styles.domainForm}><SelectInput label="Revision to restore" value={undoTarget || String(previousDocuments[0]!.revision)} onChange={event => setUndoTarget(event.target.value)} options={previousDocuments.map(item => ({ value: String(item.revision), label: `Revision ${item.revision} · ${new Date(item.createdAt).toLocaleDateString()}` }))} disabled={busy} /><Button variant="secondary" disabled={busy} onClick={() => void run(() => transport.mutate(record, "undo", { targetRevision: Number(undoTarget || previousDocuments[0]!.revision) }), "The selected document is restored as a new revision. Review and approve it before publishing.")}>Restore for review</Button></div> : null}
+
+          {(!managed || operator) && !readOnly ? <form className={styles.domainForm} onSubmit={event => { event.preventDefault(); if (domain.trim() || record.domain) void run(() => transport.mutate(record, "domain", { domain: domain.trim() || record.domain?.hostname }), "Domain status refreshed."); }}><TextInput label="Your domain" placeholder="your-business.com" value={domain} onChange={event => setDomain(event.target.value)} disabled={disabled} /><Button type="submit" variant="secondary" disabled={disabled || (!domain.trim() && !record.domain)} loading={busy}>{record.domain ? "Check domain status" : "Connect domain"}</Button></form> : <p>{pathHosted && !record.domain ? (agencyPermission ? `This publication uses a hosted address. Ask ${agencyPermission.agencyName} about a custom domain.` : "This publication uses a hosted address. Custom domain setup requires separate authority.") : (agencyPermission ? `Ask ${agencyPermission.agencyName} about domain setup and verification.` : "Domain setup and verification require separate authority.")}</p>}
+          {(!managed || operator) && !readOnly && previousDocuments.length ? <div className={styles.domainForm}><SelectInput label="Revision to restore" value={undoTarget || String(previousDocuments[0]!.revision)} onChange={event => setUndoTarget(event.target.value)} options={previousDocuments.map(item => ({ value: String(item.revision), label: `Revision ${item.revision} · ${new Date(item.createdAt).toLocaleDateString()}` }))} disabled={disabled} /><Button variant="secondary" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "undo", { targetRevision: Number(undoTarget || previousDocuments[0]!.revision) }), "The selected document is restored as a new revision. Review and approve it before publishing.")}>Restore for review</Button></div> : null}
         </section> : null}
       </>}
   </section>;

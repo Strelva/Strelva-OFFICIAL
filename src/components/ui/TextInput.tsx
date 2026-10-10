@@ -2,6 +2,7 @@
 
 import { forwardRef, useId, useRef, useEffect, useCallback, type InputHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { ChevronDown } from "lucide-react";
 
 const BASE =
   "w-full min-h-10 bg-surface-inset border border-gray-border rounded-xl px-4 py-2 text-base sm:text-sm leading-5 text-warm-black placeholder-gray-subtle outline-none transition-colors duration-150 focus:border-accent-text focus-visible:ring-2 focus-visible:ring-accent-text/40 disabled:cursor-not-allowed disabled:opacity-60";
@@ -158,20 +159,24 @@ export const SelectInput = forwardRef<HTMLSelectElement, SelectInputProps>(
             {label}
           </label>
         )}
-        <select
-          ref={ref}
-          id={id}
-          aria-describedby={describedBy || undefined}
-          aria-invalid={error ? true : ariaInvalid}
-          className={cn(BASE, "appearance-none", error && "border-terra focus:border-terra focus-visible:ring-terra/40", className)}
-          {...rest}
-        >
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative grid">
+          <select
+            data-owned-select
+            ref={ref}
+            id={id}
+            aria-describedby={describedBy || undefined}
+            aria-invalid={error ? true : ariaInvalid}
+            className={cn(BASE, "appearance-none pr-[2.1rem]", error && "border-terra focus:border-terra focus-visible:ring-terra/40", className)}
+            {...rest}
+          >
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown aria-hidden="true" className="pointer-events-none absolute right-[0.7rem] top-1/2 size-3.5 -translate-y-1/2 text-gray-muted" />
+        </div>
         {errorId && <FieldMessage id={errorId} error>{error}</FieldMessage>}
         {helperId && <FieldMessage id={helperId}>{helperText}</FieldMessage>}
       </div>

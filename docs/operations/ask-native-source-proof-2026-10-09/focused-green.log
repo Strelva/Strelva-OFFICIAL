@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-creator-maintenance-auth-proof-20261009
+
+(node:22146) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  8 passed (8)
+      Tests  558 passed (558)
+   Start at  11:21:31
+   Duration  5.18s (transform 1.72s, setup 78ms, import 3.97s, tests 240ms, environment 429ms)

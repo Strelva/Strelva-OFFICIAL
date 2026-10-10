@@ -21,7 +21,7 @@
 import { getEvents } from "../src/lib/events";
 import { isGovernedWorkEvent, eventToProposal } from "../src/lib/governed-work/shadow";
 import { getProposal } from "../src/lib/governed-work/repository";
-import { listAllTenants } from "../src/lib/db/repositories";
+import { listAllTenants } from "../src/platform/infra/db/repositories";
 
 type TenantParity = {
   tenant: string;

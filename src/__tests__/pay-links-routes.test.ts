@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import { NextRequest } from "next/server";
 import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
 
@@ -14,7 +15,7 @@ const mockListBuildPayments = vi.hoisted(() => vi.fn());
 const mockIsRateLimitedAsync = vi.hoisted(() => vi.fn());
 const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getCurrentUserEmail: mockGetCurrentUserEmail,
   getActorContext: mockGetActorContext,
@@ -40,7 +41,7 @@ vi.mock("@/lib/pay-links", async () => {
 
 vi.mock("@/lib/revenue", () => ({ listBuildPayments: mockListBuildPayments }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: mockIsRateLimitedAsync,
   rateLimitKey: (_req: unknown, prefix: string) => `key:${prefix}`,
 }));

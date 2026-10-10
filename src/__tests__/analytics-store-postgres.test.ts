@@ -40,7 +40,7 @@ function builder(): unknown {
 }
 
 // Supabase: a configured client whose every table query goes through `builder`.
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   getSupabase: () => ({
     rpc: (name: string, args: unknown) => {

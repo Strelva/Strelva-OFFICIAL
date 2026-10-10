@@ -8,6 +8,7 @@ import type { UnifiedEvent } from "@/lib/types";
 
 const mockGetAllTenants = vi.fn();
 const mockGetEvents = vi.fn();
+const mockGetEventRaw = vi.fn();
 const mockResolveEventAction = vi.fn();
 
 vi.mock("@/lib/tenants", () => ({
@@ -16,10 +17,22 @@ vi.mock("@/lib/tenants", () => ({
 }));
 vi.mock("@/lib/events", () => ({
   getEvents: (...a: unknown[]) => mockGetEvents(...a),
+  getEventRaw: (...a: unknown[]) => mockGetEventRaw(...a),
 }));
 vi.mock("@/lib/event-actions", () => ({
   resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a),
+  operatorActorId: (id: string) => `operator:${id}`,
 }));
+// The real operator decision (src/lib/operator-decisions.ts) runs; only the
+// session, the super_admins read and the audit write are stubbed.
+const mockSuperAdmin = vi.fn();
+const mockSession = vi.fn();
+const mockAudit = vi.fn();
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: () => mockSuperAdmin(), getAuthUserId: vi.fn() }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => mockSession() }));
+vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: vi.fn() }));
+vi.mock("@/lib/storage", () => ({ logAuditEvent: (...a: unknown[]) => mockAudit(...a) }));
+const operator = { userId: "10000000-0000-4000-8000-0000000000aa", verifiedEmail: "operator@example.test", actorId: "operator:10000000-0000-4000-8000-0000000000aa" };
 
 import {
   getPortfolioActions,
@@ -45,6 +58,11 @@ function evt(over: Partial<UnifiedEvent>): UnifiedEvent {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSuperAdmin.mockResolvedValue(true);
+  mockSession.mockResolvedValue({ id: operator.userId, email: operator.verifiedEmail, email_confirmed_at: "2026-10-01T00:00:00.000Z" });
+  mockAudit.mockResolvedValue(undefined);
+  // Each pending draft lives in the tenant its eventId names: "b…" in bolt, else acme.
+  mockGetEventRaw.mockImplementation(async (id: string) => evt({ id, tenantId: id.startsWith("b") ? "bolt" : "acme" }));
 });
 
 describe("isPortfolioApprovable", () => {
@@ -224,11 +242,11 @@ describe("bulkResolvePortfolioActions", () => {
     const results = await bulkResolvePortfolioActions([
       { tenantId: "acme", eventId: "a1" },
       { tenantId: "bolt", eventId: "b1" },
-    ]);
+    ], operator);
 
     expect(mockResolveEventAction).toHaveBeenCalledTimes(2);
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved");
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved");
+    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved", operator.actorId);
+    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved", operator.actorId);
     expect(results.every((r) => r.changed)).toBe(true);
   });
 
@@ -243,7 +261,7 @@ describe("bulkResolvePortfolioActions", () => {
       { tenantId: "acme", eventId: "ok" },
       { tenantId: "acme", eventId: "fail" },
       { tenantId: "acme", eventId: "throws" },
-    ]);
+    ], operator);
 
     expect(results).toEqual([
       { tenantId: "acme", eventId: "ok", changed: true, reason: undefined },
@@ -252,5 +270,52 @@ describe("bulkResolvePortfolioActions", () => {
     ]);
     // A throwing item never aborts the rest of the batch.
     expect(mockResolveEventAction).toHaveBeenCalledTimes(3);
+  });
+
+  it("writes an audit row before and after each approval, naming the operator", async () => {
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "gbp_post_failed" });
+    await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }], operator);
+    const row = (phase: string, extra: Record<string, unknown> = {}) => ({
+      tenant: "acme",
+      actor: { userId: operator.userId, email: operator.verifiedEmail, type: "super_admin", isSuperAdmin: true },
+      action: "portfolio.draft.approve",
+      targetType: "event",
+      targetId: "a1",
+      metadata: { phase, actor: operator.actorId, decision: "approved", eventType: "content_update", eventKind: null, ...extra },
+    });
+    expect(mockAudit).toHaveBeenNthCalledWith(1, row("attempt"));
+    expect(mockAudit).toHaveBeenNthCalledWith(2, row("result", { changed: false, reason: "gbp_post_failed" }));
+    expect(mockAudit.mock.invocationCallOrder[0]!).toBeLessThan(mockResolveEventAction.mock.invocationCallOrder[0]!);
+  });
+
+  it("refuses a draft routed to the owner, and anything this queue can't approve (#516)", async () => {
+    mockGetEventRaw.mockImplementation(async (id: string) => id === "owned"
+      ? evt({ id, tenantId: "acme", metadata: { reviewAudience: "owner", escalatedByOperator: true } })
+      : evt({ id, tenantId: "acme", type: "change_request" }));
+    const results = await bulkResolvePortfolioActions([
+      { tenantId: "acme", eventId: "owned" },
+      { tenantId: "acme", eventId: "request" },
+    ], operator);
+    expect(results.map((r) => r.reason)).toEqual(["owner_decides", "not_operator_decidable"]);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
+  });
+
+  it("refuses an event from another tenant than the one submitted", async () => {
+    const results = await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "b1" }], operator);
+    expect(results[0]).toMatchObject({ changed: false, reason: "wrong_tenant" });
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("approves nothing without an audit row or after the operator is revoked", async () => {
+    mockAudit.mockRejectedValueOnce(new Error("audit down"));
+    mockSuperAdmin.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const results = await bulkResolvePortfolioActions([
+      { tenantId: "acme", eventId: "a1" },
+      { tenantId: "acme", eventId: "a2" },
+      { tenantId: "acme", eventId: "a3" },
+    ], operator);
+    expect(results.map((r) => r.reason)).toEqual(["audit_unavailable", "operator_access_changed", "operator_access_changed"]);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 });

@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import type { ReviewItem } from "@/lib/types";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetReviews = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/reviews", () => ({ getReviews: mockGetReviews }));
 

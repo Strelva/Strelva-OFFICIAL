@@ -16,8 +16,8 @@ const thirdInstallationId = "55555555-5555-4555-8555-555555555555";
 const definition = {
   id: "private_staff_requests",
   version: "1.0.0",
-  name: "Provider workflow",
-  description: "A provider-operated workflow.",
+  name: "Agency workflow",
+  description: "A agency-operated workflow.",
   availability: "local" as const,
   installability: "available" as const,
   installationNote: "",
@@ -100,7 +100,7 @@ afterEach(() => {
   container.remove();
 });
 
-describe("business provider summary", () => {
+describe("business agency summary", () => {
   it("uses one business delivery list and ignores a late response after the business changes", async () => {
     renderSummary(firstBusinessId, [firstInstallationId, secondInstallationId]);
     expect(pending).toHaveLength(1);
@@ -111,21 +111,21 @@ describe("business provider summary", () => {
     expect(pending[1]!.url).toContain(`/api/offerings/provider-delivery?businessId=${secondBusinessId}`);
 
     await act(async () => pending[0]!.resolve(response({ deliveries: [delivery(firstInstallationId, "accepted", "confirmed")] })));
-    expect(container.textContent).not.toContain("Provider accepted");
+    expect(container.textContent).not.toContain("Agency accepted");
 
     await act(async () => pending[1]!.resolve(response({ deliveries: [delivery(thirdInstallationId, "requested", "pending")] })));
-    expect(container.textContent).toContain("Provider requested · waiting for acceptance");
-    expect(container.textContent).toContain("Customer decision: pending");
+    expect(container.textContent).toContain("Agency requested · waiting for acceptance");
+    expect(container.textContent).toContain("Your decision: pending");
     expect(pending).toHaveLength(2);
   });
 
   it("shows unavailable instead of inferring acceptance when the delivery endpoint fails", async () => {
     renderSummary(firstBusinessId, [firstInstallationId]);
     expect(pending).toHaveLength(1);
-    await act(async () => pending[0]!.resolve(response({ error: { message: "Provider list unavailable" } }, 503)));
-    expect(container.textContent).toContain("Provider delivery status is unavailable");
+    await act(async () => pending[0]!.resolve(response({ error: { message: "Agency list unavailable" } }, 503)));
+    expect(container.textContent).toContain("Agency delivery status is unavailable");
     expect(container.textContent).toContain("Acceptance cannot be inferred from the offering record.");
-    expect(container.textContent).not.toContain("Provider accepted");
+    expect(container.textContent).not.toContain("Agency accepted");
   });
 
   it("serves the preview delivery list and records requested, accepted, revoked, and customer decisions", async () => {

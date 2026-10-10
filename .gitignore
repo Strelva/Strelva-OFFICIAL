@@ -43,6 +43,19 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Python local tooling caches
+__pycache__/
+*.py[cod]
+
+# Local release-safety investigation logs and generated catalog captures
+/.scratch/release-safety/
+/output/release-safety/
+/output/security-runtime-*/
+/.scratch/temp-cluster-cleanup/*.log
+/.scratch/temp-cluster-cleanup/*.json
+# Stream command logs written at the worktree root
+/.scratch-*.log
+
 # content
 /public/uploads/
 .claude/sessions/
@@ -68,6 +81,7 @@ next-env.d.ts
 !docs/design/references/strelva-layered-wash-2026-09-17.png
 !docs/design/references/strelva-watercolor-blur-material-2026-09-17.png
 .validation-artifacts/
+/.scratch/launch-completion/
 blueprint-*.md
 full-page-snapshot.md
 PRODUCT.md

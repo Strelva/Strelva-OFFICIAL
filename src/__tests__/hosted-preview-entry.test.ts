@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-vi.mock("@/lib/db/server-client", () => ({ isSupabaseAuthConfigured: () => false }));
-vi.mock("@/lib/db/middleware-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({ isSupabaseAuthConfigured: () => false }));
+vi.mock("@/platform/infra/db/middleware-client", () => ({
   createMiddlewareSupabase: () => null,
   applyMiddlewareSupabaseResponse: (_request: unknown, response: unknown) => response,
 }));

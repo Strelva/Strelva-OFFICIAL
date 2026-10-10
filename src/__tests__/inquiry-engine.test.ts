@@ -226,7 +226,9 @@ describe("inquiry domain engine", () => {
     expect(() => engine.recordResponsibilityAction({ responsibilityId: policy.id, action: "send_message", actorId: "strelva", at: FIRST, what: "Sent a reply.", why: "The customer asked a question.", approvedBy: "owner", outcome: "accepted", idempotencyKey: "message-one" })).toThrow();
     const accepted = engine.recordResponsibilityAction({ responsibilityId: policy.id, action: "send_message", actorId: "strelva", at: FIRST, what: "Sent a reply.", why: "The customer asked a question.", approvedBy: "owner", outcome: "accepted", outcomeEvidence: ["Provider accepted message-one"], messageBody: "This is from Strelva.", idempotencyKey: "message-one" });
     expect(accepted.status).toBe("accepted");
+    expect(() => engine.promoteResponsibility(policy.id, "another-member")).toThrow("Only the responsibility sponsor");
     expect(engine.promoteResponsibility(policy.id, "owner").trust).toBe("trusted");
+    expect(engine.snapshot().actionReceipts.find(receipt => receipt.action === "promote_responsibility")?.evidence).toEqual(expect.arrayContaining(["old route: strelva_reviews", "new route: handle for pre-authorized ordinary messages", "commitments remain owner_decides"]));
     expect(engine.evaluateResponsibilityAction(policy.id, "send_message", { at: FIRST, messageBody: "This is from Strelva." }).decision).toBe("block");
     engine.pauseResponsibility(policy.id, "owner");
     expect(engine.evaluateResponsibilityAction(policy.id, "send_message", { at: FIRST, messageBody: "This is from Strelva." }).reason).toContain("paused");

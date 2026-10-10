@@ -194,7 +194,15 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
   const agency = snapshot.audience === "agency";
   return <aside className={styles.sidebar} data-open={mobileOpen}>
     <div className={styles.brandRow}>
-      <Link href={basePath} className={styles.brand} onClick={onClose} aria-label="Strelva inquiries home"><LogoMark className={styles.brandMark} /><span className="font-display">Strelva</span></Link>
+      <Link href={basePath} className={styles.brand} onClick={(event) => {
+        // The view lives in provider state, so a link to the page already open
+        // would change nothing. Go to the inquiry home view instead.
+        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && window.location.pathname === basePath) {
+          event.preventDefault();
+          navigate("home", { requestId: null, inquiryId: null });
+        }
+        onClose();
+      }} aria-label="Strelva inquiries home"><LogoMark className={styles.brandMark} /><span className="font-display">Strelva</span></Link>
       <button className={styles.mobileClose} type="button" onClick={onClose} aria-label="Close inquiry navigation"><X size={18} /></button>
     </div>
     <div className={styles.scopeBlock}><span className={styles.eyebrow}>{agency ? "CLIENT" : "BUSINESS"}</span><strong>{snapshot.business.name}</strong><small>{snapshot.business.domain || "Website not recorded"}</small></div>

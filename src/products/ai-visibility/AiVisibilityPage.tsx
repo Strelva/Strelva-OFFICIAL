@@ -1,9 +1,13 @@
 "use client";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { AiVisibilityResult } from "./contracts";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -14,6 +18,8 @@ interface AuditResponse extends AiVisibilityResult {
 
 interface AiVisibilityPageProps {
   initialResult?: AiVisibilityResult;
+  agency?: AgencyAttribution;
+  embedded?: boolean;
   scanId?: string;
   /** The server decides whether private workspace continuation is open. */
   workspaceEnabled?: boolean;
@@ -31,7 +37,7 @@ function acquisitionSource(): string | undefined {
   }
 }
 
-export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false }: AiVisibilityPageProps) {
+export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false, agency, embedded = false }: AiVisibilityPageProps) {
   const [business, setBusiness] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("");
@@ -41,12 +47,25 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   const [scanId, setScanId] = useState<string | null>(initialScanId ?? null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [invalidField, setInvalidField] = useState<"business" | "url" | null>(null);
+  const errorId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const businessRef = useRef<HTMLInputElement>(null);
+  const previousState = useRef(state);
+  useEffect(() => {
+    if (previousState.current === state) return;
+    previousState.current = state;
+    if (state === "scanning" || state === "done") headingRef.current?.focus();
+    else businessRef.current?.focus();
+  }, [state]);
 
   async function handleScan(event: FormEvent) {
     event.preventDefault();
+    setInvalidField(null);
     const name = business.trim();
     if (!name) {
       setError("Enter your business name to run the audit.");
+      setInvalidField("business");
       return;
     }
 
@@ -57,6 +76,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         new URL(normalized);
       } catch {
         setError("Please enter a valid website URL (e.g., example.com).");
+        setInvalidField("url");
         return;
       }
     }
@@ -75,6 +95,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
           category: category.trim() || undefined,
           city: city.trim() || undefined,
           source: acquisitionSource(),
+          ...(agency ? { agency: agency.slug } : {}),
         }),
       });
       if (!response.ok) {
@@ -86,7 +107,13 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       setResult(data);
       setScanId(data.scanId);
       if (data.scanId && /^scan_[a-z0-9]+$/i.test(data.scanId)) {
-        window.history.replaceState(window.history.state, "", `/ai-visibility/${encodeURIComponent(data.scanId)}`);
+        const location = new URL(window.location.href);
+        if (embedded) location.searchParams.set("scan", data.scanId);
+        else {
+          location.pathname = `/ai-visibility/${encodeURIComponent(data.scanId)}`;
+          if (!agency) location.search = "";
+        }
+        window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
       }
       setShareUrl(data.shareUrl);
       setState("done");
@@ -97,17 +124,23 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   }
 
   function handleReset() {
-    window.history.replaceState(window.history.state, "", "/ai-visibility");
+    const location = new URL(window.location.href);
+    if (embedded) location.searchParams.delete("scan");
+    else { location.pathname = "/ai-visibility"; if (!agency) location.search = ""; }
+    if (agency) location.searchParams.set("agency", agency.slug);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
     setState("idle");
     setResult(null);
     setScanId(null);
     setShareUrl(null);
     setError("");
+    setInvalidField(null);
   }
 
   return (
     <div className="product-surface px-6 py-8 md:px-12">
       <div className="relative z-10 mx-auto max-w-[760px] pb-16">
+        {agency && state !== "done" && <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} />}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>
@@ -118,14 +151,14 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
               Check how clearly your website explains your business to AI systems. When available, the result also includes one live Gemini citation check.
             </p>
 
-            <form onSubmit={handleScan} className="mt-8 grid gap-3 sm:grid-cols-2">
+            <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className="mt-8 grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Business name</span>
-                <input id="business-name" type="text" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+                <input id="business-name" ref={businessRef} type="text" required aria-invalid={invalidField === "business" || undefined} aria-describedby={error && invalidField !== "url" ? errorId : undefined} value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Website</span>
-                <input id="website" type="text" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+                <input id="website" type="text" aria-invalid={invalidField === "url" || undefined} aria-describedby={invalidField === "url" ? errorId : undefined} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Business category</span>
@@ -140,7 +173,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
               </button>
             </form>
 
-            {error && <p role="alert" className="mt-4 rounded-lg border px-4 py-3 text-[13px]" style={{ color: "var(--m-danger)", borderColor: "color-mix(in oklch, var(--m-danger) 38%, transparent)", background: "color-mix(in oklch, var(--m-danger) 10%, transparent)" }}>{error}</p>}
+            {error && <p id={errorId} role="alert" className="mt-4 rounded-lg border px-4 py-3 text-[13px]" style={{ color: "var(--m-danger)", borderColor: "color-mix(in oklch, var(--m-danger) 38%, transparent)", background: "color-mix(in oklch, var(--m-danger) 10%, transparent)" }}>{error}</p>}
             <p className="mt-4 text-[13px] text-m-text-3">Free. No signup required. Add your website for AI-readiness signals.</p>
           </div>
         )}
@@ -148,16 +181,16 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         {state === "scanning" && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Auditing</p>
-            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
-            <div className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
+            <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
+              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
               <span className="text-[14px] text-m-text-2">Reading your site and checking AI-crawler access. A live Gemini result will be included when available.</span>
             </div>
           </div>
         )}
 
         {state === "done" && result && (
-          <AiVisibilityResultView result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
+          <AiVisibilityResultView headingRef={headingRef} result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
         )}
       </div>
     </div>

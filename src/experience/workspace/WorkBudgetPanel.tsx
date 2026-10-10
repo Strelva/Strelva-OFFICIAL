@@ -77,7 +77,7 @@ function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, 
         <div><dt className="text-gray-muted">Estimate</dt><dd>{dollars(job.estimateCents)}</dd></div>
         <div><dt className="text-gray-muted">Maximum</dt><dd>{dollars(job.maxAuthorizedCents)}</dd></div>
         <div><dt className="text-gray-muted">Used or held</dt><dd>{dollars(job.reservedCents)}</dd></div>
-        <div><dt className="text-gray-muted">Recorded customer usage</dt><dd>{dollars(job.usedCents)}</dd></div>
+        <div><dt className="text-gray-muted">Your recorded usage</dt><dd>{dollars(job.usedCents)}</dd></div>
         <div><dt className="text-gray-muted">Strelva retries, excluded</dt><dd>{dollars(job.strelvaRetryCents)}</dd></div>
         <div><dt className="text-gray-muted">Final cost</dt><dd>{job.actualKnown ? dollars(job.actualCents) : unresolved ? "Awaiting cost verification" : job.status === "cancelled" ? "Budget cancelled" : "Budget still open"}</dd></div>
       </dl>

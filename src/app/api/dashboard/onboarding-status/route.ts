@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getActivity, getContent } from "@/lib/storage";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getConnections } from "@/lib/connections";
@@ -14,6 +15,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const [activity, brief, connections, settings] = await Promise.all([
     getActivity(tenant, { actor: "ai" }).catch(() => []),

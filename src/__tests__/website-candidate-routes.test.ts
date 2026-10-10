@@ -3,7 +3,7 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const state = vi.hoisted(() => ({ release: true, actor: null as null | { userId: string; verifiedEmail: string }, read: vi.fn(), render: vi.fn(), archive: vi.fn() }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => state.release }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: () => state.actor ? { id: state.actor.userId, email: state.actor.verifiedEmail, email_confirmed_at: "2026-09-20" } : null }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => state.actor ? { id: state.actor.userId, email: state.actor.verifiedEmail, email_confirmed_at: "2026-09-20" } : null }));
 vi.mock("@/products/websites/server", () => ({ readWebsite: state.read, renderWebsiteCandidate: state.render, exportWebsiteCandidate: state.archive, WebsiteCandidateMismatchError: class extends Error {} }));
 import { GET as preview } from "@/app/api/websites/[workId]/preview/route";
 import { GET as download } from "@/app/api/websites/[workId]/export/route";

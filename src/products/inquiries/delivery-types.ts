@@ -5,8 +5,9 @@ import type {
   ResponsibilityEvaluation,
   ReceiptActor,
 } from "./contracts";
-import type { EmailOptions } from "@/lib/email/layout";
-import type { EmailAudience } from "@/lib/email/send";
+import type { EmailOptions } from "@/platform/infra/email/layout";
+import type { InquiryDeliveryProviderOutcome } from "./message-outcome";
+import type { EmailAudience } from "@/platform/infra/email/send";
 
 export type InquiryDeliveryAction = "reply" | "send_message" | "owner_notification" | "schedule_follow_up";
 export type InquiryDeliveryMode = "off" | "approval" | "supervised" | "auto";
@@ -34,6 +35,8 @@ export type InquiryDeliveryStatus =
 export interface InquiryDeliverySubmission {
   id: string;
   tenantId: string;
+  /** Trusted engine workspace identity, never sourced from visitor fields. */
+  businessId?: string;
   name: string;
   email: string;
   message?: string | null;
@@ -48,6 +51,7 @@ export interface InquiryDeliverySubmission {
   capabilityVersion?: number | null;
   /** Optional host revision used to bind approvals and follow-up rechecks. */
   inquiryVersion?: string | number | null;
+  bookingOffer?: import("./booking-handoff").InquiryBookingOffer;
   receivedAt: string;
 }
 
@@ -109,6 +113,7 @@ export interface InquiryDeliveryMessage {
   audience: EmailAudience;
   to: string;
   replyTo?: string;
+  fromName?: string;
   subject: string;
   options: EmailOptions;
   /** Non-sensitive provider metadata used to correlate signed delivery events. */
@@ -157,6 +162,12 @@ export interface InquiryDeliveryCheckpoint {
   attemptId: string;
   attempts: number;
   startedAt: string;
+  /**
+   * Digest of the exact message this attempt handed to the provider, written
+   * when the attempt is claimed. Checkpoints written before digests were
+   * recorded have none, so a missing value means "unknown", never "matches".
+   */
+  messageDigest?: string;
   acceptedAt?: string;
   providerMessageId?: string;
   /** The exact reply-to address used by the accepted provider message. */
@@ -165,13 +176,12 @@ export interface InquiryDeliveryCheckpoint {
   verificationReason?: string;
   failureReason?: string;
   retryable?: boolean;
-  providerOutcome?: "delivered" | "bounced" | "deferred" | "failed" | "suppressed";
+  providerOutcome?: InquiryDeliveryProviderOutcome;
   providerEventId?: string;
   /** Provider event time used to ignore stale webhook retries. */
   providerEventAt?: string;
 }
 
-export type InquiryDeliveryProviderOutcome = NonNullable<InquiryDeliveryCheckpoint["providerOutcome"]>;
 
 export interface InquiryDeliveryProviderEventInput {
   tenantId: string;
@@ -240,7 +250,11 @@ export interface InquiryDeliveryStore {
     maxAttempts: number;
     now: string;
     budget: InquiryDeliveryBudgetReservation;
+    /** Digest of the exact message this attempt will hand to the provider. */
+    messageDigest?: string;
   }): Promise<InquiryDeliveryClaim>;
+  /** Confirm the exact accepted attempt's durable projections before readback. */
+  repairAcceptedProjections?(input: { tenantId: string; inquiryId: string; action: InquiryDeliveryAction; attemptId: string; acceptedAt: string; providerMessageId?: string; replyTo?: string }): Promise<InquiryDeliveryCheckpoint>;
   markAccepted(input: {
     tenantId: string;
     inquiryId: string;
@@ -314,6 +328,7 @@ export interface InquiryFollowUpRecheck {
 }
 
 export interface InquiryDeliveryDependencies {
+  messageRoute?: import("./inquiry-policy-at-use").InquiryMessageRouteReader;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
   now?: () => Date;
@@ -402,3 +417,4 @@ export interface ResponsibilityDeliveryGate {
   approval?: InquiryDeliveryApproval;
   reason?: string;
 }
+export type { InquiryDeliveryProviderOutcome } from "./message-outcome";

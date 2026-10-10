@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), release: vi.fn(), list: vi.fn(), read: vi.fn(), save: vi.fn(), respond: vi.fn(), linkDelivery: vi.fn(), withdraw: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/service-requests", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/platform/service-requests");
@@ -53,11 +53,10 @@ describe("service request route", () => {
     expect(mocks.list).toHaveBeenCalledWith({ userId: user.id, verifiedEmail: "owner@example.test" }, { businessId });
   });
 
-  it("exposes the Strelva provider inbox through the same private read route", async () => {
+  it("rejects the retired privileged Strelva provider inbox", async () => {
     const response = await GET(new Request("https://app.strelva.com/api/service-requests?providerKind=strelva"));
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ requests: [requestRecord] });
-    expect(mocks.list).toHaveBeenCalledWith({ userId: user.id, verifiedEmail: "owner@example.test" }, { providerKind: "strelva" });
+    expect(response.status).toBe(403);
+    expect(mocks.list).not.toHaveBeenCalled();
   });
 
   it("rejects malformed reopen and list identifiers at the route boundary", async () => {
@@ -73,9 +72,9 @@ describe("service request route", () => {
     expect(mocks.save).not.toHaveBeenCalled();
   });
 
-  it("maps a stale persisted request to a conflict without exposing provider details", async () => {
+  it("maps a stale persisted request to a conflict without exposing agency details", async () => {
     mocks.save.mockRejectedValueOnce(new ServiceRequestConflictError("The request changed. Reload before continuing."));
-    const response = await POST(post({ action: "save", businessId, status: "requested", request: "Need", outcome: "Result", context: {}, scope: ["scope"], provider: { kind: "strelva" }, idempotencyKey: "request:one" }));
+    const response = await POST(post({ action: "save", businessId, status: "requested", request: "Need", outcome: "Result", context: {}, scope: ["scope"], provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" }, idempotencyKey: "request:one" }));
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ error: { code: "request_conflict", message: "The request changed. Reload before continuing." } });
   });

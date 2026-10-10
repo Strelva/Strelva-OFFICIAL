@@ -1,14 +1,14 @@
 export { getOfferingDefinition, listOfferingDefinitions } from "./definitions";
-export { ProviderDeliveryService, providerDeliveryCommandSchema, providerDeliverySchema } from "./provider-delivery";
-export type { ProviderAssignmentGateway, ProviderDelivery, ProviderDeliveryCommand, ProviderDeliveryStore, ProviderOfferingGateway } from "./provider-delivery";
-export { postgresProviderDeliveries } from "./provider-delivery-repository";
+export { AgencyDeliveryService, agencyDeliveryCommandSchema, agencyDeliverySchema } from "./provider-delivery";
+export type { AgencyAssignmentGateway, AgencyDelivery, AgencyDeliveryCommand, AgencyDeliveryStore, AgencyOfferingGateway } from "./provider-delivery";
+export { postgresAgencyDeliveries } from "./provider-delivery-repository";
 export {
-  agencyApplicationDraftGrantSchema,
-  agencyApplicationDraftWorkSchema,
   createAgencyApplicationDraftAccessService,
   postgresAgencyApplicationDraftAccess,
 } from "./agency-draft-access";
-export type { AgencyApplicationDraftGrant, AgencyApplicationDraftWork, AgencyApplicationDraftAccessService } from "./agency-draft-access";
+export { agencyApplicationDraftGrantSchema, agencyApplicationDraftWorkSchema } from "./agency-application-draft-contracts";
+export type { AgencyApplicationDraftGrant, AgencyApplicationDraftWork } from "./agency-application-draft-contracts";
+export type { AgencyApplicationDraftAccessService } from "./agency-draft-access";
 export {
   agencyManagedWebsiteDraftGrantSchema,
   agencyManagedWebsiteDraftPreparationSchema,
@@ -59,3 +59,8 @@ export type {
   OfferingWebsiteBindingCommand,
   OfferingWebsiteBindingRecord,
 } from "./types";
+
+// Deprecated compatibility exports are documented at their definitions.
+export { ProviderDeliveryService, providerDeliveryCommandSchema, providerDeliverySchema } from "./provider-delivery";
+export type { ProviderAssignmentGateway, ProviderDelivery, ProviderDeliveryCommand, ProviderDeliveryStore, ProviderOfferingGateway } from "./provider-delivery";
+export { postgresProviderDeliveries } from "./provider-delivery-repository";

@@ -42,16 +42,16 @@ vi.mock("@/lib/events", () => ({
   addEvent: (...args: unknown[]) => mockAddEvent(...args),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => redisHandle,
 }));
 
-vi.mock("@/lib/production-guard", () => ({
+vi.mock("@/platform/infra/production-guard", () => ({
   isProductionEnv: () => mockIsProductionEnv(),
 }));
 
 const mockAlert = vi.fn();
-vi.mock("@/lib/monitoring", () => ({
+vi.mock("@/platform/infra/monitoring", () => ({
   alert: (...args: unknown[]) => mockAlert(...args),
 }));
 
@@ -72,11 +72,25 @@ vi.mock("stripe", () => {
   return { default: FakeStripe };
 });
 
+const mockBusinessBillingMirror = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/business-billing", async importOriginal => ({
+  ...await importOriginal<typeof import("@/platform/business-billing")>(),
+  mirrorStripeEventToBusinessBilling: mockBusinessBillingMirror,
+}));
+
+const connectedReceipts = vi.hoisted(() => ({ agency: vi.fn(), merchant: vi.fn(), enabled: vi.fn(() => false) }));
+vi.mock("@/platform/agency-billing", () => ({ syncAgencyInvoiceFromConnectEvent: connectedReceipts.agency }));
+vi.mock("@/platform/connect", () => ({ connectEnabled: connectedReceipts.enabled, ingestConnectEvent: connectedReceipts.merchant }));
+
 const ORIGINAL_SECRET = process.env.STRIPE_SECRET_KEY;
 const ORIGINAL_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  connectedReceipts.agency.mockResolvedValue({ ignored: true });
+  connectedReceipts.merchant.mockResolvedValue({ ignored: true });
+  connectedReceipts.enabled.mockReturnValue(false);
+  mockBusinessBillingMirror.mockResolvedValue({ status: "skipped", reason: "disabled" });
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
   mockUpdateTenant.mockResolvedValue({ id: "acme" });
@@ -107,6 +121,7 @@ function useFakeRedis() {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   if (ORIGINAL_SECRET === undefined) delete process.env.STRIPE_SECRET_KEY;
   else process.env.STRIPE_SECRET_KEY = ORIGINAL_SECRET;
   if (ORIGINAL_WEBHOOK_SECRET === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
@@ -877,5 +892,70 @@ describe("billing webhook isTrialCreateInvoice guard", () => {
       "acme",
       expect.objectContaining({ subscriptionStatus: "active" }),
     );
+  });
+});
+
+
+describe("workspace-only business billing webhook", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const event = {
+    id: "evt_workspace_only", type: "customer.subscription.updated", created: 100,
+    data: { object: { object: "subscription", id: "sub_Workspace", status: "active", metadata: { workspaceId: "workspace-only" } } },
+  };
+  it("flags off keeps legacy missing-tenant behavior with no business write", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "");
+    const response = await postEvent(event);
+    expect(response.status).toBe(200);
+    expect(mockBusinessBillingMirror).not.toHaveBeenCalled();
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith("billing_webhook_missing_tenant", "high", expect.any(Object));
+  });
+  it("mirrors the workspace status without fabricating a legacy tenant", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    mockBusinessBillingMirror.mockResolvedValue({ status: "mirrored", workspaceId: "workspace-only", via: "workspace_metadata", paymentStatus: "active" });
+    expect((await postEvent(event)).status).toBe(200);
+    expect(mockBusinessBillingMirror).toHaveBeenCalledWith(expect.objectContaining({ tenantId: null, workspaceId: "workspace-only", status: "active", stripeSubscriptionId: "sub_Workspace" }));
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+  it("alerts on a failed business write while preserving the webhook acknowledgement", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    mockBusinessBillingMirror.mockResolvedValue({ status: "failed", reason: "database down" });
+    expect((await postEvent(event)).status).toBe(200);
+    expect(mockAlert).toHaveBeenCalledWith("billing_webhook_business_mirror_failed", "medium", expect.objectContaining({ reason: "database down" }));
+  });
+});
+
+
+describe("connected account routing in the retained webhook", () => {
+  const invoice = { id: "evt_connected", account: "acct_Merchant", type: "invoice.paid", created: 1_700_600_500, data: { object: { id: "in_connected", metadata: { tenantId: "acme" }, parent: { subscription_details: { subscription: "sub_connected", metadata: { tenantId: "acme" } } } } } };
+  it("records independent invoice and merchant projections without touching legacy tenant billing", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    connectedReceipts.enabled.mockReturnValue(true);
+    const response = await postEvent(invoice);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ connected: true });
+    expect(connectedReceipts.agency).toHaveBeenCalledWith(expect.objectContaining({ account: "acct_Merchant", id: "evt_connected" }));
+    expect(connectedReceipts.merchant).toHaveBeenCalledTimes(1);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockBusinessBillingMirror).not.toHaveBeenCalled();
+    expect(mockSubRetrieve).not.toHaveBeenCalled();
+  });
+  it("rejects mismatched mode before either connected projection", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    connectedReceipts.enabled.mockReturnValue(true);
+    expect((await postEvent({ ...invoice, livemode: true })).status).toBe(200);
+    expect(connectedReceipts.agency).not.toHaveBeenCalled();
+    expect(connectedReceipts.merchant).not.toHaveBeenCalled();
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+  it("retries a failed durable agency receipt before marking the event processed", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    connectedReceipts.agency.mockRejectedValueOnce(new Error("receipt unavailable"));
+    useFakeRedis();
+    const response = await postEvent(invoice);
+    expect(response.status).toBe(500);
+    expect(mockRedisSet.mock.calls.some(([key, value]) => key === "stripe:event:evt_connected" && value.status === "processed")).toBe(false);
+    expect(mockRedisSet.mock.calls.some(([key, value]) => key === "stripe:event:evt_connected" && value.status === "failed")).toBe(true);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
 });

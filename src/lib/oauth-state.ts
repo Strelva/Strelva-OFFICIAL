@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 type OAuthStatePayload = {
   tenantId: string;

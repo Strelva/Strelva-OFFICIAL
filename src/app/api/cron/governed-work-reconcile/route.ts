@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { reconcileGovernedWork } from "@/lib/governed-work/reconcile";
 import { requireCronRequest } from "@/lib/cron-auth";
 

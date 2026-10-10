@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 // Transform the newsletter dependency graph during collection, outside the
 // request-validation test's timeout. These route mocks are shared by all tests.
@@ -45,8 +46,8 @@ const mockHeadersGet = vi.fn((key: string): string | null => {
 
 // Drive request-context auth as an authorized super-admin so the handlers reach
 // their body-validation/logic under test. Pure helpers stay real via importOriginal.
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/platform/infra/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/infra/auth")>();
   return {
     ...actual,
     verifyAuth: () => Promise.resolve(true),
@@ -80,7 +81,7 @@ vi.mock("next/headers", () => ({
   ),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => null),
 }));
 
@@ -199,7 +200,7 @@ vi.mock("@/lib/connections", () => ({
   deleteConnection: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: vi.fn(() => Promise.resolve(false)),
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
@@ -1189,7 +1190,9 @@ describe("Tenant Domains Route Handler", () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+    expect(body).toHaveProperty("view");
+    expect({ domains: body.domains }).toEqual({
       domains: [
         {
           domain: "example.com",
@@ -1218,7 +1221,7 @@ describe("Tenant Domains Route Handler", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
-    expect(mockAddCustomDomain).toHaveBeenCalledWith("test-tenant", "new.example.com", undefined);
+    expect(mockAddCustomDomain).toHaveBeenCalledWith("test-tenant", "new.example.com", undefined, { actor: "owner dashboard" });
   });
 
   it("POST /api/tenant/domains rejects missing tenant headers before mutation", async () => {

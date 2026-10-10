@@ -5,9 +5,9 @@
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { addInboxItem } from "./inbox-store";
 import { emitEventFromActivity } from "../events";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { insertActivity, listActivity } from "../db/repositories";
-import type { Row, Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { insertActivity, listActivity } from "@/platform/infra/db/repositories";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 function activityToInsert(entry: ActivityEntry, tenant: string): Insert<"activity_log"> {
   return {

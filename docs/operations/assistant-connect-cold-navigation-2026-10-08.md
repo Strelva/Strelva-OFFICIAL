@@ -1,0 +1,7 @@
+# Assistant connection cold navigation — 2026-10-08
+
+Actual frozen native case14 clicked the correct `/connect?workspaceId=...` link but its exact URL assertion timed out after the default five seconds, leaving the old workspace settings URL. This was not an observed redirect: the trace records a pending `/connect?...&_rsc=...` request with status -1 when the test ends; current Connect page has no workspace-settings redirect. Current run `FRhz1I/app-native.log` line408 records `Compiling /connect ...`. Subsequent case15 reaches `/connect` 200 in45ms, reads its connection list200, then sees403 after authority withdrawal. These observations support cold development compilation exceeding the assertion window; they do not prove production navigation latency.
+
+Prepared correction keeps the real settings link click and exact Connect URL/workspace expectation, but permits a bounded30-second navigation assertion in the existing120-second test. It keeps client panel visibility, cancel/confirm owner disconnect, revoked status, renewed access401 and refresh invalid_grant assertions unchanged. No product redirect/navigation changes or weaker empty-state expectation.
+
+Scoped ESLint, Playwright list(two cases), and diff check passed. Native rerun remains coordinator-owned after current frozen run. No native, server, provider or heavy window used; successful case14 disconnect is not claimed yet.

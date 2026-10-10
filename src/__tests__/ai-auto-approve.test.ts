@@ -4,7 +4,7 @@ import type { AiGovernanceDecision } from "@/lib/ai-governance";
 
 // Control the approval streak that getApprovalStreak reads from Redis.
 const mockGet = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({ get: mockGet, incr: vi.fn(), expire: vi.fn(), set: vi.fn() }),
 }));
 

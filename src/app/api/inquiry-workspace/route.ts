@@ -1,5 +1,9 @@
+// This request runtime can load before instrumentation's registry reaches it.
+// Register the existing lazy ports at the app edge before governed publication.
+import "@/register-workspace-ports";
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { readJsonObject } from "@/lib/request-body";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -9,7 +13,8 @@ import {
   InquiryValidationError,
   executeInquirySurface,
   inquiryPermissionForAction,
-  inquiryReleaseEnabled,
+  inquiryReleaseMayBeOn,
+  inquiryReleasedForCurrentUser,
   parseInquirySurfaceAction,
   readInquirySurface,
 } from "@/products/inquiries/server";
@@ -45,7 +50,7 @@ function requestedTenant(request: Request, body?: Record<string, unknown>): stri
   return /^[a-z0-9][a-z0-9-]{0,62}$/.test(tenant) ? tenant : null;
 }
 
-async function contextFor(request: Request, body?: Record<string, unknown>) {
+async function contextFor(request: Request, body?: Record<string, unknown>, auditRead = false) {
   const requested = requestedTenant(request, body);
   if (!requested) return { error: json({ error: "A tenantId is required." }, 400) } as const;
   // The control-plane business picker may select any granted membership.
@@ -54,6 +59,8 @@ async function contextFor(request: Request, body?: Record<string, unknown>) {
   const tenant = requested;
   const denied = await requireTenantAccess(tenant);
   if (denied) return { error: denied } as const;
+  if (auditRead) await authorizeTenantOperatorRead(tenant);
+  if (!(await inquiryReleasedForCurrentUser(tenant))) return { error: json({ error: "Inquiry workspace is not enabled." }, 503) } as const;
   const config = await getTenantConfig(tenant);
   if (!config || !config.active) return { error: json({ error: "Business unavailable." }, 404) } as const;
   const workspace = await resolveInquiryWorkspace({
@@ -84,10 +91,10 @@ function failure(error: unknown) {
 }
 
 export async function GET(request: Request) {
-  if (!inquiryReleaseEnabled()) return json({ error: "Inquiry workspace is not enabled." }, 503);
+  if (!inquiryReleaseMayBeOn()) return json({ error: "Inquiry workspace is not enabled." }, 503);
   if (!(await verifyAuth())) return json({ error: "Unauthorized" }, 401);
   try {
-    const context = await contextFor(request);
+    const context = await contextFor(request, undefined, true);
     if ("error" in context && context.error) return context.error;
     const result = await readInquirySurface({ tenantId: context.tenantId, businessId: context.businessId, config: context.config });
     return json({ snapshot: result.snapshot });
@@ -97,7 +104,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!inquiryReleaseEnabled()) return json({ error: "Inquiry workspace is not enabled." }, 503);
+  if (!inquiryReleaseMayBeOn()) return json({ error: "Inquiry workspace is not enabled." }, 503);
   if (!(await verifyAuth())) return json({ error: "Unauthorized" }, 401);
   if (!sameOrigin(request)) return json({ error: "Open Strelva directly to make this change." }, 403);
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return json({ error: "Send a JSON request." }, 415);

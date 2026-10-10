@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { reconcileInquiryProviderEvent } from "@/products/inquiries";
+import { reconcileInquiryProviderEvent, reconcileWorkspaceInquiryProviderEvent } from "@/products/inquiries";
+import { reconcileConnectedInquiryOwnerNotice } from "@/products/connected-sites/server";
+import { reconcileInquiryDecisionNotice } from "@/platform/needs-you";
 
 export const dynamic = "force-dynamic";
-export const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
+const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
 /** Read a signed callback without allowing an unbounded body into memory. */
 async function readBoundedBody(request: Request): Promise<string | null> {
@@ -70,7 +72,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
   }
 
-  const result = await reconcileInquiryProviderEvent({ event, eventId });
+  const decisionResult = await reconcileInquiryDecisionNotice({ event, eventId });
+  const connectedResult = decisionResult.status === "ignored" ? await reconcileConnectedInquiryOwnerNotice({ event, eventId }) : decisionResult;
+  const workspaceResult = connectedResult.status === "ignored"
+    ? await reconcileWorkspaceInquiryProviderEvent({ event, eventId }) : connectedResult;
+  const result = workspaceResult.status === "ignored"
+    ? await reconcileInquiryProviderEvent({ event, eventId })
+    : workspaceResult;
   if (result.status === "unavailable") {
     return NextResponse.json({ received: false, status: result.status, reason: result.reason }, { status: 503 });
   }

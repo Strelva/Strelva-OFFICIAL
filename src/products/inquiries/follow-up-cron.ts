@@ -24,7 +24,7 @@ import {
   sendInquiryReply,
 } from "./delivery";
 import { isInquiryReplyTrackingAddress } from "./delivery-message";
-import { getReceivedEmailReadback } from "@/lib/email/send";
+import { getReceivedEmailReadback } from "@/platform/infra/email/send";
 import type {
   InquiryDeliveryApproval,
   InquiryDeliveryDependencies,
@@ -37,7 +37,8 @@ import {
   getInquiryRepository,
   recordedInquiryStatus,
 } from "./server";
-import type { InquiryCapabilityDefinition } from "./contracts";
+import type { InquiryCapabilityDefinition, InquiryRecordStatus } from "./contracts";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type { InquiryRepository, InquiryWorkspaceSnapshot } from "./repository";
 import {
   reconcileInquiryCaptureRepairs,
@@ -61,6 +62,8 @@ export interface InquiryFollowUpSweepOptions {
   allowExternalSends?: boolean;
   /** Test/host override for the workspace exit authority. */
   workspaceExitCompleted?: (businessId: string) => Promise<boolean>;
+  /** Per-site release (STRELVA_INQUIRIES_RELEASE rows). Absent: every active tenant. */
+  released?: (tenantId: string) => Promise<boolean>;
 }
 
 export interface InquiryFollowUpSweepResult {
@@ -107,12 +110,18 @@ function sweepPolicy(definition: InquiryCapabilityDefinition): PartialInquiryRou
   };
 }
 
-function currentCapability(snapshot: InquiryWorkspaceSnapshot | null, lead: LeadRecord): InquiryCapabilityDefinition | null {
-  const capability = snapshot?.state.capabilities.find((item) => item.id === lead.capabilityId);
-  if (!capability || capability.businessId !== snapshot?.businessId || !capability.live) return null;
-  if (!["live", "live_unverified"].includes(capability.status)) return null;
-  if (capability.live.version !== lead.capabilityVersion) return null;
-  return capability.live;
+function currentCapability(
+  snapshot: InquiryWorkspaceSnapshot | null,
+  lead: LeadRecord,
+  status?: InquiryRecordStatus,
+): InquiryCapabilityDefinition | null {
+  if (!snapshot) return null;
+  const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+    capabilityId: lead.capabilityId,
+    capabilityVersion: lead.capabilityVersion,
+    status,
+  });
+  return currentness.current ? currentness.definition : null;
 }
 
 function classify(result: InquiryDeliveryResult, counts: { accepted: number; blocked: number; failed: number }): void {
@@ -127,7 +136,12 @@ export async function runDueInquiryFollowUps(
 ): Promise<InquiryFollowUpSweepResult> {
   const now = options.now?.() ?? new Date();
   const tenants = await (options.tenants ?? getAllTenants)();
-  const active = tenants.filter((tenant) => tenant.active !== false);
+  const activeTenants = tenants.filter((tenant) => tenant.active !== false);
+  const released = options.released;
+  const releasedFlags = released
+    ? await Promise.all(activeTenants.map((tenant) => released(tenant.id).catch(() => false)))
+    : null;
+  const active = releasedFlags ? activeTenants.filter((_tenant, index) => releasedFlags[index]) : activeTenants;
   const leadsReader = options.leads ?? getLeads;
   const repository = options.repository ?? getInquiryRepository();
   const deliveryStore = options.store ?? createRedisInquiryDeliveryStore();
@@ -227,12 +241,12 @@ export async function runDueInquiryFollowUps(
       const status = snapshot
         ? recordedInquiryStatus(snapshot.state, lead.id, overlay?.status ?? "new")
         : overlay?.status ?? "new";
-      if (status === "handled" || status === "blocked") continue;
-      const definition = currentCapability(snapshot, lead);
+      const definition = currentCapability(snapshot, lead, status);
       if (!definition || (!definition.routing && !definition.followUp)) continue;
       const followUp = definition.followUp;
       const inquiry = {
         ...inquirySubmissionFromLead(tenant.id, lead),
+        businessId: inquiryBusinessId,
         businessName: tenant.siteName,
         staffDestination: definition.routing?.destination || null,
         followUpMessageTemplate: followUp?.messageTemplate ?? null,
@@ -301,7 +315,7 @@ export async function runDueInquiryFollowUps(
               reason: "recipient_route_changed",
             } satisfies ResponsibilityDeliveryGate;
           }
-          const responsibility = current?.state.responsibilities.find((item) => item.capabilityId === currentInquiry.capabilityId);
+          const responsibility = current ? currentResponsibility(current.state.responsibilities, currentInquiry.capabilityId) : null;
           if (!responsibility) return null;
           // Evaluate the same disclosure shown by the email renderer. Owner
           // notices put the Strelva disclosure in the footer, so checking
@@ -449,7 +463,7 @@ export async function runDueInquiryFollowUps(
       let initialReplySent = false;
       const retryInitialReply = !replyCheckpoint || (replyCheckpoint.status === "failed" && replyCheckpoint.retryable === true);
       if (retryInitialReply && snapshot) {
-        const responsibility = snapshot.state.responsibilities.find((item) => item.capabilityId === inquiry.capabilityId);
+        const responsibility = currentResponsibility(snapshot.state.responsibilities, inquiry.capabilityId);
         const evaluation = responsibility
           ? evaluateInquiryResponsibility(snapshot, inquiry.capabilityId || lead.capabilityId!, "reply", "This acknowledgement is from Strelva.", now.toISOString())
           : null;

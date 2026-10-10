@@ -8,7 +8,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import {
   assertCanSaveWork,
   runWorkspaceOperation,

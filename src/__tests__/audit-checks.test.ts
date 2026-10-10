@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EventEmitter } from "node:events";
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before any imports that use them
@@ -6,13 +7,35 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock node:dns for SSRF validation tests
 const mockLookup = vi.fn();
+const mockRequest = vi.fn();
 vi.mock("node:dns", () => ({
   promises: { lookup: (...args: unknown[]) => mockLookup(...args) },
 }));
+vi.mock("node:http", () => ({ request: (...args: unknown[]) => mockRequest(...args) }));
+vi.mock("node:https", () => ({ request: (...args: unknown[]) => mockRequest(...args) }));
 
 // Mock global fetch for network-dependent checks (SSL, PageSpeed, HTML fetch)
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+
+type MockHttpResponse = { statusCode: number; headers: Record<string, string>; body: string; error?: Error };
+type MockRequestLog = { url: string; address?: string };
+const mockHttpResponses = new Map<string, MockHttpResponse>();
+const mockRequestLog: MockRequestLog[] = [];
+const mockBodyReadUrls: string[] = [];
+
+interface FakeResponse extends EventEmitter {
+  statusCode: number;
+  headers: Record<string, string>;
+  destroyed: boolean;
+  destroy(): this;
+}
+
+interface FakeRequest extends EventEmitter {
+  destroyed: boolean;
+  end(): void;
+  destroy(error?: Error): this;
+}
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
@@ -29,14 +52,9 @@ import type { CategoryResult } from "../lib/audit/types";
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Create a Response whose `.url` property returns the given URL. */
-function mockResponse(body: string, url = "https://example.com"): Response {
-  const res = new Response(body, {
-    status: 200,
-    headers: { "content-type": "text/html" },
-  });
-  Object.defineProperty(res, "url", { value: url });
-  return res;
+/** Queue an offline HTTP response for a canonical URL. */
+function mockResponse(body: string, url = "https://example.com/", headers = { "content-type": "text/html" }): void {
+  mockHttpResponses.set(new URL(url).href, { statusCode: 200, headers, body });
 }
 
 // ---------------------------------------------------------------------------
@@ -44,12 +62,51 @@ function mockResponse(body: string, url = "https://example.com"): Response {
 // ---------------------------------------------------------------------------
 beforeEach(() => {
   vi.clearAllMocks();
+  mockHttpResponses.clear();
+  mockRequestLog.length = 0;
+  mockBodyReadUrls.length = 0;
   // Default: DNS resolves to a public IP
-  mockLookup.mockResolvedValue({ address: "93.184.216.34" });
-  // Default: fetch returns minimal HTML with a proper .url
-  mockFetch.mockResolvedValue(
-    mockResponse("<html><head><title>Test</title></head><body></body></html>")
-  );
+  mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+  mockResponse("<html><head><title>Test</title></head><body></body></html>");
+  mockRequest.mockImplementation((rawUrl: URL, options: { lookup: (hostname: string, options: object, callback: (error: Error | null, address: string, family: number) => void) => void }, onResponse: (response: FakeResponse) => void) => {
+    const request = new EventEmitter() as FakeRequest;
+    request.destroyed = false;
+    request.destroy = (error?: Error) => {
+      request.destroyed = true;
+      if (error) queueMicrotask(() => request.emit("error", error));
+      return request;
+    };
+    request.end = () => {
+      options.lookup(rawUrl.hostname, { family: 4 }, (error, address) => {
+        if (!error) mockRequestLog.push({ url: rawUrl.href, address });
+      });
+      queueMicrotask(() => {
+        if (request.destroyed) return;
+        const fixture = mockHttpResponses.get(rawUrl.href) ?? {
+          statusCode: 200,
+          headers: { "content-type": "text/html" },
+          body: "<html><head><title>Test</title></head><body></body></html>",
+        };
+        if (fixture.error) {
+          request.emit("error", fixture.error);
+          return;
+        }
+        const response = new EventEmitter() as FakeResponse;
+        response.statusCode = fixture.statusCode;
+        response.headers = fixture.headers;
+        response.destroyed = false;
+        response.destroy = () => { response.destroyed = true; return response; };
+        onResponse(response);
+        if (response.destroyed || request.destroyed) return;
+        if (fixture.body) {
+          if (response.listenerCount("data") > 0) mockBodyReadUrls.push(rawUrl.href);
+          response.emit("data", Buffer.from(fixture.body));
+        }
+        response.emit("end");
+      });
+    };
+    return request;
+  });
   // No PageSpeed API key by default
   delete process.env.GOOGLE_PAGESPEED_API_KEY;
 });
@@ -74,7 +131,24 @@ describe("SSRF Protection", () => {
       ["127.255.255.255", "loopback upper"],
       ["169.254.0.1", "link-local"],
       ["169.254.169.254", "AWS metadata endpoint"],
+      ["100.64.0.1", "shared address space"],
+      ["198.18.0.1", "benchmarking range"],
+      ["203.0.113.7", "documentation range"],
+      ["224.0.0.1", "multicast range"],
       ["0.0.0.0", "unspecified address"],
+      ["::1", "IPv6 loopback"],
+      ["fc00::1", "IPv6 unique local"],
+      ["fe80::1", "IPv6 link-local"],
+      ["ff02::1", "IPv6 multicast"],
+      ["::ffff:127.0.0.1", "IPv4-mapped IPv6 loopback"],
+      ["::ffff:7f00:1", "hex IPv4-mapped IPv6 loopback"],
+      ["::ffff:6440:1", "IPv4-mapped shared address space"],
+      ["0:0:0:0:0:ffff:6440:1", "expanded IPv4-mapped shared address space"],
+      ["64:ff9b::a9fe:a9fe", "NAT64 address containing metadata IPv4"],
+      ["2001:20::1", "IETF special-purpose range"],
+      ["2001:0db8::1", "expanded IPv6 documentation range"],
+      ["2002:a9fe:a9fe::1", "6to4 address containing metadata IPv4"],
+      ["3fff::1", "IPv6 documentation range"],
     ])("identifies %s as private (%s)", (ip) => {
       expect(isPrivateIP(ip)).toBe(true);
     });
@@ -111,29 +185,53 @@ describe("SSRF Protection", () => {
     });
 
     it("rejects URLs resolving to private IPs", async () => {
-      mockLookup.mockResolvedValueOnce({ address: "127.0.0.1" });
+      mockLookup.mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
       await expect(
         validateUrlSafety("https://evil.example.com")
       ).rejects.toThrow("Blocked: resolved to private IP");
     });
 
     it("rejects URLs resolving to 169.254.169.254 (cloud metadata)", async () => {
-      mockLookup.mockResolvedValueOnce({ address: "169.254.169.254" });
+      mockLookup.mockResolvedValueOnce([{ address: "169.254.169.254", family: 4 }]);
       await expect(
         validateUrlSafety("https://metadata.example.com")
       ).rejects.toThrow("Blocked: resolved to private IP");
     });
 
-    it("allows URLs resolving to public IPs", async () => {
-      mockLookup.mockResolvedValueOnce({ address: "93.184.216.34" });
-      const result = await validateUrlSafety("https://example.com");
-      expect(result).toEqual({ address: "93.184.216.34" });
+    it("rejects a mixed DNS answer set when any IPv4 answer is private", async () => {
+      mockLookup.mockResolvedValueOnce([
+        { address: "93.184.216.34", family: 4 },
+        { address: "127.0.0.1", family: 4 },
+      ]);
+      await expect(validateUrlSafety("https://mixed.example.com")).rejects.toThrow(
+        "Blocked: resolved to private IP 127.0.0.1"
+      );
     });
 
-    it("forces IPv4 resolution", async () => {
-      mockLookup.mockResolvedValueOnce({ address: "93.184.216.34" });
-      await validateUrlSafety("https://example.com");
-      expect(mockLookup).toHaveBeenCalledWith("example.com", { family: 4 });
+    it("rejects a private AAAA answer mixed with a public A answer", async () => {
+      mockLookup.mockResolvedValueOnce([
+        { address: "93.184.216.34", family: 4 },
+        { address: "fd00::1", family: 6 },
+      ]);
+      await expect(validateUrlSafety("https://mixed.example.com")).rejects.toThrow(
+        "Blocked: resolved to private IP fd00::1"
+      );
+    });
+
+    it("allows URLs resolving to public IPs", async () => {
+      mockLookup.mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }]);
+      const result = await validateUrlSafety("https://example.com");
+      expect(result).toEqual({ address: "93.184.216.34", family: 4 });
+    });
+
+    it("checks all address families and pins a validated address", async () => {
+      mockLookup.mockResolvedValueOnce([
+        { address: "2606:4700:4700::1111", family: 6 },
+        { address: "93.184.216.34", family: 4 },
+      ]);
+      const result = await validateUrlSafety("https://example.com");
+      expect(result).toEqual({ address: "93.184.216.34", family: 4 });
+      expect(mockLookup).toHaveBeenCalledWith("example.com", { all: true, verbatim: true });
     });
   });
 });
@@ -268,7 +366,7 @@ describe("Scoring Math", () => {
 // ===========================================================================
 describe("runAudit", () => {
   it("rejects private IP targets via SSRF protection", async () => {
-    mockLookup.mockResolvedValueOnce({ address: "10.0.0.1" });
+    mockLookup.mockResolvedValueOnce([{ address: "10.0.0.1", family: 4 }]);
     await expect(runAudit("https://internal.corp")).rejects.toThrow(
       "Blocked: resolved to private IP"
     );
@@ -276,7 +374,51 @@ describe("runAudit", () => {
 
   it("prepends https:// to a bare domain", async () => {
     await runAudit("example.com");
-    expect(mockLookup).toHaveBeenCalledWith("example.com", { family: 4 });
+    expect(mockLookup).toHaveBeenCalledWith("example.com", { all: true, verbatim: true });
+  });
+
+  it("keeps public HTTP audit URLs working", async () => {
+    mockResponse("<html><head><title>HTTP fixture</title></head><body>ok</body></html>", "http://example.com/");
+    await expect(runAudit("http://example.com")).resolves.toHaveLength(8);
+    expect(mockRequestLog.map((request) => request.url)).toContain("http://example.com/");
+    expect(mockRequestLog.every((request) => request.url.startsWith("http://"))).toBe(true);
+  });
+
+  it.each([
+    ["http://127.0.0.1/private", "127.0.0.1"],
+    ["http://169.254.169.254/latest/meta-data", "169.254.169.254"],
+  ])("blocks a homepage redirect to %s before requesting it or reading the redirect body", async (target, privateAddress) => {
+    mockHttpResponses.set("https://example.com/", {
+      statusCode: 302,
+      headers: { "content-type": "text/html", location: target },
+      body: "redirect body must not be read",
+    });
+    mockLookup.mockImplementation(async (hostname: string) => [{
+      address: hostname === privateAddress ? privateAddress : "93.184.216.34",
+      family: 4,
+    }]);
+
+    await expect(runAudit("https://example.com")).rejects.toThrow("Blocked: resolved to private IP");
+    expect(mockRequestLog.map((request) => request.url)).toEqual(["https://example.com/"]);
+    expect(mockBodyReadUrls).not.toContain("https://example.com/");
+  });
+
+  it("blocks private well-known redirects before contacting or reading their targets", async () => {
+    const robots = "https://example.com/robots.txt";
+    const target = "http://169.254.169.254/latest/meta-data";
+    mockHttpResponses.set(robots, {
+      statusCode: 302,
+      headers: { "content-type": "text/plain", location: target },
+      body: "redirect body must not be read",
+    });
+    mockLookup.mockImplementation(async (hostname: string) => [{
+      address: hostname === "169.254.169.254" ? "169.254.169.254" : "93.184.216.34",
+      family: 4,
+    }]);
+
+    await expect(runAudit("https://example.com")).resolves.toHaveLength(8);
+    expect(mockRequestLog.map((request) => request.url)).not.toContain(target);
+    expect(mockBodyReadUrls).not.toContain(robots);
   });
 
   it("returns the full set of audit categories", async () => {
@@ -320,9 +462,7 @@ describe("runAudit", () => {
   });
 
   it("attaches a 'what this costs you' impact line to failing checks", async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockResponse("<html><head></head><body></body></html>")
-    );
+    mockResponse("<html><head></head><body></body></html>");
     const results = await runAudit("https://example.com");
     const failingWithImpact = results
       .flatMap((c) => c.checks)
@@ -344,12 +484,10 @@ describe("runAudit", () => {
       <img src="team.png" alt="The Acme Plumbing team on a job site">
       <a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a>
       </main></body></html>`;
-    mockFetch.mockResolvedValueOnce(mockResponse(richHtml));
+    mockResponse(richHtml);
     const richScore = computeOverallScore(await runAudit("https://example.com"));
 
-    mockFetch.mockResolvedValueOnce(
-      mockResponse("<html><head></head><body></body></html>")
-    );
+    mockResponse("<html><head></head><body></body></html>");
     const emptyScore = computeOverallScore(await runAudit("https://example.com"));
 
     expect(richScore).toBeGreaterThan(emptyScore);
@@ -370,7 +508,7 @@ describe("runAudit", () => {
       <a href="/contact">Contact us</a>
       </section>
       </body></html>`;
-    mockFetch.mockResolvedValueOnce(mockResponse(shellHtml));
+    mockResponse(shellHtml);
     const results = await runAudit("https://example.com");
     const content = results.find((c) => c.slug === "content");
     const enough = content?.checks.find((c) => c.name === "Enough content");

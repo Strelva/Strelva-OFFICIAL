@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { scanAllTenants } from "@/lib/scan";
 import { logAuditEvent } from "@/lib/storage";
 
@@ -19,14 +19,20 @@ export async function POST() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const outcome = await scanAllTenants(SCAN_ALL_CONCURRENCY);
   const actor = await getActorContext();
-  await logAuditEvent({
-    tenant: "*",
+  const outcome = await scanAllTenants(SCAN_ALL_CONCURRENCY);
+  // audit_logs has a real-tenant foreign key. A portfolio wildcard cannot
+  // persist there; retain one attributed result for each attempted tenant.
+  await Promise.all([
+    ...outcome.scanned.map(row => ({ tenant: row.tenant, outcome: "completed" })),
+    ...outcome.failed.map(row => ({ tenant: row.tenant, outcome: "failed" })),
+  ].map(row => logAuditEvent({
+    tenant: row.tenant,
     action: "scan.run_all",
     targetType: "portfolio",
     targetId: "all",
     actor,
-  });
+    metadata: { outcome: row.outcome },
+  })));
   return NextResponse.json(outcome);
 }

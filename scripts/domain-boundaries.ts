@@ -6,6 +6,8 @@ const PLATFORM_ROOTS = new Set([
   "src/platform/work-execution/engine.ts",
   "src/platform/work-execution/standing.ts",
   "src/platform/service-requests/delivery-commitment.ts",
+  "src/platform/business-record/contracts.ts",
+  "src/platform/business-record/tenant-import.ts",
   "src/platform/work-economics/types.ts",
   "src/platform/work-economics/execution-contracts.ts",
   "src/platform/work-economics/execution-engine.ts",
@@ -18,7 +20,7 @@ const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"
 
 function runtimeModule(target: string): boolean {
   return /^src\/(?:app|components|experience|server)(?:\/|$)/.test(target)
-    || /^src\/lib\/(?:db|auth|redis)(?:\/|$)/.test(target)
+    || /^src\/(?:lib|platform\/infra)\/(?:db|auth|redis)(?:\/|$)/.test(target)
     || /(?:^|\/)(?:server|service|repository|adapters?)(?:\/|$)/.test(target)
     || /-(?:service|repository|adapter)$/.test(target);
 }

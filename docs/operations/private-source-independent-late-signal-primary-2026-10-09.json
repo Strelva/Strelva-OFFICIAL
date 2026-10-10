@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "scope": "harmless-review-late-signal",
+  "fullReleaseQualified": false,
+  "terminalChildren": [
+    {
+      "clientPid": 62155,
+      "forced": false,
+      "reaped": true,
+      "errors": [],
+      "returncode": 0
+    }
+  ],
+  "terminalBackends": [
+    {
+      "clientPid": 62155,
+      "backendPid": 62155,
+      "state": "CLOSED"
+    }
+  ],
+  "signals": []
+}

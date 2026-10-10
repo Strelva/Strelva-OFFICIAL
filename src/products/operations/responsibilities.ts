@@ -3,7 +3,7 @@ import { getWork, assertWorkspaceMember } from "@/platform/workspaces/repository
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { readWorkspaceDocument } from "@/products/documents/server";
 import { documentCommandSchema } from "@/products/documents/contracts";
-import { readWorkspaceInvestigation } from "@/products/investigations/server";
+import { readWorkspaceInvestigation, readWorkspaceInvestigationRun } from "@/products/investigations/server";
 import { reconcileBudgetedAction } from "@/platform/work-economics/runtime";
 import { responsibilityCommands, type ExecutionAdapter } from "@/platform/work-execution/runtime";
 import { insertResponsibility, persistResponsibility, readResponsibility } from "@/platform/work-execution/repository";
@@ -91,7 +91,8 @@ async function verifyReconciliation(actor: WorkspaceActor, saved: SavedResponsib
     const executionKey = `${saved.id}:${step.id}:${step.attempt}`;
     const result = step.result && typeof step.result === "object" ? step.result as { finding?: { requestId?: unknown; reused?: unknown } } : {};
     const receiptKey = typeof result.finding?.requestId === "string" ? result.finding.requestId : executionKey;
-    const run = work.payload.runs.find(item => item.requestId === receiptKey);
+    const run = work.payload.runs.find(item => item.requestId === receiptKey)
+      ?? await readWorkspaceInvestigationRun(actor, step.workId, receiptKey);
     if (resolution === "not_applied") throw new WorkspaceConflictError("A missing investigation receipt does not prove the check never ran. An operator must verify it.");
     if (!run) throw new WorkspaceConflictError("The investigation has no receipt for this exact attempt.");
     // Live work needs current evidence before dependent actions may continue.

@@ -1,5 +1,5 @@
-import { customerEmailEnabled, emailSendingEnabled } from "@/lib/email-enabled";
-import { getClientEmailOverride } from "@/lib/client-email-override";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import type { InquiryEngine } from "./inquiry-engine";
 import type { InquiryConnectionView } from "./connections";
 

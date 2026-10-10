@@ -1,0 +1,105 @@
+
+ RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+
+(node:66078) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:66118) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:66119) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/__tests__/rebuild-recovery-independent.test.tsx (1 test | 1 failed) 96ms
+   × can read the actual committed current candidate without replay after history parsing fails 96ms
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx (5 tests | 4 failed) 107ms
+   × reopens exactly one committed native request after lost acknowledgement, retaining its original fields and ID 54ms
+   × does not settle an unknown request with a later authentication refusal 8ms
+   × admits a fresh command only after the initial authentication refusal 16ms
+   × rejects delayed creation after permission changes without discarding the same-scope attempt 17ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/rebuild-recovery-independent.test.tsx > can read the actual committed current candidate without replay after history parsing fails
+AssertionError: expected <button …(2)></button> to be undefined
+
+- Expected:
+undefined
+
++ Received:
+<button
+  class="_control_d606ee _button_d606ee bg-accent text-on-accent enabled:hover:bg-accent/85 _medium_d606ee"
+  disabled=""
+>
+  Publish approved website
+</button>
+
+ ❯ src/__tests__/rebuild-recovery-independent.test.tsx:47:44
+     45|   expect(mutationCount).toBe(1);
+     46|   expect(node.textContent).not.toContain('This exact preview is approv…
+     47|   expect(find('Publish approved website')).toBeUndefined();
+       |                                            ^
+     48|   expect(node.textContent).toContain(corrected);
+     49|   expect(node.querySelector('[role="alert"]')).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > reopens exactly one committed native request after lost acknowledgement, retaining its original fields and ID
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:35:25
+     33|   expect(h.works.size).toBe(1);
+     34|   const name = node.querySelector('input')!; const description = node.…
+     35|   expect(name.disabled).toBe(true); expect(description.disabled).toBe(…
+       |                         ^
+     36|   expect(button('Build a private preview').disabled).toBe(true);
+     37|   expect(button('Use an existing website').disabled).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > does not settle an unknown request with a later authentication refusal
+TypeError: Cannot read properties of undefined (reading 'click')
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:50:60
+     48|   vi.stubGlobal('fetch', vi.fn(async () => { calls++; return Response.…
+     49|   await intake(); await act(async () => button('Build a private previe…
+     50|   await act(async () => button('Check this website request').click());
+       |                                                            ^
+     51|   expect(button('Build a private preview').disabled).toBe(true); expec…
+     52| });
+ ❯ process.env.NODE_ENV.exports.act node_modules/.pnpm/react@19.2.4/node_modules/react/cjs/react.development.js:814:22
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:50:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > admits a fresh command only after the initial authentication refusal
+AssertionError: expected '718f552b-73b8-4083-9959-f77cc702353a' not to be '718f552b-73b8-4083-9959-f77cc702353a' // Object.is equality
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:59:36
+     57|   expect(button('Check this website request')).toBeUndefined(); expect…
+     58|   await type(node.querySelector('input')!, 'Fresh Bread'); await act(a…
+     59|   expect(bodies[1]!.requestId).not.toBe(bodies[0]!.requestId); expect(…
+       |                                    ^
+     60| });
+     61| it.each(['permission', 'workspace'] as const)('rejects delayed creatio…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > rejects delayed creation after permission changes without discarding the same-scope attempt
+AssertionError: expected undefined to be defined
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:71:50
+     69|   expect(node.textContent).not.toContain(record.title);
+     70|   if (change === 'permission') {
+     71|     expect(button('Check this website request')).toBeDefined();
+       |                                                  ^
+     72|     await act(async () => root.render(createElement(RebuildExperience,…
+     73|     expect(button('Build a private preview').disabled).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  5 failed | 1 passed (6)
+   Start at  16:36:57
+   Duration  3.49s (transform 3.87s, setup 87ms, import 5.74s, tests 204ms, environment 783ms)

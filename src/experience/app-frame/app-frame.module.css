@@ -172,6 +172,9 @@
     height: 0;
     flex-basis: 0;
     overflow: visible;
+    /* A desktop rail must release its width immediately at this breakpoint.
+       Animating its collapse leaves the narrow main partly offscreen. */
+    transition: none;
   }
 
   .frame[data-navigation-collapsed="true"] .navigation {
@@ -225,6 +228,15 @@
   .rightRailHeader {
     min-height: 56px;
     padding-inline: 16px;
+  }
+}
+
+@media (pointer: coarse) {
+  .navigationToggle,
+  .closeButton {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
   }
 }
 

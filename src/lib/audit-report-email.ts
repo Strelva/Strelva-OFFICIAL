@@ -1,3 +1,4 @@
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 /**
  * Prospect-facing "your site health report is ready" email. Sent when someone
  * runs the gated full audit on the marketing site. This is a PROSPECT send (no
@@ -10,8 +11,8 @@
  * (the hosted one-pager), which the recipient views in-browser and prints to PDF.
  */
 
-import { type EmailOptions, type EmailHighlight } from "./email/layout";
-import { sendEmail } from "./email/send";
+import { type EmailOptions, type EmailHighlight } from "@/platform/infra/email/layout";
+import { sendEmail } from "@/platform/infra/email/send";
 import { findingsFromCategories } from "./lead-audit";
 import type { AuditResult } from "./audit/types";
 
@@ -58,6 +59,7 @@ export function buildAuditReportEmailOptions(
   const bullets = findings.slice(0, 3).map((f) => ({ title: f.name, text: bulletText(f.impact, f.issue) }));
 
   return {
+    ...(result.agency ? { preparedBy: result.agency.name, brand: { ...STRELVA_BRAND, agencyId: result.agency.workspaceId, name: result.agency.name, logoUrl: result.agency.brand.logoUrl, accentColor: result.agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: result.agency.replyTo ?? null }, secondaryButton: { label: `Contact ${result.agency.name}`, url: result.agency.contactUrl } } : {}),
     preheader: `${result.grade} · ${result.overallScore}/100 for ${host}`,
     heading: "Your site health report is ready",
     paragraphs: [
@@ -72,7 +74,7 @@ export function buildAuditReportEmailOptions(
     },
     bullets: bullets.length ? bullets : undefined,
     button: { label: "See the full report", url: reportUrl },
-    footerNote: "You requested this audit at strelva.com/audit.",
+    footerNote: result.agency ? `You requested this audit through ${result.agency.name} on Strelva.` : "You requested this audit at strelva.com/audit.",
   };
 }
 
@@ -85,12 +87,15 @@ export async function sendAuditReportEmail(params: {
   lead: { name: string; email: string; url: string };
   result: AuditResult;
   reportUrl: string;
+  replyTo?: string;
 }): Promise<boolean> {
+  if (params.result.agency && !params.replyTo) return false;
   const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
   try {
     const host = displayHost(params.lead.url);
     return await sendEmail({
       audience: "prospect",
+      ...(params.result.agency ? { fromName: `${params.result.agency.name} on Strelva`, replyTo: params.replyTo } : {}),
       to: params.lead.email,
       subject: `Your site health report — ${host}`,
       options: opts,

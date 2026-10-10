@@ -329,7 +329,7 @@ export function AppFrame({
           className={styles.columns}
           data-right-rail={railIsOpen ? "open" : "closed"}
         >
-          <main id={contentId} className={styles.main} data-frame-main inert={mobileRailModal || undefined}>
+          <main id={contentId} tabIndex={-1} className={styles.main} data-frame-main inert={mobileRailModal || undefined}>
             {children}
           </main>
           {rightRail && (

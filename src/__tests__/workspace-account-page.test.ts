@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   readPublicContinuationImport: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
 vi.mock("@/platform/workspaces", () => ({
   ensurePersonalWorkspace: mocks.ensurePersonalWorkspace,
   listWorkspaces: mocks.listWorkspaces,
@@ -101,14 +101,14 @@ describe("authenticated workspace account context", () => {
     mocks.getSessionUser.mockResolvedValue(null);
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    await expect(WorkspaceAccountPage()).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
+    await expect(WorkspaceAccountPage({})).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
   });
 
   it("renders verified identity and read-only workspace access without changing permissions", async () => {
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).toHaveBeenCalledWith({ userId: "user_123", verifiedEmail: "owner@example.com" });
@@ -121,7 +121,7 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("Personal workspace");
     expect(text).toContain("Member access");
     expect(text).toContain("Harbor Dental");
-    expect(text).toContain("Customer workspace");
+    expect(text).toContain("Your business");
     expect(text).toContain("Read-only access");
     expect(text).toContain("Each site keeps its own people, settings, and agreed service");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=personal");
@@ -132,7 +132,7 @@ describe("authenticated workspace account context", () => {
     mocks.listWorkspaces.mockRejectedValue(new Error("database password secret"));
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(text).toContain("Workspace access is temporarily unavailable");
@@ -164,7 +164,7 @@ describe("authenticated workspace account context", () => {
     });
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getTenantConfig } from "@/lib/tenants";
-import { getInquiryRepository, inquiryReleaseEnabled, projectPublishedInquiry } from "@/products/inquiries/server";
+import { getInquiryRepository, inquiryReleaseEnabledForTenant, inquiryReleaseMayBeOn, projectPublishedInquiry } from "@/products/inquiries/server";
 import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
+import { inquiryDefinitionAtUse } from "@/products/inquiries";
 
 export const dynamic = "force-dynamic";
 
@@ -19,10 +20,12 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ tenant: string }> }) {
-  if (!inquiryReleaseEnabled()) return json({ error: "Inquiry forms are not enabled." }, 503);
+  if (!inquiryReleaseMayBeOn()) return json({ error: "Inquiry forms are not enabled." }, 503);
   const { tenant } = await params;
   const capabilityId = new URL(request.url).searchParams.get("capabilityId");
   if (!isTenantId(tenant) || !capabilityId || capabilityId.length > 200) return json({ error: "Invalid inquiry form." }, 400);
+  // Per site: a converted tenant follows its business's row (visitors are never operators).
+  if (!(await inquiryReleaseEnabledForTenant(tenant))) return json({ error: "Inquiry forms are not enabled." }, 503);
   try {
     const config = await getTenantConfig(tenant);
     if (!config || !config.active) return json({ error: "Inquiry form unavailable." }, 404);
@@ -34,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     if (workspace.exitCompleted) return json({ error: "Inquiry form is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
     const snapshot = await getInquiryRepository().getSnapshot(tenant, workspace.businessId);
     const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === workspace.businessId);
-    const projection = capability ? projectPublishedInquiry(capability) : null;
+    const projection = capability ? projectPublishedInquiry({ ...capability, live: capability.live ? await inquiryDefinitionAtUse(tenant, capability.live) : null }) : null;
     return projection ? json(projection) : json({ error: "Inquiry form unavailable." }, 404);
   } catch {
     return json({ error: "Inquiry forms are temporarily unavailable." }, 503);

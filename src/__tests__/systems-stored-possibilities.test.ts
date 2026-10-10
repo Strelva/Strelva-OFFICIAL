@@ -1,0 +1,257 @@
+import { randomUUID } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { createInMemoryPossibilityRepository, type Possibility } from "@/platform/possibilities";
+import type { ListedPossibility, SupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
+import { createInMemoryLiveSystems } from "@/platform/make-real";
+import type { Activation } from "@/platform/make-real/contracts";
+import type { SystemListing } from "@/platform/systems/from-existing";
+import { siteDocumentSchema, siteDocumentHash, type WebsiteRebuildRecord, type WebsiteRebuildCandidate } from "@/products/websites/index";
+import {
+  activationViews,
+  makeRealReceipts,
+  rebuildPossibilityInput,
+  publicSourceRebuildInput,
+  syncPublicSourceRebuildPossibilities,
+  syncAskPageSetPossibilities,
+  rebuildSourceRef,
+  revisionHistory,
+  storedPossibilityViews,
+  syncRebuildPossibilities,
+  type StoredTarget,
+} from "@/experience/systems/stored-possibilities";
+
+/*
+ * Rebuild Possibilities kept in Postgres for stored website Systems. The
+ * repository here is an in-memory twin of the Postgres one (same interface);
+ * possibility-repository.test.ts runs the real RPCs.
+ */
+
+const BIZ = "c1000000-0000-4000-8000-000000000001";
+const ACTOR = "c1000000-0000-4000-8000-0000000000a1";
+const AT = "2026-10-06T12:00:00.000Z";
+const HASH = "b".repeat(64);
+
+function memoryRepo(options: { deny?: boolean } = {}): SupabasePossibilityRepository & { writes: number } {
+  const inner = createInMemoryPossibilityRepository();
+  const sources = new Map<string, string>();
+  const repo = {
+    writes: 0,
+    get: inner.get, list: inner.list,
+    async create(value: Possibility) { if (options.deny) throw new WorkspaceAccessError(); repo.writes++; await inner.create(value); },
+    async save(value: Possibility, expected: number) { if (options.deny) throw new WorkspaceAccessError(); repo.writes++; await inner.save(value, expected); },
+    async createFromSource(value: Possibility, sourceRef: string) {
+      const existing = sources.get(sourceRef);
+      if (existing) return { possibility: (await inner.get(value.businessId, existing))!, replayed: true };
+      await repo.create(value);
+      sources.set(sourceRef, value.id);
+      return { possibility: value, replayed: false };
+    },
+    async listWithSources(businessId: string): Promise<ListedPossibility[]> {
+      const rows = await inner.list(businessId);
+      return rows.map((possibility) => ({ possibility, sourceRef: [...sources].find(([, id]) => id === possibility.id)?.[0] ?? null, lastActivityAt: AT }));
+    },
+  };
+  return repo;
+}
+
+function candidate(over: Partial<WebsiteRebuildCandidate> = {}): WebsiteRebuildCandidate {
+  return {
+    workId: "c1000000-0000-4000-8000-0000000000w1".replace("w", "c"), title: "The Mooney Firm, rebuilt", sourceHost: "attymooney.com", tenantId: "mooney",
+    ready: true, summary: "The same business, pages and facts, rebuilt on Strelva's website system.", evidence: "12 of 12 pages carried over.",
+    previewHref: "/api/websites/x/preview", candidateRevision: 3, candidateContentHash: HASH, origin: "rebuild", ...over,
+  };
+}
+
+function siteListing(systemId: string, revisionId: string): SystemListing {
+  return {
+    system: { id: systemId, businessId: BIZ, name: "attymooney.com", purpose: null, kind: "website", lifecycle: "live", currentRevision: { businessId: BIZ, systemId, revisionId, number: 1 }, origin: { kind: "tenant", ref: "c1000000-0000-4000-8000-0000000000b1" }, changeNumber: 3, createdAt: AT, updatedAt: AT },
+    provenance: "stored", basis: null, references: { savedWorkId: null, tenantStableId: "c1000000-0000-4000-8000-0000000000b1", tenantId: "mooney" },
+  };
+}
+
+function fixture() {
+  const live = createInMemoryLiveSystems();
+  const ref = { businessId: BIZ, systemId: "c1000000-0000-4000-8000-0000000000e1" };
+  const revisionId = live.seed(ref, "attymooney.com", { pointer: "tenant_content" });
+  const target: StoredTarget = { candidate: candidate(), site: siteListing(ref.systemId, revisionId), inquiries: [], domain: "attymooney.com" };
+  const revisions = new Map([[ref.systemId, { revisionId, number: 1 }]]);
+  return { live, ref, target, revisions };
+}
+
+describe("stored rebuild possibilities", () => {
+  it("pins the stored site's current revision and publishes through the hosted website channel", () => {
+    const { target, revisions } = fixture();
+    const input = rebuildPossibilityInput(target, revisions)!;
+    expect(input.changes![0]!.baseline).toMatchObject({ systemId: target.site.system.id, number: 1 });
+    expect(input.effects).toEqual([expect.objectContaining({ kind: "publish", channel: "hosted_website", request: { workId: target.candidate.workId, candidateRevision: 3, candidateContentHash: HASH, tenantId: "mooney" } })]);
+    expect(rebuildPossibilityInput({ ...target, candidate: candidate({ candidateRevision: null }) }, revisions)).toBeNull();
+    expect(rebuildPossibilityInput(target, new Map())).toBeNull();
+  });
+
+  it("creates one stored possibility per rebuild, Ready when reviewed, and never doubles it", async () => {
+    const { live, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    const first = await syncRebuildPossibilities(deps);
+    expect(first).toHaveLength(1);
+    expect(first[0]).toMatchObject({ sourceRef: rebuildSourceRef(target.candidate.workId), possibility: { status: "ready" } });
+    const writes = repo.writes;
+    const again = await syncRebuildPossibilities(deps);
+    expect(again.map((row) => row.possibility.id)).toEqual(first.map((row) => row.possibility.id));
+    expect(repo.writes).toBe(writes);
+  });
+
+  it("refreshes the candidate when the rebuild or the live site moved, and asks again", async () => {
+    const { live, ref, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    const [created] = await syncRebuildPossibilities(deps);
+    const moved = live.edit(ref, { pointer: "tenant_content@v2" });
+    const refreshed = await syncRebuildPossibilities({ ...deps, revisions: new Map([[ref.systemId, { revisionId: moved, number: 2 }]]), targets: [{ ...target, candidate: candidate({ candidateRevision: 4 }) }] });
+    expect(refreshed[0]!.possibility).toMatchObject({ id: created!.possibility.id, status: "ready", candidateRevision: 2 });
+    expect(refreshed[0]!.possibility.changes[0]!.baseline.revisionId).toBe(moved);
+  });
+
+  it("a member reads what is stored and writes nothing; a refused write stops quietly", async () => {
+    const { live, target, revisions } = fixture();
+    const repo = memoryRepo();
+    await expect(syncRebuildPossibilities({ repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: false })).resolves.toEqual([]);
+    expect(repo.writes).toBe(0);
+    const denied = memoryRepo({ deny: true });
+    await expect(syncRebuildPossibilities({ repo: denied, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true })).resolves.toEqual([]);
+  });
+
+  it("shows open ones with the reason a stale one went back to Exploring; made real moves to History", async () => {
+    const { live, target, revisions } = fixture();
+    const [row] = await syncRebuildPossibilities({ repo: memoryRepo(), live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true });
+    const stale: Possibility = { ...row!.possibility, status: "exploring", revision: row!.possibility.revision + 1, history: [...row!.possibility.history, { revision: row!.possibility.revision + 1, kind: "stale", actorId: ACTOR, at: AT, detail: "attymooney.com changed since this was built." }] };
+    const views = storedPossibilityViews([{ ...row!, possibility: stale }, { ...row!, possibility: { ...row!.possibility, id: randomUUID(), status: "made_real" } }], [target.candidate]);
+    expect(views).toEqual([expect.objectContaining({ id: stale.id, status: "exploring", stored: true, staleReason: "attymooney.com changed since this was built.", workId: target.candidate.workId, previewHref: "/api/websites/x/preview" })]);
+  });
+});
+
+function activation(over: Partial<Activation>): Activation {
+  return {
+    version: 1, id: "act-1", businessId: BIZ, possibilityId: "p", candidateRevision: 1, actorId: ACTOR, status: "needs_attention", revision: 4,
+    pinned: [], introduced: [], connections: [], approvals: [], checks: [],
+    steps: [
+      { id: "effect:publish-site", kind: "effect", target: "publish-site", label: "Publish the rebuilt attymooney.com", dependsOn: [], reversibility: "compensable", idempotencyKey: "k1", status: "completed", effect: "accepted", attempts: 1,
+        receipt: { providerRef: "w:hosted-3", adapterMode: "live", acceptedAt: AT }, readBack: { status: "confirmed", detail: "ok", at: AT } },
+      { id: "effect:google", kind: "effect", target: "google", label: "Add the booking link on Google", dependsOn: [], reversibility: "irreversible", idempotencyKey: "k2", status: "blocked", effect: "none", attempts: 1, reason: "Waiting: Google hasn't approved Strelva's access yet." },
+      { id: "effect:iso", kind: "effect", target: "iso", label: "Isolated rehearsal write", dependsOn: [], reversibility: "compensable", idempotencyKey: "k3", status: "completed", effect: "accepted", attempts: 1, receipt: { providerRef: "isolated-publish-1", adapterMode: "isolated", acceptedAt: AT } },
+    ],
+    createdAt: AT, updatedAt: AT, history: [], ...over,
+  };
+}
+
+describe("Make real on Home and the System page", () => {
+  const p = { id: "p", title: "A rebuilt attymooney.com", changes: [{ baseline: { businessId: BIZ, systemId: "c1000000-0000-4000-8000-0000000000e1", revisionId: "r", number: 1 } }], history: [], status: "ready" } as unknown as Possibility;
+
+  it("In progress reads Partly live with each line in the customer's words; isolated lines never show", () => {
+    const [view] = activationViews([{ possibility: p, activation: activation({}) }]);
+    expect(view).toMatchObject({ headline: "Partly live", partlyLive: true, affects: ["c1000000-0000-4000-8000-0000000000e1"] });
+    expect(view!.lines).toEqual([
+      { label: "Publish the rebuilt attymooney.com", state: "Done", detail: null },
+      { label: "Add the booking link on Google", state: "Waiting", detail: "Google hasn't approved Strelva's access yet." },
+    ]);
+    expect(activationViews([{ possibility: p, activation: activation({ status: "in_progress", steps: activation({}).steps.map((s) => ({ ...s, status: "pending", effect: "none", receipt: undefined, readBack: undefined, reason: undefined })) }) }])[0]!.headline)
+      .toBe("Making the rebuilt attymooney.com live: 0 of 3 done");
+  });
+
+  it("What changed lists each live accepted effect and the settled summary, never an isolated one", () => {
+    const receipts = makeRealReceipts([{ possibility: p, activation: activation({ status: "made_real" }) }], Date.parse(AT) - 1000);
+    expect(receipts.map((r) => r.sentence)).toEqual(["Publish the rebuilt attymooney.com", 'Made "A rebuilt attymooney.com" live']);
+    expect(receipts[0]!.undo).toBe("Undo from History");
+    expect(makeRealReceipts([{ possibility: p, activation: activation({}) }], Date.parse(AT) + 1000)).toEqual([]);
+    const withdrawn = { ...p, status: "withdrawn", history: [{ revision: 9, kind: "withdraw_idle", actorId: "strelva", at: AT }] } as unknown as Possibility;
+    expect(makeRealReceipts([{ possibility: withdrawn, activation: null }], Date.parse(AT) - 1)).toEqual([expect.objectContaining({ sentence: 'Strelva set aside "A rebuilt attymooney.com" after 90 days without activity' })]);
+  });
+
+  it("History reads the System's own changes, newest first, never calling them Versions", () => {
+    const rows = revisionHistory("s1", [
+      { id: "r1", businessId: BIZ, systemId: "s1", number: 1, implementation: { kind: "tenant_content", ref: "x@initial" }, summary: "Adopted at conversion.", createdAt: "2026-10-01T00:00:00.000Z", createdBy: ACTOR },
+      { id: "r2", businessId: BIZ, systemId: "s1", number: 2, implementation: { kind: "tenant_content", ref: "x@v_2" }, summary: "Website content changed.", createdAt: "2026-10-02T00:00:00.000Z", createdBy: ACTOR },
+      { id: "r3", businessId: BIZ, systemId: "s1", number: 3, implementation: { kind: "make_real_content", ref: "sha256:a", contentHash: HASH }, summary: "the rebuilt attymooney.com", createdAt: "2026-10-03T00:00:00.000Z", createdBy: ACTOR },
+    ]);
+    expect(rows.map((r) => r.sentence)).toEqual(["Made live: the rebuilt attymooney.com", "Website content changed", "Started running it"]);
+    expect(rows.every((r) => !/version/i.test(r.sentence))).toBe(true);
+  });
+});
+
+
+function publicFixture() {
+  const base = fixture();
+  const document = siteDocumentSchema.parse({ version: 2, siteName: "Private copy", theme: { palette: "light", typeScale: "standard" }, pages: [{ path: "/", title: "Private copy", description: "", root: "hero" }], nodes: { hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Private copy" }, children: [], factIds: [] } }, facts: {}, assets: {}, redirects: [], provenance: { composer: "rules" } });
+  const source: SystemListing = { ...base.target.site, system: { ...base.target.site.system, lifecycle: "draft" }, references: { savedWorkId: null, tenantStableId: null, tenantId: null, connectedSiteId: randomUUID() }, connectedSite: { siteUrl: "https://attymooney.com/", siteHost: "attymooney.com", verified: false, lastEventAt: null } };
+  const choice = candidate({ tenantId: null, candidateContentHash: siteDocumentHash(document) });
+  const record: WebsiteRebuildRecord = { workId: choice.workId, workspaceId: BIZ, rebuild: { version: 2, revision: 3, title: choice.title, input: { requestId: "public-source-proof", url: "https://attymooney.com/" }, status: "review_ready", stages: [], checkpoint: null, sourceAudit: { categories: [] }, audit: null, pageMapping: [], skippedPaths: [], candidate: { revision: 3, contentHash: choice.candidateContentHash!, document, previewHref: "/api/websites/public/preview" }, approvedCandidateRevision: null, tenantId: null, launch: { receipt: null, readBack: null }, lastError: null, createdBy: ACTOR, createdAt: AT, history: [] } };
+  return { ...base, target: { candidate: choice, source }, record };
+}
+
+describe("public-source native introductions", () => {
+  it("preserves external identity and directs publication only to a new native introduction", () => {
+    const { target, record } = publicFixture();
+    const before = structuredClone(target.source);
+    const input = publicSourceRebuildInput(target, record)!;
+    expect(input.changes).toEqual([]);
+    expect(input.introduces).toEqual([expect.objectContaining({ extractedFrom: [{ businessId: BIZ, systemId: target.source.system.id }] })]);
+    expect(input.effects![0]!.system).toEqual({ introducedKey: "native-website" });
+    expect(input.effects![0]!.request).not.toHaveProperty("tenantId");
+    expect(input.introduces![0]!.candidate.content.publicSourceReference).toMatchObject({ systemId: target.source.system.id, verified: false });
+    expect(target.source).toEqual(before);
+    expect(publicSourceRebuildInput({ ...target, candidate: { ...target.candidate, sourceHost: "another.example" } }, record)).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, workspaceId: randomUUID() })).toBeNull();
+    expect(publicSourceRebuildInput({ ...target, source: { ...target.source, system: { ...target.source.system, lifecycle: "paused" } } }, record)).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, rebuild: { ...record.rebuild, candidate: { ...record.rebuild.candidate!, contentHash: "0".repeat(64) } } })).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, rebuild: { ...record.rebuild, sourceAudit: null } })).toBeNull();
+  });
+
+  it("stores one private Exploring proposal and projects source lineage without mutation targets", async () => {
+    const { target, record } = publicFixture();
+    const repo = memoryRepo();
+    const deps = { repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    const stored = await syncPublicSourceRebuildPossibilities(deps);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]!.possibility.status).toBe("exploring");
+    const writes = repo.writes;
+    const again = await syncPublicSourceRebuildPossibilities({ ...deps, stored });
+    expect(again.map(row => row.possibility.id)).toEqual(stored.map(row => row.possibility.id));
+    expect(repo.writes).toBe(writes);
+    expect(storedPossibilityViews(stored, [target.candidate])[0]).toMatchObject({ stored: true, affects: [], sourceSystemIds: [target.source.system.id], introduces: [target.candidate.title] });
+  });
+
+  it("does not write on member reads or after current repository access is withdrawn", async () => {
+    const { target, record } = publicFixture();
+    let read = false;
+    const deps = { repo: memoryRepo(), businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: false, read: async () => { read = true; return record; } };
+    expect(await syncPublicSourceRebuildPossibilities(deps)).toEqual([]);
+    expect(read).toBe(false); expect(deps.repo.writes).toBe(0);
+    expect(await syncPublicSourceRebuildPossibilities({ ...deps, repo: memoryRepo({ deny: true }), canWrite: true })).toEqual([]);
+  });
+
+  it("requires exact owner approval before a public-source proposal becomes Ready", async () => {
+    const { target, record, live } = publicFixture();
+    const repo = memoryRepo();
+    const stored = await syncPublicSourceRebuildPossibilities({ repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record });
+    const deps = { repo, live: live.port, stored, actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    expect((await syncAskPageSetPossibilities(deps))[0]!.possibility.status).toBe("exploring");
+    expect((await syncAskPageSetPossibilities({ ...deps, read: async () => ({ ...record, rebuild: { ...record.rebuild, status: "approved", approvedCandidateRevision: 2 } }) }))[0]!.possibility.status).toBe("exploring");
+    expect((await syncAskPageSetPossibilities({ ...deps, read: async () => ({ ...record, rebuild: { ...record.rebuild, status: "approved", approvedCandidateRevision: 3 } }) }))[0]!.possibility.status).toBe("ready");
+  });
+
+  it("refreshes changed introduction content while retaining its durable identity", async () => {
+    const { target, record } = publicFixture();
+    const repo = memoryRepo();
+    const deps = { repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    const stored = await syncPublicSourceRebuildPossibilities(deps);
+    const changedDocument = { ...record.rebuild.candidate!.document, siteName: "Revised private copy" };
+    const hash = siteDocumentHash(changedDocument);
+    const changed = { ...record, rebuild: { ...record.rebuild, candidate: { ...record.rebuild.candidate!, revision: 4, contentHash: hash, document: changedDocument } } };
+    const again = await syncPublicSourceRebuildPossibilities({ ...deps, stored, targets: [{ ...target, candidate: { ...target.candidate, candidateRevision: 4, candidateContentHash: hash } }], read: async () => changed });
+    expect(again[0]!.possibility.id).toBe(stored[0]!.possibility.id);
+    expect(again[0]!.possibility.candidateRevision).toBe(2);
+    expect(again[0]!.possibility.introduces[0]!.candidate.content.document).toMatchObject({ siteName: "Revised private copy" });
+    expect(again[0]!.possibility.status).toBe("exploring");
+  });
+});

@@ -1,5 +1,5 @@
 import { agencyAssignedWorkAccess } from "@/platform/workspaces/repository";
-import { isSuperAdminUser } from "@/lib/db/repositories";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { responsibilityCommands } from "@/platform/work-execution/runtime";
 import { readResponsibility } from "@/platform/work-execution/repository";

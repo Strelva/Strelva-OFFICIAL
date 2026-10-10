@@ -11,7 +11,7 @@ const redis = {
   del: vi.fn(async (key: string) => (store.delete(key) ? 1 : 0)),
 };
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 
 import { claimEventAction, finishEventAction, markExecutionExternalAccepted } from "@/lib/events";
 

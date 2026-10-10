@@ -1,5 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
+import { customerImportedReview } from "@/platform/infra/google-review-content";
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getReviews, getReviewById, addReview, replyToReview } from "@/lib/reviews";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -15,6 +17,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const reviews = await getReviews(tenant);
     return NextResponse.json(reviews);
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
 
     const review = await addReview(tenant, {
       source,
+      providerContent: customerImportedReview(),
       author,
       rating: Math.min(5, Math.max(1, Number(rating))),
       text,

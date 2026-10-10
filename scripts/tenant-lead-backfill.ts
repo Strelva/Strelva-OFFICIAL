@@ -6,9 +6,9 @@
  * Idempotent: the store treats a lead id it already has as a no-op, and the
  * same submission inside five minutes as a duplicate. Rerun freely.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import type { LeadRecord } from "../src/lib/leads";
 import type { LeadMirrorResult } from "../src/lib/lead-mirror";
-
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 /** True only for a loopback database host. Anything else is production-like. */

@@ -1,9 +1,11 @@
+import { reconcileLegacyReviewImports } from "./review-import-provenance";
+import { projectGoogleReview } from "@/platform/infra/google-review-content";
 import { promises as fs } from "fs";
 import path from "path";
 import type { ReviewItem } from "./types";
-import { dataSourceIsPostgres } from "./db/source-flags";
-import { getSupabase } from "./db/client";
-import type { Row, Insert } from "./db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase } from "@/platform/infra/db/client";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 function devReviewsPath(tenant: string): string {
   return path.join(process.cwd(), `dev-reviews-${tenant}.json`);
@@ -12,7 +14,8 @@ function devReviewsPath(tenant: string): string {
 async function readDevReviews(tenant: string): Promise<ReviewItem[]> {
   try {
     const raw = await fs.readFile(devReviewsPath(tenant), "utf-8");
-    return JSON.parse(raw);
+    const rows = await reconcileLegacyReviewImports(tenant, JSON.parse(raw) as ReviewItem[]);
+    return rows.map(row => projectGoogleReview(row));
   } catch {
     return [];
   }
@@ -36,16 +39,18 @@ function reviewDb(operation: string): NonNullable<ReturnType<typeof getSupabase>
 }
 
 function rowToReview(r: Row<"reviews">): ReviewItem {
+  const row = projectGoogleReview(r);
   return {
-    id: r.id,
-    source: r.source as ReviewItem["source"],
-    author: r.author,
-    rating: r.rating ?? 0,
-    text: r.text,
-    date: r.review_date ?? r.created_at,
-    reply: r.reply ?? undefined,
-    repliedAt: r.replied_at ?? undefined,
-    externalId: r.external_id ?? undefined,
+    providerContent: (row.provider_content ?? undefined) as ReviewItem["providerContent"],
+    id: row.id,
+    source: row.source as ReviewItem["source"],
+    author: row.author,
+    rating: row.rating ?? 0,
+    text: row.text,
+    date: row.review_date ?? row.created_at,
+    reply: row.reply ?? undefined,
+    repliedAt: row.replied_at ?? undefined,
+    externalId: row.external_id ?? undefined,
   };
 }
 
@@ -64,6 +69,7 @@ async function pgInsertReview(tenant: string, review: Omit<ReviewItem, "id">): P
   const db = reviewDb(`insert ${tenant}`);
   const insert: Insert<"reviews"> = {
     tenant_id: tenant,
+    provider_content: review.providerContent ?? null,
     source: review.source,
     author: review.author,
     rating: review.rating,
@@ -152,7 +158,7 @@ export async function addReview(
 
   if (!dataSourceIsPostgres()) {
     const id = generateId();
-    const newReview: ReviewItem = { ...review, id };
+    const newReview: ReviewItem = projectGoogleReview({ ...review, id });
     const reviews = await readDevReviews(tenant);
     reviews.push(newReview);
     await writeDevReviews(tenant, reviews);
@@ -220,4 +226,20 @@ export async function replyToReviewByExternalId(
   reviews[idx] = updatedByExtId;
   await writeDevReviews(tenant, reviews);
   return updatedByExtId;
+}
+
+/** Accepted listing edit/withdrawal mirrored into the same store both owner
+ * surfaces read. Withdrawing also suppresses re-drafting that same review. */
+export async function mirrorPublishedReviewReply(tenant: string, externalId: string, text: string | null): Promise<void> {
+  if (text !== null) { await replyToReviewByExternalId(tenant, externalId, text); return; }
+  const { markReviewReplyDeclined } = await import("./review-replies");
+  await markReviewReplyDeclined(tenant, externalId);
+  if (dataSourceIsPostgres()) {
+    const db = reviewDb(`withdraw-by-external ${tenant}/${externalId}`);
+    const { error } = await db.from("reviews").update({ reply: null, replied_at: null }).eq("tenant_id", tenant).eq("external_id", externalId);
+    if (error) throw error;
+  } else {
+    const rows = await readDevReviews(tenant);
+    await writeDevReviews(tenant, rows.map(row => row.externalId === externalId ? { ...row, reply: undefined, repliedAt: undefined } : row));
+  }
 }

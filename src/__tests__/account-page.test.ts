@@ -31,8 +31,8 @@ vi.mock("@/components/auth/UseInvitedEmailButton", () => ({
   }),
 }));
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/platform/infra/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/infra/auth")>();
   return {
     ...actual,
     getAuthUserId: mockGetAuthUserId,
@@ -42,7 +42,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/dev-access", () => ({
+vi.mock("@/platform/infra/dev-access", () => ({
   getDevAccessTenant: () => null,
   isDevAccessBypassEnabled: () => false,
 }));
@@ -93,7 +93,7 @@ describe("account page access handoff", () => {
   it("shows recovery guidance when tenant grants no longer resolve", async () => {
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    const page = await AccountPage();
+    const page = await AccountPage({});
     const text = textFrom(page);
 
     expect(mockGetTenantConfig).toHaveBeenCalledWith("missing-a");
@@ -112,7 +112,7 @@ describe("account page access handoff", () => {
     mockIsSuperAdmin.mockResolvedValue(true);
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    await expect(AccountPage()).rejects.toThrow("REDIRECT:/admin");
+    await expect(AccountPage({})).rejects.toThrow("REDIRECT:/admin");
 
     expect(mockClaimPendingInvite).not.toHaveBeenCalled();
   });
@@ -120,7 +120,7 @@ describe("account page access handoff", () => {
   it("opens the inquiry business entry only when its release is enabled", async () => {
     mockInquiryReleaseEnabled.mockReturnValue(true);
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
-    await expect(AccountPage()).rejects.toThrow("REDIRECT:/business");
+    await expect(AccountPage({})).rejects.toThrow("REDIRECT:/business");
     expect(mockClaimPendingInvite).toHaveBeenCalledOnce();
   });
 
@@ -136,7 +136,7 @@ describe("account page access handoff", () => {
     mockClaimPendingInvite.mockResolvedValue({ tenant: "harbor" });
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    await expect(AccountPage()).rejects.toThrow("REDIRECT:/workspace");
+    await expect(AccountPage({})).rejects.toThrow("REDIRECT:/workspace");
 
     expect(mockClaimPendingInvite).toHaveBeenCalledOnce();
     expect(mockGetTenantConfig).not.toHaveBeenCalled();
@@ -160,7 +160,7 @@ describe("account page access handoff", () => {
     mockClaimPendingInvite.mockRejectedValueOnce(new Error("Invitation unavailable"));
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    await expect(AccountPage()).rejects.toThrow("Invitation unavailable");
+    await expect(AccountPage({})).rejects.toThrow("Invitation unavailable");
     expect(mockRedirect).not.toHaveBeenCalled();
   });
 
@@ -189,7 +189,7 @@ describe("account page access handoff", () => {
     mockGetTenantConfig.mockResolvedValue({ id: "harbor", active: true });
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    await expect(AccountPage()).rejects.toThrow("REDIRECT:https://app.strelva.com/client/harbor/dashboard");
+    await expect(AccountPage({})).rejects.toThrow("REDIRECT:https://app.strelva.com/client/harbor/dashboard");
   });
 
   it("requires authentication before any shared workspace landing", async () => {
@@ -197,7 +197,7 @@ describe("account page access handoff", () => {
     mockGetAuthUserId.mockResolvedValue(null);
     const { default: AccountPage } = await import("@/app/(marketing)/account/page");
 
-    await expect(AccountPage()).rejects.toThrow("REDIRECT:/sign-in");
+    await expect(AccountPage({})).rejects.toThrow("REDIRECT:/sign-in");
     expect(mockClaimPendingInvite).not.toHaveBeenCalled();
   });
 

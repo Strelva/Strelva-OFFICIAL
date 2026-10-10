@@ -1,0 +1,69 @@
+%% Historical view from revision 3. Revision 5 superseded several of these primitives (see PRODUCT_MODEL changes rev 5); not regenerated.
+%% Filter: nine contract families, not nine universal entities.
+%% Generated from PRODUCT_MODEL revision 3; status=all, inactive=False, focus=all, hops=1
+flowchart LR
+  LATENT_VIEW_TITLE["Strelva: proposed contracts | revision 3"]
+  N_PRIM_BUSINESS(["primitive: Business"])
+  class N_PRIM_BUSINESS type_primitive;
+  class N_PRIM_BUSINESS proposed;
+  N_PRIM_RECORD_REF(["primitive: Typed record"])
+  class N_PRIM_RECORD_REF type_primitive;
+  class N_PRIM_RECORD_REF proposed;
+  N_PRIM_FINITE_WORK(["primitive: Finite Work"])
+  class N_PRIM_FINITE_WORK type_primitive;
+  class N_PRIM_FINITE_WORK proposed;
+  N_PRIM_OPERATION(["primitive: Operation / invocation"])
+  class N_PRIM_OPERATION type_primitive;
+  class N_PRIM_OPERATION proposed;
+  N_PRIM_DECISION_GRANT(["primitive: Authority"])
+  class N_PRIM_DECISION_GRANT type_primitive;
+  class N_PRIM_DECISION_GRANT proposed;
+  N_PRIM_CONNECTION[("integration: Connection")]
+  class N_PRIM_CONNECTION type_integration;
+  class N_PRIM_CONNECTION proposed;
+  N_PRIM_RECEIPT_OBSERVATION(["primitive: Evidence"])
+  class N_PRIM_RECEIPT_OBSERVATION type_primitive;
+  class N_PRIM_RECEIPT_OBSERVATION proposed;
+  N_PRIM_PROVIDER_COMMITMENT(["primitive: Provider commitment (source: partial)"])
+  class N_PRIM_PROVIDER_COMMITMENT type_primitive;
+  class N_PRIM_PROVIDER_COMMITMENT confirmed;
+  N_PRIM_ONGOING_RESP[/"responsibility: Responsibility"/]
+  class N_PRIM_ONGOING_RESP type_responsibility;
+  class N_PRIM_ONGOING_RESP proposed;
+  N_PRIM_ACTOR_RELATIONSHIPS(["primitive: Actor"])
+  class N_PRIM_ACTOR_RELATIONSHIPS type_primitive;
+  class N_PRIM_ACTOR_RELATIONSHIPS proposed;
+  N_PRIM_METHOD_DEFINITION(["primitive: Method"])
+  class N_PRIM_METHOD_DEFINITION type_primitive;
+  class N_PRIM_METHOD_DEFINITION proposed;
+  N_PRIM_METHOD_INSTALLATION(["primitive: Installation"])
+  class N_PRIM_METHOD_INSTALLATION type_primitive;
+  class N_PRIM_METHOD_INSTALLATION proposed;
+  N_PRIM_BUSINESS -.->|"owns [P]"| N_PRIM_RECORD_REF
+  N_PRIM_ACTOR_RELATIONSHIPS -.->|"acts under [P]"| N_PRIM_DECISION_GRANT
+  N_PRIM_DECISION_GRANT -.->|"authorizes [P]"| N_PRIM_OPERATION
+  N_PRIM_OPERATION -.->|"changes [P]"| N_PRIM_RECORD_REF
+  N_PRIM_CONNECTION -.->|"enables outside effect [P]"| N_PRIM_OPERATION
+  N_PRIM_OPERATION -.->|"produces [P]"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_FINITE_WORK -.->|"completion checked by [P]"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_ONGOING_RESP -.->|"assessed over time [P]"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_ONGOING_RESP -.->|"starts scoped recovery [P]"| N_PRIM_FINITE_WORK
+  N_PRIM_PROVIDER_COMMITMENT -.->|"accepts finite delivery [P]"| N_PRIM_FINITE_WORK
+  N_PRIM_PROVIDER_COMMITMENT -.->|"accepts maintained condition [P]"| N_PRIM_ONGOING_RESP
+  N_PRIM_BUSINESS -.->|"owns [P]"| N_PRIM_METHOD_INSTALLATION
+  N_PRIM_METHOD_INSTALLATION -.->|"pins [P]"| N_PRIM_METHOD_DEFINITION
+  N_PRIM_METHOD_INSTALLATION -.->|"binds [P]"| N_PRIM_RECORD_REF
+  N_PRIM_METHOD_DEFINITION -.->|"declares [P]"| N_PRIM_OPERATION
+  N_PRIM_FINITE_WORK -.->|"orchestrates [P]"| N_PRIM_OPERATION
+  classDef type_integration fill:#E2E8F0,stroke:#475569,color:#0F172A;
+  classDef type_primitive fill:#E8F0FE,stroke:#3659C9,color:#172554;
+  classDef type_responsibility fill:#FFEDD5,stroke:#C2410C,color:#431407;
+  classDef confirmed stroke-width:2px,stroke-dasharray:0;
+  classDef inferred stroke-width:2px,stroke-dasharray:2 3;
+  classDef proposed stroke-width:2px,stroke-dasharray:8 4;
+  LEGEND_CONFIRMED["confirmed: solid"]
+  class LEGEND_CONFIRMED confirmed;
+  LEGEND_INFERRED["All arrows [P]: proposed relationships"]
+  class LEGEND_INFERRED inferred;
+  LEGEND_PROPOSED["proposed: dashed"]
+  class LEGEND_PROPOSED proposed;

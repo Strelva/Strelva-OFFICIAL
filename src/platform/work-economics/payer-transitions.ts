@@ -1,12 +1,23 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 
 export type PayerTransitionStatus = "pending" | "accepted" | "rejected" | "revoked" | "stale";
+/**
+ * Who would pay (20261009154000_payer_party.sql): a named person signing for
+ * the business, an agency workspace (any of its owners/admins answers), or
+ * the business itself (an owner answers; switches back from agency pays).
+ */
+export type PayerSuccessorKind = "user" | "agency" | "business";
 export type PayerTransition = {
   id: string;
   workspaceId: string;
+  successorKind: PayerSuccessorKind;
+  canRespond: boolean;
+  /** Empty unless the successor is a person. */
   successorUserId: string;
   successorEmail: string;
+  successorWorkspaceId: string | null;
+  successorWorkspaceName: string | null;
   proposerEmail: string;
   status: PayerTransitionStatus;
   proposedAt: string;
@@ -29,8 +40,10 @@ export class PayerTransitionNotFoundError extends Error {}
 export class PayerTransitionValidationError extends Error {}
 export class PayerTransitionPersistenceError extends Error {}
 
-const commandSchema = z.discriminatedUnion("action", [
+const commandSchema = z.union([
   z.object({ action: z.literal("propose"), workspaceId: z.string().uuid(), successorEmail: z.string().trim().email().max(254).transform(value => value.toLowerCase()) }).strict(),
+  z.object({ action: z.literal("propose"), workspaceId: z.string().uuid(), successorAgencyWorkspaceId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("propose"), workspaceId: z.string().uuid(), successorKind: z.literal("business") }).strict(),
   z.object({ action: z.enum(["accept", "reject", "revoke"]), transitionId: z.string().uuid() }).strict(),
 ]);
 
@@ -44,9 +57,9 @@ function databaseError(error: unknown): never {
   if (value.includes("payer_transition_command_invalid")) throw new PayerTransitionValidationError("Check the payer change request.");
   if (value.includes("payer_transition_not_found")) throw new PayerTransitionNotFoundError("That payer change is unavailable.");
   if (value.includes("payer_transition_owner_required")) throw new PayerTransitionAccessError("Only a business owner can propose or revoke a payer change.");
-  if (value.includes("payer_transition_successor_required")) throw new PayerTransitionAccessError("Only the exact addressed person can accept or reject this payer change.");
+  if (value.includes("payer_transition_successor_required")) throw new PayerTransitionAccessError("Only the addressed person, an owner or admin of the addressed agency, or a business owner (for the business itself) can accept or reject this payer change.");
   if (value.includes("payer_transition_identity_denied") || value.includes("payer_transition_workspace_denied")) throw new PayerTransitionAccessError("This business is unavailable to your account.");
-  if (value.includes("payer_transition_successor_unavailable")) throw new PayerTransitionConflictError("The proposed payer must still have this verified account.");
+  if (value.includes("payer_transition_successor_unavailable")) throw new PayerTransitionConflictError("The proposed payer must be a verified account or an agency workspace.");
   if (value.includes("job_economics_payer_required") || value.includes("job_economics_workspace_denied")) throw new PayerTransitionAccessError("Only the exact payer can accept this job limit.");
   if (value.includes("job_economics_identity_denied")) throw new PayerTransitionAccessError("This financial request is unavailable to your account.");
   if (value.includes("payer_transition_not_pending")) throw new PayerTransitionConflictError("This payer change is no longer pending.");
@@ -55,9 +68,14 @@ function databaseError(error: unknown): never {
 
 function map(row: Record<string, unknown>): PayerTransition {
   const string = (name: string) => typeof row[name] === "string" ? row[name] as string : "";
+  const kind = string("successor_kind");
   return {
-    id: string("id"), workspaceId: string("workspace_id"), successorUserId: string("successor_user_id"),
-    successorEmail: string("successor_email"), proposerEmail: string("proposer_email"),
+    id: string("id"), workspaceId: string("workspace_id"), canRespond: row.can_respond === true,
+    successorKind: kind === "agency" || kind === "business" ? kind : "user",
+    successorUserId: string("successor_user_id"), successorEmail: string("successor_email"),
+    successorWorkspaceId: typeof row.successor_workspace_id === "string" ? row.successor_workspace_id : null,
+    successorWorkspaceName: typeof row.successor_workspace_name === "string" ? row.successor_workspace_name : null,
+    proposerEmail: string("proposer_email"),
     status: string("status") as PayerTransitionStatus, proposedAt: string("proposed_at"),
     resolvedAt: typeof row.resolved_at === "string" ? row.resolved_at : null,
     acceptedAt: typeof row.accepted_at === "string" ? row.accepted_at : null,

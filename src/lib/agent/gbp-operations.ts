@@ -4,13 +4,13 @@ import type { getEvent } from "../events";
 /**
  * Operation registry (ontology Phase 3, first increment) — each executable agent
  * operation defined ONCE here, then the AI tools are GENERATED from these
- * definitions (see `buildGbpTools` in `src/lib/agent-shared.ts`) instead of being
+ * definitions (see `buildGbpTools` in `src/lib/agent/shared-tools.ts`) instead of being
  * hand-written. This increment covers the three Google Business Profile write ops,
  * the cleanest already-factored set. It is a pure refactor: the generated tools are
  * behaviour-identical to the previous hand-rolled literals.
  *
  * This file owns the GBP input-schema primitives (`GBP_DAY`, `GBP_PHOTO_CATEGORY`,
- * `optionalUrl`) so the registry is self-contained; `agent-shared.ts` imports the
+ * `optionalUrl`) so the registry is self-contained; `shared-tools.ts` imports the
  * registry, never the reverse (no circular import).
  */
 
@@ -162,7 +162,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
         summary,
         ctaUrl: typeof event.metadata?.ctaUrl === "string" ? event.metadata.ctaUrl : undefined,
         photoUrl: typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : undefined,
-      });
+      }, { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` });
       if (!result.success) return { ok: false, reason: "gbp_post_failed" };
       return { ok: true, activity: { type: "gbp-post", detail: summary } };
     },
@@ -196,7 +196,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
       const { updateBusinessHours } = await import("../gbp-management");
       const result = await updateBusinessHours(tenantId, {
         regularHours: { periods } as Parameters<typeof updateBusinessHours>[1]["regularHours"],
-      });
+      }, { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` });
       if (!result.success) return { ok: false, reason: "gbp_hours_failed" };
       return { ok: true, activity: { type: "gbp-hours", detail: "" } };
     },
@@ -229,6 +229,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
         tenantId,
         photoUrl,
         category as Parameters<typeof uploadGbpPhoto>[2],
+        { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` },
       );
       if (!result.success) return { ok: false, reason: "gbp_photo_failed" };
       return { ok: true, activity: { type: "gbp-photo", detail: "" } };

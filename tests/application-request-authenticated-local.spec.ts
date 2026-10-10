@@ -65,7 +65,7 @@ test("an owner starts with a request and delivers an application through the UI,
     expect(appId).toBeTruthy();
     await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(page.getByText(/Release 1 is live/)).toBeVisible();
     await page.getByLabel("Recipient email", { exact: true }).fill(employee.email);
     await page.getByRole("button", { name: "Issue access link", exact: true }).click();
     await expect(page.locator(`a[href="/apps/${appId}"]`)).toBeVisible();

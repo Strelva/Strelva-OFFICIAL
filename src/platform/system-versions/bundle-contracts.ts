@@ -1,0 +1,10 @@
+import { z } from "zod";
+const field=z.object({id:z.string().regex(/^[a-z][a-z0-9_]{0,79}$/),label:z.string().trim().min(1).max(200),kind:z.enum(["text","email","phone","date","textarea"]),required:z.boolean()}).strict();
+export const inquiryPackageDefinitionSchema=z.object({kind:z.literal("inquiry_pattern"),name:z.string().trim().min(1).max(200),title:z.string().trim().min(1).max(300),intro:z.string().max(5000),fields:z.array(field).min(1).max(30),routingWithinMinutes:z.number().int().min(1).max(10080)}).strict().refine(v=>new Set(v.fields.map(f=>f.id)).size===v.fields.length,"Fields must have unique IDs.");
+// A bounded native FAQ section. No source links, assets, bindings or customer facts.
+export const websiteSectionPackageDefinitionSchema=z.object({kind:z.literal("website_section"),title:z.string().trim().min(1).max(500),items:z.array(z.object({question:z.string().trim().min(1).max(500),answer:z.string().trim().min(1).max(4000)}).strict()).min(1).max(40)}).strict();
+export const bundleTargetsSchema=z.object({inquiryTenantId:z.string().regex(/^[a-z0-9-]{1,63}$/).optional(),websiteWorkId:z.string().uuid().optional(),websitePagePath:z.string().startsWith("/").max(512).optional()}).strict();
+export type BundleTargets=z.infer<typeof bundleTargetsSchema>;
+export const bundleInstallReceiptSchema=z.object({workspaceId:z.string().uuid(),bundleId:z.string().uuid(),sourceRevisionId:z.string().uuid(),outcome:z.literal("drafts_created"),components:z.array(z.object({key:z.string(),name:z.string(),kind:z.enum(["internal_app","inquiry_pattern","website_section"]),systemId:z.string().uuid(),versionId:z.string().uuid(),openHref:z.string().startsWith("/"),status:z.literal("draft")}).strict()).min(1).max(16)}).strict();
+
+export const bundleTargetChoicesSchema=z.object({workspaceId:z.string().uuid(),revisionId:z.string().uuid(),commandId:z.string().uuid(),boundTargets:bundleTargetsSchema.nullable(),inquiry:z.array(z.object({id:z.string(),label:z.string()}).strict()),websites:z.array(z.object({id:z.string().uuid(),label:z.string(),pages:z.array(z.object({path:z.string(),title:z.string()}).passthrough())}).strict())}).strict();

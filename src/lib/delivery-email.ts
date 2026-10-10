@@ -2,9 +2,9 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
-import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/lib/email/layout";
-import { sendEmail } from "@/lib/email/send";
-import { cleanSubjectText } from "@/lib/email/text";
+import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/platform/infra/email/layout";
+import { sendEmail } from "@/platform/infra/email/send";
+import { cleanSubjectText } from "@/platform/infra/email/text";
 
 /**
  * Log a real client-comms send into the tenant's operator CRM activity timeline
@@ -308,6 +308,63 @@ export async function sendNewLeadEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-lead email failed:`, err);
+    return false;
+  }
+}
+
+function buildNewBookingOwnerEmailOptions(params: {
+  customerName: string;
+  customerEmail?: string;
+  serviceName: string;
+  when: string;
+  dashboardUrl: string;
+}): EmailOptions {
+  const rows = [
+    { label: "Who", value: cleanSubjectText(params.customerName) },
+    { label: "What", value: cleanSubjectText(params.serviceName) },
+    { label: "When", value: cleanSubjectText(params.when) },
+  ];
+  if (params.customerEmail) rows.push({ label: "Email", value: cleanSubjectText(params.customerEmail) });
+  return {
+    heading: "New booking",
+    paragraphs: ["Someone booked through your website. It's confirmed and on your schedule."],
+    rows,
+    button: { label: "See your bookings", url: params.dashboardUrl },
+  };
+}
+
+/**
+ * "New booking" to the business's owner recipient (bookings spec,
+ * notifications table): a notice, sent once when a visitor's booking is
+ * confirmed. A booking *request* is a Needs you item instead, emailed by
+ * Needs you, so the owner never gets two emails for one booking. The caller
+ * resolves the address through the owner-recipient rule
+ * (src/lib/owner-recipient.ts). Fails soft: returns false on any error so it
+ * can never undo a booking that is already kept.
+ */
+export async function sendNewBookingOwnerEmail(params: {
+  email: string;
+  siteName: string;
+  booking: { customerName: string; customerEmail?: string; serviceName: string; when: string };
+  dashboardUrl: string;
+  tenantId?: string;
+  logPrefix?: string;
+}): Promise<boolean> {
+  try {
+    const options = buildNewBookingOwnerEmailOptions({ ...params.booking, dashboardUrl: params.dashboardUrl });
+    const sent = await sendEmail({
+      audience: "client",
+      tenantId: params.tenantId,
+      to: params.email,
+      subject: `New booking: ${cleanSubjectText(params.booking.customerName)}, ${cleanSubjectText(params.booking.when)}`,
+      html: renderEmailHtml(options),
+      text: renderEmailText(options),
+    });
+    if (!sent) return false;
+    await logSentEmailToCrm(params.tenantId, "Sent: new-booking email");
+    return true;
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-booking email failed:`, err);
     return false;
   }
 }
@@ -878,76 +935,4 @@ export async function sendDeliveryStatusEmail(params: {
   }
 }
 
-/** One at-risk client line in the ops digest: business name + its top reason. */
-export interface OpsDigestAtRisk {
-  name: string;
-  reason: string;
-}
-
-function buildOpsDigestEmailOptions(params: {
-  totalLeads: number;
-  unworkedLeads: number;
-  atRisk: OpsDigestAtRisk[];
-  recentSignups: string[];
-  opsUrl: string;
-}): EmailOptions {
-  const plural = (n: number) => (n === 1 ? "" : "s");
-  const rows: EmailRow[] = [
-    { label: "Unworked leads", value: `${params.unworkedLeads} of ${params.totalLeads}` },
-    { label: "At-risk clients", value: String(params.atRisk.length) },
-  ];
-  // One row per at-risk client (name → top reason), capped so a bad day can't
-  // blow the email up.
-  for (const client of params.atRisk.slice(0, 12)) {
-    rows.push({ label: cleanSubjectText(client.name), value: cleanSubjectText(client.reason) });
-  }
-  rows.push({
-    label: "New signups (7d)",
-    value: params.recentSignups.length
-      ? params.recentSignups.map((n) => cleanSubjectText(n)).join(", ")
-      : "None",
-  });
-  const summary =
-    `${params.unworkedLeads} unworked lead${plural(params.unworkedLeads)} of ${params.totalLeads} total · ` +
-    `${params.atRisk.length} client${plural(params.atRisk.length)} at risk · ` +
-    `${params.recentSignups.length} new signup${plural(params.recentSignups.length)} this week.`;
-  return {
-    heading: "Strelva daily ops",
-    paragraphs: [summary],
-    rows,
-    button: { label: "Open the ops board", url: params.opsUrl },
-    footerNote: "Operator notification",
-  };
-}
-
-/**
- * "Strelva daily ops" — one digest a day summarizing the portfolio for the
- * operators (Noah + Jacob): unworked leads, at-risk clients (with the top
- * reason), and recent signups. OPERATOR notification: gates on
- * operatorEmailsEnabled() (ON by default), independent of the client email
- * pause. Recipients default to jacob@strelva.com via resolveLeadNotifyRecipients().
- * Fails soft: returns false on any error so a failed digest can never affect the
- * cron's 200.
- */
-export async function sendOpsDigestEmail(params: {
-  totalLeads: number;
-  unworkedLeads: number;
-  atRisk: OpsDigestAtRisk[];
-  recentSignups: string[];
-  opsUrl: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const opts = buildOpsDigestEmailOptions(params);
-
-    return await sendEmail({
-      audience: "operator",
-      to: resolveLeadNotifyRecipients(),
-      subject: "Strelva daily ops",
-      options: opts,
-    });
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} Ops-digest email failed:`, err);
-    return false;
-  }
-}
+export { sendOpsDigestEmail, type OpsDigestAtRisk } from "@/lib/ops-digest-email";

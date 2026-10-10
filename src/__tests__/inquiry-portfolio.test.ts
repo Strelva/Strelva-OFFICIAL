@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   workspace: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   getCurrentUserTenants: mocks.tenants,
   requireTenantAccess: mocks.access,
 }));
@@ -122,6 +122,20 @@ describe("inquiry portfolio discovery", () => {
     expect(repo.getSnapshot).toHaveBeenCalledWith("active", "active-business");
   });
 
+  it("projects existing client installations as lineage and uses the current local release without copying data or permissions", async () => {
+    const current = snapshot("active", "active-business", 7);
+    Object.assign(current.state, { patternInstallations: [{ id: "installed", businessId: "active-business", capabilityId: "cap-live",
+      sourceBusinessId: "agency-business", sourceCapabilityId: "source", sourceVersion: 2, targetVersion: 4, status: "conflicted",
+      lastSourceShape: { private: "not copied" }, lastTargetShape: { private: "not copied" }, pendingUpdate: { private: "not copied" } },
+      { id: "foreign", businessId: "foreign", capabilityId: "cap-live", sourceBusinessId: "agency-business" }] });
+    const result = await discoverInquiryPortfolio(repository(() => current));
+    expect(result.versions).toEqual([{ id: "installed", tenantId: "active", businessName: "Active Business", name: "Ask us",
+      sourceBusinessId: "agency-business", sourceSystemId: "inquiry:source", sourceRevision: 2, currentRelease: 7, improvement: "blocked" }]);
+    expect(JSON.stringify(result.versions)).not.toMatch(/private|routing|approval|credential|inquiries|lastSourceShape/);
+    const repo = repository(() => current);
+    expect((await discoverInquiryPortfolio(repo, async () => false)).versions).toBeUndefined();
+    expect(repo.getSnapshot).not.toHaveBeenCalled();
+  });
   it("keeps repository outages explicit instead of presenting an empty portfolio", async () => {
     mocks.tenants.mockResolvedValue(["active"]);
     const repo = repository(() => { throw new Error("storage unavailable"); });

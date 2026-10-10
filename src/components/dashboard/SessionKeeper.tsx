@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 /**
  * Keeps the Supabase session fresh on the client. The @supabase/ssr browser client

@@ -7,10 +7,10 @@
  * This script cleans up everything a tenant owns so a throwaway onboard can be
  * wiped back to zero.
  *
- * Postgres is the source of truth, so it is the primary target: every
- * tenant-scoped table is purged by tenant_id, then the `tenants` row itself.
- * Redis cache keys and the per-tenant Vercel project are torn down too, and the
- * tenant's domain-claims are cleared from the shared claim map.
+ * Postgres is the source of truth. One database transaction checks protected
+ * workspace records, then removes tenant-scoped rows and the `tenants` row
+ * atomically. Redis, domain claims, and the per-tenant Vercel project are
+ * cleaned up afterward; those cross-store operations are not one transaction.
  *
  * SAFETY (this deletes PRODUCTION data — .env.local points at prod):
  *   - DRY RUN BY DEFAULT. Nothing is deleted without --confirm.
@@ -28,18 +28,21 @@
  *   --force         Override the real-client guards (denylist + has-paid).
  *   --keep-vercel   Leave the {tenantId}-site Vercel project in place.
  *   --json          Emit a machine-readable summary instead of the human report.
+ *   --retry-cleanup=<receiptId> Resume only the outstanding external/cache cleanup.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import * as readline from "node:readline";
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getTenantConfig } from "../src/lib/tenants";
-import { runDeprovision } from "../src/lib/deprovision";
+import { runDeprovision, isValidDeprovisionTenantId } from "../src/lib/deprovision";
 
 interface Flags {
   confirm: boolean;
   force: boolean;
   keepVercel: boolean;
   json: boolean;
+  cleanupReceiptId?: string;
 }
 
 function parseFlags(): { tenantId: string | undefined; flags: Flags } {
@@ -52,6 +55,7 @@ function parseFlags(): { tenantId: string | undefined; flags: Flags } {
       force: args.includes("--force"),
       keepVercel: args.includes("--keep-vercel"),
       json: args.includes("--json"),
+      cleanupReceiptId: args.find((arg) => arg.startsWith("--retry-cleanup="))?.slice("--retry-cleanup=".length),
     },
   };
 }
@@ -63,7 +67,7 @@ function prompt(question: string): Promise<string> {
 
 async function main() {
   const { tenantId, flags } = parseFlags();
-  if (!tenantId) {
+  if (!tenantId || !isValidDeprovisionTenantId(tenantId)) {
     console.error("Usage: npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> [--confirm] [--force] [--keep-vercel]");
     process.exit(1);
   }
@@ -113,15 +117,17 @@ async function main() {
     dryRun: !flags.confirm,
     force: flags.force,
     keepVercel: flags.keepVercel,
+    cleanupReceiptId: flags.cleanupReceiptId,
   });
 
-  if (!result.ok) {
+  if (!result.ok && result.refusalReason) {
     console.error(`REFUSED: ${result.refusalDetail ?? result.refusalReason}\n`);
     process.exit(2);
   }
 
   if (flags.json) {
-    console.log(JSON.stringify({ tenantId, dbHost, executed: result.executed, pgRowTotal: result.pgRowTotal, summary: result.summary }, null, 2));
+    console.log(JSON.stringify({ ...result, dbHost }, null, 2));
+    if (!result.ok) process.exitCode = 3;
     return;
   }
 
@@ -137,10 +143,14 @@ async function main() {
   }
   console.log(`  ${verb} ${result.pgRowTotal} Postgres row(s) across ${result.summary.postgres?.length ?? 0} table(s).`);
   console.log(banner);
+  if (!result.ok) {
+    console.error(`Database removal committed; cleanup is incomplete. Slug reuse is blocked. Retry with --confirm --retry-cleanup=${result.cleanup?.id}`);
+    process.exitCode = 3;
+  }
   if (!result.executed) {
     console.log("DRY RUN — nothing was deleted. Re-run with --confirm to execute.\n");
   } else {
-    console.log("Done. If a table delete threw mid-run, re-running is safe (idempotent). Verify the tenant is gone from the admin Tenants list.\n");
+    console.log("Postgres cleanup committed atomically. Redis, domain, and Vercel cleanup ran afterward; verify those stores if any reported an error. Verify the tenant is gone from the admin Tenants list.\n");
   }
 }
 

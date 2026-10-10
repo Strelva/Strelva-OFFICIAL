@@ -17,7 +17,7 @@ vi.mock("@/lib/governed-work/repository", () => ({
   recordOutcome: (...a: unknown[]) => mockRecordOutcome(...a),
 }));
 
-import { governedWorkDualWriteEnabled } from "@/lib/db/dual-write";
+import { governedWorkDualWriteEnabled } from "@/platform/infra/db/dual-write";
 import {
   eventToProposal,
   isGovernedWorkEvent,

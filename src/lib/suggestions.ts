@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { generateModelText } from "@/platform/infra/model-calls";
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
@@ -10,8 +9,8 @@ import { getProducts } from "./products";
 import { getSiteCapabilityManifest } from "./site-capabilities";
 import { getTenantConfig } from "./tenants";
 import type { ContentSection } from "./types";
-import { dataSourceIsPostgres } from "./db/source-flags";
-import { getSupabase, type Row, type Insert } from "./db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 export interface Suggestion {
   id: string;
@@ -608,8 +607,7 @@ async function generateLlmSuggestion(data: {
       (data.services.services || []).length ? "a services section" : null,
     ].filter(Boolean);
 
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+    const { result: { text } } = await generateModelText({ purpose: "suggestion", tenantId: data.tenantId, actorKind: "strelva" }, {
       prompt: `You help a local business owner get more customers from their website. Suggest the single most useful next thing for them to do.
 
 Business: ${data.settings.siteName || "this business"}

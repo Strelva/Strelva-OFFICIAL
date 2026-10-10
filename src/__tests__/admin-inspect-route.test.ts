@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 
 import { GET } from "@/app/api/admin/inspect/route";
 

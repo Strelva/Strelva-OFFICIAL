@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Authenticated Collections CMS CRUD (the basic client editor + admin/agent).
  * Tenant comes from the request host/headers and is access-gated, so a user of
@@ -8,7 +9,7 @@ import { NextResponse } from "next/server";
 import { isCollectionType, type CollectionType } from "@/lib/cms/collection-types";
 import { listEntriesForType, saveEntry, removeEntry } from "@/lib/cms/collections-service";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, getActorContext } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, getActorContext } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(
@@ -22,6 +23,7 @@ export async function GET(
   const tenant = await requireTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const statusParam = new URL(request.url).searchParams.get("status");
   const status = statusParam === "published" || statusParam === "draft" ? statusParam : undefined;

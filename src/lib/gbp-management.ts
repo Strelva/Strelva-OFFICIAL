@@ -17,12 +17,12 @@
  * proven by tests; live calls require the API access grant to go live.
  */
 
-import { getConnection } from "./connections";
+import { randomUUID } from "node:crypto";
+import { workspacePorts } from "./workspace-ports";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
-import { getRedis } from "./redis";
 import { GBP_WRITE_SCOPE, connectionHasWriteScope } from "./gbp-replies";
-import { refreshAccessToken } from "./google-token";
+import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
 
 // ─── GBP API base URLs ────────────────────────────────────────────────────────
 
@@ -171,36 +171,6 @@ async function emitSetupPending(
   }
 }
 
-// ─── Token helpers (refreshAccessToken shared via google-token.ts) ────────────
-
-async function getValidToken(tenantId: string): Promise<string | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
-
-  if (connection.expiresAt) {
-    const buf = 5 * 60 * 1000;
-    if (Date.now() + buf > new Date(connection.expiresAt).getTime()) {
-      if (!connection.refreshToken) return null;
-      return refreshAccessToken(connection.refreshToken);
-    }
-  }
-  return connection.accessToken;
-}
-
-// ─── Account/location meta (mirrors gbp-replies.ts) ──────────────────────────
-
-async function fetchGBPMeta(
-  tenantId: string
-): Promise<{ accountId: string; locationId: string } | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  const meta = await redis.get<{ accountId?: string; locationId?: string }>(
-    `google-meta:${tenantId}`
-  );
-  if (!meta?.accountId || !meta?.locationId) return null;
-  return { accountId: meta.accountId, locationId: meta.locationId };
-}
-
 // ─── Shared error emitter ─────────────────────────────────────────────────────
 
 async function emitFailure(
@@ -216,7 +186,7 @@ async function emitFailure(
       title: `GBP ${operation} failed`,
       body: evidence,
       status: "pending",
-      metadata: { kind: `gbp_${operation}_failed`, evidence },
+      metadata: { kind: `gbp_${operation}_failed`, evidence, reviewAudience: "operator" },
     });
     sendSlackNotification({
       text: `GBP ${operation} FAILED for *${tenantId}* — ${evidence}`,
@@ -235,14 +205,14 @@ async function resolveWriteContext(
   tenantId: string,
   operation: string
 ): Promise<WriteContextResult> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") {
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") {
     const evidence = `tenant=${tenantId} error=no_connected_google_account`;
     await emitFailure(tenantId, operation, evidence);
     return { ok: false, evidence };
   }
 
-  if (!connectionHasWriteScope(connection.scopes)) {
+  if (!connectionHasWriteScope(grant.scopes)) {
     const evidence = `tenant=${tenantId} error=missing_gbp_write_scope scope=${GBP_WRITE_SCOPE} requires_reconnect=true`;
     await emitFailure(tenantId, operation, evidence);
     sendSlackNotification({
@@ -251,14 +221,14 @@ async function resolveWriteContext(
     return { ok: false, evidence };
   }
 
-  const accessToken = await getValidToken(tenantId);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) {
     const evidence = `tenant=${tenantId} error=token_refresh_failed`;
     await emitFailure(tenantId, operation, evidence);
     return { ok: false, evidence };
   }
 
-  const meta = await fetchGBPMeta(tenantId);
+  const meta = await getGoogleLocation(tenantId, grant);
   if (!meta) {
     const evidence = `tenant=${tenantId} error=missing_account_location_meta`;
     await emitFailure(tenantId, operation, evidence);
@@ -266,6 +236,125 @@ async function resolveWriteContext(
   }
 
   return { ok: true, accessToken, accountId: meta.accountId, locationId: meta.locationId };
+}
+
+/** Stable per approval, so an accepted or uncertain dispatch cannot be replayed. */
+export interface GoogleWriteOptions { commandKey?: string; actor?: string }
+
+function normalizedGoogleValue(value: unknown, key?: string): unknown {
+  if (Array.isArray(value)) return value.map(item => normalizedGoogleValue(item)).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  if (!value || typeof value !== "object") return value;
+  const object = value as Record<string, unknown>;
+  // Google omits zero in TimeOfDay. Compare the semantics, including midnight.
+  if (key === "openTime" || key === "closeTime" || "hours" in object || "minutes" in object) return { hours: object.hours ?? 0, minutes: object.minutes ?? 0 };
+  return Object.fromEntries(Object.keys(object).sort().map((key) => [key, normalizedGoogleValue(object[key], key)]));
+}
+
+/** Same governance caller, durable dispatch reservation and honest read-back.
+ * This path is opt-in. An unavailable reservation sends nothing. Settlement
+ * failure leaves the durable pending attempt, so no retry can duplicate it. */
+async function receiptedGoogleWrite(
+  tenantId: string, kind: "gbp_hours" | "gbp_post" | "gbp_photo", input: Record<string, unknown>, options: GoogleWriteOptions,
+): Promise<GbpManagementResult & { providerRef?: string }> {
+  const operation = kind === "gbp_hours" ? "update_hours" : kind === "gbp_post" ? "create_post" : "upload_photo";
+  const ctx = await resolveWriteContext(tenantId, operation);
+  if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
+  const { accessToken, accountId, locationId } = ctx;
+  const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+  const location = locationId.startsWith("locations/") ? locationId : `locations/${locationId}`;
+  const account = accountId.startsWith("accounts/") ? accountId : `accounts/${accountId}`;
+  const base = kind === "gbp_hours" ? BUSINESS_INFORMATION_V1 : MY_BUSINESS_V4;
+  let body: Record<string, unknown>;
+  let beforeState: unknown = null;
+  let readUrl: string | null = null;
+  let writeUrl: string;
+  if (kind === "gbp_hours") {
+    body = Object.fromEntries(["regularHours", "specialHours"].filter((key) => input[key]).map((key) => [key, input[key]]));
+    if (!Object.keys(body).length) return { success: false, verified: false, evidence: "no_hours_provided" };
+    const mask = Object.keys(body).join(",");
+    readUrl = `${base}/${location}?readMask=${mask}`;
+    writeUrl = `${base}/${location}?updateMask=${mask}`;
+    try {
+      const before = await fetch(readUrl, { headers });
+      if (!before.ok) throw new Error("before_hours_unavailable");
+      beforeState = await before.json();
+    } catch {
+      return { success: false, verified: false, evidence: "Before-hours could not be read. Nothing sent to Google." };
+    }
+  } else {
+    const { validateUrlSafety } = await import("./audit/checks");
+    for (const url of [input.ctaUrl, input.photoUrl]) {
+      if (typeof url !== "string") continue;
+      try { await validateUrlSafety(url); } catch { return { success: false, verified: false, evidence: "unsafe_google_source_url" }; }
+    }
+    body = kind === "gbp_post" ? {
+      languageCode: "en", summary: input.summary, topicType: "STANDARD",
+      ...(input.ctaUrl ? { callToAction: { actionType: "LEARN_MORE", url: input.ctaUrl } } : {}),
+      ...(input.photoUrl ? { media: [{ mediaFormat: "PHOTO", sourceUrl: input.photoUrl }] } : {}),
+    } : { mediaFormat: "PHOTO", sourceUrl: input.photoUrl, locationAssociation: { category: input.category } };
+    writeUrl = `${base}/${account}/${location}/${kind === "gbp_post" ? "localPosts" : "media"}`;
+  }
+  const commandKey = options.commandKey ?? `google:${tenantId}:${kind}:${randomUUID()}`;
+  let port: Awaited<ReturnType<ReturnType<typeof workspacePorts>["outsideWriteReceipts"]>>;
+  let attemptId: string;
+  try {
+    port = await workspacePorts().outsideWriteReceipts();
+    const claim = await port.beginGoogleWrite({ commandKey, tenantId, writeKind: kind, request: body });
+    if (!claim.claimed) return {
+      success: claim.acceptance === "accepted", verified: claim.receipt?.readback === "matched",
+      providerRef: claim.receipt?.providerRef ?? undefined,
+      evidence: claim.acceptance === "accepted" ? "Google already accepted this approval. It was not resent." : "Google acceptance uncertain. Reconcile the receipt; do not resend.",
+    };
+    attemptId = claim.attemptId;
+  } catch {
+    return { success: false, verified: false, evidence: "Google receipt storage is unavailable. Nothing sent to Google." };
+  }
+  const receiptBase = { commandKey, tenantId, writeKind: kind, subject: `Google ${operation.replaceAll("_", " ")}`,
+    request: body, beforeState, actor: options.actor ?? "approved Google change" };
+  let response: Response;
+  try {
+    response = await fetch(writeUrl, { method: kind === "gbp_hours" ? "PATCH" : "POST", headers, body: JSON.stringify(body) });
+  } catch {
+    try { await port.completeGoogleWrite(attemptId, { ...receiptBase, acceptance: "unknown", acceptanceDetail: "No response from Google. Never resend without reconciliation." }); } catch { /* Durable pending attempt still blocks replay. */ }
+    return { success: false, verified: false, evidence: "Google acceptance uncertain. Do not resend." };
+  }
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    try { await port.completeGoogleWrite(attemptId, { ...receiptBase, acceptance: "rejected", acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt remains visible. */ }
+    const evidence = `tenant=${tenantId} operation=${operation} rejected status=${response.status}`;
+    if (isSetupPendingError(response.status, detail)) return { success: false, verified: false, evidence, pendingSetup: true, ownerMessage: SETUP_PENDING_MESSAGE };
+    await emitFailure(tenantId, operation, evidence);
+    return { success: false, verified: false, evidence };
+  }
+  // Record provider acceptance immediately, before parsing or read-back.
+  let providerRef: string | undefined;
+  try { const data = await response.json(); providerRef = typeof data?.name === "string" ? data.name : undefined; } catch { /* Acceptance does not depend on JSON. */ }
+  let receiptId: string | undefined;
+  try {
+    receiptId = (await port.completeGoogleWrite(attemptId, { ...receiptBase, acceptance: "accepted", providerRef, readback: "pending" })).id;
+  } catch { /* Return accepted even if settlement failed. The reservation blocks any later replay. */ }
+  if (kind !== "gbp_hours" && providerRef) readUrl = `${base}/${providerRef}`;
+  let readback: "matched" | "differs" | "failed" | "not_possible" = "not_possible";
+  let evidence = "Google accepted; no resource identifier was returned for read-back.";
+  if (readUrl) {
+    try {
+      const read = await fetch(readUrl, { headers });
+      if (!read.ok) throw new Error("readback_unavailable");
+      const live = await read.json();
+      const matches = kind === "gbp_hours"
+        ? Object.entries(body).every(([key, value]) => JSON.stringify(normalizedGoogleValue(live[key])) === JSON.stringify(normalizedGoogleValue(value)))
+        : kind === "gbp_post"
+          ? live.name === providerRef && live.summary === input.summary && (!input.ctaUrl || live.callToAction?.url === input.ctaUrl)
+          : live.name === providerRef && live.locationAssociation?.category === input.category && (!live.sourceUrl || live.sourceUrl === input.photoUrl);
+      readback = matches ? "matched" : "differs";
+      evidence = `Google accepted; read-back ${readback}.`;
+    } catch { readback = "failed"; evidence = "Google accepted; read-back failed. Do not resend."; }
+  }
+  if (receiptId) {
+    try { await port.recordReadback(receiptId, readback, evidence); } catch { evidence += " Read-back evidence could not be saved; receipt remains pending."; }
+  } else { evidence += " Receipt settlement failed; durable attempt needs reconciliation."; }
+  if (readback !== "matched") await emitFailure(tenantId, operation, evidence);
+  return { success: true, verified: readback === "matched", evidence, providerRef };
 }
 
 // ─── updateBusinessHours ──────────────────────────────────────────────────────
@@ -292,8 +381,10 @@ async function resolveWriteContext(
  */
 export async function updateBusinessHours(
   tenantId: string,
-  hours: { regularHours?: RegularHours; specialHours?: SpecialHours }
+  hours: { regularHours?: RegularHours; specialHours?: SpecialHours },
+  options: GoogleWriteOptions = {},
 ): Promise<GbpManagementResult> {
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") return receiptedGoogleWrite(tenantId, "gbp_hours", hours, options);
   const ctx = await resolveWriteContext(tenantId, "update_hours");
   if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
 
@@ -409,8 +500,13 @@ export async function updateBusinessHours(
  */
 export async function createGbpPost(
   tenantId: string,
-  post: GbpPostInput
+  post: GbpPostInput,
+  options: GoogleWriteOptions = {},
 ): Promise<GbpManagementResult & { postName?: string }> {
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") {
+    const result = await receiptedGoogleWrite(tenantId, "gbp_post", { ...post }, options);
+    return { ...result, postName: result.providerRef };
+  }
   const ctx = await resolveWriteContext(tenantId, "create_post");
   if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
 
@@ -551,8 +647,13 @@ export async function createGbpPost(
 export async function uploadGbpPhoto(
   tenantId: string,
   photoUrl: string,
-  category: GbpPhotoCategory
+  category: GbpPhotoCategory,
+  options: GoogleWriteOptions = {},
 ): Promise<GbpManagementResult & { mediaName?: string }> {
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") {
+    const result = await receiptedGoogleWrite(tenantId, "gbp_photo", { photoUrl, category }, options);
+    return { ...result, mediaName: result.providerRef };
+  }
   const ctx = await resolveWriteContext(tenantId, "upload_photo");
   if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
 
@@ -687,13 +788,13 @@ export interface GbpState {
  * Requires: Business Profile API access approval + business.manage scope.
  */
 export async function getGbpState(tenantId: string): Promise<GbpState | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") return null;
 
-  const accessToken = await getValidToken(tenantId);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) return null;
 
-  const meta = await fetchGBPMeta(tenantId);
+  const meta = await getGoogleLocation(tenantId, grant);
   if (!meta) return null;
 
   const { accountId, locationId } = meta;

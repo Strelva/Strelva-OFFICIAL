@@ -18,10 +18,13 @@ const mockCreateGbpPost = vi.fn();
 const mockPublishReviewReply = vi.fn();
 const mockMarkExecutionExternalAccepted = vi.fn();
 const mockExecuteInquiryPublication = vi.fn();
+const mockAuthorizeInquiryPublicationActor = vi.fn();
 const mockIsInquiryMessageReviewEvent = vi.fn();
 const mockAuthorizeInquiryMessageReviewActor = vi.fn();
 const mockExecuteInquiryMessageReview = vi.fn();
 const mockReconcileInquiryMessageReview = vi.fn();
+const observeAcceptedNativePublish = vi.hoisted(() => vi.fn());
+vi.mock("@/app/api/publish/native-readback", () => ({ observeAcceptedNativePublish }));
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -36,6 +39,7 @@ vi.mock("../lib/events", () => ({
 
 vi.mock("@/products/inquiries/server", () => ({
   executeInquiryPublication: (...args: unknown[]) => mockExecuteInquiryPublication(...args),
+  authorizeInquiryPublicationActor: (...args: unknown[]) => mockAuthorizeInquiryPublicationActor(...args),
 }));
 
 vi.mock("@/products/inquiries", () => ({
@@ -87,7 +91,8 @@ vi.mock("../lib/gbp-replies", () => ({
   publishReviewReply: (...args: unknown[]) => mockPublishReviewReply(...args),
 }));
 
-import { resolveEventAction } from "../lib/event-actions";
+import { agencyStaffActorId, operatorActorId, resolveEventAction } from "../lib/event-actions";
+import { recordApproval, recordRejection } from "../lib/ai-auto-approve";
 
 describe("resolveEventAction", () => {
   beforeEach(() => {
@@ -96,6 +101,23 @@ describe("resolveEventAction", () => {
     mockFinishEventAction.mockResolvedValue(undefined);
     mockRevalidateClientSite.mockResolvedValue(undefined);
     mockIsInquiryMessageReviewEvent.mockReturnValue(false);
+    mockAuthorizeInquiryPublicationActor.mockResolvedValue({ allowed: true });
+  });
+
+  it("keeps approved content resolved when public observation fails, without a second publish", async () => {
+    const event = { id: "accepted-content", tenantId: "tenant-a", type: "content_update", status: "pending", metadata: { kind: "agent_preview", section: "hero", proposedData: { title: "Approved title" } } };
+    mockGetEvent.mockResolvedValue(event);
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ title: "Old title" });
+    mockSetContent.mockResolvedValue(undefined);
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    observeAcceptedNativePublish.mockRejectedValueOnce(new Error("Observation unavailable"));
+    expect(await resolveEventAction("tenant-a", event.id, "approved")).toEqual({ changed: true });
+    expect(observeAcceptedNativePublish).toHaveBeenCalledWith(expect.objectContaining({ publicationRef: event.id, section: "hero", expected: { title: "Approved title" } }));
+    mockGetEvent.mockResolvedValue({ ...event, status: "approved" });
+    expect(await resolveEventAction("tenant-a", event.id, "approved")).toEqual({ changed: false, reason: "already_resolved" });
+    expect(mockSetContent).toHaveBeenCalledTimes(1);
+    expect(mockRevalidateClientSite).toHaveBeenCalledTimes(1);
   });
 
   it("does not execute suggestion side effects for already resolved events", async () => {
@@ -147,6 +169,21 @@ describe("resolveEventAction", () => {
       },
     });
 
+  it.each(["approved", "dismissed"] as const)("refuses unauthorized inquiry publication %s before claiming or resolving the event", async action => {
+    const event = inquiryPublicationEvent(); mockGetEvent.mockResolvedValue(event);
+    mockAuthorizeInquiryPublicationActor.mockResolvedValue({ allowed: false, reason: "permission_denied" });
+    expect(await resolveEventAction("tenant-a", event.id, action, "operator")).toEqual({ changed: false, reason: "permission_denied" });
+    expect(mockClaimEventAction).not.toHaveBeenCalled(); expect(mockExecuteInquiryPublication).not.toHaveBeenCalled();
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("an accepted inquiry publication still requires current owner authority before completing event recovery", async () => {
+    const event = inquiryPublicationEvent(); event.metadata = { ...event.metadata, execution: { state: "external_accepted" } } as typeof event.metadata;
+    mockGetEvent.mockResolvedValue(event); mockAuthorizeInquiryPublicationActor.mockResolvedValue({ allowed: false, reason: "permission_denied" });
+    expect(await resolveEventAction("tenant-a", event.id, "approved", "operator")).toEqual({ changed: false, reason: "permission_denied" });
+    expect(mockResolveEvent).not.toHaveBeenCalled(); expect(mockExecuteInquiryPublication).not.toHaveBeenCalled();
+  });
+
   it("resolves an inquiry publication only after its executor records verified acceptance", async () => {
     mockGetEvent.mockResolvedValue(inquiryPublicationEvent());
     mockExecuteInquiryPublication.mockResolvedValue({ accepted: true, verified: true });
@@ -155,7 +192,7 @@ describe("resolveEventAction", () => {
     const result = await resolveEventAction("tenant-a", "evt_inquiry_publish", "approved");
 
     expect(result).toEqual({ changed: true });
-    expect(mockExecuteInquiryPublication).toHaveBeenCalledWith({ tenantId: "tenant-a", eventId: "evt_inquiry_publish", claimId: "claim-1" });
+    expect(mockExecuteInquiryPublication).toHaveBeenCalledWith({ tenantId: "tenant-a", eventId: "evt_inquiry_publish", claimId: "claim-1", event: inquiryPublicationEvent(), actorId: "user" });
     expect(mockMarkExecutionExternalAccepted).toHaveBeenCalledWith("evt_inquiry_publish");
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_inquiry_publish", "approved", { actor: "user" });
   });
@@ -275,6 +312,49 @@ describe("resolveEventAction", () => {
     );
   });
 
+  it("an operator's content approval is versioned as the operator's and never earns the owner's trust streak", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    mockGetEvent.mockResolvedValue({
+      id: "evt_op", tenantId: "tenant-a", type: "content_update", source: "ai", status: "pending", createdAt: "2026-10-01T00:00:00.000Z",
+      metadata: { kind: "agent_preview", section: "contact", proposedData: { email: "new@example.com" } },
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ email: "old@example.com" });
+
+    expect(await resolveEventAction("tenant-a", "evt_op", "approved", operator)).toEqual({ changed: true });
+    expect(mockClaimEventAction).toHaveBeenCalledWith("evt_op", "approved", operator);
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_op", "approved", { actor: operator });
+    expect(mockAppendVersion.mock.calls[0]?.[2]).toBe("admin");
+    expect(recordApproval).not.toHaveBeenCalled();
+  });
+
+  it("agency staff's content approval is versioned as admin and never earns the owner's trust streak", async () => {
+    const staff = agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb");
+    mockGetEvent.mockResolvedValue({
+      id: "evt_ag", tenantId: "tenant-a", type: "content_update", source: "ai", status: "pending", createdAt: "2026-10-01T00:00:00.000Z",
+      metadata: { kind: "agent_preview", section: "contact", proposedData: { email: "new@example.com" } },
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ email: "old@example.com" });
+
+    expect(await resolveEventAction("tenant-a", "evt_ag", "approved", staff)).toEqual({ changed: true });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_ag", "approved", { actor: staff });
+    expect(mockAppendVersion.mock.calls[0]?.[2]).toBe("admin");
+    expect(recordApproval).not.toHaveBeenCalled();
+  });
+
+  it("an operator's dismissal still resets the trust streak, and names the operator", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    mockGetEvent.mockResolvedValue({ id: "evt_op", tenantId: "tenant-a", type: "content_update", source: "ai", status: "pending", metadata: { section: "contact" } });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    expect(await resolveEventAction("tenant-a", "evt_op", "dismissed", operator)).toEqual({ changed: true });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_op", "dismissed", { actor: operator });
+    expect(recordRejection).toHaveBeenCalledWith("tenant-a");
+    expect(recordApproval).not.toHaveBeenCalled();
+  });
+
   it("does not run an effect when another approver owns the action claim", async () => {
     mockGetEvent.mockResolvedValue({
       id: "evt_busy",
@@ -346,7 +426,7 @@ describe("resolveEventAction", () => {
           },
         ],
       },
-    });
+    }, { commandKey: "approval:evt_h", actor: "approved event evt_h" });
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "approved", { actor: "user" });
   });
 
@@ -439,7 +519,7 @@ describe("resolveEventAction", () => {
     const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
 
     expect(result).toEqual({ changed: true });
-    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!");
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!", { actor: "approved event evt_rr" });
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: "user" });
   });
 
@@ -492,7 +572,7 @@ describe("resolveEventAction", () => {
     const result = await resolveEventAction("tenant-a", event.id, "approved", "different-member");
 
     expect(result).toEqual({ changed: false, reason: "permission_denied" });
-    expect(mockAuthorizeInquiryMessageReviewActor).toHaveBeenCalledWith({ tenantId: "tenant-a", event, actorId: "different-member" });
+    expect(mockAuthorizeInquiryMessageReviewActor).toHaveBeenCalledWith({ tenantId: "tenant-a", event, actorId: "different-member", eventAction: "approved" });
     expect(mockReconcileInquiryMessageReview).not.toHaveBeenCalled();
     expect(mockResolveEvent).not.toHaveBeenCalled();
   });
@@ -518,5 +598,33 @@ describe("resolveEventAction", () => {
     expect(mockReconcileInquiryMessageReview).toHaveBeenCalledWith({ tenantId: "tenant-a", event, actorId: "original-sponsor" });
     expect(mockResolveEvent).toHaveBeenCalledWith(event.id, "approved", { actor: "original-sponsor" });
     expect(mockExecuteInquiryMessageReview).not.toHaveBeenCalled();
+  });
+
+  it("records the provider id on the event when the delivery marker could not be written", async () => {
+    const event = { ...acceptedInquiryReviewEvent(), metadata: { kind: "inquiry_delivery_approval" } };
+    mockIsInquiryMessageReviewEvent.mockReturnValue(true);
+    mockGetEvent.mockResolvedValue(event);
+    mockAuthorizeInquiryMessageReviewActor.mockResolvedValue({ allowed: true });
+    mockExecuteInquiryMessageReview.mockResolvedValue({
+      accepted: true,
+      safeToResolve: false,
+      receiptPersisted: false,
+      verified: false,
+      status: "reconciliation_required",
+      reason: "provider_accepted_marker_unavailable",
+      acceptedAt: "2026-09-11T12:00:01.000Z",
+      providerMessageId: "provider-lost",
+      deliveryAttemptId: "delivery-attempt-1",
+    });
+
+    const result = await resolveEventAction("tenant-a", event.id, "approved", "original-sponsor");
+
+    expect(result).toEqual({ changed: false, reason: "provider_accepted_marker_unavailable" });
+    expect(mockMarkExecutionExternalAccepted).toHaveBeenCalledWith(event.id, {
+      providerMessageId: "provider-lost",
+      acceptedAt: "2026-09-11T12:00:01.000Z",
+      deliveryAttemptId: "delivery-attempt-1",
+    });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
   });
 });

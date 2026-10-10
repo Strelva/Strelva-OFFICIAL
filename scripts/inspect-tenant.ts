@@ -1,5 +1,6 @@
 #!/usr/bin/env npx tsx
 /** Read one tenant's onboarding-relevant config. npx tsx --env-file=.env.local scripts/inspect-tenant.ts <id> */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getTenantConfig as getTenant } from "../src/lib/tenants";
 import { getContent } from "../src/lib/storage";
 

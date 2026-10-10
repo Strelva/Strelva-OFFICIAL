@@ -1,8 +1,9 @@
+import { mirrorRecord } from "@/lib/client-records";
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 
 const TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const USER_URL = "https://api.calendly.com/users/me";
@@ -159,6 +160,7 @@ export async function GET(req: Request) {
         { userUri, orgUri },
         { ex: 60 * 60 * 24 * 365 }
       );
+      await mirrorRecord("provider_metadata", tenantId, "calendly", { value: { userUri, orgUri } });
       // Reverse index so the webhook resolves the tenant in O(1) instead of a
       // blocking KEYS scan on every invitee.created event.
       await redis.set(`calendly-user-uri:${userUri}`, tenantId, {

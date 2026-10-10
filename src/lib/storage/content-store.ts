@@ -4,6 +4,7 @@
  */
 
 import type { ContentSection, ContentMap } from "../types";
+import { contentWithBusinessRecord, readReleasedTenantBusinessContext } from "../business-record-reader";
 import { defaults } from "../defaults";
 import { sanityImageUrl } from "../sanity";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
@@ -14,9 +15,11 @@ import {
   setCachedContent,
 } from "./content-cache";
 import { addSentryBreadcrumb } from "../sentry-context";
-import { getContentData, getStoredContentData, upsertContentData } from "../db/repositories";
-import { contentSourceIsPostgres } from "../db/source-flags";
+import { getContentData, getStoredContentData, upsertContentData, upsertContentDataWithReceipt } from "@/platform/infra/db/repositories";
+import { contentSourceIsPostgres } from "@/platform/infra/db/source-flags";
 import { getTenantContentDefault } from "../tenant-content-defaults";
+import { workspacePorts } from "../workspace-ports";
+import { isDeepStrictEqual } from "node:util";
 
 export { DEFAULT_TENANT };
 
@@ -108,7 +111,7 @@ export function transformSanityImages<K extends ContentSection>(
   return data as unknown as ContentMap[K];
 }
 
-export async function getContent<K extends ContentSection>(
+async function readContent<K extends ContentSection>(
   section: K,
   tenant: string = DEFAULT_TENANT,
   options?: { preview?: boolean }
@@ -154,6 +157,13 @@ export async function getContent<K extends ContentSection>(
   return data;
 }
 
+/** Public facts are read after the cache, so an owner edit never sticks behind it. */
+export async function getContent<K extends ContentSection>(section: K, tenant = DEFAULT_TENANT, options?: { preview?: boolean }): Promise<ContentMap[K]> {
+  const data = await readContent(section, tenant, options);
+  if (options?.preview || !["contact", "settings", "services"].includes(section)) return data;
+  return contentWithBusinessRecord(section, data, await readReleasedTenantBusinessContext(tenant));
+}
+
 /**
  * Read only a section that is actually persisted for a tenant.
  *
@@ -190,6 +200,41 @@ export async function setContent<K extends ContentSection>(
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" && contentSourceIsPostgres()) {
+    let receiptId: string | null;
+    try {
+      receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>);
+    } catch (error) {
+      await invalidateCachedContent(section, tenant);
+      throw error;
+    }
+    // Accepted content must never become retryable because cache, projection
+    // read-back or receipt settlement failed. The committed receipt stays
+    // pending if settlement cannot be saved; no publication is re-sent.
+    let result: "matched" | "differs" | "failed" = "failed";
+    let detail = "Public content projection could not be read after acceptance. External storefront rendering is unverified.";
+    try {
+      await setCachedContent(section, tenant, data);
+      // Public reads intentionally fall back on storage failure. Require a
+      // strict source read first so a fallback cannot prove publication.
+      const persisted = await getStoredContentData(tenant, SECTION_TO_TYPE[section]);
+      if (!persisted) throw new Error("Accepted section is absent from storage");
+      const publicContent = await getContent(section, tenant);
+      result = isDeepStrictEqual(transformSanityImages(section, persisted), data) && isDeepStrictEqual(publicContent, data) ? "matched" : "differs";
+      detail = result === "matched"
+        ? "Stored section and public content projection match. External storefront rendering is unverified."
+        : "Stored section or public content projection differs from the requested content. External storefront rendering is unverified.";
+    } catch {
+      // Keep a failed read-back separate from the accepted content write.
+    }
+    try {
+      if (!receiptId) throw new Error("Accepted content receipt response is unavailable");
+      await (await workspacePorts().outsideWriteReceipts()).recordReadback(receiptId, result, detail);
+    } catch {
+      console.error("[content-receipt] accepted content has unsettled read-back", { tenant, section, receiptId });
+    }
+    return;
+  }
   try {
     if (contentSourceIsPostgres()) {
       // Postgres is the source of truth. Store the frontend data shape as-is;

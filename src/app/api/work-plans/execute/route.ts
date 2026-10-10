@@ -1,7 +1,8 @@
+import { MAKE_SYSTEMS_REQUIRED_MESSAGE, WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import {
   WorkspaceAccessError,
@@ -67,6 +68,7 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 function failure(error: unknown) {
+  if (error instanceof WorkspaceMakeSystemsError) return json({ error: MAKE_SYSTEMS_REQUIRED_MESSAGE, code: "make_systems_required" }, 403);
   if (error instanceof WorkspaceAccessError) return json({ error: "This workspace is unavailable to your account." }, 403);
   if (error instanceof WorkPlanNotFoundError) return json({ error: "This saved plan is unavailable." }, 404);
   if (error instanceof WorkPlanExecutionConflictError || error instanceof WorkspaceConflictError) {

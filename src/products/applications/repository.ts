@@ -1,4 +1,5 @@
-import { getSupabase } from "@/lib/db/client";
+import { isCreatorDraftSnapshot } from "@/platform/workspaces/creator-draft-snapshot";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   WorkspaceAccessError,
   WorkspaceConflictError,
@@ -14,6 +15,7 @@ import {
   applicationReleaseSchema,
   applicationRuntimeSchema,
   applicationSchema,
+  APPLICATION_RECENT_VERSIONS,
   recordSchema,
   type ApplicationCandidate,
   type ApplicationRelease,
@@ -179,6 +181,18 @@ function touchLegacy(state: ApplicationState, kind: string, actor: WorkspaceActo
   if (state.history.length > 500) state.history = state.history.slice(-500);
 }
 
+/**
+ * The compatibility payload lists the latest releases plus the current one.
+ * Every release stays in `application_releases`, which is the authority.
+ */
+export function recentReleases(releases: ApplicationRelease[], current: ApplicationRelease | null): ApplicationRelease[] {
+  const recent = releases.slice(-APPLICATION_RECENT_VERSIONS);
+  if (current && !recent.some((value) => value.version === current.version)) {
+    return [current, ...recent.slice(1)].sort((a, b) => a.version - b.version);
+  }
+  return recent;
+}
+
 function toPayload(work: SavedWork, state: ApplicationState): ApplicationPayload {
   const release = currentRelease(state);
   const candidate = applicationCandidateSchema.parse(state.candidate);
@@ -192,7 +206,7 @@ function toPayload(work: SavedWork, state: ApplicationState): ApplicationPayload
     spec: candidate.spec,
     specVersion: candidate.specVersion,
     status: state.status,
-    versions: state.versions,
+    versions: state.versions.slice(-APPLICATION_RECENT_VERSIONS),
     rehearsal: candidate.rehearsal,
     records: state.records,
     installation: state.installation,
@@ -200,7 +214,7 @@ function toPayload(work: SavedWork, state: ApplicationState): ApplicationPayload
     recordsRevision: state.recordsRevision,
     candidate,
     release,
-    releases: state.releases,
+    releases: recentReleases(state.releases, release),
   });
 }
 
@@ -299,6 +313,7 @@ export async function load(store: BoundedStore, actor: WorkspaceActor, id: strin
   const db = durableDb(store);
   const work = await store.read(actor, id);
   if (!work || work.productId !== "applications" || work.resourceKind !== "application") throw new WorkspaceAccessError();
+  if (isCreatorDraftSnapshot(work)) return { work, state: parseStateFromPayload(work.payload) };
   if (db) {
     const state = await readDurable(db, work);
     return { work, state };

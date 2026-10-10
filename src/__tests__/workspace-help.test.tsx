@@ -2,8 +2,19 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkspaceHelp } from "@/experience/workspace/WorkspaceHelp";
+import { WorkspaceHelp as ActualWorkspaceHelp, type WorkspaceHelpProps } from "@/experience/workspace/WorkspaceHelp";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
+
+const fixtureAgencyId = "20000000-0000-4000-8000-000000000001";
+function WorkspaceHelp(props: WorkspaceHelpProps) {
+  return createElement(ActualWorkspaceHelp, { providerOptions: [{ label: "Ordinary Agency", provider: { kind: "agency", agencyWorkspaceId: fixtureAgencyId } }], ...props });
+}
+async function chooseAgency() {
+  const selector = container.querySelector<HTMLSelectElement>("#request-provider");
+  if (!selector || selector.value) return;
+  expect(container.querySelector<HTMLButtonElement>('button[type="button"]')!.disabled).toBe(true);
+  await act(async () => { selector.value = selector.options[1]!.value; selector.dispatchEvent(new Event("change", { bubbles: true })); });
+}
 
 const businessId = "10000000-0000-4000-8000-000000000001";
 const secondBusinessId = "10000000-0000-4000-8000-000000000006";
@@ -26,7 +37,7 @@ const saved = {
   outcome: "Prepare a private request flow.",
   context: { source: "workspace_help" },
   scope: ["provider_defined_scope"],
-  provider: { kind: "strelva" },
+  provider: { kind: "agency", agencyWorkspaceId: fixtureAgencyId },
   providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null },
   installationId: null,
   deliveryId: null,
@@ -71,15 +82,16 @@ describe("workspace help service request", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await chooseAgency();
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     expect(pending).toHaveLength(2);
     const body = JSON.parse(String(pending[1]!.init?.body)) as Record<string, unknown>;
-    expect(body).toMatchObject({ action: "save", businessId, status: "requested", request: "Prepare a private request flow.", outcome: "Prepare a private request flow.", provider: { kind: "strelva" } });
+    expect(body).toMatchObject({ action: "save", businessId, status: "requested", request: "Prepare a private request flow.", outcome: "Prepare a private request flow.", provider: { kind: "agency", agencyWorkspaceId: fixtureAgencyId } });
     expect(body).not.toHaveProperty("agencyWorkspaceId");
 
     await act(async () => pending[1]!.resolve(response({ request: saved })));
     expect(container.textContent).toContain("Saved for review.");
-    expect(container.textContent).toContain("does not mean a provider accepted it");
+    expect(container.textContent).toContain("does not mean an agency accepted it");
 
     await act(async () => root.render(null));
     await act(async () => root.render(createElement(
@@ -90,8 +102,8 @@ describe("workspace help service request", () => {
     expect(pending).toHaveLength(3);
     await act(async () => pending[2]!.resolve(response({ requests: [saved] })));
     const savedRow = container.querySelector<HTMLButtonElement>("ul button")!;
-    expect(savedRow.textContent).toContain("Pending provider review");
-    expect(savedRow.textContent).toContain("Strelva");
+    expect(savedRow.textContent).toContain("Pending agency review");
+    expect(savedRow.textContent).toContain("Ordinary Agency");
     expect(savedRow.textContent).not.toContain("help_request");
     await act(async () => savedRow.click());
     expect(container.querySelector<HTMLTextAreaElement>("#capability-request")?.value).toBe(saved.request);
@@ -101,6 +113,7 @@ describe("workspace help service request", () => {
       reopenedField.dispatchEvent(new Event("input", { bubbles: true }));
       reopenedField.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await chooseAgency();
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     expect(pending).toHaveLength(4);
     const updateBody = JSON.parse(String(pending[3]!.init?.body)) as Record<string, unknown>;
@@ -135,7 +148,7 @@ describe("workspace help service request", () => {
     expect(container.textContent).toContain("New persisted request");
   });
 
-  it("offers only server-provided agency recipients and persists the selected provider", async () => {
+  it("offers only server-provided agency recipients and persists the selected agency", async () => {
     const transport = (input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve) => {
       expect(String(input)).toContain("/api/service-requests");
       pending.push({ init, resolve });
@@ -146,15 +159,15 @@ describe("workspace help service request", () => {
       { value: transport },
       createElement(WorkspaceHelp, {
         workspaceId: businessId,
-        providerOptions: [
-          { label: "Strelva", provider: { kind: "strelva" } },
-          { label: "North Studio", provider: { kind: "agency", agencyWorkspaceId: agencyId } },
+        agencyOptions: [
+          { label: "Strelva", agency: { kind: "strelva" } },
+          { label: "North Studio", agency: { kind: "agency", agencyWorkspaceId: agencyId } },
         ],
       }),
     )));
     await act(async () => pending[0]!.resolve(response({ requests: [] })));
     const selector = container.querySelector<HTMLSelectElement>("#request-provider")!;
-    expect(Array.from(selector.options).map((option) => option.textContent)).toEqual(["Strelva", "North Studio"]);
+    expect(Array.from(selector.options).map((option) => option.textContent)).toEqual(["Choose an agency", "North Studio"]);
     await act(async () => {
       selector.value = JSON.stringify({ kind: "agency", agencyWorkspaceId: agencyId });
       selector.dispatchEvent(new Event("change", { bubbles: true }));
@@ -165,12 +178,14 @@ describe("workspace help service request", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await chooseAgency();
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     const body = JSON.parse(String(pending[1]!.init?.body)) as Record<string, unknown>;
     expect(body.provider).toEqual({ kind: "agency", agencyWorkspaceId: agencyId });
+    expect(body).not.toHaveProperty("agency");
   });
 
-  it("keeps a saved agency provider when that agency is no longer in the current options", async () => {
+  it("keeps a saved agency when that agency is no longer in the current options", async () => {
     const transport = (input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve) => {
       expect(String(input)).toContain("/api/service-requests");
       pending.push({ init, resolve });
@@ -202,6 +217,7 @@ describe("workspace help service request", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await chooseAgency();
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     const body = JSON.parse(String(pending[1]!.init?.body)) as Record<string, unknown>;
     expect(body.provider).toEqual(agencySaved.provider);
@@ -223,7 +239,7 @@ describe("workspace help service request", () => {
     await act(async () => pending[0]!.resolve(response({ requests: [withdrawn] })));
     const row = container.querySelector<HTMLButtonElement>("ul button")!;
     expect(row.textContent).toContain("Withdrawn");
-    expect(row.textContent).not.toContain("Pending provider review");
+    expect(row.textContent).not.toContain("Pending agency review");
     await act(async () => row.click());
     const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Saved", "Save request"].includes(button.textContent || ""));
     expect(saveButton?.disabled).toBe(true);
@@ -247,6 +263,7 @@ describe("workspace help service request", () => {
       field.dispatchEvent(new Event("input", { bubbles: true }));
       field.dispatchEvent(new Event("change", { bubbles: true }));
     });
+    await chooseAgency();
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     expect(pending).toHaveLength(2);
     await act(async () => root.render(createElement(
@@ -302,6 +319,6 @@ describe("workspace help service request", () => {
     await act(async () => {});
     expect(calls.some((url) => url.includes("/api/offerings?")).valueOf()).toBe(true);
     expect(container.textContent).toContain("Exact accepted scope");
-    expect(container.textContent).toContain("Create exact provider assignment");
+    expect(container.textContent).toContain("Create exact agency assignment");
   });
 });

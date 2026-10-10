@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission } from "@/lib/auth";
+import { requireTenantPermission } from "@/platform/infra/auth";
 import {
   addCustomDomain,
   listTenantDomainClaims,
@@ -9,6 +10,7 @@ import {
   serializeDomainClaim,
 } from "@/lib/domains";
 import { getTenantConfig } from "@/lib/tenants";
+import { loadDomainView } from "@/platform/operator-queue/domain-view-loader";
 import type { DomainClaimRole } from "@/lib/types";
 
 async function serialize(tenantId: string) {
@@ -33,13 +35,18 @@ export async function GET() {
     const tenant = await requireTenantFromHeaders();
     const blocked = await requireTenantPermission(tenant, "domains:manage");
     if (blocked) return blocked;
+    await authorizeTenantOperatorRead(tenant, ["domains:manage"]);
 
     const config = await getTenantConfig(tenant);
     if (!config) {
       return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ domains: await serialize(tenant) });
+    // `view` is the one domain projection the operator console also reads
+    // (claims + registration + monitor). Additive: `domains` is unchanged,
+    // and an unreadable store gives `view: null`, never a guessed "fine".
+    const view = await loadDomainView([{ tenantId: tenant, label: `${config.siteName || tenant} website` }]).catch(() => null);
+    return NextResponse.json({ domains: await serialize(tenant), view });
   } catch (err) {
     const missingTenant = missingTenantResponse(err);
     if (missingTenant) return missingTenant;
@@ -61,7 +68,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Domain is required" }, { status: 400 });
     }
 
-    const result = await addCustomDomain(tenant, domain, parseRole(body?.role));
+    const result = await addCustomDomain(tenant, domain, parseRole(body?.role), { actor: "owner dashboard" });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
@@ -115,7 +122,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Domain is required" }, { status: 400 });
     }
 
-    const result = await removeCustomDomain(tenant, domain);
+    const result = await removeCustomDomain(tenant, domain, { actor: "owner dashboard" });
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }

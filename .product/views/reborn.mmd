@@ -1,0 +1,381 @@
+%% Generated from PRODUCT_MODEL revision 7; status=all, inactive=False, focus=all, hops=1
+flowchart LR
+  LATENT_VIEW_TITLE["Strelva #124; revision 7 #124; view: status=all, inactive=False, focus=all, hops=1"]
+  N_REL_REBORN["release: Strelva Reborn 1.0.0 #91;planned#93;"]
+  class N_REL_REBORN type_custom;
+  class N_REL_REBORN confirmed;
+  N_PRIM_BUSINESS_RECORD(["primitive: Business record #91;partial#93;"])
+  class N_PRIM_BUSINESS_RECORD type_primitive;
+  class N_PRIM_BUSINESS_RECORD confirmed;
+  N_PRIM_TENANT_LINK(["primitive: Tenant-workspace link #91;deprecated / partial#93;"])
+  class N_PRIM_TENANT_LINK type_primitive;
+  class N_PRIM_TENANT_LINK confirmed;
+  N_CAP_CONVERT{{"capability: Convert tenant to business #91;partial#93;"}}
+  class N_CAP_CONVERT type_capability;
+  class N_CAP_CONVERT confirmed;
+  N_STATE_LEADS_REDIS(("state: Redis lead reads with a conditional durable copy #91;available#93;"))
+  class N_STATE_LEADS_REDIS type_state;
+  class N_STATE_LEADS_REDIS confirmed;
+  N_CAP_CONTACT_DEDUP{{"capability: Contact upsert with dedup #91;partial#93;"}}
+  class N_CAP_CONTACT_DEDUP type_capability;
+  class N_CAP_CONTACT_DEDUP confirmed;
+  N_RULE_EMAIL_GATE{"rule: Client email gate #91;available#93;"}
+  class N_RULE_EMAIL_GATE type_rule;
+  class N_RULE_EMAIL_GATE confirmed;
+  N_CAP_APPROVE_LINK{{"capability: One-click approve link #91;available#93;"}}
+  class N_CAP_APPROVE_LINK type_capability;
+  class N_CAP_APPROVE_LINK confirmed;
+  N_RULE_OWNER_RECIPIENT{"rule: Owner-recipient rule #91;partial#93;"}
+  class N_RULE_OWNER_RECIPIENT type_rule;
+  class N_RULE_OWNER_RECIPIENT confirmed;
+  N_CAP_BOOKING_API{{"capability: Public booking API #91;partial#93;"}}
+  class N_CAP_BOOKING_API type_capability;
+  class N_CAP_BOOKING_API confirmed;
+  N_SURF_JSONLD["surface: Structured business data on client sites #91;partial#93;"]
+  class N_SURF_JSONLD type_surface;
+  class N_SURF_JSONLD confirmed;
+  N_GAP_POLICY_AVAIL["gap: Policy and availability facts missing #91;absent#93;"]
+  class N_GAP_POLICY_AVAIL type_custom;
+  class N_GAP_POLICY_AVAIL confirmed;
+  N_UNK_EMAIL_PROD["unknown: Is client email on in production? #91;unknown#93;"]
+  class N_UNK_EMAIL_PROD type_custom;
+  class N_UNK_EMAIL_PROD inferred;
+  N_COMP_LEADS_TO_RECORD[["composition: Leads land in the business record #91;stale / planned#93;"]]
+  class N_COMP_LEADS_TO_RECORD type_composition;
+  class N_COMP_LEADS_TO_RECORD proposed;
+  N_COMP_OWNER_BY_EMAIL[["composition: Run the workspace from the inbox #91;planned#93;"]]
+  class N_COMP_OWNER_BY_EMAIL type_composition;
+  class N_COMP_OWNER_BY_EMAIL proposed;
+  N_COMP_AGENT_READABLE[["composition: Every converted business answerable by AI agents #91;planned#93;"]]
+  class N_COMP_AGENT_READABLE type_composition;
+  class N_COMP_AGENT_READABLE proposed;
+  N_BOTTLENECK_PROD_YES["constraint: Production gates #91;blocked#93;"]
+  class N_BOTTLENECK_PROD_YES type_custom;
+  class N_BOTTLENECK_PROD_YES confirmed;
+  N_PRIM_BUSINESS(["primitive: Business #91;partial#93;"])
+  class N_PRIM_BUSINESS type_primitive;
+  class N_PRIM_BUSINESS proposed;
+  N_PRIM_AVAILABILITY(["primitive: Availability and reservation policy #91;deprecated / planned#93;"])
+  class N_PRIM_AVAILABILITY type_primitive;
+  class N_PRIM_AVAILABILITY proposed;
+  N_PRIM_FINITE_WORK(["primitive: Finite Work #91;partial#93;"])
+  class N_PRIM_FINITE_WORK type_primitive;
+  class N_PRIM_FINITE_WORK proposed;
+  N_PRIM_DECISION_GRANT(["primitive: Decision and grant #91;partial#93;"])
+  class N_PRIM_DECISION_GRANT type_primitive;
+  class N_PRIM_DECISION_GRANT proposed;
+  N_PRIM_CONNECTION[("integration: External account binding #91;partial#93;")]
+  class N_PRIM_CONNECTION type_integration;
+  class N_PRIM_CONNECTION proposed;
+  N_PRIM_RECEIPT_OBSERVATION(["primitive: Receipt and observation #91;partial#93;"])
+  class N_PRIM_RECEIPT_OBSERVATION type_primitive;
+  class N_PRIM_RECEIPT_OBSERVATION proposed;
+  N_PRIM_PROVIDER_COMMITMENT(["primitive: Provider commitment #91;partial#93;"])
+  class N_PRIM_PROVIDER_COMMITMENT type_primitive;
+  class N_PRIM_PROVIDER_COMMITMENT confirmed;
+  N_PRIM_ONGOING_RESP[/"responsibility: Maintained responsibility #91;partial#93;"/]
+  class N_PRIM_ONGOING_RESP type_responsibility;
+  class N_PRIM_ONGOING_RESP proposed;
+  N_PRIM_ECONOMIC_AGREEMENT[\"economic: Economic agreement and attribution #91;partial#93;"/]
+  class N_PRIM_ECONOMIC_AGREEMENT type_economic;
+  class N_PRIM_ECONOMIC_AGREEMENT proposed;
+  N_DESIGN_TYPED_DOMAINS["architecture: Typed domains with shared references #91;stale / planned#93;"]
+  class N_DESIGN_TYPED_DOMAINS type_custom;
+  class N_DESIGN_TYPED_DOMAINS proposed;
+  N_RULE_WRITE_ACCEPTANCE{"rule: Accepted write is consumed"}
+  class N_RULE_WRITE_ACCEPTANCE type_rule;
+  class N_RULE_WRITE_ACCEPTANCE confirmed;
+  N_RULE_CONNECTOR_RIGHTS{"rule: Provider rights constrain connections"}
+  class N_RULE_CONNECTOR_RIGHTS type_rule;
+  class N_RULE_CONNECTOR_RIGHTS confirmed;
+  N_CAP_APP_SCHEMAS{{"capability: Bounded application schema releases #91;partial#93;"}}
+  class N_CAP_APP_SCHEMAS type_capability;
+  class N_CAP_APP_SCHEMAS confirmed;
+  N_CAP_STANDING_CHECKS{{"capability: Bounded standing investigations #91;blocked#93;"}}
+  class N_CAP_STANDING_CHECKS type_capability;
+  class N_CAP_STANDING_CHECKS confirmed;
+  N_COMP_FACT_TO_PUBLIC[["composition: Approved fact to verified public surfaces #91;stale / planned#93;"]]
+  class N_COMP_FACT_TO_PUBLIC type_composition;
+  class N_COMP_FACT_TO_PUBLIC proposed;
+  N_COMP_AGENCY_UPGRADES[["composition: Agency method with checked upgrades #91;stale / planned#93;"]]
+  class N_COMP_AGENCY_UPGRADES type_composition;
+  class N_COMP_AGENCY_UPGRADES proposed;
+  N_COMP_NATIVE_INDEPENDENT[["composition: Native tools independently useful #91;planned#93;"]]
+  class N_COMP_NATIVE_INDEPENDENT type_composition;
+  class N_COMP_NATIVE_INDEPENDENT proposed;
+  N_DIST_AGENCY_CHANNEL>"distribution: Agency creator channel #91;planned#93;"]
+  class N_DIST_AGENCY_CHANNEL type_distribution;
+  class N_DIST_AGENCY_CHANNEL confirmed;
+  N_ECON_RESP_MEASUREMENT[\"economic: Measure completed and maintained work #91;planned#93;"/]
+  class N_ECON_RESP_MEASUREMENT type_economic;
+  class N_ECON_RESP_MEASUREMENT proposed;
+  N_PRIM_ACTOR_RELATIONSHIPS(["primitive: Actor and relationship #91;partial#93;"])
+  class N_PRIM_ACTOR_RELATIONSHIPS type_primitive;
+  class N_PRIM_ACTOR_RELATIONSHIPS proposed;
+  N_DESIGN_SHARED_GRAMMAR["architecture: Shared contracts, typed domains, explicit promises #91;stale / planned#93;"]
+  class N_DESIGN_SHARED_GRAMMAR type_custom;
+  class N_DESIGN_SHARED_GRAMMAR proposed;
+  N_DESIGN_SYSTEMS_PRODUCT_MODEL["product_model: Systems, Connections, Possibilities, Versions #91;planned#93;"]
+  class N_DESIGN_SYSTEMS_PRODUCT_MODEL type_custom;
+  class N_DESIGN_SYSTEMS_PRODUCT_MODEL confirmed;
+  N_PRIM_SYSTEM(["primitive: System #91;partial#93;"])
+  class N_PRIM_SYSTEM type_primitive;
+  class N_PRIM_SYSTEM confirmed;
+  N_PRIM_SYSTEM_CONNECTION(["primitive: System connection #91;partial#93;"])
+  class N_PRIM_SYSTEM_CONNECTION type_primitive;
+  class N_PRIM_SYSTEM_CONNECTION confirmed;
+  N_PRIM_POSSIBILITY(["primitive: Possibility #91;partial#93;"])
+  class N_PRIM_POSSIBILITY type_primitive;
+  class N_PRIM_POSSIBILITY confirmed;
+  N_PRIM_CONTEXT_VERSION(["primitive: Contextual Version #91;partial#93;"])
+  class N_PRIM_CONTEXT_VERSION type_primitive;
+  class N_PRIM_CONTEXT_VERSION confirmed;
+  N_RULE_CONTEXT_VERSION_IDENTITY{"rule: Contextual identity and release history #91;partial#93;"}
+  class N_RULE_CONTEXT_VERSION_IDENTITY type_rule;
+  class N_RULE_CONTEXT_VERSION_IDENTITY proposed;
+  N_RULE_SYSTEM_OUTPUT_IDENTITY{"rule: System identity and issued outputs #91;partial#93;"}
+  class N_RULE_SYSTEM_OUTPUT_IDENTITY type_rule;
+  class N_RULE_SYSTEM_OUTPUT_IDENTITY proposed;
+  N_RULE_SYSTEM_CONNECTION_CONTRACT{"rule: Connection effects and propagation #91;partial#93;"}
+  class N_RULE_SYSTEM_CONNECTION_CONTRACT type_rule;
+  class N_RULE_SYSTEM_CONNECTION_CONTRACT proposed;
+  N_RULE_POSSIBILITY_ISOLATION{"rule: Possibility baseline and rehearsal #91;partial#93;"}
+  class N_RULE_POSSIBILITY_ISOLATION type_rule;
+  class N_RULE_POSSIBILITY_ISOLATION proposed;
+  N_RULE_SYSTEM_PAUSE_HEALTH{"rule: Lifecycle and operational health #91;partial#93;"}
+  class N_RULE_SYSTEM_PAUSE_HEALTH type_rule;
+  class N_RULE_SYSTEM_PAUSE_HEALTH proposed;
+  N_COMP_SYSTEM_EVOLUTION[["composition: Proposal becomes a working customer process #91;planned#93;"]]
+  class N_COMP_SYSTEM_EVOLUTION type_composition;
+  class N_COMP_SYSTEM_EVOLUTION proposed;
+  N_COMP_MULTI_SYSTEM_ACTIVATION[["composition: Make real across connected Systems #91;partial#93;"]]
+  class N_COMP_MULTI_SYSTEM_ACTIVATION type_composition;
+  class N_COMP_MULTI_SYSTEM_ACTIVATION proposed;
+  N_COMP_SYSTEM_EXTRACTION[["composition: A Possibility creates a shared System #91;planned#93;"]]
+  class N_COMP_SYSTEM_EXTRACTION type_composition;
+  class N_COMP_SYSTEM_EXTRACTION proposed;
+  N_DIST_SYSTEM_VERSIONS>"distribution: Agency and multi-location Versions #91;planned#93;"]
+  class N_DIST_SYSTEM_VERSIONS type_distribution;
+  class N_DIST_SYSTEM_VERSIONS confirmed;
+  N_ECON_SYSTEM_COMPOUNDING[\"economic: Version reuse and useful learning #91;planned#93;"/]
+  class N_ECON_SYSTEM_COMPOUNDING type_economic;
+  class N_ECON_SYSTEM_COMPOUNDING proposed;
+  N_DESIGN_EXECUTION["architecture: One execution engine #91;partial#93;"]
+  class N_DESIGN_EXECUTION type_custom;
+  class N_DESIGN_EXECUTION proposed;
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS["issue: Open defects on transition/systems #91;stale / absent#93;"]
+  class N_ISSUE_SYSTEMS_AUDIT_DEFECTS type_custom;
+  class N_ISSUE_SYSTEMS_AUDIT_DEFECTS confirmed;
+  N_RISK_PUBLIC_BOOKING_PAUSE["risk: Paused schedule still takes public bookings #91;partial#93;"]
+  class N_RISK_PUBLIC_BOOKING_PAUSE type_custom;
+  class N_RISK_PUBLIC_BOOKING_PAUSE confirmed;
+  N_GAP_LEADS_UNSEEN["gap: Lead durability and delivery acceptance need operating proof #91;partial#93;"]
+  class N_GAP_LEADS_UNSEEN type_custom;
+  class N_GAP_LEADS_UNSEEN confirmed;
+  N_OFFER_MANAGED_WEBSITES("offering: Managed websites for nine clients (tenant model) #91;operating#93;")
+  class N_OFFER_MANAGED_WEBSITES type_offering;
+  class N_OFFER_MANAGED_WEBSITES confirmed;
+  N_SURF_V1_CONTRACT["surface: /api/v1 storefront contract #91;operating#93;"]
+  class N_SURF_V1_CONTRACT type_surface;
+  class N_SURF_V1_CONTRACT confirmed;
+  N_INT_CLIENT_REPOS[("integration: Client site repos #91;operating#93;")]
+  class N_INT_CLIENT_REPOS type_integration;
+  class N_INT_CLIENT_REPOS confirmed;
+  N_GAP_CLIENT_REPO_COVERAGE["gap: Client contract checks cover 2 of 9 repos #91;absent#93;"]
+  class N_GAP_CLIENT_REPO_COVERAGE type_custom;
+  class N_GAP_CLIENT_REPO_COVERAGE confirmed;
+  N_CAP_STRIPE_BILLING{{"capability: Stripe webhook and pay links #91;operating#93;"}}
+  class N_CAP_STRIPE_BILLING type_capability;
+  class N_CAP_STRIPE_BILLING confirmed;
+  N_SURF_OPERATOR_CONSOLE["surface: Operator console #91;operating#93;"]
+  class N_SURF_OPERATOR_CONSOLE type_surface;
+  class N_SURF_OPERATOR_CONSOLE confirmed;
+  N_CAP_CRONS{{"capability: Scheduled jobs and heartbeat #91;operating#93;"}}
+  class N_CAP_CRONS type_capability;
+  class N_CAP_CRONS confirmed;
+  N_RULE_PROXY_TENANT_AUTH{"rule: Proxy and tenant authorization #91;operating#93;"}
+  class N_RULE_PROXY_TENANT_AUTH type_rule;
+  class N_RULE_PROXY_TENANT_AUTH confirmed;
+  N_CAP_WEBSITE_AGENT{{"capability: Ask Strelva website agent #91;operating#93;"}}
+  class N_CAP_WEBSITE_AGENT type_capability;
+  class N_CAP_WEBSITE_AGENT confirmed;
+  N_PROD_WEBSITE_REBUILD["product: Website rebuild and hosted publishing #91;partial#93;"]
+  class N_PROD_WEBSITE_REBUILD type_custom;
+  class N_PROD_WEBSITE_REBUILD confirmed;
+  N_PROD_WEBSITE_AUDIT["product: Website audit (/audit) #91;operating#93;"]
+  class N_PROD_WEBSITE_AUDIT type_custom;
+  class N_PROD_WEBSITE_AUDIT confirmed;
+  N_PROD_AI_VISIBILITY["product: AI visibility scorecard #91;partial#93;"]
+  class N_PROD_AI_VISIBILITY type_custom;
+  class N_PROD_AI_VISIBILITY confirmed;
+  N_PROD_DOMAIN_MONITOR["product: Domain monitor #91;operating#93;"]
+  class N_PROD_DOMAIN_MONITOR type_custom;
+  class N_PROD_DOMAIN_MONITOR confirmed;
+  N_PROD_NATIVE_APPS["product: Native applications #91;available#93;"]
+  class N_PROD_NATIVE_APPS type_custom;
+  class N_PROD_NATIVE_APPS confirmed;
+  N_PROD_CUSTOM_APPS["product: Custom applications #91;blocked#93;"]
+  class N_PROD_CUSTOM_APPS type_custom;
+  class N_PROD_CUSTOM_APPS confirmed;
+  N_PROD_TRACKER["product: Tracker #91;available#93;"]
+  class N_PROD_TRACKER type_custom;
+  class N_PROD_TRACKER confirmed;
+  N_PROD_WORK_PLANS["product: Work plans #91;blocked#93;"]
+  class N_PROD_WORK_PLANS type_custom;
+  class N_PROD_WORK_PLANS confirmed;
+  N_PROD_INVESTIGATIONS["product: Investigations (saved checks) #91;partial#93;"]
+  class N_PROD_INVESTIGATIONS type_custom;
+  class N_PROD_INVESTIGATIONS confirmed;
+  N_PROD_OPERATIONS["product: Operations (delegated and standing work) #91;partial#93;"]
+  class N_PROD_OPERATIONS type_custom;
+  class N_PROD_OPERATIONS confirmed;
+  N_PROD_PRODUCT_LEARNING["product: Product learning #91;blocked#93;"]
+  class N_PROD_PRODUCT_LEARNING type_custom;
+  class N_PROD_PRODUCT_LEARNING confirmed;
+  N_PROD_HOME_FINDER["product: Home Finder adapter #91;blocked#93;"]
+  class N_PROD_HOME_FINDER type_custom;
+  class N_PROD_HOME_FINDER confirmed;
+  N_PROD_ONBOARDING["product: Onboarding cases #91;available#93;"]
+  class N_PROD_ONBOARDING type_custom;
+  class N_PROD_ONBOARDING confirmed;
+  N_PROD_DOCUMENTS["product: Documents #91;available#93;"]
+  class N_PROD_DOCUMENTS type_custom;
+  class N_PROD_DOCUMENTS confirmed;
+  N_PROD_ASSESSMENT["product: Assessment #91;available#93;"]
+  class N_PROD_ASSESSMENT type_custom;
+  class N_PROD_ASSESSMENT confirmed;
+  N_PROD_WORKSPACE_SCHEDULING["product: Workspace scheduling #91;partial#93;"]
+  class N_PROD_WORKSPACE_SCHEDULING type_custom;
+  class N_PROD_WORKSPACE_SCHEDULING confirmed;
+  N_ISSUE_REBORN_RELEASE_AUDIT["issue: Remaining Reborn release findings #91;blocked#93;"]
+  class N_ISSUE_REBORN_RELEASE_AUDIT type_custom;
+  class N_ISSUE_REBORN_RELEASE_AUDIT confirmed;
+  N_REL_REBORN -->|"requires"| N_PRIM_BUSINESS_RECORD
+  N_REL_REBORN -->|"requires"| N_CAP_CONVERT
+  N_CAP_CONVERT -->|"depends_on"| N_PRIM_TENANT_LINK
+  N_PRIM_BUSINESS_RECORD -->|"contains"| N_CAP_CONTACT_DEDUP
+  N_COMP_LEADS_TO_RECORD -.->|"fixes #91;proposed#93;"| N_STATE_LEADS_REDIS
+  N_COMP_LEADS_TO_RECORD -.->|"uses #91;proposed#93;"| N_CAP_CONTACT_DEDUP
+  N_COMP_OWNER_BY_EMAIL -.->|"uses #91;proposed#93;"| N_CAP_APPROVE_LINK
+  N_COMP_OWNER_BY_EMAIL -.->|"depends_on #91;inferred#93;"| N_RULE_EMAIL_GATE
+  N_COMP_OWNER_BY_EMAIL -.->|"uses #91;proposed#93;"| N_RULE_OWNER_RECIPIENT
+  N_COMP_AGENT_READABLE -.->|"reads #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_COMP_AGENT_READABLE -.->|"advertises #91;proposed#93;"| N_CAP_BOOKING_API
+  N_COMP_AGENT_READABLE -.->|"requires #91;inferred#93;"| N_GAP_POLICY_AVAIL
+  N_PRIM_BUSINESS_RECORD -->|"blocked_by"| N_BOTTLENECK_PROD_YES
+  N_SURF_JSONLD -.->|"should_read #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_PRIM_BUSINESS -.->|"owns #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_PRIM_ONGOING_RESP -.->|"evaluated_by #91;proposed#93;"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_PROVIDER_COMMITMENT -.->|"accepts #91;proposed#93;"| N_PRIM_ONGOING_RESP
+  N_PRIM_ECONOMIC_AGREEMENT -.->|"bounds #91;proposed#93;"| N_PRIM_FINITE_WORK
+  N_RULE_CONNECTOR_RIGHTS -.->|"constrains #91;proposed#93;"| N_PRIM_CONNECTION
+  N_DESIGN_TYPED_DOMAINS -.->|"preserves #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_DESIGN_TYPED_DOMAINS -.->|"supports #91;proposed#93;"| N_CAP_APP_SCHEMAS
+  N_COMP_FACT_TO_PUBLIC -.->|"requires #91;proposed#93;"| N_PRIM_FINITE_WORK
+  N_COMP_FACT_TO_PUBLIC -.->|"requires #91;proposed#93;"| N_PRIM_DECISION_GRANT
+  N_COMP_FACT_TO_PUBLIC -.->|"requires #91;proposed#93;"| N_PRIM_RECEIPT_OBSERVATION
+  N_COMP_AGENCY_UPGRADES -.->|"requires #91;proposed#93;"| N_PRIM_DECISION_GRANT
+  N_COMP_AGENCY_UPGRADES -.->|"distributed_through #91;proposed#93;"| N_DIST_AGENCY_CHANNEL
+  N_COMP_NATIVE_INDEPENDENT -.->|"requires #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_ECON_RESP_MEASUREMENT -.->|"requires #91;proposed#93;"| N_PRIM_ONGOING_RESP
+  N_ECON_RESP_MEASUREMENT -.->|"requires #91;proposed#93;"| N_PRIM_ECONOMIC_AGREEMENT
+  N_COMP_AGENT_READABLE -.->|"requires #91;proposed#93;"| N_RULE_CONNECTOR_RIGHTS
+  N_PRIM_TENANT_LINK -.->|"maps_to #91;proposed#93;"| N_PRIM_BUSINESS
+  N_PRIM_ACTOR_RELATIONSHIPS -.->|"acts_under #91;proposed#93;"| N_PRIM_DECISION_GRANT
+  N_PRIM_FINITE_WORK -.->|"completed_against #91;proposed#93;"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_ONGOING_RESP -.->|"evaluated_over_window #91;proposed#93;"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_ONGOING_RESP -.->|"initiates_scoped_recovery #91;proposed#93;"| N_PRIM_FINITE_WORK
+  N_PRIM_PROVIDER_COMMITMENT -.->|"accepts_delivery #91;proposed#93;"| N_PRIM_FINITE_WORK
+  N_PRIM_PROVIDER_COMMITMENT -.->|"accepts_condition #91;proposed#93;"| N_PRIM_ONGOING_RESP
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"has"| N_PRIM_SYSTEM_CONNECTION
+  N_PRIM_SYSTEM_CONNECTION -->|"connects_to"| N_PRIM_SYSTEM
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_POSSIBILITY
+  N_PRIM_POSSIBILITY -->|"changes_one_or_more"| N_PRIM_SYSTEM
+  N_PRIM_POSSIBILITY -->|"made_real_as_change_to"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"adapted_as"| N_PRIM_CONTEXT_VERSION
+  N_PRIM_CONTEXT_VERSION -->|"binds_locally"| N_PRIM_SYSTEM_CONNECTION
+  N_DESIGN_SYSTEMS_PRODUCT_MODEL -->|"presented_through"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -.->|"supported_by #91;proposed#93;"| N_DESIGN_TYPED_DOMAINS
+  N_PRIM_SYSTEM_CONNECTION -.->|"implemented_with #91;proposed#93;"| N_PRIM_CONNECTION
+  N_PRIM_SYSTEM_CONNECTION -.->|"requires #91;proposed#93;"| N_RULE_SYSTEM_CONNECTION_CONTRACT
+  N_PRIM_CONTEXT_VERSION -.->|"requires #91;proposed#93;"| N_RULE_CONTEXT_VERSION_IDENTITY
+  N_PRIM_POSSIBILITY -.->|"requires #91;proposed#93;"| N_RULE_POSSIBILITY_ISOLATION
+  N_PRIM_POSSIBILITY -.->|"made_real_through #91;proposed#93;"| N_COMP_MULTI_SYSTEM_ACTIVATION
+  N_COMP_MULTI_SYSTEM_ACTIVATION -.->|"requires #91;proposed#93;"| N_RULE_WRITE_ACCEPTANCE
+  N_PRIM_SYSTEM -.->|"requires #91;proposed#93;"| N_RULE_SYSTEM_OUTPUT_IDENTITY
+  N_PRIM_SYSTEM -.->|"requires #91;proposed#93;"| N_RULE_SYSTEM_PAUSE_HEALTH
+  N_PRIM_CONTEXT_VERSION -->|"distributed_through"| N_DIST_SYSTEM_VERSIONS
+  N_COMP_SYSTEM_EXTRACTION -.->|"prepared_as #91;proposed#93;"| N_PRIM_POSSIBILITY
+  N_ECON_SYSTEM_COMPOUNDING -.->|"requires #91;proposed#93;"| N_PRIM_CONTEXT_VERSION
+  N_OFFER_MANAGED_WEBSITES -->|"served_through"| N_SURF_V1_CONTRACT
+  N_INT_CLIENT_REPOS -->|"calls"| N_SURF_V1_CONTRACT
+  N_GAP_CLIENT_REPO_COVERAGE -->|"constrains"| N_INT_CLIENT_REPOS
+  N_OFFER_MANAGED_WEBSITES -->|"billed_through"| N_CAP_STRIPE_BILLING
+  N_SURF_OPERATOR_CONSOLE -->|"operates"| N_OFFER_MANAGED_WEBSITES
+  N_CAP_CRONS -->|"supports"| N_OFFER_MANAGED_WEBSITES
+  N_RULE_PROXY_TENANT_AUTH -->|"constrains"| N_OFFER_MANAGED_WEBSITES
+  N_CAP_WEBSITE_AGENT -->|"changes"| N_OFFER_MANAGED_WEBSITES
+  N_SURF_V1_CONTRACT -->|"writes"| N_STATE_LEADS_REDIS
+  N_GAP_LEADS_UNSEEN -->|"arises_from"| N_STATE_LEADS_REDIS
+  N_GAP_LEADS_UNSEEN -->|"affects"| N_OFFER_MANAGED_WEBSITES
+  N_COMP_LEADS_TO_RECORD -.->|"fixes #91;proposed#93;"| N_GAP_LEADS_UNSEEN
+  N_SURF_OPERATOR_CONSOLE -->|"omits"| N_GAP_LEADS_UNSEEN
+  N_PROD_WEBSITE_REBUILD -->|"posts_to"| N_SURF_V1_CONTRACT
+  N_PROD_WEBSITE_REBUILD -.->|"seeds #91;inferred#93;"| N_PRIM_POSSIBILITY
+  N_PROD_WEBSITE_AUDIT -.->|"opens #91;proposed#93;"| N_PROD_WEBSITE_REBUILD
+  N_PROD_ASSESSMENT -->|"presents"| N_PROD_WEBSITE_AUDIT
+  N_PROD_ASSESSMENT -->|"presents"| N_PROD_AI_VISIBILITY
+  N_PROD_DOMAIN_MONITOR -->|"monitors"| N_OFFER_MANAGED_WEBSITES
+  N_RULE_SYSTEM_PAUSE_HEALTH -->|"reads"| N_PROD_DOMAIN_MONITOR
+  N_PROD_NATIVE_APPS -.->|"seeds #91;inferred#93;"| N_PRIM_SYSTEM
+  N_PROD_TRACKER -->|"duplicates"| N_PROD_NATIVE_APPS
+  N_PROD_WORK_PLANS -->|"creates"| N_PROD_NATIVE_APPS
+  N_PROD_INVESTIGATIONS -->|"implements"| N_CAP_STANDING_CHECKS
+  N_PROD_OPERATIONS -->|"runs_on"| N_DESIGN_EXECUTION
+  N_PROD_ONBOARDING -->|"stores_files_in"| N_PROD_DOCUMENTS
+  N_PROD_WORKSPACE_SCHEDULING -->|"implements"| N_CAP_BOOKING_API
+  N_RISK_PUBLIC_BOOKING_PAUSE -->|"affects"| N_CAP_BOOKING_API
+  N_RULE_SYSTEM_PAUSE_HEALTH -->|"introduces"| N_RISK_PUBLIC_BOOKING_PAUSE
+  N_PROD_HOME_FINDER -.->|"maps_to #91;inferred#93;"| N_PRIM_CONNECTION
+  N_COMP_FACT_TO_PUBLIC -.->|"requires #91;proposed#93;"| N_PRIM_BUSINESS_RECORD
+  N_COMP_AGENCY_UPGRADES -.->|"requires #91;proposed#93;"| N_PRIM_CONTEXT_VERSION
+  N_COMP_MULTI_SYSTEM_ACTIVATION -.->|"should_run_on #91;proposed#93;"| N_DESIGN_EXECUTION
+  N_DESIGN_EXECUTION -.->|"produces #91;proposed#93;"| N_PRIM_RECEIPT_OBSERVATION
+  N_PRIM_DECISION_GRANT -.->|"authorizes #91;proposed#93;"| N_DESIGN_EXECUTION
+  N_PRIM_CONNECTION -.->|"enables_external_effect #91;proposed#93;"| N_DESIGN_EXECUTION
+  N_RULE_WRITE_ACCEPTANCE -.->|"constrains #91;proposed#93;"| N_DESIGN_EXECUTION
+  N_PRIM_FINITE_WORK -.->|"orchestrates #91;proposed#93;"| N_DESIGN_EXECUTION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_COMP_MULTI_SYSTEM_ACTIVATION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_SYSTEM
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_SYSTEM_CONNECTION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_CONTEXT_VERSION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_RULE_SYSTEM_PAUSE_HEALTH
+  N_PRIM_SYSTEM_CONNECTION -->|"may_target"| N_PRIM_CONNECTION
+  N_OFFER_MANAGED_WEBSITES -->|"moves_via"| N_CAP_CONVERT
+  N_UNK_EMAIL_PROD -->|"depends_on"| N_RULE_EMAIL_GATE
+  N_UNK_EMAIL_PROD -.->|"constrains #91;inferred#93;"| N_COMP_OWNER_BY_EMAIL
+  N_COMP_SYSTEM_EVOLUTION -.->|"requires #91;proposed#93;"| N_PRIM_SYSTEM
+  N_PROD_CUSTOM_APPS -.->|"seeds #91;inferred#93;"| N_PRIM_SYSTEM
+  N_PROD_INVESTIGATIONS -.->|"feeds #91;proposed#93;"| N_RULE_SYSTEM_PAUSE_HEALTH
+  classDef type_capability fill:#FEF3C7,stroke:#A16207,color:#422006;
+  classDef type_composition fill:#FDE68A,stroke:#B45309,color:#451A03;
+  classDef type_custom fill:#FFFFFF,stroke:#64748B,color:#0F172A;
+  classDef type_distribution fill:#FCE7F3,stroke:#BE185D,color:#500724;
+  classDef type_economic fill:#1F2937,stroke:#111827,color:#FFFFFF;
+  classDef type_integration fill:#E2E8F0,stroke:#475569,color:#0F172A;
+  classDef type_offering fill:#DCFCE7,stroke:#15803D,color:#052E16;
+  classDef type_primitive fill:#E8F0FE,stroke:#3659C9,color:#172554;
+  classDef type_responsibility fill:#FFEDD5,stroke:#C2410C,color:#431407;
+  classDef type_rule fill:#F3E8FF,stroke:#7E22CE,color:#3B0764;
+  classDef type_state fill:#E0E7FF,stroke:#4338CA,color:#1E1B4B;
+  classDef type_surface fill:#F3F4F6,stroke:#6B7280,color:#111827;
+  classDef confirmed stroke-width:2px,stroke-dasharray:0;
+  classDef inferred stroke-width:2px,stroke-dasharray:2 3;
+  classDef proposed stroke-width:2px,stroke-dasharray:8 4;
+  LEGEND_CONFIRMED["confirmed: solid"]
+  class LEGEND_CONFIRMED confirmed;
+  LEGEND_INFERRED["inferred: dotted"]
+  class LEGEND_INFERRED inferred;
+  LEGEND_PROPOSED["proposed: dashed"]
+  class LEGEND_PROPOSED proposed;

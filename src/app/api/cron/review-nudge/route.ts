@@ -13,11 +13,12 @@
  * Schedule: see vercel.json.
  */
 
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { sendReviewRequestEmail } from "@/lib/delivery-email";
 import type { TenantConfig } from "@/lib/types";
 import { requireCronRequest } from "@/lib/cron-auth";
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
   let skippedNotSent = 0;
 
   await mapPool(tenants, 6, async (tenant) => {
-    const email = tenant.ownerEmail?.trim();
+    const email = await ownerNoticeEmail(tenant);
     if (!email) {
       skippedNoEmail++;
       return;

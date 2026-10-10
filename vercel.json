@@ -5,6 +5,14 @@
   },
   "crons": [
     {
+      "path": "/api/cron/google-content-retention",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/workspace-export-recovery",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/domain-monitor",
       "schedule": "*/30 * * * *"
     },
@@ -65,6 +73,18 @@
       "schedule": "17 * * * *"
     },
     {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/booking-parity",
+      "schedule": "45 5 * * *"
+    },
+    {
+      "path": "/api/cron/client-records-parity",
+      "schedule": "40 5 * * *"
+    },
+    {
       "path": "/api/cron/visibility",
       "schedule": "0 3 * * 2"
     },
@@ -97,6 +117,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/needs-you",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/heartbeat",
       "schedule": "*/30 * * * *"
     },
@@ -111,6 +135,26 @@
     {
       "path": "/api/cron/website-domain-verification",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/connected-sites-purge",
+      "schedule": "50 5 * * *"
+    },
+    {
+      "path": "/api/cron/newsletter-sender",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/split-payouts",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/payment-holds",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/google-review-content-retention",
+      "schedule": "0 * * * *"
     }
   ]
 }

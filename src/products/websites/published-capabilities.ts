@@ -3,7 +3,7 @@ import { PostgresOfferingStore } from "@/platform/offerings/store";
 import { listWorkspaces } from "@/platform/workspaces/repository";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { readInquiryWorkspace, projectPublishedInquiry } from "@/products/inquiries/server";
-import { listPublicWebsiteBookingGrants, readWorkspaceSchedule, scheduleSchema } from "@/products/scheduling/server";
+import { listPublicWebsiteBookingGrants, readWorkspaceSchedule, scheduleSchema, listWorkspaceCalendarConnections } from "@/products/scheduling/server";
 import {
   websiteCapabilityOptionsSchema,
   websiteCapabilitySelectionSchema,
@@ -76,7 +76,7 @@ export async function listPublishedWebsiteCapabilityOptions(
   // Native offering bindings belong to customer workspaces. Personal and
   // agency work can still own a website draft, but cannot expose customer
   // inquiry or booking connections through this selector.
-  if (workspace.kind !== "customer" || workspace.access === "delegated_read") return { tenants: [] };
+  if (workspace.kind !== "customer" || (workspace.access === "delegated_read" || workspace.access === "provider_seat")) return { tenants: [] };
   const inspection = await new PostgresOfferingStore().inspect(actor, workspaceId);
   const bindings = activeWebsiteBindings(inspection);
   if (bindings.length === 0) return { tenants: [] };
@@ -137,6 +137,7 @@ export async function resolvePublishedWebsiteCapabilities(
   workspaceId: string,
   websiteWorkId: string,
   selection?: WebsiteCapabilitySelection,
+  checks: { requireConnectedCalendar?: boolean } = {},
 ): Promise<WebsitePublishedCapabilities | undefined> {
   if (!selection) return undefined;
   const parsedSelection = websiteCapabilitySelectionSchema.parse(selection);
@@ -150,6 +151,7 @@ export async function resolvePublishedWebsiteCapabilities(
     ? tenant.booking.find((candidate) => candidate.grantId === parsedSelection.bookingGrantId)
     : undefined;
   if ((parsedSelection.inquiryCapabilityId && !inquiry) || (parsedSelection.bookingGrantId && !booking)) return undefined;
+  if (checks.requireConnectedCalendar && booking && !(await listWorkspaceCalendarConnections(actor, workspaceId)).some(connection => connection.provider === booking.provider && connection.status === "connected")) return undefined;
   const baseUrl = configuredBaseUrl();
   if (!baseUrl) return undefined;
   const result = websitePublishedCapabilitiesSchema.safeParse({

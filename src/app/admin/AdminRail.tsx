@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   LayoutGrid, Users, Building2, Inbox, UserPlus, CreditCard, BarChart3,
-  Zap, FileText, Wrench, Activity, ScrollText, Globe, BriefcaseBusiness, MessageSquareText,
+  Zap, FileText, Wrench, Activity, ScrollText, Globe, BriefcaseBusiness, MessageSquareText, ListChecks, ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
@@ -19,6 +19,8 @@ export const NAV: Group[] = [
   {
     items: [
       { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
+      { href: "/admin/queue", label: "Queue", icon: ListChecks },
+      { href: "/admin/needs-you", label: "Who decides", icon: ShieldCheck },
       { href: "/admin/work", label: "Internal work", icon: BriefcaseBusiness },
     ],
   },
@@ -40,6 +42,7 @@ export const NAV: Group[] = [
       { href: "/admin/leads", label: "Leads", icon: Inbox, badgeKey: "leads" },
       { href: "/admin/onboard", label: "Onboard", icon: UserPlus },
       { href: "/admin/pay-links", label: "Pay links", icon: CreditCard },
+      { href: "/admin/money", label: "Money records", icon: CreditCard },
       { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
     ],
   },
@@ -78,7 +81,9 @@ export function RailBrand() {
 export function NavList({
   badges,
   onNavigate,
+  moneyEnabled = false,
 }: {
+  moneyEnabled?: boolean;
   badges: Record<string, number | undefined>;
   onNavigate?: () => void;
 }) {
@@ -92,7 +97,7 @@ export function NavList({
               {group.label}
             </span>
           )}
-          {group.items.map((i) => {
+          {group.items.filter(i => i.href !== "/admin/money" || moneyEnabled).map((i) => {
             const on = active(pathname, i);
             const Icon = i.icon;
             const badge = i.badgeKey ? badges[i.badgeKey] : undefined;
@@ -135,7 +140,9 @@ export function RailFooter({ operatorName }: { operatorName: string }) {
 export function AdminRail({
   operatorName = "Operator",
   badges = {},
+  moneyEnabled = false,
 }: {
+  moneyEnabled?: boolean;
   operatorName?: string;
   badges?: Record<string, number | undefined>;
 }) {
@@ -144,7 +151,7 @@ export function AdminRail({
       <div className="mb-5">
         <RailBrand />
       </div>
-      <NavList badges={badges} />
+      <NavList badges={badges} moneyEnabled={moneyEnabled} />
       <RailFooter operatorName={operatorName} />
     </aside>
   );

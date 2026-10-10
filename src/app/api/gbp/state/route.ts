@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * GET /api/gbp/state
  *
@@ -13,7 +14,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getGbpState } from "@/lib/gbp-management";
 
@@ -32,6 +33,7 @@ export async function GET() {
 
   const denied = await requireTenantAccess(tenantId);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenantId);
 
   const state = await getGbpState(tenantId);
   if (!state) {

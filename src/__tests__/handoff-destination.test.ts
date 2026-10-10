@@ -9,8 +9,8 @@ const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/platform/workspaces", async () => {
   const actual = await vi.importActual<typeof import("@/platform/workspaces")>("@/platform/workspaces");
   return { ...actual, inspectHandoff: mocks.inspect, acceptHandoff: mocks.accept };

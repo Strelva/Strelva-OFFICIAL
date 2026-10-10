@@ -7,7 +7,7 @@ import {
   type DeliveryStatus,
   DELIVERY_STATUSES,
   deliveryStatusLabel,
-} from "@/lib/access-request-delivery";
+} from "@/lib/access-request-delivery-contracts";
 import type { LeadWorkflow, LeadWorkflowStatus } from "@/lib/lead-workflow";
 import { Chip } from "@/app/admin/console";
 
@@ -285,7 +285,7 @@ function LeadCard({
       {/* Row 6: stage control — what the lead sees on their tracker link — + convert. */}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <label htmlFor={`stage-${lead.statusToken}`} className="text-[11px] text-gray-faint">
-          Customer sees
+          Client sees
         </label>
         <select
           id={`stage-${lead.statusToken}`}

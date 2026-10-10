@@ -1,0 +1,25 @@
+--- a/scripts/check-full-model-journeys.sh
++++ b/scripts/check-full-model-journeys.sh
+@@ -20,6 +20,7 @@
+ if [[ "$list" == 1 ]]; then node "$manifest" manifest "$profile"; exit; fi
+ # Missing required specs and held qualification fail before a stack is touched.
+ node "$manifest" preflight "$profile" "$root"
++if [[ "$profile" == full-native ]]; then node scripts/tenant-cleanup-journey-window.mjs preflight "$root"; fi
+ for file in .env .env.local .env.development .env.development.local; do
+   [[ ! -e "$file" ]] || { echo "Remove $file from this prepared proof checkout first." >&2; exit 1; }
+ done
+@@ -131,8 +132,13 @@
+     run_clean env PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
+       --workers=1 --retries=0 --reporter=line,json --output="test-results/full-model-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
+   fi
++  node "$manifest" validate "$profile" "$work/results-$variant.json" ${variant_arg[@]+"${variant_arg[@]}"} > "$work/receipt-$variant.json" || status=1
++  # Independent closed recovery evidence never changes a failed native status.
++  # Keep the original 34-case contract and this owned app/Redis alive.
++  if [[ "$profile" == full-native ]]; then
++    run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || status=1
++  fi
+   stop_app; stop_redis
+-  node "$manifest" validate "$profile" "$work/results-$variant.json" ${variant_arg[@]+"${variant_arg[@]}"} > "$work/receipt-$variant.json" || status=1
+   [[ "$status" == 0 ]] || { echo "Closed $profile/$variant failed; see retained reports." >&2; exit 1; }
+ done
+ env -i "${base_env[@]}" node "$root/scripts/full-model-stack-qualification.mjs" verify "$root" "$work/env" > "$work/stack-qualification-end.json"

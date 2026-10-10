@@ -23,21 +23,21 @@ const redis = {
   },
 };
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
-vi.mock("@/lib/crypto/secrets", () => ({
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/crypto/secrets", () => ({
   decryptSecret: (value: string | undefined) => value,
   encryptSecret: (value: string | undefined) => value,
 }));
-vi.mock("@/lib/auth", () => ({ assignUserToTenant: vi.fn(), findUserIdByEmail: vi.fn() }));
-vi.mock("@/lib/production-guard", () => ({ isProductionEnv: () => false }));
+vi.mock("@/platform/infra/auth", () => ({ assignUserToTenant: vi.fn(), findUserIdByEmail: vi.fn() }));
+vi.mock("@/platform/infra/production-guard", () => ({ isProductionEnv: () => false }));
 vi.mock("@/lib/tenant-domain-map", () => ({ buildTenantDomainMap: vi.fn(() => ({})) }));
-vi.mock("@/lib/db/source-flags", () => ({ tenantsSourceIsPostgres: () => true }));
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/source-flags", () => ({ tenantsSourceIsPostgres: () => true }));
+vi.mock("@/platform/infra/db/repositories", () => ({
   listAllTenants: (...args: unknown[]) => mocks.listAllTenants(...args),
   getTenant: vi.fn(),
   upsertTenant: vi.fn(),
 }));
-vi.mock("@/lib/db/domain-claims", () => ({
+vi.mock("@/platform/infra/db/domain-claims", () => ({
   domainClaimToRow: vi.fn(),
   listAllDomainClaims: () => mocks.listAllDomainClaims(),
   listDomainClaims: vi.fn(async () => []),

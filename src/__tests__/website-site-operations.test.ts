@@ -29,6 +29,17 @@ describe("site document edits",()=>{
   expect(()=>applySitePatch(doc,Array.from({length:12},(_,i)=>({op:"add",path:"/pages/-",value:{path:`/page-${i}`,title:"Page",description:"",root:"hero"}})))).toThrow();
   for(const path of ["/facts/new","/assets/new","/capabilities","/theme","/provenance","/pages"])expect(()=>applySitePatch(doc,[{op:"add",path,value:{}}])).toThrow();
  });
+ it("rejects a patch that expands a valid page past the render limit",()=>{
+  const doc=fixture();let leafIndex=0;doc.nodes.hero!.children=["group0","group1","group2"];
+  for(const [groupIndex,count] of [166,165,165].entries()){
+   const children=Array.from({length:count},(_,index)=>`leaf${leafIndex+index}`);
+   doc.nodes[`group${groupIndex}`]={id:`group${groupIndex}`,type:"Section",variant:"container",props:{},children,factIds:[]};
+   for(const id of children)doc.nodes[id]={id,type:"Section",variant:"container",props:{title:"Leaf"},children:[],factIds:[]};
+   leafIndex+=count;
+  }
+  expect(Object.keys(doc.nodes)).toHaveLength(500);
+  expect(()=>applySitePatch(doc,[{op:"add",path:"/nodes/group0/children/-",value:"leaf0"}])).toThrow(/rendered sections/i);
+ });
  it("cannot launder high-risk metadata through an already supported root",async()=>{
   const doc=fixture();doc.nodes.hero!.verification={supported:true,confidence:1};
   const result=await prepareSitePatch({document:doc,ops:[{op:"replace",path:"/pages/0/description",value:"Guaranteed 100% results"}]});

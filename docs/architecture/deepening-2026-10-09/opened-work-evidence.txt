@@ -1,0 +1,111 @@
+
+ RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-opened-work-composition-20261009-retry
+
+(node:65991) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:65999) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:65998) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/__tests__/systems-runtime.test.tsx (20 tests | 1 failed) 303ms
+   × opens a standalone v2 website System in rebuild review even when new rebuilds are disabled ({"payload":null,"website":{"version":2}}) 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/systems-runtime.test.tsx > opens a standalone v2 website System in rebuild review even when new rebuilds are disabled ({"payload":null,"website":{"version":2}})
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/__tests__/systems-runtime.test.tsx:143:111
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 21 passed (22)
+   Start at  16:36:47
+   Duration  4.57s (transform 3.57s, setup 70ms, import 5.06s, tests 600ms, environment 761ms)
+
+
+Initial browser harness failure (visible alert text; exact locator corrected):
+
+  8 failed
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 1440px workspace error ─────────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 1440px workspace permission ────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 1440px system error ────────────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 1440px system permission ───────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px workspace error ──────────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px workspace permission ─────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px system error ─────────────────────
+    [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px system permission ────────────────
+  16 passed (1.1m)
+
+Initial final typecheck found the added stale-read fixture callback returned Response | Promise<Response>. Corrected fixture callback to async; runtime unchanged.
+
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/.croki/worktrees/REB/arch-opened-work-composition-20261009-retry
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+src/__tests__/opened-work-composition.test.tsx(90,67): error TS2345: Argument of type '(id: string) => Response | Promise<Response>' is not assignable to parameter of type '(id: string) => Promise<Response>'.
+  Type 'Response | Promise<Response>' is not assignable to type 'Promise<Response>'.
+    Type 'Response' is missing the following properties from type 'Promise<Response>': then, catch, finally, [Symbol.toStringTag]
+ ELIFECYCLE  Command failed with exit code 2.
+
+Final targeted behavior and failure paths:
+
+ Test Files  11 passed (11)
+      Tests  113 passed (113)
+   Start at  16:49:36
+   Duration  8.58s (transform 10.52s, setup 809ms, import 17.16s, tests 3.65s, environment 7.31s)
+
+
+Final browser matrix:
+  ✓  23 [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px system read-only (868ms)
+  ✓  24 [desktop] › tests/opened-work-composition.spec.ts:8:7 › 390px system empty (810ms)
+
+  24 passed (20.5s)
+
+Final boundaries:
+
+> strelva@0.2.0 check:boundaries /Users/jacobrhinehart/.croki/worktrees/REB/arch-opened-work-composition-20261009-retry
+> tsx scripts/check-product-boundaries.ts
+
+Product boundaries passed (source and scripts, including untracked files). Baseline, shrink only: 201 workspace -> src/lib imports in 92 files, 42 older boundary imports.
+(node:85444) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Final ontology:
+
+> strelva@0.2.0 check:ontology /Users/jacobrhinehart/.croki/worktrees/REB/arch-opened-work-composition-20261009-retry
+> tsx scripts/check-ontology.ts
+
+check:ontology passed (file-size ceiling + lifecycle CHECK constraints).
+(node:85443) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Targeted ESLint: exit 0, no diagnostics.
+Git diff --check: exit 0, no diagnostics.
+
+Final typecheck: exit 0.
+
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/.croki/worktrees/REB/arch-opened-work-composition-20261009-retry
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+
+Corrected stale-read seam fixture rerun: exit 0.
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  16:50:57
+   Duration  2.34s (transform 1.08s, setup 35ms, import 1.52s, tests 331ms, environment 384ms)

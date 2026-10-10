@@ -3,7 +3,7 @@ import type { PayLinkConfig } from "@/lib/pay-links";
 
 const mockGetRedis = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
 import {
   savePayLink,

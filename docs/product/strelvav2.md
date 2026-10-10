@@ -1,11 +1,11 @@
 # strelvav2
 
 History. The workspace this release built went to production on Sept 30.
-The next release is [Strelva Reborn](./strelva-reborn.md) (`1.0.0`).
+The next releases are [Strelva Reborn](./strelva-reborn.md), shipped as `0.x` steps.
 
 `strelvav2` is the internal migration name. The customer product is Strelva.
-The current source version is `0.2.0` in the app and marketing repositories.
-This does not establish a deployed release or change compatibility names.
+Version `0.2.0` in the app and marketing repositories is what went to
+production on Sept 30. It does not change compatibility names.
 
 ## September 21 release direction
 

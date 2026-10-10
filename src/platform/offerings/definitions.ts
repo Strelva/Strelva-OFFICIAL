@@ -56,15 +56,12 @@ const definitions: readonly OfferingDefinition[] = [
     scopes: [{ id: "handle_inquiries", label: "Handle inquiries", description: "Use the governed inquiry handling path.", required: true }],
     surfaces: [{ id: "inquiry_workspace", label: "Inquiry workspace", description: "The existing inquiry handling surface.", href: null, required: true }],
     configurationFields: [],
-    resolveSurfaces(resources, businessId, status) {
-      const workspace = resources.find((resource) => resource.kind === "inquiry_workspace");
+    resolveSurfaces() {
       return [{
         id: "inquiry_workspace",
         label: "Inquiry workspace",
         description: "The existing inquiry handling surface.",
-        href: workspace && status === "active"
-          ? `/workspace?workspaceId=${encodeURIComponent(businessId)}&view=inquiries&inquiryWorkspaceId=${encodeURIComponent(workspace.id)}`
-          : null,
+        href: null,
       }];
     },
   },

@@ -1,20 +1,24 @@
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { generateMonthlyRecap } from "@/lib/weekly-brief";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
-import { EMAIL_DOMAIN } from "@/lib/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import { getRedis } from "@/lib/redis";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import { getRedis } from "@/platform/infra/redis";
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
 import type { WeeklyBrief } from "@/lib/types";
+import { recordCatalogReport } from "@/platform/catalog-reports/receipts";
+import { deliverBusinessOutcomeReport, readBusinessOutcomeReports } from "@/platform/business-outcomes/reports";
 
 // Iterates tenants; matches the platform function ceiling so it can't die
 // mid-batch at scale.
@@ -58,9 +62,23 @@ export async function GET(request: Request) {
 
   const hostedReports = await runWebsiteMonthlyReports(monthKey).catch(() => ({ tenants: [] as string[], sent: 0, suppressed: 0, errors: ["Native website monthly reporting is unavailable"] }));
   const hostedTenants = new Set(hostedReports.tenants);
-  const tenants = (await getAllTenants().catch(() => [])).filter(
-    (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled" && !!t.ownerEmail,
+  // The one owner-recipient rule (src/lib/owner-recipient.ts) picks each
+  // recipient; a tenant with nobody on record is not sent a recap.
+  const candidates = (await getAllTenants().catch(() => [])).filter(
+    (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled",
   );
+  const recipients = new Map<string, string>();
+  const receipt = (tenantId: string, status: "accepted" | "suppressed" | "failed", recipient: string | null, reason: string | null = null) =>
+    recordCatalogReport({ tenantId, kind: "monthly", period: monthKey, status, recipient, reason });
+  await mapPool(candidates, 8, async (t) => {
+    const email = await ownerNoticeEmail(t);
+    if (email) recipients.set(t.id, email);
+    else await receipt(t.id, "suppressed", null, "missing_owner_email");
+  });
+  const outcomes = await readBusinessOutcomeReports(candidates.map(t => t.id), monthKey);
+  const outcomesByTenant = new Map((outcomes ?? []).map(row => [row.primaryTenantId, row]));
+  const groupedSites = new Set((outcomes ?? []).flatMap(row => row.tenantIds.filter(id => id !== row.primaryTenantId)));
+  const tenants = candidates.filter((t) => recipients.has(t.id) && !groupedSites.has(t.id));
 
   const sent: string[] = [];
   const errors: string[] = [...hostedReports.errors];
@@ -68,73 +86,94 @@ export async function GET(request: Request) {
   const redis = getRedis();
 
   await mapPool(tenants, 8, async (tenant) => {
+    const to = recipients.get(tenant.id)!;
     try {
       // Always refresh the recap so the Reports surface is current.
       const recap = await generateMonthlyRecap(tenant.id);
 
+      // Armed grouping failure must never fall back around the durable receipt.
+      if (outcomes === null) {
+        skipped.push({ tenantId: tenant.id, reason: "business_outcome_grouping_unavailable" });
+        return;
+      }
       // Send gates: pause switch, then the once-per-month dedup marker.
       if (paused) {
         skipped.push({ tenantId: tenant.id, reason: "email_paused" });
+        await receipt(tenant.id, "suppressed", to, "email_paused");
         return;
       }
       if (redis) {
         const already = await redis.get(sentKey(tenant.id, monthKey)).catch(() => null);
         if (already) {
           skipped.push({ tenantId: tenant.id, reason: "already_sent" });
+          await receipt(tenant.id, "suppressed", to, "already_sent");
           return;
         }
       }
 
       const heading = buildMonthlyHeading(recap);
       const paragraphs = recapParagraphs(recap.summary);
-      const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
+      const outcome = outcomesByTenant.get(tenant.id);
+      if (outcome) paragraphs.push(`Across your business: ${outcome.line.text}`);
+      const brand = await resolveTenantBrand(tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(tenant.id)}/dashboard/reports` : await ownerNoticeUrl(tenant, "/dashboard/reports", getTenantDashboardUrl(tenant, "/dashboard/reports"));
 
       const html = renderEmailHtml({
+        brand,
         preheader: paragraphs[0],
         heading,
         paragraphs,
         button: { label: "See your full recap", url: dashboardUrl },
         footerNote: `Your ${monthName} recap for ${tenant.siteName}`,
       });
-      const text = renderEmailText({ heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
+      const text = renderEmailText({ brand, heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
 
       if (process.env.RESEND_API_KEY) {
-        const domain = tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+        const domain = brand.agencyId ? EMAIL_DOMAIN : tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
         // Shared transport boundary; keeps the report@ from + per-tenant domain.
         let ok = false;
         try {
-          ok = await sendEmail({
+          const send = async () => await sendEmail({
             audience: "client",
             tenantId: tenant.id,
-            to: tenant.ownerEmail!,
+            to: to,
             subject: `Your ${monthName} recap`,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(tenant.siteName),
+            brand,
+            fromName: tenant.siteName,
             fromAddress: `report@${domain}`,
           });
+          ok = outcome
+            ? (await deliverBusinessOutcomeReport(outcome, monthKey, async () => ({ status: await send() ? "accepted" as const : "suppressed" as const }))).status === "accepted"
+            : await send();
         } catch (err) {
           const reason = err instanceof Error ? err.message : "send failed";
           errors.push(`${tenant.id}: ${reason}`);
-          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: tenant.ownerEmail! }).catch(() => {});
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: to }).catch(() => {});
+          await receipt(tenant.id, "failed", to, reason.slice(0, 500));
           return;
         }
         if (!ok) {
           errors.push(`${tenant.id}: send suppressed or unconfigured`);
-          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: tenant.ownerEmail! }).catch(() => {});
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: to }).catch(() => {});
+          await receipt(tenant.id, "suppressed", to, "suppressed_or_unconfigured");
           return;
         }
-        await recordMailSend(tenant.id, "monthly_report", { ok: true, to: tenant.ownerEmail! }).catch(() => {});
+        await recordMailSend(tenant.id, "monthly_report", { ok: true, to: to }).catch(() => {});
+        await receipt(tenant.id, "accepted", to);
         // Mark sent ONLY after a confirmed real send so a dev-mode run (no
         // RESEND_API_KEY) never consumes the once-per-month dedup marker.
         if (redis) await redis.set(sentKey(tenant.id, monthKey), "1", { ex: 60 * 60 * 24 * 45 }).catch(() => {});
       } else {
-        console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${tenant.ownerEmail}`);
+        console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${to}`);
+        await receipt(tenant.id, "suppressed", to, "email_provider_unconfigured");
       }
 
       sent.push(tenant.id);
     } catch (err) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "error"}`);
+      await receipt(tenant.id, "failed", to, "report_generation_or_delivery_failed");
     }
   });
 

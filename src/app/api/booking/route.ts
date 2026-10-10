@@ -1,11 +1,20 @@
+import { bookingServicePoliciesEnabled } from "@/platform/bookings/service-policy";
+import { z } from "zod";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import { bookingConflictAlternatives, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
 import { NextResponse } from "next/server";
-import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
+import { getContent, logActivity } from "@/lib/storage";
+import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
+import { issueNativeAccess } from "@/platform/bookings/native";
+import { readTenantBookings } from "@/platform/bookings/store";
+import { bookingMessagesEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { readJsonObject } from "@/lib/request-body";
-import { requireActiveSubscription } from "@/lib/subscription";
 import { sendBookingConfirmation } from "@/lib/delivery-email";
+import { notifyOwnerOfBooking } from "@/platform/bookings/notices";
 
 function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -19,9 +28,28 @@ function cleanText(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
+const UNAVAILABLE = "We couldn't save your booking just now, so nothing was booked. Please try again in a minute.";
+
+/** Booking writes require the shared limiter; a limiter outage denies before effects. */
+async function bookingRateLimit(request: Request): Promise<"ok" | "limited" | "unavailable"> {
+  try { return await isRateLimitedAsync(rateLimitKey(request, "booking"), 10) ? "limited" : "ok"; }
+  catch { return "unavailable"; }
+}
+
+/** After the booking is stored, nothing that follows may turn it into a failure for the visitor. */
+async function afterStored(label: string, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    console.error(`[booking] ${label} failed after the booking was stored (non-fatal):`, error instanceof Error ? error.message : error);
+  }
+}
+
 export async function POST(request: Request) {
   try {
-    if (await isRateLimitedAsync(rateLimitKey(request, "booking"), 10)) {
+    const limit = await bookingRateLimit(request);
+    if (limit === "unavailable") return NextResponse.json({ error: UNAVAILABLE }, { status: 503 });
+    if (limit === "limited") {
       return NextResponse.json({ error: "Too many requests" }, { status: 429 });
     }
 
@@ -35,6 +63,8 @@ export async function POST(request: Request) {
     const clientEmail = cleanText(body.clientEmail, 320).toLowerCase();
     const clientPhone = cleanText(body.clientPhone, 80);
     const notes = cleanText(body.notes, 1000);
+    const intake = bookingServicePoliciesEnabled() ? z.record(z.string().max(80),z.string().max(2000)).safeParse(body.intakeAnswers ?? {}) : null;
+    if (intake && !intake.success) return NextResponse.json({error:"Check your intake answers."},{status:400});
 
     if (!serviceId || !date || !startTime || !clientName || !clientEmail) {
       return NextResponse.json(
@@ -50,9 +80,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
+    // A visitor booking on a live site is never billing-gated: a lapsed or
+    // past-due payment never drops a client's customer (money-and-data rule 6).
     const tenant = await getTenantFromHeaders();
-    const blocked = await requireActiveSubscription(tenant);
-    if (blocked) return blocked;
 
     // Calculate end time (parse service duration or default 60)
     const services = await getContent("services", tenant);
@@ -80,22 +110,57 @@ export async function POST(request: Request) {
         clientEmail,
         clientPhone,
         notes: notes || undefined,
+        ...(intake?.success ? {intakeAnswers:intake.data} : {}),
       },
       tenant
     );
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 409 });
+      // Only the one booking store (reads flipped) returns a code: a paused
+      // bookings System, or a service the business record no longer offers.
+      if (result.code === "invalid_intake") return NextResponse.json({error:result.error},{status:400});
+      if (result.code === "invalid_service") return NextResponse.json({ error: "Invalid service" }, { status: 400 });
+      // Nothing could be stored or guarded (store and Redis both unavailable): say so, never claim success.
+      if (result.code === "unavailable") return NextResponse.json({ error: result.error }, { status: 503 });
+      const alternatives = result.code === "paused" ? {} : await bookingConflictAlternatives(new PublicBookingError("conflict", result.error), () => nativeBookingAlternatives(tenant, serviceId));
+      return NextResponse.json({ error: result.error, ...alternatives, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
     }
+    const requested = result.requested === true;
+    // With reads on the one store, the name comes from the business record.
+    const bookedService = result.booking.serviceName;
 
-    await logActivity(
+    await afterStored("activity log", () => logActivity(
       {
-        text: `New booking: ${service.name} on ${date} at ${startTime} for ${clientName}`,
+        text: `${requested ? "New booking request" : "New booking"}: ${bookedService} on ${date} at ${startTime} for ${clientName}`,
         time: new Date().toISOString(),
         type: "booking",
       },
       tenant
-    );
+    ));
+    if (requested && bookingOwnerNoticeEnabled() && !bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
+      const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      if (saved) await afterStored("request owner", () => notifyBookingRequestNow(saved));
+    }
+    if (bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
+      const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      let confirmationSent = false;
+      if (saved) {
+        await afterStored("request owner", () => notifyBookingRequestNow(saved));
+        await afterStored("manage link", () => issueNativeAccess(tenant, saved.id));
+        await afterStored("booking messages", async () => {
+          const messages = await deliverBookingUpdates(saved.id);
+          confirmationSent = !requested && messages.customerSent > 0;
+        });
+      }
+      if (!saved) await afterStored("owner notice", () => notifyOwnerOfBooking(tenant, result.booking));
+      return NextResponse.json({ success: true, booking: result.booking, confirmationSent, ...(requested ? { requested: true } : {}) });
+    }
+    // "New booking" to the owner recipient (off unless STRELVA_BOOKING_OWNER_NOTICE=1).
+    // A request reaches the owner as a Needs you item instead.
+    await afterStored("owner notice", () => notifyOwnerOfBooking(tenant, result.booking));
+
+    // A request isn't confirmed yet, so no confirmation goes out.
+    if (requested) return NextResponse.json({ success: true, booking: result.booking, confirmationSent: false, requested: true });
 
     // Confirm to the customer. Fail-soft: the booking already committed, so an email
     // failure must never surface as an error. Gated by CUSTOMER_EMAIL_ENABLED (default
@@ -107,7 +172,7 @@ export async function POST(request: Request) {
       confirmationSent = await sendBookingConfirmation({
         to: clientEmail,
         clientName,
-        serviceName: service.name,
+        serviceName: bookedService,
         date,
         time: startTime,
         businessName: config?.siteName ?? "",

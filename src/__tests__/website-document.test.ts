@@ -3,7 +3,7 @@ import { siteDocumentSchema, siteDocumentHash, unresolvedSiteFacts } from "@/pro
 import { createWebsiteDocumentStore } from "@/products/websites/document-store";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 
-vi.mock("@/lib/redis", () => ({ getRedis: vi.fn(() => null) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: vi.fn(() => null) }));
 
 const actor = { userId: "61000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const key = { workspaceId: "61000000-0000-4000-8000-000000000002", workId: "61000000-0000-4000-8000-000000000003" };

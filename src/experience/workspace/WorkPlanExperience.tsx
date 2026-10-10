@@ -1,6 +1,6 @@
 "use client";
 
-import { useWorkspaceIntent } from "./WorkspaceIntent";
+import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -9,9 +9,10 @@ import type { BudgetExecution } from "@/platform/work-economics/runtime";
 import type { JobEconomicsRecord } from "@/platform/work-economics/types";
 import type { WorkPlan, WorkPlanOutputExecution } from "@/products/work-plans/contracts";
 import type { WorkspaceWork } from "./contracts";
+import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { WorkPlanOutputPreview } from "./WorkPlanOutputPreview";
 
-type PlanningEconomicsInput = { jobId: string; executionKey: string; maximumCents: number };
+type PlanningEconomicsInput = { fundingWorkspaceId?: string; jobId: string; executionKey: string; maximumCents: number };
 type PlanningEconomicsReceipt = BudgetExecution;
 type PlanningBudgetResponse = {
   ledger: JobEconomicsRecord | null;
@@ -82,9 +83,14 @@ function storeExecution(workspaceId: string, jobId: string, value: StoredPlannin
 }
 export type WorkPlanExperienceProps = {
   presentation?: "document";
+  /** Agency authoring supplies guarded adapters; default native paths stay unchanged. */
+  prepareUrl?: string;
+  outputUrl?: string;
   workspaceId: string;
   workId?: string;
   initialRequest?: string;
+  systemsRelease?: boolean;
+  onRequest?: (request: string) => void;
   /** Supplied only after a payer has accepted the planning budget. */
   planningEconomics?: PlanningEconomicsInput;
   sources: readonly WorkspaceWork[];
@@ -97,10 +103,12 @@ export type WorkPlanExperienceProps = {
 export function WorkPlanExperience(props: WorkPlanExperienceProps) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequest={props.initialRequest || (!props.workId && intent.route === "plan" ? intent.request : undefined)} />;
+  const onSaved = props.onSaved && !props.workId ? (id: string) => { intent.spend("plan"); props.onSaved?.(id); } : props.onSaved;
+  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
 }
 
-function PlanSession({ presentation, workspaceId, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
+function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, workspaceId, systemsRelease, onRequest, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
+  const transport = useWorkspaceRequest();
   const [request, setRequest] = useState(initialRequest);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
   const [result, setResult] = useState<PlanResponse | null>(null);
@@ -110,6 +118,9 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
   const [budget, setBudget] = useState<PlanningBudgetResponse | null>(null);
   const [budgetLoading, setBudgetLoading] = useState(!localPreview);
   const [budgetError, setBudgetError] = useState("");
+  const [fundingWorkspaceId, setFundingWorkspaceId] = useState(workspaceId);
+  const [requestRequired, setRequestRequired] = useState(false);
+  const [fallbackRequestId, setFallbackRequestId] = useState<string | null>(null);
   const [budgetBusy, setBudgetBusy] = useState(false);
   const [budgetRetry, setBudgetRetry] = useState<PlanningBudgetCommand | null>(null);
   const [executionJobId, setExecutionJobId] = useState(providedPlanningEconomics?.jobId ?? null);
@@ -166,12 +177,24 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     setBudgetLoading(true);
     setBudgetError("");
     try {
+      let funding = workspaceId;
+      if (systemsRelease) {
+        const authority = await fetch(`/api/work-plans/funding?workspaceId=${encodeURIComponent(workspaceId)}`, { credentials: "same-origin", cache: "no-store" });
+        const body = await authority.json().catch(() => null) as { fundingWorkspaceId?: string; code?: string } | null;
+        if (!authority.ok) {
+          if (body?.code === "make_systems_required") setRequestRequired(true);
+          throw new Error(responseError(body, "Planning authority could not be checked."));
+        }
+        if (!body?.fundingWorkspaceId) throw new Error("The planning budget target could not be confirmed.");
+        funding = body.fundingWorkspaceId;
+        setFundingWorkspaceId(funding);
+      }
       const query = new URLSearchParams({
-        workspaceId,
+        workspaceId: funding,
         productId: PLANNING_PRODUCT_ID,
         resourceKind: PLANNING_RESOURCE_KIND,
       });
-      const response = await fetch(`/api/work-economics?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
+      const response = await transport(`/api/work-economics?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(responseError(body, "The planning budget could not be checked."));
       applyBudget(body as PlanningBudgetResponse);
@@ -180,7 +203,7 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     } finally {
       setBudgetLoading(false);
     }
-  }, [applyBudget, localPreview, workspaceId]);
+  }, [applyBudget, localPreview, transport, workspaceId, systemsRelease]);
 
   useEffect(() => { void loadPlanningBudget(); }, [loadPlanningBudget]);
 
@@ -191,7 +214,7 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     setBudgetRetry(null);
     let retryable = true;
     try {
-      const response = await fetch("/api/work-economics", {
+      const response = await transport("/api/work-economics", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -209,19 +232,19 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     } finally {
       setBudgetBusy(false);
     }
-  }, [applyBudget, budgetBusy, localPreview, readOnly]);
+  }, [applyBudget, budgetBusy, localPreview, readOnly, transport]);
 
   useEffect(() => {
     if (!workId || localPreview) return;
     const controller = new AbortController();
-    fetch(`/api/work-plans?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}`, { signal: controller.signal, cache: "no-store" })
+    transport(`/api/work-plans?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}`, { signal: controller.signal, cache: "no-store" })
       .then(async response => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Your plan could not be loaded.");
         if (!controller.signal.aborted) { setResult(body); setRequest(body.plan.userGoal); }
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Your plan could not be loaded."); });
     return () => controller.abort();
-  }, [workspaceId, workId, localPreview]);
+  }, [workspaceId, workId, localPreview, transport]);
 
   async function prepare() {
     if (busy || readOnly || localPreview || !request.trim()) return;
@@ -258,7 +281,7 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     storeExecution(workspaceId, accepted.jobId, { executionKey: nextExecutionKey, fingerprint });
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/work-plans", {
+      const response = await transport(prepareUrl, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -268,6 +291,7 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
           sourceWorkIds: sourceIds,
           planningEconomics: {
             jobId: accepted.jobId,
+            ...(systemsRelease ? { fundingWorkspaceId } : {}),
             executionKey: nextExecutionKey,
             maximumCents: accepted.maximumCents,
           },
@@ -279,6 +303,11 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
         if (code === "planning_receipt_requires_reconciliation") {
           await loadPlanningBudget();
           throw new Error("A previous planning call has a durable receipt. Its maximum remains held until the cost is reconciled.");
+        }
+        if (systemsRelease && code === "make_systems_required") setRequestRequired(true);
+        if (code === "planning_request_filed") {
+          const id = (body as { requestId?: unknown }).requestId;
+          if (typeof id === "string") setFallbackRequestId(id);
         }
         throw new Error(responseError(body, "The plan could not be prepared."));
       }
@@ -296,17 +325,22 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
   const latestExecution = budget?.executions[budget.executions.length - 1];
   const executionBlocksNewCall = Boolean(result?.planningEconomics || (latestExecution && !(latestExecution.status === "finished" && latestExecution.effect === "none" && latestExecution.amountCents === 0)));
   const accepted = Boolean(providedJobId || (job && (job.status === "accepted" || job.status === "reserved")));
-  const canPrepare = !budgetLoading && !budgetError && accepted && !executionBlocksNewCall;
+  const canPrepare = !requestRequired && !budgetLoading && !budgetError && accepted && !executionBlocksNewCall;
   const plan = result?.plan;
   const Heading = presentation === "document" ? "h2" : "h1";
   return <section className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" aria-label="Work plan" aria-busy={busy}>
     <header><p className="text-sm text-gray-muted">{presentation === "document" ? "Draft with Strelva" : "Proposed work"}</p><Heading className="font-display text-2xl">{plan ? "Review what Strelva prepared" : presentation === "document" ? "What should this document cover?" : "What would you like to accomplish?"}</Heading><p className="mt-2 text-sm text-gray-muted">Describe the result you want. Strelva prepares a proposal using the work you choose to share.</p></header>
     {localPreview ? <p role="status" className="text-sm">AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.</p> : null}
-    {!localPreview ? <PlanningBudgetPanel workspaceId={workspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
+    {!localPreview && !requestRequired ? <PlanningBudgetPanel workspaceId={fundingWorkspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
+    {systemsRelease && fundingWorkspaceId !== workspaceId ? <p className="text-sm text-gray-muted">Your agency funds this planning call. The draft and its records stay in this client’s workspace.</p> : null}
+    {fallbackRequestId ? <p role="status" className="text-sm">Your Request is in this business’s Requests for Strelva to review.</p> : null}
+    {requestRequired ? <p role="status" className="text-sm">Strelva or your authorized agency builds Systems. Send the result you want as a Request for review.</p> : null}
+    {systemsRelease && onRequest && !fallbackRequestId && (requestRequired || error || budgetError) ? <Button type="button" variant="secondary" disabled={busy || !request.trim()} onClick={() => onRequest(request.trim())}>Ask Strelva to build this</Button> : null}
     {result?.planningEconomics ? <p role="status" className="text-sm text-gray-muted">Planning admission recorded. The provider cost is unverified, so up to the accepted maximum remains held until reconciliation.</p> : null}
     {workId && !plan && !error && !localPreview ? <p role="status">Loading your plan…</p> : null}
-    {(!workId || refining) && !readOnly ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>
+    {requestRequired && !readOnly ? <TextArea label="The result you want" rows={5} value={request} maxLength={3000} onChange={event => setRequest(event.target.value)} /> : null}
+    {(!workId || refining) && !readOnly && !requestRequired ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>
       <TextArea label="The result you want" rows={5} value={request} maxLength={3000} required disabled={busy} onChange={event => setRequest(event.target.value)} placeholder="Help my team handle new customer requests without anything slipping through." />
       {availableSources.length ? <details><summary className="cursor-pointer py-2 text-sm">Include saved work{sourceIds.length ? ` (${sourceIds.length} selected)` : " (optional)"}</summary><fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Include saved work, optional</legend><p className="mb-3 text-sm text-gray-muted">Choose up to six documents, trackers, or assessments. Strelva reads a limited excerpt of each selected item when preparing this plan.</p>{availableSources.map(source => <label key={source.id} className="flex items-center gap-3 py-2 text-sm"><input type="checkbox" checked={sourceIds.includes(source.id)} disabled={busy || (!sourceIds.includes(source.id) && sourceIds.length >= 6)} onChange={event => setSourceIds(current => event.target.checked ? [...current, source.id] : current.filter(id => id !== source.id))} />{source.title}</label>)}</fieldset></details> : null}
       <p className="text-sm text-gray-muted">Preparing a plan uses the configured AI provider after the accepted maximum is recorded. It does not publish, send messages, or start the proposed work.</p>
@@ -317,8 +351,8 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
     </form> : null}
     {plan ? <>
       <details className="text-sm"><summary className="cursor-pointer py-2">Original request</summary><p className="whitespace-pre-wrap">{plan.userGoal}</p></details>
-      {plan.context?.sources.length ? <details className="text-sm"><summary className="cursor-pointer">What Strelva looked at</summary><ul className="mt-3 space-y-3">{plan.context.sources.map(source => <li key={source.workId}><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(source.workId)}`}>{source.title}</a><p className="text-gray-muted">{source.revision === null ? "Saved version" : `Revision ${source.revision}`} · Last changed {new Date(source.updatedAt).toLocaleString()}</p></li>)}</ul><p className="mt-3 text-gray-muted">These are the versions used to prepare this proposal. Later source edits do not update the saved plan.</p></details> : null}
-      <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Ready to review</h2><p className="text-sm">{plan.summary}</p><ul className="space-y-6">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`}><h3 className="font-medium">{output.title}</h3><p className="text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul></section>
+      {plan.context?.sources.length ? <details className="text-sm"><summary className="cursor-pointer">What Strelva looked at</summary><ul className="mt-3 space-y-3">{plan.context.sources.map(source => <li key={source.workId}><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(source.workId)}`}>{source.title}</a><p className="text-gray-muted">{source.revision === null ? "Saved state" : `Revision ${source.revision}`} · Last changed {new Date(source.updatedAt).toLocaleString()}</p></li>)}</ul><p className="mt-3 text-gray-muted">These are the saved states used to prepare this proposal. Later source edits do not update the saved plan.</p></details> : null}
+      <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Ready to review</h2><p className="text-sm">{plan.summary}</p><ul className="space-y-6">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`}><h3 className="font-medium">{output.title}</h3><p className="text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview executionUrl={outputUrl} onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul></section>
       {plan.steps.length ? <details className="space-y-3 border-t border-gray-border pt-4"><summary className="cursor-pointer text-sm">How this will be done</summary><ol className="list-decimal space-y-3 pl-5">{plan.steps.map(step => <li key={step.id}><h3 className="font-medium">{step.title}</h3><p className="text-sm text-gray-muted">{step.description}</p></li>)}</ol></details> : null}
       {plan.neededInputs.length || plan.requiredDecisions.length ? <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Needs you</h2><ul className="space-y-3">{plan.neededInputs.map(input => <li key={`input-${input.id}`}><p className="font-medium">{input.label}{input.required ? "" : " (optional)"}</p><p className="text-sm text-gray-muted">{input.reason}</p></li>)}{plan.requiredDecisions.map(decision => <li key={`decision-${decision.id}`}><p className="font-medium">{decision.question}</p><p className="text-sm text-gray-muted">{decision.reason}</p></li>)}</ul></section> : null}
       <p className="text-sm text-gray-muted">Cost has not been estimated. Each output needs its own explicit action. Creating private work does not start an ongoing job.</p>

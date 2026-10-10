@@ -7,6 +7,8 @@ import { Panel } from "../console";
 import { workspaceHref } from "./workspace-href";
 import { OperationalInbox } from "@/experience/operations/OperationalInbox";
 import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
+import { BusinessEffortPortfolio } from "./BusinessEffort";
+import { loadBusinessEffort } from "./effort-data";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +50,7 @@ export default async function InternalWorkPage() {
   const learningOpen = workspaceOpen && productLearningEnabled();
   const operationsHref = workspaceHref(requestHost, forwardedProto, "operations");
   const learningHref = workspaceHref(requestHost, forwardedProto, "product-learning");
+  const effort = await loadBusinessEffort();
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -68,6 +71,7 @@ export default async function InternalWorkPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <BusinessEffortPortfolio load={effort} />
         <Panel title="Pre-installation service requests" className="lg:col-span-2" bodyClassName="p-[18px]">
           <ServiceRequestInbox />
         </Panel>
@@ -87,10 +91,10 @@ export default async function InternalWorkPage() {
           ]} />
         </Panel>
 
-        <Panel title="Customer support" bodyClassName="">
+        <Panel title="Support" bodyClassName="">
           <SurfaceLinks links={[
             { href: "/admin/clients", label: "Clients", detail: "Open the current client record, site health, access, and delivery controls." },
-            { href: "/admin/accounts", label: "Accounts", detail: "Inspect customer and payer groupings across managed sites." },
+            { href: "/admin/accounts", label: "Accounts", detail: "Inspect client and payer groupings across managed sites." },
             { href: "/admin/leads", label: "Leads", detail: "Work received requests without treating them as accepted delivery." },
           ]} />
         </Panel>

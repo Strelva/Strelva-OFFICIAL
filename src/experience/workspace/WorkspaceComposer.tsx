@@ -12,22 +12,26 @@ export interface WorkspaceComposerProps {
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
-  onSubmit: (request: string) => void | Promise<void>;
+  onSubmit: (ask: string) => void | Promise<void>;
   onTemplates?: () => void;
-  onChange?: (request: string) => void;
-  onEdited?: (request: string) => void;
+  onChange?: (ask: string) => void;
+  onEdited?: (ask: string) => void;
+  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Get or build an app" label. */
+  systemsReleased?: boolean;
+  /** `glass`: the compact frosted composer on Home's dusk band (October 6, 2026). */
+  tone?: "default" | "glass";
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
   return <ComposerSession key={`${props.draftKey || "transient"}:${props.initialRequest || ""}`} {...props} />;
 }
 
-/** One request editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited }: WorkspaceComposerProps) {
+/** One ask editor. Routing, permission and execution remain with its caller. */
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false, tone = "default" }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
-  const [request, setRequest] = useState(initialRequest);
+  const [ask, setAsk] = useState(initialRequest);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [storageUnavailable, setStorageUnavailable] = useState(false);
@@ -37,7 +41,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     if (!draftKey || initialRequest) return;
     try {
       const saved = readRequestDraft(window.sessionStorage, draftKey);
-      if (saved) setRequest(saved);
+      if (saved) setAsk(saved);
     } catch { /* The editor still works without browser storage. */ }
   }, [draftKey, initialRequest]);
 
@@ -47,14 +51,14 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     input.style.height = "auto";
     const minHeight = Number.parseFloat(window.getComputedStyle(input).minHeight) || 0;
     input.style.height = `${Math.min(288, Math.max(minHeight, input.scrollHeight))}px`;
-  }, [request]);
+  }, [ask]);
 
   useEffect(() => {
     if (autoFocus) textarea.current?.focus({ preventScroll: true });
   }, [autoFocus]);
 
   function change(value: string) {
-    setRequest(value);
+    setAsk(value);
     onChange?.(value);
     onEdited?.(value);
     setError("");
@@ -65,30 +69,30 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const value = request.trim();
+    const value = ask.trim();
     if (!value || disabled || submitting.current) return;
     submitting.current = true;
     setPending(true);
     setError("");
     try { await onSubmit(value); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "That request could not be opened. Your draft is still here."); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "That ask could not be opened. Your draft is still here."); }
     finally { submitting.current = false; setPending(false); }
   }
 
-  return <div className={styles.wrap}>
+  return <div className={styles.wrap} data-tone={tone === "glass" ? "glass" : undefined}>
     <form className={styles.composer} onSubmit={event => void submit(event)} aria-label="Start new work" aria-busy={pending || undefined}>
       <label className={styles.srOnly} htmlFor={id}>What do you want to accomplish?</label>
-      <textarea ref={textarea} id={id} value={request} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
+      <textarea ref={textarea} id={id} value={ask} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={tone === "glass" ? 1 : 3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form?.requestSubmit();
         }
       }} />
       <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />Get or build an app</Button> : <span />}
+        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending} aria-label={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined} title={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined}><LayoutGrid size={16} aria-hidden="true" />{tone === "glass" ? null : systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</Button> : <span />}
         <div className={styles.send}>
-          {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
-          <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !request.trim()} aria-label="Continue with this request"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>
+          {ask ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
+          <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !ask.trim()} aria-label="Continue with this ask"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>
         </div>
       </div>
     </form>

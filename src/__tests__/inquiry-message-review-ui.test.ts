@@ -92,9 +92,14 @@ describe("InquiryMessageReview", () => {
   });
 
   it("distinguishes provider delivery failures from a message that was never sent", () => {
-    expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "bounced", retryable: false }).title).toContain("bounce");
-    expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "deferred", retryable: true }).title).toContain("deferred");
-    expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "suppressed", retryable: false }).title).toContain("suppressed");
+    const bounced = messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "bounced", retryable: false });
+    expect(bounced.title).toBe("This message was accepted but not delivered.");
+    expect(bounced.detail).toContain("refused it");
+    expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "deferred", retryable: true }).title).toContain("still trying");
+    const suppressed = messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: "owner_notification", status: "suppressed", retryable: false });
+    expect(suppressed.detail).toContain("would not send to this address");
+    expect(suppressed.detail).toContain("Let your team know another way.");
+    expect(messageReviewCompletionCopy({ inquiryId: review.inquiryId, action: review.action, status: "failed", retryable: true }).title).toBe("Message delivery failed.");
   });
 
   it("keeps unknown expiry honest instead of inventing a deadline", () => {

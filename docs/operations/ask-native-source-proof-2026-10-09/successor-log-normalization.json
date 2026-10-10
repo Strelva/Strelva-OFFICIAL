@@ -1,0 +1,12 @@
+{
+  "candidate-race-24f-original-red.log": {
+    "originalSha256": "03925840a83059f272b67134d3032f41d41f3369711b110d5713a351e976d7f5",
+    "archivedSha256": "217909fc91e70cc646d14909cb0011b757fe932579622c60ef54e2c665246037",
+    "normalization": "extra final blank lines only; all diagnostic body lines preserved"
+  },
+  "candidate-successor-green.log": {
+    "originalSha256": "3800dd85ae65044e14f724d33fea544ad5c87251101e61101af76377a1cbc9e5",
+    "archivedSha256": "2a241b6b7c2efb198d7cc75535606c5b4f5728b1610342adaac7f178c159b929",
+    "normalization": "extra final blank lines only; all diagnostic body lines preserved"
+  }
+}

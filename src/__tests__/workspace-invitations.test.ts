@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceInvitationRecipientError } from "@/platform/workspaces/invitations";
-import { workspaceInvitationReturnTarget } from "@/lib/workspace-location";
+import { workspaceInvitationReturnTarget } from "@/platform/workspaces/location";
 import { isPublicRoute } from "@/proxy";
 import { analyticsAllowedPath } from "@/lib/analytics-privacy";
 import type { NextRequest } from "next/server";
@@ -127,6 +127,9 @@ describe("workspace invitation return target", () => {
     expect(analyticsAllowedPath("/sign-in")).toBe(false);
     expect(analyticsAllowedPath("/sign-up")).toBe(false);
     expect(analyticsAllowedPath("/auth/callback")).toBe(false);
+    expect(analyticsAllowedPath("/preview/strelva/website-forms")).toBe(false);
+    expect(analyticsAllowedPath("/preview")).toBe(false);
+    expect(analyticsAllowedPath("/preview-other")).toBe(true);
     expect(analyticsAllowedPath("/")).toBe(true);
   });
 });

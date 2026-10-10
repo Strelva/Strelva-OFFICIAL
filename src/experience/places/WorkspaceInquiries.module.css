@@ -1,0 +1,6 @@
+/* Keep the owned action link's focus geometry above legacy global defaults. */
+.emailReply.emailReply:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}

@@ -1,19 +1,23 @@
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
-import { EMAIL_DOMAIN } from "@/lib/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import type { EmailRow } from "@/lib/email/layout";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import type { EmailRow } from "@/platform/infra/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
+import { catalogReportsMayBeOn, recordCatalogReport } from "@/platform/catalog-reports/receipts";
+import { getAllTenants } from "@/lib/tenants";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -31,9 +35,10 @@ function reportSummaryParagraphs(summary: string): string[] {
     .filter(Boolean);
 }
 
-function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
   const paragraphs = reportSummaryParagraphs(summary);
   return renderEmailHtml({
+    brand,
     preheader: paragraphs[0],
     // Verdict-first h1 (from buildReportHeading) — the plain verdict the body
     // proves, never the generic "Your weekly report" label.
@@ -47,8 +52,9 @@ function reportToHtml(heading: string, summary: string, siteName: string, dashbo
   });
 }
 
-function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
   return renderEmailText({
+    brand,
     heading,
     paragraphs: reportSummaryParagraphs(summary),
     rows: analyticsRows.length ? analyticsRows : undefined,
@@ -64,11 +70,20 @@ export async function GET(request: Request) {
   // tenants) the report's only purpose — the email — can't go out, so skip the
   // whole run rather than build reports nothing sends.
   if (emailSendingPaused()) {
+    if (catalogReportsMayBeOn()) {
+      await mapPool((await getAllTenants()).filter(tenant => tenant.active !== false && tenant.subscriptionStatus !== "cancelled"), 8, tenant =>
+        recordCatalogReport({ tenantId: tenant.id, kind: "weekly", period: new Date().toISOString().slice(0, 10), status: "suppressed", recipient: null, reason: "email_paused" }));
+    }
     console.warn("[weekly-report] skipped — email sending paused (EMAIL_SENDING_ENABLED != true)");
     return NextResponse.json({ status: "skipped", reason: "email_sending_paused" });
   }
 
   const { reports: allReports, skipped: generationSkips } = await generateAllReports();
+  const receipt = (tenantId: string, status: "accepted" | "suppressed" | "failed", recipient: string | null, reason: string | null = null) =>
+    recordCatalogReport({ tenantId, kind: "weekly", period: new Date().toISOString().slice(0, 10), status, recipient, reason });
+  for (const skip of generationSkips) {
+    if (skip.reason !== "inactive") await receipt(skip.tenantId, skip.reason === "generation_failed" ? "failed" : "suppressed", null, skip.reason);
+  }
 
   // Track skipped tenants with a reason so "why did X never get a receipt?" is
   // answerable from this response. Seed with tenants skipped during generation
@@ -114,9 +129,11 @@ export async function GET(request: Request) {
 
 await mapPool(reports, 8, async (report) => {
     try {
-      const email = report.tenant.ownerEmail;
+      // Resolved once by generateAllReports (the one owner-recipient rule).
+      const email = report.ownerRecipient ?? report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
+        await receipt(report.tenant.id, "suppressed", null, "missing_owner_email");
         return;
       }
 
@@ -125,23 +142,27 @@ await mapPool(reports, 8, async (report) => {
       const subject = buildReportSubject(report);
       const heading = buildReportHeading(report);
 
+      const brand = await resolveTenantBrand(report.tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports"));
       const html = reportToHtml(
         heading,
         report.summary,
         report.tenant.siteName,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        dashboardUrl,
         report.analyticsRows,
+        brand,
       );
       const text = reportToText(
         heading,
         report.summary,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        dashboardUrl,
         report.analyticsRows,
+        brand,
       );
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {
-        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+        const domain = brand.agencyId ? EMAIL_DOMAIN : report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
 
         // Route through the shared transport boundary (audience gate + the single
         // Resend call). sendEmail throws on a provider error and returns false on
@@ -156,7 +177,8 @@ await mapPool(reports, 8, async (report) => {
             subject,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(report.tenant.siteName),
+            brand,
+            fromName: report.tenant.siteName,
             fromAddress: `report@${domain}`,
           });
         } catch (err) {
@@ -164,20 +186,24 @@ await mapPool(reports, 8, async (report) => {
           console.error(`[weekly-report] send failed for tenant ${report.tenant.id}:`, err);
           errors.push(`${report.tenant.id}: ${reason}`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: reason, to: email });
+          await receipt(report.tenant.id, "failed", email, reason.slice(0, 500));
           return;
         }
         if (!ok) {
           errors.push(`${report.tenant.id}: send suppressed or unconfigured`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: "suppressed_or_unconfigured", to: email });
+          await receipt(report.tenant.id, "suppressed", email, "suppressed_or_unconfigured");
           return;
         }
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
+        await receipt(report.tenant.id, "accepted", email);
       } else {
         console.log(`[Weekly report dev] "${subject}" -> ${email}`);
         console.log(report.summary);
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
+        await receipt(report.tenant.id, "suppressed", email, "email_provider_unconfigured");
       }
 
       // Persist last-sent so the cadence gate can throttle the next run. Only
@@ -200,6 +226,7 @@ await mapPool(reports, 8, async (report) => {
       const msg = `${report.tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`;
       console.error(`[weekly-report] Failed for tenant ${report.tenant.id}:`, err);
       errors.push(msg);
+      await receipt(report.tenant.id, "failed", report.ownerRecipient ?? report.tenant.ownerEmail ?? null, "report_generation_or_delivery_failed");
     }
   });
 

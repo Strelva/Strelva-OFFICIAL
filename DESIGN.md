@@ -50,6 +50,62 @@ design specification.
 
 ## Latest foundation decisions
 
+### October 6 workspace: linen beside an ink rail (Strelva 1.0)
+
+Jacob approved the Strelva 1.0 workspace designs on October 6, 2026 and asked
+for them in the real workspace. Phase 1 (theme, shell, Home, Needs you) is
+implemented; the palette and its contrast adjustments are in the
+[color system](./docs/design/color-system.md#october-6-2026-linen-workspace-and-ink-rail).
+
+- **Linen content, ink navigation.** White cards with hairlines on linen,
+  moss for the one primary action per decision, clay only for what needs the
+  owner, pills for buttons, DM Sans in the workspace. Light display numerals.
+- **Home is two sides under a dusk band.** The dusk band (greeting, the glass
+  ask, live chips from real data) is the first screen of the day. Below it,
+  "Strelva is working" on ink-moss (what is moving, with its steps, then what
+  What changed) and "Your side" on linen (decisions as rows, the rule
+  behind them, the site's week).
+- **Needs you is a place.** With the Needs you release on, it has its own page:
+  a deck with one card per decision, shaped by what is being decided (a price,
+  a go-live, a reply), always with what happens either way.
+- **Nothing invented.** Chips, numbers and steps appear only when the snapshot
+  carries them. Week sparkbars and Square sales from the design are left out
+  until the product has those numbers.
+
+This supersedes the dark workspace content (September 15–17) and the October 4
+Home order inside the customer workspace. The October 2 and October 4 product
+rules (plain places, Strelva as the only actor, Systems first) still hold. The
+tenant dashboard keeps its dark foundation.
+
+### October 4 product model: Systems first
+
+Jacob selected Systems, Connections, Possibilities and Versions on October 4,
+2026 ([CONTEXT.md](./CONTEXT.md#product-model)). This is the structure the
+interface follows. Screens for it are not built or accepted yet.
+
+- **Home shows the business's Systems and Needs you.** A System appears by its
+  own name and state: "attymooney.com · Live", "Consult booking · Draft".
+  Needs you stays first when something is waiting.
+- **Opening a System gives most of the page to the actual thing:** the site,
+  the proposal, the booking page, the app. Not a settings page about it.
+- **Connections, Possibilities and Versions are contextual on the System
+  page,** shown where they matter, not as sidebar places or tabs you visit to
+  find out they're empty.
+  - Connections show what it reads, acts on and appears in, and say plainly
+    when one is disconnected or stale.
+  - A Possibility opens as a working alternative beside the current System,
+    with **Make real** as its one action. After Make real, show what landed and
+    what didn't, item by item.
+  - Versions show where else this System runs and what each one changed.
+- **Lifecycle and health are separate marks.** Draft, Live and Paused say what
+  the business intends; health says whether it's working. "Live · booking
+  calendar disconnected" is a valid state.
+- The October 2 rules below still hold: plain names, **Strelva** is the only
+  name that acts, Ask Strelva is the way in, and the words to avoid stay
+  avoided. Where the October 2 Home order or places disagree with this
+  section, this section wins. Whether the word "Systems" itself appears as a
+  heading is open.
+
 ### October 2 navigation: plain places, Strelva as the actor
 
 Jacob chose this on October 2, 2026. It replaces the October 1 places below.
@@ -58,7 +114,7 @@ tacky. Objects keep plain names, and **Strelva** is the only name that acts:
 "Strelva updated your hours", "Strelva needs your call".
 
 - **Places** in the sidebar: **Home**, **Customers**, **Requests**, **Running**.
-  - **Home** lists, in order: **Needs you**, **Strelva handled**,
+  - **Home** lists, in order: **Needs you**, **What changed**,
     **In progress**, **Recent**.
     - Personal workspaces have no business requests, so they show only Needs
       you and Recent.
@@ -371,6 +427,10 @@ they do not make a website or tenant requirement for general Strelva users.
 
 ## Product, Work, and specific thing
 
+> October 4: for customer structure, the [Systems model](#october-4-product-model-systems-first)
+> replaces Products and specific things. Work remains the record of a bounded
+> result underneath a System.
+
 The product relationship is represented as follows; this is not a mandatory
 sequence of screens or a requirement to begin in a catalog:
 
@@ -416,6 +476,10 @@ For a managed-presence owner, the dominant loop is:
 For an operator, the dominant loop is to open the work that needs judgment, inspect it in the context of the correct client, approve, dismiss, or repair it, and see the resulting state. Portfolio rollups support this loop; they are not the product by themselves.
 
 ## Product nouns and actions
+
+> October 4: the customer nouns are System, Connection, Possibility and
+> Version ([CONTEXT.md](./CONTEXT.md#language)). The managed-presence nouns
+> below still describe today's `/dashboard`.
 
 - A **product** is a repeatable value system; a product entry is descriptive
   until its release, authorization, and installation gates are met.
@@ -507,11 +571,10 @@ Retain this record for the local preview's history, not as the palette for new w
 Jacob selected a warm ivory, ink-teal and muted-sage business interface with a
 persistent text navigation rail, a central request composer and recent work,
 and a business context panel. The business implementation is scoped to the
-local `/preview/strelva/client` route; it does not replace the personal workspace
-or agency composition. `src/experience/delivery/BusinessHome.tsx` and
-`business.module.css` own the business composition and use the shared request
-session and AppFrame. `delivery.module.css` scopes its shell refinements under
-`businessTheme`.
+local `/preview/strelva/client` route; it did not replace the personal workspace
+or agency composition. That preview and its `src/experience/delivery` shell were
+deleted on October 6, 2026; the live Home is
+`src/experience/workspace/BusinessHome.tsx`.
 
 Use the existing cairn mark, `font-display` for editorial headings, soft outlined
 controls, restrained surface depth, and purposeful work thumbnails. The Buffalo

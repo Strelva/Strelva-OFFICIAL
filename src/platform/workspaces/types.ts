@@ -6,6 +6,8 @@ export interface WorkspaceActor {
   verifiedEmail: string;
 }
 
+/** The per-user cap in `create_owned_workspace` (five workspaces created by one person). */
+export const WORKSPACE_LIMIT_MESSAGE = "You have reached the limit of five workspaces for one account.";
 export const WORKSPACE_EXIT_STOPPED_MESSAGE = "New work is stopped for this workspace. Existing records remain available for review.";
 export const WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE = "Resources are stopped for this workspace. Existing records remain available for review.";
 
@@ -17,7 +19,7 @@ export interface Workspace {
   createdAt: string;
   updatedAt: string;
   role?: WorkspaceRole;
-  access: "member" | "delegated_read";
+  access: "member" | "delegated_read" | "provider_seat";
 }
 
 export interface SavedWork {
@@ -104,6 +106,22 @@ export class WorkspaceAccessError extends Error {
   constructor(message = "Workspace access denied") {
     super(message);
     this.name = "WorkspaceAccessError";
+  }
+}
+
+/** Shown to owners, admins and members who try to make or change an internal tool. */
+export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask your agency, or find one.";
+
+/**
+ * Only the business's acting provider (an agency's seat and staff row) or a
+ * delegated agency makes Systems (`make_systems`). Everyone else files a Request instead. Extends the
+ * access error so every existing 403 path still applies.
+ */
+export class WorkspaceMakeSystemsError extends WorkspaceAccessError {
+  readonly code = "make_systems_required" as const;
+  constructor(message = MAKE_SYSTEMS_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "WorkspaceMakeSystemsError";
   }
 }
 

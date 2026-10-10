@@ -1,13 +1,16 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { getAllTenants, createTenant, updateTenant, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { applyFeatureChange, cleanTenantFeatureIds, FeatureGuardError } from "@/lib/features/registry";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
+import { normalizeTrackPublicKey } from "@/lib/track-signature";
+import { setTenantTrackPublicKey } from "@/lib/tracking-signing-keys";
 import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import type { DesignTokenScope, TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
 
 const DELIVERY_MODELS = new Set<TenantDeliveryModel>(["custom_repo", "platform_template"]);
@@ -31,6 +34,7 @@ export async function GET(req: Request) {
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "true";
   const tenants = await getAllTenants();
@@ -169,6 +173,8 @@ export async function PATCH(req: Request) {
       revalidateUrl: z.string().max(2048),
       // Operator-settable when wiring a client's revalidation (super-admin gated).
       revalidationSecret: z.string().max(512),
+      // Per-site public key for verifying server-signed tracking orders.
+      trackingPublicKey: z.string().max(512),
       siteUrl: z.string().max(2048),
       active: z.boolean(),
       subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
@@ -228,7 +234,19 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const data = parsedUpdates.data as Partial<TenantConfig> & { features?: string[] };
+  const { trackingPublicKey: rawTrackingPublicKey, ...tenantUpdates } = parsedUpdates.data;
+  const trackingPublicKeyProvided = Object.hasOwn(parsedUpdates.data, "trackingPublicKey");
+  const normalizedTrackingPublicKey = rawTrackingPublicKey?.trim()
+    ? normalizeTrackPublicKey(rawTrackingPublicKey)
+    : null;
+  if (trackingPublicKeyProvided && rawTrackingPublicKey?.trim() && !normalizedTrackingPublicKey) {
+    return NextResponse.json({ error: "trackingPublicKey must be a valid Ed25519 public key" }, { status: 400 });
+  }
+  if (trackingPublicKeyProvided && Object.keys(tenantUpdates).length > 0) {
+    return NextResponse.json({ error: "Update trackingPublicKey separately from tenant fields" }, { status: 400 });
+  }
+
+  const data = tenantUpdates as Partial<TenantConfig> & { features?: string[] };
 
   // Feature toggle: validate + expand sets + refuse to remove a locked core feature.
   if (data.features !== undefined) {
@@ -268,7 +286,20 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const updated = await updateTenant(id, data as Partial<TenantConfig>);
+  let updated: TenantConfig | null;
+  if (trackingPublicKeyProvided) {
+    updated = await getTenantConfig(id) ?? null;
+    if (updated) {
+      try {
+        await setTenantTrackPublicKey(id, normalizedTrackingPublicKey);
+      } catch (error) {
+        console.error("[admin tenants PATCH] tracking key update failed", id, error);
+        return NextResponse.json({ error: "Tracking key storage is unavailable" }, { status: 503 });
+      }
+    }
+  } else {
+    updated = await updateTenant(id, data as Partial<TenantConfig>);
+  }
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
@@ -282,5 +313,8 @@ export async function PATCH(req: Request) {
     metadata: { fields: Object.keys(updates) },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    ...updated,
+    ...(trackingPublicKeyProvided ? { trackingPublicKeyConfigured: Boolean(normalizedTrackingPublicKey) } : {}),
+  });
 }

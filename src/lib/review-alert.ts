@@ -7,8 +7,13 @@
  * (client email pause) or fails, so the alert reaches the owner the day client
  * email is switched on rather than being lost forever — the same "only stamp on a
  * real send" discipline the review-nudge cron uses.
+ *
+ * One-click Approve / Not-yet links go only to a site with no business: the
+ * route refuses them once the site is converted (src/app/api/approve), so a
+ * converted owner gets the review and the dashboard link.
  */
-import { getRedis } from "./redis";
+import { resolveOwnerNoticeRecipient } from "./owner-recipient";
+import { getRedis } from "@/platform/infra/redis";
 import { sendReviewNeedsReplyEmail } from "./delivery-email";
 import type { TenantConfig } from "./types";
 
@@ -30,8 +35,10 @@ export async function maybeAlertNewReview(params: {
   notYetUrl?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  const email = params.tenant.ownerEmail?.trim();
-  if (!email) return false;
+  const recipient = await resolveOwnerNoticeRecipient(params.tenant);
+  if (!recipient) return false;
+  const { email } = recipient;
+  const links = recipient.workspaceId === null ? { approveUrl: params.approveUrl, notYetUrl: params.notYetUrl } : {};
 
   const redis = getRedis();
   // No dedup store → don't risk re-alerting the same review on every poll.
@@ -48,8 +55,7 @@ export async function maybeAlertNewReview(params: {
     review: params.review,
     reviewsUrl: params.reviewsUrl,
     draftedReply: params.draftedReply,
-    approveUrl: params.approveUrl,
-    notYetUrl: params.notYetUrl,
+    ...links,
     tenantId: params.tenant.id,
     logPrefix: params.logPrefix,
   });

@@ -15,10 +15,10 @@ export function workspaceWorkLabel(work: Pick<WorkspaceWork, "productId" | "reso
     "investigations:investigation": "Ongoing check",
     "operations:responsibility": "Delegated work",
     "product-learning:learning": "Learning",
-    "tracker:tracker": "Tracker",
+    "tracker:tracker": "Internal tool",
     "documents:document": "Private document",
     "work_plans:plan": "Work plan",
-    "research:experiment": "Tracker experiment",
+    "research:experiment": "Internal tool trial",
   };
   return labels[`${work.productId}:${work.resourceKind}`] ?? work.assessment?.method.label ?? "Saved work · view unavailable";
 }

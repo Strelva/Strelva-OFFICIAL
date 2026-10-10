@@ -10,7 +10,7 @@
  * Once the index covers all records, the fallback becomes a no-op.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export interface BuildPayment {
   sessionId: string;

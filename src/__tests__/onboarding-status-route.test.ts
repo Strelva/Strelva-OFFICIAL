@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 
@@ -9,7 +10,7 @@ const mockGetWeeklyBrief = vi.hoisted(() => vi.fn());
 const mockGetConnections = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: mockGetTenantFromHeaders }));
-vi.mock("@/lib/auth", () => ({ requireTenantAccess: mockRequireTenantAccess }));
+vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: mockRequireTenantAccess }));
 vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity, getContent: mockGetContent }));
 vi.mock("@/lib/weekly-brief", () => ({ getWeeklyBrief: mockGetWeeklyBrief }));
 vi.mock("@/lib/connections", () => ({ getConnections: mockGetConnections }));

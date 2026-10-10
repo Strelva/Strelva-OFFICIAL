@@ -48,9 +48,9 @@ export function businessDeliveryItems(requests: readonly ServiceRequest[]): Busi
     const stage = requestStage(request);
     const detail = commitment ? deliveryCommitmentStatus(commitment)
       : request.status === "withdrawn" ? "Request withdrawn"
-      : request.providerAcceptance.status === "declined" ? "Provider declined the request"
+      : request.providerAcceptance.status === "declined" ? "Agency declined the request"
       : request.providerAcceptance.status === "accepted" ? "Accepted for review; no delivery deadline agreed"
-      : "Awaiting provider review; delivery has not started";
+      : "Awaiting agency review; delivery has not started";
     return {
       id: request.id,
       title: request.outcome,

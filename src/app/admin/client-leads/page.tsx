@@ -1,12 +1,15 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageSquareText } from "lucide-react";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants } from "@/lib/tenants";
 import { getClientLeadsForOperator, type OperatorClientLeads } from "@/lib/client-leads";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { AdminEmpty, Chip } from "@/app/admin/console";
 import { ClientLeadList } from "./ClientLeadList";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
+import { operatorNoticeReviewEnabled } from "@/platform/operator-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,7 @@ export default async function ClientLeadsPage({
   // The layout also gates /admin; check here too so this page never reads
   // client data for anyone else, whatever renders first.
   if (!(await isSuperAdmin())) redirect("/sign-in");
+  await authorizeAdminOperatorRead("admin.client-leads.read");
 
   const params = await searchParams;
   const raw = Array.isArray(params.tenant) ? params.tenant[0] : params.tenant;
@@ -85,6 +89,7 @@ export default async function ClientLeadsPage({
       </div>
 
       <StoreStatus data={data} />
+      {(inquiryRecordsEnabled() || operatorNoticeReviewEnabled()) && <Link href="/admin/client-leads/inquiries" className="inline-block text-sm text-warm-white underline focus-visible:outline focus-visible:outline-accent">Review held inquiries and owner notices</Link>}
 
       {unreadable ? (
         <AdminEmpty

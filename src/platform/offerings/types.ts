@@ -86,6 +86,10 @@ export interface OfferingSurface {
 }
 
 export interface OfferingInstallationRecord {
+  /** Persisted immutable creator/source identity, after operator lineage adoption. */
+  sourceRevisionId?: string;
+  creatorWorkspaceId?: string;
+  versionLineageId?: string;
   id: string;
   businessId: string;
   definitionId: string;

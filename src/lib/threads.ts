@@ -1,14 +1,16 @@
 /**
  * Thread persistence for conversation-primary interface.
  *
- * Uses Redis (Upstash) with fallback to dev file storage.
+ * Qualified client-record cutover uses Postgres for reads and writes.
+ * Before cutover, uses Redis (Upstash) with fallback to dev file storage.
  * Key pattern: threads:{tenant}:{threadId}
  * Index key: threads:{tenant}:index (sorted set by updatedAt)
  */
 
+import { mirrorRecord, removeRecord, readRecord, readRecords, durableRecordAuthority, writeDurableRecord, removeDurableRecord } from "./client-records";
 import { promises as fs } from "fs";
 import path from "path";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { Thread } from "./conversation-types";
 
 export type { ChatMessage, Thread } from "./conversation-types";
@@ -51,12 +53,34 @@ async function writeDevThreads(
   await fs.writeFile(DEV_THREADS_PATH(tenant), JSON.stringify(threads, null, 2));
 }
 
+/** A timestamp guard that retained another version did not save this edit. */
+async function writeAuthoritativeThread(tenant: string, thread: Thread): Promise<void> {
+  const status = await writeDurableRecord("threads", tenant, thread.id, thread, thread.updatedAt);
+  if (status === "kept") throw new Error("client_records_write_failed:kept");
+}
+
+/** Retain the frozen Redis rollback cache after the durable commit. */
+async function cacheCommittedThread(tenant: string, thread: Thread): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(threadKey(tenant, thread.id), thread, { ex: THREAD_TTL_SECONDS });
+    await redis.zadd(indexKey(tenant), { score: Date.parse(thread.updatedAt), member: thread.id });
+    await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
+  } catch {
+    // Postgres accepted the mutation; a cache failure cannot undo it or use a dev file.
+  }
+}
+
 // --- CRUD Operations ---
 
 /**
  * List all threads for a tenant, sorted by updatedAt desc.
  */
 export async function listThreads(tenant: string): Promise<Thread[]> {
+  return readRecords("threads", tenant, () => listRedisThreads(tenant));
+}
+async function listRedisThreads(tenant: string): Promise<Thread[]> {
   const redis = getRedis();
 
   if (redis) {
@@ -95,6 +119,9 @@ export async function getThread(
   tenant: string,
   threadId: string
 ): Promise<Thread | null> {
+  return readRecord("threads", tenant, threadId, () => getRedisThread(tenant, threadId));
+}
+async function getRedisThread(tenant: string, threadId: string): Promise<Thread | null> {
   const redis = getRedis();
 
   if (redis) {
@@ -127,6 +154,11 @@ export async function createThread(
     updatedAt: now,
   };
 
+  if (await durableRecordAuthority("threads")) {
+    await writeAuthoritativeThread(tenant, thread);
+    await cacheCommittedThread(tenant, thread);
+    return thread;
+  }
   const redis = getRedis();
 
   if (redis) {
@@ -137,6 +169,7 @@ export async function createThread(
         member: thread.id,
       });
       await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
+      await mirrorRecord("threads", tenant, thread.id, thread, thread.updatedAt);
       return thread;
     } catch {
       // Redis failed, fall through to dev file
@@ -168,6 +201,11 @@ export async function updateThread(
     updatedAt: new Date().toISOString(),
   };
 
+  if (await durableRecordAuthority("threads")) {
+    await writeAuthoritativeThread(tenant, updated);
+    await cacheCommittedThread(tenant, updated);
+    return updated;
+  }
   const redis = getRedis();
 
   if (redis) {
@@ -178,6 +216,7 @@ export async function updateThread(
         member: threadId,
       });
       await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
+      await mirrorRecord("threads", tenant, threadId, updated, updated.updatedAt);
       return updated;
     } catch {
       // Redis failed, fall through to dev file
@@ -198,12 +237,26 @@ export async function deleteThread(
   tenant: string,
   threadId: string
 ): Promise<void> {
+  if (await durableRecordAuthority("threads")) {
+    await removeDurableRecord("threads", tenant, threadId);
+    const redis = getRedis();
+    if (redis) {
+      try {
+        await redis.del(threadKey(tenant, threadId));
+        await redis.zrem(indexKey(tenant), threadId);
+      } catch {
+        // The durable removal succeeded; cache repair must not become a dev-file write.
+      }
+    }
+    return;
+  }
   const redis = getRedis();
 
   if (redis) {
     try {
       await redis.del(threadKey(tenant, threadId));
       await redis.zrem(indexKey(tenant), threadId);
+      await removeRecord("threads", tenant, threadId);
       return;
     } catch {
       // Redis failed, fall through to dev file

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type BrowserContext, type Page, type Request } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres.");
 test.setTimeout(240_000);
@@ -75,8 +76,8 @@ test("customer grants one managed website draft, agency prepares it, and custome
   const owner = await signedInContext(browser, admin, "agency-website-customer");
   const operator = await signedInContext(browser, admin, "agency-website-operator");
   const outsider = await signedInContext(browser, admin, "agency-website-outsider");
-  const businessId = randomUUID();
-  const agencyId = randomUUID();
+  let businessId = "";
+  let agencyId = "";
   const tenantId = `agency-website-proof-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
   const tenantStableId = randomUUID();
   let bindingId = "";
@@ -95,19 +96,21 @@ test("customer grants one managed website draft, agency prepares it, and custome
     for (const identity of [owner, operator, outsider]) {
       expect((await identity.context.request.get("/api/workspace")).status()).toBe(200);
     }
-    expect((await admin.from("workspaces").insert([
-      { id: businessId, kind: "customer", name: "Website draft customer", created_by: owner.userId },
-      { id: agencyId, kind: "agency", name: "Website draft agency", created_by: operator.userId },
-    ])).error).toBeNull();
-    expect((await admin.from("workspace_memberships").insert([
-      { workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: owner.userId },
-      { workspace_id: agencyId, user_id: operator.userId, role: "owner", created_by: operator.userId },
-    ])).error).toBeNull();
+    businessId = await ordinaryCustomerBusiness(owner, "Website draft customer");
+    const selectedAgency = await ordinaryAgencyMaker(browser, admin, owner, businessId, operator);
+    agencyId = selectedAgency.agencyId;
+    // Ordinary HTTP agency creation, owner-selected provider and current staffing;
+    // no customer membership overlay or hand-written provider seats.
+
     expect((await admin.from("tenants").insert({
       id: tenantId,
       stable_id: tenantStableId,
       site_name: "Website draft customer",
       template: "wellness",
+      // This exact job prepares/publishes native wellness content sections.
+      // Classify that existing fixture explicitly; the database otherwise
+      // defaults to custom_repo and its preview requires an external repo.
+      delivery_model: "platform_template",
       owner_name: "Website owner",
       owner_email: owner.email,
       active: true,
@@ -201,12 +204,12 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await customerPage.getByRole("button", { name: /Accepted for review/ }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await expect(customerPage.getByRole("heading", { name: "Move this request into delivery", exact: true })).toBeVisible();
-    await customerPage.getByLabel("Named provider operator email", { exact: true }).fill(operator.email);
+    await customerPage.getByLabel("Named agency operator email", { exact: true }).fill(operator.email);
     for (const checkbox of await customerPage.getByRole("checkbox").all()) {
       if (!(await checkbox.isChecked())) await checkbox.check();
     }
-    await customerPage.getByRole("button", { name: "Create exact provider assignment", exact: true }).click();
-    await expect(customerPage.getByText("Provider acceptance is still pending.", { exact: false })).toBeVisible();
+    await customerPage.getByRole("button", { name: "Create exact agency assignment", exact: true }).click();
+    await expect(customerPage.getByText("Agency acceptance is still pending.", { exact: false })).toBeVisible();
 
     const deliveries = await getJson(operator.context.request, `/api/offerings/provider-delivery?businessId=${businessId}`);
     const pending = (deliveries.deliveries as Array<{ id: string; installationId: string; assignmentId: string }>).find((item) => item.installationId === installationId);
@@ -219,23 +222,35 @@ test("customer grants one managed website draft, agency prepares it, and custome
     agencyPage.setDefaultTimeout(25_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByRole("heading", { name: "Assigned website drafts", exact: true })).toBeVisible();
+    // The released agency Home opens Clients; assigned drafts live in Queue.
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
+    // The heading names Possibilities only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
+    await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Website possibilities for clients" : "Assigned website drafts", exact: true })).toBeVisible();
     await expect(agencyPage.getByRole("link", { name: "Open website", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open website", exact: true }).click();
-    await expect(agencyPage.getByText("The customer needs to enable draft editing", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("The client needs to enable draft editing", { exact: false })).toBeVisible();
     await agencyPage.screenshot({ path: testInfo.outputPath("agency-website-before-grant-mobile.png"), fullPage: true });
 
     await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
     await customerPage.getByRole("button", { name: /Accepted for review/ }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await expect(customerPage.getByRole("heading", { name: "Agency website preparation", exact: true })).toBeVisible();
-    await customerPage.getByRole("button", { name: "Grant draft preparation", exact: true }).click();
+    await customerPage.getByRole("button", { name: "Allow website draft changes", exact: true }).click();
     await expect(customerPage.getByText("Draft preparation is enabled for the named operator.", { exact: false })).toBeVisible({ timeout: 30_000 });
     customerEditorHref = await customerPage.getByRole("link", { name: "Review and publish in website editor", exact: true }).getAttribute("href") ?? "";
     expect(customerEditorHref).toContain(`/client/${tenantId}/dashboard/site`);
     await customerPage.screenshot({ path: testInfo.outputPath("customer-website-grant-desktop.png"), fullPage: true });
 
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
     await agencyPage.getByRole("link", { name: "Open website", exact: true }).click();
     await expect(agencyPage.getByRole("heading", { name: "Prepare a website update", exact: true })).toBeVisible();
     const preparedHeadline = `Prepared by the named agency ${randomUUID().slice(0, 8)}`;
@@ -245,16 +260,42 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await expect(prepareButton).toBeFocused();
     await prepareButton.press("Enter");
     await expect(agencyPage.getByText(/Saved hero draft revision 1/)).toBeVisible({ timeout: 30_000 });
-    await expect(agencyPage.getByText(/The customer reviews and publishes your draft\./)).toBeVisible();
+    await expect(agencyPage.getByText(/The client reviews and publishes your draft\./)).toBeVisible();
     await agencyPage.screenshot({ path: testInfo.outputPath("agency-website-prepared-mobile.png"), fullPage: true });
 
     customerWebsitePage = await owner.context.newPage();
     customerWebsitePage.setDefaultTimeout(25_000);
     await customerWebsitePage.setViewportSize({ width: 1280, height: 900 });
-    await customerWebsitePage.goto(customerEditorHref, { waitUntil: "domcontentloaded" });
-    await expect(customerWebsitePage.getByRole("button", { name: "Edit site", exact: true })).toBeVisible();
-    await customerWebsitePage.getByRole("button", { name: "Edit site", exact: true }).click();
-    await expect(customerWebsitePage.getByLabel("Headline", { exact: true }).first()).toHaveValue(preparedHeadline);
+    const editor = customerWebsitePage;
+    let heroRead: Request | undefined;
+    const captureHeroRead = (request: Request) => {
+      const url = new URL(request.url());
+      if (url.origin === env.app && url.pathname === `/client/${tenantId}/api/content/hero` && url.searchParams.get("draft") === "true" && request.method() === "GET") heroRead = request;
+    };
+    editor.on("request", captureHeroRead);
+    try {
+      // The inspector loads the real saved draft after Edit site. Bind the
+      // response to its newly dispatched physical Request; an older pending
+      // response at this URL cannot satisfy the actual customer review.
+      const [draftRead] = await Promise.all([
+        editor.waitForResponse(response => response.request() === heroRead, { timeout: 20_000 }),
+        (async () => {
+          await editor.goto(customerEditorHref, { waitUntil: "domcontentloaded" });
+          await expect(editor.getByRole("button", { name: "Edit site", exact: true })).toBeVisible();
+          await editor.getByRole("button", { name: "Edit site", exact: true }).click();
+        })(),
+      ]);
+      expect(draftRead.status(), await draftRead.text()).toBe(200);
+      expect(await draftRead.json()).toMatchObject({ ...hero, headline: preparedHeadline });
+    } finally {
+      editor.off("request", captureHeroRead);
+    }
+    await expect(editor.getByLabel("Headline", { exact: true }).first()).toHaveValue(preparedHeadline);
+    const previewAddress = new URL(await editor.locator('iframe[title="Editable preview"]').getAttribute("src") ?? "", env.app);
+    expect(previewAddress.origin).toBe(env.app);
+    expect(previewAddress.searchParams.get("tenant")).toBe(tenantId);
+    expect(previewAddress.searchParams.get("preview")).toBe("true");
+    await expect(editor.frameLocator('iframe[title="Editable preview"]').getByRole("heading", { name: preparedHeadline, exact: true })).toBeVisible();
     await customerWebsitePage.screenshot({ path: testInfo.outputPath("customer-website-review-desktop.png"), fullPage: true });
     const publish = customerWebsitePage.getByRole("button", { name: /^(Publish live|Save changes)$/ }).last();
     await expect(publish).toBeEnabled();
@@ -269,14 +310,14 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
     await customerPage.getByRole("button", { name: /Accepted for review/ }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
-    await customerPage.getByRole("textbox", { name: "Customer review", exact: true }).fill("Reviewed and published the returned website draft.");
+    await customerPage.getByRole("textbox", { name: "Your review", exact: true }).fill("Reviewed and published the returned website draft.");
     await customerPage.getByRole("button", { name: "Confirm completed delivery", exact: true }).click();
     await expect(customerPage.getByText("The completed delivery is confirmed and linked to this request.", { exact: true })).toBeVisible();
-    await customerPage.getByRole("button", { name: "Revoke draft preparation", exact: true }).click();
+    await customerPage.getByRole("button", { name: "Remove draft access", exact: true }).click();
     await expect(customerPage.getByText("Draft preparation is revoked", { exact: false })).toBeVisible();
 
     await agencyPage.goto(`/agency-websites/${bindingId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByText("The customer needs to enable draft editing", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("The client needs to enable draft editing", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Prepare and save draft", exact: true })).toHaveCount(0);
     await post(operator.context.request, "/api/agency-website-draft-access", {
       action: "prepare",

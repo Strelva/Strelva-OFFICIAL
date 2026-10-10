@@ -31,11 +31,11 @@ const mocks = vi.hoisted(() => ({
   legacy: vi.fn(),
   trackClick: vi.fn(),
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
 vi.mock("@/lib/storage", () => ({ trackClick: mocks.trackClick }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
 
 import { POST as LEADS_POST } from "@/app/api/v1/leads/[tenant]/route";
 import { POST as TRACK_POST } from "@/app/api/v1/track/[tenant]/route";

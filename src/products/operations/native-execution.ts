@@ -5,7 +5,7 @@ import { documentCommandSchema, changeDocument } from "@/products/documents/cont
 import { editSavedTracker, readSavedTracker } from "@/products/tracker/server";
 import { trackerCommandSchema } from "@/products/tracker/contracts";
 import { applyTrackerCommand } from "@/products/tracker/client";
-import { changeWorkspaceApplication, readWorkspaceApplication, rehearseApplicationCandidateForAssignment } from "@/products/applications/server";
+import { assertApplicationCommandCurrent, changeWorkspaceApplication, readWorkspaceApplication, rehearseApplicationCandidateForAssignment } from "@/products/applications/server";
 import { applicationCommandSchema } from "@/products/applications/contracts";
 import { changeWorkspaceSchedule, readWorkspaceSchedule } from "@/products/scheduling/server";
 import { scheduleCommandSchema } from "@/products/scheduling/contracts";
@@ -149,22 +149,9 @@ const nativeCapabilityAdapters: CapabilityAdapterMap = new Map([
     async recheck(context, input) {
       await assertNativeTarget(context, true);
       const target = await readWorkspaceApplication(context.actor, context.workId!);
-      const command = applicationCommandSchema.parse(input);
-      const candidateRevision = target.payload.candidate?.designRevision ?? target.payload.designRevision ?? target.payload.revision;
-      const releaseVersion = target.payload.release?.version ?? null;
-      const recordsRevision = target.payload.recordsRevision ?? target.payload.records.length;
-      if (command.kind === "publish") {
-        if (command.expectedCandidateRevision !== candidateRevision || command.expectedReleaseVersion !== releaseVersion) throw new WorkspaceConflictError();
-      } else if (command.kind === "rollback_release") {
-        if (command.expectedDesignRevision !== candidateRevision || command.expectedReleaseVersion !== releaseVersion) throw new WorkspaceConflictError();
-      } else if (command.kind === "submit" && command.expectedReleaseVersion !== undefined && command.expectedRecordsRevision !== undefined) {
-        if (command.expectedReleaseVersion !== releaseVersion || command.expectedRecordsRevision !== recordsRevision) throw new WorkspaceConflictError();
-      } else {
-        const expectedRevision = command.kind === "revise" || command.kind === "rehearse" || command.kind === "install" || command.kind === "retire"
-          ? command.expectedRevision ?? command.expectedDesignRevision
-          : command.expectedRevision;
-        if (expectedRevision !== target.payload.revision && expectedRevision !== candidateRevision) throw new WorkspaceConflictError();
-      }
+      // The application product's own check, so recheck is never looser
+      // than the command it guards.
+      assertApplicationCommandCurrent(target.payload, input, { actorId: context.actor.userId, delegated: context.delegated });
     },
     async perform(context, input) {
       const command = applicationCommandSchema.parse(input);

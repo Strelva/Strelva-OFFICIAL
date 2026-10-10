@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), release: vi.fn(), list: vi.fn(), execute: vi.fn(), offeringList: vi.fn(), inspect: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/offerings", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/platform/offerings");
@@ -9,8 +9,8 @@ vi.mock("@/platform/offerings", async () => {
     ...actual,
     PostgresOfferingStore: class {},
     OfferingService: class { list = mocks.offeringList; },
-    postgresProviderDeliveries: {},
-    ProviderDeliveryService: class { list = mocks.list; execute = mocks.execute; },
+    postgresAgencyDeliveries: {},
+    AgencyDeliveryService: class { list = mocks.list; execute = mocks.execute; },
   };
 });
 vi.mock("@/products/operations/server", () => ({
@@ -31,7 +31,7 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-describe("provider delivery route", () => {
+describe("agency delivery route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.release.mockReturnValue(true);

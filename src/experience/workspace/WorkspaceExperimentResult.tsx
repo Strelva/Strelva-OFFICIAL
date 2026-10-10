@@ -65,7 +65,7 @@ function LegacyExperimentResult({ work, onOpenTracker }: { work: WorkspaceWork; 
         <div><dt className="text-gray-muted">Previous approach</dt><dd className="mt-1 font-medium">{minutes(legacyExperiment.baselineMinutes)}</dd></div>
         <div><dt className="text-gray-muted">Reported difference</dt><dd className="mt-1 font-medium">{signedMinutes(legacyExperiment.differenceMinutes)}</dd></div>
         <div><dt className="text-gray-muted">Provider cost</dt><dd className="mt-1 font-medium">{legacyExperiment.providerCostUsd === null ? "Not recorded" : `$${legacyExperiment.providerCostUsd.toFixed(2)}`}</dd></div>
-        <div><dt className="text-gray-muted">Tracker version</dt><dd className="mt-1 font-medium">{legacyExperiment.targetRevision}</dd></div>
+        <div><dt className="text-gray-muted">Tracker History entry</dt><dd className="mt-1 font-medium">{legacyExperiment.targetRevision}</dd></div>
         <div><dt className="text-gray-muted">Recorded</dt><dd className="mt-1 font-medium">{recordedDate(legacyExperiment.recordedAt)}</dd></div>
       </dl>
       <section className="space-y-3">
@@ -85,7 +85,7 @@ function LegacyExperimentResult({ work, onOpenTracker }: { work: WorkspaceWork; 
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-muted">{legacyExperiment.evidence}</p>
       </section>
       {trackerHref ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-gray-border px-4 text-sm font-medium text-warm-black" href={trackerHref} onNavigate={onOpenTracker && work.sourceWorkId ? (event) => { event.preventDefault(); onOpenTracker(work.sourceWorkId!); } : undefined}>Open current tracker</Link> : null}
-      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker version. It is immutable and has not been promoted into a customer capability or verified savings claim.</p>
+      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker History entry. It is immutable and has not been promoted into a business capability or verified savings claim.</p>
     </article>
   );
 }
@@ -100,7 +100,7 @@ function ComparisonResult({ comparison, work, onOpenTracker }: { comparison: Tra
         <p className="text-sm text-accent-text">Internal R&amp;D · Candidate comparison</p>
         <h1 className="font-display text-3xl font-medium text-warm-black">{work.title}</h1>
         <p className="max-w-3xl text-[15px] leading-relaxed text-gray-muted">{comparison.hypothesis}</p>
-        <p className="inline-flex w-fit rounded-full border border-gray-border px-3 py-1 text-xs text-gray-muted">Experimental · {evidenceLabel(comparison.evidenceKind)} evidence · Not promoted</p>
+        <p className="inline-flex w-fit rounded-full border border-gray-border px-3 py-1 text-xs text-gray-muted">Trial · {evidenceLabel(comparison.evidenceKind)} evidence · Not promoted</p>
       </header>
 
       <section aria-labelledby="experiment-workload-title" className="space-y-3 border-y border-gray-border py-5">
@@ -163,7 +163,7 @@ function ComparisonResult({ comparison, work, onOpenTracker }: { comparison: Tra
       </section>
 
       {trackerHref ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-gray-border px-4 text-sm font-medium text-warm-black" href={trackerHref} onNavigate={onOpenTracker && work.sourceWorkId ? (event) => { event.preventDefault(); onOpenTracker(work.sourceWorkId!); } : undefined}>Open current tracker</Link> : null}
-      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">This comparison is immutable research evidence. It records the selected decision and stays experimental; it does not promote, publish or claim verified customer savings.</p>
+      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">This comparison is immutable research evidence. It records the selected decision and stays experimental; it does not promote, publish or claim verified business savings.</p>
     </article>
   );
 }

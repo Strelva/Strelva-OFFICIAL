@@ -1,5 +1,6 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getAllAccounts, accountMrrCents } from "@/lib/accounts";
 import { AccountsBoard, type SiteOption } from "./AccountsBoard";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminAccountsPage() {
   // Defense in depth — the /admin layout already gates super-admin, mirror it.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.accounts.read");
 
   const [accounts, allTenants] = await Promise.all([getAllAccounts(), getAllTenants()]);
   const active = allTenants.filter(isActiveTenant);
@@ -46,7 +48,7 @@ export default async function AdminAccountsPage() {
           Accounts
         </h1>
         <p className="text-sm text-gray-muted mt-1">
-          One customer, many sites. Group a multi-site owner under one account + bundled subscription.
+          One client, many sites. Group a multi-site owner under one account + bundled subscription.
         </p>
       </div>
 

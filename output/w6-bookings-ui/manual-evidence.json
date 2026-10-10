@@ -1,0 +1,900 @@
+{
+  "date": "2026-10-07",
+  "browser": "installed Playwright Chromium; fallback after T3 host disconnected",
+  "transport": "ManualBookingPreview injectedrequest returns local Response; external resources blocked",
+  "keyboard": {
+    "tag": "INPUT",
+    "outline": "rgb(26, 21, 16) dashed 2px"
+  },
+  "reopenedCustomerDraft": "Jordan Fixture",
+  "requestIdRepeat": "Not observed; synthetic response does not exercise actual idempotency",
+  "captures": [
+    {
+      "state": "ready",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "SELECT",
+            "name": "Choose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 32,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nReading open times…\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": true,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nOpen times couldn't be read. Nothing changed.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nThese bookings belong to another business. Ask its owner to invite you.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\n\nNo open times in the next two weeks. Choose another service or check again later.\n\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 32,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nBookings are paused. Existing bookings are kept.\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 32,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "ready",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "SELECT",
+            "name": "Choose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "manual-ready-390.png"
+      }
+    },
+    {
+      "state": "loading",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nReading open times…\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nOpen times couldn't be read. Nothing changed.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nThese bookings belong to another business. Ask its owner to invite you.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\n\nNo open times in the next two weeks. Choose another service or check again later.\n\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nBookings are paused. Existing bookings are kept.\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "ready",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "SELECT",
+            "name": "Choose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nReading open times…\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nOpen times couldn't be read. Nothing changed.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nThese bookings belong to another business. Ask its owner to invite you.\n\nTry loading again\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Try loading again",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\n\nNo open times in the next two weeks. Choose another service or check again later.\n\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Save booking request",
+            "height": 44,
+            "disabled": true,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nBookings are paused. Existing bookings are kept.\n\nClose",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "local-request-receipt",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\n\nBooking request saved. The owner decides it in Needs you. Customer notices follow the business's email settings.\n\nClose",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Choose a service\nConsultation",
+            "height": 40,
+            "disabled": true,
+            "required": true,
+            "value": "consultation"
+          },
+          {
+            "tag": "SELECT",
+            "name": "Choose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM",
+            "height": 40,
+            "disabled": true,
+            "required": true,
+            "value": "2026-11-06T15:00:00Z"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": true,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": true,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 40,
+            "disabled": true,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "",
+            "height": 64,
+            "disabled": true,
+            "required": true,
+            "value": "Consultation goals"
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Close",
+            "height": 44,
+            "disabled": false,
+            "value": ""
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "manual-receipt-390.png"
+      }
+    }
+  ],
+  "followUp": {
+    "date": "2026-10-07",
+    "change": "Manual input/select mobile minimum height added after initial review",
+    "metrics": {
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "_r_4_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "SELECT",
+          "name": "_r_5_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_6_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_7_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_8_",
+          "height": 44,
+          "disabled": false,
+          "required": false
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "_r_9_",
+          "height": 64,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "BUTTON",
+          "name": "Save booking request",
+          "height": 44,
+          "disabled": true
+        },
+        {
+          "tag": "BUTTON",
+          "name": "Close",
+          "height": 44,
+          "disabled": false
+        }
+      ]
+    },
+    "screenshot": {
+      "captured": true,
+      "retained": true,
+      "path": "manual-ready-390.png"
+    },
+    "limit": "Other captures retain initial pre-change measurements; latest390px recheck measures inputs/selects44px."
+  }
+}

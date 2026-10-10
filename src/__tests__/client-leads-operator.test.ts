@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import { makeRedisMock } from "./support/redis-mock";
 
 const redis = makeRedisMock();
@@ -10,11 +11,11 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`NEXT_REDIRECT ${to}`);
   }),
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mocks.isSuperAdmin }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.isSuperAdmin }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mocks.getAllTenants, getTenantConfig: vi.fn() }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: vi.fn() }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect, notFound: vi.fn() }));
 
 import { GET } from "@/app/api/admin/client-leads/route";

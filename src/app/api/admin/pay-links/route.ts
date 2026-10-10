@@ -1,5 +1,7 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
+import { businessBillingEnabled } from "@/platform/business-billing";
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
 import { listBuildPayments } from "@/lib/revenue";
@@ -25,6 +27,7 @@ import {
  * to clobber an existing link (409).
  */
 export async function POST(req: Request) {
+  if (businessBillingEnabled()) return NextResponse.json({ error: "Create invoices in your verified agency workspace.", agencyPath: "/api/agency/pay-links" }, { status: 410 });
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -101,6 +104,7 @@ export async function GET() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.pay-links.read");
 
   let payLinks;
   try {

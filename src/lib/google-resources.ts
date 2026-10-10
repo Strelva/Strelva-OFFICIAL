@@ -1,8 +1,15 @@
-import { getConnection } from "./connections";
 import { GA4_READ_SCOPE, GSC_READ_SCOPE, getGoogleAccessToken } from "./google-token";
 import { getAnalyticsConfig, setAnalyticsConfig } from "./analytics";
-import { getRedis } from "./redis";
 import { GBP_WRITE_SCOPE } from "./gbp-replies";
+import {
+  beginGoogleTenantOperation,
+  getGoogleGrant,
+  getGoogleLocation,
+  googleLocationIdFromName,
+  recordAuthorizedGoogleLocationSelection,
+  type GoogleGrant,
+  type GoogleOperationActor,
+} from "./google-access";
 
 const GSC_SITES_URL = "https://www.googleapis.com/webmasters/v3/sites";
 const GA4_ACCOUNTS_URL = "https://analyticsadmin.googleapis.com/v1beta/accountSummaries";
@@ -63,9 +70,8 @@ function uniqueResources(items: Array<GoogleResource | null>): GoogleResource[] 
   return result;
 }
 
-async function getToken(tenantId: string): Promise<string | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
+async function getToken(tenantId: string, grant: GoogleGrant | null): Promise<string | null> {
+  if (!grant || grant.status !== "connected") return null;
   return getGoogleAccessToken(tenantId);
 }
 
@@ -132,7 +138,7 @@ async function listGbpResources(token: string): Promise<GoogleResource[] | null>
     for (const location of locations) {
       if (!location || typeof location !== "object") continue;
       const locationRow = location as JsonRecord;
-      const locationId = text(locationRow.name).split("/locations/")[1];
+      const locationId = googleLocationIdFromName(text(locationRow.name));
       if (!locationId) continue;
       const label = text(locationRow.title, `${accountRow.accountName ?? "Google Business"} location`);
       resources.push(resource(`${accountId}|${locationId}`, label, accountId));
@@ -141,25 +147,21 @@ async function listGbpResources(token: string): Promise<GoogleResource[] | null>
   return uniqueResources(resources);
 }
 
-async function readSelectedGbp(tenantId: string): Promise<{ accountId: string; locationId: string } | null> {
-  const redis = getRedis();
-  if (!redis) return null;
+async function readSelectedGbp(tenantId: string, grant: GoogleGrant | null): Promise<{ accountId: string; locationId: string } | null> {
   try {
-    const value = await redis.get<{ accountId?: unknown; locationId?: unknown }>(`google-meta:${tenantId}`);
-    if (typeof value?.accountId !== "string" || typeof value.locationId !== "string") return null;
-    return { accountId: value.accountId, locationId: value.locationId };
+    return await getGoogleLocation(tenantId, grant);
   } catch {
     return null;
   }
 }
 
 export async function discoverGoogleResources(tenantId: string): Promise<GoogleResourceCatalog> {
-  const connection = await getConnection(tenantId, "google");
-  const scopes = connection?.scopes ?? [];
-  const disconnected = !connection || connection.status !== "connected";
-  const baseStatus = connection?.status === "needs_reauth" ? "needs_reauth" : connection?.status === "error" ? "error" : disconnected ? "disconnected" : "connected";
+  const grant = await getGoogleGrant(tenantId);
+  const scopes = grant?.scopes ?? [];
+  const disconnected = !grant || grant.status !== "connected";
+  const baseStatus = grant?.status === "needs_reauth" ? "needs_reauth" : grant?.status === "error" ? "error" : disconnected ? "disconnected" : "connected";
   const config = await getAnalyticsConfig(tenantId);
-  const selectedGbp = await readSelectedGbp(tenantId);
+  const selectedGbp = await readSelectedGbp(tenantId, grant);
   if (disconnected) {
     return {
       connection: { connected: false, status: baseStatus, scopes },
@@ -169,7 +171,7 @@ export async function discoverGoogleResources(tenantId: string): Promise<GoogleR
     };
   }
 
-  const token = await getToken(tenantId);
+  const token = await getToken(tenantId, grant);
   const hasGscScope = scopes.includes(GSC_READ_SCOPE);
   const hasGa4Scope = scopes.includes(GA4_READ_SCOPE);
   const hasGbpScope = scopes.includes(GBP_WRITE_SCOPE);
@@ -200,9 +202,12 @@ export async function selectGoogleResource(
   tenantId: string,
   kind: GoogleResourceKind,
   resourceId: string,
+  actor?: GoogleOperationActor,
 ): Promise<GoogleResourceCatalog> {
   const normalized = resourceId.trim();
   if (!normalized || normalized.length > 512) throw new Error("resource_id_invalid");
+  if (kind === "gbp" && !actor) throw new Error("google_settings_permission_denied");
+  const operation = kind === "gbp" ? await beginGoogleTenantOperation(tenantId, actor!) : undefined;
   const catalog = await discoverGoogleResources(tenantId);
   const group = catalog[kind];
   const chosen = group.resources.find((item) => item.id === normalized);
@@ -216,9 +221,7 @@ export async function selectGoogleResource(
   } else {
     const split = chosen.id.split("|");
     if (split.length !== 2 || !split[0] || !split[1]) throw new Error("resource_id_invalid");
-    const redis = getRedis();
-    if (!redis) throw new Error("persistence_unavailable");
-    await redis.set(`google-meta:${tenantId}`, { accountId: split[0], locationId: split[1] }, { ex: 60 * 60 * 24 * 365 });
+    await recordAuthorizedGoogleLocationSelection(tenantId, { accountId: split[0], locationId: split[1], title: chosen.label }, actor!, operation!);
   }
 
   return discoverGoogleResources(tenantId);

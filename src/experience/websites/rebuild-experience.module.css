@@ -7,9 +7,11 @@
 .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .meta { font-size:12px; line-height:1.5; color:var(--gray-muted); }
 .notice,.error { display:flex; gap:12px; align-items:flex-start; font-size:14px; line-height:1.5; margin:24px 0; color:var(--gray-muted); }
+.notice { flex-wrap:wrap; }
 .notice svg,.error svg { flex-shrink:0; margin-top:2px; }
-.error { padding:16px; border:1px solid var(--critical); border-radius:12px; color:var(--critical); }
+.error { flex-wrap:wrap; padding:16px; border:1px solid var(--critical); border-radius:12px; color:var(--critical); }
 .error p { margin-top:8px; }
+.error > :is(p, div) { min-width:0; max-width:100%; }
 .progress { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:24px; padding:24px 0; margin-bottom:24px; border-block:1px solid var(--gray-border); }
 .progress li { display:flex; gap:8px; color:var(--gray-muted); font-size:12px; line-height:1.5; }
 .progress strong { color:var(--warm-black); text-transform:capitalize; font-weight:500; font-size:14px; }
@@ -50,3 +52,7 @@
 @media(max-width:767px) { .root { padding:24px 24px 48px; } .progress { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .intake { padding:24px; } .previewBar { padding:16px; } .preview iframe { height:520px; } .actions { gap:8px; } .domainForm > div { min-width:0; width:100%; } }
 @media(max-width:360px) { .root { padding-inline:16px; } .intake { padding:16px; } }
 @media(max-width:767px) { .domainForm { display:grid; grid-template-columns:minmax(0,1fr); } .domainForm > div { max-width:none; } }
+
+@media (max-width: 767px) {
+  .root :is(input, textarea, select, button) { min-block-size: 44px; max-inline-size: 100%; }
+}

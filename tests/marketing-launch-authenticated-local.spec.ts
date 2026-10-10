@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { businessStartHref, businessStartRequest, businessStartView } from "../src/lib/business-start";
+import { businessStartHref, businessStartRequest, businessStartView } from "../src/platform/workspaces/business-start";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 
 const enabled = process.env.STRELVA_LOCAL_AUTH_PROOF === "1" && process.env.STRELVA_MARKETING_ENTRY_PROOF === "1";
@@ -80,7 +80,7 @@ for (const width of [1440, 390]) {
             await expectReady(page.getByRole("button", { name: "Create case", exact: true })).toBeEnabled();
           } else {
             await expectReady(page.getByRole("form", { name: "Application setup" }).getByLabel("App name", { exact: true })).toBeEditable();
-            await expectReady(page.getByRole("button", { name: "Create private app", exact: true })).toBeVisible();
+            await expectReady(page.getByRole("button", { name: "Create private tool", exact: true })).toBeVisible();
           }
         }
         const businesses = await owner.context.request.get("/api/workspace/businesses");

@@ -7,14 +7,14 @@ import {
   getActorContext,
   findUserIdByEmail,
   type ClientRole,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { sendEmail } from "@/lib/email/send";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { sendEmail } from "@/platform/infra/email/send";
 import { sendWelcomeEmail } from "@/lib/delivery-email";
 
 function normalizeEmail(value: unknown): string | null {

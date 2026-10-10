@@ -1,8 +1,9 @@
 "use client";
 
+import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
-import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
+import { navigateWorkspace, readWorkspaceLocation, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 import {
   ArrowRight,
@@ -11,6 +12,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
@@ -19,16 +21,9 @@ import { WorkspaceLayout } from "./WorkspaceLayout";
 import { normalizeWorkspaceHandoffPreview, normalizeWorkspaceSnapshot, normalizeWorkspaceWork } from "./result";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceRequestContext, useWorkspaceRequest, WorkspaceRequestError, readResponse, usePostAction } from "./WorkspaceRequest";
-import { TrackerExperience } from "./TrackerExperience";
-import { LocalTrackerPreview } from "./preview/LocalTrackerPreview";
-import { DocumentExperience } from "./DocumentExperience";
-import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
+import { OpenedWork } from "./OpenedWork";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
-import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
-import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
-import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
-import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { LearningExperience } from "@/experience/operations/LearningExperience";
 import { WorkAuthorityPanel } from "@/experience/operations/WorkAuthorityPanel";
 import { WorkspaceOngoing } from "./WorkspaceOngoing";
@@ -41,12 +36,14 @@ import type {
   WorkspaceSnapshot,
   WorkspaceWork,
 } from "./contracts";
-import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
+import type { WorkspaceInquiryTarget, WorkspacePlanRenderer } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
-import { selectWorkspaceLocation, isHorizontalView, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
+import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
+import { NO_OPEN_WORK, leaveWork, startContinuation, startAsk, type OpenWorkContext } from "./open-work";
+import type { PreviewRouteContext } from "./preview/route-context";
 
-type Notice = { kind: "success" | "error"; message: string } | null;
+type Notice = { kind: "success" | "error"; message: string; refreshWorkspaceId?: string } | null;
 
 export interface WorkspaceInquiryConfig {
   tenantId: string;
@@ -65,34 +62,32 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, rebuildEnabled = false }: { rebuildEnabled?: boolean; request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
-  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} rebuildEnabled={rebuildEnabled} /></WorkspaceRequestContext.Provider>;
+export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, rebuildEnabled = false, previewRouteContext }: { previewRouteContext?: PreviewRouteContext; rebuildEnabled?: boolean; request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
+  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} rebuildEnabled={rebuildEnabled} previewRouteContext={previewRouteContext} /></WorkspaceRequestContext.Provider>;
 }
 
-function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled }: { rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
+function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled, previewRouteContext }: { previewRouteContext?: PreviewRouteContext; rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
+  const router = useRouter();
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
-  const [missingWork, setMissingWork] = useState(false);
   const [returnTarget, setReturnTarget] = useState("/workspace");
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
-  const [selectedStandingId, setSelectedStandingId] = useState<string | null>(null);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
-  const [standingCreating, setStandingCreating] = useState(false);
   const [view, setView] = useState<View>("work");
-  const [inquiryTenantId, setInquiryTenantId] = useState<string | null>(null);
-  const [assessmentStartContext, setAssessmentStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [inquiryStartContext, setInquiryStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [trackerStartContext, setTrackerStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [documentStartContext, setDocumentStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [planStartRequest, setPlanStartRequest] = useState<string | null>(null);
+  // Everything that belongs to the open work. Transitions replace it whole via leaveWork().
+  const [open, setOpen] = useState<OpenWorkContext>(NO_OPEN_WORK);
+  const { missingWork, standingId: selectedStandingId, assignmentId: selectedAssignmentId, standingCreating, inquiryTenantId, showAssessment } = open;
+  const assessmentStartContext = startContinuation(open, "work", "assessment");
+  const inquiryStartContext = startContinuation(open, "inquiries", "inquiries");
+  const trackerStartContext = startContinuation(open, "tracker", "tracker");
+  const documentStartContext = startContinuation(open, "document", "document");
+  const planStartAsk = startAsk(open, "plan");
+  const horizontalRequest = startAsk(open, view);
   const [home, setHome] = useState(true);
-  const [horizontalRequest, setHorizontalRequest] = useState<string | undefined>();
   const [pendingRequest, setPendingRequest] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
   const attemptRef = useRef<{ signature: string; id: string } | null>(null);
   const [retryWork, setRetryWork] = useState<WorkspaceWork | null>(null);
-  const [showAssessment, setShowAssessment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
   const [handoffPreview, setHandoffPreview] = useState<WorkspaceHandoffPreview | null>(null);
@@ -107,21 +102,28 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const requestRef = useRef(0);
   const activeWorkspaceRef = useRef<string | null>(null);
   const requestedWorkspaceRef = useRef<string | null>(null);
+  const navigationGenerationRef = useRef(0);
 
   const loadWorkspace = useCallback(async (workspaceId?: string, preserveNotice = false) => {
-    const locationWorkspaceId = new URLSearchParams(window.location.search).get("workspaceId");
-    const selectedId = workspaceId || locationWorkspaceId;
+    const locationWorkspaceId = readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId;
+    const selectedId = workspaceId || locationWorkspaceId || null;
+    setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
     // A response-triggered refresh from the previous render must not replace a
     // newer workspace selection. Explicit workspace changes set this ref before
     // starting their request; ordinary navigation reads the current URL.
     if (workspaceId && requestedWorkspaceRef.current && requestedWorkspaceRef.current !== workspaceId) return;
+    // A same-workspace save refresh must keep the mounted work until the read
+    // resolves, including explicit retries after a supplemental failure. Requested
+    // scope is retained data, not callback authority, which is invalidated below.
+    const preserveSelection = preserveNotice && selectedId === requestedWorkspaceRef.current;
+    if (!preserveNotice) navigationGenerationRef.current += 1;
     requestedWorkspaceRef.current = selectedId;
     const requestId = ++requestRef.current;
     activeWorkspaceRef.current = null;
     setLoading(true);
     setSignInRequired(false);
     if (!preserveNotice) setNotice(null);
-    setSelectedWorkId(null);
+    if (!preserveSelection) setSelectedWorkId(null);
     try {
       const suffix = selectedId ? `?workspaceId=${encodeURIComponent(selectedId)}` : "";
       const response = await request(`/api/workspace${suffix}`, { cache: "no-store" });
@@ -130,27 +132,21 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       activeWorkspaceRef.current = data.workspaceId;
       requestedWorkspaceRef.current = data.workspaceId;
       setSnapshot(data);
+      if (preserveNotice) setNotice(current => current?.refreshWorkspaceId === data.workspaceId ? null : current);
       const params = new URLSearchParams(window.location.search);
       const selection = selectWorkspaceLocation(params, data, inquiryConfig);
-      setMissingWork(selection.missingWork);
       setSelectedWorkId(selection.selectedWorkId);
-      setSelectedStandingId(selection.selectedStandingId);
-      setSelectedAssignmentId(selection.selectedAssignmentId);
-      setInquiryTenantId(selection.inquiryTenantId);
-      setStandingCreating(false);
-      setAssessmentStartContext(null);
-      setInquiryStartContext(null);
-      setTrackerStartContext(null);
-      setDocumentStartContext(null);
-      setPlanStartRequest(null);
+      setOpen(leaveWork({ missingWork: selection.missingWork, standingId: selection.selectedStandingId, assignmentId: selection.selectedAssignmentId, inquiryTenantId: selection.inquiryTenantId, showAssessment: selection.showAssessment }));
       if (!preserveNotice) { setHome(selection.home); setView(selection.view); }
-      setShowAssessment(selection.showAssessment);
-      replaceWorkspaceLocation(data.workspaceId, params.get("standingId") ? undefined : params.get("work") || undefined);
+      replaceWorkspaceLocation(data.workspaceId, readWorkspaceLocation(params).work);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
-      setSnapshot(null);
+      const accessRefused = cause instanceof WorkspaceRequestError && [401, 403, 404].includes(cause.status);
+      const supplementalFailure = preserveSelection && !accessRefused;
+      if (!supplementalFailure) setSnapshot(null);
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
-      setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "We couldn’t load this workspace." });
+      const message = cause instanceof Error ? cause.message : "We couldn’t load this workspace.";
+      setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message, ...(supplementalFailure && selectedId ? { refreshWorkspaceId: selectedId } : {}) });
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -158,7 +154,6 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   useEffect(() => {
     const restore = () => {
-      setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
       void loadWorkspace();
     };
     restore();
@@ -171,7 +166,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     const hashToken = params.get("handoff");
     if (hashToken) {
       sessionStorage.setItem("strelva:workspace-handoff", hashToken);
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      window.history.replaceState(workspaceHistoryState(window.history.state), "", `${window.location.pathname}${window.location.search}`);
     }
     const token = hashToken || sessionStorage.getItem("strelva:workspace-handoff");
     if (!token) return;
@@ -239,7 +234,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   const currentWorkspace = snapshot?.workspaces.find((workspace) => workspace.id === snapshot.workspaceId) ?? null;
-  const delegatedRead = currentWorkspace?.access === "delegated_read";
+  const delegatedRead = currentWorkspace?.access === "delegated_read" || currentWorkspace?.access === "provider_seat";
   const workspaceReadOnly = Boolean(delegatedRead || workspaceExitBlocks);
   const calendarRecoveryAllowed = Boolean(workspaceStopped && !delegatedRead && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin"));
   const canShowWorkBudget = Boolean(snapshot && !snapshot.actor.localPreview && !delegatedRead);
@@ -265,33 +260,31 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   function chooseWork(id: string) {
     const chosen = snapshot?.work.find((work) => work.id === id);
-    setMissingWork(false);
+    leaveCurrentWork();
     setHome(false);
     setSelectedWorkId(id);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setShowAssessment(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setView(isHorizontalView(chosen?.productId) ? chosen.productId : chosen?.productId === "tracker" ? "tracker" : chosen?.productId === "documents" ? "document" : chosen?.productId === "work_plans" ? "plan" : "work");
+    setView(viewForWork(chosen?.productId));
     setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("offering");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // Callers push the new entry. Never rewrite the entry being left, or Back loses its offering or standing.
   }
 
   function workspaceIdForNavigation(fallback: string): string {
-    return new URLSearchParams(window.location.search).get("workspaceId") || fallback;
+    return readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId || fallback;
   }
 
+  const callbackLocation = typeof window === "undefined" ? "" : JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
+  // Back can revisit the identical URL with a new tool instance.
+  const callbackGeneration = navigationGenerationRef.current;
   function acceptsWorkspaceCallback(workspaceId: string): boolean {
-    return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId;
+    return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId
+      && callbackGeneration === navigationGenerationRef.current
+      && callbackLocation === JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
+  }
+
+  /** Every transition that leaves the current work resets all of its context, then sets only what the next view needs. */
+  function leaveCurrentWork(next?: Partial<OpenWorkContext>) {
+    navigationGenerationRef.current += 1;
+    setOpen(leaveWork(next));
   }
 
   function openWorkFromPlan(id: string, receiptProductId?: string) {
@@ -300,292 +293,130 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     const productId = chosen?.productId ?? receiptProductId;
     const workspaceId = snapshot.workspaceId;
     chooseWork(id);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("work", id);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("view", isHorizontalView(productId) ? productId : productId === "tracker" ? "tracker" : productId === "documents" ? "document" : productId === "work_plans" ? "plan" : "work");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId, work: id, view: viewForWork(productId) });
     void loadWorkspace(workspaceId);
   }
 
-  function clearEmbeddedRouteParams(url: URL) {
-    url.searchParams.delete("template");
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("assignmentId");
-    url.searchParams.delete("tenantId");
-    url.searchParams.delete("inquiryView");
-    url.searchParams.delete("inquiryRequest");
-    url.searchParams.delete("inquiryRecord");
-    url.searchParams.delete("trackerWork");
-    url.searchParams.delete("row");
-    url.searchParams.delete("offering");
-  }
-
   function chooseInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
-    setMissingWork(false);
+    leaveCurrentWork({ inquiryTenantId: tenantId, start: context?.route === "inquiries" ? { view: "inquiries", continuation: context } : null });
     setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(tenantId);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(context?.route === "inquiries" ? context : null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("inquiries");
-    setShowAssessment(false);
     setNotice(null);
+  }
+
+  function startWork(nextView: View, start: OpenWorkContext["start"], showAssessment = false) {
+    if (!snapshot || workspaceExitBlocks) return;
+    leaveCurrentWork({ start, showAssessment });
+    setSelectedWorkId(null);
+    setHome(false);
+    setView(nextView);
+    setNotice(null);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(snapshot.workspaceId), view: nextView });
+  }
+
+  function startAssessment(context?: WorkspaceStartContinuation) {
+    if (workspaceExitBlocks) return;
+    setRetryWork(null);
+    startWork("work", context?.route === "assessment" ? { view: "work", continuation: context } : null, true);
   }
 
   function startTracker(context?: WorkspaceStartContinuation) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
-    setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(context?.route === "tracker" ? context : null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHome(false);
-    setView("tracker");
-    setShowAssessment(false);
-    setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "tracker");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    startWork("tracker", context?.route === "tracker" ? { view: "tracker", continuation: context } : null);
   }
 
   function startDocument(context?: WorkspaceStartContinuation) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
-    setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(context?.route === "document" ? context : null);
-    setPlanStartRequest(null);
-    setHome(false);
-    setView("document");
-    setShowAssessment(false);
-    setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "document");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    startWork("document", context?.route === "document" ? { view: "document", continuation: context } : null);
   }
 
   function startPlan(requestText: string) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
-    setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(requestText);
-    setHome(false);
-    setView("plan");
-    setShowAssessment(false);
-    setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "plan");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    startWork("plan", { view: "plan", request: requestText });
   }
 
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
     if (workspaceExitBlocks) return;
+    if (productId === "websites" && snapshot?.releases?.systems === true && snapshot.releases.websiteRebuild === true && currentWorkspace?.kind === "customer") {
+      const key = requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId });
+      if (context?.request && !writeRequestDraft(window.sessionStorage, key, context.request)) {
+        setNotice({ kind: "error", message: "Your website request could not be carried forward. Copy it before reopening website creation." });
+        return;
+      }
+      router.push(`${appBase || ""}/workspace/site?${new URLSearchParams({ workspaceId: snapshot.workspaceId, entry: "rebuild" })}`);
+      return;
+    }
     if (productId === "applications" && context?.request) { startPlan(context.request); return; }
-    setSelectedWorkId(null); setSelectedStandingId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView(productId); setNotice(null); setHorizontalRequest(context?.request);
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    startWork(productId, context?.request ? { view: productId, request: context.request } : null);
   }
   function openOngoing() {
     if (!snapshot) return;
-    setSelectedWorkId(null); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView("operations"); setNotice(null); setHorizontalRequest(undefined);
+    leaveCurrentWork();
+    setSelectedWorkId(null); setHome(false); setView("operations"); setNotice(null);
   }
-  function openClientWork(workspaceId: string, workId: string) {
+  function switchWorkspace(workspaceId: string, workId?: string) {
     requestedWorkspaceRef.current = workspaceId;
-    const url = new URL(window.location.href);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("work", workId);
-    url.searchParams.set("view", "work");
-    url.searchParams.delete("search");
-    url.searchParams.delete("offering");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    setHome(false);
+    leaveCurrentWork();
+    setSelectedWorkId(null);
+    setHome(!workId);
     setView("work");
+    navigateWorkspace({ workspaceId, work: workId, view: workId ? "work" : undefined });
     void loadWorkspace(workspaceId);
+  }
+
+  function openClientWork(workspaceId: string, workId: string) {
+    switchWorkspace(workspaceId, workId);
   }
   function openStanding(standingId: string) {
     if (!snapshot) return;
-    setMissingWork(false);
+    leaveCurrentWork({ standingId });
     setSelectedWorkId(null);
-    setSelectedStandingId(standingId);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHorizontalRequest(undefined);
     setHome(false);
     setView("operations");
-    setShowAssessment(false);
     setNotice(null);
-    const workspaceId = workspaceIdForNavigation(snapshot.workspaceId);
-    const url = new URL(window.location.href);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "operations");
-    url.searchParams.set("standingId", standingId);
-    url.searchParams.delete("work");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(snapshot.workspaceId), view: "operations", standingId });
   }
-  function horizontalSaved(workId: string) {
+
+  function workSaved(workId: string, savedView: View) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    setSelectedWorkId(workId); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
+    leaveCurrentWork();
+    setSelectedWorkId(workId);
+    setHome(false);
+    setView(savedView);
+    navigateWorkspace({ workspaceId, work: workId, view: savedView }, "replace");
+    void loadWorkspace(workspaceId, true);
   }
+
+  function horizontalSaved(workId: string) { workSaved(workId, view); }
+
   function goHome() {
-    setMissingWork(false);
+    leaveCurrentWork();
     setHome(true);
     setView("work");
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setShowAssessment(false);
     if (snapshot) void loadWorkspace(undefined, true);
   }
 
-  function handleTrackerSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
-    setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHome(false);
-    setView("tracker");
-    setShowAssessment(false);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "tracker");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
-
-  function handleDocumentSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
-    setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHome(false);
-    setView("document");
-    setShowAssessment(false);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "document");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
-
-  function handlePlanSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
-    setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHome(false);
-    setView("plan");
-    setShowAssessment(false);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "plan");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
+  function handleTrackerSaved(workId: string) { workSaved(workId, "tracker"); }
+  function handleDocumentSaved(workId: string) { workSaved(workId, "document"); }
+  function handlePlanSaved(workId: string) { workSaved(workId, "plan"); }
 
   const trackerContent: React.ReactNode | undefined = snapshot && view === "tracker"
-    ? snapshot.actor.localPreview
-      ? <LocalTrackerPreview workspaceId={snapshot.workspaceId} readOnly={workspaceReadOnly} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
-      : <>
-        <TrackerExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "tracker" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleTrackerSaved} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
-        {canShowWorkBudget && selectedWork?.productId === "tracker" && selectedWork.resourceKind === "tracker" ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="tracker" resourceKind="tracker" /> : null}
-      </>
+    ? <>
+      <OpenedWork productId="tracker" workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "tracker" ? selectedWork.id : undefined} sources={snapshot.work} localPreview={snapshot.actor.localPreview} readOnly={workspaceReadOnly} onSaved={handleTrackerSaved} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
+      {!snapshot.actor.localPreview && canShowWorkBudget && selectedWork?.productId === "tracker" && selectedWork.resourceKind === "tracker" ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="tracker" resourceKind="tracker" /> : null}
+    </>
     : undefined;
   const documentRequestText = documentStartContext?.route === "document" ? documentStartContext.request : undefined;
   const documentContent: React.ReactNode | undefined = snapshot && view === "document"
-    ? snapshot.actor.localPreview
-      ? <LocalDocumentPreview key={`${snapshot.workspaceId}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} readOnly={workspaceReadOnly} initialRequestText={documentRequestText} />
-      : <><DocumentExperience key={`${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} sources={snapshot.work} />{selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
+    ? <><OpenedWork key={snapshot.actor.localPreview ? `${snapshot.workspaceId}:${documentRequestText || "new"}` : `${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} productId="documents" workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} sources={snapshot.work} localPreview={snapshot.actor.localPreview} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} />{!snapshot.actor.localPreview && selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
     : undefined;
-  const planContent: React.ReactNode | undefined = snapshot && view === "plan"
-    ? <WorkPlanExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartRequest || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
+  const planContent: WorkspacePlanRenderer | undefined = snapshot && view === "plan"
+    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartAsk || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
     : undefined;
 
   function clearPublicSaveQuery() {
     const url = new URL(window.location.href);
     url.searchParams.delete("save");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   async function savePublicResult() {
@@ -599,6 +430,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       );
       if (activeWorkspaceRef.current !== snapshot.workspaceId) return;
       const normalizedWork = normalizeWorkspaceWork(body.work, { access: currentWorkspace?.kind === "personal" ? "owned" : "member" });
+      if (normalizedWork.workspaceId !== snapshot.workspaceId) throw new Error("The saved result could not be confirmed for this workspace.");
       setSnapshot((current) => {
         if (!current || current.workspaceId !== normalizedWork.workspaceId) return current;
         const work = current.work.some((item) => item.id === normalizedWork.id)
@@ -606,12 +438,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           : [normalizedWork, ...current.work];
         return { ...current, work };
       });
+      leaveCurrentWork();
       setSelectedWorkId(normalizedWork.id);
-      setMissingWork(false);
-      replaceWorkspaceLocation(normalizedWork.workspaceId, normalizedWork.id);
+      navigateWorkspace({ workspaceId: normalizedWork.workspaceId, work: normalizedWork.id, view: "work" }, "replace");
       setHome(false);
       setView("work");
-      setShowAssessment(false);
       setPublicSaveResultId(null);
       clearPublicSaveQuery();
       setNotice({
@@ -648,7 +479,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   return (
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
-      <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
+      <WorkspaceLayout previewRouteContext={previewRouteContext} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
         workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
         atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
@@ -657,11 +488,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         onHome={goHome}
         onChoose={chooseWork}
         onCreatedApp={id => openWorkFromPlan(id, "applications")}
-        onNew={(context) => { if (workspaceExitBlocks) return; setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
+        onNew={startAssessment}
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}
-        onAgency={() => { setHome(false); setView("agency"); }}
+        onAgency={() => { leaveCurrentWork(); setHome(false); setView("agency"); }}
         onInquiry={chooseInquiry}
         onTracker={startTracker}
         onDocument={startDocument}
@@ -678,18 +509,20 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         trackerTemplates={TRACKER_TEMPLATES.map((template) => ({ id: template.id, label: template.name, description: template.description }))}
         inquiryBusinesses={inquiryBusinesses}
         inquiry={inquiryTarget}
+        inquirySource={inquiryConfig?.tenantId ? { tenantId: inquiryConfig.tenantId, adapter: inquiryConfig.adapter } : undefined}
         tracker={trackerContent}
         plan={planContent}
         document={documentContent}
-        onWorkspace={(id) => { requestedWorkspaceRef.current = id; replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setSelectedStandingId(null); setStandingCreating(false); setHome(true); setView("work"); setInquiryTenantId(null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); void loadWorkspace(id); }}
+        onWorkspace={switchWorkspace}
         onOpenClientWork={openClientWork}
         notice={<>
         {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
           {(snapshot.pendingAssessments?.length || 0) > 1 ? <label className="flex items-center gap-2">Assessment<select className="rounded-lg border border-gray-border bg-surface px-3 py-2" value={pendingRequest} onChange={event => setPendingRequest(event.target.value)}>{!snapshot.pendingAssessments?.some(item => item.id === pendingRequest) ? <option value={pendingRequest}>Current attempt</option> : null}{snapshot.pendingAssessments?.map((item, index) => <option key={item.id} value={item.id}>{index + 1} · {formatDate(item.createdAt)}</option>)}</select></label> : null}<Button disabled={recovering} onClick={() => void recoverAssessment()}>Recover assessment</Button><Button variant="ghost" disabled={recovering} onClick={() => rememberAttempt(null)}>Dismiss</Button></div> : null}
         {notice ? (
-        <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
+        <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex flex-col items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 sm:flex-row ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
           <span>{notice.message}</span>
-          <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button>
+          {notice.refreshWorkspaceId ? <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => void loadWorkspace(notice.refreshWorkspaceId, true)}>Retry workspace refresh</Button> : null}
+          {!notice.refreshWorkspaceId ? <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button> : null}
         </div>
       ) : null}</>}>
           {missingWork ? (
@@ -703,7 +536,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               selectedWork={selectedWork}
               postAction={postAction}
               onChanged={() => void loadWorkspace(snapshot.workspaceId, true)}
-              onAgencyCreated={(workspaceId) => { requestedWorkspaceRef.current = workspaceId; void loadWorkspace(workspaceId); }}
+              onAgencyCreated={(workspaceId) => {
+                // With the agency front door on, a new agency opens its setup checklist (#258).
+                if (snapshot.releases?.agencySetup) { window.location.assign(new URL(`${appBase}/workspace/agency/start?workspaceId=${encodeURIComponent(workspaceId)}`, window.location.origin)); return; }
+                requestedWorkspaceRef.current = workspaceId; void loadWorkspace(workspaceId);
+              }}
               setNotice={setNotice}
             />
           ) : delegatedRead && !selectedWork ? (
@@ -722,22 +559,23 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
                 const body = await postAction<{ work: WorkspaceWork }>({ action: "assess", workspaceId: snapshot.workspaceId, requestId, ...input }, "The assessment couldn’t be completed. Use Recover assessment before starting again.");
         return normalizeWorkspaceWork(body.work, { access: "owned" });
               }}
-              onCancel={snapshot.work.length ? () => { setAssessmentStartContext(null); setShowAssessment(false); } : undefined}
+              onCancel={snapshot.work.length ? () => setOpen(current => ({ ...current, showAssessment: false, start: null })) : undefined}
               onCreated={(work) => {
                 if (activeWorkspaceRef.current !== work.workspaceId) return;
                 setSnapshot((current) => current?.workspaceId === work.workspaceId ? { ...current, work: [work, ...current.work] } : current);
                 rememberAttempt(null);
                 attemptRef.current = null;
-                setAssessmentStartContext(null);
+                setOpen(current => ({ ...current, showAssessment: false, start: null }));
                 setSelectedWorkId(work.id);
                 replaceWorkspaceLocation(work.workspaceId, work.id);
-                setShowAssessment(false);
                 setNotice({ kind: "success", message: "Assessment saved privately to this workspace." });
               }}
             />
           ) : isHorizontalView(view) ? <>
             {view === "operations" ? <WorkspaceOngoing
+              inquiriesEnabled={snapshot.releases?.inquiries === true && !delegatedRead}
               workspaceId={snapshot.workspaceId}
+              monthlyRecap={snapshot.releases?.systems === true && snapshot.systems?.systems.some(system => system.kind === "website" && !!system.tenantId)}
               sources={snapshot.work}
               selectedWork={selectedWork}
               selectedStandingId={selectedStandingId}
@@ -746,25 +584,27 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               readOnly={Boolean(delegatedRead || currentWorkspace?.role === "member")}
               newWorkBlocked={workspaceExitBlocks}
               initialRequest={horizontalRequest}
-              onCreatingStandingChange={setStandingCreating}
+              onCreatingStandingChange={(creating) => setOpen(current => ({ ...current, standingCreating: creating }))}
               onOpenStanding={openStanding}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency"} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
-              : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
-              : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
-              : <BoundedWorkExperience key={`${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} productId={view} sources={snapshot.work} readOnly={workspaceReadOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
+              : view === "websites" && selectedWork?.productId === "websites" && selectedWork.unavailableReason ? <p role="alert">{selectedWork.unavailableReason}</p>
+              : <OpenedWork key={view === "custom-applications" ? selectedWork?.id : view === "websites" || view === "onboarding" ? `${snapshot.workspaceId}:${selectedWork?.id || "new"}` : `${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} productId={view} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work}
+                readOnly={view === "websites" ? workspaceExitBlocks || (workspaceReadOnly && currentWorkspace?.access !== "provider_seat") : view === "custom-applications" ? Boolean(workspaceReadOnly || currentWorkspace?.role === "member") : view === "applications" && (selectedWork?.creatorDraft || (!selectedWork && snapshot.canMakeSystems === true)) ? workspaceExitBlocks : workspaceReadOnly}
+                canEdit={!workspaceExitBlocks && (snapshot.canMakeSystems === true || selectedWork?.creatorDraft === true)} draftEditOnly={!workspaceExitBlocks && view === "applications" && (selectedWork?.creatorDraft === true || (!selectedWork && currentWorkspace?.access === "provider_seat" && snapshot.canMakeSystems === true))} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed}
+                rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} managed={Boolean(snapshot.managedWork?.length)} canPublish={currentWorkspace?.access === "member" && currentWorkspace?.role === "owner"} agency={currentWorkspace?.kind === "agency" || currentWorkspace?.access === "provider_seat"}
+                initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
             {selectedWork && view !== "product-learning" && view !== "websites" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}
           </> : selectedWork?.assessment?.kind === "website_audit" && selectedWork.assessment.payload ? (
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
           ) : selectedWork?.assessment?.kind === "ai_visibility" ? (
             <>
-            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setAssessmentStartContext(null); setRetryWork(selectedWork); setShowAssessment(true); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
+            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the client" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
               {canShowWorkBudget ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="ai_visibility" resourceKind={selectedWork.resourceKind} /> : null}
             </>
           ) : selectedWork?.productId === "research" && selectedWork.resourceKind === "experiment" ? (
-            <WorkspaceExperimentResult work={selectedWork} onOpenTracker={handleTrackerSaved} />
+            <WorkspaceExperimentResult work={selectedWork} onOpenTracker={id => openWorkFromPlan(id, "tracker")} />
           ) : selectedWork ? <p className="mx-auto max-w-2xl text-[14px] text-gray-muted">This saved work is unavailable in this release. Its stored record remains unchanged.</p> : null}
       </WorkspaceLayout>
       </div>
@@ -780,7 +620,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             replaceWorkspaceLocation(workspaceId, workId);
             const url = new URL(window.location.href);
             url.hash = "";
-            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+            window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}`);
             sessionStorage.removeItem("strelva:workspace-handoff");
             setHandoffToken(null);
             setHandoffPreview(null);
@@ -789,7 +629,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           onClose={() => {
             const url = new URL(window.location.href);
             url.hash = "";
-            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+            window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}`);
             sessionStorage.removeItem("strelva:workspace-handoff");
             setHandoffToken(null);
             setHandoffPreview(null);
@@ -838,8 +678,8 @@ function DelegatedEmpty() {
   return (
     <div className="mx-auto max-w-2xl">
       <LockKeyhole className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Customer work shared read-only.</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the customer can create or change work here.</p>
+      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Client work shared read-only.</h1>
+      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the client can create or change work here.</p>
     </div>
   );
 }
@@ -895,10 +735,4 @@ function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose
       </div>
     </div>
   );
-}
-
-function websiteDocumentVersion(value: unknown): 2 | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const item = value as { version?: unknown; rebuild?: { version?: unknown } };
-  return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
 }

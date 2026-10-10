@@ -1,0 +1,563 @@
+import {
+  assertShareableDefinition,
+  changedPaths,
+  cloneJson,
+  jsonEqual,
+  readPath,
+  threeWayCompare,
+  writePath,
+  type JsonObject,
+  type JsonValue,
+} from "./compare";
+import { sameSystem, type SystemRef, type SystemRevisionRef } from "./refs";
+import { assertPackageDeclaration, automatedRevisionQualification, effectivePackageBehavior, isRevisionQualified, type PackageDeclaration, type PackageRehearsalReceipt } from "./declaration";
+import type { ConnectionOwnership, VersionStore } from "./store";
+import {
+  VERSION_CONTEXT_KINDS,
+  VersionAccessError,
+  VersionConflictError,
+  VersionIncompatibleError,
+  VersionStaleError,
+  VersionValidationError,
+  type ImprovementComparison,
+  type LocalBinding,
+  type SourceRevision,
+  type VersionActor,
+  type VersionConflictResolution,
+  type VersionContext,
+  type VersionGrantScope,
+  type VersionLineage,
+  type VersionOverride,
+  type VersionView,
+} from "./types";
+
+export interface SystemVersionsDeps {
+  store: VersionStore;
+  connections: ConnectionOwnership;
+  now?: () => string;
+  id?: (prefix: string) => string;
+  rehearsePackage?: (revision: SourceRevision) => PackageRehearsalReceipt;
+}
+
+function overlaps(left: string, right: string): boolean {
+  return left === "*" || right === "*" || left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
+}
+
+function validPath(path: string): string {
+  if (path === "*") return path;
+  if (typeof path !== "string" || !/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(path) || path.length > 300) {
+    throw new VersionValidationError("The override path is invalid.");
+  }
+  return path;
+}
+
+function text(value: string, field: string, max = 200): string {
+  const result = typeof value === "string" ? value.trim() : "";
+  if (!result || result.length > max) throw new VersionValidationError(`Add a ${field} within ${max} characters.`);
+  return result;
+}
+
+/** Locks belong to an immutable source revision, never to local bindings/data. */
+export function validateLockedPaths(definition: JsonObject, paths: readonly string[]): string[] {
+  if (paths.length > 100) throw new VersionValidationError("A revision supports at most 100 pushed standards.");
+  const result = [...new Set(paths.map(validPath))].sort();
+  if (result.some(path => path === "*" || path.split(".").some(part => ["__proto__", "prototype", "constructor"].includes(part)) || readPath(definition, path) === undefined)) throw new VersionValidationError("Lock an existing definition field, not local data or an entire System.");
+  return result;
+}
+export function assertLockedDefinition(revision: SourceRevision, definition: JsonObject): void {
+  for (const path of revision.lockedPaths ?? []) {
+    if (!jsonEqual(readPath(revision.definition, path), readPath(definition, path))) throw new VersionValidationError("This change would alter a pushed standard. Take the source value before releasing.");
+  }
+}
+
+/** Baseline plus local overrides, shallowest first. */
+export function applyOverrides(baseline: JsonObject, overrides: readonly VersionOverride[]): JsonObject {
+  const result = cloneJson(baseline);
+  for (const override of [...overrides].sort((left, right) => left.path.length - right.path.length)) {
+    writePath(result, override.path, override.value);
+  }
+  return result;
+}
+
+/** A restore edits only the draft; release appends and sets current to latest.
+ * This describes a candidate, never authority, approval or native verification. */
+export function determineVersionRelease(lineage: VersionLineage) {
+  const definition = applyOverrides(lineage.baseline.definition, lineage.overrides);
+  const release = lineage.releases.at(-1);
+  return {
+    definition, release,
+    needsRelease: !release || !jsonEqual(release.definition, definition),
+    nextRelease: (release?.number ?? 0) + 1,
+    changedPaths: changedPaths(release?.definition ?? {}, definition),
+  };
+}
+
+export function createSystemVersions(deps: SystemVersionsDeps) {
+  const { store, connections } = deps;
+  const now = deps.now ?? (() => new Date().toISOString());
+  // UUIDs by default so the same ids are valid in the in-memory store and in Postgres.
+  const id = deps.id ?? ((_prefix: string) => globalThis.crypto.randomUUID());
+
+  function roleIn(actor: VersionActor, businessId: string) {
+    return actor.memberships.find((membership) => membership.businessId === businessId)?.role ?? null;
+  }
+
+  function requireManage(actor: VersionActor, businessId: string, systemId?: string): void {
+    const role = roleIn(actor, businessId);
+    if (role !== "owner" && role !== "admin" && !actor.delegatedSystems?.some(scope => scope.businessId === businessId && scope.systemId === systemId && scope.canWrite)) throw new VersionAccessError();
+  }
+
+  function requireMember(actor: VersionActor, businessId: string, systemId?: string): void {
+    if (!roleIn(actor, businessId) && !actor.delegatedSystems?.some(scope => scope.businessId === businessId && scope.systemId === systemId)) throw new VersionAccessError();
+  }
+
+  async function sourceVisibleTo(actor: VersionActor, source: SystemRef, businessId: string): Promise<boolean> {
+    if (source.businessId === businessId) return true;
+    const record = await store.getSource(actor, source);
+    return record?.listingState === "listed" || record?.availableTo?.includes(businessId) || record?.sharedWith.includes(businessId) || false;
+  }
+
+  async function loadOwned(actor: VersionActor, versionId: string, manage: boolean): Promise<VersionLineage> {
+    const lineage = await store.getLineage(actor, versionId);
+    // Same error for missing and forbidden so IDs cannot be probed.
+    if (!lineage) throw new VersionAccessError();
+    if (manage) requireManage(actor, lineage.version.businessId, lineage.version.systemId);
+    else requireMember(actor, lineage.version.businessId, lineage.version.systemId);
+    return lineage;
+  }
+
+  async function save(actor: VersionActor, lineage: VersionLineage, expectedRowRevision: number): Promise<VersionLineage> {
+    const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+    if (!baseline) throw new VersionAccessError();
+    assertLockedDefinition(componentRevision(lineage, baseline), working(lineage));
+    const next = { ...lineage, updatedAt: now() };
+    const saved = await store.updateLineage(actor, next, expectedRowRevision);
+    return saved ?? (await store.getLineage(actor, lineage.id))!;
+  }
+
+  function working(lineage: VersionLineage): JsonObject {
+    return applyOverrides(lineage.baseline.definition, lineage.overrides);
+  }
+
+  function componentRevision(lineage:VersionLineage,revision:SourceRevision):SourceRevision {
+    if(!lineage.sourceComponentKey)return revision;
+    const definition=revision.definition.systems;
+    const part=Array.isArray(definition)?definition.find(item=>item&&typeof item==="object"&&!Array.isArray(item)&&item.key===lineage.sourceComponentKey):undefined;
+    if(!part||typeof part!=="object"||Array.isArray(part)||!part.definition||typeof part.definition!=="object"||Array.isArray(part.definition))throw new VersionValidationError("This bundle component was removed from the source. Keep the current draft and review the source.");
+    return {...revision,definition:part.definition, lockedPaths: revision.lockedPaths?.includes("systems") ? ["*"] : []};
+  }
+  function compareWith(lineage: VersionLineage, revision: SourceRevision): ImprovementComparison & { upstreamPaths: string[] } {
+    revision=componentRevision(lineage,revision);
+    const local = working(lineage);
+    if (revision.source.number <= lineage.baseline.revision) {
+      return {
+        versionId: lineage.id,
+        baselineRevision: lineage.baseline.revision,
+        sourceRevision: revision.source.number,
+        summary: revision.summary,
+        status: "up_to_date",
+        changes: [],
+        conflicts: [],
+        missingBindings: [],
+        preview: local,
+        upstreamPaths: [],
+      };
+    }
+    // Overrides are the unit of local change. Adoption keeps or drops whole
+    // overrides, so an upstream change anywhere inside (or above) one must be
+    // a conflict, or adoption would silently discard part of the local edit.
+    const result = threeWayCompare({
+      base: lineage.baseline.definition,
+      upstream: revision.definition,
+      local,
+      localEditPaths: lineage.overrides.map((override) => override.path),
+    });
+    for (const locked of revision.lockedPaths ?? []) {
+      if (jsonEqual(readPath(local, locked), readPath(revision.definition, locked))) continue;
+      for (const override of lineage.overrides.filter(item => overlaps(item.path, locked))) {
+        if (result.conflicts.some(conflict => overlaps(conflict.path, override.path))) continue;
+        result.conflicts.push({ path: override.path, reason: "overlapping_edit", base: readPath(lineage.baseline.definition, override.path), upstream: readPath(revision.definition, override.path), local: readPath(local, override.path) });
+      }
+    }
+    const bound = new Set(lineage.bindings.map((binding) => binding.kind));
+    const missingBindings = revision.requires.bindingKinds.filter((kind) => !bound.has(kind));
+    return {
+      versionId: lineage.id,
+      baselineRevision: lineage.baseline.revision,
+      sourceRevision: revision.source.number,
+      summary: revision.summary,
+      status: result.conflicts.length > 0 || missingBindings.length > 0 ? "blocked" : "auto_applicable",
+      lockedPaths: revision.lockedPaths ?? [],
+      changes: result.changes,
+      conflicts: result.conflicts,
+      missingBindings,
+      preview: result.merged,
+      upstreamPaths: result.upstreamPaths,
+    };
+  }
+
+  async function loadImprovement(actor: VersionActor, lineage: VersionLineage, revisionNumber: number): Promise<SourceRevision> {
+    if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) throw new VersionAccessError("The source of this Version is no longer shared with this business.");
+    const revision = await store.getRevision(actor, lineage.source, revisionNumber);
+    if (!revision) throw new VersionValidationError("That source revision does not exist.");
+    if (revision.declaration && !isRevisionQualified(revision)) throw new VersionValidationError("That exact source revision has not passed qualification and human review.");
+    return componentRevision(lineage,revision);
+  }
+
+  return {
+    /** Author side: publish an immutable shareable revision of a source System. */
+    async publishSourceRevision(
+      actor: VersionActor,
+      input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string; declaration?: PackageDeclaration; lockedPaths?: string[] },
+    ): Promise<SourceRevision> {
+      requireManage(actor, input.source.businessId);
+      assertShareableDefinition(input.definition);
+      if (!(await store.getSource(actor, input.source))) await store.putSource(actor, { source: input.source, sharedWith: [], createdAt: now() });
+      const previous = (await store.listRevisions(actor, input.source)).at(-1);
+      const revision: SourceRevision = {
+        source: {
+          businessId: input.source.businessId,
+          systemId: input.source.systemId,
+          revisionId: id("source_revision"),
+          number: (previous?.source.number ?? 0) + 1,
+        },
+        ...(input.label ? { label: input.label } : {}),
+        summary: text(input.summary, "summary", 500),
+        definition: cloneJson(input.definition),
+        ...(input.lockedPaths ? { lockedPaths: validateLockedPaths(input.definition, input.lockedPaths) } : {}),
+        requires: { bindingKinds: [...new Set(input.requires?.bindingKinds ?? [])].sort() },
+        publishedBy: actor.userId,
+        publishedAt: now(),
+        creatorWorkspaceId: input.source.businessId,
+        ...(input.definition.kind === "internal_app" || input.definition.kind === "bundle" ? { declaration: input.declaration ?? effectivePackageBehavior(input.definition, input.requires?.bindingKinds) } : {}),
+      };
+      if (revision.declaration) assertPackageDeclaration(revision.definition, revision.declaration, revision.requires.bindingKinds);
+      const stored = await store.insertRevision(actor, revision);
+      if (revision.declaration && store.recordQualification) await store.recordQualification(actor, automatedRevisionQualification(stored ?? revision, previous, deps.rehearsePackage?.(stored ?? revision)));
+      return cloneJson(stored ?? revision);
+    },
+
+    /** Author side: let another business base Versions on this source. */
+    async shareSource(actor: VersionActor, source: SystemRef, businessId: string): Promise<void> {
+      requireManage(actor, source.businessId);
+      const record = await store.getSource(actor, source);
+      if (!record) throw new VersionValidationError("Publish a source revision before sharing it.");
+      if (!record.sharedWith.includes(businessId)) record.sharedWith.push(businessId);
+      await store.putSource(actor, record);
+    },
+
+    async unshareSource(actor: VersionActor, source: SystemRef, businessId: string): Promise<void> {
+      requireManage(actor, source.businessId);
+      const record = await store.getSource(actor, source);
+      if (!record) return;
+      record.sharedWith = record.sharedWith.filter((item) => item !== businessId);
+      await store.putSource(actor, record);
+    },
+
+    /**
+     * Descendant side: create a Version owned by the descendant business.
+     * Only the shareable definition is copied. Bindings, data, grants and
+     * people start empty and are chosen locally.
+     */
+    async createVersion(actor: VersionActor, input: { source: SystemRevisionRef; version: SystemRef; context: VersionContext }): Promise<VersionLineage> {
+      requireManage(actor, input.version.businessId, input.version.systemId);
+      if (sameSystem(input.source, input.version)) throw new VersionValidationError("A Version needs its own System identity.");
+      if (!VERSION_CONTEXT_KINDS.includes(input.context.kind)) throw new VersionValidationError("Choose a supported Version context.");
+      if (!(await sourceVisibleTo(actor, input.source, input.version.businessId))) throw new VersionAccessError("That source is not shared with this business.");
+      const revision = await store.getRevision(actor, input.source, input.source.number);
+      if (!revision || revision.source.revisionId !== input.source.revisionId) {
+        throw new VersionValidationError("That source revision does not exist.");
+      }
+      if (input.source.businessId !== input.version.businessId && revision.declaration && !isRevisionQualified(revision)) throw new VersionValidationError("This revision needs qualification and human review before another business can install it.");
+      if (await store.findLineageByVersion(actor, input.version)) throw new VersionValidationError("That System is already a Version of a source.");
+      const at = now();
+      const lineage: VersionLineage = {
+        id: id("version"),
+        version: { businessId: input.version.businessId, systemId: input.version.systemId },
+        source: { businessId: input.source.businessId, systemId: input.source.systemId },
+        creatorWorkspaceId: revision.creatorWorkspaceId ?? input.source.businessId,
+        sourceRevisionId: revision.source.revisionId,
+        context: { kind: input.context.kind, label: text(input.context.label, "context label") },
+        baseline: { revision: revision.source.number, definition: cloneJson(revision.definition) },
+        overrides: [],
+        bindings: [],
+        localData: {},
+        releases: [],
+        currentRelease: null,
+        decisions: [],
+        grants: [],
+        rowRevision: 1,
+        createdBy: actor.userId,
+        createdAt: at,
+        updatedAt: at,
+      };
+      const stored = await store.insertLineage(actor, lineage);
+      return cloneJson(stored ?? lineage);
+    },
+
+    /** Set (or with `undefined`, clear) one business-owned override. */
+    async setOverride(actor: VersionActor, versionId: string, input: { path: string; value: JsonValue | undefined; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const path = validPath(input.path);
+      const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (!baseline) throw new VersionAccessError();
+      if (input.value !== undefined && baseline.lockedPaths?.some(locked => overlaps(locked, path))) throw new VersionValidationError("This field is a pushed standard. Change it at the source.");
+      const at = now();
+      const restored = lineage.overrides.find(override => override.path === "*");
+      if (path === "*" || restored) {
+        const definition = path === "*" ? input.value : cloneJson(restored!.value);
+        if (path !== "*") writePath(definition as JsonObject, path, input.value === undefined ? readPath(lineage.baseline.definition, path) : input.value);
+        if (definition !== undefined) assertShareableDefinition(definition);
+        return save(actor, { ...lineage, overrides: definition === undefined ? [] : [{ path: "*", value: definition, setBy: actor.userId, setAt: at }] }, input.expectedRowRevision);
+      }
+      let overrides = lineage.overrides.filter((override) => !override.path.startsWith(`${path}.`));
+      const ancestor = overrides.find((override) => path.startsWith(`${override.path}.`));
+      if (ancestor) {
+        if (input.value === undefined) throw new VersionValidationError("Clear the broader override that contains this path instead.");
+        const wrapper: JsonObject = { value: cloneJson(ancestor.value) };
+        try {
+          writePath(wrapper, `value${path.slice(ancestor.path.length)}`, input.value);
+        } catch {
+          throw new VersionValidationError("A broader local override replaced this part of the System.");
+        }
+        overrides = overrides.map((override) =>
+          override === ancestor ? { ...override, value: wrapper.value!, setBy: actor.userId, setAt: at } : override);
+      } else {
+        overrides = overrides.filter((override) => override.path !== path);
+        if (input.value !== undefined && !jsonEqual(readPath(lineage.baseline.definition, path), input.value)) {
+          overrides.push({ path, value: cloneJson(input.value), setBy: actor.userId, setAt: at });
+        }
+      }
+      const next = { ...lineage, overrides };
+      try {
+        assertShareableDefinition(working(next));
+      } catch (error) {
+        throw new VersionValidationError(error instanceof Error ? error.message : "The override is invalid.");
+      }
+      return save(actor, next, input.expectedRowRevision);
+    },
+
+    /**
+     * Bind a live account or resource. The connection must belong to the
+     * Version's own business: a source's or sibling's credentials are never
+     * reused.
+     */
+    async bindAccount(actor: VersionActor, versionId: string, input: { kind: string; connectionId: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const owner = await connections.ownerOf(actor, input.connectionId);
+      if (owner !== lineage.version.businessId) {
+        throw new VersionAccessError("Connect an account owned by this business. Accounts from another business are never reused.");
+      }
+      const holder = await store.connectionHolder(actor, input.connectionId);
+      if (holder && holder !== lineage.id) {
+        // Two locations of one business still get their own live accounts.
+        throw new VersionValidationError("That account is already connected to another Version. Connect a separate account for this one.");
+      }
+      const binding: LocalBinding = {
+        kind: text(input.kind, "binding kind", 80),
+        connectionId: input.connectionId,
+        ownerBusinessId: owner,
+        boundBy: actor.userId,
+        boundAt: now(),
+      };
+      const bindings = [...lineage.bindings.filter((item) => item.kind !== binding.kind), binding];
+      return save(actor, { ...lineage, bindings }, input.expectedRowRevision);
+    },
+
+    /** Restore an immutable release into a draft. The baseline never moves
+     * backward, histories stay append-only, and Live waits for approval. A
+     * whole-definition override also removes fields added after that release. */
+    async restoreReleaseDraft(actor: VersionActor, versionId: string, input: { releaseNumber: number; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const release = lineage.releases.find(item => item.number === input.releaseNumber);
+      if (!release) throw new VersionValidationError("That release is not in this Version's History.");
+      assertShareableDefinition(release.definition);
+      return save(actor, { ...lineage, overrides: [{ path: "*", value: cloneJson(release.definition), setBy: actor.userId, setAt: now() }] }, input.expectedRowRevision);
+    },
+
+    async putLocalData(actor: VersionActor, versionId: string, input: { key: string; value: JsonValue; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, false);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const key = text(input.key, "data key", 120);
+      return save(actor, { ...lineage, localData: { ...lineage.localData, [key]: cloneJson(input.value) } }, input.expectedRowRevision);
+    },
+
+    /** Descendant side: every newer source revision, each compared against local state. */
+    async listAvailableImprovements(actor: VersionActor, versionId: string): Promise<ImprovementComparison[]> {
+      const lineage = await loadOwned(actor, versionId, false);
+      if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) return [];
+      return (await store.listRevisions(actor, lineage.source))
+        .filter((revision) => revision.source.number > lineage.baseline.revision && (!revision.declaration || isRevisionQualified(revision)))
+        .map((revision) => {
+          const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, revision);
+          return comparison;
+        });
+    },
+
+    async compareImprovement(actor: VersionActor, versionId: string, revision: number): Promise<ImprovementComparison> {
+      const lineage = await loadOwned(actor, versionId, false);
+      const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, await loadImprovement(actor, lineage, revision));
+      return comparison;
+    },
+
+    /**
+     * Adopt a source revision into the working definition. Non-overlapping
+     * upstream changes apply; every conflict needs an explicit choice; missing
+     * local accounts block adoption outright. Adoption never releases.
+     */
+    async adoptImprovement(
+      actor: VersionActor,
+      versionId: string,
+      input: { revision: number; expectedRowRevision: number; resolutions?: VersionConflictResolution[] },
+    ): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const revision = await loadImprovement(actor, lineage, input.revision);
+      const comparison = compareWith(lineage, revision);
+      if (comparison.status === "up_to_date") throw new VersionValidationError("This Version already includes that revision.");
+      if (comparison.missingBindings.length > 0) throw new VersionIncompatibleError(comparison.missingBindings);
+      const resolutions = input.resolutions ?? [];
+      const expected = new Map(comparison.conflicts.map((conflict) => [conflict.path, conflict]));
+      const seen = new Set<string>();
+      for (const resolution of resolutions) {
+        if (!expected.has(resolution.path) || seen.has(resolution.path)) throw new VersionValidationError("Each conflict must be resolved exactly once.");
+        if (resolution.choice !== "keep_local" && resolution.choice !== "take_upstream") throw new VersionValidationError("Choose keep local or take upstream.");
+        if (resolution.choice === "keep_local" && revision.lockedPaths?.some(locked => overlaps(locked, resolution.path))) throw new VersionValidationError("A pushed standard must take the upstream value.");
+        seen.add(resolution.path);
+      }
+      if (seen.size !== expected.size) throw new VersionConflictError(comparison.conflicts);
+
+      const at = now();
+      const overrides: VersionOverride[] = [];
+      for (const override of lineage.overrides) {
+        if (comparison.conflicts.some((conflict) => overlaps(conflict.path, override.path))) continue;
+        // Upstream now matches this local value; the override is no longer needed.
+        if (comparison.upstreamPaths.some((path) => overlaps(path, override.path))) continue;
+        overrides.push(override);
+      }
+      const local = working(lineage);
+      for (const resolution of resolutions) {
+        if (resolution.choice !== "keep_local") continue;
+        const value = readPath(local, resolution.path);
+        if (value === undefined) throw new VersionValidationError("A local value to keep is missing.");
+        const original = lineage.overrides.find((override) => override.path === resolution.path);
+        overrides.push(original ?? { path: resolution.path, value, setBy: actor.userId, setAt: at });
+      }
+      const next: VersionLineage = {
+        ...lineage,
+        baseline: { revision: revision.source.number, definition: cloneJson(revision.definition) },
+        overrides,
+        decisions: [...lineage.decisions, { sourceRevision: revision.source.number, choice: "adopted", resolutions, by: actor.userId, at }],
+      };
+      // Every override path is still writable on the new baseline, and the
+      // adopted result is exactly the preview with the chosen upstream values.
+      const expectedResult = cloneJson(comparison.preview);
+      for (const resolution of resolutions) {
+        if (resolution.choice !== "take_upstream") continue;
+        try {
+          writePath(expectedResult, resolution.path, readPath(revision.definition, resolution.path));
+        } catch {
+          throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
+        }
+      }
+      if (!jsonEqual(working(next), expectedResult)) {
+        throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
+      }
+      return save(actor, next, input.expectedRowRevision);
+    },
+
+    /** Stay on the current baseline. Recorded so the choice is visible. */
+    async declineImprovement(actor: VersionActor, versionId: string, input: { revision: number; reason: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      await loadImprovement(actor, lineage, input.revision);
+      return save(actor, {
+        ...lineage,
+        decisions: [...lineage.decisions, { sourceRevision: input.revision, choice: "declined", reason: text(input.reason, "reason", 500), by: actor.userId, at: now() }],
+      }, input.expectedRowRevision);
+    },
+
+    /** Release the working definition. Release numbers belong to this Version alone. */
+    async release(actor: VersionActor, versionId: string, input: { expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const { definition, needsRelease, nextRelease: number } = determineVersionRelease(lineage);
+      const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (baseline?.declaration) {
+        if (!isRevisionQualified(baseline)) throw new VersionValidationError("This exact revision needs qualification and human review before release.");
+        assertPackageDeclaration(definition, baseline.declaration, baseline.requires.bindingKinds);
+      }
+      const baselineForLocks = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (!baselineForLocks) throw new VersionAccessError();
+      assertLockedDefinition(componentRevision(lineage, baselineForLocks), definition);
+      if (!needsRelease) throw new VersionValidationError("Nothing changed since the current release.");
+      return save(actor, {
+        ...lineage,
+        releases: [...lineage.releases, {
+          number,
+          definition,
+          baselineRevision: lineage.baseline.revision,
+          overridePaths: changedPaths(lineage.baseline.definition, definition),
+          releasedBy: actor.userId,
+          releasedAt: now(),
+        }],
+        currentRelease: number,
+      }, input.expectedRowRevision);
+    },
+
+    async grantAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; scope: VersionGrantScope; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (roleIn(actor, lineage.version.businessId) !== "owner") throw new VersionAccessError("Only the business owner can share Version lineage or data.");
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      if (input.scope !== "lineage" && input.scope !== "lineage_and_data") throw new VersionValidationError("Choose a supported grant scope.");
+      const grants = lineage.grants.map((grant) =>
+        grant.granteeBusinessId === input.granteeBusinessId && !grant.revokedAt ? { ...grant, revokedAt: now() } : grant);
+      grants.push({ granteeBusinessId: input.granteeBusinessId, scope: input.scope, grantedBy: actor.userId, grantedAt: now() });
+      return save(actor, { ...lineage, grants }, input.expectedRowRevision);
+    },
+
+    async revokeAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (roleIn(actor, lineage.version.businessId) !== "owner") throw new VersionAccessError("Only the business owner can change Version sharing.");
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const grants = lineage.grants.map((grant) =>
+        grant.granteeBusinessId === input.granteeBusinessId && !grant.revokedAt ? { ...grant, revokedAt: now() } : grant);
+      return save(actor, { ...lineage, grants }, input.expectedRowRevision);
+    },
+
+    /**
+     * Read one Version. Members of the owning business see everything.
+     * Another business (including the source author) sees nothing without an
+     * active grant, and never sees bindings even with one.
+     */
+    async readVersion(actor: VersionActor, versionId: string): Promise<VersionView> {
+      const lineage = await store.getLineage(actor, versionId);
+      if (!lineage) throw new VersionAccessError();
+      const base = {
+        id: lineage.id,
+        version: lineage.version,
+        source: lineage.source,
+        context: lineage.context,
+        baselineRevision: lineage.baseline.revision,
+        overrides: lineage.overrides,
+        workingDefinition: working(lineage),
+        releases: lineage.releases,
+        currentRelease: lineage.currentRelease,
+        decisions: lineage.decisions,
+      };
+      if (roleIn(actor, lineage.version.businessId) || actor.delegatedSystems?.some(scope => scope.businessId === lineage.version.businessId && scope.systemId === lineage.version.systemId)) {
+        return cloneJson({ ...base, access: "owner" as const, bindings: lineage.bindings, localData: lineage.localData, grants: lineage.grants });
+      }
+      const mine = new Set(actor.memberships.map((membership) => membership.businessId));
+      const grant = lineage.grants.find((item) => !item.revokedAt && mine.has(item.granteeBusinessId));
+      if (!grant) throw new VersionAccessError();
+      if (grant.scope === "lineage_and_data") return cloneJson({ ...base, access: grant.scope, localData: lineage.localData });
+      return cloneJson({ ...base, access: grant.scope });
+    },
+  };
+}
+
+export type SystemVersions = ReturnType<typeof createSystemVersions>;

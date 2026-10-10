@@ -22,12 +22,53 @@ import {
 } from "./governed-work/shadow";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
-import {
-  authorizeInquiryMessageReviewActor,
-  executeInquiryMessageReview,
-  isInquiryMessageReviewEvent,
-  reconcileInquiryMessageReview,
-} from "@/products/inquiries";
+// Inquiries and the Google listing System through the ports src/lib
+// declares (Strelva Reborn section 7).
+import { workspacePorts } from "./workspace-ports";
+
+/** The actor the review auto-post cron approves with: the listing receipt's
+ * authority is then the auto-reply policy, never an owner approval. */
+export const AUTO_REPLY_ACTOR = "auto-reply-policy";
+
+const OPERATOR_ACTOR = /^operator:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The actor a Strelva operator approves with: their verified user id, marked
+ * so no receipt, version or trust streak can read it as the owner's approval.
+ * Built only by /admin server actions after the operator check. */
+export function operatorActorId(userId: string): string {
+  const actorId = `operator:${userId}`;
+  if (!OPERATOR_ACTOR.test(actorId)) throw new Error("operator_actor_invalid");
+  return actorId;
+}
+
+export function isOperatorActor(actorId: string): boolean {
+  return OPERATOR_ACTOR.test(actorId);
+}
+
+const AGENCY_STAFF_ACTOR = /^agency-staff:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The actor agency staff approve with on a client's site: the agency whose
+ * provider seat they work through and their own user id. Like an operator,
+ * never the owner's approval. Built only after the staffing check in
+ * src/lib/operator-decisions.ts. */
+export function agencyStaffActorId(agencyWorkspaceId: string, userId: string): string {
+  const actorId = `agency-staff:${agencyWorkspaceId}:${userId}`;
+  if (!AGENCY_STAFF_ACTOR.test(actorId)) throw new Error("agency_staff_actor_invalid");
+  return actorId;
+}
+
+/** Someone deciding for the business who is not its owner: a Strelva
+ * operator or agency staff. Their approval is an instruction, never the
+ * owner's approval, and never counts toward the owner's trust streak. */
+export function isDelegateActor(actorId: string): boolean {
+  return OPERATOR_ACTOR.test(actorId) || AGENCY_STAFF_ACTOR.test(actorId);
+}
+
+/** Who the event's resolution history names. Owner paths keep "user", as
+ * before; an operator or agency staff member is always named. */
+function resolvedBy(actorId: string): string {
+  return isDelegateActor(actorId) ? actorId : "user";
+}
 
 export type EventWorkflowAction =
   | "approved"
@@ -121,8 +162,15 @@ export async function resolveEventAction(
   // receipt and resolve the existing event without calling the provider again.
   // This also covers a process that died while the event was still marked
   // processing: the durable delivery marker is the only safe source of truth.
+  const inquiries = await workspacePorts().inquiries();
+  if (event.type === "change_request" && typeof event.metadata?.kind === "string" && INQUIRY_PUBLICATION_KINDS.has(event.metadata.kind)) {
+    if (action !== "approved" && action !== "dismissed") return { changed: false, reason: "invalid_action" };
+    const claimId = typeof event.metadata?.publicationClaimId === "string" ? event.metadata.publicationClaimId : "";
+    const authorized = await inquiries.authorizeInquiryPublicationActor({ tenantId, eventId, claimId, event, actorId, action });
+    if (!authorized.allowed) return { changed: false, reason: authorized.reason ?? "permission_denied" };
+  }
   if (
-    isInquiryMessageReviewEvent(event) &&
+    inquiries.isInquiryMessageReviewEvent(event) &&
     (event.metadata?.execution?.state === "external_accepted" || event.metadata?.execution?.state === "processing")
   ) {
     // Reconciliation may close an accepted provider write without sending
@@ -130,11 +178,11 @@ export async function resolveEventAction(
     // be the live responsibility sponsor before we allow that transition.
     // Never infer authorization from the event's requestedBy metadata or from
     // the actor that started the abandoned attempt.
-    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId, eventAction: "approved" });
     if (!authorized.allowed) {
       return { changed: false, reason: authorized.reason || "permission_denied" };
     }
-    const recovery = await reconcileInquiryMessageReview({ tenantId, event, actorId });
+    const recovery = await inquiries.reconcileInquiryMessageReview({ tenantId, event, actorId });
     if (!recovery.safeToResolve) {
       return { changed: false, reason: recovery.reason || "responsibility_receipt_reconciliation_required" };
     }
@@ -154,7 +202,14 @@ export async function resolveEventAction(
   // failed opaquely. Resolve as "approved" (the marker is only ever set on an
   // accepted approval); resolveEvent no-ops idempotently if already resolved.
   if (event.metadata?.execution?.state === "external_accepted") {
-    const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
+    if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+      const publishing = await workspacePorts().publishingContent();
+      const authorized = await publishing.authorizePublishingEvent({ tenantId, event, actorId });
+      if (!authorized.allowed) return { changed: false, reason: authorized.reason ?? "publishing_permission_denied" };
+      const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+      return resolved.changed ? { changed: true, reason: "accepted_unverified" } : { changed: false, reason: "already_resolved" };
+    }
+    const resolved = await resolveEvent(eventId, "approved", { actor: resolvedBy(actorId) });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 
@@ -233,7 +288,7 @@ export async function resolveEventAction(
     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
 
   try {
-    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId);
+    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId, claim.attemptId);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",
       reason: result.reason,
@@ -257,22 +312,37 @@ async function executeResolvedEventAction(
   action: "approved" | "dismissed",
   event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
   actorId: string,
+  attemptId: string,
 ): Promise<{ changed: boolean; reason?: string }> {
 
-  if (isInquiryMessageReviewEvent(event)) {
-    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+  const inquiries = await workspacePorts().inquiries();
+  if (inquiries.isInquiryMessageReviewEvent(event)) {
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId, eventAction: action === "dismissed" ? "dismissed" : "approved" });
     if (!authorized.allowed) return { changed: false, reason: authorized.reason || "permission_denied" };
     if (action === "dismissed") {
       const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
-    const execution = await executeInquiryMessageReview({ tenantId, eventId, event, actorId });
+    const execution = await inquiries.executeInquiryMessageReview({ tenantId, eventId, event, actorId });
     // Once the provider has accepted a message, close the duplicate barrier
     // before any receipt or event-resolution work. A receipt persistence blip
     // therefore leaves a recoverable, blocking event instead of enabling a
     // second provider call.
-    if (execution.accepted) await markExecutionExternalAccepted(eventId);
+    // The provider id travels with the marker as a second copy, so a lost
+    // delivery checkpoint write can still be reconciled without a resend.
+    if (execution.accepted) {
+      await markExecutionExternalAccepted(
+        eventId,
+        execution.providerMessageId || execution.acceptedAt
+          ? {
+              providerMessageId: execution.providerMessageId,
+              acceptedAt: execution.acceptedAt,
+              deliveryAttemptId: execution.deliveryAttemptId,
+            }
+          : undefined,
+      );
+    }
     if (!execution.accepted) return { changed: false, reason: execution.reason || "delivery_unavailable" };
     if (!execution.safeToResolve || !execution.receiptPersisted) {
       return { changed: false, reason: execution.reason || "responsibility_receipt_reconciliation_required" };
@@ -294,8 +364,7 @@ async function executeResolvedEventAction(
         ? event.metadata.publicationClaimId.trim()
         : "";
       if (!claimId) return { changed: false, reason: "inquiry_publication_claim_missing" };
-      const { executeInquiryPublication } = await import("@/products/inquiries/server");
-      const publication = await executeInquiryPublication({ tenantId, eventId, claimId });
+      const publication = await inquiries.executeInquiryPublication({ tenantId, eventId, claimId, event, actorId });
       if (!publication.accepted) {
         return { changed: false, reason: publication.reason || "inquiry_publication_failed" };
       }
@@ -303,13 +372,13 @@ async function executeResolvedEventAction(
       // read-back remains accepted and non-retryable; its verification evidence
       // is recorded by the inquiry executor.
       await markExecutionExternalAccepted(eventId);
-      const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
+      const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
       if (!resolved.changed) return { changed: false, reason: "already_resolved" };
       return publication.verified
         ? { changed: true }
         : { changed: true, reason: publication.reason || "accepted_unverified" };
     }
-    const resolved = await resolveEvent(eventId, "dismissed", { actor: "user" });
+    const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 
@@ -317,6 +386,27 @@ async function executeResolvedEventAction(
   // email, publish content), validate + perform the effect BEFORE flipping the
   // event to resolved. A failed or stale action must leave the item pending —
   // never resolve it and have the UI falsely say "Made live".
+
+  // Workspace publishing uses the existing event claim and owner decision.
+  // New kinds cannot fall through to a tenant publisher when rollout is off.
+  if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+    const publishing = await workspacePorts().publishingContent();
+    const authorization = await publishing.authorizePublishingEvent({ tenantId, event, actorId });
+    if (!authorization.allowed) return { changed: false, reason: authorization.reason ?? "publishing_permission_denied" };
+    if (action === "dismissed") {
+      const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+    const execution = await publishing.executePublishingEvent({ tenantId, event, actorId, attemptId });
+    if (!execution?.accepted) return { changed: false, reason: execution?.reason ?? "publishing_unavailable" };
+    // Google acceptance, atomic site publication or an immutable newsletter
+    // approval all close this exact draft. A failed read-back never republishes.
+    await markExecutionExternalAccepted(eventId);
+    const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+    return resolved.changed
+      ? { changed: true, ...(execution.reason ? { reason: execution.reason } : execution.verified === false ? { reason: "accepted_unverified" } : {}) }
+      : { changed: false, reason: "already_resolved" };
+  }
 
   if (event.type === "content_update") {
     const kind = event.metadata?.kind;
@@ -345,7 +435,7 @@ async function executeResolvedEventAction(
         // lost resolve-lock or crash can't let a retry duplicate the post.
         await markExecutionExternalAccepted(eventId);
       }
-      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
       if (resolved.changed && action === "approved" && activity) {
         await logGbpActivity(tenantId, activity.type, activity.detail);
       }
@@ -356,7 +446,7 @@ async function executeResolvedEventAction(
     // the builder. Resolve it, but signal the handoff so the UI doesn't claim
     // "Made live" for a change that hasn't shipped.
     if (kind === "manual_structural_change") {
-      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
       return resolved.changed
         ? { changed: true, reason: "structural_handoff" }
         : { changed: false, reason: "already_resolved" };
@@ -396,12 +486,12 @@ async function executeResolvedEventAction(
       // The live write is the authoritative effect. Resolve only after it
       // succeeds so a storage failure cannot produce a false "Made live" state.
       await setContent(section, draft as ContentMap[typeof section], tenantId);
-      const resolved = await resolveEvent(eventId, action, { actor: "user" });
+      const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
       if (!resolved.changed) return { changed: false, reason: "already_resolved" };
       await appendVersion(
         section,
         draft,
-        "user",
+        isDelegateActor(actorId) ? "admin" : "user",
         tenantId,
         diffFields(current, draft as unknown as Record<string, unknown>),
         eventId,
@@ -410,18 +500,26 @@ async function executeResolvedEventAction(
       const { revalidatePath } = await import("next/cache");
       revalidatePath("/");
       const { revalidateClientSite } = await import("./revalidate-client");
-      revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
+      const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
       await clearDraft(section, tenantId);
-      if (event.source === "ai") recordApproval(tenantId).catch(() => {});
+      // The trust streak counts the owner's approvals only. An operator's or
+      // agency's approval must never earn the owner's auto-publish.
+      if (event.source === "ai" && !isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {});
+      try {
+        await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
+          tenantId, section, expected: draft, actorId, publicationRef: eventId, revalidation,
+        });
+      } catch { /* The approved publish remains accepted when read-back fails. */ }
       return { changed: true };
     }
 
     // Dismissed, or a content_update with no section: resolve + clean up.
-    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
     if (!resolved.changed) return { changed: false, reason: "already_resolved" };
     if (section) await clearDraft(section, tenantId);
     if (event.source === "ai") {
-      (action === "approved" ? recordApproval : recordRejection)(tenantId).catch(() => {});
+      if (action === "dismissed") recordRejection(tenantId).catch(() => {});
+      else if (!isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {});
     }
     return { changed: true };
   }
@@ -441,7 +539,7 @@ async function executeResolvedEventAction(
       // idempotency-keyed, but the marker also blocks a re-claim entirely).
       await markExecutionExternalAccepted(eventId);
     }
-    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 
@@ -461,9 +559,34 @@ async function executeResolvedEventAction(
             ? event.body
             : "";
       if (!reviewId || !replyText) return { changed: false, reason: "review_reply_invalid" };
-      const { publishReviewReply } = await import("./gbp-replies");
-      const result = await publishReviewReply(tenantId, reviewId, replyText);
-      if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      // One ledger per write (persistence-boundaries.md). A tenant linked to a
+      // business, with the publishing release on, posts through the Google
+      // listing System and records in google_listing_receipts only. Anyone
+      // else keeps the legacy publisher and its outside-write receipt.
+      const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await workspacePorts().tenantReviewReplies();
+      const deps = await defaultTenantReplyDeps();
+      const route = await routeTenantReviewReply(tenantId, deps);
+      let acceptedUnverified = false;
+      if (route.kind === "listing") {
+        const rating = typeof event.metadata?.rating === "number" ? event.metadata.rating : null;
+        // An operator's or agency's approval is an operator instruction, never the owner's.
+        const authority = actorId === AUTO_REPLY_ACTOR
+          ? rating !== null && rating >= 3 && rating <= 5 && Number.isInteger(rating)
+            ? { kind: "auto_reply_policy" as const, rating }
+            : null
+          : isDelegateActor(actorId)
+            ? { kind: "operator_instruction" as const, actor: actorId, instructionRef: `event:${eventId}`.slice(0, 200) }
+            : { kind: "owner_approval" as const, actor: actorId.slice(0, 200) || "user", approvalRef: `event:${eventId}`.slice(0, 200) };
+        if (!authority) return { changed: false, reason: "review_reply_needs_owner" };
+        const posted = await postTenantReviewReply({ tenantId, workspaceId: route.workspaceId, eventId, attemptId, reviewId, text: replyText, authority }, deps);
+        if (posted.status === "write_unconfirmed") return { changed: false, reason: "google_write_unconfirmed" };
+        if (posted.status === "failed" || posted.status === "refused") return { changed: false, reason: "review_reply_failed" };
+        acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
+      } else {
+        const { publishReviewReply } = await import("./gbp-replies");
+        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
+        if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      }
       // Reply accepted by Google — mark acceptance before resolving so a lost
       // lock / crash can't let a retry re-post it.
       await markExecutionExternalAccepted(eventId);
@@ -472,8 +595,12 @@ async function executeResolvedEventAction(
       // unreplied and re-drafts + re-posts it in an endless loop.
       const { replyToReviewByExternalId } = await import("./reviews");
       await replyToReviewByExternalId(tenantId, reviewId, replyText).catch(() => {});
+      if (acceptedUnverified) {
+        const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
+        return resolved.changed ? { changed: true, reason: "accepted_unverified" } : { changed: false, reason: "already_resolved" };
+      }
     }
-    const resolved = await resolveEvent(eventId, action, { actor: "user" });
+    const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
     if (resolved.changed && action === "dismissed" && metaReviewId) {
       // A dismissal is a per-review veto: mark it durably so the backlog never
       // re-drafts (and eventually auto-posts) a reply the owner rejected.
@@ -484,7 +611,7 @@ async function executeResolvedEventAction(
   }
 
   // Remaining simple cases (suggestion, etc.) — resolve then handle.
-  const resolved = await resolveEvent(eventId, action, { actor: "user" });
+  const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
   if (!resolved.changed) return { changed: false, reason: "already_resolved" };
 
   if (event.type !== "suggestion") return { changed: true };

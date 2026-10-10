@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { filterTrackerRows } from "@/products/tracker";
 import type { TrackerHistoryEntry, TrackerImportPreview, TrackerMappingSelection, TrackerSnapshot } from "@/products/tracker/contracts";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import { TrackerCoordinationEditor, TrackerRecordCoordination, useTrackerCoordinationOptions } from "./TrackerCoordination";
 import { TrackerExperimentForm } from "./TrackerExperimentForm";
 import { trackerReceiptChanges, trackerUndoBlock } from "@/products/tracker/client";
@@ -190,7 +191,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
 
   return <section className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-8" aria-label="Spreadsheet tracker" aria-busy={busy}>
     <header>
-      <p className="text-sm text-gray-muted">Experimental · Spreadsheet tracker</p>
+      <p className="text-sm text-gray-muted">Internal tool · Started from a list</p>
       <h1 className="font-display text-2xl">{tracker?.title ?? "Turn a spreadsheet into a tracker"}</h1>
       <p className="mt-2 text-sm text-gray-muted">Start with suggested fields or import a CSV. Review changes and keep a history you can undo. Formulas are not calculated.</p>
     </header>
@@ -263,7 +264,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
         <Button type="submit" disabled={busy || !Object.values(newRow).some(value => value.trim())}>Save record</Button>
         <Button type="button" variant="secondary" disabled={busy} onClick={() => setNewRow(null)}>Cancel new record</Button>
       </form> : null}
-      {linkedRowId ? <div className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-border py-3 text-sm"><p>{tracker.rows.some(row => row.id === linkedRowId && row.state === "active") ? "Showing the linked record." : "This linked record is no longer active or available. Its recorded history remains below."}</p><Button type="button" variant="secondary" onClick={() => { setLinkedRowId(null); const url = new URL(window.location.href); url.searchParams.delete("row"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); }}>Show all records</Button></div> : null}
+      {linkedRowId ? <div className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-border py-3 text-sm"><p>{tracker.rows.some(row => row.id === linkedRowId && row.state === "active") ? "Showing the linked record." : "This linked record is no longer active or available. Its recorded history remains below."}</p><Button type="button" variant="secondary" onClick={() => { setLinkedRowId(null); const url = new URL(window.location.href); url.searchParams.delete("row"); window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`); }}>Show all records</Button></div> : null}
       <TextInput label="Filter rows" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any field" />
       {selectedRows.length > 0 && !readOnly ? <form aria-label="Change selected rows" className="space-y-3 border-y border-gray-border py-4" onSubmit={event => { event.preventDefault(); setBulk(current => ({ ...current, reviewed: true })); }}>
         <p>{selectedRows.length} rows selected, including any hidden by your filter.</p>

@@ -34,6 +34,15 @@ function fixture(): SiteDocument {
 }
 
 describe("v2 website catalog and static export", () => {
+  it("only adds ReserveAction for an enabled connected booking page", () => {
+    const document=fixture();
+    document.capabilities={baseUrl:"https://app.example",tenant:"example",booking:{capabilityId:"booking-1",version:1,range:{from:"2026-11-01T00:00:00Z",to:"2026-11-30T00:00:00Z"}}};
+    vi.stubEnv("STRELVA_BOOKING_AGENTS","0"); expect(siteDocumentJsonLd(document,"https://example.test")).not.toHaveProperty("potentialAction");
+    vi.stubEnv("STRELVA_BOOKING_AGENTS","1"); expect(siteDocumentJsonLd(document,"https://example.test")).toMatchObject({potentialAction:{"@type":"ReserveAction",target:"https://example.test/"}});
+    document.capabilities=undefined; expect(siteDocumentJsonLd(document,"https://example.test")).not.toHaveProperty("potentialAction");
+    vi.unstubAllEnvs();
+  });
+
   it("renders all 22 catalog entries with escaped text and no arbitrary markup", () => {
     const document = fixture();
     const html = renderSiteDocumentHtml(document, "/", { preview: true });

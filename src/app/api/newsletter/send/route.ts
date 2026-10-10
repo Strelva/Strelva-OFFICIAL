@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import { sendNewsletter } from "@/lib/newsletter";
 

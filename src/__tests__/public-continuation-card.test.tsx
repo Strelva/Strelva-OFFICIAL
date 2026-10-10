@@ -3,7 +3,10 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicContinuationCard } from "@/experience/workspace/PublicContinuationCard";
+import { serverRebuildTransport } from "@/experience/websites/rebuild-transport";
 import type { WebsiteExperienceTransport } from "@/experience/websites/contracts";
+
+vi.mock("@/experience/websites/rebuild-transport", () => ({ serverRebuildTransport: { start: vi.fn() } }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
@@ -37,7 +40,7 @@ function transport(): WebsiteExperienceTransport {
   };
 }
 
-async function render(websiteTransport: WebsiteExperienceTransport, onWebsiteSaved?: (location: string) => void) {
+async function render(websiteTransport: WebsiteExperienceTransport | undefined, onWebsiteSaved?: (location: string) => void) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -54,6 +57,30 @@ async function render(websiteTransport: WebsiteExperienceTransport, onWebsiteSav
 afterEach(() => { document.body.innerHTML = ""; });
 
 describe("public continuation website entry", () => {
+  it("uses native creation by default and opens the acknowledged saved work", async () => {
+    const start = vi.mocked(serverRebuildTransport.start);
+    start.mockResolvedValueOnce({ workspaceId: destinations[0]!.id, workId: "native-work" } as never);
+    const saved = vi.fn();
+    const { container, root } = await render(undefined, saved);
+    const button = [...container.querySelectorAll("button")].find(candidate => candidate.textContent?.includes("Start website draft"));
+    await act(async () => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(start).toHaveBeenCalledWith({ workspaceId: destinations[0]!.id, requestId: `public-website-${brief.id}`, businessName: brief.businessName, description: `${brief.request}\n\nDesired result: ${brief.result}\n\nScope: ${brief.scope}\n\nPrimary call to action: Contact us` });
+    expect(saved).toHaveBeenCalledWith(`/workspace?workspaceId=${destinations[0]!.id}&view=websites&work=native-work`);
+    await act(async () => root.unmount());
+  });
+
+  it("refuses a native acknowledgement from another workspace without navigating", async () => {
+    vi.mocked(serverRebuildTransport.start).mockResolvedValueOnce({ workspaceId: "other-workspace", workId: "foreign-work" } as never);
+    const saved = vi.fn();
+    const { container, root } = await render(undefined, saved);
+    const button = [...container.querySelectorAll("button")].find(candidate => candidate.textContent?.includes("Start website draft"));
+    await act(async () => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(saved).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("could not be confirmed");
+    expect(container.textContent).toContain(brief.request);
+    await act(async () => root.unmount());
+  });
+
   it("carries the retained brief into a durable website record and returns to the website view", async () => {
     const api = transport();
     let destination = "";

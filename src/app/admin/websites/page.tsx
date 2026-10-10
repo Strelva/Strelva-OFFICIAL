@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { workspaceHttpActor } from "@/platform/workspaces/http";
-import { listWorkspaces } from "@/platform/workspaces";
-import { OperatorRebuildEntry } from "@/experience/websites/OperatorRebuildEntry";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { z } from "zod";
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Website rebuilds", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Website work", robots: { index: false, follow: false } };
+/** Retained operator bookmark, with no serving authority of its own. */
 export default async function WebsiteRebuildsPage({ searchParams }: { searchParams: Promise<{ workspaceId?: string; workId?: string }> }) {
-  if (process.env.STRELVA_WEBSITE_REBUILD_RELEASE !== "1") return <p role="status">Website rebuilds are not enabled. Existing managed-site work remains available.</p>;
   const query = await searchParams;
-  const actor = await workspaceHttpActor();
-  const workspaces = actor ? await listWorkspaces(actor).catch(() => null) : null;
-  if (!workspaces) return <p role="alert">Authorized business workspaces could not be loaded. Reopen this page after workspace access is available.</p>;
-  return <OperatorRebuildEntry initialWorkspaceId={query.workspaceId} initialWorkId={query.workId} workspaces={workspaces.filter(item => item.access === "member" && item.role !== "member").map(item => ({ id: item.id, name: item.name }))} />;
+  const workspace = z.string().uuid().safeParse(query.workspaceId);
+  const work = query.workId === undefined ? null : z.string().uuid().safeParse(query.workId);
+  if (workspace.success && (!work || work.success)) redirect(`/workspace/site?${new URLSearchParams({ workspaceId: workspace.data, entry: "rebuild", ...(work?.success ? { workId: work.data } : {}) })}`);
+  return <div className="p-6"><p>Website work uses the business or its agency’s ordinary permissions. Existing saved drafts remain available there.</p><Link href="/workspace">Choose a business or agency workspace</Link></div>;
 }

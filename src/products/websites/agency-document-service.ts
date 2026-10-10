@@ -1,3 +1,4 @@
+import { tenantHostedBaseUrl } from "@/platform/infra/brand";
 import { z } from "zod";
 import { isDeepStrictEqual } from "node:util";
 import { createAgencyManagedWebsiteDraftAccessService, assertAgencyWebsiteDraftSubscription } from "@/platform/offerings/agency-website-draft";
@@ -9,7 +10,7 @@ import { prepareSitePatch, sitePatchSchema } from "./site-operations";
 import { renderSiteDocumentHtml } from "./site-export";
 import { auditRebuildHtml } from "./rebuild-audit";
 import { AGENCY_DOCUMENT_NODE_SECTIONS, AGENCY_DOCUMENT_SECTIONS } from "./agency-document-contracts";
-import { websiteRebuildReleaseEnabled } from "./rebuild-release";
+import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "./rebuild-release";
 import { renderRebuildPreview } from "./rebuild-export";
 const uuid=z.string().uuid();
 const sectionSchema=z.enum(AGENCY_DOCUMENT_SECTIONS);
@@ -28,14 +29,24 @@ interface AgencyDocumentDependencies {
  grants?:Pick<ReturnType<typeof createAgencyManagedWebsiteDraftAccessService>,"read">;
  subscription?:(tenantId:string)=>Promise<boolean>;
  enabled?:()=>boolean;
+ /** Per client site (the grant's tenant). Default: the per-tenant release resolver. */
+ enabledForTenant?:(actor:WorkspaceActor,tenantId:string)=>Promise<boolean>;
  now?:()=>string;
+}
+async function defaultEnabledForTenant(actor:WorkspaceActor,tenantId:string):Promise<boolean>{
+ const {releaseViewerFor}=await import("@/platform/release-flags/viewer");
+ return websiteRebuildReleaseEnabledForTenant(tenantId,await releaseViewerFor(actor));
 }
 export function createAgencyWebsiteDocumentService(dependencies:AgencyDocumentDependencies={}){
  const documents=dependencies.documents??websiteDocumentStore;const grants=dependencies.grants??createAgencyManagedWebsiteDraftAccessService();const subscription=dependencies.subscription??assertAgencyWebsiteDraftSubscription;const now=dependencies.now??(()=>new Date().toISOString());
  async function authorized(actor:WorkspaceActor,bindingId:string){
-  if(!(dependencies.enabled??websiteRebuildReleaseEnabled)())throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+  if(!(dependencies.enabled??websiteRebuildReleaseMayBeOn)())throw new WorkspaceConflictError("Website rebuilds are not enabled.");
   const grant=await grants.read(actor,uuid.parse(bindingId));
   if(!grant||grant.status!=="active"||grant.operatorUserId!==actor.userId||Date.parse(grant.expiresAt)<=Date.parse(now()))throw new WorkspaceAccessError("The named operator's website draft grant is unavailable or expired.");
+  // Per client site: the client's business row decides under `workspace`.
+  // An injected `enabled` alone owns the whole decision (tests).
+  const enabledForTenant=dependencies.enabledForTenant??(dependencies.enabled?async()=>true:defaultEnabledForTenant);
+  if(!(await enabledForTenant(actor,grant.tenantId)))throw new WorkspaceConflictError("Website rebuilds are not enabled.");
   return{grant,subscriptionExemption:await subscription(grant.tenantId)};
  }
  async function load(actor:WorkspaceActor,bindingId:string,input:{workId?:string;section?:string}={}){
@@ -74,7 +85,7 @@ export function createAgencyWebsiteDocumentService(dependencies:AgencyDocumentDe
   if(!prepared.changedNodeIds.length)throw new WorkspaceConflictError("This patch does not change the website.");
   const documentRevision=candidate.revision+1;const workRevision=scoped.rebuild.revision+1;
   const nextCandidate={revision:documentRevision,contentHash:prepared.contentHash,document:prepared.document,previewHref:`/api/websites/${scoped.work.id}/preview?revision=${documentRevision}&contentHash=${prepared.contentHash}`};
-  const audit=scoped.rebuild.sourceAudit?{scope:"html" as const,before:scoped.rebuild.sourceAudit,after:auditRebuildHtml(renderSiteDocumentHtml(prepared.document,"/",{canonicalUrl:`https://${loaded.grant.tenantId}.strelva.com`,tenant:loaded.grant.tenantId}),`https://${loaded.grant.tenantId}.strelva.com`),checkedAt:now(),unavailable:["PageSpeed and Lighthouse performance","Response security headers","AI assistant visibility","Live hosted response"]}:null;
+  const audit=scoped.rebuild.sourceAudit?{scope:"html" as const,before:scoped.rebuild.sourceAudit,after:auditRebuildHtml(renderSiteDocumentHtml(prepared.document,"/",{canonicalUrl:tenantHostedBaseUrl(loaded.grant.tenantId),tenant:loaded.grant.tenantId}),tenantHostedBaseUrl(loaded.grant.tenantId)),checkedAt:now(),unavailable:["PageSpeed and Lighthouse performance","Response security headers","AI assistant visibility","Live hosted response"]}:null;
   const payload=websiteRebuildSchema.parse({...scoped.rebuild,revision:workRevision,status:"review_ready",candidate:nextCandidate,approvedCandidateRevision:null,checkpoint:null,lastError:null,audit,history:[...scoped.rebuild.history,{revision:workRevision,kind:"agency_document_draft",actorId:actor.userId,at:now()}]});
   if(Buffer.byteLength(JSON.stringify(payload),"utf8")>1_950_000)throw new WorkspaceStoreError("This website draft exceeds its saved-work size limit.");
   // Atomic storage rechecks grant/assignment/native sponsor, scope and both CAS

@@ -1,13 +1,14 @@
+import { projectGoogleReviewEvent } from "@/platform/infra/google-review-content";
 /**
  * UnifiedEvent data layer - Redis-backed event queue for dashboard.
  * Uses sorted sets with timestamp scores for efficient time-range queries.
  */
 
 import type { UnifiedEvent } from "./types";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { DEFAULT_TENANT } from "./storage/core";
-import { insertEvent, setEventStatus } from "./db/repositories";
-import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "./db/dual-write";
+import { insertEvent, setEventStatus } from "@/platform/infra/db/repositories";
+import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "@/platform/infra/db/dual-write";
 import { shadowDecisionFromResolve, shadowProposalFromEvent } from "./governed-work/shadow";
 import { getGovernedEventById, listGovernedEventsForTenant } from "./governed-work/repository";
 import { isGovernedScopeEvent } from "./governed-work/read";
@@ -109,7 +110,7 @@ export async function claimEventAction(
   // accepted but the event didn't resolve) survive the lock and force operator
   // reconciliation instead of risking a duplicate external write.
   const execState = existing.metadata?.execution?.state;
-  if (execState === "processing" || execState === "external_accepted") {
+  if (execState === "processing" || execState === "external_accepted" || execState === "external_unconfirmed") {
     return { acquired: false, reason: "action_reconciliation_required" };
   }
 
@@ -142,10 +143,24 @@ export async function claimEventAction(
  * event. If the subsequent resolve loses its lock or the process dies, the
  * marker survives so claimEventAction refuses a retry (which would duplicate the
  * write). No-op if the execution attempt no longer matches (best-effort).
+ *
+ * `acceptance` keeps what the provider accepted (its message id, time and the
+ * delivery attempt) on the event, so reconciliation can finish from this copy
+ * when the delivery's own marker could not be written.
  */
-export async function markExecutionExternalAccepted(id: string): Promise<void> {
+export async function markExecutionExternalAccepted(
+  id: string,
+  acceptance?: { providerMessageId?: string; acceptedAt?: string; deliveryAttemptId?: string },
+): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
+  const evidence = acceptance && (acceptance.providerMessageId || acceptance.acceptedAt || acceptance.deliveryAttemptId)
+    ? {
+        ...(acceptance.providerMessageId ? { providerMessageId: acceptance.providerMessageId.slice(0, 240) } : {}),
+        ...(acceptance.acceptedAt ? { acceptedAt: acceptance.acceptedAt.slice(0, 80) } : {}),
+        ...(acceptance.deliveryAttemptId ? { deliveryAttemptId: acceptance.deliveryAttemptId.slice(0, 240) } : {}),
+      }
+    : null;
   await updateEvent(id, (event) => {
     const execution = event.metadata?.execution;
     if (!execution || execution.state !== "processing") return event;
@@ -153,10 +168,20 @@ export async function markExecutionExternalAccepted(id: string): Promise<void> {
       ...event,
       metadata: {
         ...event.metadata,
-        execution: { ...execution, state: "external_accepted" },
+        execution: { ...execution, state: "external_accepted", ...(evidence ? { acceptance: evidence } : {}) },
       },
     };
   }).catch(() => {});
+}
+
+/** A publishing transport failed after dispatch; the provider may hold it.
+ * Preserve uncertainty separately from acceptance and refuse any new write. */
+export async function markExecutionExternalUnconfirmed(id: string): Promise<void> {
+  await updateEvent(id, event => {
+    const execution = event.metadata?.execution;
+    if (!execution || execution.state !== "processing") return event;
+    return { ...event, metadata: { ...event.metadata, execution: { ...execution, state: "external_unconfirmed", reason: "Google write needs reconciliation before retry." } } };
+  });
 }
 
 export async function finishEventAction(
@@ -173,7 +198,7 @@ export async function finishEventAction(
       // Never downgrade an "external_accepted" marker to "failed": the provider
       // write already went through, so unblocking the claim would let a retry
       // duplicate it. Keep it blocking so an operator reconciles instead.
-      if (execution.state === "external_accepted" && outcome.state === "failed") {
+      if ((execution.state === "external_accepted" || execution.state === "external_unconfirmed") && outcome.state === "failed") {
         return event;
       }
       return {
@@ -204,7 +229,7 @@ export async function addEvent(
 ): Promise<UnifiedEvent> {
   const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const createdAt = new Date().toISOString();
-  const full: UnifiedEvent = { ...event, id, createdAt };
+  const full: UnifiedEvent = projectGoogleReviewEvent({ ...event, id, createdAt });
   const requiresPersistence =
     opts.requirePersistence ||
     (process.env.NODE_ENV === "production" &&
@@ -270,7 +295,7 @@ export async function addEvent(
  */
 export async function getEventsRaw(
   tenantId: string,
-  opts?: { status?: string; limit?: number; requireStore?: boolean }
+  opts?: { status?: string; limit?: number; requireStore?: boolean; all?: boolean }
 ): Promise<UnifiedEvent[]> {
   const redis = getRedis();
   if (!redis) {
@@ -284,7 +309,7 @@ export async function getEventsRaw(
   // dashboard feed, but it means a status-filtered read can miss matching
   // events older than that window. Callers that must not miss an old match
   // (e.g. getOpenChangeRequest gating) pass a large `limit` to widen it.
-  const raw = await redis.zrange(eventsKey(tenantId), 0, limit * 2, {
+  const raw = await redis.zrange(eventsKey(tenantId), 0, opts?.all ? -1 : limit * 2, {
     rev: true,
   });
 
@@ -306,8 +331,8 @@ export async function getEventsRaw(
     const event = (ref.id ? byId.get(ref.id) : null) ?? ref.embedded;
     if (!event) continue;
     if (!opts?.status || event.status === opts.status) {
-      events.push(event);
-      if (events.length >= limit) break;
+      events.push(projectGoogleReviewEvent(event));
+      if (!opts?.all && events.length >= limit) break;
     }
   }
 
@@ -349,7 +374,7 @@ async function hydrateGovernedFromPg(
   // could miss an old-but-selected event and serve a mixed Redis/PG view (#31).
   const pgEvents = await listGovernedEventsForTenant(tenantId, { ids: governedIds });
   const pgById = new Map(pgEvents.map((e) => [e.id, e]));
-  return events.map((e) => (isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e));
+  return events.map((e) => (projectGoogleReviewEvent(isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e)));
 }
 
 export async function getEvent(id: string): Promise<UnifiedEvent | null> {
@@ -362,9 +387,9 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   // falls back to the Redis event.
   if (governedWorkReadPgEnabled() && isGovernedScopeEvent(event)) {
     const pg = await getGovernedEventById(id);
-    if (pg) return pg;
+    if (pg) return projectGoogleReviewEvent(pg);
   }
-  return event;
+  return projectGoogleReviewEvent(event);
 }
 
 /**
@@ -379,7 +404,8 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
 export async function getEventRaw(id: string): Promise<UnifiedEvent | null> {
   const redis = getRedis();
   if (!redis) return null;
-  return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+  const event = await redis.get<UnifiedEvent>(eventKey(id));
+  return event ? projectGoogleReviewEvent(event) : null;
 }
 
 /**
@@ -448,8 +474,14 @@ export async function updateEvent(
     const existing = await redis.get<UnifiedEvent>(eventKey(id));
     if (!existing) return { event: null, changed: false };
 
-    const updated = updater(existing);
-    await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
+    const proposed = updater(projectGoogleReviewEvent(existing));
+    if (existing.type === "review" && (existing.source === "google" || existing.metadata?.kind === "review_reply_draft")) {
+      proposed.metadata = { ...proposed.metadata };
+      if (existing.metadata?.providerContent !== undefined) proposed.metadata.providerContent = existing.metadata.providerContent;
+      else delete proposed.metadata.providerContent;
+    }
+    const updated = projectGoogleReviewEvent(proposed);
+    await redis.set(eventKey(id), projectGoogleReviewEvent(updated), { ex: remainingEventTtlSeconds(updated) });
     return { event: updated, changed: true };
   } finally {
     await redis.del(lockKey);
@@ -535,7 +567,7 @@ async function resolveEventLocked(
   };
 
   // The zset member is the stable id; only the event:{id} record changes.
-  await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
+  await redis.set(eventKey(id), projectGoogleReviewEvent(updated), { ex: remainingEventTtlSeconds(updated) });
 
   // Postgres shadow-write: mirror the status transition AND the updated metadata
   // (resolutionHistory) so the shadow row stays in parity, not status-frozen.

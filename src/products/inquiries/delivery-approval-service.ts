@@ -14,12 +14,11 @@ import type {
 import { InquiryEngine } from "./inquiry-engine";
 import {
   createEmailInquiryTransport,
-  createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   createRedisInquiryDeliveryStore,
   deliverInquiryAction,
   evaluateInquiryDelivery,
   getInquiryDeliveryMessageDigest,
-  normalizeInquiryRoutingPolicy,
   renderInquiryMessage,
   resolveInquiryRoute,
 } from "./delivery";
@@ -37,7 +36,22 @@ import type {
   ResponsibilityDeliveryGate,
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
+import { inquiryMessageRouteAtUse, type InquiryMessageRouteReader } from "./inquiry-policy-at-use";
+import { bindInquiryReviewActor, authorizeSignedInquiryMessageDecision, type InquiryActorAuthorityDependencies } from "./message-review-authority";
 import { stateForReceive } from "./receive";
+import { checkpointAccepted, outcomeError, outcomeFromCheckpoint } from "./message-review-outcome";
+import { type MessageReceiptContext, writeMessageReceipt } from "./message-receipt";
+import {
+  DIFFERENT_MESSAGE_SENT,
+  MESSAGE_DIGEST_UNKNOWN,
+  metadataFromEvent,
+  approvalEventMatches,
+  acceptanceEvidenceFromEvent,
+  previewFromEvent,
+  sentMessageBinding,
+} from "./message-review-event";
+import { policyFor } from "./message-review-policy";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
@@ -53,14 +67,11 @@ import {
   InquiryMessageReviewEngineError,
   type InquiryMessageReviewEventMetadata,
   assertOpenInquiry,
-  assertResponsibilitySponsor,
   dependency,
   errorCode,
   errorMessage,
   hash,
   inquiryFromLead,
-  policyVersionFor,
-  positiveVersion,
   recordFromLead,
   responsibilityActionFor,
   reviewAction,
@@ -84,7 +95,7 @@ type ResolveRoute = (
   policy: InquiryRoutingPolicy,
 ) => Promise<InquiryRoute>;
 
-export interface InquiryMessageReviewDependencies {
+export interface InquiryMessageReviewDependencies extends InquiryActorAuthorityDependencies {
   repository?: import("./repository").InquiryRepository;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
@@ -96,8 +107,11 @@ export interface InquiryMessageReviewDependencies {
   resolveAction?: ResolveApprovalAction;
   emailReady?: (tenantId: string) => Promise<boolean>;
   allowExternalSends?: boolean;
+  /** Ask validates workspace draft authority here; never used by execution. */
+  authorizeDraft?: (actorId: string, businessId: string) => Promise<boolean>;
   /** Test/host seam for the durable workspace exit authority. */
   isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
+  messageRoute?: InquiryMessageRouteReader;
 }
 
 interface ReviewContext {
@@ -114,53 +128,18 @@ interface ReviewContext {
   messageBody: string;
   messageDigest: string;
   evaluation: ResponsibilityEvaluation;
+  decisionRoute: Awaited<ReturnType<InquiryMessageRouteReader>>;
   deliveryEvaluation: InquiryDeliveryResult;
   status: InquiryRecordStatus;
+  ownerDecisionActor?: string;
+  operatorReviewActor?: string;
+  authoredReply?: string;
 }
 
 async function repositoryFor(deps: InquiryMessageReviewDependencies): Promise<import("./repository").InquiryRepository> {
   if (deps.repository) return deps.repository;
   const repository = await import("./repository");
   return repository.getInquiryRepository();
-}
-
-function policyFor(
-  definition: InquiryCapabilityDefinition,
-  responsibility: ResponsibilityPolicy,
-  action?: InquiryMessageReviewAction,
-): InquiryRoutingPolicy {
-  const followUp = definition.followUp;
-  return normalizeInquiryRoutingPolicy({
-    version: policyVersionFor(responsibility),
-    paused: false,
-    autoReply: {
-      mode: "approval",
-      enabled: true,
-      delayHours: 0,
-      budgetHours: 24,
-      maxAttempts: 1,
-    },
-    followUp: followUp
-      ? {
-          mode: "approval",
-          enabled: true,
-          delayHours: followUp.afterMinutes / 60,
-          budgetHours: Math.max(24, followUp.afterMinutes / 60 + 24),
-          maxAttempts: followUp.maxAttempts,
-          messageTemplate: followUp.messageTemplate,
-        }
-      : {
-          mode: "off",
-          enabled: false,
-          delayHours: 0,
-          budgetHours: 24,
-          maxAttempts: 1,
-        },
-    // The capture path may send a legacy notice, but an explicit review action
-    // is its own governed message. It is enabled only while building the owner
-    // notification preview, so reply/follow-up previews cannot duplicate it.
-    ownerNotification: action === "owner_notification" ? "send" : "legacy",
-  });
 }
 
 async function readyForEmail(
@@ -216,25 +195,24 @@ function responsibilityFor(
   capabilityId: string,
   expectedId?: string,
 ): ResponsibilityPolicy {
-  const candidates = state.responsibilities
-    .filter((item) => item.capabilityId === capabilityId && (!expectedId || item.id === expectedId))
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
-  const responsibility = candidates[0];
+  const responsibility = currentResponsibility(state.responsibilities, capabilityId, expectedId);
   if (!responsibility) throwCode("current_policy_unavailable", "The current inquiry responsibility is unavailable.");
   return responsibility;
 }
 
-function assertCapability(
+function assertCurrentInquiry(
   snapshot: import("./repository").InquiryWorkspaceSnapshot,
   lead: LeadRecord,
+  status: InquiryRecordStatus,
 ): { capability: InquiryCapabilityState; definition: InquiryCapabilityDefinition } {
-  const capabilityId = typeof lead.capabilityId === "string" ? lead.capabilityId.trim() : "";
-  const version = lead.capabilityVersion;
-  const capability = snapshot.state.capabilities.find((item) => item.id === capabilityId);
-  if (!capability?.live || capability.status !== "live" || !Number.isSafeInteger(version) || capability.live.version !== version) {
-    throwCode("inquiry_changed", "This inquiry was created from an older capability version. Refresh before preparing a message.");
-  }
-  return { capability, definition: capability.live };
+  const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+    capabilityId: lead.capabilityId,
+    capabilityVersion: lead.capabilityVersion,
+    status,
+  });
+  if (currentness.current) return { capability: currentness.capability, definition: currentness.definition };
+  if (currentness.reason === "inquiry_closed") assertOpenInquiry(status);
+  throwCode("inquiry_changed", "This inquiry was created from an older capability version. Refresh before preparing a message.");
 }
 
 function assertEventBinding(
@@ -267,25 +245,35 @@ async function buildContext(input: {
   action: InquiryMessageReviewAction;
   actorId: string;
   responsibilityId?: string;
+  authoredReply?: string;
+  draftActorAllowed?: boolean;
   expectedResponsibilityRevision?: string;
   expectedPolicyVersion?: string;
+  ownerDecisionEvent?: UnifiedEvent;
+  ownerDecisionAction?: "approved" | "dismissed";
   deps: InquiryMessageReviewDependencies;
   now: Date;
 }): Promise<ReviewContext> {
   const snapshot = await snapshotFor(input.tenantId, input.businessId, input.deps);
   const lead = await dependency(input.deps.getLead, getLeadById)(input.tenantId, input.inquiryId);
   if (!lead) throwCode("inquiry_not_found", "Inquiry record unavailable.");
-  const { capability, definition } = assertCapability(snapshot, lead);
-  await readyForEmail(input.tenantId, definition, input.deps);
   const status = await overlayStatus(input.tenantId, input.businessId, input.inquiryId, snapshot.state, input.deps);
-  assertOpenInquiry(status);
+  const { capability, definition } = assertCurrentInquiry(snapshot, lead, status);
+  await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertResponsibilitySponsor(responsibility, input.actorId);
+  // An authorized Ask draft (prepare only) skips sponsor binding; every other actor binds current authority.
+  const actorBinding = input.draftActorAllowed ? {} : await bindInquiryReviewActor({ tenantId: input.tenantId, businessId: input.businessId,
+    inquiryId: input.inquiryId, action: input.action, actorId: input.actorId, responsibility,
+    event: input.ownerDecisionEvent, eventAction: input.ownerDecisionAction, deps: input.deps });
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
-  const inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  let inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  if (input.action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const policy = policyFor(definition, responsibility, input.action);
   if (input.expectedPolicyVersion && policy.version !== input.expectedPolicyVersion) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
@@ -297,8 +285,13 @@ async function buildContext(input: {
   } catch (error) {
     throw new InquiryMessageReviewEngineError(errorMessage(error, "The inquiry recipient could not be resolved."), "recipient_route_changed");
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, input.action);
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, input.action);
   if (!message) throwCode("recipient_unavailable", "A permitted inquiry recipient is not configured.");
+  if (input.authoredReply !== undefined) {
+    if (input.action !== "reply") throwCode("message_mismatch", "Authored copy is only available for inquiry replies.");
+    const authoredReply = text(input.authoredReply, "Reply body", 4096);
+    message.options = { heading: "A reply from your business", paragraphs: [authoredReply], footerNote: "Sent by Strelva for the business named above" };
+  }
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);
   const record = recordFromLead(snapshot.state, capability, lead, status);
@@ -317,12 +310,17 @@ async function buildContext(input: {
   if (evaluation.decision === "block") {
     throwCode("delivery_unavailable", evaluation.reason || "The current responsibility blocks this message.");
   }
+  const decisionRoute = await (input.deps.messageRoute ?? inquiryMessageRouteAtUse)(input.tenantId, evaluation, `${message.subject}\n${messageBody}`, input.businessId);
+  if (actorBinding.operatorReviewActor && decisionRoute !== "strelva_reviews") {
+    throwCode("permission_denied", "The current responsibility does not delegate this review to Strelva.");
+  }
   const deliveryEvaluation = evaluateInquiryDelivery(inquiry, input.action, policy, null, input.now, messageDigest);
   if (deliveryEvaluation.status !== "awaiting_approval" && deliveryEvaluation.status !== "ready") {
     throwCode("delivery_unavailable", deliveryEvaluation.reason || "The message is not ready for approval.");
   }
   return {
     snapshot,
+    ...actorBinding,
     lead,
     inquiry,
     capability,
@@ -335,8 +333,10 @@ async function buildContext(input: {
     messageBody,
     messageDigest,
     evaluation,
+    decisionRoute,
     deliveryEvaluation,
     status,
+    ...(input.authoredReply === undefined ? {} : { authoredReply: text(input.authoredReply, "Reply body", 4096) }),
   };
 }
 
@@ -366,73 +366,8 @@ function metadataFor(
     messageDigest: context.messageDigest,
     preparedAt: now.toISOString(),
     expiresAt: context.deliveryEvaluation.expiresAt ?? null,
-    reviewAudience: "owner",
-  };
-}
-
-function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEventMetadata | null {
-  if (event.type !== "change_request") return null;
-  const value = event.metadata;
-  if (!value || value.kind !== INQUIRY_MESSAGE_REVIEW_KIND || value.schemaVersion !== INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION) return null;
-  const row = value as Record<string, unknown>;
-  try {
-    if (row.reviewAudience !== "owner") return null;
-    const action = reviewAction(row.action);
-    const metadata: InquiryMessageReviewEventMetadata = {
-      kind: INQUIRY_MESSAGE_REVIEW_KIND,
-      schemaVersion: INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION,
-      tenantId: text(row.tenantId, "Tenant id", 80),
-      businessId: text(row.businessId, "Business id", 160),
-      inquiryId: text(row.inquiryId, "Inquiry id", 256),
-      action,
-      requestedBy: text(row.requestedBy, "Request actor", 256),
-      responsibilityId: text(row.responsibilityId, "Responsibility id", 256),
-      responsibilityRevision: text(row.responsibilityRevision, "Responsibility revision", 256),
-      capabilityId: text(row.capabilityId, "Capability id", 256),
-      capabilityVersion: positiveVersion(row.capabilityVersion, "Capability version"),
-      inquiryVersion: text(row.inquiryVersion, "Inquiry version", 256),
-      policyVersion: text(row.policyVersion, "Policy version", 256),
-      recipient: text(row.recipient, "Recipient", 320),
-      replyTo: row.replyTo === null ? null : text(row.replyTo, "Reply address", 320),
-      subject: text(row.subject, "Subject", 500),
-      messageBody: text(row.messageBody, "Message body", 10_000, true),
-      messageDigest: text(row.messageDigest, "Message digest", 128),
-      preparedAt: text(row.preparedAt, "Prepared time", 80),
-      expiresAt: row.expiresAt === null ? null : text(row.expiresAt, "Expiry", 80),
-      reviewTokenHash: text(row.reviewTokenHash, "Review token", 128),
-      reviewAudience: "owner",
-    };
-    if (!/^[a-f0-9]{64}$/.test(metadata.messageDigest) || !/^[a-f0-9]{64}$/.test(metadata.reviewTokenHash)) return null;
-    return metadata;
-  } catch {
-    return null;
-  }
-}
-
-export function isInquiryMessageReviewEvent(event: UnifiedEvent): boolean {
-  return metadataFromEvent(event) !== null;
-}
-
-export function getInquiryMessageReviewMetadata(event: UnifiedEvent): InquiryMessageReviewEventMetadata | null {
-  return metadataFromEvent(event);
-}
-
-function previewFromEvent(event: UnifiedEvent, metadata: InquiryMessageReviewEventMetadata, actorId: string): InquiryMessageReviewPreview {
-  const token = tokenFor(metadata, actorId);
-  if (hash(token) !== metadata.reviewTokenHash) throwCode("review_revoked", "This message review is no longer valid.");
-  return {
-    reviewToken: token,
-    inquiryId: metadata.inquiryId,
-    action: metadata.action,
-    recipient: metadata.recipient,
-    subject: metadata.subject,
-    body: metadata.messageBody,
-    messageDigest: metadata.messageDigest,
-    policyVersion: metadata.policyVersion,
-    capabilityId: metadata.capabilityId,
-    capabilityVersion: metadata.capabilityVersion,
-    preparedAt: metadata.preparedAt,
-    expiresAt: metadata.expiresAt,
+    reviewAudience: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && context.decisionRoute === "strelva_reviews" ? "operator" : "owner",
+    ...(context.authoredReply === undefined ? {} : { authoredReply: context.authoredReply }),
   };
 }
 
@@ -457,7 +392,9 @@ export async function prepareInquiryMessageReviewWithDependencies(
   const action = reviewAction(input.action);
   const now = dependency(deps.now, () => new Date())();
   const tenantId = text(input.tenantId, "Tenant id", 80);
-  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, deps, now });
+  const draftActorAllowed = input.authoredReply !== undefined && deps.authorizeDraft
+    ? await deps.authorizeDraft(actorId, businessId) : false;
+  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, authoredReply: input.authoredReply, draftActorAllowed, deps, now });
   const baseMetadata = metadataFor(context, actorId, now);
   const reviewToken = tokenFor(baseMetadata, actorId);
   const metadata: InquiryMessageReviewEventMetadata = { ...baseMetadata, reviewTokenHash: hash(reviewToken) };
@@ -497,69 +434,12 @@ export async function prepareInquiryMessageReviewWithDependencies(
     status: "pending",
     metadata: metadata as unknown as Record<string, unknown>,
   }, { requirePersistence: true });
+  if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+    // Opening the owner decision is immediate; notice failures cannot undo the saved draft.
+    const { notifyPreparedInquiryDecision } = await import("./decision-notice");
+    await notifyPreparedInquiryDecision(tenantId, context.lead).catch(() => "none");
+  }
   return previewFromEvent(created, metadata, actorId);
-}
-
-function checkpointAccepted(checkpoint: InquiryDeliveryCheckpoint | null): boolean {
-  if (!checkpoint) return false;
-  return Boolean(
-    checkpoint.acceptedAt || checkpoint.providerMessageId ||
-    checkpoint.status === "accepted" || checkpoint.status === "accepted_unverified" ||
-    checkpoint.status === "verified" || checkpoint.status === "delivered" ||
-    checkpoint.status === "bounced" || checkpoint.status === "deferred" ||
-    checkpoint.status === "suppressed" ||
-    (checkpoint.status === "failed" && checkpoint.providerOutcome),
-  );
-}
-
-function outcomeFromCheckpoint(
-  checkpoint: InquiryDeliveryCheckpoint | null,
-  inquiryId: string,
-  action: InquiryMessageReviewAction,
-  fallback?: { status?: InquiryDeliveryResult["status"]; reason?: string },
-): InquiryMessageReviewOutcome {
-  const status = checkpoint?.status;
-  const outputStatus: InquiryMessageReviewOutcome["status"] =
-    fallback?.status === "reconciliation_required" ? "reconciliation_required" :
-      status === "verified" ? "verified" :
-      status === "delivered" ? "delivered" :
-        status === "bounced" ? "bounced" :
-          status === "deferred" ? "deferred" :
-            status === "suppressed" ? "suppressed" :
-              status === "failed" ? "failed" :
-                status === "accepted" || status === "accepted_unverified" ? "accepted_unverified" :
-                  status === "sending" || status === "unknown" ? "reconciliation_required" :
-                    fallback?.status === "failed" ? "failed" : "unavailable";
-  return {
-    inquiryId,
-    action,
-    status: outputStatus,
-    ...(checkpoint?.failureReason || checkpoint?.verificationReason || fallback?.reason ? { reason: checkpoint?.failureReason || checkpoint?.verificationReason || fallback?.reason } : {}),
-    ...(checkpoint?.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}),
-    ...(checkpoint?.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}),
-    ...(checkpoint?.verificationEvidence ? { verificationEvidence: checkpoint.verificationEvidence } : {}),
-    retryable: outputStatus === "failed" ? Boolean(checkpoint?.retryable) : false,
-  };
-}
-
-function approvalEventMatches(
-  event: UnifiedEvent,
-  tenantId: string,
-  input: InquiryMessageReviewApproveInput,
-  actorId: string,
-): InquiryMessageReviewEventMetadata | null {
-  const metadata = metadataFromEvent(event);
-  if (!metadata || event.tenantId !== tenantId || metadata.businessId !== input.businessId || metadata.inquiryId !== input.inquiryId || metadata.action !== input.action) return null;
-  if (metadata.requestedBy !== actorId) return metadata;
-  if (metadata.messageDigest !== input.messageDigest) return metadata;
-  if (hash(input.reviewToken) !== metadata.reviewTokenHash) return metadata;
-  return metadata;
-}
-
-function outcomeError(result: { changed: boolean; reason?: string }): InquiryMessageReviewEngineError {
-  const reason = result.reason || "delivery_approval_failed";
-  const known = new Set(["policy_changed", "inquiry_changed", "recipient_route_changed", "message_mismatch", "approval_required", "permission_denied", "review_expired", "review_revoked"]);
-  return new InquiryMessageReviewEngineError(reason, known.has(reason) ? reason : "delivery_unavailable");
 }
 
 export async function approveInquiryMessageReviewWithDependencies(
@@ -596,7 +476,7 @@ export async function approveInquiryMessageReviewWithDependencies(
   if (candidate.status === "approved") {
     const store = dependency(deps.store, createRedisInquiryDeliveryStore());
     const checkpoint = await store.getCheckpoint({ tenantId, inquiryId, action });
-    return outcomeFromCheckpoint(checkpoint, inquiryId, action, { status: "unavailable", reason: "approval_already_resolved" });
+    return outcomeFromCheckpoint(checkpoint, inquiryId, action, { status: "unavailable", reason: "approval_already_resolved" }, suppliedDigest);
   }
   if (candidate.status !== "pending") throwCode("review_revoked", "This message review was revoked. Prepare a fresh review.");
   const resolveAction = deps.resolveAction ?? (async (id, eventId, eventAction, actor) => {
@@ -614,6 +494,7 @@ export async function approveInquiryMessageReviewWithDependencies(
       result.changed
         ? { status: "unavailable", reason: result.reason }
         : { status: "reconciliation_required", reason: result.reason },
+      suppliedDigest,
     );
   }
   if (!result.changed) throw outcomeError(result);
@@ -655,79 +536,104 @@ async function checkpointFor(
   }
 }
 
+/** The workspace facts a message receipt needs. A full review context has them. */
+type ReceiptContext = MessageReceiptContext;
+
 async function persistVerifiedReceipt(input: {
-  context: ReviewContext;
+  context: ReceiptContext;
   metadata: InquiryMessageReviewEventMetadata;
   providerResult: InquiryDeliveryResult;
+  /** The digest the checkpoint recorded for the accepted attempt. */
+  sentMessageDigest: string | undefined;
   deps: InquiryMessageReviewDependencies;
 }): Promise<boolean> {
-  const repository = await repositoryFor(input.deps);
-  const idempotencyKey = `inquiry-delivery:${input.metadata.inquiryId}:${input.metadata.action}:${input.metadata.messageDigest}`;
-  let snapshot = input.context.snapshot;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (attempt > 0) {
-      try {
-        const current = await repository.getSnapshot(snapshot.tenantId, snapshot.businessId);
-        if (!current) return false;
-        snapshot = current;
-      } catch {
-        return false;
-      }
-    }
-    const existing = snapshot.state.responsibilityReceipts.find((receipt) => receipt.responsibilityId === input.metadata.responsibilityId && receipt.idempotencyKey === idempotencyKey);
-    if (existing) return existing.status === "accepted";
-    const currentResponsibility = snapshot.state.responsibilities.find((item) => item.id === input.metadata.responsibilityId);
-    if (!currentResponsibility || currentResponsibility.sponsorId !== input.metadata.requestedBy) return false;
-    const record = recordFromLead(snapshot.state, input.context.capability, input.context.lead, input.context.status);
-    const state = stateForReceive(snapshot);
-    state.inquiries = [...state.inquiries.filter((item) => item.id !== record.id), record];
-    let receipt: import("./contracts").ResponsibilityActionReceipt;
-    let updatedState: InquiryEngineState | null = null;
-    try {
-      const engine = new InquiryEngine({ businessId: snapshot.businessId, state, now: () => input.providerResult.acceptedAt || new Date().toISOString() });
-      updatedState = engine.snapshot();
-      receipt = engine.recordResponsibilityAction({
-        responsibilityId: currentResponsibility.id,
-        action: input.context.responsibilityAction,
-        actorId: "strelva",
-        approvedBy: input.metadata.requestedBy,
-        at: input.providerResult.acceptedAt || new Date().toISOString(),
-        what: `Sent the reviewed inquiry ${input.metadata.action} to ${input.metadata.recipient}.`,
-        why: "The responsibility sponsor approved the exact rendered message.",
-        lookedAt: [
-          `recipient ${input.metadata.recipient}`,
-          `message digest ${input.metadata.messageDigest}`,
-          `capability ${input.metadata.capabilityId} version ${input.metadata.capabilityVersion}`,
-          `policy ${input.metadata.policyVersion}`,
-        ],
-        outcome: "accepted",
-        outcomeEvidence: [
-          `provider status ${input.providerResult.status}`,
-          ...(input.providerResult.providerMessageId ? [`provider message ${input.providerResult.providerMessageId}`] : []),
-          ...(input.providerResult.verificationEvidence ?? []),
-        ],
-        messageBody: input.metadata.messageBody,
-        idempotencyKey,
-      });
-      updatedState = engine.snapshot();
-    } catch {
-      return false;
-    }
-    if (receipt.status !== "accepted" || !updatedState) return false;
-    try {
-      const saved = await repository.compareAndSwap({
-        tenantId: snapshot.tenantId,
-        businessId: snapshot.businessId,
-        expectedRevision: snapshot.revision,
-        state: updatedState,
-        actorId: input.metadata.requestedBy,
-      });
-      if (saved.changed) return true;
-    } catch {
-      return false;
+  return (await writeMessageReceipt({ ...input, loadRepository: () => repositoryFor(input.deps) })) === "persisted";
+}
+
+async function receiptContextFor(
+  tenantId: string,
+  metadata: InquiryMessageReviewEventMetadata,
+  deps: InquiryMessageReviewDependencies,
+): Promise<ReceiptContext> {
+  // The message already went out, so this reads only what the receipt
+  // records. It does not re-run the send gates (open inquiry, live capability
+  // version, email readiness) that applied before the provider call.
+  const snapshot = await snapshotFor(tenantId, metadata.businessId, deps);
+  const lead = await dependency(deps.getLead, getLeadById)(tenantId, metadata.inquiryId);
+  if (!lead) throwCode("inquiry_not_found", "Inquiry record unavailable.");
+  const capability = snapshot.state.capabilities.find((item) => item.id === metadata.capabilityId);
+  if (!capability) throwCode("inquiry_changed", "The inquiry capability is unavailable.");
+  const status = await overlayStatus(tenantId, metadata.businessId, metadata.inquiryId, snapshot.state, deps);
+  return { snapshot, lead, capability, status, responsibilityAction: responsibilityActionFor(metadata.action) };
+}
+
+export type InquiryMessageReceiptOutcome = "persisted" | "not_owed" | "refused" | "unavailable";
+
+/**
+ * Write the message receipt an approved review is owed once a provider report
+ * shows its message was delivered. The approval may have resolved earlier,
+ * while the message was unconfirmed or deferred, with no receipt.
+ *
+ * Idempotent: the receipt key is the same one the approval path uses, so the
+ * receipt is written at most once however many reports arrive. It is written
+ * only for an approved review whose digest matches the accepted attempt's
+ * digest; a checkpoint without a digest never earns one.
+ */
+export async function persistDeliveredInquiryMessageReceipt(input: {
+  tenantId: string;
+  checkpoint: InquiryDeliveryCheckpoint;
+  deps?: InquiryMessageReviewDependencies;
+}): Promise<InquiryMessageReceiptOutcome> {
+  const deps = input.deps ?? {};
+  const { checkpoint } = input;
+  if (checkpoint.tenantId !== input.tenantId) return "not_owed";
+  if (checkpoint.status !== "delivered" && checkpoint.status !== "verified") return "not_owed";
+  if (!checkpoint.messageDigest) return "not_owed";
+  let events: UnifiedEvent[];
+  try {
+    events = await eventsFor(input.tenantId, deps);
+  } catch {
+    return "unavailable";
+  }
+  let metadata: InquiryMessageReviewEventMetadata | null = null;
+  for (const event of events) {
+    const candidate = metadataFromEvent(event);
+    if (
+      !candidate || event.tenantId !== input.tenantId ||
+      candidate.inquiryId !== checkpoint.inquiryId || candidate.action !== checkpoint.action ||
+      candidate.messageDigest.toLowerCase() !== checkpoint.messageDigest.toLowerCase()
+    ) continue;
+    // Only a review the sponsor actually approved is owed a receipt. A pending
+    // review with the same digest (for example, a standing-approval send of an
+    // identical body) is not an approval.
+    if (event.status === "approved" || event.metadata?.execution?.state === "external_accepted") {
+      metadata = candidate;
+      break;
     }
   }
-  return false;
+  if (!metadata) return "not_owed";
+  let context: ReceiptContext;
+  try {
+    context = await receiptContextFor(input.tenantId, metadata, deps);
+  } catch (error) {
+    return errorCode(error) === "persistence_unavailable" ? "unavailable" : "refused";
+  }
+  return writeMessageReceipt({
+    loadRepository: () => repositoryFor(deps),
+    context,
+    metadata,
+    providerResult: {
+      inquiryId: checkpoint.inquiryId,
+      tenantId: input.tenantId,
+      action: checkpoint.action,
+      status: checkpoint.status,
+      acceptedAt: checkpoint.acceptedAt,
+      providerMessageId: checkpoint.providerMessageId,
+      verificationEvidence: checkpoint.verificationEvidence,
+      retryable: false,
+    },
+    sentMessageDigest: checkpoint.messageDigest,
+  });
 }
 
 export async function executeInquiryMessageReview(
@@ -751,7 +657,9 @@ export async function executeInquiryMessageReview(
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -799,7 +707,9 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -821,7 +731,9 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -856,12 +768,20 @@ export async function executeInquiryMessageReview(
     result = await deliverInquiryAction(context.inquiry, metadata.action, {
       policy: context.policy,
       approval,
+      ...(metadata.authoredReply === undefined ? {} : { messageOptions: context.message.options }),
       deps: deliveryDeps,
     });
   } catch (error) {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "unavailable", reason: errorCode(error) };
   }
   const checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  const binding = sentMessageBinding(checkpoint, metadata.messageDigest);
+  if (checkpointAccepted(checkpoint) && binding === "different") {
+    // The provider accepted a different message for this inquiry and purpose
+    // (an earlier review or a standing-approval send). This review was not
+    // sent, can never be sent under this purpose, and earns no receipt.
+    return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
+  }
   const providerAccepted = checkpointAccepted(checkpoint) || Boolean(result.acceptedAt || result.providerMessageId);
   if (!providerAccepted) {
     return {
@@ -879,8 +799,14 @@ export async function executeInquiryMessageReview(
   const markerDurable = Boolean(checkpoint) && checkpointAccepted(checkpoint);
   const verified = result.status === "verified" || result.status === "delivered" || checkpoint?.status === "verified" || checkpoint?.status === "delivered";
   let receiptPersisted = true;
+  const digestUnknown = verified && Boolean(checkpoint) && binding === "unknown";
   if (verified) {
-    receiptPersisted = await persistVerifiedReceipt({ context: latestContext ?? context, metadata, providerResult: result, deps });
+    // A checkpoint without a digest predates digest tracking. It may hold this
+    // review's message or another one, so refuse the receipt and leave the
+    // approval for a person to reconcile. It never becomes retryable.
+    receiptPersisted = digestUnknown
+      ? false
+      : await persistVerifiedReceipt({ context: latestContext ?? context, metadata, providerResult: result, sentMessageDigest: checkpoint?.messageDigest, deps });
   }
   const safeToResolve = markerDurable && (!verified || receiptPersisted);
   return {
@@ -889,9 +815,10 @@ export async function executeInquiryMessageReview(
     receiptPersisted,
     verified,
     status: result.status,
-    reason: result.reason,
+    reason: digestUnknown ? MESSAGE_DIGEST_UNKNOWN : result.reason,
     acceptedAt: result.acceptedAt || checkpoint?.acceptedAt,
     providerMessageId: result.providerMessageId || checkpoint?.providerMessageId,
+    ...(result.attemptId || checkpoint?.attemptId ? { deliveryAttemptId: result.attemptId || checkpoint?.attemptId } : {}),
     verificationEvidence: result.verificationEvidence || checkpoint?.verificationEvidence,
   };
 }
@@ -900,17 +827,29 @@ export async function authorizeInquiryMessageReviewActor(input: {
   tenantId: string;
   event: UnifiedEvent;
   actorId: string;
+  eventAction?: "approved" | "dismissed";
   deps?: InquiryMessageReviewDependencies;
 }): Promise<{ allowed: boolean; reason?: string }> {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { allowed: false, reason: "wrong_tenant" };
+  // Not yet closes the exact signed source without sending. A later email
+  // pause or capability edit cannot turn this declined decision into a send,
+  // nor should it prevent the owner from closing the old draft.
+  if (input.eventAction === "dismissed" && input.actorId.startsWith("owner-link:")) {
+    const allowed = await authorizeSignedInquiryMessageDecision({ tenantId: input.tenantId, event: input.event,
+      actorId: input.actorId, eventAction: "dismissed", deps: input.deps });
+    return { allowed, ...(allowed ? {} : { reason: "permission_denied" }) };
+  }
   try {
     const context = await buildContext({
       tenantId: input.tenantId,
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
+      ownerDecisionAction: input.eventAction,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -934,7 +873,40 @@ export async function reconcileInquiryMessageReview(input: {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "unavailable", reason: "wrong_tenant" };
   const store = dependency(deps.store, createRedisInquiryDeliveryStore());
-  const checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  let checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  if (checkpoint?.status === "sending") {
+    // The provider may have accepted this attempt while the acceptance write
+    // failed. If the governed event kept a copy of that acceptance for this
+    // exact attempt, record it now. Reconciliation never sends.
+    const evidence = acceptanceEvidenceFromEvent(input.event);
+    if (evidence?.acceptedAt && evidence.deliveryAttemptId === checkpoint.attemptId) {
+      try {
+        checkpoint = await store.markAccepted({
+          tenantId: input.tenantId,
+          inquiryId: metadata.inquiryId,
+          action: metadata.action,
+          attemptId: checkpoint.attemptId,
+          acceptedAt: evidence.acceptedAt,
+          ...(evidence.providerMessageId ? { providerMessageId: evidence.providerMessageId } : {}),
+          ...(metadata.replyTo ? { replyTo: metadata.replyTo } : {}),
+        });
+      } catch {
+        return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: false, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable" };
+      }
+    }
+  }
+  const binding = sentMessageBinding(checkpoint, metadata.messageDigest);
+  if (checkpointAccepted(checkpoint) && binding === "different") {
+    return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
+  }
+  if (checkpointAccepted(checkpoint) && checkpoint?.acceptedAt && store.repairAcceptedProjections) {
+    try {
+      checkpoint = await store.repairAcceptedProjections({ tenantId: input.tenantId, inquiryId: metadata.inquiryId, action: metadata.action,
+        attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, replyTo: checkpoint.replyTo });
+    } catch {
+      return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: false, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable" };
+    }
+  }
   if (!checkpointAccepted(checkpoint)) {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: checkpoint?.status === "unknown" || checkpoint?.status === "sending" ? "reconciliation_required" : "unavailable", reason: "delivery_acceptance_unavailable" };
   }
@@ -948,6 +920,9 @@ export async function reconcileInquiryMessageReview(input: {
               "accepted_unverified";
     return { accepted: true, safeToResolve: true, receiptPersisted: true, verified: false, status, reason: checkpoint?.verificationReason || checkpoint?.failureReason };
   }
+  if (binding === "unknown") {
+    return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: true, status: "reconciliation_required", reason: MESSAGE_DIGEST_UNKNOWN };
+  }
   let context: ReviewContext;
   try {
     const now = dependency(deps.now, () => new Date())();
@@ -956,7 +931,9 @@ export async function reconcileInquiryMessageReview(input: {
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       deps: { ...deps, emailReady: async () => true },
       now,
@@ -977,6 +954,7 @@ export async function reconcileInquiryMessageReview(input: {
       verificationEvidence: checkpoint?.verificationEvidence,
       retryable: false,
     },
+    sentMessageDigest: checkpoint?.messageDigest,
     deps,
   });
   return {
@@ -993,3 +971,4 @@ export { INQUIRY_MESSAGE_REVIEW_KIND, INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION, Inq
 export type { InquiryMessageReviewEventMetadata } from "./delivery-approval-primitives";
 
 export type { InquiryMessageReviewExecution, InquiryMessageReviewReconciliation } from "./delivery-approval-contract";
+export { getInquiryMessageReviewMetadata, isInquiryMessageReviewEvent } from "./message-review-event";

@@ -6,7 +6,7 @@ import type { OfferingCollection, OfferingCommand, OfferingInstallation, Offerin
 import type { WorkspaceProduct, WorkspaceWork } from "./contracts";
 import { sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { composeOfferingDiscovery, type OfferingDiscoveryEntry } from "./offering-discovery";
-import { BusinessProviderStatus, useBusinessProviderDeliveries, type BusinessProviderDeliveryState } from "./business-provider-summary";
+import { BusinessAgencyStatus, useBusinessAgencyDeliveries, type BusinessAgencyDeliveryState } from "./business-provider-summary";
 import styles from "./workspace-offerings.module.css";
 import { type WorkspaceOfferingState } from "./useWorkspaceOfferings";
 import { availabilityLabel, definitionFor } from "./offering-configuration";
@@ -132,7 +132,7 @@ function WebsiteAssignments({
   }
 
   return <section className={styles.websiteAssignments} aria-labelledby="website-assignments-title">
-    <header><p className={styles.eyebrow}>Managed websites</p><h2 id="website-assignments-title">Website assignments</h2><p>An account-authorized site is not this business&apos;s installation until an owner explicitly assigns it here.</p></header>
+    <header><p className={styles.eyebrow}>Managed websites</p><h2 id="website-assignments-title">Website assignments</h2><p>An account-authorized site is not part of this business until an owner explicitly assigns it here.</p></header>
     {active.length ? <ul className={styles.simpleList}>{active.map((binding) => {
       const href = binding.surface.href ? sameAppHref(binding.surface.href) : null;
       return <li key={binding.id}><span><strong>{binding.siteName}</strong><small>Assigned to this business{!binding.tenantActive ? " · Website inactive" : href ? " · You can open it" : " · Website access not granted to you"}</small></span><span className={styles.bindingActions}>{href ? <a href={href}>Open</a> : null}{collection.permissions.canManage ? <button type="button" disabled={saving} onClick={() => void revoke(binding)}>Remove assignment</button> : null}</span></li>;
@@ -228,15 +228,15 @@ export function WorkspaceOfferingDirectory({
   </section>;
   if (state.status === "unavailable") {
     if (discoveryEntries) return renderProductFallback(state.reason);
-    return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Offerings belong to a business.</h2><p>{state.reason}</p></section>;
+    return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Ready-made systems are set up for a business.</h2><p>{state.reason}</p></section>;
   }
   if (state.status === "loading") {
-    if (discoveryEntries) return renderProductFallback("Checking whether business offerings can be added here…");
-    return <p className={styles.status} role="status">Loading business offerings…</p>;
+    if (discoveryEntries) return renderProductFallback("Checking whether ready-made systems can be set up here…");
+    return <p className={styles.status} role="status">Loading ready-made systems…</p>;
   }
   if (state.status === "error") {
     if (discoveryEntries) return renderProductFallback(`${state.message} Business offerings remain unavailable until this is checked again.`, "alert", true);
-    return <section className={styles.status}><h2>Offerings could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
+    return <section className={styles.status}><h2>Ready-made systems could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
   }
 
   const selectedInstallation = state.collection.installations.find((installation) => installation.id === selectedId);
@@ -246,7 +246,7 @@ export function WorkspaceOfferingDirectory({
 
   const currentByDefinition = new Map(state.collection.installations.filter((installation) => installation.status !== "retired").map((installation) => [installation.definitionId, installation]));
   return <section aria-labelledby="business-offerings-title">
-    <header className={styles.directoryHeader}><p className={styles.eyebrow}>{discoveryEntries ? "Explore" : "Business offerings"}</p><h2 id="business-offerings-title">{discoveryEntries ? "Useful outcomes for this business." : "What this business can use."}</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Install a supported offering around work the business already owns. Availability does not grant access or promise a provider."}</p></header>
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>{discoveryEntries ? "Explore" : "Ready-made systems"}</p><h2 id="business-offerings-title">{discoveryEntries ? "Useful outcomes for this business." : "What this business can use."}</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Set up a ready-made system around work the business already owns. Availability does not grant access or promise an agency."}</p></header>
     <WebsiteAssignments collection={state.collection} sites={managedSites} saving={state.saving} onCommand={onWebsiteCommand} />
     {discoveryEntries ? <DiscoveryRows entries={discoveryEntries} onOffering={(entry) => {
       if (entry.offering) onSelect(entry.installation?.id ?? entry.offering.id);
@@ -258,8 +258,8 @@ export function WorkspaceOfferingDirectory({
         <ArrowRight size={17} aria-hidden="true" />
       </button>;
     })}</div>}
-    {state.collection.installations.some((installation) => installation.status === "retired") ? <div className={styles.retiredList}><h3>Retired offerings</h3>{state.collection.installations.filter((installation) => installation.status === "retired").map((installation) => <button key={installation.id} type="button" onClick={() => onSelect(installation.id)}>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}<ArrowRight size={14} /></button>)}</div> : null}
-    {!state.collection.permissions.canManage ? <p className={styles.note}>This is a permission-limited view. Only a business owner or admin can install, change, or retire offerings.</p> : null}
+    {state.collection.installations.some((installation) => installation.status === "retired") ? <div className={styles.retiredList}><h3>Retired</h3>{state.collection.installations.filter((installation) => installation.status === "retired").map((installation) => <button key={installation.id} type="button" onClick={() => onSelect(installation.id)}>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}<ArrowRight size={14} /></button>)}</div> : null}
+    {!state.collection.permissions.canManage ? <p className={styles.note}>This is a permission-limited view. Only a business owner or admin can set up, change, or retire them.</p> : null}
   </section>;
 }
 
@@ -267,23 +267,30 @@ export function BusinessOfferingSummary({
   state,
   work,
   onOpen,
+  agencyDeliveryState,
   providerDeliveryState,
+  systemsReleased = false,
 }: {
   state: WorkspaceOfferingState;
   work: readonly WorkspaceWork[];
   onOpen: (id?: string) => void;
-  providerDeliveryState?: BusinessProviderDeliveryState;
+  agencyDeliveryState?: BusinessAgencyDeliveryState;
+  /** @deprecated Use agencyDeliveryState. */
+  providerDeliveryState?: BusinessAgencyDeliveryState;
+  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "offerings" words on Home. */
+  systemsReleased?: boolean;
 }) {
-  const fetchedProviderDeliveryState = useBusinessProviderDeliveries(state);
+  const fetchedAgencyDeliveryState = useBusinessAgencyDeliveries(state);
+  const panelTitle = systemsReleased ? "Set up for this business" : "Installed offerings";
   if (state.status === "unavailable") return null;
-  if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Installed offerings</h2></header><p role="status">Loading offerings…</p></section>;
-  if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Installed offerings</h2></header><p>Offering records are unavailable. Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>Open offerings</button></section>;
+  if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p role="status">{systemsReleased ? "Loading…" : "Loading offerings…"}</p></section>;
+  if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p>{systemsReleased ? "These records are unavailable." : "Offering records are unavailable."} Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>{systemsReleased ? "Open ready-made systems" : "Open offerings"}</button></section>;
   const current = state.collection.installations.filter((installation) => installation.status !== "retired");
-  const providerState = providerDeliveryState ?? fetchedProviderDeliveryState;
-  const providerDeliveries = providerState.status === "ready" ? providerState.deliveries : [];
+  const agencyState = agencyDeliveryState ?? providerDeliveryState ?? fetchedAgencyDeliveryState;
+  const agencyDeliveries = agencyState.status === "ready" ? agencyState.deliveries : [];
   return <section className={styles.homePanel} aria-labelledby="home-offerings">
-    <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Business offerings</h2><span>{current.length}</span></header>
-    {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>No offerings are installed for this business. Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>Explore offerings</button></div>}
-    <BusinessProviderStatus state={providerState} deliveries={providerDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
+    <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{systemsReleased ? "Ready-made systems" : "Business offerings"}</h2><span>{current.length}</span></header>
+    {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>{systemsReleased ? "Nothing ready-made is set up for this business." : "No offerings are installed for this business."} Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>{systemsReleased ? "Explore ready-made systems" : "Explore offerings"}</button></div>}
+    <BusinessAgencyStatus state={agencyState} deliveries={agencyDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
   </section>;
 }

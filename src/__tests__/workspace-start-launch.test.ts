@@ -50,17 +50,60 @@ describe("agency and native entry", () => {
     assert.equal(plan.request, request);
     assert.equal(plan.helpRequest, request);
   });
+  // Without a managed relationship, ordinary creation wording stays self-serve.
+  const selfServeContext: WorkspaceStartContext = { ...nativeContext, managedSites: [], products: nativeContext.products!.filter((product) => product.id !== "managed_presence") };
   for (const request of [
     "Create a website for my business.",
     "Generate a website myself.",
     "I don't want Strelva to build my website; let me create it myself.",
     "Create a website. Our supplier is Strelva.",
   ]) {
-    it(`does not force agency delivery: ${request}`, () => {
+    it(`does not force agency delivery without a managed relationship: ${request}`, () => {
+      const plan = planWorkspaceStart(request, selfServeContext);
+      assert.notEqual(plan.deliveryMode, "service");
+    });
+  }
+  // Audit finding 7 (2026-10-05): the managed relationship chooses the default.
+  for (const request of [
+    "Build a new website",
+    "Create a website for my business.",
+    "Redo the site",
+    "Add a booking page",
+    "Make a landing page for our spring sale.",
+  ]) {
+    it(`a managed client gets a request to Strelva without special wording: ${request}`, () => {
+      const plan = planWorkspaceStart(request, nativeContext);
+      assert.equal(plan.deliveryMode, "service");
+      assert.equal(plan.route, "help");
+      assert.equal(plan.helpRequest, request);
+      assert.equal(plan.canContinue, true);
+      assert.match(plan.nextAction, /separate acceptance/);
+      assert.equal(plan.selfServiceRoute, "websites");
+      assert.equal(createWorkspaceStartContinuation(plan), null);
+    });
+  }
+  for (const request of [
+    "Generate a website myself.",
+    "I don't want Strelva to build my website; let me create it myself.",
+  ]) {
+    it(`a managed client who asks to make it themselves keeps self-serve: ${request}`, () => {
       const plan = planWorkspaceStart(request, nativeContext);
       assert.notEqual(plan.deliveryMode, "service");
     });
   }
+  it("a managed client can still change the connected site directly", () => {
+    assert.equal(planWorkspaceStart("Make our website work better.", nativeContext).route, "website");
+  });
+  it("offers self-making second only where the owner can make Systems", () => {
+    const noCreation = { ...nativeContext, products: nativeContext.products!.filter((product) => product.id !== "websites") };
+    const plan = planWorkspaceStart("Build a new website", noCreation);
+    assert.equal(plan.deliveryMode, "service");
+    assert.equal(plan.selfServiceRoute, undefined);
+  });
+  it("an explicit managedRelationship flag works without discovered sites", () => {
+    const plan = planWorkspaceStart("Build a new website", { ...nativeContext, managedSites: [], managedRelationship: true });
+    assert.equal(plan.deliveryMode, "service");
+  });
   it("routes a native app without a website or inquiry binding", () => {
     const context: WorkspaceStartContext = { products: [{ id: "applications", availability: "available" }] };
     const plan = planWorkspaceStart("Create a staff request app.", context);

@@ -12,11 +12,12 @@ const mocks = vi.hoisted(() => ({
   createToken: vi.fn(() => "token_123"),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedWindowedAsync: mocks.rateLimited,
   rateLimitKey: vi.fn(() => "test:127.0.0.1"),
 }));
-vi.mock("@/products/ai-visibility/server", () => ({
+vi.mock("@/products/ai-visibility/server", async importOriginal => ({
+  ...await importOriginal<object>(),
   scoreAiVisibility: mocks.score,
   saveAiVisibilityResult: mocks.saveResult,
   getAiVisibilityResult: mocks.getResult,

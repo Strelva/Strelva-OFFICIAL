@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -29,7 +30,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: mocks.verifyAuth,
   getAuthUserId: mocks.actor,
   requireTenantAccess: mocks.access,
@@ -41,6 +42,9 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
 vi.mock("@/products/inquiries/server", async () => ({
   ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   parseInquirySurfaceAction: mocks.parse,
   inquiryPermissionForAction: mocks.permissionForAction,
   readInquirySurface: mocks.read,

@@ -1,6 +1,7 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts, getDailyMetrics } from "@/lib/storage";
 import { Sparkline } from "@/components/dashboard/Sparkline";
@@ -23,13 +24,18 @@ import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-
 import { getReportCadence } from "@/lib/report-cadence";
 import { getReplyVoice } from "@/lib/reviews/reply-voice";
 import { getContentAutonomy } from "@/lib/content-autonomy";
-import { getClientEmailOverride } from "@/lib/client-email-override";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { TenantEditor } from "./TenantEditor";
 import { OperatorControlsPanel } from "./OperatorControlsPanel";
+import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";
+import { OwnerInvitationsPanel } from "./OwnerInvitationsPanel";
+import { loadOwnerInvitations } from "@/platform/owner-entry/operator-invitations";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
+import { DomainView } from "./DomainView";
+import { loadDomainView } from "@/platform/operator-queue/domain-view-loader";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
@@ -40,6 +46,8 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { getClientLeadsForOperator } from "@/lib/client-leads";
 import { ClientLeadList } from "../../client-leads/ClientLeadList";
 import { ClientLogo, Chip, faviconFor, Panel, PanelLink } from "../../console";
+import { BusinessEffortForSite } from "../../work/BusinessEffort";
+import { loadBusinessEffort } from "../../work/effort-data";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -88,10 +96,11 @@ export default async function ClientDetailPage({
   // /sign-in rather than "/" to avoid a loop on the bare admin host where "/"
   // rewrites back to /admin.
   if (!(await isSuperAdmin())) redirect("/sign-in");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const { id } = await params;
   const tenant = await getTenantConfig(id);
-  if (!tenant) notFound();
+  if (!tenant) redirect(`/admin/tenant-cleanup/${encodeURIComponent(id)}`);
 
   const noRisk: AtRiskSignal = {
     tenantId: id,
@@ -102,6 +111,10 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
+  // loadBusinessEffort never throws; it reports disabled/denied/unavailable states.
+  const effortLoad = loadBusinessEffort();
+  const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(() => null);
+  const ownerInvitationsLoad = loadOwnerInvitations(id);
   const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -126,6 +139,8 @@ export default async function ClientDetailPage({
       getClientEmailOverride(id).catch(() => "inherit" as const),
       getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(() => null),
     ]);
+  const effort = await effortLoad;
+  const ownerInvitations = await ownerInvitationsLoad;
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
 
@@ -354,9 +369,17 @@ export default async function ClientDetailPage({
             visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
+        <ReleaseFlagsPanel tenantId={tenant.id} />
+        {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
+        <DomainView load={await domainViewLoad} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
         <DeploymentStatus status={deployStatus} tenantId={tenant.id} />
+      </Section>
+
+      {/* ── Human effort (ADR 0009 factory measure) ── */}
+      <Section label="Human effort">
+        <BusinessEffortForSite load={effort} tenantId={tenant.id} />
       </Section>
 
       {/* ── CRM ── */}

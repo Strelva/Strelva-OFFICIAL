@@ -265,7 +265,7 @@ export function SitePreview({
     }
   }, [activePage, setActiveSection]);
 
-  // Handle scroll-to-section requests from ContentBrowser
+  // Handle scroll-to-section requests from the managed website editor
   useEffect(() => {
     if (scrollToSection && iframeRef.current?.contentWindow) {
       try {

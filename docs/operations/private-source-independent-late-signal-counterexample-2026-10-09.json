@@ -1,0 +1,21 @@
+{
+  "injected": [
+    {
+      "line": 354,
+      "depth": 1
+    }
+  ],
+  "pending": [
+    15
+  ],
+  "inMemoryStatus": "PASS",
+  "retainedStatus": "PASS",
+  "retainedSignals": [],
+  "terminal": {
+    "path": "/tmp/strelva-review-owned-child-wbf92s75/late-signal-primary.json",
+    "status": "RETAINED"
+  },
+  "mainAccepts": true,
+  "childReaped": true,
+  "childGone": "CLOSED"
+}

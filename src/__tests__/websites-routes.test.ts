@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({
   prepareWebsiteLaunch: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: () => state.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => state.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => state.release }));
 vi.mock("@/products/websites/server", () => ({
   createWebsite: state.createWebsite,

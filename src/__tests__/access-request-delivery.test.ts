@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRedisStore = vi.hoisted(() => new Map<string, unknown>());
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn(() => "access-request-intake:test"),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => ({
     get: vi.fn((key: string) => Promise.resolve(mockRedisStore.get(key) ?? null)),
     set: vi.fn((key: string, value: unknown) => {
@@ -71,7 +71,7 @@ describe("access request delivery flow", () => {
     });
     expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"Strelva" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
       html: expect.stringContaining(`href="${body.statusUrl}"`),

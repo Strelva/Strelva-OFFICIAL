@@ -25,7 +25,7 @@
 
 import type { UnifiedEvent } from "../types";
 import type { DecisionAction, ProposalStatus } from "./types";
-import { governedWorkDualWriteEnabled } from "../db/dual-write";
+import { governedWorkDualWriteEnabled } from "@/platform/infra/db/dual-write";
 import {
   finishExecutionAttempt,
   insertProposal,

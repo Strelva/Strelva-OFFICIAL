@@ -1,3 +1,5 @@
+import { googleReviewContentLive } from "@/platform/infra/google-review-content";
+import { workspacePorts } from "../workspace-ports";
 /**
  * The "auto-post" half of done-for-you review replies.
  *
@@ -16,12 +18,15 @@
 
 import type { TenantConfig, UnifiedEvent } from "../types";
 import { getEventsRaw, addEvent, updateEvent } from "../events";
-import { resolveEventAction } from "../event-actions";
+import { AUTO_REPLY_ACTOR, resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
 import { draftReviewReply, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
 import { mapPool } from "../concurrency";
+import { autoReplyAllowed } from "./auto-reply-rule";
+
+export { AUTO_REPLY_MIN_RATING, autoReplyAllowed } from "./auto-reply-rule";
 
 /** Tenant-level concurrency for the auto-reply crons. A serial per-tenant loop
  *  with up-to-2 Gemini calls each blows Vercel's 300s budget past ~30 tenants;
@@ -61,6 +66,7 @@ export async function draftReplyBacklog(
     if (t.active === false) return;
     const voice = await getReplyVoice(t.id).catch(() => null);
     if (!voice || voice.mode === "off") return;
+    if (!(await (await workspacePorts().tenantReviewReplies()).listingDraftingAllowed(t.id))) return;
 
     const [reviews, pending] = await Promise.all([
       getReviews(t.id).catch(() => []),
@@ -79,7 +85,7 @@ export async function draftReplyBacklog(
       // Only Google reviews can be published back through the GBP API. Drafting
       // for Yelp/manual reviews queues a reply whose id can never resolve, so it
       // fails every auto-post run forever (alert-event + Slack spam).
-      if (r.source !== "google") continue;
+      if (r.source !== "google" || !googleReviewContentLive(r.providerContent, nowMs)) continue;
       const reviewId = r.externalId ?? r.id;
       if (alreadyDrafted.has(reviewId)) continue;
       // A prior owner dismissal is a durable per-review veto — never re-draft it.
@@ -98,11 +104,13 @@ export async function draftReplyBacklog(
           status: "pending",
           metadata: {
             kind: "review_reply_draft",
+            providerContent: r.providerContent,
             reviewId,
             rating: r.rating,
             author: r.author,
             draftedReply: reply,
-            ...(voice.mode === "auto"
+            // 1 and 2 star replies always go to the owner, even in auto mode.
+            ...(voice.mode === "auto" && autoReplyAllowed(r.rating)
               ? { autoPostAt: new Date(nowMs + AUTO_POST_DELAY_MS).toISOString() }
               : {}),
           },
@@ -140,15 +148,17 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
       () => [] as UnifiedEvent[],
     );
     for (const e of pending) {
-      if (e.metadata?.kind !== "review_reply_draft") continue;
+      if (e.metadata?.kind !== "review_reply_draft" || !googleReviewContentLive(e.metadata.providerContent, nowMs)) continue;
       if (e.metadata?.autoPostFailed === true) continue; // gave up after the cap
+      // A draft stamped before the rating rule still goes to the owner.
+      if (!autoReplyAllowed(e.metadata?.rating)) continue;
       const at = e.metadata?.autoPostAt;
       if (typeof at !== "string") continue; // approve-mode drafts carry no timer
       const due = new Date(at).getTime();
       if (Number.isNaN(due) || due > nowMs) continue; // still inside the window
       let ok = false;
       try {
-        const result = await resolveEventAction(t.id, e.id, "approved");
+        const result = await resolveEventAction(t.id, e.id, "approved", AUTO_REPLY_ACTOR);
         ok = result.changed;
       } catch {
         ok = false;

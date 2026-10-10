@@ -120,7 +120,9 @@ Two ways to handle form submissions; pick per site:
    owner gets the platform's lead email. This path has no published inquiry capability
    version, so it does not enter the governed reply/follow-up workspace. Use the
    versioned `StrelvaInquiryForm.tsx` path below when the owner needs that record and
-   responsibility history.
+   responsibility history. A `200 {ok:true}` means a store holds the lead. When no store
+   could confirm it, the route answers `503` with `code: "lead_storage_unavailable"`, and
+   the form shows its try-again message instead of a false receipt.
 2. **Standalone email** — `form-route.template.tsx` + `scaffold-forms.ts`. The drop-in
    **Formspree replacement** for ANY site (Studio sites, or any repo not wired as a
    tenant): the form POSTs, the owner is emailed the submission directly via Resend.
@@ -309,6 +311,50 @@ import { trackPhoneClick } from "@/components/ScaffoldTracker";
 The tracker fails silent, is non-blocking (`sendBeacon` / `keepalive` fetch),
 skips in development, and respects `prefers-reduced-data`. It never throws, so a
 network error or missing env var can never break the client site.
+
+Page views and CTA clicks remain anonymous engagement signals. An `order` sent
+from browser JavaScript is accepted for compatibility but is marked unverified
+and is not shown in Store totals, order lists, or order follow-up. A browser
+cannot safely hold the site's signing key. Use the server-side Stripe webhook
+below to report completed orders.
+
+#### Verify server-side orders
+
+The track endpoint verifies optional Ed25519 signatures bound to the tenant,
+the exact request body, a five-minute timestamp, and one of the site's
+configured public origins. The starter adds the signed origin as
+`x-reb-track-origin`; server-side `fetch` does not supply a browser `Origin`
+header. Browser beacons can continue to use their normal `Origin` header.
+Unsigned legacy requests still receive HTTP 200, but do not create an order.
+Verified orders are deduplicated by their provider order id.
+
+Create one Ed25519 key pair per site outside the repo:
+
+```bash
+umask 077
+openssl genpkey -algorithm Ed25519 -out /private/path/track-private.pem
+openssl pkey -in /private/path/track-private.pem -pubout -out /private/path/track-public.pem
+openssl pkey -in /private/path/track-private.pem -outform DER | base64 | tr -d '\n'
+```
+
+Send the contents of `track-public.pem` in an authorized
+`PATCH /api/admin/tenants` request with `{ "id": "TENANT_ID", "trackingPublicKey": "...PEM..." }`.
+The key is write-only through that API; its response says whether a key is
+configured and never returns the public key. Set the base64 PKCS#8 DER output
+as the client repo's server-only `REB_TRACKING_PRIVATE_KEY` environment value.
+Never use a `NEXT_PUBLIC_` variable or commit the private key.
+
+Copy `track-signature.ts` into the client repo beside the webhook template. The
+starter's Stripe webhook signs the verified checkout event automatically when
+`REB_TRACKING_PRIVATE_KEY` is set. Its request URL origin must match a configured
+site origin from `siteUrl`, `productionDomain`, `customDomains`, or the hosted
+tenant URL. Keep the private key only in the server environment.
+
+When a new public key is configured, Strelva keeps the previous key valid for
+24 hours so in-flight webhook deliveries can finish during rotation. Only the
+immediately previous key is retained; another rotation replaces that overlap
+key. Clearing `trackingPublicKey` with an empty string removes both keys and
+returns the site to compatibility mode, where new order beacons are unverified.
 
 See `docs/operations/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
 roll this into the live GLDF and Rohlax repos plus how to verify the report
@@ -656,6 +702,7 @@ unit-tested.
 - [ ] Booking CTA calls `trackBookingClick(serviceId)`
 - [ ] DNS configured: production domain, www subdomain, admin subdomain
 - [ ] Vercel env vars set: `TENANT_ID`, `SCAFFOLD_API_URL`, `REVALIDATION_SECRET`, `NEXT_PUBLIC_TENANT_ID`, `NEXT_PUBLIC_SCAFFOLD_API_URL`
+- [ ] Commerce outcomes: per-site Ed25519 public key is configured in Strelva and server-only `REB_TRACKING_PRIVATE_KEY` is set in this repo
 
 ## Commerce (optional — for storefront clients)
 
@@ -663,8 +710,9 @@ Drop-in module under `commerce/` for a client that sells online. Proven on RHM +
 GLDF, promoted here per the build-at-2-repos rule. Reads the canonical Model B
 product catalog from Strelva; checkout is **rock solid by construction** — prices
 come from the catalog server-side (never the browser), sold-out items are
-rejected, and a completed order fires the Strelva `order` beacon so the owner's
-dashboard Store shows revenue/orders in real time.
+rejected, and a completed Stripe webhook signs the Strelva `order` beacon so
+the owner's dashboard Store shows verified revenue and orders. Browser-side
+order beacons remain compatible but are excluded from Store outcomes.
 
 | File | Drop into | What it does |
 |------|-----------|--------------|

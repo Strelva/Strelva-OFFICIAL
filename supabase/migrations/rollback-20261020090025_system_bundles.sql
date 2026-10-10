@@ -1,0 +1,46 @@
+-- Prepared rollback. Refuse to erase any installed native lineage or receipt.
+begin;
+set local lock_timeout='2s';
+do $$ begin if exists(select 1 from public.system_bundle_installations) or exists(select 1 from public.system_bundle_native_rehearsals) or exists(select 1 from public.system_bundle_target_scopes) then raise exception 'system_bundle_receipts_require_preservation'; end if; end $$;
+do $$ declare body text; patched text; original text; begin
+ select pg_get_functiondef('public.save_system_version_owner_grants_core(uuid,text,uuid,bigint,jsonb)'::regprocedure) into body;
+ execute replace(body,'public.system_bundle_component_definition(v.id,r.definition)','r.definition');
+ select pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure) into body;
+ patched:=$bundle$  perform 1 from public.workspace_memberships where workspace_id=p_workspace_id and user_id=p_user_id for share;
+  if not found then
+    -- Provider seats extend only website work, never other bounded payloads.
+    if p_product_id is distinct from 'websites'
+      or not exists(select 1 from public.saved_product_work where id=p_work_id and workspace_id=p_workspace_id and product_id='websites' and resource_kind='website')
+      or (coalesce(public.provider_seat_role(p_workspace_id,p_user_id,true) not in ('owner','admin','member'),true)
+        and not (p_expected_revision=0 and public.system_bundle_native_draft_active(p_workspace_id,p_work_id,p_user_id,p_verified_email)))
+      then raise exception 'workspace_access_denied'; end if;
+  end if;$bundle$;
+ original:=$current$  perform 1 from public.workspace_memberships where workspace_id=p_workspace_id and user_id=p_user_id for share;
+  if not found then
+    -- Provider seats extend only website work, never other bounded payloads.
+    if p_product_id is distinct from 'websites'
+      or not exists(select 1 from public.saved_product_work where id=p_work_id and workspace_id=p_workspace_id and product_id='websites' and resource_kind='website')
+      or coalesce(public.provider_seat_role(p_workspace_id,p_user_id,true) not in ('owner','admin','member'),true)
+      then raise exception 'workspace_access_denied'; end if;
+  end if;$current$;
+ if position(patched in body)=0 then raise exception 'system_bundle_native_authority_rollback_invalid'; end if;
+ execute replace(body,patched,original);
+end $$;
+drop function public.read_version_actor(uuid,text);
+alter function public.read_version_actor_bundle_core(uuid,text) rename to read_version_actor;
+revoke all on function public.read_version_actor(uuid,text) from public,anon,authenticated;
+grant execute on function public.read_version_actor(uuid,text) to service_role;
+drop function public.system_version_json(public.system_versions,text,uuid,text);
+alter function public.system_version_json_bundle_core(public.system_versions,text,uuid,text) rename to system_version_json;
+drop function public.system_actor_scope(uuid,uuid,text,boolean);
+alter function public.system_actor_scope_bundle_core(uuid,uuid,text,boolean) rename to system_actor_scope;
+drop function public.website_document_assert_actor(uuid,uuid,uuid,text,boolean,boolean);
+alter function public.website_document_assert_actor_bundle_core(uuid,uuid,uuid,text,boolean,boolean) rename to website_document_assert_actor;
+drop function public.system_package_rehearsal(jsonb);
+alter function public.system_package_rehearsal_bundle_core(jsonb) rename to system_package_rehearsal;
+drop function public.system_package_behavior(jsonb,text[]);
+alter function public.system_package_behavior_bundle_core(jsonb,text[]) rename to system_package_behavior;
+drop function public.read_system_bundle_install_receipt(uuid,uuid,text,uuid,uuid,text,jsonb),public.read_system_bundle_target_choices(uuid,uuid,text,uuid,uuid),public.read_system_bundle_targets(uuid,uuid,text,uuid,uuid,jsonb),public.grant_system_bundle_targets(uuid,uuid,text,uuid,jsonb),public.install_system_bundle(uuid,uuid,text,uuid,uuid,uuid,integer,uuid,text,jsonb,bigint,integer,integer,jsonb,jsonb),public.system_bundle_read_work_ids(uuid,uuid,text),public.system_bundle_read_scope(uuid,uuid,text,uuid,uuid,jsonb),public.system_bundle_native_draft_active(uuid,uuid,uuid,text),public.system_bundle_component_definition(uuid,jsonb),public.system_bundle_assert_scope(uuid,uuid,text,uuid,uuid,jsonb),public.read_system_bundle_qualification_source(uuid,uuid,text,uuid),public.record_system_bundle_qualification(uuid,uuid,text,uuid,jsonb);
+drop table public.system_bundle_components,public.system_bundle_draft_permissions,public.system_bundle_target_scopes,public.system_bundle_installations,public.system_bundle_native_rehearsals;
+drop function public.system_bundle_receipt_immutable();
+commit;

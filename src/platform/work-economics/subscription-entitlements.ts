@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   MAX_PERIOD_SPENDING_CAP_CENTS,
   MAX_WORK_ALLOWANCE_UNITS,
@@ -25,6 +25,8 @@ export const subscriptionAllowanceEntitlementSchema = z.object({
   customerId: STRIPE_ID.nullable(),
   workspaceId: UUID,
   payerId: UUID,
+  payerKind: z.enum(["business", "agency"]).optional(),
+  payerWorkspaceId: UUID.optional(),
   configKey: CONFIG_KEY,
   status: STATUS,
   periodStart: DATE_TIME,
@@ -32,6 +34,7 @@ export const subscriptionAllowanceEntitlementSchema = z.object({
   grants: z.array(GRANT).min(1).max(WORK_ALLOWANCE_UNIT_KINDS.length).optional(),
   spendingCapCents: z.number().int().nonnegative().max(MAX_PERIOD_SPENDING_CAP_CENTS).optional(),
 }).strict().superRefine((value, context) => {
+  if ((value.payerKind === "agency") !== Boolean(value.payerWorkspaceId)) context.addIssue({ code: z.ZodIssueCode.custom, path: ["payerWorkspaceId"], message: "An agency entitlement needs its payer workspace." });
   const start = Date.parse(value.periodStart);
   const end = Date.parse(value.periodEnd);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 370 * 24 * 60 * 60 * 1000) {
@@ -289,6 +292,8 @@ export function subscriptionAllowanceFromStripeEvent(event: unknown): Subscripti
         : metadata.customerId ?? null),
     workspaceId,
     payerId,
+    ...(metadata.payerKind ? { payerKind: metadata.payerKind } : {}),
+    ...(metadata.payerWorkspaceId ? { payerWorkspaceId: metadata.payerWorkspaceId } : {}),
     configKey,
     status: terms && (status === "active" || status === "trialing") ? status : terms ? status : "unavailable",
     periodStart: period.start,

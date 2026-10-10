@@ -1,4 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { setOwnerRecipientResolver } from "@/lib/owner-recipient";
+
+afterEach(() => { setOwnerRecipientResolver(null); vi.unstubAllEnvs(); });
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
@@ -9,13 +13,13 @@ const mockSendWelcome = vi.hoisted(() => vi.fn());
 const mockSendSiteLive = vi.hoisted(() => vi.fn());
 const mockSendReviewRequest = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/storage", () => ({ logAuditEvent: mockLogAuditEvent }));
-vi.mock("@/lib/email-enabled", () => ({ emailSendingPaused: mockEmailSendingPaused }));
+vi.mock("@/platform/infra/email/enabled", () => ({ emailSendingPaused: mockEmailSendingPaused }));
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardUrl: () => "https://admin.demo.com/dashboard",
 }));
@@ -56,6 +60,14 @@ beforeEach(() => {
 });
 
 describe("POST /api/admin/tenants/[id]/lifecycle-email", () => {
+  it("rollout sends lifecycle notices to the one owner-recipient rule", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", "1");
+    setOwnerRecipientResolver(async () => ({ email: "record-owner@example.test", name: null, from: "record", workspaceId: "w" }));
+    const { POST } = await import("@/app/api/admin/tenants/[id]/lifecycle-email/route");
+    expect((await POST(post({ type: "welcome" }), params("demo"))).status).toBe(200);
+    expect(mockSendWelcome).toHaveBeenCalledWith(expect.objectContaining({ email: "record-owner@example.test", tenantId: "demo" }));
+  });
+
   it("403s a non-super-admin", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
     const { POST } = await import("@/app/api/admin/tenants/[id]/lifecycle-email/route");

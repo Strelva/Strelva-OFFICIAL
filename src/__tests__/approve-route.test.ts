@@ -7,12 +7,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // be idempotent (already-resolved → friendly page, not an error).
 
 const mockResolveEventAction = vi.hoisted(() => vi.fn());
+const mockBrand = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mockBrand, resolveOwnerBrand: mockBrand }));
+
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mockResolveEventAction }));
+// Existing tenant links must not load the unreleased workspace decision runtime.
+vi.mock("@/experience/workspace/needs-you-server", () => { throw new Error("Legacy approval loaded workspace runtime"); });
+vi.mock("@/app/api/owner-website-preview/preview", () => { throw new Error("Legacy approval loaded website renderer"); });
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardUrl: (t: { id: string }, path: string) => `https://admin.${t.id}.strelva.com${path}`,
+}));
+// These cases exercise legacy tenant links. Workspace-link behavior has its
+// own route tests; avoid loading its unrelated execution graph in each reset.
+vi.mock("@/experience/workspace/needs-you-server", () => ({
+  needsYouReleaseEnabled: () => false,
+  needsYouAppOrigin: () => "https://app.strelva.example",
+  needsYouService: {}, needsYouStore: {},
 }));
 
 const claims = { eventId: "evt_1", tenantId: "gldf", action: "approve" as const };
@@ -40,6 +53,7 @@ async function postReq(token: string | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockBrand.mockResolvedValue({ agencyId: null });
   process.env.APPROVE_LINK_SECRET = "test-approve-secret";
   mockGetTenantConfig.mockResolvedValue({ id: "gldf", siteName: "GLDF" });
   mockResolveEventAction.mockResolvedValue({ changed: true });
@@ -137,5 +151,52 @@ describe("POST /api/approve (the real resolve)", () => {
     const { signApproveToken } = await import("@/lib/approve-link");
     const res = await postReq(signApproveToken(claims));
     expect(res.status).toBe(403);
+  });
+
+  it("refuses a tenant link once the site has a business: nothing resolves (#524)", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => ({ email: "trusted@gldf.example", name: null, from: "record", workspaceId: "w1", tenantId: "gldf" }));
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const token = signApproveToken(claims);
+    const res = await postReq(token);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("Decide this in Strelva");
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    const confirm = await getReq(token);
+    expect(confirm.status).toBe(403);
+    expect(await confirm.text()).not.toContain('method="POST"');
+  });
+
+  it("refuses a tenant link when the site's business can't be read (fail closed)", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => { throw new Error("db down"); });
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(403);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("a site with no business keeps its tenant link", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => ({ email: "owner@gldf.example", name: null, from: "tenant", workspaceId: null, tenantId: "gldf" }));
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(200);
+    expect(mockResolveEventAction).toHaveBeenCalledWith("gldf", "evt_1", "approved");
+  });
+});
+
+describe("owner link agency presentation", () => {
+  it("brands a scanner-safe confirmation and a successful decision with escaped identity", async () => {
+    mockBrand.mockResolvedValue({ agencyId: "agency", name: '<Agency & "Web">', logoUrl: null, accentColor: "#ffff00", replyTo: "reply@agency.example", credit: "runs_on_strelva" });
+    const { signApproveToken } = await import("@/lib/approve-link"); const token = signApproveToken(claims);
+    const confirm = await getReq(token); const html = await confirm.text();
+    expect(html).toContain("&lt;Agency &amp; &quot;Web&quot;&gt;"); expect(html).toContain("Runs on Strelva."); expect(html).toContain("background:#ffff00;color:#000000"); expect(html).toContain('method="POST"'); expect(mockResolveEventAction).not.toHaveBeenCalled();
+    const result = await postReq(token); expect(result.status).toBe(200); expect(await result.text()).toContain("Runs on Strelva."); expect(mockResolveEventAction).toHaveBeenCalledTimes(1);
+  });
+  it("preserves a completed decision when brand storage is unavailable", async () => {
+    mockBrand.mockRejectedValue(new Error("Brand storage offline"));
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const response = await postReq(signApproveToken(claims)); expect(response.status).toBe(200); expect(mockResolveEventAction).toHaveBeenCalledTimes(1);
   });
 });

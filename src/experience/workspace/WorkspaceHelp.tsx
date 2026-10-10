@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { WorkspaceHelp as WorkspaceHelpForm, type WorkspaceHelpProps } from "./WorkspaceHelpForm";
 import { BusinessSetupPanel } from "./BusinessSetupPanel";
-export type { WorkspaceHelpProps, WorkspaceHelpProviderOption } from "./WorkspaceHelpForm";
+export type { WorkspaceHelpProps, WorkspaceHelpAgencyOption, WorkspaceHelpProviderOption } from "./WorkspaceHelpForm";
 
 export function WorkspaceHelp(props: WorkspaceHelpProps) {
   const [contactOpen, setContactOpen] = useState(false);

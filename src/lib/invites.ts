@@ -1,6 +1,6 @@
-import { getRedis } from "./redis";
-import type { ClientRole } from "./auth";
-import { createInvite as createInvitePg } from "./db/repositories";
+import { getRedis } from "@/platform/infra/redis";
+import type { ClientRole } from "@/platform/infra/auth";
+import { createInvite as createInvitePg } from "@/platform/infra/db/repositories";
 
 const INVITE_PREFIX = "reb:invites:";
 const INVITE_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -64,16 +64,4 @@ export async function getInvite(email: string): Promise<PendingInvite | null> {
 
   const key = `${INVITE_PREFIX}${email.toLowerCase()}`;
   return redis.get<PendingInvite>(key);
-}
-
-export async function consumeInvite(email: string): Promise<PendingInvite | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  const key = `${INVITE_PREFIX}${email.toLowerCase()}`;
-  const invite = await redis.get<PendingInvite>(key);
-  if (invite) {
-    await redis.del(key);
-  }
-  return invite;
 }

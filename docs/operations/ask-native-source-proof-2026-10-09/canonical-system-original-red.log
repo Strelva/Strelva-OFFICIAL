@@ -1,0 +1,38 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-creator-maintenance-auth-proof-20261009
+
+ ❯ src/__tests__/ask-strelva.test.ts (496 tests | 1 failed | 495 skipped) 5ms
+     × resolves the canonical stored app System and reaches the native tool instead of guessing its work-derived id 5ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 495 skipped (496)
+   Start at  11:17:32
+   Duration  264ms (transform 127ms, setup 30ms, import 164ms, tests 5ms, environment 0ms)
+
+(node:19444) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/ask-strelva.test.ts > startAskTurn > resolves the canonical stored app System and reaches the native tool instead of guessing its work-derived id
+AssertionError: expected { kind: 'refused', status: 404, …(1) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "error": "This System is unavailable to your account.",
+  "kind": "refused",
+  "status": 404,
+}
+
+ ❯ src/__tests__/ask-strelva.test.ts:274:28
+    272|     h.deps.nativeSystems = { read: native, prepare: vi.fn() };
+    273|     const result = await run(h.deps, "What fields does this app have?"…
+    274|     expect(result.refused).toBeNull();
+       |                            ^
+    275|     expect(native).toHaveBeenCalledWith(actor, { workspaceId: WS, syst…
+    276|     expect(result.text).toContain(NATIVE_WORK);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

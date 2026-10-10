@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getServiceHealth } from "@/lib/health";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { pruneOldEvents } from "@/lib/events";
 import { createDailySiteSnapshot } from "@/lib/storage";

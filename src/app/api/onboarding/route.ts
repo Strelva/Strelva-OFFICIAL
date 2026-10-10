@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { readWorkspaceBody, isWorkspaceBodyTooLarge } from "@/platform/workspaces/http";
 import {
   acceptOnboardingRequirement,
   attachExistingOnboardingDocument,
@@ -22,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, {
   status,
-  headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+  headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" },
 });
 
 async function actor() {
@@ -34,6 +35,7 @@ function failure(error: unknown) {
   if (error instanceof WorkspaceAccessError) return json({ error: "This onboarding work is unavailable to your account." }, 403);
   if (error instanceof OnboardingUnavailableError) return json({ error: error.message }, 404);
   if (error instanceof WorkspaceConflictError || error instanceof OnboardingConflictError) return json({ error: error.message }, 409);
+  if (isWorkspaceBodyTooLarge(error)) return json({ error: "This onboarding request is too large." }, 413);
   if (error instanceof z.ZodError) return json({ error: "Check the onboarding details and try again." }, 400);
   if (error instanceof WorkspaceStoreError) return json({ error: error.message }, 503);
   return json({ error: "Onboarding storage is unavailable. Your change has not been confirmed." }, 503);
@@ -46,9 +48,9 @@ function sameOrigin(request: Request): boolean {
 
 export async function GET(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to open onboarding." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to open onboarding." }, 401);
     const params = new URL(request.url).searchParams;
     const documentWorkId = params.get("documentWorkId");
     if (documentWorkId) return json(await readOnboardingUpload(current, documentWorkId));
@@ -70,9 +72,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
   if (!sameOrigin(request)) return json({ error: "Open Strelva directly to change onboarding." }, 403);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to change onboarding." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to change onboarding." }, 401);
     if (!request.headers.get("content-type")?.startsWith("application/json")) return json({ error: "Send a JSON onboarding request." }, 415);
     const body = z.discriminatedUnion("action", [
       z.object({ action: z.literal("create"), input: z.unknown() }).strict(),
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("review"), caseId: z.string().uuid(), requirementId: z.string().uuid(), values: z.unknown() }).strict(),
       z.object({ action: z.literal("correction"), caseId: z.string().uuid(), requirementId: z.string().uuid(), note: z.string().optional() }).strict(),
       z.object({ action: z.literal("accept"), caseId: z.string().uuid(), requirementId: z.string().uuid() }).strict(),
-    ]).parse(await request.json());
+    ]).parse(await readWorkspaceBody(request));
     if (body.action === "create") return json(await createOnboardingCase(current, body.input), 201);
     if (body.action === "assign") return json(await assignOnboardingCase(current, body.caseId, { email: body.email, userId: body.userId }));
     if (body.action === "attach") return json(await attachExistingOnboardingDocument(current, body));

@@ -60,7 +60,7 @@ vi.mock("@/lib/storage", () => ({
   getSectionTimestamps: () => Promise.resolve({}),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => null,
 }));
 
@@ -106,7 +106,7 @@ vi.mock("@/lib/apply-section-update", () => ({
   applySectionUpdate: vi.fn(),
 }));
 
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: { id: "primary" }, label: "primary" }),
   getFallbackModel: () => null,
   isTransientModelError: () => false,

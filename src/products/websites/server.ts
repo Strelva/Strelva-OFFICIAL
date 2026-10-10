@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
+import { type BoundedStore } from "@/platform/bounded-work/repository";
+import { websiteWorkspaceStore as boundedStore } from "./workspace-store";
 import { listWork } from "@/platform/workspaces/repository";
 import {
   WorkspaceAccessError,
@@ -556,3 +557,17 @@ export const approveWebsite = (actor: WorkspaceActor, workId: string, input: unk
 export const prepareWebsiteLaunch = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.prepareLaunch(actor, workId, input);
 export const listWebsiteCapabilityOptions = (actor: WorkspaceActor, workId: string) => websiteService.capabilityOptions(actor, workId);
 export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.connectCapabilities(actor, workId, input);
+
+// A managed website in the workspace: how it changes, its own pages, and repo-change Requests.
+export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-editing";
+export { resolveWorkspaceSite, type WorkspaceSiteDeps, type WorkspaceSiteState } from "./workspace-site";
+export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
+
+/** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */
+export { crawlWebsite, normalizeRebuildUrl, WebsiteCrawlError } from "./rebuild-crawl";
+export { extractBusinessFacts } from "./rebuild-pipeline";
+
+/** Product adapter for platform assistant website operations. */
+export { createAgentWebsiteAdapter } from "./agent-adapter";
+
+export { readWorkspaceResults } from "./linked-results";

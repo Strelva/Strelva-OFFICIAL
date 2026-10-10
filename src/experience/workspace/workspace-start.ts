@@ -36,6 +36,11 @@ export interface WorkspaceStartContext {
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   /** Discovery can be partially unavailable even when saved work is readable. */
   managedWorkUnavailable?: boolean;
+  /**
+   * The workspace has an accepted managed service relationship. When omitted it
+   * is inferred from a connected managed website plus managed availability.
+   */
+  managedRelationship?: boolean;
   /** Layout supplies the callbacks that are actually mounted in this route. */
   native?: Partial<Record<WorkspaceStartRoute, boolean>>;
 }
@@ -66,6 +71,8 @@ export interface WorkspaceStartPlan {
   helpRequest?: string;
   /** A provider request opens review, never a self-service generator or delivery promise. */
   deliveryMode?: "service";
+  /** Offered second on a managed service request, only where the owner can make Systems. */
+  selfServiceRoute?: "websites";
   /** Native routes found in the request, in the order they were mentioned. */
   matchedRoutes?: readonly Exclude<WorkspaceStartRoute, "help">[];
   needsSelection?: "business" | "site";
@@ -184,7 +191,7 @@ const SIGNALS: readonly Signal[] = [
 
 const ROUTE_ORDER = ["onboarding", "websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
 
-function normalizeRequest(value: string): string {
+function normalizeAsk(value: string): string {
   // Preserve the person's wording, punctuation and line breaks for the native
   // or model-backed flow. Matching operates on whitespace-insensitive regexes.
   return value.trim();
@@ -315,7 +322,7 @@ function emptyPlan(): WorkspaceStartPlan {
 }
 
 function helpPlan(request: string, context: WorkspaceStartContext, routes: readonly Exclude<WorkspaceStartRoute, "help">[] = []): WorkspaceStartPlan {
-  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace you own before preparing a plan." : undefined;
+  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace where you can start work before preparing a plan." : undefined;
   const multiOutcome = routes.length > 1;
   return {
     kind: "help",
@@ -323,27 +330,47 @@ function helpPlan(request: string, context: WorkspaceStartContext, routes: reado
     route: "help",
     request,
     context,
-    title: multiOutcome ? "A plan that keeps the whole request" : "Let’s narrow that down together.",
+    title: multiOutcome ? "A plan that keeps the whole ask" : "Let’s narrow that down together.",
     summary: multiOutcome
-      ? "We’ll prepare one plan for the full request. You can review it before work starts."
-      : "This request does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
+      ? "We’ll prepare one plan for the full ask. You can review it before work starts."
+      : "This ask does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
     parts: [],
     ...(reason ? { reason } : {}),
     helpRequest: request,
     matchedRoutes: [...routes],
     selectedPartIds: [],
-    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this request down.",
+    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this ask down.",
     canContinue: !reason,
   };
+}
+
+function requestsSelfService(request: string): boolean {
+  return /\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request);
+}
+
+function hasManagedRelationship(context: WorkspaceStartContext): boolean {
+  if (context.managedRelationship !== undefined) return context.managedRelationship;
+  return Boolean(context.managedSites?.length) && productFor(context, "website")?.availability === "managed";
+}
+
+/**
+ * New website work in a managed workspace: a new site or page, or a redo of the
+ * existing one. Ordinary edits to the connected site stay on the change flow.
+ */
+function requestsManagedWebsiteWork(request: string): boolean {
+  if (/\b(?:new|another)\s+(?:website|web site|site|landing page|page)\b/i.test(request)) return true;
+  if (/\b(?:redo|rebuild|redesign|remake|replace|start over)\b[^.!?;\n]{0,40}\b(?:website|web site|site)\b/i.test(request)) return true;
+  if (/\badd\b[^.!?;\n]{0,40}\bpages?\b/i.test(request)) return true;
+  return matchedRoutes(request).includes("websites");
 }
 
 function requestsWebsiteService(request: string): boolean {
   if (!/\b(?:website|web site|landing page)\b/i.test(request)) return false;
   // Negated or explicitly self-service requests stay on the existing planning path.
-  if (/\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request)) return false;
+  if (requestsSelfService(request)) return false;
   if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
-  const providerFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
-  return providerFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+  const agencyFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
+  return agencyFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
 }
 
 function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
@@ -360,11 +387,12 @@ function websiteServicePlan(request: string, context: WorkspaceStartContext): Wo
     status: reason ? "blocked" : "help",
     reason,
     canContinue: !reason,
+    ...(!context.readOnly && supportedFlowMounted(context, "websites") && hasAvailableProduct(context, "websites") ? { selfServiceRoute: "websites" as const } : {}),
   };
 }
 
 function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): string | undefined {
-  if (context.readOnly) return "This workspace is read-only. Switch to a workspace you own before starting new work.";
+  if (context.readOnly) return "This workspace is read-only. Switch to a workspace where you can start work before starting new work.";
   if (!supportedFlowMounted(context, route)) return "This flow is not available in the current workspace. Nothing has been started.";
   if (!hasAvailableProduct(context, route)) {
     if (route === "website") return "Website work is available here only for a connected managed website.";
@@ -377,16 +405,35 @@ function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceS
 }
 
 export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput, suppliedContext: WorkspaceStartContext = {}): WorkspaceStartPlan {
-  const request = normalizeRequest(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
+  const request = normalizeAsk(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
   if (requestsWebsiteService(request)) return websiteServicePlan(request, context);
+  // The accepted managed relationship chooses the default: no special wording
+  // such as "hire Strelva" is needed (audit 2026-10-05, finding 7).
+  if (hasManagedRelationship(context) && !requestsSelfService(request) && requestsManagedWebsiteWork(request)) return websiteServicePlan(request, context);
 
   const routes = matchedRoutes(request);
   if (routes.length > 1) return helpPlan(request, context, routes);
   const route = routes[0] || classify(request);
   if (!route) return helpPlan(request, context);
+  return routePlan(request, context, route);
+}
 
+/**
+ * "Make it yourself instead": the second choice on a managed website request.
+ * Returns the self-service website plan for the same request, or null where
+ * the plan offered no self-service route (read-only, flow not mounted, or the
+ * product is not available). Nothing has been sent either way.
+ */
+export function selfServiceWorkspaceStartPlan(plan: WorkspaceStartPlan): WorkspaceStartPlan | null {
+  if (plan.deliveryMode !== "service" || plan.selfServiceRoute !== "websites") return null;
+  const context = plan.context || {};
+  const next = routePlan(plan.request, context, plan.selfServiceRoute);
+  return next.status === "ready" ? next : null;
+}
+
+function routePlan(request: string, context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): WorkspaceStartPlan {
   const copy = ROUTE_COPY[route];
   const parts = partsFor(route, request);
   const reason = blockedReason(context, route);

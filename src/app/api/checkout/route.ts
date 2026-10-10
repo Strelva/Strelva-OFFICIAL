@@ -1,11 +1,14 @@
+import { createHash } from "node:crypto";
+import { assertBusinessCheckoutAdmission, connectEnabled, getConnectedMerchant, moneyRpc, type ConnectedAccount } from "@/platform/connect";
+import { workspaceIdForTenant } from "@/platform/business-billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getContent } from "@/lib/storage";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 
 const checkoutItemSchema = z.object({
   productId: z.string(),
@@ -140,8 +143,35 @@ export async function POST(req: NextRequest) {
   const hasSubscription = subItems.length > 0;
   const mode = hasSubscription ? "subscription" : "payment";
 
+  const connectedCheckout = (process.env.STRELVA_CONNECT_CHECKOUT_TENANTS ?? "").split(",").map(v => v.trim()).includes(tenant);
+  let merchantAccount: string | undefined;
+  let paymentId: string | undefined;
+  let paymentKey: string | undefined;
+  let existingSession: string | undefined;
+  let checkoutMerchant: ConnectedAccount | undefined;
+  if (connectedCheckout) {
+    if (!connectEnabled()) return NextResponse.json({error:"Business payments are not enabled."},{status:503});
+    // Existing customers are activated separately after merchant/KYC/provider verification.
+    const key = req.headers.get("idempotency-key");
+    if (!key || key.length < 8 || key.length > 200) return NextResponse.json({error:"A stable payment request key is required."},{status:400});
+    if (hasSubscription) return NextResponse.json({error:"Connected recurring store checkout requires a separately approved recurring-sale policy."},{status:409});
+    try {
+      const workspaceId = await workspaceIdForTenant(tenant);
+      if (!workspaceId) return NextResponse.json({error:"The business merchant is unavailable."},{status:503});
+      const merchant = await getConnectedMerchant(workspaceId);
+      checkoutMerchant=merchant;
+      merchantAccount = merchant.stripe_account_id!;
+      const subtotal = lineItems.reduce((sum,item)=>sum+item.price_data.unit_amount*item.quantity,0);
+      const payment = await moneyRpc<{id:string}>("reserve_business_payment", {p_workspace_id:workspaceId,p_key:key,p_purpose:"checkout",p_amount:subtotal+(subtotal>=4500?0:599),p_currency:"usd",p_reference:createHash("sha256").update(JSON.stringify(lineItems)).digest("hex")});
+      await moneyRpc("claim_business_payment_channel",{p_payment_id:payment.id,p_channel:"checkout"});
+      existingSession=(await moneyRpc<{sessionId?:string}>("prepare_business_checkout",{p_payment_id:payment.id}))?.sessionId;
+      paymentId=payment.id;paymentKey=`payment:${payment.id}`;
+    } catch {return NextResponse.json({error:"The business merchant could not be confirmed."},{status:503});}
+  }
   try {
-    const session = await stripe.checkout.sessions.create({
+    if(paymentId && checkoutMerchant && !existingSession) await assertBusinessCheckoutAdmission(paymentId,checkoutMerchant);
+    const session = existingSession ? await stripe.checkout.sessions.retrieve(existingSession,{stripeAccount:merchantAccount}) : await stripe.checkout.sessions.create({
+      ...(paymentId ? {metadata:{businessPaymentId:paymentId},payment_intent_data:{application_fee_amount:0,metadata:{businessPaymentId:paymentId}}} : {}),
       mode,
       line_items: lineItems,
       success_url: `${origin}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
@@ -171,7 +201,8 @@ export async function POST(req: NextRequest) {
           },
         ],
       }),
-    });
+    }, merchantAccount ? {stripeAccount:merchantAccount,idempotencyKey:paymentKey} : undefined);
+    if(paymentId) await moneyRpc("record_business_payment_event",{p_account_id:merchantAccount,p_event_id:`checkout:${session.id}`,p_object_id:session.id,p_payment_id:paymentId,p_kind:"checkout_created",p_amount:0});
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

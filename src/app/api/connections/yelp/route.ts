@@ -1,9 +1,11 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getAuthUserId, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { saveConnection, getConnection } from "@/lib/connections";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
+import { disconnectTenantProvider } from "@/lib/provider-disconnect";
 
 const YELP_API_BASE = "https://api.yelp.com/v3";
 
@@ -59,6 +61,7 @@ export async function GET(_req: Request) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const connection = await getConnection(tenant, "yelp");
   if (!connection) {
@@ -81,8 +84,7 @@ export async function DELETE(_req: Request) {
   const permissionDenied = await requireTenantPermission(tenant, "settings:write");
   if (permissionDenied) return permissionDenied;
 
-  const { deleteConnection } = await import("@/lib/connections");
-  await deleteConnection(tenant, "yelp");
+  const receipt = await disconnectTenantProvider({ tenantId: tenant, provider: "yelp", actorUserId: await getAuthUserId() });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, revocationOutcome: receipt.revocationOutcome, revocationErrorCode: receipt.revocationErrorCode });
 }

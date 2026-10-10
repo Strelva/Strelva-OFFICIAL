@@ -1,6 +1,8 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import Stripe from "stripe";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
+import { workspacePorts } from "./workspace-ports";
 import type { TenantConfig } from "./types";
 import type { CommercialPlanKey } from "./types";
 
@@ -82,15 +84,18 @@ export async function createTenantSubscriptionCheckout(
     await updateTenant(tenant.id, { stripeCustomerId: customerId });
   }
 
+  // A converted business also gets workspaceId (STRELVA_BUSINESS_BILLING,
+  // off by default). Additive: tenantId always stays.
+  const businessMetadata = await (await workspacePorts().businessBilling()).businessBillingCheckoutMetadata(tenant.id);
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     client_reference_id: tenant.id,
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     success_url:
-      input.successUrl || getTenantDashboardUrl(tenant, "/dashboard?checkout=success"),
+      input.successUrl || await ownerNoticeUrl(tenant, "/dashboard?checkout=success", getTenantDashboardUrl(tenant, "/dashboard?checkout=success")),
     cancel_url:
-      input.cancelUrl || getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled"),
+      input.cancelUrl || await ownerNoticeUrl(tenant, "/dashboard/settings?checkout=cancelled", getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled")),
     metadata: {
       tenantId: tenant.id,
       ...(input.planKey ? { planKey: input.planKey } : {}),
@@ -98,6 +103,7 @@ export async function createTenantSubscriptionCheckout(
         ? { planMonthlyCents: String(input.planMonthlyCents) }
         : {}),
       planCurrency: input.planCurrency ?? "usd",
+      ...businessMetadata,
     },
     subscription_data: {
       metadata: {
@@ -107,6 +113,7 @@ export async function createTenantSubscriptionCheckout(
           ? { planMonthlyCents: String(input.planMonthlyCents) }
           : {}),
         planCurrency: input.planCurrency ?? "usd",
+        ...businessMetadata,
       },
     },
   });

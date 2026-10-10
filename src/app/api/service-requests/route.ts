@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody } from "@/platform/workspaces/http";
 import {
@@ -12,6 +12,8 @@ import {
   ServiceRequestValidationError,
   type ServiceRequestActor,
 } from "@/platform/service-requests";
+
+import { readServiceRequestProviders } from "@/platform/service-requests/provider-options";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 10;
@@ -54,6 +56,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!current) return json({ error: { code: "unauthenticated", message: "Sign in with a confirmed email." } }, 401);
   try {
     const params = new URL(request.url).searchParams;
+    const providersBusinessId = params.get("providersBusinessId");
+    if (providersBusinessId) return json({ providers: await readServiceRequestProviders(current, providersBusinessId) });
     const requestId = params.get("requestId");
     if (requestId) return json({ request: await service().read(current, requestId) });
     const businessId = params.get("businessId");

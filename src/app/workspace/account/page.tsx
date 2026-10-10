@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { ensurePersonalWorkspace, listWorkspaces, type Workspace } from "@/platform/workspaces";
 import { WorkspaceAccountView } from "@/experience/workspace/WorkspaceAccountView";
@@ -42,7 +42,7 @@ export default async function WorkspaceAccountPage({
   searchParams,
 }: {
   searchParams?: Promise<{ continue?: string | string[] }>;
-} = {}) {
+}) {
   // This route deliberately reads the verified server session directly. It
   // must never resolve a local/dev bypass into a personal identity page.
   const user = await getSessionUser() as UserIdentity | null;

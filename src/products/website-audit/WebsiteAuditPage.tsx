@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -17,8 +17,12 @@ import {
   Loader2,
   Download,
 } from "lucide-react";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
 import { topFixes } from "@/lib/audit/impact";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -140,18 +144,30 @@ function CategoryCard({ category }: { category: CategoryResult }) {
   );
 }
 
-export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false }: { initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
+export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false, agency }: { agency?: AgencyAttribution; initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
   const [url, setUrl] = useState(initialUrl);
   const [state, setState] = useState<ScanState>(initialResult ? "done" : "idle");
   const [result, setResult] = useState<AuditResult | null>(initialResult || null);
   const [reportId, setReportId] = useState<string | null>(initialReportId || null);
   const [error, setError] = useState(initialError || "");
+  const [invalidUrl, setInvalidUrl] = useState(false);
+  const errorId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const previousState = useRef(state);
+  useEffect(() => {
+    if (previousState.current === state) return;
+    previousState.current = state;
+    if (state === "scanning" || state === "done") headingRef.current?.focus();
+    else addressRef.current?.focus();
+  }, [state]);
   const [reportLoading, setReportLoading] = useState(false);
 
 
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
+    setInvalidUrl(false);
     const cleaned = url.trim();
     if (!cleaned) return;
 
@@ -164,6 +180,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       new URL(normalizedUrl);
     } catch {
       setError("Please enter a valid URL (e.g., example.com)");
+      setInvalidUrl(true);
       return;
     }
 
@@ -176,7 +193,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       const res = await fetch("/api/audit/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: cleaned }),
+        body: JSON.stringify({ url: cleaned, ...(agency ? { agency: agency.slug } : {}) }),
       });
 
 
@@ -190,7 +207,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       if (data.reportId && /^audit_[a-f0-9]{32}$/.test(data.reportId)) {
         const location = new URL(window.location.href);
         location.searchParams.set("report", data.reportId);
-        window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+        window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
       }
       setResult(data);
       setState("done");
@@ -203,9 +220,10 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   function handleReset() {
     const location = new URL(window.location.href);
     location.searchParams.delete("report");
-    window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
     setReportId(null);
     setState("idle");
+    setInvalidUrl(false);
     setResult(null);
     setError("");
     setUrl("");
@@ -219,7 +237,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
     if (!result || reportLoading) return;
     setReportLoading(true);
     try {
-      const res = await fetch("/api/audit/report", {
+      const res = await fetch(result.agency ? `/api/audit/report?agency=${encodeURIComponent(result.agency.slug)}` : "/api/audit/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result),
@@ -245,6 +263,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   return (
     <div className={saved ? "product-surface py-8" : "product-surface px-6 py-8 md:px-12"}>
       <div className="relative z-10 mx-auto max-w-[960px] pb-16">
+        {agency && <div className="mb-6"><OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /></div>}
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
@@ -262,13 +281,17 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
 
             <form
               onSubmit={handleScan}
+              aria-describedby={error ? errorId : undefined}
               className="mt-8 flex flex-col gap-3 sm:flex-row"
             >
               <div className="relative flex-1">
                 <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-m-text-3" />
                 <input
                   type="text"
+                  ref={addressRef}
                   aria-label="Website address"
+                  aria-invalid={invalidUrl || undefined}
+                  aria-describedby={error ? errorId : undefined}
                   required
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -289,6 +312,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
 
             {error && (
               <p
+                id={errorId}
                 role="alert"
                 className="mt-4 rounded-lg border px-4 py-3 text-[13px]"
                 style={{
@@ -315,7 +339,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
             <p className="text-[14px] font-medium text-m-text-3">
               Scanning
             </p>
-            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
+            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
               Analyzing your site...
             </h2>
             <p className="mt-3 text-[15px] text-m-text-2">
@@ -323,7 +347,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
             </p>
 
             <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
               <span className="text-[14px] text-m-text-2">Reading the website and running its checks. Results appear when the scan completes.</span>
             </div>
           </div>
@@ -357,7 +381,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 </div>
               </div>
 
-              <h2 className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
+              <h2 ref={headingRef} tabIndex={-1} className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
                 Site Health Report
               </h2>
               <p className="mt-2 text-[15px] text-m-text-2">
@@ -438,9 +462,10 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 Inspect the findings and export the report. This assessment does not change your website or activate monitoring.
               </p>
               {saved ? <p className="mt-4 text-sm text-m-text-2">Saved privately to this workspace.</p> : reportId && workspaceEnabled ? <Link className="marketing-button-primary mt-4 min-h-12 px-6" href={`/workspace?save=${reportId}`}>Save to my work</Link> : <p className="mt-4 text-sm text-m-text-2">Account saving is unavailable for this result. You can still export it.</p>}
+              {result.agency && <Link href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer" className="marketing-button-primary mt-4 min-h-12 px-6">Get this fixed by {result.agency.name}</Link>}
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
-                  href="/ai-visibility"
+                  href={result.agency ? `/ai-visibility?agency=${encodeURIComponent(result.agency.slug)}` : "/ai-visibility"}
                   className="marketing-button-primary h-12 px-6"
                 >
                   Check AI Visibility

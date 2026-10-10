@@ -1,15 +1,202 @@
 # Strelva interface and Managed Websites context
 
+## October 9 premerge quality integration
+
+Jacob authorized merging the verified deletion and architecture cleanup into
+`reborn-1.0`. The merge at `6edd7389c` preserves the four pending tenant-lead
+conflict resolutions after completing the existing `origin/main` merge at
+`47065b3fb`. The combined source passes full typecheck, boundary checks and
+63 focused tests. Earlier full coverage, build and browser receipts remain
+bound to the isolated quality candidate. The
+[quality integration record](docs/operations/premerge-code-quality-2026-10-09.md)
+owns changes and proof limits. Native, Auth, provider and main-release gates
+remain open; no production action or main merge is authorized by this integration.
+
+## October 9 Reborn 1.0 publication
+
+Jacob authorized publishing the reviewed union as canonical `reborn-1.0`,
+deleting safely incorporated inactive branches and closing superseded pull
+requests. `reborn-1.0` is the next-release source before `main`; the earlier
+`integrate/reborn-1.0` name is superseded. Active, dirty, held and uniquely
+unmerged work stays isolated. The legacy remote `reborn` remains for the
+nightly workflow on `main`, which still defaults to that name; remove this
+compatibility reference after the routing change reaches `main`.
+[Draft next-release PR #616](https://github.com/Strelva/Strelva-OFFICIAL/pull/616)
+now carries the reviewed union; the consolidation record owns completed branch
+cleanup and the two source-superseded PR closures. Neither
+publication nor cleanup authorizes a `main` merge or production rollout.
+
+## October 9 reviewed Reborn consolidation
+
+Jacob authorized consolidating all reviewed Reborn work before moving to `main`.
+The local candidate combines private source `bb90f8555`, the published Reborn
+integration `4afd7c286`, and reviewed language/actor source `7e933fa64`. Older
+streams already incorporated through reviewed adaptations are retained in their
+newer form. Held proposal/dependency packets remain isolated.
+
+This union retains ordinary agency authority, immutable resource qualification,
+website recovery, creator permissions, and the product-owned MCP adapter. It adds
+approved glossary, actor attribution, What changed, History and release language.
+The 354 forward migration files are byte-identical to the private source; duplicate
+older MCP filenames are excluded. Local combined checks qualify only their stated
+scope. Native application/Auth, managed-target execution, provider operation and
+full release remain unqualified; historical receipts remain bound to their source.
+No `main`, production, canonical model, provider or commercial state is changed.
+[Consolidation record](docs/operations/reborn-consolidation-2026-10-09.md) owns the
+source disposition and proof boundaries. Canonical `PRODUCT_MODEL.md` updates
+remain with its existing integration owner.
+
+## October 8 private readiness convergence
+
+`prepare/launch-readiness-convergence-20261008` combines isolated local repairs
+after frozen candidate `e28e1a5f`: no-policy provider-request recovery, completed-month
+evidence, original-bringer attribution, creator-maintenance identity and Connect
+profile validation. Attribution's prepared inverse now fences concurrent writers
+before checking for retained receipts. Earlier section proof counts refer to their
+own exact branch checkpoints; they are not results for this combined source.
+
+The explicit attribution ledger bridge, approved bundle maintenance and original
+provider-change/exit cleanup are still separate active preparations. Exact combined
+native/upgrade, units/build, affected API/UI and actual Auth/client qualification
+must follow convergence. No existing SQL, production data, public origin, price,
+provider configuration, Google project, billing or directory activation is granted
+by local source availability. Workspace `PRODUCT_MODEL.md` remains canonical;
+this worktree contains no competing model.
+
+## October 8 private creator maintenance identity #287
+
+Migration 35 protects current verified identity only around the existing creator
+maintenance command; it selects no royalty rate, taper schedule or provider
+configuration. [Private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md)
+records original takeover/taper eligibility, preserved creator/history, isolated
+concurrent loss proof and guarded inverse. Proposed packet 17 stays private;
+combined release reconciliation and all original outside/provider gates remain open.
+## October 8 private completed-month evidence #299
+
+This isolated follow-up starts at frozen private candidate `e28e1a5f`. New
+migration32 adds immutable completed-month responsibility evidence from recorded
+historical captures, with current actor checks, exact source identity and explicit
+partial/unavailable coverage. Current-month previews remain separate. Prices,
+Stripe export, accepted SLA targets and production authority stay off/unselected.
+[Monthly evidence contract and native rehearsal](docs/operations/responsibility-month-evidence-2026-10-08.md)
+own this branch's preparation; no prior public release claim is extended.
+
+## October 8 private integration #601
+
+`prepare/launch-integration-601-20261008` reconciles prepared `1902c15c` onto
+`e9ac136f`, preserving every existing deployed migration byte. Its unapplied tail
+is rebased after the deployed 266-file history; no production migration or flag
+changed. [Integration proof](docs/operations/launch-integration601-proof.md) records
+all 42 retained acceptances, current-authority/native/rollback/upgrade checks,
+8,693 passing units with 46 skips, 196 client contracts and remaining review/provider
+limits. The wholesale eligibility repair selects no rate or commercial policy.
+This private candidate does not include the parallel October 8 website/recent-auth
+changes; final convergence and authenticated release proof remain gates.
+
+## October 7 security/runtime and bounded agency release (deployed)
+
+The four requested repairs are deployed at `https://app.strelva.com`: snapshot
+readers, owner-link authority, inquiry retention and forward-preserving runtime
+recovery. Final source `954f1905`, artifact `dpl_9k1j1sG8ioAGVeYr6WAAZZvKzBmP`,
+exact hosted 266 migrations. All seven stronger owner guards and the original
+238-signature recovery scope remain unchanged. The retired 151200 was never applied.
+
+8,505 units, final native SQL/actual-PUBLIC restore, local authenticated agency
+journey and final hosted checks pass. All 60 public client reads remain
+byte-identical. Existing workspace flag was preserved; only agency add-client
+and website-rebuild flags were added as `1`. Other 65 env entries were unchanged.
+
+Agency work can reach signed-in owner claim, exact approval, explicit named-agency
+consent and accepted publication/receipt. New-site public URLs remain unavailable:
+default `<tenant>.strelva.com` has no qualified wildcard DNS. This is not full 1.0
+acceptance, adoption, economics or live external website delivery. Native app/Version
+signed links still require sign-in; scheduled retention and real provider undo
+remain unproven. Existing dirty main/model/customer checkouts were preserved.
+[Exact release, recovery and remaining proof boundaries](docs/operations/security-runtime-production-2026-10-07.md)
+own this rollout. Broader Reborn work remains outside this authorization.
+
 Reviewed: 2026-09-17
 
 Component checkpoint reviewed on this date; earlier product evidence retains its
 own dates.
 Kind: product
 
-Next release: **Strelva Reborn** (`1.0.0`), every client in a business
-workspace. See the [release entry point](./docs/product/strelva-reborn.md). The earlier
+Next release: **Strelva Reborn**, the one build to `1.0.0` (decided Oct 6).
+Jacob subsequently authorized the bounded security/agency rollout above before
+the full 1.0 release. See the
+[build](./docs/product/strelva-reborn.md) and
+[what Strelva becomes at 1.0.0](./docs/product/product-model.md), the product
+model area by area. The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
-This branch is for internal work and is not approved for production.
+Broader Reborn work remains internal and unapproved for production beyond the
+explicit bounded October 7 security/agency rollout above.
+
+## Money and agents/apps private preparation, October 7–8, 2026
+
+Private `build/money-apps-combined-20261007` implements the two money and
+agents/apps issue chains from pinned `cdf5c31a`. It is unmerged; local native
+command/rollback/authority tests and browser fixtures do not establish provider
+operation, adopted pricing, demand or commercial responsibility. The
+[prepared implementation record](./docs/operations/money-apps-prepared-2026-10-07.md)
+owns proof commands and stop points; the workspace `.scratch/agency-1.0/money-apps-2026-10-07/`
+owns exact42 issue acceptances and final receipts. Main-workspace
+`PRODUCT_MODEL.md` remains canonical. Reserved decisions, directory/legal facts,
+Sandbox dependency/resource consent and real provider proof remain explicit.
+
+## Product model
+
+Selected by Jacob on October 4, 2026
+([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)).
+Customers see **Systems**, **Connections**, **Possibilities** and
+**Versions**. The verbs are Make, Connect, Explore, Make real and Version.
+This is direction. No System runtime, table or screen is shipped yet, and
+nothing here proves demand, delivery cost or pricing.
+
+Walk it with The Mooney Firm. Its website is a **System**: it stays the same
+System through a rebuild, a new domain or a new booking section. It has
+**Connections**: it reads hours and services from the business record, appears
+on attymooney.com, and could act on the firm's Google Business profile once
+that access is granted. A **Possibility** could be a consult-booking flow
+Strelva builds beside the current contact path, which the owner can open, try
+and compare. **Make real** turns it on. If the website change lands and the
+calendar grant fails, the owner sees exactly that, and the part that landed
+stays. If the firm opened a second office, a **Version** would be the same
+site adapted for it, with its own hours, people and accounts.
+
+Five rules hold underneath. They are proposed records in the product ledger
+(`PRODUCT_MODEL.md`, untracked in the main checkout) and must be proven before
+any of them is called shipped:
+
+1. **Identity outlives the build** (`RULE_SYSTEM_OUTPUT_IDENTITY`). A System
+   keeps its ID while it changes. Things it already issued, like an accepted
+   proposal, keep their own terms and never rewrite.
+2. **Connections are contracts** (`RULE_SYSTEM_CONNECTION_CONTRACT`). Each
+   declares direction, authority, source of truth, freshness and what happens
+   on failure. Knowing about Stripe is not permission to charge.
+3. **Possibilities are isolated** (`RULE_POSSIBILITY_ISOLATION`). They pin
+   the baselines they change, use isolated data and effects, and go stale
+   when the System under them changes. Make real goes through the same
+   approvals, governance and stop points as any other change.
+4. **Versions are context, not time** (`RULE_CONTEXT_VERSION_IDENTITY`). A
+   Version has its own releases. Across businesses, each Version is that
+   business's own System with its own data, credentials and grants; nothing is
+   shared implicitly.
+5. **Lifecycle is not health** (`RULE_SYSTEM_PAUSE_HEALTH`). Draft, Live and
+   Paused say what the business intends. Health and needed decisions are
+   tracked separately. Pausing keeps records and commitments already made.
+
+Capabilities, offerings, methods and installations below are the machinery
+and packaging under Systems, not what a customer navigates. Open questions:
+where a System ends and a new one begins, how Versions map onto today's
+release fields, what Make real guarantees after a partial failure, and whether
+any of this makes customer work easier at a cost we can carry.
+
+[docs/product/product-model.md](./docs/product/product-model.md) says what
+every area becomes at 1.0.0, including the two nouns outside the four
+(Requests and Running), Needs you and What changed.
+[docs/product/systems-transition.md](./docs/product/systems-transition.md)
+maps today's code onto Systems, Connections, Possibilities and Versions:
+where each existing module lands and what the inventory found.
 
 ## Role
 
@@ -34,6 +221,61 @@ connect selected direction, source owners, specimens and verification. They
 resolve older font-selection guidance in favor of the recorded Geist/custom-logo
 decision. This is structural documentation work; component implementation and
 adoption gaps remain in the foundation inventory.
+
+## Agency Team implementation, October 7, 2026
+
+Branch `a1/agency-team` prepares #261 locally: workspace/Systems-gated Team
+management uses existing invitation records and acceptance, extends agency
+admin sponsorship only for staff invitations, protects owner/self memberships,
+and assigns staff through 7A's SQL command in an atomic bulk wrapper. Removal
+extends the 7A membership-deletion trigger to end staff rows and revoke
+offered/accepted agency work assignments with removal actor/time; rejoining
+restores neither.
+Browser evidence uses fictional responses; permission, cleanup and rollback
+proof use isolated PostgreSQL. This is not deployed or adopted. Per-client
+permissions remain the 7A provider-seat policy; #241 is still a production
+decision. [The handoff](./docs/product/streams/a1-agency-team.md) owns commands,
+limits, touched shared files and the next integration action.
+
+## Ordinary agency workflow, October 7, 2026
+
+Private branch `agency/workflow-proof-20261007` composes add-client, provider
+verification/resource gates and exact owner effects against integration
+`f3097dd6` (private merge `f3483091`). Staff on the current provider seat can prepare and retain website
+work without a direct client membership. A verified business owner can explicitly
+authorize their named current agency to publish this website after each exact
+approval; anonymous approval alone grants no publishing mandate. Seat, staff,
+verification and resource authority are rechecked before native effects.
+
+The [workflow handoff](./docs/operations/agency-workflow-2026-10-07.md) owns
+local Auth/Postgres/browser proof, migration order, failure evidence and next
+actions. Fictional delivery receipts and platform verification are fixtures.
+The combined security/agency artifact is deployed as recorded above. Minimum
+three-flag local Auth/browser and final 266 native SQL proofs pass; the final source
+also passes 8,505 unit tests. Signed-in owner claim and consent are qualified;
+public HTTPS website delivery, sent email, adoption and economics are not.
+Fictional providers/models stay fixtures. Public routing remains open under #243/#322.
+The earlier restored-dump supplied-actor ACL finding is historical: fresh hosted
+ACLs deny anon/auth execution; 191 adds explicit drift protection. Root performed
+the sole production migration sequence and final promotion. Broader agency
+#245/#255/#263 and the flags-off app authority acceptance remain open.
+Canonical model reconciliation remains pending because main revision 8 and
+integration revision 7 contain independent evidence; the handoff preserves the
+proposed delta and exact merge action without replacing the main checkout.
+## Provider website workspace access, October 8, 2026
+
+Prepared code for #245 lists a named provider's client workspace through
+`read_version_actor` without creating a direct membership. Seat-only saved reads
+and writes are restricted to `websites/website`; exact delegated work keeps its
+existing grant. General workspace controls, inquiry entry, inquiry/booking
+connection selection and Ask do not gain member authority from this projection.
+#241 remains Jacob's decision. The website checkpoint migration
+`20261018110000_provider_seat_website_access.sql` keeps identity, resource,
+revision, exit and existing owner/customer launch checks. Native forward,
+rollback and reapply tests exercise real website creation/checkpoint RPCs;
+browser proof uses fictional responses. No production migration, provider write
+or customer adoption is established. #245's broader relationship lifecycle
+and decision requirements remain open.
 
 ## Current product work
 
@@ -91,64 +333,12 @@ authority and production restrictions remain unchanged.
 
 ## Language
 
-**Business:** The customer organization whose work and records must remain
-separate from other businesses. A business is not a website tenant, payer or
-agency merely because the same person can access them.
-_Avoid_: tenant (legacy storage name only), account, client (for the record)
-
-**Business record:** The one shared set of facts, contacts, requests, bookings
-and content that belongs to a business and that every capability reads.
-_Avoid_: CRM, knowledge graph, tenant config
-
-**Capability:** Something Strelva's software can do on a business record, such
-as answering requests, taking bookings or publishing a website. Businesses
-don't buy capabilities directly.
-_Avoid_: module, product, executable, feature, app (for first-party capabilities)
-
-**Offering:** An outcome a business turns on, named the way the business would
-say it ("Never miss a new client"), delivered by one or more capabilities
-under stated limits. Human help is the exception path inside it, not the
-offering itself.
-_Avoid_: item, shelf item, package, product, service
-
-**Responsibility:** A condition an offering keeps true over time under stated
-limits, such as every inquiry answered within five minutes. It is the unit
-Strelva prices and is accountable for.
-_Avoid_: retainer, maintenance, service level
-
-**Receipt:** The record that an outside change was made and then read back from
-the outside system, with what changed and how to undo it.
-_Avoid_: proof, log, evidence (for a single change)
-
-**Provider:** Whoever serves a business beyond the software: nobody
-(self-serve), an agency, or Strelva's own agency.
-_Avoid_: operator (that's Strelva staff in the console), vendor
-
-**Method:** An agency's reusable way of setting up and running offerings for
-its clients. A method carries no customer data, secrets or grants.
-_Avoid_: playbook, snapshot, template, recipe
-
-**Customer agent:** An AI acting for a member of the public, such as Google
-calling to book or ChatGPT making a reservation. It is not Strelva's agent and
-holds no business authority.
-_Avoid_: bot, AI customer
-
-**Installation:** An offering configured for one business, with its selected
-version and connected resources. Installation does not grant new authority or
-prove that a human provider accepted service.
-
-**Assignment:** A person's or agent's explicit permission to operate specified
-work within agreed limits and time. It does not transfer customer ownership.
-
-**Work:** A finite request, action or result. Work can belong to an installation
-or remain independently useful.
-
-**Provider commitment:** The work a provider has actually agreed to take care of.
-Requesting a provider is not its acceptance.
-
-**Contribution reward:** An explicitly awarded benefit for helping develop an
-offering. It may begin as usage or subscription credit; it is not company equity
-or permission to access client information.
+[GLOSSARY.md](./GLOSSARY.md) is the single word authority. Its **On screen**
+layer governs business-screen nouns and actions; exact labels are Jacob-approved
+and open labels remain marked there. **Underneath** owns internal definitions.
+The [product ontology](./docs/architecture/product-ontology.md) owns structure
+and governance rules. Actor and audience naming follows the glossary and
+company ADR 0013; copy names whoever acted.
 
 ## Evidence state
 
@@ -332,3 +522,27 @@ presence of these routes.
   and [acceptance matrix](./docs/capabilities/inquiries/inquiry-first-acceptance-2026-09-11.md).
 - [Client dashboard surfaces](./docs/architecture/client-dashboard-ia.md) and
   [operator responsibilities](./docs/architecture/operator-command-center.md).
+
+## Agency prospecting (October 7, local)
+
+The `a1/agency-prospecting` stream prepares agency-attributed public checks,
+name-only report/email branding, agency-owned prospect capture, membership-only
+reads and durable per-agency quota behind the default-off
+`STRELVA_AGENCY_PROSPECTING_RELEASE`. Its [stream contract](./docs/product/streams/a1-agency-prospecting.md)
+owns the routes, configuration, migration/rollback proof and extension handoff.
+This is local implementation, not a production change or evidence of agency
+adoption. Extensions and richer agency profiles/branding remain unfinished.
+
+## Owner assistant MCP (October 8, local preparation)
+
+Jacob selected business context and website work, with Claude and Croki/Codex
+as the first clients. Jacob then chose to skip staging and push these changes to Reborn. The scoped
+`integrate/mcp-reborn-20261008` branch starts from remote Reborn `f3097dd6` and
+adds only the MCP/auth prerequisites, renewable connections, owner disconnect
+and native website reads/proposals. Other private money/apps/hosting work is
+outside this Git integration. Proposals
+reuse saved website revisions and owner fact review; the connector cannot approve
+or publish. [The operating record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns exact sources, local proof and the native-client rehearsal. Actual HTTPS
+client login/renewal, production activation and a real customer/site binding
+remain unproved. This is prepared capability, not operated or adopted service.

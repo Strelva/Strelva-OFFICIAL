@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   workspace: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: mocks.verifyAuth,
   getAuthUserId: mocks.actor,
   requireTenantAccess: mocks.access,
@@ -25,6 +25,9 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
 }));
 vi.mock("@/products/inquiries", () => ({
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   prepareInquiryMessageReview: mocks.prepare,
   approveInquiryMessageReview: mocks.approve,
 }));
@@ -159,6 +162,8 @@ describe("authenticated inquiry message review route", () => {
       status: "accepted_unverified",
       reason: "provider read-back unavailable",
       retryable: false,
+      delivery: "unconfirmed",
+      retryAllowed: false,
     } });
     expect(mocks.approve).toHaveBeenCalledWith({
       tenantId: "tenant-a",

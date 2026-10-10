@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextResponse } from "next/server";
 
@@ -22,7 +23,7 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("tenant-a"),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: (t: string) => mockRequireTenantAccess(t),
   requireTenantPermission: () => Promise.resolve(null),
   verifyAuth: () => Promise.resolve(true),

@@ -20,3 +20,11 @@ export type {
   HomeFinderReceiptListOptions,
   HomeFinderServerAdapterOptions,
 } from "./types";
+
+// Browser-safe native runtime schemas and values; no storage or crypto exports.
+export {
+  homeFinderBindingSchema, homeFinderConfigureSchema, homeFinderInstallSchema,
+  homeFinderInquirySchema, homeFinderInquiryResultSchema, homeFinderListingSchema,
+  homeFinderSearchSchema, homeFinderSearchResultSchema,
+} from "./runtime-contracts";
+export type { HomeFinderBinding, HomeFinderConfigure, HomeFinderInstall, HomeFinderInquiry, HomeFinderSearch } from "./runtime-contracts";

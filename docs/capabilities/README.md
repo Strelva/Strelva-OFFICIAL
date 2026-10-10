@@ -1,10 +1,13 @@
 # Capabilities
 
-Updated: 2026-10-02
+Updated: 2026-10-05
 
 Every customer capability in this repo, what it does, how live it is, and where
 its code, specs, and tests live. Start here before building on a capability.
 Specs for a capability sit in its folder under `docs/capabilities/`.
+
+Capabilities are the code inventory. Customers see the Systems built from them
+([CONTEXT.md](../../CONTEXT.md#product-model), October 4).
 
 ## Status words
 
@@ -47,7 +50,7 @@ model** (`src/platform`, `src/products`, `src/experience`, `/workspace`,
 | [Billing](#billing) | Stripe subscriptions, pay links, workspace allowances | Both | Stripe live; workspace allowances in production, unproven | — |
 | [Analytics and reports](#analytics-and-reports) | Traffic, Search Console, weekly and monthly reports | Tenant | Live | — |
 | [Domain monitor](#domain-monitor) | Flags managed domains that are down, parked, or expiring | Tenant | Internal | — |
-| [Product learning](#product-learning) | Collects research evidence from registered sources | Workspace | Internal, flag off in production | — |
+| [Product learning](#product-learning) | Collects research evidence from registered sources | Workspace | Internal, flag off in production. Out of 1.0.0 release scope (Oct 6); code kept | — |
 | [Home Finder](#home-finder) | Guided home search for brokerages (separate product) | Workspace | Not enabled | — |
 
 Also present but not customer capabilities on their own: enterprise customers
@@ -57,7 +60,25 @@ continuation (carry a public result into a workspace).
 
 ## Where capabilities are declared
 
-There is no single registry. Six files each name a slice:
+One registry lists them all: `src/capability-registry.ts` (Strelva Reborn
+section 7, local). `listCapabilities()` returns every declared capability as
+`{ key, kind, id, name, description, declaredIn }`; `getCapability(key)`
+finds one. It reads the six declaration files below through adapters, so each
+capability is still declared once, in the file that owns its kind. It sits at
+the app edge because two kinds are tenant-model declarations in `src/lib` and
+the rest live in workspace layers, and neither may import the other. Listing
+grants nothing: access, release state and execution stay with the owner.
+
+Readers that list capabilities for a surface take them from the registry
+(`/api/workspace` does). Still reading their declaration directly, and fine to
+move one at a time: the offerings service (`getOfferingDefinition`), the
+operations runtime (`requireExactExecutableCapability`,
+`executableCapabilityRegistry`), the agent prompt (`capabilityPromptFragment`)
+and the dashboard feature editor and banner (client components, which must
+not load the server registry). Folding the declarations themselves into one
+file is not done: the tenant-model kinds would have to leave `src/lib` first.
+
+The six declaration files:
 
 | File | Declares |
 | --- | --- |
@@ -79,6 +100,10 @@ All are checked with `=== "1"`.
 | --- | --- | --- |
 | `STRELVA_WORKSPACE_RELEASE` | `/workspace` and nearly every workspace API | On since 2026-09-30 |
 | `STRELVA_INQUIRIES_RELEASE` | Workspace inquiries, `/business` | Off |
+| `STRELVA_SYSTEMS_RELEASE` | The Systems customer model: the Systems projection in `GET /api/workspace` (with `releases.systems` telling the browser), Systems on Home, System pages (`view=system`), Possibilities, Make real (`POST /api/workspace/systems/make-real` answers 503 when off), contextual Versions and the agency source/Version list. Off, the workspace renders as it did before transition/systems. A 1.0.0 launch feature, not Reborn ([Reborn in Systems terms](../product/strelva-reborn.md#reborn-in-systems-terms)). Local preview: add `systems=on` or `systems=off` to `/preview/strelva` | Off (code not on `main`) |
+| `STRELVA_NEEDS_YOU_RELEASE` | Needs you and What changed from the decision policy ([spec](../product/specs/needs-you.md)): `GET/POST /api/workspace/needs-you`, `POST /api/workspace/needs-you/undo`, workspace-keyed one-tap links at `/api/approve`, the hourly `/api/cron/needs-you` chase, and Home reading the new model (`releases.needsYou`). Off: routes answer 503, workspace links refuse, the cron records a heartbeat only, Home is unchanged. On, every email still goes through `email/send.ts`, so while client email is gated deliveries are recorded as suppressed ("owner not told"). Local preview: add `needsYou=on` to `/preview/strelva` | Off (code not on `main`) |
+| `STRELVA_AGENCY_SIGNUP_RELEASE` | The agency front door (#258): `/sign-up` asks "I run a business / I run an agency" (agency goes to `/workspace/agency/start`; the business path no longer offers "Request your build", so Strelva is not the default provider), the agency setup checklist (profile, team, verification per effect from `read_agency_verification`, first client), `GET /api/agency-onboarding`, and the agency Home link (`releases.agencySetup`). Needs `STRELVA_WORKSPACE_RELEASE`. Off: sign-up is unchanged, the checklist redirects to `/workspace`, the read answers 503. Agency creation (`create_agency`) is the ordinary path and is not gated | Off (code not on `main`) |
+| `STRELVA_AGENCY_ADD_CLIENT_RELEASE` | An agency adds a client (#259, `20261015100000_agency_add_client.sql`): `/workspace/agency/clients/new` from a website or a prospect, `POST /api/workspace/agency-clients` (`add`, `owner_link`), `GET /api/workspace/agency-clients/added`, the owner claim link (`/workspace/claim/[token]`, `/api/workspace-claims/[token]`) and the agency Home and checklist links (`releases.agencyAddClient`). The business gets the agency as provider of record and provider seat (no direct membership), the acting member is staffed, facts from a small site scan are seeded `source = agency`, unconfirmed. The owner link is recorded "not sent: gated" and copied by the agency (decision R08, #235). Limits: 25 adds per agency per UTC day, 100 businesses waiting for an owner, 10 per person per minute. Needs `STRELVA_WORKSPACE_RELEASE`. Off: the page redirects, the routes answer 503/404. Operators keep `/admin/onboard` | Off (code not on `main`) |
 | `STRELVA_PLANNING_ENABLED` | Work-plan generation | Off |
 | `STRELVA_BACKGROUND_WORK_RELEASE` | `/api/cron/workspace-work` | Off |
 | `STRELVA_PRODUCT_LEARNING_RELEASE` | Product learning in production | Off |
@@ -225,7 +250,16 @@ reviews, blog, and newsletter. Writes go through governance and owner approval.
 ## Product learning
 
 - `src/products/product-learning/`, `src/experience/operations/LearningExperience.tsx`, `/admin/work`, `/api/product-learning`. Super-admin only.
+- Out of 1.0.0 release scope (October 6, 2026, systems-catalog spec §9.6). The code, migration and SQL test stay, behind `STRELVA_PRODUCT_LEARNING_RELEASE` (off). Release gates do not count it, and it is not offered to customers.
 
 ## Home Finder
 
 - `src/products/home-finder/`, `src/platform/customers/home-finder-port.ts`, `/preview/strelva/customers`. Needs `HOME_FINDER_*` env; not sold.
+
+## Agent booking attribution
+
+- Owner and delegated agency booking source, filter, existing Needs-you approval
+  and receipts, and weekly request counts: default off under
+  `STRELVA_BOOKING_AGENT_VISIBILITY`. Uses the native Postgres booking store.
+- [Local #304 evidence and integration handoff](../product/streams/a1-agent-bookings-visible.md).
+  This is local implementation evidence; production and actual owner use remain unverified.

@@ -1,7 +1,8 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getVersions, logActivity, logAuditEvent, restoreVersionToDraft } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import type { ContentSection } from "@/lib/types";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -17,6 +18,7 @@ export async function GET(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const template = await getTemplateManifestForTenant(tenant);
     if (!template.contentSections.includes(section as ContentSection)) {

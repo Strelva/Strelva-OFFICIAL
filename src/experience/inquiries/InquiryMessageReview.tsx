@@ -8,6 +8,7 @@ import type {
   InquiryMessageReviewPreview,
   InquiryMessageReviewRequest,
 } from "./message-review-contract";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
 import styles from "./message-review.module.css";
 
 export type {
@@ -24,14 +25,6 @@ export type {
 } from "./message-review-contract";
 
 const DEFAULT_ENDPOINT = "/api/inquiry-workspace/message-review";
-const COMPLETION_STATUSES = new Set<InquiryMessageReviewOutcome["status"]>([
-  "accepted",
-  "verified",
-  "delivered",
-  "accepted_unverified",
-  "reconciliation_required",
-  "sending",
-]);
 const OUTCOME_STATUSES = new Set<InquiryMessageReviewOutcome["status"]>([
   "ready",
   "awaiting_approval",
@@ -153,7 +146,14 @@ function readOutcome(value: unknown): InquiryMessageReviewOutcome | null {
   const status = row.status;
   if (!inquiryId || !isAction(action) || typeof status !== "string") return null;
   if (!OUTCOME_STATUSES.has(status as InquiryMessageReviewOutcome["status"]) || typeof row.retryable !== "boolean") return null;
-  const providerAccepted = ["accepted", "verified", "delivered", "accepted_unverified", "reconciliation_required"].includes(status);
+  const classification = classifyInquiryMessageOutcome({
+    status,
+    acceptedAt: typeof row.acceptedAt === "string" ? row.acceptedAt : null,
+    providerMessageId: typeof row.providerMessageId === "string" ? row.providerMessageId : null,
+    delivery: row.delivery,
+    retryAllowed: row.retryAllowed,
+    reason: typeof row.reason === "string" ? row.reason : null,
+  });
   return {
     inquiryId,
     action,
@@ -164,7 +164,9 @@ function readOutcome(value: unknown): InquiryMessageReviewOutcome | null {
     ...(Array.isArray(row.verificationEvidence) ? {
       verificationEvidence: row.verificationEvidence.filter((item): item is string => typeof item === "string"),
     } : {}),
-    retryable: providerAccepted ? false : row.retryable,
+    retryable: classification.retryAllowed ? row.retryable : false,
+    delivery: classification.delivery,
+    retryAllowed: classification.retryAllowed,
   };
 }
 
@@ -180,8 +182,15 @@ function actionLabel(action: InquiryMessageReviewAction): string {
   return "reply";
 }
 
-function outcomeClosesRetry(status: InquiryMessageReviewOutcome["status"]): boolean {
-  return COMPLETION_STATUSES.has(status);
+/** Only a message the provider never accepted may get a new review. */
+function outcomeAllowsNewReview(outcome: InquiryMessageReviewOutcome): boolean {
+  return classifyInquiryMessageOutcome(outcome).retryAllowed;
+}
+
+function undeliveredCause(outcome: InquiryMessageReviewOutcome): string {
+  if (outcome.status === "bounced") return "The recipient's mail server refused it.";
+  if (outcome.status === "suppressed") return "The provider would not send to this address.";
+  return "The provider reported that delivery failed.";
 }
 
 export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome): { title: string; detail: string; tone: "success" | "warning" | "error" } {
@@ -197,6 +206,21 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
       title: outcome.acceptedAt || outcome.providerMessageId ? "The message was accepted, but its receipt needs checking." : "We could not confirm what happened to this message.",
       detail: "Do not send it again. Check the delivery history before taking another action.",
       tone: "warning",
+    };
+  }
+  const { delivery } = classifyInquiryMessageOutcome(outcome);
+  if (delivery === "deferred") {
+    return {
+      title: "The provider is still trying to deliver this message.",
+      detail: "Nothing to do. The provider accepted it and keeps trying on its own.",
+      tone: "warning",
+    };
+  }
+  if (delivery === "undeliverable") {
+    return {
+      title: "This message was accepted but not delivered.",
+      detail: `${undeliveredCause(outcome)} It can't be sent again for this inquiry. ${outcome.action === "owner_notification" ? "Let your team know another way." : "Contact the customer another way."}`,
+      tone: "error",
     };
   }
   if (outcome.status === "accepted") {
@@ -220,25 +244,11 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
       tone: "success",
     };
   }
-  if (outcome.status === "bounced") {
+  if (outcome.status === "blocked" && outcome.reason === "different_message_already_sent") {
     return {
-      title: "The provider reported a bounce.",
-      detail: outcome.reason || "The message did not reach the recipient. Resolve the recipient issue before preparing another review.",
-      tone: "error",
-    };
-  }
-  if (outcome.status === "deferred") {
-    return {
-      title: "The provider deferred delivery.",
-      detail: outcome.reason || "Delivery is not confirmed. Resolve the provider issue before preparing another review.",
+      title: `A different ${actionLabel(outcome.action)} was already sent for this inquiry.`,
+      detail: "This one was not sent and can't be. Check the inquiry's history to see what went out.",
       tone: "warning",
-    };
-  }
-  if (outcome.status === "suppressed") {
-    return {
-      title: "The provider suppressed this message.",
-      detail: outcome.reason || "The provider did not deliver this message. Resolve the suppression before preparing another review.",
-      tone: "error",
     };
   }
   if (outcome.status === "blocked") {
@@ -442,7 +452,7 @@ export function InquiryMessageReview({
         <button type="submit" className={styles.primaryButton} disabled={!canSend || busy} aria-describedby={sendHelpId} data-review-send>{busy ? "Checking approval…" : "Send this message"}</button>
         <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare again</button>
         <p id={sendHelpId}>Only the reviewed recipient, subject, and body can be approved. A changed or revoked review is rejected by the server.</p>
-      </form> : completed && state.status === "completed" && !outcomeClosesRetry(state.outcome.status) ? <div className={styles.actions}>
+      </form> : completed && state.status === "completed" && outcomeAllowsNewReview(state.outcome) ? <div className={styles.actions}>
         <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare a new review</button>
         <p>The failed attempt was recorded. Resolve the issue before preparing another message.</p>
       </div> : null}

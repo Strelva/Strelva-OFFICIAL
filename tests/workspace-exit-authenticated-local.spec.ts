@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import type { WorkspaceSnapshot } from "../src/experience/workspace/contracts";
+import { workspaceExitStateSchema } from "../src/platform/workspace-exit/contracts";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires a separately created, isolated local Supabase Auth and database.");
 test.setTimeout(90_000);
@@ -20,6 +22,23 @@ test("owner records a local exit choice through the real Auth route and can stil
 
     const page = await owner.context.newPage();
     await page.setViewportSize({ width: 1280, height: 900 });
+    // A membership does not select the trusted business email recipient.
+    // Prove the missing-recipient export refusal, then let this real owner
+    // choose the address through the existing revision-bound details form.
+    if (process.env.STRELVA_EXPORT_SCHEMA_3 === "1") {
+      const missingRecipient = await owner.context.request.post("/api/workspace-export/v3", {
+        headers: { origin: env.app }, data: { workspaceId },
+      });
+      expect(missingRecipient.status(), await missingRecipient.text()).toBe(400);
+    }
+    await page.goto(`/workspace/business-details?workspaceId=${workspaceId}`);
+    await expect(page.getByRole("heading", { name: "Business details", exact: true })).toBeVisible();
+    await page.getByRole("textbox", { name: "Send Strelva's emails to", exact: true }).fill(owner.email);
+    await page.getByRole("button", { name: "Save details", exact: true }).click();
+    await expect(page.getByText("Saved to your business record. To change what your site or Google listing shows, ask Strelva from Home.", { exact: true })).toBeVisible();
+    const recipient = await admin.rpc("resolve_business_owner_recipient", { p_workspace_id: workspaceId });
+    expect(recipient.error).toBeNull();
+    expect(recipient.data).toMatchObject({ email: owner.email, trusted: true });
     let failuresRemaining = 2;
     await page.route(/\/api\/workspace-exit(?:\?.*)?$/, async (route) => {
       if (failuresRemaining > 0) {
@@ -47,32 +66,64 @@ test("owner records a local exit choice through the real Auth route and can stil
     await page.screenshot({ path: testInfo.outputPath("workspace-exit-mobile.png"), fullPage: true });
     const save = page.getByRole("button", { name: "Save exit choice" });
     await save.focus();
+    const savingExit = page.waitForResponse(response => new URL(response.url()).pathname === "/api/workspace-exit" && response.request().method() === "POST");
     await page.keyboard.press("Enter");
+    const exitResponse = await savingExit;
+    expect(exitResponse.status(), await exitResponse.text()).toBe(200);
+    const completedExit = workspaceExitStateSchema.parse((await exitResponse.json()).state);
+    expect(completedExit).toMatchObject({ workspaceId, requestedBy: owner.userId, status: "completed", futureWork: "cancelled", providerParticipation: "kept", maintainedResources: { kind: "stopped" } });
     await expect(page.getByRole("heading", { name: "New work has been cancelled." })).toBeVisible();
 
     const exportPage = await owner.context.newPage();
     await exportPage.setViewportSize({ width: 390, height: 844 });
     await exportPage.goto(`/workspace/export?workspaceId=${workspaceId}`);
-    await expect(exportPage.getByRole("heading", { name: "Download current workspace data" })).toBeVisible();
+    const schema3 = process.env.STRELVA_EXPORT_SCHEMA_3 === "1";
+    await expect(exportPage.getByRole("heading", { name: schema3 ? "Take your business records with you" : "Download current workspace data", exact: true })).toBeVisible();
     expect(await exportPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    const exportResponsePromise = exportPage.waitForResponse(response => response.url().includes("/api/workspace-export") && response.request().method() === "POST");
-    const downloadPromise = exportPage.waitForEvent("download");
-    await exportPage.getByRole("button", { name: "Download workspace JSON" }).click();
+    const exportResponsePromise = exportPage.waitForResponse(response => new URL(response.url()).pathname === (schema3 ? "/api/workspace-export/v3" : "/api/workspace-export") && response.request().method() === "POST");
+    let downloadPromise = schema3 ? undefined : exportPage.waitForEvent("download");
+    await exportPage.getByRole("button", { name: schema3 ? "Prepare business export" : "Download workspace JSON", exact: true }).click();
     const exportResponse = await exportResponsePromise;
-    expect(exportResponse.status()).toBe(200);
-    expect(exportResponse.headers()["content-disposition"]).toMatch(/^attachment; filename=/);
+    if (schema3) {
+      expect(exportResponse.status()).toBe(202);
+      const prepared = await exportResponse.json();
+      expect(prepared.buildId).toMatch(/^[0-9a-f-]{36}$/);
+      const archive = exportPage.getByRole("link", { name: "Download business archive", exact: true });
+      await expect(archive).toHaveAttribute("href", `/api/workspace-export/v3/owner-download?build=${prepared.buildId}`, { timeout: 60_000 });
+      downloadPromise = exportPage.waitForEvent("download");
+      await archive.click();
+    } else {
+      expect(exportResponse.status()).toBe(200);
+      expect(exportResponse.headers()["content-disposition"]).toMatch(/^attachment; filename=/);
+    }
+    if (!downloadPromise) throw new Error("Export download was not armed.");
     const download = await downloadPromise;
     const downloadPath = await download.path();
     if (!downloadPath) throw new Error("Export download path unavailable");
-    const snapshot = JSON.parse(await readFile(downloadPath, "utf8")) as { lifecycle?: { exit?: { status?: string } } };
-    expect(snapshot.lifecycle?.exit?.status).toBe("completed");
-    await expect(exportPage.getByText("Workspace JSON prepared. The export action was recorded without storing its contents.", { exact: true })).toBeVisible();
+    const snapshot = JSON.parse(await readFile(downloadPath, "utf8")) as { schemaVersion?: number; lifecycle?: { exit?: { status?: string } }; workspaceSnapshot?: { lifecycle?: { exit?: { status?: string } } } };
+    if (schema3) expect(snapshot.schemaVersion).toBe(3);
+    expect((schema3 ? snapshot.workspaceSnapshot : snapshot)?.lifecycle?.exit?.status).toBe("completed");
+    await expect(exportPage.getByText(schema3 ? "Your business export is ready. Download it below." : "Workspace JSON prepared. The export action was recorded without storing its contents.", { exact: true })).toBeVisible();
     await exportPage.close();
     await expect(page.getByText(/does not change billing or stop an outside provider service/)).toBeVisible();
     await expect(page.getByRole("link", { name: "review it in website billing settings" })).toHaveAttribute("href", "/dashboard/settings#plan");
 
     await page.setViewportSize({ width: 1280, height: 900 });
+    // This link loads a public shell, then Auth loads the selected private
+    // snapshot. The frozen trace spent 17.6s on the shell, then began this
+    // exact GET two seconds later; URL arrival alone did not finish the read.
+    // Bound that real navigation/read phase inside the unchanged 90s case.
+    const reopening = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/workspace" && url.searchParams.get("workspaceId") === workspaceId && response.request().method() === "GET";
+    }, { timeout: 25_000 });
     await page.getByRole("link", { name: "Return to workspace" }).click();
+    const reopenedResponse = await reopening;
+    expect(reopenedResponse.status(), await reopenedResponse.text()).toBe(200);
+    const reopened = await reopenedResponse.json() as WorkspaceSnapshot;
+    expect(reopened.workspaceId).toBe(workspaceId);
+    expect(reopened.workspaceExitReadStatus).toBe("available");
+    expect(workspaceExitStateSchema.parse(reopened.workspaceExitState)).toEqual(completedExit);
     await expect(page).toHaveURL(new RegExp(`/workspace\\?workspaceId=${workspaceId}.*view=access`));
     await expect(page.getByRole("status", { name: "Workspace stopped" })).toBeVisible();
     const stoppedNewButton = page.getByRole("button", { name: "New" });
@@ -105,6 +156,7 @@ test("owner records a local exit choice through the real Auth route and can stil
       p_verified_email: owner.email,
     });
     expect(stored.error).toBeNull();
+    expect(stored.data.state.id).toBe(completedExit.id);
     expect(stored.data).toMatchObject({ state: { status: "completed", futureWork: "cancelled", providerParticipation: "kept", maintainedResources: { kind: "stopped" } } });
     await page.reload();
     await expect(page.getByText(/Work in this workspace has stopped\.|Workspace status is temporarily unavailable\./)).toBeVisible();

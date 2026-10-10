@@ -1,0 +1,20 @@
+{
+  "harnessSha256": "d1659a67630a77c29d7fadae04cbf55882ba2ce502d0b21790c4e3b248029068",
+  "injected": [
+    {
+      "line": 369,
+      "depth": 1
+    }
+  ],
+  "pending": [
+    15
+  ],
+  "memoryStatus": "HOLD",
+  "retainedStatus": "PASS",
+  "retainedSignals": [],
+  "mainAccepts": false,
+  "childReturncode": 0,
+  "childGone": "CLOSED",
+  "scope": "actual-harmless-local-child-only",
+  "databaseExecuted": false
+}

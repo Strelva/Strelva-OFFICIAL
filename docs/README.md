@@ -1,12 +1,13 @@
 # Docs
 
-Updated: 2026-10-02
+Updated: 2026-10-04
 
 | Folder | Holds | Start with |
 | --- | --- | --- |
 | [capabilities/](./capabilities/README.md) | Every customer capability: what it does, status, code, specs, tests | [capabilities/README](./capabilities/README.md) |
 | [architecture/](./architecture/README.md) | Data, auth, tenancy, contracts, platform layers | [persistence-boundaries](./architecture/persistence-boundaries.md) |
 | [operations/](#operations) | Runbooks: release, rollback, secrets, domains, onboarding, testing | [production-readiness](./operations/production-readiness.md) |
+| [agency/](./agency/README.md) | Internal 1.0 help drafts, week-one playbook and source verification; unbuilt steps marked | [agency/README](./agency/README.md) |
 | [product/](#product) | Direction, briefs, evidence, roadmap | [product-reality](./product/product-reality.md) |
 | [design/](./design/) | Tokens, components, color, motion, brand | [component-system](./design/component-system.md) |
 | [research/](./research/), [strategy/](./strategy/00-INDEX.md) | Research memos and strategy explorations. Inputs, not decisions | — |
@@ -16,7 +17,9 @@ Updated: 2026-10-02
 ## When docs disagree
 
 1. [`AGENTS.md`](../AGENTS.md): repo rules and live-client constraints.
-2. [product-ontology](./architecture/product-ontology.md): names and boundaries.
+2. [CONTEXT.md](../CONTEXT.md#product-model): the customer model and its
+   names. [product-ontology](./architecture/product-ontology.md): deployed
+   compatibility names and boundaries.
 3. [persistence-boundaries](./architecture/persistence-boundaries.md): store authority.
 4. Current code and contract tests.
 5. Runbooks in `operations/`.
@@ -47,11 +50,13 @@ a current doc and a contract test.
 
 | Doc | Use it for |
 | --- | --- |
-| [offerings-and-differentiation](./product/offerings-and-differentiation-2026-10-02.md) | Every offering against the market, what to lead with, how we build differently (Oct 2) |
+| [Product model](../CONTEXT.md#product-model) | Systems, Connections, Possibilities, Versions: the customer model and its rules (Oct 4) |
+| [offerings-and-differentiation](./product/offerings-and-differentiation-2026-10-02.md) | Every offering against the market, what to lead with, how we build differently (Oct 2; customer noun now System) |
 | [product-reality](./product/product-reality.md) | Evidence register and the current decision (Oct 1) |
 | [horizontal-product-brief](./product/horizontal-product-brief-2026-09-11.md) | Confirmed product direction, clarified through Oct 1 |
 | [horizontal-audit-and-plan](./product/horizontal-audit-and-plan-2026-09-11.md) | Source audit and build order |
-| [Strelva Reborn](./product/strelva-reborn.md) | The `1.0.0` release: every client in a business workspace. Exit criteria and order (Oct 2) |
+| [Strelva Reborn](./product/strelva-reborn.md) | The `0.x` release series that moves every client into a business workspace. Exit criteria and order (Oct 2) |
+| [Strelva 1.0.0](./product/strelva-1.0.0.md) | Every feature planned for the 1.0.0 launch, with today's state and open decisions (Oct 5) |
 | [strelvav2](./product/strelvav2.md), [definition of done](./product/strelvav2-definition-of-done.md), [module map](./product/strelvav2-module-map-2026-09-19.md) | The Sept 30 workspace release (history) |
 | [roadmap](./product/roadmap.md) | Delivery state as of Aug 1 (older than product-reality) |
 | [strelva-labs](./product/strelva-labs.md), [assets](./product/assets.md) | Labs direction; client and asset snapshot (Jul 30) |

@@ -3,6 +3,8 @@ import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { executeInquiryPublication } from "@/products/inquiries/publication";
 import { InMemoryInquiryRepository, publicationClaimToken } from "@/products/inquiries/repository";
 import { recordInquiryEvidence } from "@/products/inquiries/receive";
+const native=vi.hoisted(()=>({rpc:vi.fn(async()=>0)}));
+vi.mock("@/platform/infra/inquiry-records",async original=>({...await original<typeof import("@/platform/infra/inquiry-records")>(),inquiryRecordsRpc:native.rpc}));
 
 async function prepared() {
   const repository = new InMemoryInquiryRepository();
@@ -16,11 +18,12 @@ async function prepared() {
   const reserved = await repository.claimPublication({ tenantId: "tenant-one", businessId: "business-one", requestId: work.id, capabilityId: work.capabilityId, changeId: ready.activeChangeId!, action: "make_live", version: ready.draft!.version, idempotencyKey: "first-publication", actorId: "owner-one" });
   if (!reserved.acquired) throw new Error("Fixture claim was not acquired");
   await repository.linkPublicationEvent({ tenantId: "tenant-one", claimId: reserved.claim.id, claimToken: reserved.claimToken, governanceEventId: "event-one" });
-  return { repository, work: ready, claim: reserved.claim, input: { tenantId: "tenant-one", eventId: "event-one", claimId: reserved.claim.id, repository } };
+  return { repository, work: ready, claim: reserved.claim, input: { tenantId: "tenant-one", eventId: "event-one", claimId: reserved.claim.id, repository,
+    actorId: "owner-one", authorizeActor: async () => ({ allowed: true }) } };
 }
 
 describe("governed inquiry publication transaction", () => {
-  beforeEach(() => vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1"));
+  beforeEach(() => {native.rpc.mockClear();vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1");});
   afterEach(() => vi.unstubAllEnvs());
 
   it("commits the public definition and its receipt, verifies it and never repeats the command", async () => {
@@ -33,6 +36,8 @@ describe("governed inquiry publication transaction", () => {
     const commit = vi.spyOn(repository, "compareAndSwap");
     expect(await executeInquiryPublication(input)).toEqual({ accepted: true, verified: true });
     expect(commit).not.toHaveBeenCalled();
+    expect(native.rpc).toHaveBeenCalledTimes(2);
+    expect(native.rpc).toHaveBeenLastCalledWith("reconcile_bundle_inquiry_releases",{p_workspace_id:claim.businessId,p_capability_id:claim.capabilityId});
   });
 
   it("rejects foreign event identity and stale draft approval before writing", async () => {
@@ -47,6 +52,13 @@ describe("governed inquiry publication transaction", () => {
     await repository.compareAndSwap({ tenantId: input.tenantId, businessId: claim.businessId, expectedRevision: saved!.revision, state: changed.snapshot() });
     commit.mockClear();
     expect((await executeInquiryPublication(input)).reason).toBe("publication_approval_is_stale");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unauthorized click before changing the public form, even for an existing owner-prepared claim", async () => {
+    const { input, repository } = await prepared();
+    const commit = vi.spyOn(repository, "compareAndSwap");
+    expect(await executeInquiryPublication({ ...input, actorId: "operator", authorizeActor: async () => ({ allowed: false, reason: "permission_denied" }) })).toEqual({ accepted: false, verified: false, reason: "permission_denied" });
     expect(commit).not.toHaveBeenCalled();
   });
 

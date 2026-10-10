@@ -47,19 +47,8 @@ export {
 } from "./analytics-store";
 export type { DailyMetric } from "./analytics-store";
 
-// Booking
-export {
-  getBookingConfig,
-  setBookingConfig,
-  getDateOverrides,
-  setDateOverrides,
-  getBookings,
-  createBooking,
-  createBookingAtomic,
-  updateBooking,
-  getAvailableSlots,
-  isSlotClaimed,
-} from "./booking-store";
+// Booking: the legacy store moved to src/platform/bookings/legacy-store.ts
+// (Strelva Reborn section 7); import it from there.
 
 // Newsletter
 export { addSubscriber, getSubscribers } from "./newsletter-store";

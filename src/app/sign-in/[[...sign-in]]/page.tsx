@@ -1,17 +1,18 @@
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { LogoFull } from "@/components/Logo";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { tenantSignInNext } from "@/platform/owner-entry/env";
 import { WorkspaceSignIn } from "@/experience/workspace/WorkspaceSignIn";
 
 export const metadata: Metadata = {
@@ -131,7 +132,7 @@ export default async function SignInPage({
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
-    const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
+    const dashboardPath = tenantSignInNext(tenantAuth.clientFallbackRoot);
 
     return (
       <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">

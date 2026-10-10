@@ -1,8 +1,9 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext, getTenantOwnerUserIds, LastOwnerError } from "@/lib/auth";
+import { isSuperAdmin, getActorContext, getTenantOwnerUserIds, LastOwnerError } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { listTenantMembers, deleteMembership } from "@/lib/db/repositories";
+import { listTenantMembers, deleteMembership } from "@/platform/infra/db/repositories";
 
 /**
  * Tenant membership list and revoke — super-admin only.
@@ -15,6 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.tenant-controls.read");
   const { id } = await params;
   if (!(await getTenantConfig(id))) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });

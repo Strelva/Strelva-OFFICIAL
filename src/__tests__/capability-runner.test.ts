@@ -15,6 +15,7 @@ const fixture = vi.hoisted(() => {
 vi.mock("@/platform/workspaces/repository", () => ({
   assertWorkspaceMember: vi.fn(async () => undefined),
   getWork: vi.fn(async (_actor: unknown, workId: string) => fixture.works.get(workId) ?? null),
+  saveWork: vi.fn(),
 }));
 vi.mock("@/platform/work-execution/repository", () => ({
   readResponsibility: vi.fn(async (_actor: unknown, workId: string) => fixture.responsibilities.get(workId)),
@@ -32,7 +33,9 @@ vi.mock("@/platform/work-execution/standing-repository", () => ({
   persistStandingResponsibility: vi.fn(),
   assertStandingExecutionAllowed: (...args: Parameters<typeof fixture.standingGate>) => fixture.standingGate(...args),
 }));
-vi.mock("@/products/applications/server", () => ({
+vi.mock("@/products/applications/server", async () => ({
+  // Recheck uses the real application check against the fixture payload.
+  assertApplicationCommandCurrent: (await vi.importActual<typeof import("@/products/applications/server")>("@/products/applications/server")).assertApplicationCommandCurrent,
   changeWorkspaceApplication: fixture.command,
   readWorkspaceApplication: fixture.readApplication,
 }));

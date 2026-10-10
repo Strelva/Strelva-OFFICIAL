@@ -1,3 +1,5 @@
+import { googleReviewContent } from "@/platform/infra/google-review-content";
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Google Reviews Polling Cron
  *
@@ -10,28 +12,35 @@
  */
 
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
-import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
-import { alert } from "@/lib/monitoring";
+import { updateLastSynced } from "@/lib/connections";
+import {
+  getGoogleGrant,
+  getGoogleLocation,
+  getValidGoogleAccessToken,
+  markGoogleGrantNeedsReauth,
+  noteGoogleReadSucceeded,
+} from "@/lib/google-access";
+import { alert } from "@/platform/infra/monitoring";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
+import { listingDraftingAllowed, noteTenantListingRead } from "@/products/google-listing/server";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
-import { AUTO_POST_DELAY_MS } from "@/lib/reviews/auto-reply";
+import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";
 import { buildApproveUrl } from "@/lib/approve-link";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { maybeAlertNewReview } from "@/lib/review-alert";
-import type { Connection, TenantConfig } from "@/lib/types";
+import type { TenantConfig } from "@/lib/types";
 import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
 export const maxDuration = 300;
 
-const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 interface GoogleReview {
   name: string;
@@ -59,66 +68,16 @@ function lastReviewsKey(tenantId: string): string {
   return `google-reviews:last:${tenantId}`;
 }
 
-async function refreshAccessToken(connection: Connection): Promise<string | null> {
-  if (!connection.refreshToken) return null;
-
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) return null;
-
-  try {
-    const res = await fetch(GOOGLE_TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: connection.refreshToken,
-        grant_type: "refresh_token",
-      }),
-    });
-
-    if (!res.ok) {
-      console.error(`[poll-google-reviews] Token refresh failed for ${connection.tenantId}:`, await res.text());
-      return null;
-    }
-
-    const data = await res.json();
-    const newAccessToken = data.access_token as string;
-    const expiresIn = data.expires_in as number;
-
-    // Update connection with new token
-    await saveConnection({
-      ...connection,
-      accessToken: newAccessToken,
-      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-    });
-
-    return newAccessToken;
-  } catch (err) {
-    console.error(`[poll-google-reviews] Token refresh error for ${connection.tenantId}:`, err);
-    return null;
-  }
-}
-
-async function getValidAccessToken(connection: Connection): Promise<string | null> {
-  // Check if token is expired or about to expire (5 min buffer)
-  if (connection.expiresAt) {
-    const expiresAt = new Date(connection.expiresAt).getTime();
-    const buffer = 5 * 60 * 1000;
-    if (Date.now() + buffer > expiresAt) {
-      return refreshAccessToken(connection);
-    }
-  }
-  return connection.accessToken;
-}
-
 async function fetchGoogleReviews(
   accessToken: string,
   accountId: string,
-  locationId: string
+  locationId: string,
+  tenantId: string,
 ): Promise<GoogleReview[]> {
-  const baseUrl = `https://mybusiness.googleapis.com/v4/accounts/${accountId}/locations/${locationId}/reviews`;
+  // google-meta stores "accounts/123"; a bare id gets the prefix. The old
+  // `accounts/${accountId}` doubled it to accounts/accounts/123.
+  const account = accountId.startsWith("accounts/") ? accountId : `accounts/${accountId}`;
+  const baseUrl = `https://mybusiness.googleapis.com/v4/${account}/locations/${locationId}/reviews`;
   const allReviews: GoogleReview[] = [];
   let pageToken: string | undefined;
 
@@ -131,7 +90,9 @@ async function fetchGoogleReviews(
     });
 
     if (!res.ok) {
-      throw new Error(`Google API error: ${res.status} ${await res.text()}`);
+      const detail = await res.text();
+      await noteTenantListingRead(tenantId, locationId, { status: res.status, detail }).catch(() => {});
+      throw new Error(`Google API error: ${res.status} ${detail}`);
     }
 
     const data = (await res.json()) as GoogleReviewsResponse;
@@ -139,16 +100,18 @@ async function fetchGoogleReviews(
     pageToken = data.nextPageToken;
   } while (pageToken);
 
+  await noteTenantListingRead(tenantId, locationId, { status: 200 }).catch(() => {});
+
   return allReviews;
 }
 
 async function pollTenant(tenant: TenantConfig): Promise<number> {
   const tenantId = tenant.id;
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return 0;
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") return 0;
 
   // Get valid access token (refresh if needed)
-  const accessToken = await getValidAccessToken(connection);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) {
     // Transition from connected -> needs_reauth (we only get here if it was
     // connected). A null token here means the refresh token itself is dead, so
@@ -156,10 +119,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     // transient sync error. Recording `needs_reauth` makes the dashboard show
     // "reconnect" rather than "sync failed". Alert once on the transition so a
     // client's review sync can't die silently.
-    await saveConnection({
-      ...connection,
-      status: "needs_reauth",
-    });
+    await markGoogleGrantNeedsReauth(grant, "The Google refresh token no longer works.");
     alert("google_reviews_token_refresh_failed", "high", {
       tenantId,
       hint: "Client's Google connection needs re-auth — reviews sync is stopped.",
@@ -167,16 +127,17 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     return 0;
   }
 
-  // Get account/location IDs from Redis (stored during OAuth callback)
+  // Get account/location IDs: the business binding first, then the Redis
+  // google-meta written during the OAuth callback.
   const redis = getRedis();
   if (!redis) {
     console.warn(`[poll-google-reviews] Redis not available for ${tenantId}`);
     return 0;
   }
 
-  const metadata = await redis.get<{ accountId?: string; locationId?: string }>(`google-meta:${tenantId}`);
-  const accountId = metadata?.accountId;
-  const locationId = metadata?.locationId;
+  const location = await getGoogleLocation(tenantId, grant);
+  const accountId = location?.accountId;
+  const locationId = location?.locationId;
 
   if (!accountId || !locationId) {
     console.warn(`[poll-google-reviews] Missing accountId/locationId for ${tenantId}`);
@@ -184,7 +145,8 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   }
 
   // Fetch reviews
-  const reviews = await fetchGoogleReviews(accessToken, accountId, locationId);
+  const reviews = await fetchGoogleReviews(accessToken, accountId, locationId, tenantId);
+  await noteGoogleReadSucceeded(grant);
 
   // Get last known review IDs
   let lastReviewIds: Set<string> = new Set();
@@ -203,16 +165,19 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   // Emit events for new reviews and queue drafted replies for human approval.
   // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
   for (const review of newReviews) {
+    if (typeof review.reviewId !== "string" || !review.reviewId.trim()) throw new Error("Google review identity unavailable.");
     const rating = starRatingToNumber(review.starRating);
+    const providerContent = googleReviewContent();
 
     await addEvent({
       tenantId,
       source: "google",
       type: "review",
       title: `New ${rating}-star Google review from ${review.reviewer.displayName}`,
-      body: review.comment || "(no comment)",
+      body: "A new Google review is available in Reviews.",
       status: "pending",
       metadata: {
+        providerContent,
         reviewId: review.reviewId,
         rating,
         author: review.reviewer.displayName,
@@ -225,6 +190,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     // gated on new-only above, so a write blip never blocks the poll.
     await addReview(tenantId, {
       source: "google",
+      providerContent,
       author: review.reviewer.displayName,
       rating,
       text: review.comment || "",
@@ -246,7 +212,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     let draftedReply: string | undefined;
     let draftEventId: string | undefined;
     const replyMode = (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode;
-    if (replyMode !== "off") {
+    if (replyMode !== "off" && await listingDraftingAllowed(tenantId, locationId)) {
       try {
         draftedReply = await draftReviewReply(
           {
@@ -269,12 +235,14 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
           status: "pending",
           metadata: {
             kind: "review_reply_draft",
+            providerContent,
             reviewId: review.reviewId,
             rating,
             author: review.reviewer.displayName,
             draftedReply,
             reviewCreatedAt: review.createTime,
-            ...(replyMode === "auto"
+            // 1 and 2 star replies always go to the owner, even in auto mode.
+            ...(replyMode === "auto" && autoReplyAllowed(rating)
               ? { autoPostAt: new Date(Date.now() + AUTO_POST_DELAY_MS).toISOString() }
               : {}),
           },
@@ -306,7 +274,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
         tenant,
         reviewId: review.reviewId,
         review: { author: review.reviewer.displayName, rating, text: review.comment },
-        reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+        reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
         draftedReply,
         approveUrl,
         notYetUrl,

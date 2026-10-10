@@ -25,7 +25,7 @@ const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
 const mockRedisSet = vi.fn(() => Promise.resolve("OK"));
 const mockRedisZadd = vi.fn(() => Promise.resolve(1));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     get: (...args: Parameters<typeof mockRedisGet>) => mockRedisGet(...args),
     set: (...args: Parameters<typeof mockRedisSet>) => mockRedisSet(...args),

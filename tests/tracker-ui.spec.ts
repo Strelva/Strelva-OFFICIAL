@@ -197,7 +197,7 @@ test("owner can import, save, reload, edit with conflict feedback, paginate, and
   await expect(page.getByText(/Changed Name from.*Task 1.*Task one revised/)).toBeVisible();
 
   await writeExperiment(page);
-  await expect(page.getByText("Experiment recorded in My work. These are reported observations, not verified customer savings.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Experiment recorded in My work. These are reported observations, not verified business savings.", { exact: true })).toBeVisible();
   expect(fixture.experimentRecorded).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -251,8 +251,15 @@ test("selected records retain assignment and exact related records, with conflic
   await page.getByRole("link", { name: "Open related record in Release checklist", exact: true }).first().click();
   await expect(page.getByText("Showing the linked record.", { exact: true })).toBeVisible();
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(2);
+  expect(new URL(page.url()).searchParams.get("row")).toBe(initial.rows[2]!.id);
   await page.getByRole("button", { name: "Show all records", exact: true }).click();
   await expect(page.getByRole("table").getByRole("row")).toHaveCount(51);
+  await expect.poll(() => new URL(page.url()).searchParams.has("row")).toBe(false);
+  await page.waitForTimeout(5_000);
+  expect(new URL(page.url()).searchParams.has("row")).toBe(false);
+  await page.reload();
+  await expect(page.getByRole("table").getByRole("row")).toHaveCount(51);
+  expect(new URL(page.url()).searchParams.has("row")).toBe(false);
   await page.goto(`/workspace?workspaceId=${WORKSPACE_ID}&view=tracker&work=${WORK_ID}`);
   await page.getByRole("button", { name: "Edit Name, source row 2", exact: true }).click();
   await page.getByLabel("New cell value").fill("Later cell edit");

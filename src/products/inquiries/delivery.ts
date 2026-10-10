@@ -14,22 +14,31 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
-import { createHash } from "node:crypto";
+import { clientRecordReadStores } from "@/platform/client-records/move";
+import { ownerNoticeEmail, businessRecordReadsEnabled } from "@/lib/owner-recipient";
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 
-import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
+import type { InquiryTimelineEventType } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
+export type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
-import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { createRedisInquiryDeliveryStore, InquiryDeliveryDurableWriteError } from "./delivery-store";
+import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
+import { inquiryMessageRouteAtUse } from "./inquiry-policy-at-use";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
-import type { EmailAudience } from "@/lib/email/send";
+import type { EmailAudience } from "@/platform/infra/email/send";
+import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   deliveryActionLabel,
   getInquiryReplyTrackingAddress,
+  getInquiryDeliveryMessageDigest,
   inquiryBusinessName,
   validEmail,
 } from "./delivery-message";
@@ -62,6 +71,8 @@ export { createMemoryInquiryDeliveryStore, createRedisInquiryDeliveryStore } fro
 
 const MAX_ATTEMPTS = 5;
 const MAX_HOURS = 24 * 30;
+/** Bounded retries for the accepted marker after the provider took a message. */
+const ACCEPTANCE_WRITE_ATTEMPTS = 3;
 
 export const DEFAULT_INQUIRY_ROUTING_POLICY: InquiryRoutingPolicy = Object.freeze({
   version: "inquiry-delivery-v1",
@@ -183,31 +194,9 @@ function actionTimes(
   return { dueAt: dueAt.toISOString(), expiresAt: expiresAt.toISOString() };
 }
 
-/**
- * Bind an approval to the exact message and capability revision. The provider
- * idempotency key alone is not sufficient because an edited body could reuse
- * the same inquiry/action key under the same policy version.
- */
-export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
-  const canonical = JSON.stringify({
-    tenantId: message.tenantId,
-    inquiryId: message.inquiryId,
-    action: message.action,
-    capabilityId: message.capabilityId ?? null,
-    capabilityVersion: message.capabilityVersion ?? null,
-    audience: message.audience,
-    to: message.to,
-    replyTo: message.replyTo ?? null,
-    tags: message.tags ?? null,
-    subject: message.subject,
-    options: message.options,
-    idempotencyKey: message.idempotencyKey,
-  });
-  return createHash("sha256").update(canonical).digest("hex");
-}
-
 /** Build the exact message that an approval UI must display and hash. */
-export { createInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
+export { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage, getInquiryReplyTrackingAddress, getInquiryDeliveryMessageDigest };
+export { gateResponsibilityAction, isWithinResponsibilityHours } from "./delivery-responsibility";
 
 export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): InquiryDeliverySubmission {
   return {
@@ -239,98 +228,25 @@ export async function resolveInquiryRoute(
   // The capability's destination is server-authored configuration. Browser
   // fields never populate `staffDestination`; when it is absent or not an
   // email address, retain the tenant owner fallback for the legacy notice.
-  const ownerEmail = validEmail(inquiry.staffDestination) || validEmail(tenant?.ownerEmail);
+  // Without a configured destination, the one owner-recipient rule decides
+  // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
+  // A destination wins only as a current business person when inquiry facts
+  // are on. With record reads on, a bare legacy staff address yields to the
+  // business record's owner.
+  const business = inquiry.staffDestination ? await readInquiryBusinessContext(inquiry.tenantId) : null;
+  const staff = business ? inquiryPersonEmail(business, inquiry.staffDestination) : businessRecordReadsEnabled() ? null : inquiry.staffDestination;
+  const ownerEmail = validEmail(staff) || (businessRecordReadsEnabled()
+    ? validEmail(await ownerNoticeEmail({ id: inquiry.tenantId, ownerEmail: tenant?.ownerEmail }))
+    : tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+  const context = await readReleasedTenantBusinessContext(inquiry.tenantId);
   return {
     tenantId: inquiry.tenantId,
-    businessName: inquiryBusinessName(inquiry, tenant?.siteName),
+    businessName: context?.facts.display_name || context?.facts.legal_name || inquiryBusinessName(inquiry, tenant?.siteName),
     customerEmail: validEmail(inquiry.email),
     ownerEmail,
     ownerNotification: policy.ownerNotification,
     customerReplyTo: getInquiryReplyTrackingAddress(inquiry) || ownerEmail,
   };
-}
-
-/** Policy gate used by hosts that already evaluate a Responsibility in the engine. */
-export function gateResponsibilityAction(
-  action: InquiryDeliveryAction,
-  policy: ResponsibilityPolicy | null | undefined,
-  evaluation?: ResponsibilityEvaluation | null,
-  now: Date = new Date(),
-): ResponsibilityDeliveryGate {
-  const responsibilityAction: ResponsibilityAction =
-    action === "schedule_follow_up" ? "schedule_follow_up" : action === "owner_notification" ? "send_message" : "reply";
-  if (!policy) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "responsibility_unavailable" };
-  }
-  if (policy.status !== "active") {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "responsibility_paused" };
-  }
-  if (!isWithinResponsibilityHours(policy, now)) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "outside_responsibility_hours" };
-  }
-  if (!policy.allowedActions.includes(responsibilityAction)) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "action_not_allowed" };
-  }
-  const forbidden = policy.never.some((clause) => clause.action === responsibilityAction);
-  if (forbidden) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "action_forbidden" };
-  }
-  // A policy's trust level is never authority by itself. Every outbound
-  // action needs an explicit, current engine evaluation that says allow.
-  if (evaluation?.decision !== "allow") {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "approval_required" };
-  }
-  const limit = Math.floor(policy.budget.dailyMessages);
-  const timezone = policy.budget.timezone.trim();
-  if (!Number.isFinite(limit) || limit < 1 || !timezone) {
-    return { allowed: false, action, evaluation, reason: "daily_budget_unavailable" };
-  }
-  return {
-    allowed: true,
-    action,
-    evaluation,
-    budget: {
-      limit,
-      timezone,
-      policyVersion: policy.id,
-      now: now.toISOString(),
-    },
-  };
-}
-
-/** Check the policy's stated support hours without relying on the server's zone. */
-export function isWithinResponsibilityHours(policy: ResponsibilityPolicy, now: Date = new Date()): boolean {
-  const { timezone, days, start, end } = policy.hours;
-  if (!timezone || !Array.isArray(days) || days.length === 0) return false;
-  const parseMinutes = (value: string): number | null => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-    if (!match) return null;
-    const hour = Number(match[1]);
-    const minute = Number(match[2]);
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? hour * 60 + minute : null;
-  };
-  const startMinutes = parseMinutes(start);
-  const endMinutes = parseMinutes(end);
-  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return false;
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(now);
-    const weekday = parts.find((part) => part.type === "weekday")?.value;
-    const hour = Number(parts.find((part) => part.type === "hour")?.value);
-    const minute = Number(parts.find((part) => part.type === "minute")?.value);
-    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday || "");
-    if (day < 0 || !days.includes(day) || !Number.isFinite(hour) || !Number.isFinite(minute)) return false;
-    const currentMinutes = hour * 60 + minute;
-    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-  } catch {
-    // An invalid or unavailable timezone must never authorize a send.
-    return false;
-  }
 }
 
 export function isInquiryApprovalValid(
@@ -552,6 +468,8 @@ export async function deliverInquiryAction(
   options: {
     policy?: PartialInquiryRoutingPolicy | null;
     approval?: InquiryDeliveryApproval | null;
+    /** Exact reviewed copy; the approval digest is checked against these options before sending. */
+    messageOptions?: InquiryDeliveryMessage["options"];
     responsibilityGate?: ResponsibilityDeliveryGate;
     deps?: InquiryDeliveryDependencies;
   } = {},
@@ -563,7 +481,7 @@ export async function deliverInquiryAction(
   const deps = options.deps || {};
   const store = deps.store || createRedisInquiryDeliveryStore();
   const transport = deps.transport || createEmailInquiryTransport({ allowExternalSends: deps.allowExternalSends });
-  if (!store.durable) {
+  if (!store.durable && !clientRecordReadStores().has("inquiry_delivery")) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "durable_delivery_state_required", retryable: false };
   }
   const now = deps.now?.() || new Date();
@@ -590,11 +508,16 @@ export async function deliverInquiryAction(
   if (route.tenantId !== inquiry.tenantId) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_route_tenant_mismatch", retryable: false };
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, action);
+  if (action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, action);
   if (!message) {
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_unavailable", retryable: false };
   }
+  if (options.messageOptions) message.options = options.messageOptions;
 
   let responsibilityGate: ResponsibilityDeliveryGate | null | undefined = options.responsibilityGate;
   if (deps.getResponsibilityGate) {
@@ -611,6 +534,19 @@ export async function deliverInquiryAction(
     const reason = responsibilityGate.reason || "responsibility_blocked";
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: blockedResultStatus(reason), reason, retryable: false };
+  }
+
+  if (action !== "owner_notification" && options.approval === undefined
+    && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && inquiryRecordsEnabled()) {
+    const decisionRoute = responsibilityGate.evaluation
+      ? await (deps.messageRoute ?? inquiryMessageRouteAtUse)(inquiry.tenantId, responsibilityGate.evaluation,
+        `${message.subject}\n${renderInquiryMessage(message).text}`, inquiry.businessId)
+      : "never";
+    if (decisionRoute !== "handle") {
+      const reason = decisionRoute === "never" ? "responsibility_blocked" : "approval_required";
+      await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
+      return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: decisionRoute === "never" ? "paused" : "awaiting_approval", reason, retryable: false };
+    }
   }
 
   const messageDigest = getInquiryDeliveryMessageDigest(message);
@@ -651,6 +587,20 @@ export async function deliverInquiryAction(
     return { ...evaluated, status: "failed", reason: checkpoint.failureReason || "provider_failed", acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, verificationEvidence: checkpoint.verificationEvidence, retryable: Boolean(checkpoint.retryable) };
   }
   if (checkpoint?.status === "accepted" || checkpoint?.status === "accepted_unverified") {
+    if (!store.durable) {
+      return { ...evaluated, status: "accepted_unverified", reason: "durable_acceptance_recovered_atomic_store_unavailable",
+        attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, retryable: false };
+    }
+    if (store.repairAcceptedProjections) {
+      if (!checkpoint.acceptedAt) return { ...evaluated, status: "reconciliation_required", reason: "acceptance_evidence_unavailable", attemptId: checkpoint.attemptId, retryable: false };
+      try {
+        checkpoint = await store.repairAcceptedProjections({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action,
+          attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, replyTo: checkpoint.replyTo });
+      } catch {
+        return { ...evaluated, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable",
+          attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, retryable: false };
+      }
+    }
     const acceptance = { status: "accepted" as const, ...(checkpoint.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}), ...(checkpoint.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}) };
     let verification: InquiryVerificationResult;
     try {
@@ -709,6 +659,12 @@ export async function deliverInquiryAction(
   // Exit blocks a new claim, while the checkpoint branches above remain
   // available to verify or reconcile an already accepted or ambiguous write.
   try {
+    if (action !== "owner_notification" && inquiryBusinessFactsEnabled()) {
+      const business = await readInquiryBusinessContext(inquiry.tenantId);
+      if (business && !inquiryWithinBusinessHours(business, now)) {
+        return { ...evaluated, status: "paused", reason: "outside_business_hours", retryable: false };
+      }
+    }
     const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
     if (exited) {
       const reason = INQUIRY_WORKSPACE_EXIT_CODE;
@@ -774,6 +730,9 @@ export async function deliverInquiryAction(
   if (!budget || !Number.isInteger(budget.limit) || budget.limit < 1 || !budget.timezone.trim()) {
     return { ...evaluated, status: "unavailable", reason: "daily_budget_state_required", retryable: false };
   }
+  if (!store.durable) {
+    return { ...evaluated, status: "unavailable", reason: "durable_delivery_state_required", retryable: false };
+  }
   if (!store.atomicBudget) {
     return { ...evaluated, status: "unavailable", reason: "atomic_daily_budget_required", retryable: false };
   }
@@ -787,6 +746,7 @@ export async function deliverInquiryAction(
       maxAttempts: actionPolicy.maxAttempts,
       now: now.toISOString(),
       budget: { ...budget, now: now.toISOString() },
+      messageDigest,
     });
   } catch {
     return { ...evaluated, status: "unavailable", reason: "durable_delivery_state_unavailable", retryable: false };
@@ -832,8 +792,23 @@ export async function deliverInquiryAction(
     } catch {
       return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", attemptId, retryable: false };
     }
+    // The workspace owner and governed engine cannot acquire two first replies,
+    // even while the other's provider write or acceptance checkpoint is pending.
+    let purposeClaimed: boolean;
+    try {
+      purposeClaimed = await claimInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId);
+    } catch {
+      return { ...evaluated, status: "reconciliation_required", reason: "shared_reply_claim_unavailable", attemptId, retryable: false };
+    }
+    if (!purposeClaimed) {
+      await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: "reply_purpose_already_claimed", retryable: false });
+      return { ...evaluated, status: "paused", reason: "reply_purpose_already_claimed", attemptId, retryable: false };
+    }
     const sent = await transport.send(message);
     if (sent.status === "rejected") {
+      // Explicit rejection proves nothing was accepted. Failure to record the
+      // release stays closed; an accepted/unknown write never reaches this seam.
+      await releaseRejectedInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId).catch(() => undefined);
       let failed: InquiryDeliveryCheckpoint;
       try {
         failed = await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: sent.reason, retryable: sent.retryable });
@@ -854,13 +829,39 @@ export async function deliverInquiryAction(
       return { ...evaluated, status: "reconciliation_required", reason: sent.reason, attemptId, retryable: false };
     }
     const acceptedAt = sent.acceptedAt || now.toISOString();
-    try {
-      // This marker is the duplicate barrier. It is written before read-back.
-      await store.markAccepted({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, acceptedAt, providerMessageId: sent.providerMessageId, replyTo: message.replyTo });
-    } catch {
-      // The provider may already have accepted the message. Keep the sending
-      // checkpoint wedged behind reconciliation and never claim retryability.
-      return { ...evaluated, status: "reconciliation_required", reason: "provider_accepted_marker_unavailable", attemptId, acceptedAt, retryable: false };
+    // This marker is the duplicate barrier and the only place the provider id
+    // is indexed for provider reports. It is written before read-back, and a
+    // transient store error gets bounded retries before we give up on it.
+    let acceptanceRecorded = false;
+    for (let write = 0; write < ACCEPTANCE_WRITE_ATTEMPTS && !acceptanceRecorded; write += 1) {
+      try {
+        await store.markAccepted({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, acceptedAt, providerMessageId: sent.providerMessageId, replyTo: message.replyTo });
+        acceptanceRecorded = true;
+      } catch (error) {
+        // A cached acceptance cannot prove all selected durable projections.
+        // Retry the same attempt's recording, never the provider send.
+        if (error instanceof InquiryDeliveryDurableWriteError) continue;
+        // A concurrent writer may have recorded it, or the store is down.
+        const current = await store.getCheckpoint({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action }).catch(() => null);
+        if (current?.attemptId === attemptId && current.status !== "sending") acceptanceRecorded = true;
+        else if (current && current.attemptId !== attemptId) break;
+      }
+    }
+    if (!acceptanceRecorded) {
+      // The provider accepted the message. The sending checkpoint stays wedged
+      // behind reconciliation (never retryable), and the result carries the
+      // provider id and attempt so the caller can keep a second copy that
+      // reconciliation can finish from.
+      await appendTimelineSafe(store, timelineFor(inquiry, action, "notification_accepted", `provider accepted${sent.providerMessageId ? ` ${sent.providerMessageId}` : ""}; acceptance marker unavailable`, "accepted", acceptedAt));
+      return {
+        ...evaluated,
+        status: "reconciliation_required",
+        reason: "provider_accepted_marker_unavailable",
+        attemptId,
+        acceptedAt,
+        ...(sent.providerMessageId ? { providerMessageId: sent.providerMessageId } : {}),
+        retryable: false,
+      };
     }
     await appendTimelineSafe(store, timelineFor(inquiry, action, "notification_accepted", "provider accepted", "accepted", acceptedAt));
     let verification: InquiryVerificationResult;

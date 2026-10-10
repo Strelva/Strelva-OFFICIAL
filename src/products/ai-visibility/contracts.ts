@@ -1,3 +1,5 @@
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+
 /**
  * Browser-safe contracts for the AI Visibility product.
  *
@@ -25,6 +27,7 @@ export interface CitationProbe {
 }
 
 export interface AiVisibilityResult {
+  agency?: AgencyAttribution;
   business: string;
   url?: string;
   score: number;
@@ -42,6 +45,8 @@ export interface AiVisibilityResult {
   measurementNote?: string;
   /** Whether the readiness inputs required to present score/grade were measured. */
   readinessMeasured?: boolean;
+  /** Operational capability check; separate from the AI-search readiness grade. */
+  agentBookingAvailability?: { status: "yes" | "no" | "unknown"; detail: string };
 }
 
 export interface ScoreInput {

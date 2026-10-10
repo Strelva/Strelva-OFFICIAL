@@ -1,6 +1,8 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 
 import { getActivity, listDrafts } from "@/lib/storage";
@@ -22,7 +24,7 @@ function clientDomain(t: { productionDomain?: string; siteUrl?: string }): strin
   const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
   if (!raw) return null;
   const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  if (!host || isPlatformDomain(host) || host.endsWith(".vercel.app")) return null;
   return host;
 }
 
@@ -33,6 +35,7 @@ export default async function AdminClientsPage() {
   // super-admin, but mirror the guard here so this page never renders client
   // data for a non-admin even if the layout chain changes.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const tenants = await getAllTenants();
 

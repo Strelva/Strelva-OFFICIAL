@@ -1,10 +1,12 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
+import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { sendUpdateLiveEmail } from "@/lib/delivery-email";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import { ROOT_DOMAIN } from "@/lib/brand";
+import { tenantSiteHost } from "@/platform/infra/brand";
 import {
   listDrafts,
   getDraftContent,
@@ -27,6 +29,7 @@ export async function GET() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.drafts.read");
 
   const TENANTS = (await getAllTenants()).filter(isActiveTenant);
   const allDrafts: { tenant: string; section: string; data: unknown }[] = [];
@@ -173,12 +176,12 @@ export async function POST(request: Request) {
     // succeeded above.
     try {
       const tenantConfig = await getTenantConfig(tenant);
-      const ownerEmail = tenantConfig?.ownerEmail;
+      const ownerEmail = await releasedOwnerNoticeEmail({ id: tenant, ownerEmail: tenantConfig?.ownerEmail });
       if (ownerEmail) {
         const siteName = tenantConfig?.siteName || tenant;
         const sectionLabel = SECTION_LABELS[typedSection] || typedSection;
         const whatChanged = `your ${sectionLabel.toLowerCase()}`;
-        const domain = tenantConfig?.productionDomain || `${tenant}.${ROOT_DOMAIN}`;
+        const domain = tenantConfig?.productionDomain || tenantSiteHost(tenant);
         const siteUrl =
           tenantConfig?.siteUrl ||
           (domain.startsWith("http") ? domain : `https://${domain}`);
@@ -188,6 +191,8 @@ export async function POST(request: Request) {
           whatChanged,
           siteUrl,
           rollingOut: revalidationFailed,
+          // Client email is tenant-aware: the per-client override must apply here too.
+          tenantId: tenant,
           logPrefix: "[admin/drafts]",
         });
       }

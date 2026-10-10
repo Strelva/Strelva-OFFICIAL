@@ -11,7 +11,9 @@ import { RailBrand, NavList, RailFooter } from "./AdminRail";
 export function AdminMobileNav({
   operatorName = "Operator",
   badges = {},
+  moneyEnabled = false,
 }: {
+  moneyEnabled?: boolean;
   operatorName?: string;
   badges?: Record<string, number | undefined>;
 }) {
@@ -103,7 +105,7 @@ export function AdminMobileNav({
                 <X className="h-[18px] w-[18px]" strokeWidth={1.8} />
               </button>
             </div>
-            <NavList badges={badges} onNavigate={() => setOpen(false)} />
+            <NavList moneyEnabled={moneyEnabled} badges={badges} onNavigate={() => setOpen(false)} />
             <RailFooter operatorName={operatorName} />
           </aside>
         </div>

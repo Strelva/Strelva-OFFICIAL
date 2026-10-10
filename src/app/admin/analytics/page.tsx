@@ -1,5 +1,6 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import {
   getAnalyticsConfig,
@@ -32,6 +33,7 @@ export default async function AdminAnalyticsPage({
   // Defense in depth: the admin layout already gates on super-admin, but mirror
   // the guard so this page never renders client data if the layout chain changes.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.analytics.read");
 
   const allTenants = await getAllTenants();
   const active = allTenants.filter(isActiveTenant);

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InquiryRepository, PublicationClaim } from "@/products/inquiries/repository";
+import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
+import { tenantEventItem } from "@/platform/needs-you/adapters";
 
 const mocks = vi.hoisted(() => ({ addEvent: vi.fn() }));
 vi.mock("@/lib/events", () => ({ addEvent: mocks.addEvent }));
@@ -7,7 +9,7 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
   assertInquiryWorkspaceOpen: vi.fn(async () => undefined),
 }));
 
-import { queueInquiryPublication } from "@/products/inquiries/server";
+import { findInquiryPublication, queueInquiryPublication } from "@/products/inquiries/server";
 
 const time = "2026-09-11T12:00:00.000Z";
 const claim: PublicationClaim = {
@@ -34,7 +36,15 @@ const claim: PublicationClaim = {
 };
 
 function repository() {
+  const engine = new InquiryEngine({ businessId: input.businessId, now: () => time });
+  const original = engine.start({ actorId: input.actorId, intent: "quote inquiry" });
+  engine.acceptShape(original.id, { actorId: input.actorId });
+  const state = engine.snapshot();
+  state.requests[0]!.id = input.requestId; state.requests[0]!.capabilityId = input.capabilityId;
+  state.requests[0]!.activeChangeId = input.changeId; state.requests[0]!.draft!.version = input.version;
+  state.capabilities[0]!.id = input.capabilityId;
   return {
+    getSnapshot: vi.fn(async () => ({ state })),
     claimPublication: vi.fn(async () => ({ acquired: true as const, claim, claimToken: "server-only-claim-token" })),
     linkPublicationEvent: vi.fn(async () => ({ ...claim, governanceEventId: "event-1" })),
     markPublicationFailed: vi.fn(async () => ({ ...claim, status: "failed" as const })),
@@ -72,6 +82,33 @@ describe("inquiry publication queue", () => {
     });
     expect(JSON.stringify(queued)).not.toContain("server-only-claim-token");
     expect(JSON.stringify(result)).not.toContain("server-only-claim-token");
+    expect(queued.title).toBe("Make the inquiry form live");
+    expect(queued.body).toContain("release 2 for acme");
+    expect(queued.body).toContain("Appears in: acme's website inquiry form");
+    expect(queued.body).toContain("Routing:"); expect(queued.body).toContain("Follow-up:");
+    expect(queued.body).toContain("Sender: Strelva via mail.strelva.com");
+    expect(queued.body).not.toMatch(/capability|rehearsal|responsibility|agent/i);
+    expect(tenantEventItem({ ...queued, id: "event-1", createdAt: time })?.detail).toBe(queued.body);
+  });
+
+  it("a changed draft closes the claim without emailing a different release", async () => {
+    const store = repository();
+    const snapshot = await store.getSnapshot(input.tenantId, input.businessId);
+    snapshot!.state.requests[0]!.draft!.version = 3;
+    await expect(queueInquiryPublication({ ...input, summary: "Make this sound safe", repository: store })).rejects.toThrow("This changed since we emailed you");
+    expect(mocks.addEvent).not.toHaveBeenCalled();
+    expect(store.markPublicationFailed).toHaveBeenCalled();
+  });
+
+  it("an undo confirms its new immutable release and preserves records when removing the first form", async () => {
+    const store = repository(); const snapshot = await store.getSnapshot(input.tenantId, input.businessId);
+    snapshot!.state.capabilities[0]!.live = snapshot!.state.requests[0]!.draft;
+    snapshot!.state.requests[0]!.lastLiveChangeId = input.changeId;
+    await queueInquiryPublication({ ...input, action: "undo", version: 3, repository: store });
+    const queued = mocks.addEvent.mock.calls[0]?.[0];
+    expect(queued.title).toBe("Undo the live inquiry form change");
+    expect(queued.body).toContain("Undo release 3");
+    expect(queued.body).toContain("received inquiries stay kept");
   });
 
   it("closes the claim when the governed event cannot be persisted", async () => {
@@ -95,5 +132,30 @@ describe("inquiry publication queue", () => {
 
     expect(result).toMatchObject({ acquired: false, reason: "already_claimed", eventId: null });
     expect(mocks.addEvent).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("readonly native publication recovery", () => {
+  it("reads an accepted command while inquiry admission is OFF without creating a claim, event or snapshot", async () => {
+    vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "0");
+    const lookup = vi.fn(async () => ({ ...claim, status: "accepted" as const }));
+    const store = repository(); store.findPublicationClaim = lookup;
+    const create = vi.mocked(store.claimPublication), snapshot = vi.mocked(store.getSnapshot);
+    mocks.addEvent.mockClear();
+    try {
+      expect(await findInquiryPublication({ ...input, repository: store })).toMatchObject({ status: "accepted" });
+      expect(lookup).toHaveBeenCalledWith({ ...input, repository: store });
+      expect(create).not.toHaveBeenCalled(); expect(snapshot).not.toHaveBeenCalled(); expect(mocks.addEvent).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it("keeps completed workspace-exit refusal before the receipt read", async () => {
+    const { assertInquiryWorkspaceOpen } = await import("@/products/inquiries/workspace-exit");
+    const guard = vi.mocked(assertInquiryWorkspaceOpen);
+    const lookup = vi.fn(async () => ({ ...claim, status: "accepted" as const }));
+    const store = repository(); store.findPublicationClaim = lookup;
+    guard.mockRejectedValueOnce(new Error("Workspace exited"));
+    await expect(findInquiryPublication({ ...input, repository: store })).rejects.toThrow("Workspace exited");
+    expect(lookup).not.toHaveBeenCalled();
   });
 });

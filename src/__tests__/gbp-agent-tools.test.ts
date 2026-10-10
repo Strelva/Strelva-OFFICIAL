@@ -53,7 +53,7 @@ vi.mock("ai", () => ({
   },
 }));
 
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: { id: "primary" }, label: "primary" }),
   getFallbackModel: () => null,
   isTransientModelError: () => false,
@@ -63,14 +63,14 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("test-tenant"),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: () => Promise.resolve(null),
   requireTenantPermission: () => Promise.resolve(null),
   getAuthUserId: () => Promise.resolve("user_test"),
   isSuperAdmin: () => Promise.resolve(false),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: () => Promise.resolve(false),
 }));
 
@@ -124,7 +124,7 @@ vi.mock("@/lib/storage", () => ({
   logActivity: () => Promise.resolve(),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => null,
 }));
 

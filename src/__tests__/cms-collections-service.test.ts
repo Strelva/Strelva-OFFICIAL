@@ -6,7 +6,7 @@ const mockGetEntryBySlug = vi.fn();
 const mockDeleteEntry = vi.fn();
 const mockLogActivity = vi.fn();
 
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   upsertEntry: (...a: unknown[]) => mockUpsertEntry(...a),
   listEntries: (...a: unknown[]) => mockListEntries(...a),
   getEntryBySlug: (...a: unknown[]) => mockGetEntryBySlug(...a),

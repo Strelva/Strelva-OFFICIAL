@@ -24,90 +24,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getReviews, replyToReview } from "@/lib/reviews";
-import { getConnection } from "@/lib/connections";
-import { addEvent, getEventRaw, getEvents, updateEvent } from "@/lib/events";
-import { resolveEventAction } from "@/lib/event-actions";
-import { logActivity } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
-import type { ReviewItem } from "@/lib/types";
-
-/**
- * Publish the owner's reply to Google via the governed approval machinery.
- * Reuses the pending review_reply_draft event the review poller queued for
- * this review when one exists (updated to the owner's final text) so the
- * queue never keeps a stale duplicate draft; otherwise queues a fresh one.
- * Returns true only when Google accepted the write (resolveEventAction gates
- * resolution on `published`, not `verified` — see AGENTS.md).
- */
-async function publishReplyViaApproval(
-  tenant: string,
-  review: ReviewItem,
-  gbpReviewId: string,
-  reply: string,
-): Promise<boolean> {
-  // Use a large limit so the scan window covers the full 90-day event retention
-  // depth. getEventsRaw scans `limit * 2` raw zset entries before filtering to
-  // `limit`, so 5 000 here covers 10 000 raw entries — well beyond what any
-  // single tenant can accumulate within the TTL window. Without a wide enough
-  // window the existing draft falls outside the scan and we create a duplicate.
-  const pending = await getEvents(tenant, { status: "pending", limit: 5000 });
-  const existing = pending.find(
-    (e) =>
-      e.type === "review" &&
-      e.metadata?.kind === "review_reply_draft" &&
-      e.metadata?.reviewId === gbpReviewId,
-  );
-
-  let eventId: string;
-  if (existing) {
-    const updated = await updateEvent(existing.id, (event) => ({
-      ...event,
-      body: reply,
-      metadata: { ...event.metadata, draftedReply: reply },
-    }));
-    // If the owner's final text didn't land (lost the write lock to a concurrent
-    // updater), resolving now would publish the STALE draft to Google. Bail so
-    // the caller surfaces a retryable failure instead of silently diverging the
-    // dashboard from the live listing.
-    if (!updated.changed) return false;
-    eventId = existing.id;
-  } else {
-    const created = await addEvent({
-      tenantId: tenant,
-      source: "ai",
-      type: "review",
-      title: `Reply to ${review.author}'s ${review.rating}-star review`,
-      body: reply,
-      status: "pending",
-      metadata: {
-        kind: "review_reply_draft",
-        reviewId: gbpReviewId,
-        rating: review.rating,
-        author: review.author,
-        draftedReply: reply,
-      },
-    });
-    eventId = created.id;
-  }
-
-  const result = await resolveEventAction(tenant, eventId, "approved");
-  if (result.changed) return true;
-  // "already_resolved" is ambiguous: it fires for BOTH a concurrent approve
-  // (published to Google) AND a concurrent dismiss (nothing reached Google).
-  // Re-read the event and treat it as published ONLY when it actually resolved
-  // to "approved" — otherwise the card would falsely lock to "Your reply" with
-  // no reply live on the listing.
-  if (result.reason === "already_resolved") {
-    // Redis-authoritative re-read: under READ_PG, getEvent could serve a
-    // stale-pending PG twin and misreport a live published reply as a failure.
-    const latest = await getEventRaw(eventId);
-    return latest?.status === "approved";
-  }
-  return false;
-}
+import { submitOwnerReviewReply } from "@/lib/reviews/owner-reply";
+import { sessionTenantDecider } from "@/lib/operator-decisions";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -134,46 +55,22 @@ export async function POST(req: Request) {
     );
   }
 
-  const review = (await getReviews(tenant)).find((r) => r.id === reviewId);
-  if (!review) {
+  // An operator or agency staff reply as themselves, audited (src/lib/operator-decisions.ts).
+  const decider = await sessionTenantDecider(tenant);
+  if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const result = await submitOwnerReviewReply(tenant, reviewId, reply, decider);
+  if (result.status === "not_found") {
     return NextResponse.json({ error: "Review not found" }, { status: 404 });
   }
-
-  let published = false;
-  if (review.source === "google" && review.externalId) {
-    const connection = await getConnection(tenant, "google");
-    if (connection?.status === "connected") {
-      published = await publishReplyViaApproval(tenant, review, review.externalId, reply);
-      if (!published) {
-        // Nothing reached Google and the draft event is still pending in the
-        // review queue. Save nothing locally — an unpublished reply must not
-        // flip the card to the "Your reply" state.
-        return NextResponse.json(
-          { error: "Could not publish the reply to Google", published: false },
-          { status: 502 },
-        );
-      }
-    }
+  if (result.status === "owner_decides") {
+    return NextResponse.json({ error: "The owner decides this reply. Nothing was posted." }, { status: 403 });
   }
-
-  const updated = await replyToReview(tenant, reviewId, reply);
-  if (!updated) {
-    return NextResponse.json({ error: "Review not found" }, { status: 404 });
-  }
-
-  try {
-    await logActivity(
-      {
-        text: published
-          ? `Replied to ${updated.author}'s ${updated.rating}-star review on Google`
-          : `Replied to ${updated.author}'s ${updated.rating}-star review`,
-        time: new Date().toISOString(),
-        type: "review-reply",
-        actor: "user",
-      },
-      tenant,
+  if (result.status === "publish_failed") {
+    return NextResponse.json(
+      { error: "Could not publish the reply to Google", published: false },
+      { status: 502 },
     );
-  } catch {}
-
-  return NextResponse.json({ review: updated, published });
+  }
+  return NextResponse.json({ review: result.review, published: result.published });
 }

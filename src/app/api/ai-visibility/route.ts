@@ -1,7 +1,12 @@
+import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { attributedAiVisibility } from "@/products/ai-visibility/server";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { scoreAiVisibility, type ScoreInput, saveAiVisibilityResult } from "@/products/ai-visibility/server";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { readAgentBookingAvailability } from "@/platform/agent-channel/public-tools";
+import { tenantDirectory } from "@/app/api/mcp/_directory";
+import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 
 /**
  * Public AI-visibility audit endpoint (sales lead-magnet front door).
@@ -21,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { business?: string; url?: string; category?: string; city?: string; source?: string };
+  let body: { business?: string; url?: string; category?: string; city?: string; source?: string; agency?: string };
   try {
     body = await request.json();
   } catch {
@@ -55,7 +60,13 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const result = await scoreAiVisibility(input);
+    const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
+    if (agency) await admitAgencyCheck(agency);
+    const scored = await scoreAiVisibility(input);
+    const agentBookingAvailability = bookingAgentVisibilityEnabled()
+      ? await readAgentBookingAvailability(tenantDirectory, input.business, input.url)
+      : undefined;
+    const result = attributedAiVisibility({ ...scored, ...(agentBookingAvailability ? { agentBookingAvailability } : {}) }, agency);
     const stored = await saveAiVisibilityResult(result, {
       category: input.category,
       location: input.location,
@@ -65,6 +76,7 @@ export async function POST(request: NextRequest) {
       : null;
     return NextResponse.json({ ...result, scanId: stored?.id ?? null, shareUrl });
   } catch (err) {
+    if (err instanceof AgencyProspectingError) return NextResponse.json({ error: err.message }, { status: err.status });
     Sentry.captureException(err, {
       tags: { feature: "ai-visibility-audit" },
       extra: { business, url },

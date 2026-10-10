@@ -1,0 +1,13 @@
+import { z } from "zod";
+import { RELEASE_FLAG_LABELS } from "./resolve";
+const flag = z.enum(Object.keys(RELEASE_FLAG_LABELS) as [keyof typeof RELEASE_FLAG_LABELS, ...(keyof typeof RELEASE_FLAG_LABELS)[]]);
+const state = z.enum(["off", "operators", "on"]);
+const revision = z.number().int().min(0);
+const reason = z.string().trim().min(3).max(500);
+export const agencyFlagScopeSchema = z.object({ agencyWorkspaceId: z.string().uuid(), workspaceId: z.string().uuid() }).strict();
+export const agencyFlagCommandSchema = agencyFlagScopeSchema.extend({ flag, state, expectedRevision: revision, ceilingRevision: revision, reason }).strict();
+export const operatorCeilingCommandSchema = agencyFlagScopeSchema.extend({ flag, systemId: z.string().uuid(), verificationEffect: z.enum(["publish", "google", "email", "payments"]), maxState: state, expectedRevision: revision, reason }).strict();
+export const agencyFlagsSchema = agencyFlagScopeSchema.extend({ flags: z.array(z.object({ flag, ceiling: state, ceilingRevision: revision, systemId: z.string().uuid(), systemName: z.string(), verificationEffect: z.enum(["publish", "google", "email", "payments"]), verified: z.boolean(), state, revision, changedAt: z.string().nullable() }).strict()) }).strict();
+export type AgencyFlags = z.infer<typeof agencyFlagsSchema>;
+export const agencyFlagViewSchema = agencyFlagsSchema.extend({ flags: z.array(agencyFlagsSchema.shape.flags.element.extend({ label: z.string(), environment: z.enum(["off", "workspace", "on"]), workspaceReleased: z.boolean() })) });
+export type AgencyFlagView = z.infer<typeof agencyFlagViewSchema>;

@@ -6,11 +6,33 @@ import type { InquiryAudience, InquirySurfaceAdapter, InquirySurfaceSnapshot } f
 const FIXTURE_TIME = "2026-09-11T14:00:00.000Z";
 const BUSINESS_ID = "buffalo-realty";
 
+/** A different fictional or captured business for the same isolated engine. */
+export interface InquiryPreviewProfile {
+  id: string;
+  name: string;
+  domain: string;
+  type: string;
+  description: string;
+  intent: string;
+  title: string;
+  destination: string;
+  owner: string;
+}
+
+const BUFFALO_REALTY: InquiryPreviewProfile = {
+  id: BUSINESS_ID, name: "Buffalo Realty", domain: "buffalo-realty.example", type: "Brokerage",
+  description: "Fictional brokerage. No real customers, messages, or website changes.",
+  intent: "Create a seller inquiry form and route requests to Maria, with a follow-up if nobody replies.",
+  title: "Seller inquiries", destination: "maria@example.invalid", owner: "Maria",
+};
+
 /** All transitions use the product engine. This adapter has no network transport. */
 export function createPreviewInquiryAdapter(
   audience: InquiryAudience = "business",
   scenarioName?: string,
+  profile: InquiryPreviewProfile = BUFFALO_REALTY,
 ): InquirySurfaceAdapter {
+  const BUSINESS_ID = profile.id;
   let sequence = 0;
   const publishedFixtures = new Map<string, InquiryCapabilityDefinition | null>();
   const engine = new InquiryEngine({
@@ -27,19 +49,19 @@ export function createPreviewInquiryAdapter(
   if (scenarioName !== "empty" && scenarioName !== "unavailable") {
     engine.start({
       actorId: "fixture-owner",
-      intent: "Create a seller inquiry form and route requests to Maria, with a follow-up if nobody replies.",
-      title: "Seller inquiries",
-      destination: "maria@example.invalid",
+      intent: profile.intent,
+      title: profile.title,
+      destination: profile.destination,
       emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: FIXTURE_TIME },
     });
   }
   const context: Omit<InquirySurfaceSnapshot, "state" | "capabilities"> = {
     business: {
       id: BUSINESS_ID,
-      name: "Buffalo Realty",
-      domain: "buffalo-realty.example",
+      name: profile.name,
+      domain: profile.domain,
       role: scenarioName === "read-only" ? "read_only" : audience === "agency" ? "agency_member" : "owner",
-      description: "Fictional brokerage. No real customers, messages, or website changes.",
+      description: profile.description,
     },
     connections: ["google", "email", "calendar", "stripe", "mls"].map((id) => ({
       id: id as "google" | "email" | "calendar" | "stripe" | "mls",
@@ -52,11 +74,11 @@ export function createPreviewInquiryAdapter(
       manageHref: null,
     })),
     onboarding: {
-      website: "https://buffalo-realty.example",
+      website: `https://${profile.domain}`,
       statements: [
-        { id: "website", label: "Website", value: "https://buffalo-realty.example", provenance: "Fictional fixture", editable: true, confirmed: false },
-        { id: "business", label: "Business name", value: "Buffalo Realty", provenance: "Fictional fixture", editable: true, confirmed: false },
-        { id: "type", label: "Business type", value: "Brokerage", provenance: "Fictional fixture", editable: true, confirmed: false },
+        { id: "website", label: "Website", value: `https://${profile.domain}`, provenance: "Fictional fixture", editable: true, confirmed: false },
+        { id: "business", label: "Business name", value: profile.name, provenance: "Fictional fixture", editable: true, confirmed: false },
+        { id: "type", label: "Business type", value: profile.type, provenance: "Fictional fixture", editable: true, confirmed: false },
       ],
       checks: [{ id: "website", label: "Website evidence", status: "unknown", detail: "No website was fetched in this isolated preview." }],
     },
@@ -86,7 +108,7 @@ export function createPreviewInquiryAdapter(
       if (context.readOnly) throw new Error("This business is read-only for your account.");
       switch (action.kind) {
         case "start": {
-          const work = engine.start({ ...action.input, destination: "maria@example.invalid", title: action.input.title || "Inquiry form", emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: FIXTURE_TIME } });
+          const work = engine.start({ ...action.input, destination: profile.destination, title: action.input.title || "Inquiry form", emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: FIXTURE_TIME } });
           return { snapshot: getSnapshot(), work };
         }
         case "contextual-request": {
@@ -98,11 +120,11 @@ export function createPreviewInquiryAdapter(
           if (!engine.snapshot().responsibilities.some((policy) => policy.capabilityId === work.capabilityId)) {
             engine.createResponsibility({
               actorId: action.input.actorId, capabilityId: work.capabilityId, title: "Handle inquiry follow-up",
-              scope: "Route inquiries to Maria and prepare a follow-up when no one has replied.",
+              scope: `Route inquiries to ${profile.owner} and prepare a follow-up when no one has replied.`,
               allowedActions: ["send_message", "schedule_follow_up", "charge", "delete", "change_permissions"],
               never: [{ action: "charge", sentence: "Never charge a customer." }, { action: "delete", sentence: "Never delete an inquiry." }, { action: "change_permissions", sentence: "Never change anyone's access." }],
               approval: [{ action: "send_message", sentence: "Ask before sending a customer message." }],
-              escalation: { primary: "Maria", secondary: null },
+              escalation: { primary: profile.owner, secondary: null },
               budget: { dailyMessages: 10, timezone: "America/New_York" },
               hours: { timezone: "America/New_York", days: [1, 2, 3, 4, 5], start: "09:00", end: "17:00" },
             });
@@ -205,7 +227,7 @@ export function createPreviewInquiryAdapter(
         case "fix-why": {
           const why = engine.explainWhy(action.requestId);
           if (!why.fix || why.fix.targetPath !== action.path) throw new Error("That proposed fix is no longer available. Review the current timeline.");
-          const work = engine.start({ actorId: action.actorId, intent: `${why.fix.title}. ${why.fix.reason}`, title: why.fix.title, destination: "maria@example.invalid" });
+          const work = engine.start({ actorId: action.actorId, intent: `${why.fix.title}. ${why.fix.reason}`, title: why.fix.title, destination: profile.destination });
           return { snapshot: getSnapshot(), work, why, message: "Review the proposed shape before making a change." };
         }
         case "propose-pattern-update": {
@@ -226,7 +248,7 @@ export function createPreviewInquiryAdapter(
           return { snapshot: getSnapshot(), work: staged.work, change: staged.change, patternUpdate: proposal, message: "The pattern update is staged. Run a fresh rehearsal before making it live." };
         }
         case "use-pattern": {
-          if (action.businessId !== BUSINESS_ID) throw new Error("This preview only grants access to Buffalo Realty.");
+          if (action.businessId !== BUSINESS_ID) throw new Error(`This preview only grants access to ${profile.name}.`);
           const work = engine.copyPattern(action.patternId, { sourceCapabilityId: action.patternId, targetBusinessId: BUSINESS_ID, targetActorId: action.actorId, destination: action.destination ?? "your team", emailConnection: { status: "missing", consent: "missing", lastCheckedAt: null } });
           return { snapshot: getSnapshot(), work, message: "Pattern copied as a draft. Review its staff destination, email permission, and rehearsal before making it live." };
         }

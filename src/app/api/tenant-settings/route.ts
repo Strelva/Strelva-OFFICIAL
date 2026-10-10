@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import {
@@ -5,7 +6,7 @@ import {
   requireTenantAccess,
   requireTenantPermissions,
   type TenantPermission,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { validateTenantDomains } from "@/lib/domains";
@@ -21,6 +22,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const config = await getTenantConfig(tenant);
     if (!config) {

@@ -11,7 +11,7 @@ const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   CLIENT_ROLES: ["viewer", "editor", "admin", "owner"],
   assignUserToTenant: mockAssignUserToTenant,
   getCurrentUserEmail: mockGetCurrentUserEmail,
@@ -104,7 +104,7 @@ describe("admin invites route", () => {
       "production",
     );
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"Strelva" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),

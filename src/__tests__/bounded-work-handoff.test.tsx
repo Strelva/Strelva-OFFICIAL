@@ -28,7 +28,7 @@ it("does not expose app lifecycle controls until the workspace accepts the saved
   const onSaved = vi.fn();
   const node = document.createElement("div"); document.body.appendChild(node); root = createRoot(node);
   const render = (workId?: string) => createElement(WorkspaceRequestContext.Provider, { value: transport as typeof fetch }, createElement(BoundedWorkExperience, {
-    workspaceId: "workspace-a", productId: "applications", workId, sources: [], onSaved,
+    workspaceId: "workspace-a", productId: "applications", canEdit: true, workId, sources: [], onSaved,
   }));
   await act(async () => root!.render(render()));
   const form = node.querySelector<HTMLFormElement>('form[aria-label="Application setup"]')!;
@@ -57,4 +57,33 @@ it("does not expose app lifecycle controls until the workspace accepts the saved
   await act(async () => { review!.click(); });
   expect(node.textContent).toContain("Check proposed change");
   expect(onSaved).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  { canEdit: false, draftEditOnly: false, tab: "Review", checks: false, publish: true },
+  { canEdit: true, draftEditOnly: false, tab: "Edit", checks: true, publish: true },
+  { canEdit: true, draftEditOnly: true, tab: "Edit", checks: true, publish: false },
+])("separates manager release review from maker controls: $tab, draft-only $draftEditOnly", async ({ canEdit, draftEditOnly, tab, checks, publish }) => {
+  const service = createApplicationService(memoryBoundedStore());
+  const saved = await service.create(owner, "workspace-a", { title: "Team records", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }] });
+  const transport = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(String(url).includes("/access") ? { grants: [] } : saved), { status: 200 }));
+  const node = document.createElement("div"); document.body.append(node); root = createRoot(node);
+  await act(async () => root!.render(createElement(WorkspaceRequestContext.Provider, { value: transport as typeof fetch }, createElement(BoundedWorkExperience, { workspaceId: "workspace-a", workId: saved.id, productId: "applications", canManage: true, canEdit, draftEditOnly, sources: [], onSaved: () => undefined }))));
+  const reviewTab = [...node.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(button => button.textContent === tab);
+  expect(reviewTab).toBeDefined();
+  await act(async () => reviewTab!.click());
+  expect(node.textContent?.includes("Edit proposed app")).toBe(checks);
+  expect([...node.querySelectorAll("button")].some(button => button.textContent === "Check proposed change")).toBe(checks);
+  const publishButton = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Publish");
+  expect(Boolean(publishButton)).toBe(publish);
+  if (publishButton) expect(publishButton.disabled).toBe(true);
+  if (!checks) expect(node.textContent).toContain("Ask your agency to run the checks before you publish.");
+  expect(transport.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
+});
+
+it("does not offer application creation to a manager without maker authority", async () => {
+  const node = document.createElement("div"); document.body.append(node); root = createRoot(node);
+  await act(async () => root!.render(createElement(BoundedWorkExperience, { workspaceId: "workspace-a", productId: "applications", initialRequest: "A team tool", canManage: true, canEdit: false, sources: [], onSaved: () => undefined })));
+  expect(node.querySelector('form[aria-label="Application setup"]')).toBeNull();
+  expect(node.textContent).toContain("Ask your agency to create or copy an internal tool.");
 });

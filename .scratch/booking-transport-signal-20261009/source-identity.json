@@ -1,0 +1,17 @@
+{
+  "base_commit": "864c2d5cb8dd1a4ce0a8ef46d23822e376c603d3",
+  "source_sha256": {
+    "scripts/lib/booking-owned-cluster.mjs": "710291e7303a1de30c7da0611703e6a78490bcdbcf14ebc8437210f4eabf3d0f",
+    "scripts/sql/booking-settings-atomicity.sh": "9e92eb622d2863d9b768df9c7b3e9a22a00e3960f2a6b026e54b004e71da0c67",
+    "scripts/sql/booking-settings-forward-identity.sh": "6962dbea346a2d165402c4fabd1f4eb2b442e06111c2dc0d377b80c336689902",
+    "scripts/sql/booking-settings-inverse-identity.sh": "f8f2fd920bb85fdcf770f49dafe0891ba64d2158c268408392f6a3c43992947d",
+    "scripts/tests/booking-settings-atomic-guard.node-test.mjs": "7708e44732f63dde8435cb9d54d16f7a18c81da69514d00edc7ebfb78e81a456",
+    "scripts/sql/booking-psql.sh": "0a4e3e869d656412a6cb56037b581c9acfba9878cbd1dd329574949c6dd6d059",
+    "scripts/tests/booking-transport-signal.node-test.mjs": "2e2840097956fe305a101c5304ee2b9c8d9011cb2b765a98197ede3adef3eb16",
+    "scripts/tests/support/booking-proof-fake.mjs": "5f858695228cbc42b4e6e46434b5cc11ad2d856693b9b804c367c1dcccf5e3f8"
+  },
+  "historical_migrations_compared": 589,
+  "changed_migrations": [],
+  "forward_sha256": "6497dd7346ce3f9e9e77409b5fc933871ac931dc266e792dd4806ffcf0b07ce6",
+  "qualification": "source and harmless fake transport only; independent review and native PostgreSQL pending"
+}

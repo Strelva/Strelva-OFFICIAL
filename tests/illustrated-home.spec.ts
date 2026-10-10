@@ -8,7 +8,8 @@ test("request-first Home opens saved work on desktop and mobile", async ({ page 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
     await page.goto("/preview/strelva?scenario=free");
-    await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+    // October 6: Home opens on the dusk band, greeting first.
+    await expect(page.locator("h1#business-start-title")).toBeVisible();
     const composer = page.getByLabel("What do you want to accomplish?", { exact: true });
     await expect(composer).toBeVisible();
     expect((await composer.boundingBox())!.y).toBeLessThan(400);
@@ -62,7 +63,7 @@ test("Home search retains its query and request review retains the owner's words
   await page.keyboard.press("Escape");
   const goal = "Create an equipment request application for my team";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(goal);
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
   await expect(page.getByLabel("What do you want to accomplish?", { exact: true })).toHaveValue(goal);
   await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(goal);
@@ -72,8 +73,8 @@ for (const start of ["home", "new"]) test(`${start} carries the full multi-part 
   await page.goto(start === "home" ? "/preview/strelva?scenario=business" : "/preview/strelva/workspace?scenario=business&view=start");
   const request = "Build a staff request app and turn our supplier spreadsheet into a tracker.";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(request);
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "A plan that keeps the whole request", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "A plan that keeps the whole ask", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(request);
   await expect(page.getByText("AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.", { exact: true })).toBeVisible();
@@ -102,13 +103,21 @@ test("Home keeps decisions, allowance, business switching and site assignment re
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Customers", "Requests", "Running", "All apps and files", "Business details", "People & access", "Help"]) {
+  for (const label of ["Home", "Requests", "Running", "All apps and files", "Business details", "People & access", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
-    for (const name of ["Home", "Customers", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
+    for (const name of ["Home", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
   }
+  await expect(navigation(page).getByRole("link", { name: "Customers", exact: true })).toHaveCount(0);
   await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
   await page.screenshot({ path: info.outputPath("desktop-settings.png"), fullPage: true });
+});
+
+test("the retired Customers address opens Home and drops the old view", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=free&view=customers");
+  await expect(navigation(page).getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Customers", exact: true })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/view=customers/);
 });
 
 test("mobile navigation traps focus and opens search without background interaction", async ({ page }, info) => {

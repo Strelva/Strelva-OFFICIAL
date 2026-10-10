@@ -6,7 +6,7 @@
  * a tenant. Change the shape only by versioning (add a v2 sibling).
  */
 import { NextResponse } from "next/server";
-import { listEntries } from "@/lib/db/repositories";
+import { listEntries } from "@/platform/infra/db/repositories";
 import { isCollectionType } from "@/lib/cms/collection-types";
 import { getTenantConfig } from "@/lib/tenants";
 import { toPublicEntry } from "@/lib/cms/public-entry";

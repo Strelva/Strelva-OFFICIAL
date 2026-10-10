@@ -2,7 +2,7 @@ import {describe,it,expect,vi,beforeEach} from "vitest";
 const deps=vi.hoisted(()=>({published:vi.fn(),read:vi.fn(),patch:vi.fn(),release:vi.fn()}));
 vi.mock("@/products/websites/document-store",()=>({websiteDocumentStore:{published:deps.published}}));
 vi.mock("@/products/websites/rebuild-service",()=>({readWebsiteRebuild:deps.read,patchWebsiteRebuild:deps.patch}));
-vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release}));
+vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release,websiteRebuildReleaseMayBeOn:(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForWorkspace:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForTenant:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleasedFor:async(...args:unknown[])=>deps.release(...args)}));
 vi.mock("@/lib/ai-auto-approve",()=>({maybeAutoApprove:vi.fn()}));
 import {buildSiteDocumentTools} from "@/lib/agent-shared";
 import {siteDocumentSchema} from "@/products/websites/site-document";

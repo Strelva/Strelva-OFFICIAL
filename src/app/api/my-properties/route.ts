@@ -1,8 +1,9 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/lib/auth";
+import { getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
 import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
-import { isDevAccessBypassEnabled } from "@/lib/dev-access";
+import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import type { TenantConfig } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export async function GET() {
 
   let configs: TenantConfig[];
   if (dev || (await isSuperAdmin())) {
+    if (!dev) await authorizeAdminOperatorRead("admin.clients.read");
     configs = (await getAllTenants()).filter(isActiveTenant);
   } else {
     const ids = await getCurrentUserTenants();

@@ -1,21 +1,36 @@
-import {describe,it,expect,vi,beforeEach} from "vitest";
+import {describe,it,expect,vi,beforeEach,afterEach} from "vitest";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+const mail=vi.hoisted(()=>({override:vi.fn()}));
+vi.mock("@/platform/infra/email/client-override",()=>({getClientEmailOverride:mail.override}));
 const deps=vi.hoisted(()=>({member:vi.fn(),list:vi.fn(),read:vi.fn(),documents:vi.fn(),inquiries:vi.fn(),grants:vi.fn(),send:vi.fn(),tenant:vi.fn(),workspaces:vi.fn(),receipts:vi.fn(),published:vi.fn(),native:vi.fn()}));
 vi.mock("@/platform/workspaces/repository",()=>({assertWorkspaceMember:deps.member,listWork:deps.list,listWorkspaces:deps.workspaces}));
 vi.mock("@/products/websites/rebuild-service",()=>({readWebsiteRebuild:deps.read}));
 vi.mock("@/products/websites/document-store",()=>({websiteDocumentStore:{list:deps.documents,receipts:deps.receipts,published:deps.published,managePublishedTenant:deps.native}}));
 vi.mock("@/products/inquiries/server",()=>({readInquiryWorkspace:deps.inquiries}));
 vi.mock("@/products/scheduling/server",()=>({listPublicWebsiteBookingGrants:deps.grants}));
-vi.mock("@/lib/email/send",()=>({sendEmailWithReceipt:deps.send}));
+vi.mock("@/platform/infra/email/send",()=>({sendEmailWithReceipt:deps.send}));
 vi.mock("@/lib/tenants",()=>({getTenantConfig:deps.tenant}));
 import {readWebsiteMonthlyReport,sendWebsiteMonthlyReport,sendOwnerWebsiteMonthlyReport} from "@/products/websites/site-report";
 const actor={userId:"owner",verifiedEmail:"owner@example.com"};
+beforeEach(()=>{vi.stubEnv("STRELVA_WEBSITE_REPORT_EMAIL_ENABLED","1");vi.stubEnv("EMAIL_SENDING_ENABLED","true");vi.stubEnv("CUSTOMER_EMAIL_ENABLED","true");});
+afterEach(()=>vi.unstubAllEnvs());
 beforeEach(()=>{vi.resetAllMocks();deps.member.mockResolvedValue(undefined);deps.native.mockResolvedValue(undefined);deps.list.mockResolvedValue([]);deps.documents.mockResolvedValue([]);deps.receipts.mockResolvedValue([]);deps.published.mockResolvedValue({workspaceId:"workspace",workId:"website",tenantId:"mooney",document:{siteName:"The Mooney Firm",provenance:{sourceUrl:"https://attymooney.com"}}});deps.read.mockResolvedValue({workId:"website",workspaceId:"workspace",rebuild:{title:"The Mooney Firm",tenantId:"mooney",candidate:{document:{provenance:{sourceUrl:"https://attymooney.com"}}}}});deps.inquiries.mockResolvedValue({recordsAvailable:false,records:null});});
 describe("website reports",()=>{
+ beforeEach(()=>mail.override.mockResolvedValue("inherit"));
  it("labels absent native stores and visibility unavailable, never zero or fabricated",async()=>{const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});expect(report.inquiries.count).toBeNull();expect(report.bookings.scheduledInPeriod).toBeNull();expect(report.visibility.status).toBe("unavailable");expect(report.changes).toEqual([]);});
  it("counts only retained native submissions in the selected month",async()=>{deps.inquiries.mockResolvedValue({recordsAvailable:true,records:[{id:"in",createdAt:"2026-09-12T12:00:00Z"},{id:"out",createdAt:"2026-10-01T00:00:00Z"}]});const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});expect(report.inquiries.count).toBe(1);expect(report.inquiries.limitedToRecentRecords).toBe(true);});
+ it("links the report email to the implemented workspace query route (audit finding 9)",async()=>{const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});deps.send.mockResolvedValue({status:"suppressed"});await sendWebsiteMonthlyReport(report,"owner@example.com",actor);const url=new URL(deps.send.mock.calls[0]![0].options.button.url);expect(url.origin).toBe(CONTROL_PLANE_URL);expect(url.pathname).toBe("/workspace");expect(Object.fromEntries(url.searchParams)).toEqual({workspaceId:report.workspaceId,view:"websites",work:report.workId});});
  it("rechecks workspace membership before reading any private records",async()=>{deps.member.mockRejectedValue(Error("access"));await expect(readWebsiteMonthlyReport(actor,"website",{month:"2026-09"})).rejects.toThrow("access");expect(deps.inquiries).not.toHaveBeenCalled();});
  it("refuses report delivery from nonowners and never accepts an arbitrary recipient",async()=>{deps.workspaces.mockResolvedValue([{id:"workspace",role:"member",access:"member"}]);await expect(sendOwnerWebsiteMonthlyReport(actor,"website",{month:"2026-09"})).rejects.toThrow("owner");expect(deps.send).not.toHaveBeenCalled();deps.workspaces.mockResolvedValue([{id:"workspace",role:"owner",access:"member"}]);deps.send.mockResolvedValue({status:"suppressed"});await sendOwnerWebsiteMonthlyReport(actor,"website",{month:"2026-09"});expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({to:actor.verifiedEmail}));});
  it("sends only through shared tenant-aware transport with updates domain and idempotency",async()=>{const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});deps.send.mockResolvedValue({status:"suppressed",reason:"disabled"});await sendWebsiteMonthlyReport(report,"owner@example.com",actor);expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({audience:"client",tenantId:"mooney",fromAddress:"report@updates.strelva.com",idempotencyKey:"website-report:website:2026-09"}));report.tenantId=null;expect((await sendWebsiteMonthlyReport(report,"owner@example.com",actor)).status).toBe("suppressed");expect(deps.send).toHaveBeenCalledOnce();});
+});
+
+describe("silent website monthly report delivery",()=>{
+ beforeEach(()=>mail.override.mockResolvedValue("inherit"));
+ for(const[flag,value]of[["STRELVA_WEBSITE_REPORT_EMAIL_ENABLED",""],["STRELVA_WEBSITE_REPORT_EMAIL_ENABLED","true"],["EMAIL_SENDING_ENABLED","false"],["CUSTOMER_EMAIL_ENABLED","false"]]){
+  it(`suppresses mail with ${flag}=${value||"unset"}`,async()=>{vi.stubEnv(flag!,value!);const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});expect(await sendWebsiteMonthlyReport(report,actor.verifiedEmail,actor)).toEqual({status:"suppressed",reason:"website_report_email_disabled"});expect(deps.send).not.toHaveBeenCalled();expect(mail.override).not.toHaveBeenCalled();});
+ }
+ it("obeys the tenant's off switch even with every global flag enabled",async()=>{mail.override.mockResolvedValue("off");const report=await readWebsiteMonthlyReport(actor,"website",{month:"2026-09"});expect((await sendWebsiteMonthlyReport(report,actor.verifiedEmail,actor)).status).toBe("suppressed");expect(mail.override).toHaveBeenCalledWith("mooney");expect(deps.send).not.toHaveBeenCalled();});
 });
 
 const reservation=(requestId:string)=>({requestId,title:"Consultation",start:"2026-09-20T12:00:00Z",end:"2026-09-20T12:30:00Z",status:"accepted",provider:"google",providerId:`calendar-${requestId}`,verification:"verified"});

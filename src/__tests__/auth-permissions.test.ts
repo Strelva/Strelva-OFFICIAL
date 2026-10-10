@@ -9,12 +9,12 @@ const mockGetSessionUser = vi.fn();
 const mockGetMembershipRole = vi.fn();
 const mockIsSuperAdminUser = vi.fn();
 
-vi.mock("../lib/db/server-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({
   isSupabaseAuthConfigured: () => true,
   getSessionUser: () => mockGetSessionUser(),
 }));
 
-vi.mock("../lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   getMembershipRole: (...a: unknown[]) => mockGetMembershipRole(...a),
   isSuperAdminUser: (...a: unknown[]) => mockIsSuperAdminUser(...a),
   listMembershipsForUser: vi.fn(),
@@ -29,7 +29,7 @@ vi.mock("../lib/tenants", () => ({
   getTenantConfig: vi.fn(),
 }));
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => undefined,
 }));
 
@@ -50,7 +50,7 @@ describe("auth permission helpers", () => {
   });
 
   it("requires owner for domains, billing, team, and publishing", async () => {
-    const { roleHasPermission } = await import("../lib/auth");
+    const { roleHasPermission } = await import("@/platform/infra/auth");
 
     for (const role of ["viewer", "editor", "admin"] as const) {
       expect(roleHasPermission(role, "domains:manage")).toBe(false);
@@ -68,7 +68,7 @@ describe("auth permission helpers", () => {
   it("allows viewers to read tenant access but blocks write permissions", async () => {
     mockGetMembershipRole.mockResolvedValue("viewer");
 
-    const { hasTenantAccess, hasTenantPermission } = await import("../lib/auth");
+    const { hasTenantAccess, hasTenantPermission } = await import("@/platform/infra/auth");
 
     expect(await hasTenantAccess("gldf")).toBe(true);
     expect(await hasTenantPermission("gldf", "tenant:read")).toBe(true);
@@ -79,7 +79,7 @@ describe("auth permission helpers", () => {
   it("lets scaffold super admins override tenant permissions", async () => {
     mockIsSuperAdminUser.mockResolvedValue(true);
 
-    const { hasTenantPermission } = await import("../lib/auth");
+    const { hasTenantPermission } = await import("@/platform/infra/auth");
 
     expect(await hasTenantPermission("any-tenant", "billing:manage")).toBe(true);
     expect(await hasTenantPermission("any-tenant", "team:manage")).toBe(true);
@@ -90,7 +90,7 @@ describe("auth permission helpers", () => {
     vi.stubEnv("REB_DEV_UNGATED_ACCESS", "1");
     mockGetSessionUser.mockResolvedValue(null);
 
-    const { isSuperAdmin } = await import("../lib/auth");
+    const { isSuperAdmin } = await import("@/platform/infra/auth");
 
     expect(await isSuperAdmin()).toBe(true);
   });

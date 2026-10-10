@@ -26,6 +26,8 @@ const storage = vi.hoisted(() => ({
 }));
 const queueAiContentReview = vi.hoisted(() => vi.fn());
 const revalidateClientSite = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const observeAcceptedNativePublish = vi.hoisted(() => vi.fn());
+vi.mock("@/app/api/publish/native-readback", () => ({ observeAcceptedNativePublish }));
 
 vi.mock("../lib/storage", () => storage);
 vi.mock("../lib/schemas", () => ({
@@ -95,6 +97,22 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("applySectionUpdate", () => {
+  it("keeps a human restore pending, naming its preparer in review and role in activity", async () => {
+    const preparer = { userId: "76000000-0000-4000-8000-000000000001", email: "operator@example.test", kind: "operator" as const };
+    expect(await applySectionUpdate({ ...baseInput(), forceReview: true, preparer })).toMatchObject({ status: "queued" });
+    expect(queueAiContentReview).toHaveBeenCalledWith(expect.objectContaining({ preparer }));
+    expect(storage.logActivity).toHaveBeenCalledWith(expect.objectContaining({ actor: "admin", eventStatus: "pending" }), "gldf");
+    expect(storage.setContent).not.toHaveBeenCalled();expect(storage.appendVersion).not.toHaveBeenCalled();
+  });
+  it("keeps auto-publication accepted when the public observer fails", async () => {
+    observeAcceptedNativePublish.mockRejectedValueOnce(new Error("Observation unavailable"));
+    const res = await applySectionUpdate({ ...baseInput(), requestId: "accepted-auto-1" });
+    expect(res.status).toBe("published");
+    expect(storage.setContent).toHaveBeenCalledTimes(1);
+    expect(revalidateClientSite).toHaveBeenCalledTimes(1);
+    expect(queueAiContentReview).not.toHaveBeenCalled();
+    expect(observeAcceptedNativePublish).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "gldf", section: "hero", expected: { title: "New" }, publicationRef: "accepted-auto-1" }));
+  });
   it("publishes a low-risk approved change (writes content, no review queued)", async () => {
     const res = await applySectionUpdate(baseInput());
     expect(res.status).toBe("published");

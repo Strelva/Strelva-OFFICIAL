@@ -1,41 +1,64 @@
 /**
  * Where everything in the workspace lives (October 2, 2026 navigation).
  *
- * Plain places, with Strelva as the only actor:
- * - Home: what needs you, what Strelva handled, what is in progress.
- * - Customers: the people who reach the business.
+ * Plain places, with each action attributed to whoever did it:
+ * - Home: what needs you, what changed, what is in progress.
  * - Requests: things someone asked for that have an end.
- * - Running: what Strelva keeps doing, named by the sentence it keeps true.
+ * - Running: agreed conditions kept true over time, named in plain words.
  * The business menu holds Business details, People & access and Help. The
  * website and apps are pinned by their own names; "apps", "work" and
  * "products" stay addressable as the full list so existing links keep working.
+ * October 4: the website and apps are Systems. Each opens its System page
+ * (`view=system&system=<id>`); the full list keeps its old `apps` address.
+ * The on-screen word lives in `SYSTEMS_LABEL` so the brand call stays one edit.
+ * October 5: Customers left the navigation. The page only listed where people
+ * reach the business, not customers.
+ * October 6: the Customers page is retired in both states (systems-catalog
+ * spec §9.6). Only its old address survives: `view=customers` opens Home, and
+ * the workspace rewrites the URL. Contacts live in the business record.
+ * October 6 (1.0): Needs you is its own place, the deck of decisions, shown
+ * only while STRELVA_NEEDS_YOU_RELEASE is on; off, `view=needs-you` opens Home.
+ * The rest of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list
+ * is called "Apps", as before.
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
  */
-export type StrelvaSection = "home" | "customers" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account";
+import { SYSTEMS_LABEL } from "@/experience/systems/model";
+
+export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["customers", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["needs-you", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system", "ask"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
   home: "Home",
-  customers: "Customers",
+  "needs-you": "Needs you",
   requests: "Requests",
   ongoing: "Running",
-  apps: "Apps",
-  work: "Apps",
-  products: "Apps",
+  apps: SYSTEMS_LABEL,
+  work: SYSTEMS_LABEL,
+  products: SYSTEMS_LABEL,
   settings: "Business details",
   access: "People & access",
   help: "Help",
   account: "Account",
+  system: "System",
+  ask: "Ask Strelva",
 };
 
 /** The sidebar place that owns a section. Every view of the app list counts as Apps. */
 export function placeForSection(section: StrelvaSection | undefined): StrelvaSection | undefined {
   return section && APP_VIEWS.has(section) ? "apps" : section;
+}
+
+/** Views whose page is retired. Their old address still resolves, to Home. */
+const RETIRED_VIEWS: ReadonlySet<string> = new Set(["customers"]);
+
+/** True when a `view` URL value names a retired page that now opens Home. */
+export function isRetiredView(view: string | null | undefined): boolean {
+  return !!view && RETIRED_VIEWS.has(view);
 }
 
 /** Reads a `view` URL value, including links written before these places. */
@@ -46,9 +69,9 @@ export function sectionFromView(view: string | null | undefined): StrelvaSection
   return view && DIRECT_VIEWS.has(view) ? view as StrelvaSection : "home";
 }
 
-/** The header title for a section. */
-export function sectionTitle(section: StrelvaSection): string {
-  return TITLES[section];
+/** The header title for a section. The app list is "Apps" until Systems are released. */
+export function sectionTitle(section: StrelvaSection, systemsReleased = false): string {
+  return !systemsReleased && APP_VIEWS.has(section) ? "Apps" : TITLES[section];
 }
 
 export function workspaceSectionHref(section: StrelvaSection, base = "", workspaceId?: string): string {
@@ -63,8 +86,15 @@ export interface StrelvaPinnedItem {
   id: string;
   title: string;
   href: string;
-  kind?: "website" | "app";
+  kind?: "website" | "app" | "inquiries" | "bookings" | "document" | "tracker" | "onboarding" | "listing" | "newsletter" | "home_finder";
   onOpen?: () => void;
+  /** The System currently open. */
+  current?: boolean;
+}
+
+/** Systems pinned by name, websites first, then everything else the business runs. */
+export function pinnedSystems(systems: readonly { id: string; name: string; kind: NonNullable<StrelvaPinnedItem["kind"]> }[], href: (id: string) => string, open?: (id: string) => void, currentId?: string | null, limit = 8): StrelvaPinnedItem[] {
+  return systems.slice(0, limit).map(system => ({ id: `system-${system.id}`, title: system.name, href: href(system.id), kind: system.kind, onOpen: open ? () => open(system.id) : undefined, current: system.id === currentId }));
 }
 
 /** Websites assigned to the business are pinned first, in their given order. */

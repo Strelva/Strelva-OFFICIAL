@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { isSuperAdmin } from "./auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 
 /**
  * Super-admin "inspect mode". Lets an operator pull up any client's dashboard —

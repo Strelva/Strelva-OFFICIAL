@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 export type ReadinessStatus = "ok" | "warn" | "fail" | "skip";
 
 export interface TenantReadinessInput {
@@ -168,7 +169,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
   const productionDomain = normalizeReadinessDomain(tenant.productionDomain);
   const adminDomain = normalizeReadinessDomain(tenant.adminDomain);
   const clientCustomDomains = tenant.customDomains?.map(normalizeReadinessDomain).filter((domain) =>
-    domain && !domain.startsWith("admin.") && !domain.endsWith(".strelva.com") && !domain.endsWith(".vercel.app")
+    domain && !domain.startsWith("admin.") && !isPlatformDomain(domain) && !domain.endsWith(".vercel.app")
   );
   // Fall back to the live siteUrl's host so an already-live client on its own
   // domain is detected even when productionDomain/customDomains weren't filled in.
@@ -176,7 +177,7 @@ export function getTenantLaunchReadinessResults(tenant: TenantReadinessInput): T
   const siteUrlDomain =
     siteUrlDomainRaw &&
     !siteUrlDomainRaw.startsWith("admin.") &&
-    !siteUrlDomainRaw.endsWith(".strelva.com") &&
+    !isPlatformDomain(siteUrlDomainRaw) &&
     !siteUrlDomainRaw.endsWith(".vercel.app")
       ? siteUrlDomainRaw
       : "";

@@ -31,7 +31,7 @@ function builder(): unknown {
 }
 
 // Configured Supabase client -> forces the Postgres branch.
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await (orig() as Promise<Record<string, unknown>>)),
   getSupabase: () => ({
     from: (t: string) => {
@@ -43,7 +43,7 @@ vi.mock("@/lib/db/client", async (orig) => ({
 
 // Redis must be inert (the store only touches it on the Sanity path, but keep
 // it null so nothing real is reached).
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
 // Sanity client must never be invoked on the Postgres-only path; throw if it is.
 vi.mock("@/lib/sanity", () => ({

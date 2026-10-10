@@ -3,13 +3,15 @@
  *
  * Client repos own checkout (Stripe); on a completed purchase they fire an
  * `order` beacon to /api/v1/track/[tenant]. This is a VISIBILITY layer — the
- * client's Stripe remains the financial source of truth — so a Redis-backed
- * 90-day window is the right durability: it answers "how's my store doing this
- * week/month" without trying to be the accounting system.
+ * client's Stripe remains the financial source of truth. Before qualified
+ * cutover, Redis retains a 90-day compatibility window. After cutover,
+ * Postgres owns complete order visibility and Redis is a rollback mirror.
  *
  * Idempotent on the provider order id so a retried beacon can't double-count.
  */
-import { getRedis } from "./redis";
+import { createHash } from "node:crypto";
+import { mirrorRecord, readRecords, durableRecordAuthority, writeDurableRecord } from "./client-records";
+import { getRedis } from "@/platform/infra/redis";
 
 const ORDER_TTL_SECONDS = 90 * 24 * 60 * 60;
 const ORDER_KEEP = 500;
@@ -22,6 +24,8 @@ export interface OrderLineItem {
 export interface OrderRecord {
   id: string;
   externalId?: string;
+  /** Only site-signature orders enter Store outcome totals and receipts. */
+  verification: "site-signature";
   amountCents: number;
   currency: string;
   itemCount: number;
@@ -83,28 +87,51 @@ function newOrderId(): string {
   return `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Record a completed storefront order. Idempotent on externalId (required —
- *  the idempotency key); returns null on dedup/no-redis. */
+/** Record a site-verified storefront order. Idempotent on externalId (required). */
 export async function recordOrder(
   tenant: string,
-  input: { amountCents: number; currency: string; items: OrderLineItem[]; externalId: string },
+  input: {
+    amountCents: number;
+    currency: string;
+    items: OrderLineItem[];
+    externalId: string;
+    verification: "site-signature";
+  },
 ): Promise<OrderRecord | null> {
   const redis = getRedis();
-  if (!redis) return null;
+  const durable = await durableRecordAuthority("orders");
+  if (!durable && !redis) throw new Error("Order storage is unavailable");
 
   const dedupKey = `order-ext:${tenant}:${input.externalId}`;
-  const fresh = await redis.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
+  const fresh = durable ? true : await redis!.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
   if (!fresh) return null; // already captured this provider order
 
   const order: OrderRecord = {
-    id: newOrderId(),
+    id: durable ? `ord_${createHash("sha256").update(input.externalId).digest("hex")}` : newOrderId(),
     externalId: input.externalId,
+    verification: input.verification,
     amountCents: input.amountCents,
     currency: input.currency,
     itemCount: input.items.reduce((sum, it) => sum + it.quantity, 0) || input.items.length,
     items: input.items,
     createdAt: new Date().toISOString(),
   };
+
+  if (durable) {
+    // The tenant-scoped deterministic identity and keep_first RPC arbitrate
+    // concurrent/restarted beacons without Redis locks or TTLs.
+    const status = await writeDurableRecord("orders", tenant, order.id, order, order.createdAt, "keep_first");
+    if (status === "kept" || status === "unchanged") return null;
+    if (redis) {
+      try {
+        await redis.set(orderKey(tenant, order.id), order, { ex: ORDER_TTL_SECONDS });
+        await redis.zadd(ordersKey(tenant), { score: Date.now(), member: order.id });
+        await redis.set(dedupKey, "1", { ex: ORDER_TTL_SECONDS });
+      } catch { /* Postgres has committed; Redis remains a rollback mirror. */ }
+    }
+    return order;
+  }
+  if (!redis) throw new Error("Order storage is unavailable");
 
   // If a write fails after the externalId dedup lock is set, release it — else a
   // retry of the same provider order is silently dropped while the record sits
@@ -118,24 +145,31 @@ export async function recordOrder(
     await redis.del(dedupKey).catch(() => {});
     throw err;
   }
+  await mirrorRecord("orders", tenant, order.id, order, order.createdAt);
   return order;
 }
 
 /** Most recent orders, newest first. */
 export async function getOrders(tenant: string, limit = 50): Promise<OrderRecord[]> {
+  return (await readRecords<OrderRecord>("orders", tenant, () => getRedisOrders(tenant, limit), limit)).filter(order => order.verification === "site-signature");
+}
+
+async function getRedisOrders(tenant: string, limit: number): Promise<OrderRecord[]> {
   const redis = getRedis();
   if (!redis) return [];
   const ids = await redis.zrange<string[]>(ordersKey(tenant), 0, limit - 1, { rev: true });
   if (!ids.length) return [];
   const rows = await redis.mget<OrderRecord[]>(...ids.map((id) => orderKey(tenant, id)));
-  return rows.filter((o): o is OrderRecord => Boolean(o));
+  // Old records predate the site-signature boundary. Keep them out of order
+  // visibility and every derived outcome total; their source cannot be proven.
+  return rows.filter((o): o is OrderRecord => Boolean(o) && o.verification === "site-signature");
 }
 
 /** Order count + revenue + top products over the trailing window. */
 export async function getOrderSummary(tenant: string, sinceDays = 30): Promise<OrderSummary> {
-  const orders = await getOrders(tenant, ORDER_KEEP);
+  const orders = await readRecords<OrderRecord>("orders", tenant, () => getRedisOrders(tenant, ORDER_KEEP));
   const cutoff = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
-  const recent = orders.filter((o) => new Date(o.createdAt).getTime() >= cutoff);
+  const recent = orders.filter((o) => o.verification === "site-signature" && new Date(o.createdAt).getTime() >= cutoff);
 
   const revenueCents = recent.reduce((sum, o) => sum + o.amountCents, 0);
   const counts = new Map<string, number>();

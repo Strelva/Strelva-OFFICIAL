@@ -1,3 +1,4 @@
+import { tenantSiteOrigin } from "@/platform/infra/brand";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -55,7 +56,7 @@ export function buildSiteDocumentExport(input: SiteDocument, options: SiteDocume
     binaryFiles.push({ path: asset.path, base64: bytes.toString("base64"), sha256: imageHash, bytes: bytes.length });
   }
   const previewHtml = renderSiteDocumentHtml(document, "/", { preview: true, canonicalUrl: options.canonicalUrl, assetPaths });
-  const files = [file("site-document.json", JSON.stringify(document, null, 2) + "\n"), ...document.pages.map(page => file(page.path === "/" ? "index.html" : `${page.path.slice(1)}/index.html`, renderSiteDocumentHtml(document, page.path, { canonicalUrl: options.canonicalUrl, apiOrigin: options.apiOrigin ?? (options.tenant ? `https://${options.tenant}.strelva.com` : undefined), assetPaths, tenant: options.tenant })))];
+  const files = [file("site-document.json", JSON.stringify(document, null, 2) + "\n"), ...document.pages.map(page => file(page.path === "/" ? "index.html" : `${page.path.slice(1)}/index.html`, renderSiteDocumentHtml(document, page.path, { canonicalUrl: options.canonicalUrl, apiOrigin: options.apiOrigin ?? (options.tenant ? tenantSiteOrigin(options.tenant) : undefined), assetPaths, tenant: options.tenant })))];
   if (options.tenant && !document.capabilities?.inquiry) files.push(file("website-generation/site-lead-runtime.mjs", readFileSync(join(process.cwd(), "src/products/websites/site-lead-runtime.mjs"), "utf8")));
   if (document.capabilities) files.push(file("website-generation/capability-runtime.mjs", readFileSync(join(process.cwd(), "custom-repo-starter/website-generation/capability-runtime.mjs"), "utf8")));
   if (options.canonicalUrl) { const origin = new URL(options.canonicalUrl).origin; files.push(file("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${document.pages.map(page => `<url><loc>${escapeSiteHtml(new URL(page.path, origin).toString())}</loc></url>`).join("")}</urlset>`), file("robots.txt", `User-agent: *\nAllow: /\nSitemap: ${origin}/sitemap.xml\n`)); }

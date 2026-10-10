@@ -5,7 +5,9 @@ import { applicationSchema, applicationSpecSchema } from "@/products/application
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { z } from "zod";
 
-export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
+import { SYSTEMS_PREVIEW_SCENARIOS, createSystemsPreviewRequest, isSystemsPreviewScenario } from "./systems-fixture";
+
+export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery", ...SYSTEMS_PREVIEW_SCENARIOS] as const;
 export type PreviewScenario = typeof PREVIEW_SCENARIOS[number];
 export function previewScenario(value: string | undefined): PreviewScenario {
   return PREVIEW_SCENARIOS.includes(value as PreviewScenario) ? value as PreviewScenario : "free";
@@ -98,6 +100,7 @@ function sampleWork(workspaceId: string, title = "Harbor Dental", id = "44444444
 }
 
 export function createPreviewRequest(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean } = {}): typeof fetch {
+  if (isSystemsPreviewScenario(scenario)) return createSystemsPreviewRequest(scenario);
   const workspaceId = scenario === "agency" ? AGENCY : scenario === "read-only" || scenario === "business" ? CUSTOMER : PERSONAL;
   const base: WorkspaceSnapshot = {
     actor: { email: "alex@example.com", localPreview: true },
@@ -105,7 +108,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     workspaces: [
       { id: PERSONAL, kind: "personal", name: "Alex’s work" },
       ...(scenario === "agency" || scenario === "read-only" || scenario === "business" ? [
-        { id: AGENCY, kind: "agency" as const, name: "North Studio" },
+        { id: AGENCY, kind: "agency" as const, name: "North Studio", role: "owner" as const },
         { id: CUSTOMER, kind: "customer" as const, name: "Harbor Dental", ...(scenario === "business" ? { role: "owner" as const } : { access: "delegated_read" as const }) },
         ...(scenario === "agency" ? [{ id: SECOND_CUSTOMER, kind: "customer" as const, name: "Lake Bakery", access: "delegated_read" as const }] : []),
       ] : []),
@@ -248,10 +251,11 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     });
     if ((scenario === "business" || scenario === "agency") && url.pathname === "/api/service-requests") {
       if ((init?.method || "GET") === "GET") {
+        if (url.searchParams.get("providersBusinessId")) return response({ providers: [{ agencyWorkspaceId: "22222222-2222-4222-8222-222222222222", name: "North Agency", providerOfRecord: true }] });
         const requestId = url.searchParams.get("requestId");
         const businessId = url.searchParams.get("businessId");
         const providerKind = url.searchParams.get("providerKind");
-        if (providerKind === "strelva") return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "strelva" && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
+        if (providerKind === "strelva") return response({ error: "The privileged provider inbox is retired." }, 403);
         const providerWorkspaceId = url.searchParams.get("providerWorkspaceId");
         if (providerWorkspaceId) return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "agency" && item.provider.agencyWorkspaceId === providerWorkspaceId && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
         if (requestId) {
@@ -270,6 +274,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
           let provider: ServiceRequest["provider"];
           try { provider = serviceRequestProvider(command.provider); }
           catch (error) { return response({ error: error instanceof Error ? error.message : "The provider is unavailable in the local preview." }, 422); }
+          if (provider.kind !== "agency") return response({ error: "Choose an ordinary agency." }, 400);
           const digest = serviceRequestDigest(command);
           const prior = serviceRequestKeys.get(`${CUSTOMER}:${command.idempotencyKey}`);
           if (prior) {
@@ -294,8 +299,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
         }
         if (command.action === "respond" && typeof command.requestId === "string") {
           const existing = serviceRequests.find((candidate) => candidate.id === command.requestId);
-          const providerMatches = existing?.provider.kind === "strelva"
-            || (existing?.provider.kind === "agency" && existing.provider.agencyWorkspaceId === AGENCY);
+          const providerMatches = existing?.provider.kind === "agency" && existing.provider.agencyWorkspaceId === AGENCY;
           if (!existing || !providerMatches) return response({ error: "The local service request was not found." }, 404);
           if (typeof command.idempotencyKey !== "string") return response({ error: "The local service request is invalid." }, 400);
           const digest = serviceRequestDigest(command);
@@ -438,9 +442,15 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     if (scenario === "unavailable") return response({ error: "Saved work is unavailable right now. Nothing has been confirmed. Please try again." }, 503);
     if ((init?.method || "GET") === "GET") {
       const current = url.searchParams.get("workspaceId") || workspaceId;
-      if (!base.workspaces.some(workspace => workspace.id === current)) return response({ error: "This workspace is not part of the local preview." }, 403);
+      const selectedWorkspace = base.workspaces.find(workspace => workspace.id === current);
+      if (!selectedWorkspace) return response({ error: "This workspace is not part of the local preview." }, 403);
       if (scenario === "agency" && current === SECOND_CUSTOMER) return response({ error: "This fictional client is unavailable for partial-load testing." }, 503);
-      return response({ ...base, workspaceId: current, work: saved.get(current) || [] });
+      // Creation walkthroughs model an explicit fictional maker grant only in
+      // their own business/agency. Switching to a shared client must discard it.
+      // Owner membership alone is never the production permission.
+      const makerGranted = (scenario === "business" || scenario === "agency") && current === workspaceId;
+      const canMakeSystems = makerGranted && selectedWorkspace.role === "owner" && selectedWorkspace.access !== "delegated_read";
+      return response({ ...base, workspaceId: current, canMakeSystems, work: saved.get(current) || [] });
     }
     if (init?.method !== "POST" || typeof init.body !== "string") return response({ error: "Unsupported local preview request." }, 400);
     let action: WorkspaceAction;

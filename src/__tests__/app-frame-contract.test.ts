@@ -54,16 +54,24 @@ describe("shared app frame accessibility contract", () => {
       signOut: createElement("button", { type: "button" }, "Sign out"),
       children: createElement("p", null, "Workspace"),
     };
-    const html = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
+    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "All apps and files".
+    // The Customers page is retired in both states (October 6); its old address opens Home.
+    const before = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
+    expect(before).toContain("All apps and files");
+    expect(before).not.toContain(">Customers<");
+    expect(before).not.toContain('href="/workspace?view=customers"');
+    expect(before).not.toContain("All systems and files");
+    const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
 
     expect(html).toContain('aria-label="Strelva navigation"');
     expect(html).toContain('aria-label="Main"');
     expect(html).toContain('aria-label="Workspace utilities"');
-    for (const label of [">Home<", ">Customers<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All apps and files"]) {
+    for (const label of [">Home<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {
       expect(html).toContain(label);
     }
-    for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<"]) expect(html).not.toContain(retired);
-    expect(html).toContain('href="/workspace?view=customers"');
+    // With Systems, Customers left the navigation (October 5) and the page is retired (October 6). view=customers opens Home.
+    for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<", ">Customers<"]) expect(html).not.toContain(retired);
+    expect(html).not.toContain('href="/workspace?view=customers"');
     expect(html).toContain('href="/workspace?view=requests"');
     expect(html).toContain('href="/workspace?view=ongoing"');
     expect(html).toContain('href="/workspace?view=apps"');

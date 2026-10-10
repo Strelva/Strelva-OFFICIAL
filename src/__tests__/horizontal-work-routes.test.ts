@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({ session: vi.fn(), database: null as unknown }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: boundary.session }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: boundary.session }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 
 import { GET as getOperations, POST as postOperations } from "@/app/api/operations/route";
 import { GET as getDocuments, POST as postDocuments } from "@/app/api/documents/route";
@@ -22,8 +22,13 @@ type Row = Record<string, unknown>;
 function databaseBoundary() {
   const tables: Record<string, Row[]> & { workspace_memberships: Row[]; saved_product_work: Row[]; workspace_delegations: Row[] } = {
     workspace_memberships: [{ workspace_id: workspaceId, user_id: owner.id, role: "owner" }],
-    saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
+    // The fixture's owner is also staffed on its agency's provider seat, so it
+    // may make internal tools (make_systems). The plain-owner refusal has its
+    // own test below.
+    acting_provider_staff: [{ user_id: owner.id, revoked_at: null }],
+    saved_product_work: [], investigation_history_events: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
+  const packageReads = new Set<string>();
   let rpcError: string | null = null;
   let lostCommitResponse: string | null = null;
   function touchApplication(workId: string, actorId: string, kind: string, patch: Row) {
@@ -87,10 +92,47 @@ function databaseBoundary() {
   }
   return {
     tables,
+    allowPackageRead(userId: string, workId: string) { packageReads.add(`${userId}:${workId}`); },
+    revokePackageRead(userId: string, workId: string) { packageReads.delete(`${userId}:${workId}`); },
     loseResponseAfterCommit(name: string) { lostCommitResponse = name; },
     failNextCommit(message: string) { rpcError = message; },
     from,
     async rpc(name: string, args: Record<string, unknown>) {
+      // Mirrors public.workspace_make_systems_authority.
+      const makeAuthority = () => {
+        const member = tables.workspace_memberships.some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        if (member && (tables.acting_provider_staff ?? []).some((row) => row.user_id === args.p_user_id && !row.revoked_at)) return "provider";
+        if (tables.workspace_delegations.some((row) => row.customer_workspace_id === args.p_workspace_id && row.status === "active"
+          && tables.workspace_memberships.some((m) => m.workspace_id === row.agency_workspace_id && m.user_id === args.p_user_id))) return "agency";
+        return member ? "member" : null;
+      };
+      if (name === "read_investigation_runs") {
+        const work = tables.saved_product_work.find(row => row.id === args.p_work_id && row.product_id === "investigations");
+        const actor = [owner, outsider, agency].find(user => user.id === args.p_user_id && user.email.toLowerCase() === String(args.p_verified_email).toLowerCase());
+        if (!actor || !work || !tables.workspace_memberships.some(row => row.workspace_id === work.workspace_id && row.user_id === actor.id)) return { data: null, error: { message: "workspace_access_denied" } };
+        const limit = Number(args.p_limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 101) return { data: null, error: { message: "investigation_page_invalid" } };
+        const rows = tables.investigation_history_events!.filter(row => row.work_id === work.id && row.run
+          && (args.p_request_id == null || (row.run as Row).requestId === args.p_request_id)
+          && (args.p_before_revision == null || Number(row.revision) < Number(args.p_before_revision)))
+          .sort((a, b) => Number(b.revision) - Number(a.revision)).slice(0, limit)
+          .map(row => ({ revision: row.revision, run: structuredClone(row.run) }));
+        return { data: rows, error: null };
+      }
+      if (name === "workspace_make_systems_authority") return { data: makeAuthority(), error: null };
+      // Mirrors public.save_workspace_work and public.save_system_work: membership
+      // or make_systems is re-checked inside the write.
+      if (name === "save_workspace_work" || name === "save_system_work") {
+        const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        const authority = makeAuthority();
+        if (name === "save_workspace_work" && !member) return { data: null, error: { message: "workspace_membership_required" } };
+        if ((name === "save_system_work" || ["applications", "custom-applications"].includes(String(args.p_product_id)))
+          && authority !== "provider" && authority !== "agency") {
+          return { data: null, error: { message: authority ? "workspace_make_systems_required" : "workspace_membership_required" } };
+        }
+        const saved = await from("saved_product_work").insert({ workspace_id: args.p_workspace_id, product_id: args.p_product_id, resource_kind: args.p_resource_kind, title: args.p_title, payload: args.p_payload, input: args.p_input, source_work_id: args.p_source_work_id, created_by: args.p_user_id }).select().single();
+        return { data: saved.data ? [saved.data] : null, error: saved.error };
+      }
       if (rpcError) { const error = rpcError; rpcError = null; return { data: null, error: { message: error } }; }
       if (name === "work_allowance_execution_command") {
         // This fixture has legacy accepted job budgets but no configured period
@@ -146,6 +188,7 @@ function databaseBoundary() {
         touchApplication(String(args.p_work_id), String(args.p_user_id), "retire", { status: "retired" });
         return { data: [structuredClone(state)], error: null };
       }
+      if (name === "agency_can_read_package_work") return { data: args.p_workspace_id === workspaceId && packageReads.has(`${String(args.p_user_id)}:${String(args.p_work_id)}`), error: null };
       if (name === "agency_can_read_assigned_work") {
         const assignment = tables.operational_assignments!.find((row) => row.workspace_id === args.p_workspace_id
           && row.assignee_user_id === args.p_user_id && row.assignee_kind === "agency" && row.status === "accepted");
@@ -192,6 +235,15 @@ function databaseBoundary() {
       if (!["update_bounded_product_work", "update_work_responsibility", "update_document_work"].includes(name)) throw new Error(`Unexpected SQL command: ${name}`);
       const work = tables.saved_product_work.find(row => row.id === args.p_work_id);
       if (!work) return { data: null, error: { message: "workspace_access_denied" } };
+      if (name === "update_bounded_product_work" && work.product_id === "investigations") {
+        const next = args.p_payload as Row;
+        const run = (next.runs as Row[] | undefined)?.at(-1);
+        // The SQL trigger archives committed receipts before the client receives
+        // its response; snapshot eviction and lost responses cannot remove them.
+        if (run && !tables.investigation_history_events!.some(row => row.work_id === work.id && (row.run as Row).requestId === run.requestId)) {
+          tables.investigation_history_events!.push({ work_id: work.id, revision: next.revision, run: structuredClone(run) });
+        }
+      }
       work.payload = structuredClone(args.p_payload); work.updated_at = new Date().toISOString();
       if (lostCommitResponse === name) { lostCommitResponse = null; return { data: null, error: { message: "database connection lost after commit" } }; }
       return { data: [structuredClone(work)], error: null };
@@ -251,7 +303,7 @@ describe("horizontal work HTTP authority and execution", () => {
       expect((await handler(post(path, {}, { origin: "https://other.test" }))).status).toBe(403);
       expect((await handler(post(path, {}, { "content-type": "text/plain" }))).status).toBe(415);
       expect((await handler(post(path, { action: "run", workId: workspaceId, actorId: outsider.id }))).status).toBe(400);
-      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(400);
+      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(413);
     }
   });
 
@@ -263,6 +315,24 @@ describe("horizontal work HTTP authority and execution", () => {
     expect((await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: { ...applicationInput, script: "fetch('https://other.test')" } }))).status).toBe(400);
   });
 
+  it("tells an owner who is not the acting provider to ask their agency, and creates nothing", async () => {
+    database.tables.acting_provider_staff = [];
+    const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Ask your agency, or find one.", code: "make_systems_required" });
+    expect(database.tables.saved_product_work).toHaveLength(0);
+  });
+
+  it("lets a delegated agency make a tool in its client's business without a direct membership", async () => {
+    database.tables.acting_provider_staff = [];
+    database.tables.workspace_memberships.push({ workspace_id: agencyWorkspaceId, user_id: agency.id, role: "member" });
+    database.tables.workspace_delegations.push({ id: randomUUID(), customer_workspace_id: workspaceId, agency_workspace_id: agencyWorkspaceId, status: "active" });
+    boundary.session.mockResolvedValue(agency);
+    const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
+    expect(response.status).toBe(201);
+    expect(database.tables.saved_product_work).toEqual([expect.objectContaining({ workspace_id: workspaceId, created_by: agency.id, product_id: "applications" })]);
+  });
+
   it("refuses another account's reads and mutations through actual workspace membership", async () => {
     const app = await createApplication();
     const work = await createResponsibility(app.id);
@@ -271,6 +341,19 @@ describe("horizontal work HTTP authority and execution", () => {
     expect((await getOperations(read("operations", work.id))).status).toBe(403);
     expect((await postBounded(post("bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "retire", expectedRevision: 0 } }))).status).toBe(403);
     expect((await postOperations(post("operations", { action: "run", workId: work.id }))).status).toBe(403);
+  });
+
+  it("reads only a package's named installed draft while keeping native writes denied", async () => {
+    const app = await createApplication();
+    const other = await createApplication();
+    database.allowPackageRead(agency.id, app.id);
+    boundary.session.mockResolvedValue(agency);
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(200);
+    expect((await getBounded(read("bounded-work", other.id))).status).toBe(403);
+    expect((await postBounded(post("bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "retire", expectedRevision: 0 } }))).status).toBe(403);
+    expect(database.tables.workspace_memberships.some(row => row.user_id === agency.id && row.workspace_id === workspaceId)).toBe(false);
+    database.revokePackageRead(agency.id, app.id);
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(403);
   });
 
   it("requires a live exact agency assignment for native work reads", async () => {
@@ -442,6 +525,9 @@ describe("horizontal work HTTP authority and execution", () => {
     expect(interrupted).toMatchObject({ payload: { status: "needs_attention", steps: [{ effect: "unknown" }] } });
     vi.setSystemTime(new Date("2026-09-12T12:01:00Z"));
     await postDocuments(post("documents", { action: "command", workId: docs[0]!.workId, command: { kind: "edit", expectedRevision: 0, title: "Source", text: "Changed after the recorded check" } }));
+    // Evict the snapshot copy: reconciliation must still find the exact durable receipt.
+    const investigationRow = database.tables.saved_product_work.find(row => row.id === investigation.id)!;
+    (investigationRow.payload as Row).runs = [];
     // Active work still cannot use a stale finding to authorize dependent actions.
     expect((await postOperations(post("operations", { action: "command", workId: work.id, command: { kind: "reconcile", expectedRevision: interrupted.payload.revision, stepId: "check", resolution: "completed", evidence: "Old receipt" } }))).status).toBe(409);
     const cancelled = await (await postOperations(post("operations", { action: "command", workId: work.id, command: { kind: "cancel", expectedRevision: interrupted.payload.revision } }))).json();

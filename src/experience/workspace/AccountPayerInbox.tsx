@@ -49,17 +49,17 @@ export function AccountPayerInbox() {
     {!pending.length && !accepted.length && !jobs.length ? <p className="text-sm text-gray-muted">No payer requests or job limits are addressed to this account.</p> : null}
     {pending.map(item => <article key={item.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">Future jobs for {item.workspaceName}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-muted">{item.proposerEmail} asked this exact account to become payer for jobs created after acceptance. This does not grant access to the business or its saved work. Each job limit still requires separate acceptance.</p>
+      <p className="mt-2 text-sm leading-relaxed text-gray-muted">{item.proposerEmail} asked {item.successorKind === "agency" ? item.successorWorkspaceName ?? "your agency" : item.successorKind === "business" ? "this business" : "this account"} to become payer for jobs created after acceptance. This does not grant access to the business or its saved work. Each job limit still requires separate acceptance.</p>
       <div className="mt-4 flex flex-wrap gap-2"><Button disabled={busy === item.id} onClick={() => void transition("accept", item.id)}>Accept future payer role</Button><Button variant="secondary" disabled={busy === item.id} onClick={() => void transition("reject", item.id)}>Decline</Button></div>
     </article>)}
     {accepted.map(item => <article key={item.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">Accepted future payer role for {item.workspaceName}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-muted">Accepted by this verified account. Only jobs created after this acceptance can name this account, and each job limit remains separate.</p>
+      <p className="mt-2 text-sm leading-relaxed text-gray-muted">Accepted for {item.successorKind === "agency" ? item.successorWorkspaceName ?? "the agency" : "the business"}. Only jobs created after this acceptance can name this account, and each job limit remains separate.</p>
     </article>)}
     {jobs.map(job => <article key={job.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">{job.workspaceName} · {job.productId.replaceAll("_", " ")}</h3>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-gray-muted">Maximum</dt><dd>{money(job.maxAuthorizedCents)}</dd></div><div><dt className="text-gray-muted">Status</dt><dd className="capitalize">{job.status}</dd></div><div><dt className="text-gray-muted">Estimate</dt><dd>{job.estimateCents === null ? "Unknown" : money(job.estimateCents)}</dd></div><div><dt className="text-gray-muted">Reserved or held</dt><dd>{money(job.reservedCents)}</dd></div><div><dt className="text-gray-muted">Recorded use</dt><dd>{money(job.usedCents)}</dd></div><div><dt className="text-gray-muted">Final actual</dt><dd>{job.actualKnown && job.actualCents !== null ? money(job.actualCents) : "Unresolved"}</dd></div></dl>
-      <p className="mt-3 text-xs leading-relaxed text-gray-muted">This financial receipt does not include the saved work’s title, content, or customer data.</p>
+      <p className="mt-3 text-xs leading-relaxed text-gray-muted">This financial receipt does not include the saved work’s title, content, or business data.</p>
       {job.status === "draft" ? <Button className="mt-4" disabled={busy === job.id} onClick={() => void acceptJob(job.id)}>Accept {money(job.maxAuthorizedCents)} job limit</Button> : null}
     </article>)}
   </div>;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn(() => Promise.resolve({ email: "a@b.com" })));
@@ -9,7 +10,7 @@ const mockListClaims = vi.hoisted(() => vi.fn(() => Promise.resolve([])));
 const mockRefresh = vi.hoisted(() => vi.fn());
 const mockRemove = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));
@@ -68,7 +69,7 @@ describe("admin domains route — mutations (super-admin)", () => {
       params("gldf")
     );
     expect(res.status).toBe(200);
-    expect(mockAddCustomDomain).toHaveBeenCalledWith("gldf", "new.com", "production");
+    expect(mockAddCustomDomain).toHaveBeenCalledWith("gldf", "new.com", "production", { actor: "operator console" });
     expect(mockLogAuditEvent).toHaveBeenCalled();
   });
 
@@ -97,7 +98,7 @@ describe("admin domains route — mutations (super-admin)", () => {
       params("gldf")
     );
     expect(res.status).toBe(200);
-    expect(mockRemove).toHaveBeenCalledWith("gldf", "gone.com");
+    expect(mockRemove).toHaveBeenCalledWith("gldf", "gone.com", { actor: "operator console" });
     expect(mockLogAuditEvent).toHaveBeenCalled();
   });
 });

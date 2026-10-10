@@ -4,10 +4,10 @@ import type { NextRequest } from "next/server";
 const mockConfigured = vi.fn(() => true);
 const mockCreate = vi.fn();
 
-vi.mock("@/lib/db/server-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({
   isSupabaseAuthConfigured: () => mockConfigured(),
 }));
-vi.mock("@/lib/db/middleware-client", () => ({
+vi.mock("@/platform/infra/db/middleware-client", () => ({
   createMiddlewareSupabase: () => mockCreate(),
   applyMiddlewareSupabaseResponse: (_req: unknown, response: unknown) => response,
 }));

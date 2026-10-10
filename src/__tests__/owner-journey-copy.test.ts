@@ -80,7 +80,7 @@ describe("owner journey copy and links", () => {
   it("keeps rollback safety reachable under the Website History tab", () => {
     // Safety net + recent changes moved off the dashboard into Website > History
     // (site-management tools, not at-a-glance metrics).
-    const historyPage = readRepoFile("src/app/dashboard/history/page.tsx");
+    const historyPage = readRepoFile("src/components/dashboard/SiteHistoryContent.tsx");
     const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
@@ -88,10 +88,10 @@ describe("owner journey copy and links", () => {
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
     expect(historyPage).toContain('snapshots.status === "fulfilled"');
     expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
-    expect(safetyPanel).toContain("Revert to a last good version");
-    expect(safetyPanel).toContain("Save a version now");
+    expect(safetyPanel).toContain("Restore from History");
+    expect(safetyPanel).toContain("Save to History");
     // Per-row restore over the whole version history, not just the latest.
-    expect(safetyPanel).toContain("Restore this version");
+    expect(safetyPanel).toContain("Restore this saved state");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");

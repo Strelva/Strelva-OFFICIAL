@@ -1,6 +1,8 @@
+import { publicBookingAdmission } from "@/platform/bookings/public-admission";
+import { cachedPublicCalendarRead } from "@/platform/bookings/public-read";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
 import { captureLead } from "@/lib/leads";
 import { PostgresOfferingStore } from "@/platform/offerings/store";
@@ -22,6 +24,9 @@ import {
 import { scheduleSchema } from "./contracts";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingCalendar, type PublicBookingInquiryCapture, type PublicBookingRange } from "./public-booking";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
+import { bookingReadSource } from "@/platform/bookings/flags";
+import { recordPublicAvailability, changePublicRecord, cancelPublicRecord, confirmPublicRecord } from "@/platform/bookings/public-record";
+import { publicBookingStoreHook, subtractStoreBookings } from "@/server/bookings/public-api";
 
 type DbRow = Record<string, unknown>;
 type DbResult = { data: unknown; error: { code?: unknown; message?: unknown } | null };
@@ -94,6 +99,7 @@ export async function resolvePublishedPublicBooking(input: {
   capabilityId: string;
   range?: PublicBookingRange;
   includeRevoked?: boolean;
+  requestId?: string;
 }): Promise<PublicBookingBinding | null> {
   const config = await getTenantConfig(input.tenantId);
   if (!config?.active || !config.stableId) return null;
@@ -133,19 +139,41 @@ export async function resolvePublishedPublicBooking(input: {
   }
   const work = await readWorkspaceSchedule(owner, workId);
   const schedule = scheduleSchema.parse(work.payload);
-  const configuredRange = input.range
+  if (await bookingReadSource() === "postgres") {
+    const record = await recordPublicAvailability({ ...input, name: requiredText(grant, "display_name") });
+    if (record.workspaceId !== workspaceId) throw new PublicBookingError("not_found", "This booking belongs to another business.");
+    const paused = Boolean(schedule.pause) || record.paused;
+    return {
+      tenantId: input.tenantId, tenantStableId: config.stableId, grantId: requiredText(grant, "id"),
+      status: text(grant, "status") as "published" | "revoked", websiteBindingActive, paused,
+      capabilityId: input.capabilityId, version: numberValue(grant, "capability_version"),
+      inquiryCapabilityId: requiredText(grant, "inquiry_capability_id"), inquiryVersion: numberValue(grant, "inquiry_version"),
+      name: record.name, provider: requiredText(grant, "provider") as "outlook" | "google", timeZone: record.timeZone,
+      recordBooking: record.recordBooking, slots: paused ? [] : record.slots.map(slot => ({
+        id: slotId(input.tenantId, input.capabilityId, numberValue(grant, "capability_version"), slot.start, slot.end), start: slot.start, end: slot.end,
+      })), owner, workspaceId, workId,
+    };
+  }
+  // A paused schedule offers no open times. The response keeps its shape (an
+  // empty slot list is a valid published schedule), and the provider is not
+  // asked about times nobody can book.
+  const paused = Boolean(schedule.pause);
+  const configuredRange = paused ? null : input.range
     ? { start: input.range.from, end: input.range.to }
     : minMax(schedule.availability);
+  if (configuredRange && Date.parse(configuredRange.end) - Date.parse(configuredRange.start) > 60 * 86400000) {
+    configuredRange.end = new Date(Date.parse(configuredRange.start) + 60 * 86400000).toISOString();
+  }
   const availability = configuredRange
-    ? await readWorkspaceProviderAvailability(owner, workspaceId, requiredText(grant, "provider") as "outlook" | "google", {
+    ? await cachedPublicCalendarRead([workspaceId, workId, requiredText(grant, "provider"), configuredRange.start, configuredRange.end, text(grant, "time_zone")], () => readWorkspaceProviderAvailability(owner, workspaceId, requiredText(grant, "provider") as "outlook" | "google", {
       start: configuredRange.start,
       end: configuredRange.end,
       timeZone: text(grant, "time_zone") || undefined,
-    })
+    }))
     : { busy: [] as Array<{ start: string; end: string }>, timeZone: text(grant, "time_zone") || "UTC" };
   const providerBusy = Array.isArray(availability.busy) ? availability.busy : [];
-  const slots = schedule.availability
-    .filter(slot => !input.range || (Date.parse(slot.start) >= Date.parse(input.range.from) && Date.parse(slot.end) <= Date.parse(input.range.to)))
+  const slots = (paused ? [] : schedule.availability)
+    .filter(slot => !configuredRange || (Date.parse(slot.start) >= Date.parse(configuredRange.start) && Date.parse(slot.end) <= Date.parse(configuredRange.end)))
     .filter(slot => !schedule.reservations.some(reservation => reservation.status !== "cancelled" && overlaps(slot, reservation)))
     .filter(slot => !providerBusy.some(busy => overlaps(slot, busy)))
     .slice(0, 500)
@@ -154,12 +182,15 @@ export async function resolvePublishedPublicBooking(input: {
       start: slot.start,
       end: slot.end,
     }));
+  // One booking store: once reads flip, a time a widget booking holds is not offered here.
+  const openSlots = await subtractStoreBookings(input.tenantId, slots);
   return {
     tenantId: input.tenantId,
     tenantStableId: config.stableId,
     grantId: requiredText(grant, "id"),
     status: text(grant, "status") as "published" | "revoked",
     websiteBindingActive,
+    paused,
     capabilityId: input.capabilityId,
     version: numberValue(grant, "capability_version"),
     inquiryCapabilityId: requiredText(grant, "inquiry_capability_id"),
@@ -167,7 +198,7 @@ export async function resolvePublishedPublicBooking(input: {
     name: requiredText(grant, "display_name"),
     provider: requiredText(grant, "provider") as "outlook" | "google",
     timeZone: text(grant, "time_zone") || availability.timeZone || "UTC",
-    slots,
+    slots: openSlots,
     owner,
     workspaceId,
     workId,
@@ -199,11 +230,13 @@ function publicInquiryCapture(): PublicBookingInquiryCapture {
         email: input.visitor.email,
         ...(message ? { message } : {}),
       };
+      if (input.visitor.phone?.trim()) for (const field of capability.live.form.fields.filter(field => field.kind === "phone")) fields[field.id] = input.visitor.phone.trim();
       const validationErrors = validateInquiryFields(capability.live, fields);
       if (validationErrors.length) throw new Error(validationErrors[0]);
       const captured = await captureLead(input.tenantId, {
         name: input.visitor.name,
         email: input.visitor.email,
+        ...(input.visitor.phone?.trim() ? { phone: input.visitor.phone.trim() } : {}),
         message,
         source: "public-booking",
         fields,
@@ -248,6 +281,7 @@ function nativeCalendar(): PublicBookingCalendar {
   }
   return {
     async reserve(input) {
+      if (input.binding.recordBooking) return confirmPublicRecord(input.binding, input.reservationId);
       const current = await read(input.binding);
       await changeWorkspaceSchedule(input.binding.owner, input.binding.workId, {
         kind: "reserve",
@@ -261,6 +295,10 @@ function nativeCalendar(): PublicBookingCalendar {
       return confirmation(await read(input.binding), input.requestId, input);
     },
     async change(input) {
+      if (input.binding.recordBooking) {
+        const result = await changePublicRecord(input.binding, input.reservationId, input.start, input.end);
+        if (result) return result;
+      }
       await calendarSchedulingService.reschedule(input.binding.owner, input.binding.workId, input.requestId, {
         provider: input.binding.provider,
         expectedRevision: input.expectedRevision,
@@ -270,6 +308,10 @@ function nativeCalendar(): PublicBookingCalendar {
       return confirmation(await read(input.binding), input.requestId, input);
     },
     async cancel(input) {
+      if (input.binding.recordBooking) {
+        const result = await cancelPublicRecord(input.binding, input.reservationId);
+        if (result) return result;
+      }
       await calendarSchedulingService.cancel(input.binding.owner, input.binding.workId, input.requestId, {
         provider: input.binding.provider,
         expectedRevision: input.expectedRevision,
@@ -289,6 +331,8 @@ export function createPublicWebsiteBookingService() {
     inquiries: publicInquiryCapture(),
     calendar: nativeCalendar(),
     tokens: postgresPublicBookingTokenStore,
+    store: publicBookingStoreHook(),
+    admission: publicBookingAdmission,
     createRequestId: () => `public-${randomUUID()}`,
   });
 }
