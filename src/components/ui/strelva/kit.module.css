@@ -7,6 +7,10 @@
  */
 
 /* ---------- Page ---------- */
+.entry { box-sizing: border-box; display: flex; flex-direction: column; gap: 32px; width: 100%; max-width: 560px; min-height: 100dvh; margin-inline: auto; padding: 48px 20px 24px; color: var(--st-text); }
+.entryBody { display: flex; flex-direction: column; gap: 20px; }
+.entryFooter { display: flex; flex-direction: column; gap: 12px; margin-top: auto; }
+@media (max-width: 767px) { .entry { padding-top: 24px; } }
 .page {
   box-sizing: border-box;
   width: 100%;

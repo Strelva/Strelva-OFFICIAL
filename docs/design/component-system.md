@@ -19,6 +19,15 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 [ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
 both modes on October 9; consumers are added lane by lane.
 
+L9 adds `StEntry`: a 560 px standalone entry/signed-link composition with a
+footer that follows short content to the bottom and stays in document flow.
+Specimen: the kit's “Standalone entry specimen” disclosure; consumer:
+`/preview/strelva/email?view=confirm`. Source and isolated-interaction tests
+are local; L9 rendered desktop/mobile proof is still pending. Email templates
+serialize the light paper roles in `platform/infra/email/paper-tokens.ts` for
+mail clients through the existing `renderEmailHtml` / `renderEmailText`
+boundary. [L9 handoff](./ui-1.0-l9-email.md) records scope and proof limits.
+
 ## Party billing, October 7, 2026 (local)
 
 [AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)

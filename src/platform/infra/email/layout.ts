@@ -1,4 +1,7 @@
 import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { escapeEmailHtml } from "./escape";
+import { renderPaperEmailHtml, renderPaperEmailText, type PaperEmail } from "./paper";
+export { escapeEmailHtml } from "./escape";
 /**
  * Strelva shared email design system.
  *
@@ -94,6 +97,8 @@ export interface EmailDecision {
 }
 
 export interface EmailOptions {
+  /** Additive 1.0 presentation. No sender uses it during the silent rollout. */
+  paper?: PaperEmail;
   /** Legacy name-only attribution. Prefer brand for workspace identity. */
   preparedBy?: string;
   brand?: OwnerBrand;
@@ -122,15 +127,6 @@ export interface EmailOptions {
   manageUrl?: string;
   /** When set, renders an "Unsubscribe" link in the footer. */
   unsubscribeUrl?: string;
-}
-
-export function escapeEmailHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /** The real Strelva logo (cairn + Fraunces wordmark) as a hosted image.
@@ -246,6 +242,7 @@ function footerHtml(opts: EmailOptions): string {
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
+  if (opts.paper) return renderPaperEmailHtml(opts.paper);
   const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailHtml(opts.preheader)}</div>`
@@ -284,6 +281,7 @@ ${preheader}
 
 /** Plain-text counterpart — same content, no markup. */
 export function renderEmailText(opts: EmailOptions): string {
+  if (opts.paper) return renderPaperEmailText(opts.paper);
   const parts: string[] = [opts.heading, ""];
   for (const p of opts.paragraphs ?? []) parts.push(p, "");
   if (opts.highlight) {
