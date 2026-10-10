@@ -18,10 +18,22 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
+import { forwardRef, createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
+
+/** Native field: labels, descriptions and errors stay attached to the input. */
+export const StTextField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { label: string; description?: string; error?: string }>(function StTextField({ label, description, error, id: suppliedId, "aria-describedby": describedBy, ...props }, ref) {
+  const generatedId = useId();
+  const id = suppliedId || generatedId;
+  const messageId = description || error ? `${id}-message` : undefined;
+  return <div className={styles.textField}><label htmlFor={id}>{label}</label><input {...props} id={id} ref={ref} className={styles.textFieldInput} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={[describedBy, messageId].filter(Boolean).join(" ") || undefined} />{messageId ? <p id={messageId} className={styles.textFieldMessage} data-error={!!error} role={error ? "alert" : undefined}>{error || description}</p> : null}</div>;
+});
+
+export function StCopy({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
+  return <p className={styles.copy} data-muted={muted || undefined}>{children}</p>;
+}
 
 /* ---------- Page and head ---------- */
 

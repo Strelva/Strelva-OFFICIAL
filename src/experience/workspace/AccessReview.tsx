@@ -1,19 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { StPage, StHead, StSection, StRows, StRow, StTextButton, StEmpty, StNotice, StSkeleton, StState, StSegmented } from "@/components/ui/strelva/Kit";
+import { StEmpty, StHead, StMono, StNotice, StPage, StSection, StSegmented, StSkeleton, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StTable } from "@/components/ui/strelva/Table";
 import { accessReviewSchema, type AccessReview, type AccessReviewRevoke, type AccessReviewScope } from "@/platform/access-review/contracts";
 const kindLabel = { member: "Member", delegation: "Read-only delegation", operational_assignment: "Operating assignment", agency_assignment: "Agency staff assignment", provider: "Provider of record", provider_seat: "Provider seat", agent_token: "Assistant connection" };
 export function AccessReviewView({ review, pending, notice, onRevoke }: { review: AccessReview; pending?: string | null; notice?: string; onRevoke: (input: AccessReviewRevoke) => void }) {
-  return <div className="space-y-8">
-    {review.organization ? <StNotice>Includes this workspace and active mapped businesses where you are a current member. {review.inaccessibleUnits ? `${review.inaccessibleUnits} mapped business${review.inaccessibleUnits === 1 ? " is" : "es are"} unavailable to your account; their access details are excluded.` : "All mapped businesses are accessible to your account."} Mapping a business never grants access.</StNotice> : null}
-    {notice ? <StNotice><span role="status">{notice}</span></StNotice> : null}
+  return <div className="grid gap-8">
+    {review.organization ? <p className="text-sm text-gray-muted">Includes this workspace and active mapped businesses where you are a current member. {review.inaccessibleUnits ? `${review.inaccessibleUnits} mapped business${review.inaccessibleUnits === 1 ? " is" : "es are"} unavailable to your account; their access details are excluded.` : "All mapped businesses are accessible to your account."} Mapping a business never grants access.</p> : null}
+    {notice ? <StToast>{notice}</StToast> : null}
     {review.units.map(unit => <StSection key={unit.workspaceId} title={unit.name}>
       <p className="text-sm text-gray-muted">Your role: {unit.role}. Owners are protected. {unit.role === "member" ? "Only an owner or administrator can revoke access." : "Revocations are recorded in audit."}</p>
-      {unit.entries.length ? <StRows>{unit.entries.map(entry => <StRow key={`${entry.kind}:${entry.id}`} title={entry.label} kind={kindLabel[entry.kind]} detail={`Last use: ${entry.lastUsedAt ? new Date(entry.lastUsedAt).toLocaleString() : "Not recorded"}`} end={<><StState kind={entry.status === "active" ? "live" : "draft"}>{entry.status}</StState>{entry.canRevoke ? <StTextButton tone="accent" disabled={Boolean(pending)} aria-label={`Revoke ${kindLabel[entry.kind].toLowerCase()} for ${entry.label}`} onClick={() => onRevoke({ workspaceId: review.workspaceId, organization: review.organization, businessId: unit.workspaceId, kind: entry.kind, recordId: entry.id })}>{pending === `${unit.workspaceId}:${entry.kind}:${entry.id}` ? "Revoking…" : "Revoke"}</StTextButton> : null}</>}>
-        {entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`} tone="accent">Review provider change notice</StTextButton> : null}
-      </StRow>)}</StRows> : <StEmpty>No access records.</StEmpty>}
+      {unit.entries.length ? <StTable label={`${unit.name} access`} rows={unit.entries} rowKey={entry => `${entry.kind}:${entry.id}`} columns={[
+        { key: "person", label: "Person or connection", render: entry => <>{entry.label}{entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <div><StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`}>Review provider change notice</StTextButton></div> : null}</> },
+        { key: "access", label: "Access", render: entry => kindLabel[entry.kind] },
+        { key: "status", label: "State", render: entry => entry.status },
+        { key: "last", label: "Last use", render: entry => entry.lastUsedAt ? <StMono as="time" dateTime={entry.lastUsedAt}>{new Date(entry.lastUsedAt).toLocaleString()}</StMono> : "Not recorded" },
+        { key: "decision", label: "Review", render: entry => entry.canRevoke ? <StTextButton tone="danger" disabled={Boolean(pending)} aria-busy={pending === `${unit.workspaceId}:${entry.kind}:${entry.id}` || undefined} aria-label={`Revoke ${kindLabel[entry.kind].toLowerCase()} for ${entry.label}`} onClick={() => onRevoke({ workspaceId: review.workspaceId, organization: review.organization, businessId: unit.workspaceId, kind: entry.kind, recordId: entry.id })}>{pending === `${unit.workspaceId}:${entry.kind}:${entry.id}` ? "Removing…" : "Remove"}</StTextButton> : entry.status === "owner" ? "Protected owner" : "Read only" },
+      ]} /> : <StEmpty>No access records.</StEmpty>}
     </StSection>)}
-    <p className="text-sm text-gray-muted">Only connections with current membership and an active grant are listed. Last use is recorded for assistant reads and proposed changes; other access types have no use tracking.</p>
+    <StNotice>Only connections with current membership and an active native grant are listed. Last use is recorded for assistant reads and proposals; other access types have no use tracking.</StNotice>
   </div>;
 }
 
@@ -55,10 +60,10 @@ function AccessReviewLoader({ scope, onScopeChange }: { scope: AccessReviewScope
     } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : "Access could not be revoked."); }
     finally { if (alive.current) setPending(null); }
   }
-  return <StPage>
-    <StHead title="People & access" crumb={{label: "Back to workspace", href: `/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access`}} />
-    <StSegmented value={scope.organization ? "organization" : "business"} label="Access review scope" options={[{value: "business", label: "This business"}, {value: "organization", label: "Organization & mapped businesses"}]} disabledValues={pending ? ["business", "organization"] : review?.units.find(unit => unit.workspaceId === scope.workspaceId)?.role === "member" ? ["organization"] : []} disabledReason={pending ? "Wait for the current change." : "Only owners and administrators can review mapped businesses."} onChange={value => onScopeChange(value === "organization")} />
-    {error ? <div><StNotice tone="critical">{error}</StNotice><StTextButton onClick={() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : "Access review is unavailable.")); }}>Retry</StTextButton></div> : null}
-    {review ? <AccessReviewView review={review} pending={pending} notice={notice} onRevoke={input => void revoke(input)} /> : !error ? <StSkeleton label="Loading access review" /> : null}
-  </StPage>;
+  return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas text-warm-black" style={{ fontFamily: "var(--font-workspace, system-ui)" }}><StPage width="wide">
+    <StHead crumb={{ label: "Workspace", href: `/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access` }} title="People and access review" meta="Review who can see or change each business. Removing access is recorded in audit." />
+    <StSegmented label="Review scope" value={scope.organization ? "organization" : "business"} options={[{ value: "business", label: "This business" }, ...(review?.units.find(unit => unit.workspaceId === scope.workspaceId)?.role !== "member" ? [{ value: "organization", label: "Organization and mapped businesses" }] : [])]} onChange={value => onScopeChange(value === "organization")} disabledValues={pending ? ["business", "organization"] : []} disabledReason="Wait for the current access change to finish." />
+    {error ? <div className="grid gap-3"><StNotice tone="critical">{error}</StNotice><StTextButton onClick={() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : "Access review is unavailable.")); }}>Retry</StTextButton></div> : null}
+    {review ? <AccessReviewView review={review} pending={pending} notice={notice} onRevoke={input => void revoke(input)} /> : !error ? <StSection title="Access records"><StSkeleton label="Loading access review" /><StSkeleton width="65%" /></StSection> : null}
+  </StPage></main>;
 }

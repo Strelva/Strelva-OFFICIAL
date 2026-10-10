@@ -5,7 +5,7 @@ import { AiVisibilityPage } from "@/products/ai-visibility";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 export const metadata: Metadata = {
-  title: "Free AI Visibility Audit",
+  title: "Ask Gemini about your business",
   description:
     "Assess website readability and inspect one sampled Gemini response when available. Free, no signup required.",
 };

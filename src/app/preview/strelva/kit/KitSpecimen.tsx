@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StInput, StGrid, StCell, StToggle, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StTable as StDenseTable } from "@/components/ui/strelva/Table";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StCopy, StTextField, StInput, StGrid, StCell, StToggle, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -62,6 +63,8 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         <StToggle label="Preview switch" checked={accepted} onChange={setAccepted} />
         <StGrid label="Fictional site checks" columns={["Site", "State", "Checked"]}><tr><StCell heading label="Site">example.test</StCell><StCell label="State"><StState kind="live">Up</StState></StCell><StCell label="Checked"><StMono>2m ago</StMono></StCell></tr></StGrid>
       </StSection>
+      <StSection title="Dense comparison"><StDenseTable label="Example locations" rows={[{ id: "elmwood", name: "Elmwood", state: "Live" }, { id: "downtown", name: "Downtown", state: "Draft" }]} rowKey={row => row.id} columns={[{ key: "name", label: "Location", render: row => row.name }, { key: "state", label: "State", render: row => <StState kind={row.state === "Live" ? "live" : "draft"}>{row.state}</StState> }]} /></StSection>
+      <StSection title="Fields"><StTextField label="Website" placeholder="example.com" description="A public website address." /><StTextField label="Email" type="email" error="Enter a valid email address." /><StTextField label="Unavailable field" disabled value="Read only" readOnly /><StCopy muted>Native fields keep labels and errors connected.</StCopy></StSection>
       <StSection title="Objects, notices, empty, loading">
         <StPage><StLabel>Native page inside a System · shares its outer insets</StLabel><StSurface label="Embedded document">The object keeps the whole column, including on a phone.</StSurface></StPage>
         <StSurface tone="need" selected label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>
