@@ -187,3 +187,29 @@
     scroll-behavior: auto;
   }
 }
+
+/*
+ * October 9, 2026: paper with a 24px dot grid (the Pen canon's dot-paper),
+ * and a header that stays out of the way: no rule, no fill.
+ */
+.root[data-workspace-theme="linen"] {
+  --app-navigation-width: 264px;
+  background: var(--st-canvas);
+  color: var(--st-text);
+}
+
+.root[data-workspace-theme="linen"] .shell {
+  --app-navigation-width: 264px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px,
+    var(--st-canvas);
+}
+
+.root[data-workspace-theme="linen"] .shell > * {
+  background: transparent;
+}
+
+.root[data-workspace-theme="linen"] .title {
+  color: var(--st-text-3);
+  font-size: 13px;
+}

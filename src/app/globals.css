@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/workspace-colors.css";
+@import "./styles/workspace-paper.css";
 @import "./styles/motion.css";
 
 /* =============================================

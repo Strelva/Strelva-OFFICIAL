@@ -566,3 +566,88 @@
     flex-shrink: 0;
   }
 }
+
+/*
+ * October 9, 2026: the paper workspace. The navigation is a light card that
+ * floats on the dot paper, sized to its content (Jacob: "the side bar should
+ * not be the entire thing"), instead of the October 6 full-height ink rail.
+ * Tokens come from src/app/styles/workspace-paper.css.
+ */
+@media (min-width: 1024px) {
+  :global([data-workspace-theme="linen"]) .sidebar {
+    width: calc(100% - 12px);
+    height: auto;
+    max-height: calc(100% - 24px);
+    flex: 0 1 auto;
+    margin: 12px 0 12px 12px;
+    padding: 14px 10px 10px;
+    border-radius: var(--st-r-lg, 16px);
+    background: var(--st-surface);
+    box-shadow: 0 1px 2px #1a221c0a;
+  }
+}
+
+:global([data-workspace-theme="linen"]) .sidebar {
+  color-scheme: inherit;
+  background: var(--st-surface);
+}
+
+:global([data-workspace-theme="linen"]) .brand {
+  gap: 10px;
+  font-family: var(--font-workspace, system-ui), sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:global([data-workspace-theme="linen"]) .navItem,
+:global([data-workspace-theme="linen"]) .newAction,
+:global([data-workspace-theme="linen"]) .recent a,
+:global([data-workspace-theme="linen"]) .contextual a,
+:global([data-workspace-theme="linen"]) .contextual button {
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--st-r-sm, 8px);
+  font-size: 14px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem svg,
+:global([data-workspace-theme="linen"]) .newAction svg {
+  width: 16px;
+  height: 16px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem[aria-current="page"] {
+  font-weight: 500;
+}
+
+:global([data-workspace-theme="linen"]) .recent {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--st-line);
+}
+
+:global([data-workspace-theme="linen"]) .recent h2 {
+  font-size: 12px;
+}
+
+:global([data-workspace-theme="linen"]) .footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--st-line);
+}
+
+:global([data-workspace-theme="linen"]) .avatar {
+  background: var(--st-inset);
+  color: var(--st-text-2);
+}
+
+:global([data-workspace-theme="linen"]) .badge {
+  background: var(--st-need);
+}
+
+@media (pointer: coarse) {
+  :global([data-workspace-theme="linen"]) .sidebar :is(a, button, select) {
+    min-height: 44px;
+  }
+}

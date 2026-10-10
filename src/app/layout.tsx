@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, Geist } from "next/font/google";
+import { DM_Sans, Geist, Geist_Mono } from "next/font/google";
 import { PrivacyAwareAnalytics } from "@/components/PrivacyAwareAnalytics";
 import { BRAND_NAME, MARKETING_URL } from "@/platform/infra/brand";
 import "./globals.css";
@@ -13,6 +13,13 @@ const geist = Geist({
 // The workspace's interface face (October 6, 2026). Scoped by StrelvaShell's linen theme.
 const dmSans = DM_Sans({
   variable: "--font-workspace",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+// October 9, 2026: times, counts, paths and keys in the paper workspace.
+const geistMono = Geist_Mono({
+  variable: "--font-mono-st",
   subsets: ["latin"],
   display: "swap",
 });
@@ -51,7 +58,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geist.variable} ${dmSans.variable} antialiased`}
+        className={`${geist.variable} ${dmSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
         <PrivacyAwareAnalytics />

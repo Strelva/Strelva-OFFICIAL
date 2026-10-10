@@ -7,6 +7,18 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Strelva 1.0 kit, October 9, 2026 (local)
+
+`src/components/ui/strelva/Kit.tsx` with `kit.module.css`, on the paper tokens
+in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
+(light) and `?mode=dark`. Pieces: `StPage`, `StHead`, `StSection`, `StLabel`,
+`StRows`/`StRow`, `StBeacon`, `StState`, `StMono`, `StKbd`, `StStamp`,
+`StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
+`StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
+`StComposerBar`, `StComposerDock`. Rules and adoption lanes:
+[ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
+both modes on October 9; consumers are added lane by lane.
+
 ## Party billing, October 7, 2026 (local)
 
 [AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)

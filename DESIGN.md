@@ -50,6 +50,25 @@ design specification.
 
 ## Latest foundation decisions
 
+### October 9 paper workspace and composition (supersedes the October 6 ink rail)
+
+Jacob selected the Pen canon (`../design/Strelva-Reborn-UI-UX-2026-10-08.pen`,
+rules in `../design/foundation/FOUNDATION.md` sections 0, 6 and 7) and asked
+for "the composition feel of OpenAI if they made it" across every surface,
+then to integrate all of it. Scope: workspace, agency, operator, entry, owner
+email and the public pages Strelva owns. Replaces the October 6 decision of
+linen content beside an ink rail.
+
+- Paper canvas with a 24 px dot grid; a light, floating sidebar card sized to
+  its content; moss as the one action color; clay for Needs you.
+- DM Sans for interface text, Geist Mono for data only.
+- One calm column, open rows instead of boxed lists, sentence-case labels,
+  28/500 titles, pill actions with one solid primary per view.
+- Light is the default; dark is finished and opt-in.
+- Implementation contract and lanes: [docs/design/ui-1.0-integration.md](./docs/design/ui-1.0-integration.md).
+  Tokens: `src/app/styles/workspace-paper.css`. Kit:
+  `src/components/ui/strelva/Kit.tsx`, specimen `/preview/strelva/kit`.
+
 ### October 6 workspace: linen beside an ink rail (Strelva 1.0)
 
 Jacob approved the Strelva 1.0 workspace designs on October 6, 2026 and asked
