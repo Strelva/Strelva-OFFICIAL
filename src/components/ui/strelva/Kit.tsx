@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -130,7 +130,7 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {
+export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger" | "text"; href?: string }) {
   if (href) return <Link href={href} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }
@@ -256,4 +256,28 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
 
 export function StComposerDock({ children }: { children: ReactNode }) {
   return <div className={styles.composerDock}>{children}</div>;
+}
+
+/* ---------- Forms and dense comparison ---------- */
+
+/** A named field with the same paper geometry as the rest of the kit. */
+export function StField({ label, hint, id, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+  const generated = useId();
+  const fieldId = id || generated;
+  return <div className={styles.field}><label htmlFor={fieldId}>{label}</label><input {...props} id={fieldId} className={styles.fieldInput} aria-describedby={hint ? `${fieldId}-hint` : props["aria-describedby"]} />{hint ? <p id={`${fieldId}-hint`} className={styles.fieldHint}>{hint}</p> : null}</div>;
+}
+
+/** A switch must always have a name and an explanation of any disabled state. */
+export function StToggle({ label, checked, onChange, disabled, reason }: { label: string; checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; reason?: string }) {
+  const hintId = useId();
+  return <span className={styles.toggleWrap}><button type="button" className={styles.toggle} role="switch" aria-label={label} aria-checked={checked} aria-describedby={reason ? hintId : undefined} disabled={disabled || !onChange} onClick={() => onChange?.(!checked)} /><span className="sr-only" id={hintId}>{reason}</span></span>;
+}
+
+/** Open comparison table. On a phone each row keeps its column names. */
+export function StTable({ label, columns, children }: { label: string; columns: readonly string[]; children: ReactNode }) {
+  return <table className={styles.table}><caption className="sr-only">{label}</caption><thead><tr>{columns.map(column => <th scope="col" key={column}>{column}</th>)}</tr></thead><tbody>{children}</tbody></table>;
+}
+export function StCell({ label, children, heading = false }: { label: string; children: ReactNode; heading?: boolean }) {
+  const As = heading ? "th" : "td";
+  return <As scope={heading ? "row" : undefined} data-label={label}>{children}</As>;
 }

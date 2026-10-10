@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StCell, StField, StTable, StToggle, StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -37,6 +37,12 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       </StSection>
       <StSection title="Who decides" meta="only stricter than Strelva’s default">
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
+      </StSection>
+      <StSection title="Forms, switches and comparison">
+        <StField label="Reason" hint="Fictional field, no changes are saved." placeholder="Why should this change?" />
+        <StToggle label="Owner emails" checked={false} disabled reason="Off globally during rollout" />
+        <StToggle label="Preview switch" checked={accepted} onChange={setAccepted} />
+        <StTable label="Fictional site checks" columns={["Site", "State", "Checked"]}><tr><StCell heading label="Site">example.test</StCell><StCell label="State"><StState kind="live">Up</StState></StCell><StCell label="Checked"><StMono>2m ago</StMono></StCell></tr></StTable>
       </StSection>
       <StSection title="Objects, notices, empty, loading">
         <StSurface tone="need" label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>

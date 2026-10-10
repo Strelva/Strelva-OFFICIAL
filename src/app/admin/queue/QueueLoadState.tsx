@@ -1,14 +1,13 @@
-import { ShieldAlert } from "lucide-react";
-import { AdminEmpty } from "../console";
+import { StEmpty, StHead, StNotice, StPage, StSkeleton } from "@/components/ui/strelva/Kit";
 
 /** Shared by the real route and its local permission/error specimens. */
 export function QueueLoadState({ state, message }: { state: "loading" | "denied" | "unavailable"; message?: string }) {
-  if (state === "loading") return <div className="mx-auto max-w-[920px]" role="status" aria-busy="true">
-    <p className="text-[14px] text-gray-muted">Reading the operator queue…</p>
-  </div>;
-  return <div className="mx-auto max-w-[920px]">
-    <AdminEmpty icon={<ShieldAlert className="size-5" aria-hidden />}
-      title={state === "denied" ? "Operators only" : "The queue could not be read"}
-      description={state === "denied" ? "The queue is for Strelva operators. Sign in with a verified operator account." : message ?? "The queue could not be read. Refresh to try again."} />
-  </div>;
+  return <StPage>
+    <StHead title="Queue" meta="Support, incidents and releases only Strelva staff can do. Every action here is logged." />
+    {state === "loading" ? <div role="status" aria-busy="true" className="space-y-4">
+      <p className="text-[14px] text-gray-muted">Reading the operator queue…</p>
+      <StSkeleton label="Reading the operator queue" /><StSkeleton width="75%" /><StSkeleton width="90%" />
+    </div> : state === "denied" ? <StEmpty>Operators only. Sign in with a verified Strelva operator account to open the queue.</StEmpty>
+      : <StNotice tone="critical">{message ?? "The queue could not be read. Refresh to try again."}</StNotice>}
+  </StPage>;
 }

@@ -827,7 +827,7 @@ fixtures live at `/preview/strelva/publishing`; these do not prove provider writ
 | Toggle | [Toggle.tsx](../../src/components/ui/Toggle.tsx) | Controlled checked/onChange, required accessible label, optional disabled, 44 px minimum hit height. |
 | Agency client and Queue rows | [AgencyViews.tsx](../../src/experience/workspace/agency/AgencyViews.tsx) | Existing row controls and tokens; released operator overview adds a separate health label beside lifecycle, scoped links into the client's System, and a named incomplete-source alert. Missing or stale health says Not verified. The old overview remains when the operator release flag is off. |
 | Version Possibilities | [SystemVersionImprovements.tsx](../../src/experience/systems/SystemVersionImprovements.tsx), [SystemPage.tsx](../../src/experience/systems/SystemPage.tsx) | Version improvements and unreleased alternatives share the existing Possibilities panel. Native disclosure compares current and alternative definitions; closed native app candidates reuse ApplicationDraftPreview with isolated test records. Conflicts show both values, and shared fields/buttons prepare a draft. Make real approves the existing exact `version_release` Needs you item; only the business owner can decide. Row revision pins invalidate edited candidates. Failed, foreign, stale and uncertain acknowledgments stay visible, and retries retain the same decision command. Local DOM tests cover these states. After the collaborative host disconnected, the existing headless Playwright runner verified 1280px/390px preparation and same-decision Make real, isolated native-app submission, keyboard focus, no page overflow, and mobile loading/error/empty/read-only/missing-account fixtures. These are fictional local records; no authenticated provider or production proof. |
-| Operator queue | [QueueBoard.tsx](../../src/app/admin/queue/QueueBoard.tsx), [QueueSourceActions.tsx](../../src/app/admin/queue/QueueSourceActions.tsx), [QueueLoadState.tsx](../../src/app/admin/queue/QueueLoadState.tsx) | Composes console Chips/Panels and shared Button/fields; row and source buttons use the shared 48px large control size, links and checkbox labels have 48px touch areas. Owner decisions offer only Stop chasing in the operator close form. The real loading, unavailable and permission states share the preview specimens at `/preview/strelva/operator-queue?scenario=loading`, `error`, or `denied`. |
+| Operator queue | [QueueBoard.tsx](../../src/app/admin/queue/QueueBoard.tsx), [QueueSourceActions.tsx](../../src/app/admin/queue/QueueSourceActions.tsx), [QueueLoadState.tsx](../../src/app/admin/queue/QueueLoadState.tsx) | October 9 L8: composes `StPage`/`StHead`, open `StRows`/`StRow`, state marks and pill/text controls. Existing native source actions and fields retain their original authority. Source parity and client lead counts sit in a disclosure; all close/minutes, notes, handoff and parked actions remain. Owner decisions offer only Stop chasing in the operator close form. The real loading, unavailable and permission states share the preview specimens at `/preview/strelva/operator-queue?scenario=loading`, `error`, or `denied`. |
 | AtmosphericCard | [AtmosphericCard.tsx](../../src/components/ui/atmosphere/AtmosphericCard.tsx) | Semantic section, ref forwarding, theme light/dark, numeric composition variant 0–5, contentClassName, optional controlled paused/onPausedChange. |
 | AtmosphericCardHeader / Detail / Footer | [AtmosphericCardParts.tsx](../../src/components/ui/atmosphere/AtmosphericCardParts.tsx) | Content slots inheriting card roles. Header accepts an optional decorative icon; caller supplies heading semantics. Detail is optional, never automatic filler. |
 | GooeyDisclosure | [GooeyDisclosure.tsx](../../src/components/ui/motion/GooeyDisclosure.tsx) | Controlled `open`, required `id`, children and optional className. Spring height, sharp content, inert when closed, reduced-motion support. |
@@ -1651,3 +1651,29 @@ This consolidation instead retains the newer ordinary-agency selection and
 restricted delivery controls from the private integration. Full combined native
 and authenticated qualification remains separate. Revocation reason copy maps
 the legacy stored reason at display time; commands retain that stored value.
+
+### October 9 · L8 operator paper integration
+
+The operator frame ([OperatorFrame](../../src/experience/operations/OperatorFrame.tsx))
+keeps ink navigation distinct from the business workspace and composes the paper
+canvas on the same tokens. Existing admin destinations remain under More operations.
+Queue, client release switches, invitation controls and every-site monitor use the
+Strelva kit; existing source actions, release gates and API payloads remain owned by
+their original paths. Client records and older site controls remain in a disclosure.
+
+Kit additions in [Kit.tsx](../../src/components/ui/strelva/Kit.tsx), shown in
+[/preview/strelva/kit](/preview/strelva/kit): `StField` pairs input/label/hint,
+`StToggle` provides a named switch and disabled reason with a 44px target, and
+`StTable`/`StCell` compose open comparison tables. On phones each cell keeps its
+column name. `StTextButton tone="text"` supports left-aligned disclosure titles.
+All use `--st-*` roles and inherit light/dark treatment.
+
+Preview routes: `operator-queue`, `operator-client`, `operator-convert`,
+`operator-checks`, `operator-ask` beneath `/preview/strelva/`. Fictional values
+and transports live under `src/experience/workspace/preview/`. Conversion and
+on-behalf chat are fixture-only: ADR 0013 assigns client service to ordinary
+agency permissions. The monitor exposes measured site responses and registry
+expiry; certificate lifetime, form delivery and 30-day uptime remain unknown.
+
+Rendered proof is pending local browser access; do not treat source or test
+coverage as visual acceptance. See the [L8 handoff](./ui-1.0-l8-operator.md).

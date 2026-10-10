@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Chip, Panel } from "@/app/admin/console";
+import { StEmpty, StField, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StState, StTextButton, StToggle } from "@/components/ui/strelva/Kit";
 import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 
 /**
@@ -14,20 +14,14 @@ import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 
 type FlagState = "unset" | "off" | "operators" | "on";
 const STATES: { value: FlagState; label: string }[] = [
-  { value: "unset", label: "Follow env" },
+  { value: "unset", label: "Follow global" },
   { value: "off", label: "Off" },
   { value: "operators", label: "Operators" },
   { value: "on", label: "On" },
 ];
-const labelCls = "text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-faint";
-const inputCls = "w-full rounded-lg border border-glass-border bg-surface-base/40 px-3 py-2 text-[13px] text-warm-white placeholder:text-gray-faint focus:border-accent focus:outline-none";
 
-function envLabel(mode: string): string {
-  return mode === "on" ? "1 (on everywhere)" : mode === "workspace" ? "workspace (per client)" : "off (kill switch)";
-}
-
-export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
-  const [state, setState] = useState<TenantReleaseState | null>(null);
+export function ReleaseFlagsPanel({ tenantId, initialState, request = fetch, globalOwnerEmailPaused = true }: { tenantId: string; initialState?: TenantReleaseState; request?: typeof fetch; globalOwnerEmailPaused?: boolean }) {
+  const [state, setState] = useState<TenantReleaseState | null>(initialState ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,22 +31,22 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
   const load = useCallback(async () => {
     setLoadError(null);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/release-flags`, { cache: "no-store" });
+      const res = await request(`/api/admin/tenants/${tenantId}/release-flags`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       setState(data as TenantReleaseState);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Couldn't read the release flags.");
     }
-  }, [tenantId]);
+  }, [tenantId, request]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (!initialState) void load(); }, [initialState, load]);
 
   async function send(body: Record<string, unknown>) {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/release-flags`, {
+      const res = await request(`/api/admin/tenants/${tenantId}/release-flags`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -69,117 +63,43 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
     }
   }
 
+  const ownerEmails = <StRow title="Owner emails" detail={globalOwnerEmailPaused ? "Off for every client during rollout · global, not per client" : "Global sending is enabled · cannot be changed here"} lead={<StToggle label="Owner emails" checked={!globalOwnerEmailPaused} disabled reason={globalOwnerEmailPaused ? "Owner emails are off globally during rollout." : "Owner email sending is a global setting."} />} />;
+
   if (loadError) {
-    return (
-      <Panel title="Release flags">
-        <p className="text-[13px] text-critical" role="alert">{loadError}</p>
-        <button type="button" onClick={() => void load()} className="mt-3 text-[12px] font-medium text-accent hover:underline">Try again</button>
-      </Panel>
-    );
+    return <StSection title="What this client sees"><StNotice tone="critical">{loadError}</StNotice><StRows>{ownerEmails}</StRows><StTextButton onClick={() => void load()}>Try again</StTextButton></StSection>;
   }
   if (!state) {
-    return <Panel title="Release flags"><p className="text-[13px] text-gray-muted" aria-busy="true">Loading release flags…</p></Panel>;
+    return <StSection title="What this client sees"><StSkeleton label="Loading release flags" /><StSkeleton width="70%" /><StRows>{ownerEmails}</StRows></StSection>;
   }
   if (!state.linked) {
-    return (
-      <Panel title="Release flags">
-        <p className="text-[13px] leading-relaxed text-gray-muted">
-          This client isn&apos;t converted to a business workspace yet, so it has no per-client flags. It follows the env flags and lands on /dashboard.
-        </p>
-      </Panel>
-    );
+    return <StSection title="What this client sees"><StEmpty>This client isn&apos;t converted to a business workspace yet, so it has no per-client flags. It follows the release settings and lands on <StMono>/dashboard</StMono>.</StEmpty><StRows>{ownerEmails}</StRows></StSection>;
   }
 
   const reasonOk = reason.trim().length >= 3;
-  return (
-    <Panel title="Release flags" trailing={<Chip tone={state.workspaceRelease ? "good" : "neutral"}>{state.workspaceRelease ? "Workspace release on" : "Workspace release off"}</Chip>}>
-      <div className="space-y-5">
-        <div className="space-y-1.5">
-          <label htmlFor={`release-reason-${tenantId}`} className={labelCls}>Reason for the next change</label>
-          <input id={`release-reason-${tenantId}`} className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Walk every gldf page before the owner invite" maxLength={480} />
-          <p className="text-[11px] text-gray-faint">Turning a flag on records a single use approval for your signed-in operator account, bound to this business, flag and reason.</p>
-        </div>
+  const primaryFlags = new Set(["owner_entry", "inquiries", "website_rebuild", "systems"]);
+  const labelFor = (flag: typeof state.flags[number]) => flag.flag === "owner_entry" ? "Owner sign-in" : flag.flag === "inquiries" ? "Inquiries in the workspace" : flag.flag === "website_rebuild" ? "Rebuilt site" : flag.flag === "agent_channel" ? "Assistant customer confirmation (owner consent required)" : flag.label;
+  const flagRow = (flag: typeof state.flags[number], compact = false) => {
+    const current: FlagState = flag.row ?? "unset";
+    return <StRow key={flag.flag} title={labelFor(flag)} align="start" lead={compact ? <StToggle label={labelFor(flag)} checked={flag.effective === "on"} disabled={busy || !reasonOk} reason={!reasonOk ? "Write a reason to enable changes." : busy ? "Change in progress." : undefined} onChange={checked => void send({ kind: "flag", flag: flag.flag, state: checked ? "on" : "off", reason, expectedRevision: flag.revision })} /> : undefined} detail={<>
+      <StState kind={flag.effective === "on" ? "live" : flag.effective === "operators" ? "need" : "draft"}>{flag.effective === "on" ? "On for this client" : flag.effective === "operators" ? "Operators and testers" : "Off for this client"}</StState>
+      <span className="block">{flag.envMode === "off" ? "The global release switch is off." : flag.envMode === "workspace" ? "Released separately for each client." : "The global release switch is on."}</span>
+    </>} end={compact ? undefined : <StSegmented value={current} options={STATES} label={`${labelFor(flag)} for this client`} disabledValues={busy || !reasonOk ? STATES.map(option => option.value) : [current]} disabledReason={!reasonOk ? "Write a reason to enable changes." : "Change in progress."} onChange={next => void send({ kind: "flag", flag: flag.flag, state: next, reason, expectedRevision: flag.revision })} />} />;
+  };
 
-        <ul className="space-y-4">
-          {state.flags.map((flag) => {
-            const current: FlagState = flag.row ?? "unset";
-            return (
-              <li key={flag.flag} className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-[13px] font-medium text-warm-white">{flag.label}</p>
-                  <Chip tone={flag.effective === "on" ? "good" : flag.effective === "operators" ? "warn" : "neutral"}>
-                    {flag.effective === "on" ? "On for this client" : flag.effective === "operators" ? "Operators and testers" : "Off for this client"}
-                  </Chip>
-                </div>
-                <div className="inline-flex flex-wrap rounded-lg border border-glass-border bg-surface-base/40 p-0.5" role="group" aria-label={`${flag.label} for this client`}>
-                  {STATES.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={current === option.value}
-                      disabled={busy || current === option.value || !reasonOk}
-                      onClick={() => void send({ kind: "flag", flag: flag.flag, state: option.value, reason, expectedRevision: flag.revision })}
-                      className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed ${current === option.value ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-white disabled:opacity-40"}`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[11px] text-gray-faint">{flag.envName} = {envLabel(flag.envMode)}</p>
-              </li>
-            );
-          })}
-        </ul>
+  return <StSection title="What this client sees" meta={<StState kind={state.workspaceRelease ? "live" : "draft"}>{state.workspaceRelease ? "Workspace release on" : "Workspace release off"}</StState>}>
+    <StField id={`release-reason-${tenantId}`} label="Reason for the next change" value={reason} onChange={event => setReason(event.target.value)} placeholder="Why should this change?" maxLength={480} hint="Every change records your signed-in identity and reason in this client's History." />
+    <StRows label="Client release switches">{state.flags.filter(flag => primaryFlags.has(flag.flag)).map(flag => flagRow(flag, true))}{ownerEmails}</StRows>
+    {!reasonOk && <StNotice>Write a reason to enable changes. Turning a release on records a single-use approval for this business, release and reason.</StNotice>}
+    {state.flags.length > 0 && <details><summary className="cursor-pointer text-sm font-medium">All release settings</summary><div className="mt-3"><StRows>{state.flags.map(flag => flagRow(flag))}</StRows></div></details>}
 
-        {state.ownerEntryBlockers.length > 0 && (
-          <div className="space-y-1.5">
-            <p className={labelCls}>Pages keeping owner entry from going on</p>
-            <ul className="space-y-1 text-[12px] text-gray-muted">
-              {state.ownerEntryBlockers.map((page) => (
-                <li key={page.route}><span className="font-mono text-warm-white">/dashboard{page.route === "/" ? "" : page.route}</span> → {page.home}. {page.note}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+    {state.ownerEntryBlockers.length > 0 && <StSection as="div" title="Before owner sign-in can turn on"><StRows>{state.ownerEntryBlockers.map(page => <StRow key={page.route} title={<StMono>/dashboard{page.route === "/" ? "" : page.route}</StMono>} detail={<>Moves to {page.home}. {page.note}</>} />)}</StRows></StSection>}
 
-        <div className="space-y-1.5">
-          <p className={labelCls}>Named testers</p>
-          {state.testerEmails.length === 0 ? (
-            <p className="text-[12px] text-gray-muted">None. Operators state reaches super admins only.</p>
-          ) : (
-            <ul className="space-y-1">
-              {state.testerEmails.map((email) => (
-                <li key={email} className="flex items-center justify-between gap-2 text-[12px] text-warm-white">
-                  <span>{email}</span>
-                  <button type="button" disabled={busy || !reasonOk} onClick={() => void send({ kind: "tester", email, present: false, reason })} className="text-gray-muted hover:text-critical disabled:opacity-40">Remove</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <label htmlFor={`release-tester-${tenantId}`} className="sr-only">Tester email</label>
-            <input id={`release-tester-${tenantId}`} className={inputCls} type="email" value={testerEmail} onChange={(e) => setTesterEmail(e.target.value)} placeholder="tester@example.com" />
-            <button type="button" disabled={busy || !reasonOk || !testerEmail.includes("@")} onClick={() => void send({ kind: "tester", email: testerEmail, present: true, reason })} className="shrink-0 rounded-lg border border-glass-border px-3 text-[12px] font-medium text-warm-white hover:border-accent disabled:opacity-40">Add</button>
-          </div>
-        </div>
-
-        {error && <p className="text-[12px] text-critical" role="alert">{error}</p>}
-        {!reasonOk && <p className="text-[11px] text-gray-faint">Write a reason to enable changes.</p>}
-
-        {state.history.length > 0 && (
-          <div className="space-y-1.5">
-            <p className={labelCls}>Recent changes</p>
-            <ul className="space-y-1 text-[12px] text-gray-muted">
-              {state.history.map((change) => (
-                <li key={change.id}>
-                  <span className="text-warm-white">{change.subject === "tester" ? `Tester ${change.testerEmail ?? ""}` : change.subject}</span>{" "}
-                  {change.fromState} → {change.toState} · {change.reason} · {change.changedBy} · {new Date(change.changedAt).toLocaleString()}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </Panel>
-  );
+    <StSection as="div" title="Named testers">
+      {state.testerEmails.length === 0 ? <StEmpty>None. Operators state reaches Strelva operators only.</StEmpty> : <StRows>{state.testerEmails.map(email => <StRow key={email} title={email} end={<StTextButton disabled={busy || !reasonOk} onClick={() => void send({ kind: "tester", email, present: false, reason })}>Remove</StTextButton>} />)}</StRows>}
+      <div className="flex flex-wrap items-end gap-3"><div className="min-w-0 flex-1"><StField id={`release-tester-${tenantId}`} label="Tester email" type="email" value={testerEmail} onChange={event => setTesterEmail(event.target.value)} placeholder="Email address" /></div><StPill variant="soft" disabled={busy || !reasonOk || !testerEmail.includes("@")} onClick={() => void send({ kind: "tester", email: testerEmail, present: true, reason })}>Add tester</StPill></div>
+    </StSection>
+    {error && <StNotice tone="critical">{error}</StNotice>}
+    {state.history.length > 0 && <details><summary className="cursor-pointer text-sm font-medium">Recent changes</summary><div className="mt-3"><StRows>{state.history.map(change => <StRow key={change.id} title={<>{change.subject === "tester" ? `Tester ${change.testerEmail ?? ""}` : change.subject === "agent_channel" ? "Assistant customer confirmation" : change.subject} · {change.fromState} → {change.toState}</>} detail={<>{change.reason} · {change.changedBy} · <StMono as="time" dateTime={change.changedAt}>{new Date(change.changedAt).toLocaleString()}</StMono></>} />)}</StRows></div></details>}
+    <StLabel>Each switch asks for a reason and appears in the client&apos;s History.</StLabel>
+  </StSection>;
 }

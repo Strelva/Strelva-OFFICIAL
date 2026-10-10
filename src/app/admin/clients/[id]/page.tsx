@@ -1,5 +1,4 @@
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
@@ -45,10 +44,11 @@ import { IntegrationsPanel } from "./IntegrationsPanel";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { getClientLeadsForOperator } from "@/lib/client-leads";
 import { ClientLeadList } from "../../client-leads/ClientLeadList";
-import { ClientLogo, Chip, faviconFor, Panel, PanelLink } from "../../console";
+import { Panel, PanelLink } from "../../console";
 import { BusinessEffortForSite } from "../../work/BusinessEffort";
 import { loadBusinessEffort } from "../../work/effort-data";
-import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
+import { StHead, StPage, StSection, StTextButton, StState, StRows, StRow } from "@/components/ui/strelva/Kit";
+import styles from "@/experience/operations/operator-client.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -205,61 +205,27 @@ export default async function ClientDetailPage({
   } else {
     verdict = { tone: "emerald", message: "Healthy. Nothing needs you." };
   }
-  const verdictTone = {
-    red: "border-critical/25 bg-critical/10",
-    amber: "border-warning/25 bg-warning/10",
-    emerald: "border-positive/25 bg-positive/10",
-  }[verdict.tone];
-  const verdictDot = {
-    red: "bg-critical",
-    amber: "bg-warning",
-    emerald: "bg-positive",
-  }[verdict.tone];
-
   const publicUrl = getTenantPublicUrl(tenant);
   const dashboardUrl = getTenantDashboardFallbackUrl(tenant);
 
   const inspectHref = `/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`;
-  const actionCls = "inline-flex items-center gap-1.5 rounded-[9px] border border-glass-border px-3 py-2 text-[12px] font-medium text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white";
-
   return (
-    <div className="max-w-6xl space-y-5">
-      <Link href="/admin/clients" className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-gray-muted transition-colors hover:text-warm-white">
-        <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} /> All clients
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <ClientLogo name={getTenantSiteName(tenant.id, tenant)} logoUrl={faviconFor(tenant)} size={48} />
-          <div>
-            <h1 className="font-display text-[24px] font-medium tracking-[-0.02em] text-warm-white sm:text-[26px]">
-              {getTenantSiteName(tenant.id, tenant)}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-gray-muted">
-              <span>{tenant.id}</span><span className="text-gray-faint">·</span>
-              <span>{tenant.deliveryModel ?? "custom_repo"}</span>
-              {account && account.tenantIds.length > 1 && (
-                <>
-                  <span className="text-gray-faint">·</span>
-                  <Link href="/admin/accounts" className="font-medium text-accent hover:underline">
-                    {account.name} · {account.tenantIds.length} sites
-                  </Link>
-                </>
-              )}
-              {tenant.active ? null : <Chip tone="neutral">archived</Chip>}
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <a href={dashboardUrl} className={actionCls}><LayoutDashboard className="h-3.5 w-3.5" strokeWidth={1.7} /> Dashboard</a>
-          <a href={inspectHref} className={actionCls} title="Open this client's dashboard as a read-only preview"><Eye className="h-3.5 w-3.5" strokeWidth={1.7} /> Inspect</a>
-          <a href={publicUrl} target="_blank" rel="noopener noreferrer" className={actionCls}><ExternalLink className="h-3.5 w-3.5" strokeWidth={1.7} /> Site</a>
-        </div>
+    <StPage>
+      <StHead crumb={{ label: "Clients", href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active client" : "Archived client"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={dashboardUrl}>Open workspace</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton></>} />
+      <div className={styles.columns}>
+        <ReleaseFlagsPanel tenantId={tenant.id} globalOwnerEmailPaused={emailSendingPaused()} />
+        <aside className={styles.aside}>
+          <StSection title="Owner"><StRows><StRow title={tenant.ownerName || "Owner not recorded"} detail={tenant.ownerEmail || "Owner email not recorded"} /></StRows></StSection>
+          {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
+          <StSection title="On behalf of the owner"><p>Client work uses the business or its agency’s ordinary permissions. Every request names who asked.</p><StTextButton href={dashboardUrl}>Open their workspace</StTextButton></StSection>
+          <StState kind={verdict.tone === "red" ? "down" : verdict.tone === "amber" ? "need" : "live"}>{verdict.message}</StState>
+          {verdict.detail && <p>{verdict.detail}</p>}
+        </aside>
       </div>
-
+      <details className={styles.fold}><summary>Client records and existing site controls</summary><div className="space-y-5">
       {/* Next action */}
-      <div className={`flex items-center gap-3 rounded-2xl border p-4 ${verdictTone}`}>
-        <span className={`h-2 w-2 shrink-0 rounded-full ${verdictDot}`} />
+      <div className="flex items-center gap-3 py-4">
+
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-muted">Next action</p>
           <p className="mt-0.5 text-[13.5px] font-semibold text-warm-white">{verdict.message}</p>
@@ -369,8 +335,6 @@ export default async function ClientDetailPage({
             visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
-        <ReleaseFlagsPanel tenantId={tenant.id} />
-        {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
         <DomainView load={await domainViewLoad} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
@@ -409,6 +373,7 @@ export default async function ClientDetailPage({
           </ul>
         </div>
       )}
-    </div>
+    </div></details>
+    </StPage>
   );
 }

@@ -1,0 +1,17 @@
+.frame { min-height: 100dvh; background: radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.body { display: grid; grid-template-columns: 276px minmax(0, 1fr); }
+.main { min-width: 0; padding: 12px 0 0; }
+.rail { position: sticky; top: 12px; width: 252px; max-height: calc(100dvh - 24px); overflow-y: auto; margin: 12px; padding: 18px 10px; border-radius: var(--st-r-lg); background: var(--st-canvas); color: var(--st-text); display: flex; flex-direction: column; gap: 24px; font-size: 13px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; color: var(--st-text); text-decoration: none; font-size: 16px; }
+.scope { display: flex; align-items: center; gap: 10px; padding: 0 10px; color: var(--st-text-2); font-size: 14px; }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.link { display: flex; align-items: center; gap: 10px; padding: 8px 10px; color: var(--st-text-2); text-decoration: none; border-radius: var(--st-r-sm); font-size: 13px; min-height: 32px; }
+.link[aria-current="page"], .link:hover { color: var(--st-text); background: var(--st-inset); }
+.link:focus-visible, .brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.note { margin: 0; padding: 0 10px; color: var(--st-text-3); font-size: 12px; line-height: 18px; }
+.footer { display: flex; align-items: center; gap: 10px; padding: 16px 10px 0; border-top: 1px solid var(--st-line); color: var(--st-text-2); font-size: 13px; }
+.avatar { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text-3); font-size: 12px; }
+.more { color: var(--st-text-3); font-size: 12px; }
+.more summary { padding: 8px 10px; cursor: pointer; }
+.clients { display: flex; flex-direction: column; gap: 4px; }
+@media(max-width: 767px) { .body { display: block; } .desktopRail { display: none; } .main { padding-top: 0; } .link { min-height: 44px; } }
