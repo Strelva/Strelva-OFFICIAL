@@ -2,8 +2,8 @@
 
 import { useWebsiteAttempt } from "./website-attempt";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ArrowRight, Check, CircleAlert, ExternalLink, History, Loader2, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { ExternalLink } from "lucide-react";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSkeleton, StState } from "@/components/ui/strelva/Kit";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
 import type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
 import {
@@ -165,25 +165,12 @@ function ArtifactPreview({ artifact }: { artifact: NonNullable<Website["candidat
 }
 
 function HistoryList({ history }: { history: readonly Website["history"][number][] }) {
-  if (!history.length) return <p className={styles.notice}>No earlier revisions are recorded yet.</p>;
-  return (
-    <ol className={styles.historyList} aria-label="Website revision history">
-      {history.slice().reverse().map((entry) => (
-        <li key={`${entry.revision}:${entry.kind}:${entry.at}`}>
-          <strong>Revision {entry.revision} · {historyLabel(entry.kind)}</strong>
-          {entry.note ? <span>{entry.note}</span> : null}
-          <time dateTime={entry.at}>{formatDate(entry.at)}</time>
-        </li>
-      ))}
-    </ol>
-  );
+  if (!history.length) return <StEmpty>No earlier revisions are recorded yet.</StEmpty>;
+  return <StRows label="Website revision history">{history.slice().reverse().map(entry =>
+    <StRow key={`${entry.revision}:${entry.kind}:${entry.at}`} title={`Revision ${entry.revision} · ${historyLabel(entry.kind)}`} detail={entry.note} end={<StMono as="time" dateTime={entry.at}>{formatDate(entry.at)}</StMono>} />
+  )}</StRows>;
 }
 
-function StatusIcon({ website }: { website: Website }) {
-  if (website.status === "approved" || website.status === "published") return <Check size={16} aria-hidden="true" />;
-  if (website.status === "failed") return <CircleAlert size={16} aria-hidden="true" />;
-  return <History size={16} aria-hidden="true" />;
-}
 
 export function WebsiteExperience(props: WebsiteExperienceProps) {
   if (!props.transport && !props.workId && !props.rebuildEnabled) {
@@ -349,47 +336,30 @@ function WebsiteSession({
   const canRetryLaunch = Boolean(website?.status === "failed" && website.lastError?.stage === "launch" && website.candidate && website.approvedCandidateRevision === website.candidate.revision);
 
   if (loading) {
-    return <section className={styles.root} aria-label="Website setup" aria-busy="true"><p className={styles.srStatus} role="status"><Loader2 className="mr-2 inline size-4 motion-safe:animate-spin" aria-hidden="true" />Opening your saved website…</p></section>;
+    return <section aria-label="Website setup" aria-busy="true"><StPage><StHead title="Website" /><StSkeleton label="Opening your saved website…" /></StPage></section>;
   }
 
   return (
-    <section ref={recoveryRootRef} className={styles.root} aria-label="Website setup" aria-busy={busy || undefined}>
-      <header className={styles.header}>
-        <p className={styles.eyebrow}>Website</p>
-        <h1 ref={reviewHeadingRef} tabIndex={-1}>{website?.title || "Create a useful website for your business"}</h1>
-        <p>{record ? "Review your website draft, make changes and see its approval history." : "Describe your business and what visitors should be able to do. Start with a private website preview."}</p>
-      </header>
+    <section ref={recoveryRootRef} aria-label="Website setup" aria-busy={busy || undefined}><StPage className={styles.root}>
+      <StHead headingRef={reviewHeadingRef} title={website?.title || "Create a useful website for your business"} meta={record ? "Review your website draft, make changes and see its approval history." : "Describe your business and what visitors should be able to do. Start with a private website preview."} />
 
-      {readOnly ? <div className={styles.status}><ShieldCheck size={16} aria-hidden="true" /><span>You can review this website, but this access level cannot change it.</span></div> : null}
-      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details are kept here." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : needsReload && creationAttempt.current ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy || readOnly} onClick={() => void createPreview(true)}>Check this website request</Button> : null}</div> : null}
+      {readOnly ? <StNotice>You can review this website, but this access level cannot change it.</StNotice> : null}
+      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details are kept here." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <StPill ref={reloadRef} type="button" variant="soft" busy={busy} disabled={busy} onClick={() => void reload()}>Reload current state</StPill> : needsReload && creationAttempt.current ? <StPill ref={reloadRef} type="button" variant="soft" busy={busy} disabled={busy || readOnly} onClick={() => void createPreview(true)}>Check this website request</StPill> : null}</div> : null}
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
 
       {workId && loadFailed && !record ? (
         <div className={styles.requestCard}>
           <p>This website draft could not be opened. Your saved work is unchanged.</p>
-          <div className={styles.actions}><Button type="button" variant="secondary" onClick={() => { setError(""); setLoadFailed(false); setLoading(true); setLoadAttempt((attempt) => attempt + 1); }} icon={<RefreshCw size={16} />}>Try loading again</Button></div>
+          <div className={styles.actions}><StPill type="button" variant="soft" onClick={() => { setError(""); setLoadFailed(false); setLoading(true); setLoadAttempt((attempt) => attempt + 1); }}>Try loading again</StPill></div>
         </div>
       ) : !record ? (
         <BriefForm fields={fields} setFields={next => { if (!inFlight.current && !unresolved.current && !readOnly) setFields(next); }} onSubmit={() => void createOrRevise()} busy={busy} frozen={needsReload} readOnly={readOnly} submitLabel="Generate a private preview" canSubmit={canSubmitBrief} />
       ) : (
         <>
           <div className={styles.status} data-tone={website?.status === "failed" ? "attention" : undefined}>
-            {needsReload ? <CircleAlert size={16} aria-hidden="true" /> : <StatusIcon website={website!} />}
-            <span>{needsReload ? "Approval and launch status are unconfirmed." : <><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</>}</span>
+            <StState kind={needsReload || website!.status === "failed" ? "need" : website!.status === "published" ? "live" : "draft"}>{needsReload ? "Approval and launch status are unconfirmed." : statusLabel(website!)}</StState>
+            {!needsReload ? <span>{statusMessage(website!)}</span> : null}
           </div>
-
-          <div className={styles.requestCard}>
-            <BriefForm fields={fields} setFields={next => { if (!inFlight.current && !unresolved.current && !readOnly) setFields(next); }} onSubmit={() => void createOrRevise()} busy={busy} frozen={needsReload} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
-            <div className={styles.actions}>
-              {!readOnly && canApprove ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void approve()} icon={<Check size={16} />}>Approve this preview</Button> : null}
-              {!readOnly && canPrepare ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()} icon={<Rocket size={16} />}>Prepare launch</Button> : null}
-              {!readOnly && canRetryLaunch ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()} icon={<RefreshCw size={16} />}>Retry launch preparation</Button> : null}
-              {!needsReload && website!.status === "launch_pending" && !isLocalExportReady(website!) ? <Button type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()} icon={<RefreshCw size={16} />}>Check saved status</Button> : null}
-            </div>
-            {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
-          </div>
-
-          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}:${connectionReadRevision}`} record={record} readOnly={readOnly} onUnconfirmed={recovery => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } websiteAttempt.requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); connectionFocus.current?.cancel(); connectionFocus.current = null; if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} disabled={readOnly || busy || dirty || needsReload} onBusyChange={value => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; setBusy(value); }} onSaved={(next) => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== next.workId) throw new Error("The current saved website could not be confirmed."); currentWebsiteRecord(next, workspaceId, record.workId); setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
 
           {website!.candidate ? (
             <section className={styles.previewSection} aria-labelledby="website-preview-heading">
@@ -398,13 +368,28 @@ function WebsiteSession({
             </section>
           ) : <p className={styles.srStatus} role="status">A generated site preview is not available yet. Your saved brief remains available for recovery.</p>}
 
+          <div className={styles.requestCard}>
+            <BriefForm fields={fields} setFields={next => { if (!inFlight.current && !unresolved.current && !readOnly) setFields(next); }} onSubmit={() => void createOrRevise()} busy={busy} frozen={needsReload} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
+            <div className={styles.actions}>
+              {!readOnly && canApprove ? <StPill type="button" busy={busy} disabled={busy || needsReload} onClick={() => void approve()}>Approve this preview</StPill> : null}
+              {!readOnly && canPrepare ? <StPill type="button" busy={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()}>Prepare launch</StPill> : null}
+              {!readOnly && canRetryLaunch ? <StPill type="button" busy={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()}>Retry launch preparation</StPill> : null}
+              {!needsReload && website!.status === "launch_pending" && !isLocalExportReady(website!) ? <StPill type="button" variant="soft" busy={busy} disabled={busy} onClick={() => void reload()}>Check saved status</StPill> : null}
+            </div>
+            {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
+          </div>
+
+          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}:${connectionReadRevision}`} record={record} readOnly={readOnly} onUnconfirmed={recovery => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } websiteAttempt.requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); connectionFocus.current?.cancel(); connectionFocus.current = null; if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} disabled={readOnly || busy || dirty || needsReload} onBusyChange={value => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; setBusy(value); }} onSaved={(next) => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== next.workId) throw new Error("The current saved website could not be confirmed."); currentWebsiteRecord(next, workspaceId, record.workId); setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
+
+
+
           <section className={styles.history} aria-labelledby="website-history-heading">
             <div className={styles.sectionHeading}><h2 id="website-history-heading">Revision history</h2><span>{website!.history.length} {website!.history.length === 1 ? "entry" : "entries"}</span></div>
             <HistoryList history={website!.history} />
           </section>
         </>
       )}
-    </section>
+    </StPage></section>
   );
 }
 
@@ -443,7 +428,7 @@ function BriefForm({
       </div>
       <TextInput label="Primary call to action" value={fields.primaryCallToAction} onChange={update("primaryCallToAction")} maxLength={300} disabled={busy || readOnly} readOnly={frozen} helperText="For example, Request an appointment or Contact us." />
       <TextArea label="Additional notes (optional)" value={fields.notes} onChange={update("notes")} rows={compact ? 2 : 3} maxLength={4_000} disabled={busy || readOnly} readOnly={frozen} />
-      {!readOnly ? <div className={styles.actions}><Button type="submit" loading={busy} disabled={busy || frozen || !canSubmit} icon={<ArrowRight size={16} />}>{submitLabel}</Button></div> : null}
+      {!readOnly ? <div className={styles.actions}><StPill type="submit" busy={busy} disabled={busy || frozen || !canSubmit}>{submitLabel}</StPill></div> : null}
     </form>
   );
 }

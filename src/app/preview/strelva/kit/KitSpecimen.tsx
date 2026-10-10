@@ -1,16 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const focusControl = useRef<HTMLButtonElement>(null);
   const [who, setWho] = useState<"handles" | "after" | "ask">("ask");
   const [ask, setAsk] = useState("");
   const [accepted, setAccepted] = useState(false);
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas)", fontFamily: "var(--font-workspace), system-ui, sans-serif" }}>
     <StPage>
-      <StHead crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
+      <StHead headingRef={titleRef} crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
       <StSection title="Needs you" meta="open rows, one primary each">
         <StRows label="Needs you">
           <StRow lead={<StBeacon kind="need" pulse />} kind="Google review reply" title="Reply to M. Patel’s 5-star review" detail="“Thank you for helping us settle this without court.” Reply drafted." end={<><StTextButton>Not yet</StTextButton><StTextButton>Open</StTextButton><StPill>Post reply</StPill></>} />
@@ -35,6 +37,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
           {accepted ? <StToast onUndo={() => setAccepted(false)}>Published · attymooney.com/fees</StToast> : null}
         </div>
       </StSection>
+      <StTextButton ref={focusControl} onClick={() => titleRef.current?.focus()}>Focus the page title</StTextButton>
       <StSection title="Who decides" meta="only stricter than Strelva’s default">
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
       </StSection>

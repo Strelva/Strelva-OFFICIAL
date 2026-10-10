@@ -102,7 +102,7 @@ for (const entrance of entrances) {
     expect(tool()).toBe(identity);
     expect(tool().textContent).toContain("Accepted revision two");
     expect(tool().textContent).toContain("1 decision needs you");
-    await act(async () => button("Reload saved History")!.click());
+    await act(async () => button("Reload saved history")!.click());
     expect(reads).toBe(2);
     const stale = { ...envelope(), rebuild: { ...envelope().rebuild, title: "Obsolete revision one" } };
     expect(parseRebuildView(stale).revision).toBe(1);
@@ -142,12 +142,12 @@ for (const entrance of entrances) {
     expect(tool()).toBe(identity);
     expect(tool().textContent).toContain("Fact confirmed in a new revision");
     expect(tool().textContent).toContain("Your accepted website change remains saved");
-    await act(async () => button("Reload saved History")!.click());
+    await act(async () => button("Reload saved history")!.click());
     expect(tool()).toBe(identity);
     expect(tool().textContent).toContain("Saved state refreshed");
     expect(tool().textContent).toContain("Your accepted website change remains saved");
     expect(tool().querySelector(':scope > [role="alert"]')).toBeNull();
-    expect(button(failure === "domain" ? "Reload domain status" : "Reload saved History")).toBeDefined();
+    expect(button(failure === "domain" ? "Reload domain status" : "Reload saved history")).toBeDefined();
     expect(button("Reload current state")).toBeUndefined();
     expect(button("Confirm")!.disabled).toBe(false);
     expect(command).toHaveBeenCalledTimes(1);

@@ -32,7 +32,7 @@ it('can read the actual committed current candidate without replay after history
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   node = document.createElement('div'); document.body.append(node); root = createRoot(node);
   await act(async () => root.render(createElement(RebuildExperience, { workspaceId: prior.workspaceId, workId: prior.workId, canPublish: true })));
-  const find = (label: string) => Array.from(node.querySelectorAll('button')).find(b => b.textContent?.trim() === label);
+  const find = (label: string) => Array.from(node.querySelectorAll('button')).find(b => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === label);
   const factArticle = Array.from(node.querySelectorAll('article')).find(article => article.textContent?.includes(original))!;
   await act(async () => (factArticle.querySelector('button') as HTMLButtonElement).click());
   const field = factArticle.querySelector('textarea')!;
@@ -49,8 +49,8 @@ it('can read the actual committed current candidate without replay after history
   expect(node.querySelector('[role="alert"]')).toBeNull();
   expect(find('Reload current state')).toBeUndefined();
   expect(find('Edit fact')?.disabled).toBe(false);
-  expect(node.textContent).toContain('Saved History is unavailable');
-  await act(async () => find('Reload saved History')!.click());
+  expect(node.textContent).toContain('Saved history is unavailable');
+  await act(async () => find('Reload saved history')!.click());
   expect(node.querySelector('[role="alert"]')).toBeNull();
   expect(find('Edit fact')?.disabled).toBe(false);
   expect(node.textContent).toContain(corrected);

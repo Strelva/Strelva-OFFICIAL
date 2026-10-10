@@ -1,0 +1,10 @@
+.description { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.stack { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: 12px; }
+.stackEnd { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.connectSteps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.stepTitle { margin: 0; color: var(--st-text); font-size: 16px; line-height: 24px; font-weight: 600; }
+.installCode { width: 100%; margin: 0; padding: 12px; border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); font-family: var(--st-font-mono); font-size: 12px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .connectSteps { grid-template-columns: minmax(0, 1fr); } }
+
+.form { display: grid; min-width: 0; gap: 16px; }

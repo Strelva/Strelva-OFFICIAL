@@ -40,7 +40,7 @@ it.each([{ stage: 'payload', status: 409 }, { stage: 'product', status: 403 }])(
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   node = document.createElement('div'); document.body.append(node); root = createRoot(node);
   await act(async () => root.render(createElement(RebuildExperience, { workspaceId: prior.workspaceId, workId: prior.workId, canPublish: true })));
-  const find = (label: string) => Array.from(node.querySelectorAll('button')).find(b => b.textContent?.trim() === label);
+  const find = (label: string) => Array.from(node.querySelectorAll('button')).find(b => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === label);
   const factArticle = Array.from(node.querySelectorAll('article')).find(article => article.textContent?.includes(original))!;
   await act(async () => (factArticle.querySelector('button') as HTMLButtonElement).click());
   const field = factArticle.querySelector('textarea')!;

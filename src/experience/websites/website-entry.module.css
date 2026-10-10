@@ -1,0 +1,4 @@
+.entry { min-width: 0; color: var(--st-text); }
+.options { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; }
+.saved { width: 100%; max-width: 1016px; margin-inline: auto; padding: 24px 48px 0; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .saved { padding: 24px 20px 0; } }

@@ -2,10 +2,10 @@
 
 import { useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/Button";
+import { StNotice, StPill, StSection, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { TextArea } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import { SystemPanel as Panel } from "./SystemPanel";
+import styles from "./website-panels.module.css";
 
 /**
  * "Ask for a change" on a managed website's System page: files a Request to
@@ -75,15 +75,16 @@ export function WebsiteChangeAsk({ workspaceId, systemId, siteName, onFiled, onC
     }
   }
 
-  return <Panel id={`${systemId}-ask`} title="Ask for a change" count={0} intro={`Tell Strelva what should change on ${siteName}. It becomes a Request you can follow below.`}>
-    <form className="mt-3 grid gap-2" onSubmit={file}>
+  return <StSection id={`${systemId}-ask`} title="Ask for a change">
+    <p className={styles.description}>Tell Strelva what should change on {siteName}. It becomes a Request you can follow below.</p>
+    <StSurface label="Website change request"><form className={styles.form} onSubmit={file}>
       <TextArea label="What should change?" value={words} maxLength={3000} rows={4}
         disabled={sending || unconfirmed} onChange={event => { if (!inFlight.current && !attempt.current) setWords(event.target.value); }} placeholder="New office hours in the footer, starting Monday." />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" disabled={sending || (!unconfirmed && words.trim().length < 3)}>{sending ? (unconfirmed ? "Checking…" : "Filing…") : unconfirmed ? "Check this request" : "File the request"}</Button>
-        <Button type="button" size="sm" variant="ghost" disabled={sending || unconfirmed} onClick={() => { if (!inFlight.current && !attempt.current) onClose(); }}>Close</Button>
+      <div className={styles.actions}>
+        <StPill type="submit" disabled={sending || (!unconfirmed && words.trim().length < 3)}>{sending ? (unconfirmed ? "Checking…" : "Filing…") : unconfirmed ? "Check this request" : "File the request"}</StPill>
+        <StTextButton disabled={sending || unconfirmed} onClick={() => { if (!inFlight.current && !attempt.current) onClose(); }}>Close</StTextButton>
       </div>
-      {notice ? <p role={notice.tone} className="text-sm">{notice.text}</p> : null}
-    </form>
-  </Panel>;
+      {notice ? <StNotice tone={notice.tone === "alert" ? "critical" : undefined}><span role={notice.tone}>{notice.text}</span></StNotice> : null}
+    </form></StSurface>
+  </StSection>;
 }

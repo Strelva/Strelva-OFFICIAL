@@ -2,7 +2,10 @@
 
 import { useCallback, useRef, useState } from "react";
 import Link from "next/link";
-import { Image as ImageIcon, ArrowRight, Sparkles } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
+import { StHead, StNotice, StPage, StPillLink, StSection, StState, StSurface } from "@/components/ui/strelva/Kit";
+import { TextArea, TextInput } from "@/components/ui/TextInput";
+import styles from "./website-library.module.css";
 import { useDashboard } from "./DashboardContext";
 
 type Settings = Record<string, string>;
@@ -19,6 +22,7 @@ function Field({
   onBlur,
   multiline,
   placeholder,
+  readOnly = false,
 }: {
   label: string;
   hint?: string;
@@ -27,42 +31,19 @@ function Field({
   onBlur: () => void;
   multiline?: boolean;
   placeholder?: string;
+  readOnly?: boolean;
 }) {
-  const cls =
-    "w-full rounded-lg border border-gray-border bg-surface-base px-3 py-2.5 text-[14px] text-warm-black placeholder-gray-faint outline-none transition-colors focus:border-accent/40";
-  return (
-    <label className="block">
-      <span className="text-[13px] font-medium text-warm-black">{label}</span>
-      {hint && <span className="mt-0.5 block text-[12px] text-gray-muted">{hint}</span>}
-      {multiline ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          rows={4}
-          className={`mt-2 resize-y ${cls}`}
-        />
-      ) : (
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          className={`mt-2 ${cls}`}
-        />
-      )}
-    </label>
-  );
+  return multiline ? <TextArea disabled={readOnly} label={label} helperText={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} rows={4} /> : <TextInput disabled={readOnly} label={label} helperText={hint} value={value} onChange={event => onChange(event.target.value)} onBlur={onBlur} placeholder={placeholder} />;
 }
 
 export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }) {
-  const { dashboardHref } = useDashboard();
+  const { dashboardHref, readOnly } = useDashboard();
   const [settings, setSettings] = useState<Settings>(initialSettings);
   const [status, setStatus] = useState<SaveStatus>("idle");
   const latest = useRef<Settings>(initialSettings);
 
   const save = useCallback(async () => {
+    if (readOnly) return;
     setStatus("saving");
     try {
       const res = await fetch(dashboardHref("/api/content/settings"), {
@@ -80,7 +61,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
     } catch {
       setStatus("error");
     }
-  }, [dashboardHref]);
+  }, [dashboardHref, readOnly]);
 
   const onChange = useCallback((key: string, value: string) => {
     const next = { ...latest.current, [key]: value };
@@ -91,36 +72,21 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
   const logoUrl = settings.logoUrl?.trim();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted">
-            <Sparkles className="h-3.5 w-3.5" strokeWidth={1.7} />
-            Brand Kit
-          </div>
-          <h1 className="mt-2 font-display text-[28px] font-normal leading-tight text-warm-black">
-            Teach Strelva about your business
-          </h1>
-          <p className="mt-2 max-w-[520px] text-[14px] leading-relaxed text-gray-muted">
-            This is what Strelva draws on to write and update your site. The clearer it is,
-            the more every change sounds like you.
-          </p>
-          <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent-dim/40 px-2.5 py-1 text-[11px] font-medium text-accent">
-            <Sparkles className="h-3 w-3" strokeWidth={1.8} />
-            Strelva reads this on every change it makes
-          </span>
-        </div>
-        <SavePill status={status} />
-      </div>
+    <StPage>
+      <StHead title="Your website’s voice" meta="What Strelva draws on to write and update your site. Changes save when you leave a field." actions={<SavePill status={status} />} />
+      {readOnly ? <StNotice>You can read these details. Only an owner or admin can change them.</StNotice> : null}
+      <StNotice>Strelva reads these details when preparing changes to your site.</StNotice>
+      <StSurface label="Website voice and business details"><div className={styles.brandFields}>
 
-      <div className="mt-7 space-y-5">
         <Field
+          readOnly={readOnly}
           label="Business name"
           value={settings.siteName ?? ""}
           onChange={(v) => onChange("siteName", v)}
           onBlur={save}
         />
         <Field
+          readOnly={readOnly}
           label="What you do, in one line"
           hint="The short version a stranger would understand instantly."
           value={settings.siteTagline ?? ""}
@@ -129,6 +95,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
           placeholder="Assisted stretching studio in Williamsville, NY"
         />
         <Field
+          readOnly={readOnly}
           label="About your business"
           hint="Who you serve, what makes you different, anything Strelva should always know."
           value={settings.siteDescription ?? ""}
@@ -137,6 +104,7 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
           multiline
         />
         <Field
+          readOnly={readOnly}
           label="How should Strelva sound?"
           hint="Your voice and tone. Strelva writes everything this way."
           value={settings.brandVoice ?? ""}
@@ -145,64 +113,27 @@ export function BrandKitPanel({ initialSettings }: { initialSettings: Settings }
           multiline
           placeholder={VOICE_PLACEHOLDER}
         />
-      </div>
+      </div></StSurface>
 
       {/* Media */}
-      <section className="mt-6 rounded-xl border border-glass-border bg-surface-raised p-5">
-        <div className="flex items-center gap-2">
-          <ImageIcon className="h-4 w-4 text-gray-muted" strokeWidth={1.6} />
-          <h2 className="text-[14px] font-medium text-warm-black">Your media</h2>
-        </div>
-        <p className="mt-1 text-[13px] text-gray-muted">
-          Photos, logo, and files Strelva can pull into your site.
-        </p>
-        <div className="mt-3 flex items-center gap-3">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Logo" className="h-12 w-12 rounded-lg border border-gray-border object-contain" />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-gray-border text-gray-faint">
-              <ImageIcon className="h-5 w-5" strokeWidth={1.5} />
-            </div>
-          )}
-          <Link
-            href={dashboardHref("/dashboard/assets")}
-            prefetch={false}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-border px-3 py-2 text-[13px] font-medium text-warm-black transition-colors hover:border-accent/35"
-          >
-            Manage media
-            <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.7} />
-          </Link>
-        </div>
-      </section>
+      <StSection title="Your media">
+        <p className={styles.description}>Photos and your logo, ready for Strelva to use on the site.</p>
+        <div className={styles.mediaRow}>{logoUrl ? <img src={logoUrl} alt="Logo" className={styles.mediaLogo} /> : <ImageIcon size={24} aria-label="No logo recorded" />}<StPillLink href={dashboardHref("/dashboard/assets")} variant="soft">Manage media</StPillLink></div>
+      </StSection>
 
-      <p className="mt-5 text-[13px] text-gray-muted">
+      <p className={styles.description}>
         Your services, story, and page copy live in{" "}
         <Link href={dashboardHref("/dashboard/site")} prefetch={false} className="font-medium text-accent underline-offset-2 hover:underline">
           Website
         </Link>
-        . The AI uses everything here together.
+        . Strelva uses these details together.
       </p>
-    </div>
+    </StPage>
   );
 }
 
 function SavePill({ status }: { status: SaveStatus }) {
   if (status === "idle") return null;
-  const copy: Record<Exclude<SaveStatus, "idle">, { label: string; cls: string }> = {
-    saving: { label: "Saving…", cls: "border-accent/30 bg-accent/10 text-accent" },
-    saved: { label: "Saved", cls: "border-positive/30 bg-positive/10 text-positive" },
-    error: { label: "Could not save", cls: "border-critical/30 bg-critical/10 text-critical" },
-  };
-  const item = copy[status];
-  // Announce autosave outcome — there's no save button, so a non-sighted user
-  // gets no other feedback that a blur-save succeeded or (critically) failed.
-  return (
-    <span
-      role={status === "error" ? "alert" : "status"}
-      aria-live={status === "error" ? "assertive" : "polite"}
-      className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium ${item.cls}`}
-    >
-      {item.label}
-    </span>
-  );
+  const copy = { saving: "Saving…", saved: "Saved", error: "Could not save" };
+  return <span role={status === "error" ? "alert" : "status"} aria-live={status === "error" ? "assertive" : "polite"}><StState kind={status === "error" ? "down" : status === "saved" ? "live" : "need"}>{copy[status]}</StState></span>;
 }

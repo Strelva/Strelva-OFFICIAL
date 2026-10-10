@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -28,13 +28,15 @@ export function StPage({ children, width = "column", className }: { children: Re
   return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef }: {
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
   beacon?: BeaconKind;
   actions?: ReactNode;
   titleId?: string;
+  /** Stable focus destination when a saved state read replaces its controls. */
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const crumbNode = crumb ? (crumb.href
     ? <Link className={styles.crumb} href={crumb.href} onClick={crumb.onClick}><ChevronLeft size={14} aria-hidden="true" />{crumb.label}</Link>
@@ -43,7 +45,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}
@@ -120,7 +122,7 @@ export function StStamp({ children }: { children: ReactNode }) {
 
 /* ---------- Actions ---------- */
 
-type PillProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; busy?: boolean };
+type PillProps = ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement>; variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; busy?: boolean };
 
 export function StPill({ variant = "primary", size = "md", block, busy, children, disabled, ...rest }: PillProps) {
   return <button type="button" {...rest} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined} disabled={disabled || busy} aria-busy={busy || undefined}>{busy ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : null}{children}</button>;
@@ -130,8 +132,8 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {
-  if (href) return <Link href={href} className={styles.textButton} data-tone={tone}>{children}</Link>;
+export function StTextButton({ tone, children, href, target, rel, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement>; tone?: "accent" | "danger"; href?: string; target?: HTMLAttributeAnchorTarget; rel?: string }) {
+  if (href) return <Link href={href} target={target} rel={rel} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }
 
@@ -167,7 +169,7 @@ export function StLedger({ path, count, lines, action }: { path: ReactNode; coun
 
 /* ---------- Hold to accept ---------- */
 
-const HOLD_MS = 900;
+const HOLD_MS = 800;
 
 /**
  * For consequential yeses (publish, confirm a booking, leave). Press and hold
@@ -179,6 +181,8 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }:
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
   const done = useRef(false);
+  const accept = useRef(onAccept);
+  const blocked = useRef(disabled);
   const hintId = useId();
 
   const stop = useCallback(() => {
@@ -193,22 +197,25 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }:
     done.current = false;
     start.current = performance.now();
     const tick = (now: number) => {
+      if (blocked.current) { stop(); return; }
       const value = Math.min(1, (now - (start.current ?? now)) / HOLD_MS);
       setProgress(value);
-      if (value >= 1) { done.current = true; frame.current = null; onAccept(); return; }
+      if (value >= 1) { done.current = true; frame.current = null; accept.current(); return; }
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
-  }, [disabled, onAccept]);
+  }, [disabled, stop]);
 
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
+  useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-describedby={hintId}
-    style={{ "--hold-progress": progress } as CSSProperties}
+  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-label={label} aria-describedby={hintId}
+    style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
     onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
     onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
+    onBlur={stop}
     onKeyDown={event => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); done.current = true; onAccept(); return; }
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); if (!event.repeat && !blocked.current) { stop(); done.current = true; accept.current(); } return; }
       if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); begin(); }
     }}
     onKeyUp={event => { if (event.key === " " || event.key === "Enter") stop(); }}

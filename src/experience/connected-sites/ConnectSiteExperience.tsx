@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { expectedConnectedSiteSystemId } from "@/products/connected-sites/client";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StState, StSteps, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import styles from "./connected-sites.module.css";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
@@ -56,6 +57,7 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
   const [platform, setPlatform] = useState<SitePlatform>("unknown");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
   const inFlight = useRef(false);
   const needsReload = useRef(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -118,33 +120,52 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     finally { inFlight.current = false; setBusy(false); }
   }
 
-  return <div ref={scope} className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-10 md:px-8">
-    <header className="grid gap-2">
-      <h1 className="font-display text-[32px] leading-10">Bring the website you already have</h1>
-      <p className="text-sm text-gray-muted">Keep your site where it is: Wix, Squarespace, WordPress or anything else. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.</p>
-    </header>
-    {sites.length ? <div className="grid gap-3">
-      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { if (!inFlight.current && !needsReload.current) { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); } }} disabled={busy || unconfirmed} />
-      {site && canManage ? <Button type="button" variant="ghost" className="justify-self-start" disabled={busy || unconfirmed} onClick={() => { if (!inFlight.current && !needsReload.current) { setSite(null); setError(""); } }}>Connect another website</Button> : null}
+  async function copy() {
+    if (!site) return;
+    try { await navigator.clipboard.writeText([site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")); setCopied(true); }
+    catch { setError("Copy is unavailable. Select the lines and copy them manually."); }
+  }
+
+  return <div ref={scope}><StPage>
+    <StHead crumb={{ label: "Systems", href: `${appBase}/workspace?${new URLSearchParams({ workspaceId })}` }} title={site ? `Connect ${site.siteHost}` : "Bring the website you already have"}
+      meta="Keep your site where it is. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages." />
+    {sites.length ? <div className={styles.stack}>
+      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { if (!inFlight.current && !needsReload.current) { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); setCopied(false); } }} disabled={busy || unconfirmed} />
+      {site && canManage ? <StTextButton disabled={busy || unconfirmed} onClick={() => { if (!inFlight.current && !needsReload.current) { setSite(null); setError(""); setCopied(false); } }}>Connect another website</StTextButton> : null}
     </div> : null}
-    {!site ? canManage ? <form className="grid gap-4" onSubmit={connect} noValidate aria-label="Connect your website">
+    {!site ? canManage ? <StSurface label="Connect your website"><form className={styles.stack} onSubmit={connect} noValidate aria-label="Connect your website">
       <TextInput label="Your site's address" type="url" inputMode="url" autoComplete="url" placeholder="yourbusiness.com" value={url} readOnly={busy || unconfirmed} spellCheck={false} autoCapitalize="none" onChange={event => { if (!inFlight.current && !needsReload.current) { setUrl(event.target.value); setError(""); } }} />
       <SelectInput label="Built with" value={platform} options={PLATFORM_OPTIONS} disabled={busy || unconfirmed} onChange={event => { if (!inFlight.current && !needsReload.current) setPlatform(event.target.value as SitePlatform); }} />
-      <Button type="submit" loading={busy} disabled={unconfirmed} className="justify-self-start">Get my two lines</Button>
-    </form> : <p className="text-sm text-gray-muted">An owner or admin of this business connects its website.</p>
-    : site.verifiedAt ? <section className="grid gap-3" aria-labelledby="connected-done">
-      <h2 ref={resultHeading} tabIndex={-1} id="connected-done" className="text-base font-medium">{site.siteHost} is connected</h2>
-      <p className="text-sm text-gray-muted">It&rsquo;s proven to be yours. Inquiries from it now arrive in Strelva, and visits show on its page.</p>
-      <a className="justify-self-start text-sm underline" href={systemPage(site.systemId)}>Open your website</a>
-    </section>
-    : <section className="grid gap-3" aria-labelledby="connected-install">
-      <h2 ref={resultHeading} tabIndex={-1} id="connected-install" className="text-base font-medium">Add these two lines to {site.siteHost}</h2>
-      <p className="text-sm text-gray-muted">Paste them into your site&rsquo;s header code (most builders call it &ldquo;custom code&rdquo;), on every page. Someone else runs your site? Send them these lines; they&rsquo;re safe to share.</p>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-bg p-3 text-xs" aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
-      <p className="text-sm text-gray-muted">Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours. Nothing is collected until then.</p>
-      {canManage ? <Button type="button" loading={busy} disabled={unconfirmed} className="justify-self-start" onClick={() => void verify()}>Check my site</Button> : null}
-    </section>}
-    {error ? <p ref={alert} tabIndex={-1} role="alert" className="text-sm text-terra">{error}</p> : null}
-    {unconfirmed ? <Button ref={reloadAction} type="button" variant="secondary" disabled={busy} className="justify-self-start" onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload connection</Button> : null}
-  </div>;
+      <div><StPill type="submit" busy={busy} disabled={unconfirmed}>Get my two lines</StPill></div>
+    </form></StSurface> : <StEmpty>An owner or admin of this business connects its website.</StEmpty>
+    : <>
+      <div className={styles.installGrid}>
+        <StSurface label="Lines to add to your site"><div className={styles.stack}>
+          <h2 ref={resultHeading} tabIndex={-1} id={site.verifiedAt ? "connected-done" : "connected-install"} className="text-base font-semibold">{site.verifiedAt ? `${site.siteHost} is connected` : `Add these two lines to ${site.siteHost}`}</h2>
+          {site.verifiedAt ? <><StState kind="live">Connected</StState><p className={styles.body}>The site stays with your current provider. Its connection to Strelva is verified.</p></> : <>
+            <p className={styles.body}>Paste them into your site&rsquo;s header code (most builders call it &ldquo;custom code&rdquo;), on every page. Someone else runs your site? Send them these lines; they&rsquo;re safe to share.</p>
+            <pre className={styles.code} tabIndex={0} aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
+            <div className={styles.actions}><StPill variant="soft" onClick={() => void copy()}>{copied ? "Copied" : "Copy"}</StPill>{copied ? <span role="status" className={styles.body}>Lines copied</span> : null}</div>
+          </>}
+        </div></StSurface>
+        <StSection title={site.verifiedAt ? "The site is connected" : "Publish, then check"}>
+          <StSteps label="Connecting your site" steps={[
+            { title: "Connection lines ready", state: "done" },
+            { title: "Publish them on your site", state: site.verifiedAt ? "done" : "pending", detail: "Your website stays with its current provider." },
+            { title: busy ? "Strelva is checking the live page" : site.verifiedAt ? "Strelva confirmed your site" : "Check the live page", state: busy ? "active" : site.verifiedAt ? "done" : "pending" },
+          ]} />
+          {site.verifiedAt ? <><p className={styles.body}>It&rsquo;s proven to be yours. Inquiries from it now arrive in Strelva, and visits show on its page.</p><div><StPillLink href={systemPage(site.systemId)}>Open your website</StPillLink></div></> : <><p className={styles.body}>Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours. Nothing is collected until then.</p>{canManage ? <div><StPill busy={busy} disabled={unconfirmed} onClick={() => void verify()}>Check my site</StPill></div> : <StNotice>An owner or admin of this business checks the connection.</StNotice>}</>}
+          <StState kind={site.verifiedAt ? "live" : "draft"}>{site.verifiedAt ? "Connected" : busy ? "Checking" : "Waiting for verification"}</StState>
+        </StSection>
+        <StSection title="What this connection does">
+          <StRows label="Connection capabilities">
+            <StRow title="Strelva can" detail="Fill in your confirmed business details, receive inquiries from the site and count visits after verification." />
+            <StRow title="Strelva can’t" detail="Change your pages. They stay with your current provider." />
+          </StRows>
+        </StSection>
+      </div>
+    </>}
+    {error ? <StNotice tone="critical"><p ref={alert} tabIndex={-1}>{error}</p></StNotice> : null}
+    {unconfirmed ? <div><StPill ref={reloadAction} variant="soft" disabled={busy} onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload connection</StPill></div> : null}
+  </StPage></div>;
 }

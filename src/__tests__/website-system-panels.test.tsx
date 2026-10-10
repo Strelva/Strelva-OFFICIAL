@@ -60,6 +60,21 @@ describe("website System page: domains, Waiting on you, Requests and History", (
   });
 });
 
+describe("deployment read-back evidence", () => {
+  it.each([
+    ["confirmed", "Live page read back and confirmed"],
+    ["not_confirmed", "Published; live page not confirmed"],
+    ["not_checked", "Published; live page not checked"],
+  ] as const)("keeps %s separate from publication", (readBack, label) => {
+    const detail = previewWebsiteDetail(SITE, "empty");
+    detail.history = [{ id: "deploy-receipt:example", source: "deploy", at: "2026-10-07T12:00:00Z", by: "Strelva", title: "Updated fees", undo: null, deployment: { commitSha: "abc123", url: "https://example.com", readBack } }];
+    const page = renderToStaticMarkup(createElement(WebsiteHistoryPanel, { workspaceId: BUSINESS, systemId: SITE, canRestore: false, state: { status: "ready", detail } }));
+    expect(page).toContain(label);
+    expect(page).toContain("abc123");
+    expect(page).toContain("No undo for this change.");
+  });
+});
+
 describe("website System page reads its lists from the server", () => {
   const roots: ReturnType<typeof createRoot>[] = [];
   beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });

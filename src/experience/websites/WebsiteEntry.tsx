@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { StHead, StNotice, StPage, StTextButton } from "@/components/ui/strelva/Kit";
+import styles from "./website-entry.module.css";
 import { SelectInput } from "@/components/ui/TextInput";
 import { ConnectSiteExperience, type ConnectableSite } from "@/experience/connected-sites/ConnectSiteExperience";
 import { RebuildExperience } from "./RebuildExperience";
@@ -48,16 +50,16 @@ function ScopedWebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, pat
     }
     window.history.replaceState(window.history.state, "", href("rebuild", id));
   };
-  return <div className="text-warm-black">
-    {connectedEnabled && rebuildEnabled || !path ? <nav aria-label="Website options" className="mx-auto grid w-full max-w-2xl gap-4 px-4 pt-10 md:px-8">
-      {!path ? <><h1 className="font-display text-[32px] leading-10">Your website in Strelva</h1><p className="text-sm text-gray-muted">Connect the site you already have, or prepare a new one. You review it before anything goes live.</p></> : null}
-      {connectedEnabled ? <a className="text-sm underline underline-offset-4" href={href("connect")} aria-current={path === "connect" ? "page" : undefined}>Connect your existing website</a> : null}
-      {rebuildEnabled ? <a className="text-sm underline underline-offset-4" href={href("rebuild")} aria-current={path === "rebuild" ? "page" : undefined}>Prepare a new website</a> : null}
-      {!connectedEnabled && !rebuildEnabled ? <p role="status" className="text-sm text-gray-muted">Website entry isn&rsquo;t open for this business yet.</p> : null}
-    </nav> : null}
+  return <div className={styles.entry}>
+    {connectedEnabled && rebuildEnabled || !path ? <StPage><nav aria-label="Website options" className={styles.options}>
+      {!path ? <StHead title="Your website in Strelva" meta="Connect the site you already have, or prepare a new one. You review it before anything goes live." /> : null}
+      {connectedEnabled ? <StTextButton href={href("connect")}>Connect your existing website</StTextButton> : null}
+      {rebuildEnabled ? <StTextButton href={href("rebuild")}>Prepare a new website</StTextButton> : null}
+      {!connectedEnabled && !rebuildEnabled ? <StNotice>Website entry isn&rsquo;t open for this business yet.</StNotice> : null}
+    </nav></StPage> : null}
     {path === "connect" && connectedEnabled ? <ConnectSiteExperience workspaceId={workspaceId} canManage={canManage} initialSites={sites} appBase={appBase} /> : null}
-    {path === "rebuild" && rebuildEnabled ? <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-10 md:px-8">
-      {saved.length ? <div className="min-w-0 max-w-2xl break-words"><SelectInput helperText={selected ? `Last known saved work: ${selected.title} · ${selected.status}` : undefined} className="max-sm:min-h-11" label="Saved website work" value={workId ?? ""} options={[{ value: "", label: "Start a new website request" }, ...saved.map(item => ({ value: item.workId, label: `${item.title} · ${item.status}` }))]} onChange={event => chooseWork(event.target.value || undefined)} /></div> : null}
+    {path === "rebuild" && rebuildEnabled ? <div>
+      {saved.length ? <div className={styles.saved}><SelectInput helperText={selected ? `Last known saved work: ${selected.title} · ${selected.status}` : undefined} className="max-sm:min-h-11" label="Saved website work" value={workId ?? ""} options={[{ value: "", label: "Start a new website request" }, ...saved.map(item => ({ value: item.workId, label: `${item.title} · ${item.status}` }))]} onChange={event => chooseWork(event.target.value || undefined)} /></div> : null}
       <RebuildExperience initialRequest={!workId ? requestDraft : ""} agency={agency} key={workId ?? (requestDraft ? "new:carried" : "new")} workspaceId={workspaceId} workId={workId} managed operator={operator} canPublish={canPublish} allowIntake readOnly={!canManage} transport={transport} onCurrentRecord={updateCurrentRecord} minimumRecordRevision={saved.find(item => item.workId === workId)?.revision ?? -1}
         onSaved={id => { setSaved(items => items.some(item => item.workId === id) ? items : [...items, { workId: id, title: "Saved website request", status: "building", revision: -1 }]); chooseWork(id); }} />
     </div> : null}

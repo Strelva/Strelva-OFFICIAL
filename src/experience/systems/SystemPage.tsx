@@ -10,6 +10,7 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { StHead, StNotice, StPage, StPill, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
 import { OpenedWork } from "@/experience/workspace/OpenedWork";
@@ -18,7 +19,7 @@ import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
-  CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
+  CONNECTION_KIND_LABEL, HEALTH_LABEL, INCOMING_CONNECTION_LABEL, LIFECYCLE_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
 } from "./model";
 import { workspaceSiteHref } from "@/platform/workspaces/site-places";
@@ -29,6 +30,8 @@ import { websiteDomainConnections } from "./website-detail";
 import { SystemVersionImprovements } from "./SystemVersionImprovements";
 import { SystemVersionManagement } from "./SystemVersionManagement";
 import { SystemCreator } from "./SystemCreator";
+import { WebsiteSystemCanvas } from "./WebsiteSystemCanvas";
+import canvasStyles from "./website-system-canvas.module.css";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -98,8 +101,27 @@ export function SystemPage(props: SystemPageProps) {
     setMode("both");
   }
 
-  return <div className={styles.page} aria-busy={loading || undefined}>
-    <header className={styles.header}>
+  const website = system.kind === "website" && system.surface.kind === "website";
+  const Page = website ? StPage : "div";
+  return <Page className={website ? undefined : styles.page} aria-busy={loading || undefined}>
+    {website ? <div className={canvasStyles.heading}>
+      <StHead crumb={{ label: system.detail || "Home", onClick: onHome }} title={system.name}
+        meta={<span className={canvasStyles.meta}>
+          <span data-lifecycle={system.lifecycle}><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState></span>
+          <StState kind={system.health.state === "healthy" ? "live" : system.health.state === "blocked" ? "down" : system.health.state === "degraded" ? "need" : "draft"}>{HEALTH_LABEL[system.health.state]}. {system.health.summary}</StState>
+        </span>}
+        actions={<div className={canvasStyles.actions}>
+          {system.surface.kind === "website" && system.surface.liveUrl ? <StTextButton href={system.surface.liveUrl} target="_blank" rel="noreferrer" tone="accent">Visit site<ArrowUpRight size={14} aria-hidden="true" /></StTextButton> : null}
+          {system.surface.kind === "website" && system.surface.editing ? <StTextButton href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: "request" }, props.appBase || "")}>Changes to this site</StTextButton>
+            : system.surface.kind === "website" && system.surface.manageHref ? <StTextButton href={system.surface.manageHref}>Website controls</StTextButton> : null}
+          <StPill disabled={readOnly} title={readOnly ? readOnlyReason : undefined} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</StPill>
+        </div>} />
+      {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
+      {system.operatedBy ? <p className={canvasStyles.note}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={canvasStyles.note}>Agency identity could not be loaded</p> : system.providerIdentityStatus === "unassigned" ? <p className={canvasStyles.note}>No agency of record</p> : null}
+      {system.storedVersionId ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}
+      {system.health.signals?.length ? <details className={canvasStyles.note}><summary>Latest checks</summary><ul aria-label="Website health evidence" className={canvasStyles.evidence}>{system.health.signals.map(signal => <li key={signal}>{signal}</li>)}</ul></details> : null}
+      {system.lifecycle === "paused" ? <StNotice>{PAUSED_KEEPS.website}</StNotice> : null}
+    </div> : <header className={styles.header}>
       <div>
         {back}
         {titled ? <h1 className="font-display">{system.name}</h1> : null}
@@ -120,26 +142,17 @@ export function SystemPage(props: SystemPageProps) {
         {readOnly && readOnlyReason ? <span className="self-center text-xs text-gray-muted">{readOnlyReason}</span> : null}
         <Button size="sm" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} icon={<MessageSquareText size={16} />} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</Button>
       </div>
-    </header>
+    </header>}
 
-    <div className={styles.body} data-context={hasContext(system) ? undefined : "none"}>
-      <section className={styles.surface} data-kind={system.surface.kind} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}>
+    <div className={website ? canvasStyles.body : styles.body} data-context={(website ? showAside : hasContext(system)) ? undefined : "none"} aria-busy={website && loading || undefined}>
+      <section className={website ? canvasStyles.surface : styles.surface} data-kind={system.surface.kind} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}>
         {system.surface.kind === "website" ? <>
-          <div className={styles.surfaceBar}>
-            <span>{comparing && mode !== "current" ? `Comparing with: ${comparing.title}` : system.surface.previewSrc ? system.surface.previewLabel : "No public address is recorded"}</span>
-            {comparing ? <span className={styles.segmented} role="group" aria-label="What to show">
-              {(["current", "possibility", "both"] as const).map(value => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)}>{value === "current" ? "Current" : value === "possibility" ? "Possibility" : "Side by side"}</button>)}
-            </span> : null}
-          </div>
-          <div className={styles.frames}>
-            {mode !== "possibility" || !comparing ? <figure>{comparing && mode === "both" ? <figcaption>Current · {system.surface.domain || system.name}</figcaption> : null}{system.surface.previewSrc ? <iframe title={`${system.name} as visitors see it`} src={system.surface.previewSrc} sandbox={websiteSandbox(system.surface.previewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /> : <p className="p-4 text-sm text-gray-muted">No address is recorded for this website yet, so there is nothing to show. Website controls still open it.</p>}</figure> : null}
-            {comparing && mode !== "current" ? <figure>{mode === "both" ? <figcaption>{POSSIBILITY_STATUS_LABEL[comparing.status]} · {comparing.title}</figcaption> : null}<iframe title={`${comparing.title}, not live`} src={comparing.previewSrc} sandbox="" loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /></figure> : null}
-          </div>
+          <WebsiteSystemCanvas system={{ ...system, surface: system.surface }} comparing={comparing} mode={mode} onModeChange={setMode} sandbox={websiteSandbox} />
           {system.publishing && !props.localPreview ? <ContentWorkspace key={system.id} workspaceId={props.workspaceId} systemId={system.id} kind="website" readOnly={readOnly || system.lifecycle === "paused"} /> : null}
         </> : <div className={styles.workSurface}><SystemSurface {...props} system={system} /></div>}
       </section>
 
-      {showAside ? <aside className={styles.aside} aria-label={`About ${system.name}`}>
+      {showAside ? <aside className={website ? canvasStyles.aside : styles.aside} aria-label={`About ${system.name}`}>
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
@@ -154,7 +167,7 @@ export function SystemPage(props: SystemPageProps) {
       </aside> : null}
     </div>
     {showAside ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
-  </div>;
+  </Page>;
 }
 
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */

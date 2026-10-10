@@ -11,5 +11,5 @@ export default async function WebsiteEntryPreviewPage({ searchParams }: { search
   const params = await searchParams;
   const recovery = params.recovery === "progress" || params.recovery === "pending" ? params.recovery : undefined;
   if (params.recovery !== undefined && (process.env.NODE_ENV !== "development" || !recovery)) notFound();
-  return <div data-dashboard className="min-h-screen bg-surface-base"><WebsiteEntryPreview entry={params.entry ?? null} state={params.state ?? "ready"} recovery={recovery} /></div>;
+  return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={params.mode === "dark" ? "dark" : "light"} className="min-h-screen bg-surface-base"><WebsiteEntryPreview entry={params.entry ?? null} state={params.state ?? "ready"} recovery={recovery} /></div>;
 }

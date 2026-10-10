@@ -19,6 +19,26 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 [ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
 both modes on October 9; consumers are added lane by lane.
 
+Website adoption preserves focus recovery with `StHead.headingRef` and button
+refs on `StPill` / `StTextButton` (React 19). The specimen includes a focus-title
+control. `StHold` names its acceptance independently of the described keyboard
+hint, so publication controls retain one stable accessible name. External
+`StTextButton` links retain their `target` and `rel` attributes. A hold cancels
+on disabled access or focus loss; its shortcut cancels an in-flight hold and
+ignores key repeat. Bounded DOM tests cover these acceptance/focus contracts.
+
+The L2 website lane recomposes the website System iframe, request/rebuild review,
+retained draft history, connected-site verification and visitor-form controls on
+the kit. `PhotoLibrary` retains Image, PhotoDetail and its existing media API;
+`BrandKitPanel` retains the blur-save settings contract and shared fields;
+`CollectionsManager` retains collection schemas, AssetPickerModal and its edit/
+delete paths, using kit rows and held publication. The managed website frame
+keeps DashboardProvider and tenant-relative API routing. Unsupported page diff,
+incident/pause, live fonts/colors, media usage, weekly visits and Search Console
+compositions are explicitly fictional gated previews. Browser rendering and
+390px acceptance remain unproven; the lane handoff records the rejected browser
+access and source checks.
+
 ## Party billing, October 7, 2026 (local)
 
 [AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)
