@@ -40,6 +40,12 @@ function browserDependencies(root: string, read: (file: string) => string | unde
       } else {
         const target = localTarget(file, specifier);
         if (target === null) continue;
+        // CSS modules are bundled assets, not executable server dependencies.
+        // Still require the actual asset so a missing import cannot pass.
+        if (target.endsWith(".css")) {
+          if (read(target) === undefined) violations.push(`${file}: unresolved ${specifier}`);
+          continue;
+        }
         const dependency = [...extensions.map(extension => target + extension), ...extensions.map(extension => `${target}/index${extension}`)]
           .find(candidate => read(candidate) !== undefined);
         if (dependency) pending.push(dependency);
@@ -51,6 +57,8 @@ function browserDependencies(root: string, read: (file: string) => string | unde
 }
 
 const leadRows = "src/app/admin/leads/LeadRows.tsx";
+const publishingClient = "src/products/publishing/client.ts";
+const publishingPreview = "src/experience/workspace/preview/PublishingRecordPreview.tsx";
 function readSource(file: string): string | undefined {
   const absolute = path.join(process.cwd(), file);
   return existsSync(absolute) ? readFileSync(absolute, "utf8") : undefined;
@@ -65,6 +73,19 @@ describe("delivery client dependencies", () => {
     const originalImport = readSource(leadRows)!.replace("@/lib/access-request-delivery-contracts", "@/lib/access-request-delivery");
     const violations = browserDependencies(leadRows, file => file === leadRows ? originalImport : readSource(file));
     expect(violations).toContain("src/lib/access-request-delivery.ts: crypto");
+  });
+
+  it("keeps the publishing browser entry and its actual preview runtime graph free of server dependencies", () => {
+    expect(browserDependencies(publishingClient, readSource)).toEqual([]);
+    expect(browserDependencies(publishingPreview, readSource)).toEqual([]);
+  });
+
+  it("rejects a publishing projection re-export that pulls Node crypto through a transitive helper", () => {
+    const unsafeExport = `${readSource(publishingClient)!}\nexport { addPublishingSystems } from "./projection";`;
+    const readUnsafe = (file: string) => file === publishingClient ? unsafeExport : readSource(file);
+    const cryptoDependency = "src/platform/business-record/tenant-import.ts: node:crypto";
+    expect(browserDependencies(publishingClient, readUnsafe)).toContain(cryptoDependency);
+    expect(browserDependencies(publishingPreview, readUnsafe)).toContain(cryptoDependency);
   });
 
   it("erases type-only edges and honors module-level server-action boundaries", () => {
