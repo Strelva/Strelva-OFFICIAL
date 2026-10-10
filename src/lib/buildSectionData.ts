@@ -1,4 +1,4 @@
-import type { SectionData } from "@/components/dashboard/ContentBrowser";
+import type { SectionData } from "@/products/managed-presence/contracts";
 import { truncate, getFreshness } from "@/lib/utils";
 import type { ContentMap } from "@/lib/types";
 

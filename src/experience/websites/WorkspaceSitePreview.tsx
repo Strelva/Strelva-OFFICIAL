@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import { withAskPreview } from "@/experience/workspace/preview/ask-fixture";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
-import type { SectionData } from "@/components/dashboard/ContentBrowser";
+import type { SectionData } from "@/products/managed-presence/contracts";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
 import { type SiteTab } from "@/platform/workspaces/site-places";
 import type { SiteChangeRequest } from "@/products/websites/client";
