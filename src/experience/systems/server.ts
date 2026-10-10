@@ -51,7 +51,7 @@ import { prepareIsolatedPossibility, type IsolatedSandbox, type SandboxRunOption
 import { planFingerprint } from "@/platform/make-real/approvals";
 import { bareHostname, websiteRebuildCandidate, readWebsiteRebuild, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
-import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/client";
+import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/server";
 import { readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
 import { receiptHeadline } from "@/products/google-listing/server";
 import {
