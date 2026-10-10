@@ -53,6 +53,15 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     const page = html({ readOnly: true, websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
     const node = document.createElement("div");node.innerHTML = page;
     expect([...node.querySelectorAll("button")].find(button => button.textContent === "Ask for a change")?.disabled).toBe(true);
+    expect(node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')?.disabled).toBe(true);
+  });
+  it.each(["unavailable", "unassigned"] as const)("omits missing agency identity (%s) while keeping recorded attribution", status => {
+    const detail = { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } as const;
+    const page = html({ system: { ...site, operatedBy: undefined, providerIdentityStatus: status }, websiteDetail: detail });
+    expect(page).not.toContain("Agency identity could not be loaded");
+    expect(page).not.toContain("No agency of record");
+    expect(page).not.toContain("Agency of record:");
+    expect(html({ websiteDetail: detail })).toContain("Agency of record: Strelva");
   });
   it("does not show website lists on other kinds of System", () => {
     const tool: SystemView = { ...site, kind: "app", surface: { kind: "work", workId: "w", productId: "unknown" } };

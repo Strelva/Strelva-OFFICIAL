@@ -32,7 +32,7 @@ import { SystemCreator } from "./SystemCreator";
 import { WebsiteSystemCanvas } from "./WebsiteSystemCanvas";
 import canvasStyles from "./website-system-canvas.module.css";
 import styles from "./systems.module.css";
-import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { StComposerBar, StComposerDock, StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { ConnectionDetail, connectionDetailData } from "./ConnectionDetail";
 import { MakeRealProgress } from "./MakeRealProgress";
 import { PossibilityComparison } from "./PossibilityComparison";
@@ -82,6 +82,7 @@ export function SystemPage(props: SystemPageProps) {
   const [mode, setMode] = useState<"current" | "possibility" | "both">("current");
   // A managed website (Strelva edits it, or every change is a repo Request): "Ask for a change" files a Request.
   const [askingChange, setAskingChange] = useState(false);
+  const [ask, setAsk] = useState("");
   const [detailVersion, setDetailVersion] = useState(0);
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail), detailVersion);
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
@@ -127,7 +128,7 @@ export function SystemPage(props: SystemPageProps) {
 
   const website = system.kind === "website" && system.surface.kind === "website";
   const Page = website ? StPage : "div";
-  return <Page className={website ? undefined : styles.page} aria-busy={loading || undefined}>
+  return <><Page className={website ? undefined : styles.page} aria-busy={loading || undefined}>
     {website ? <div className={canvasStyles.heading}>
       <StHead crumb={{ label: system.detail || "Home", onClick: onHome }} title={system.name}
         meta={<span className={canvasStyles.meta}>
@@ -141,7 +142,7 @@ export function SystemPage(props: SystemPageProps) {
           <StPill disabled={readOnly} title={readOnly ? readOnlyReason : undefined} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</StPill>
         </div>} />
       {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
-      {system.operatedBy ? <p className={canvasStyles.note}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={canvasStyles.note}>Agency identity could not be loaded</p> : system.providerIdentityStatus === "unassigned" ? <p className={canvasStyles.note}>No agency of record</p> : null}
+      {system.operatedBy ? <p className={canvasStyles.note}>Agency of record: {system.operatedBy}</p> : null}
       {system.storedVersionId ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}
       {system.health.signals?.length ? <details className={canvasStyles.note}><summary>Latest checks</summary><ul aria-label="Website health evidence" className={canvasStyles.evidence}>{system.health.signals.map(signal => <li key={signal}>{signal}</li>)}</ul></details> : null}
       {system.lifecycle === "paused" ? <StNotice>{PAUSED_KEEPS.website}</StNotice> : null}
@@ -191,7 +192,7 @@ export function SystemPage(props: SystemPageProps) {
       </aside> : null}
     </div>
     {showAside ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
-  </Page>;
+  </Page>{website ? <StComposerDock><StComposerBar scope={system.name} placeholder={`Ask about ${system.name}`} value={ask} onChange={setAsk} disabled={readOnly || loading} maxLength={3000} onSubmit={() => onAsk(`About ${system.name}: ${ask.trim()}`)} /></StComposerDock> : null}</>;
 }
 
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */

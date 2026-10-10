@@ -7,6 +7,7 @@ import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallba
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { AGENCY_START_PATH, agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 import { tenantSignInNext } from "@/platform/owner-entry/env";
@@ -59,12 +60,16 @@ async function getTenantAuthContext() {
   const tenantConfig = await getTenantConfig(tenant);
   if (tenantConfig && tenantConfig.active === false) return null;
 
+  // A missing or unavailable site theme is normal at entry. Never borrow the
+  // generic template brand just because this business has no saved theme.
+  const theme = tenantConfig ? await getStoredContent("theme", tenant).catch(() => null) : null;
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
     host: requestHeaders.get("host") || undefined,
+    brandFontFamily: theme?.fontDisplay?.trim().replaceAll("_", " ") || undefined,
   };
 }
 
@@ -83,7 +88,7 @@ export default async function SignUpPage({
 
   if (invite) return <StEntry helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /></StEntry>;
   const tenantAuth = await getTenantAuthContext();
-  if (tenantAuth) return <StEntry brand={tenantAuth.siteName} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /></StEntry>;
+  if (tenantAuth) return <StEntry brand={tenantAuth.siteName} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /></StEntry>;
   if (workspaceOpen) {
     const asAgency = agencySignupReleaseEnabled() && searchValue(params.as) === "agency";
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || "/workspace";

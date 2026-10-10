@@ -143,5 +143,12 @@ it("a departed real document POST cannot navigate a replacement at the same crea
   expect(new URLSearchParams(window.location.search).get("view")).toBe("document");
   expect(window.history.length).toBe(historyLength);
   expect(node.querySelector('section[aria-label="Workspace document"] h1')?.textContent).toBe("Replacement fictional document");
+  // Saved documents open in reading mode; the retained edit control must
+  // reopen this document's saved input rather than the departed draft.
+  expect(node.querySelector('section[aria-label="Workspace document"] input')).toBeNull();
+  const edit = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Edit document");
+  expect(edit).toBeDefined();
+  await act(async () => edit!.click());
   expect(titleInput(node).value).toBe("Replacement fictional document");
+  expect([...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Save document")?.disabled).toBe(true);
 });

@@ -38,6 +38,7 @@
   --st-dot: #16171512;
   --st-shadow-float: 0 1px 1px #1a221c14, 0 4px 12px #1a221c14, 0 16px 40px #1a221c1a;
   --st-shadow-card: 0 1px 2px #1a221c0f, 0 8px 24px #1a221c0d;
+  --st-shadow-sidebar: 0 1px 2px #1a221c0a;
 
   /* Geometry, from the Pen canon: radii 8/12/16/999, type 12/13/14/16/22/28. */
   --st-r-sm: 8px;

@@ -83,7 +83,7 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
   }
   const dirty = saved ? saved.document.title !== title || saved.document.text !== text : Boolean(title.trim());
   const disabled = Boolean(readOnly || busy || (workId && !saved));
-  return <StPage>
+  return <section aria-label="Workspace document" aria-busy={busy}><StPage>
     <StHead title={saved?.document.title ?? "Write something your business can use"} crumb={{ label: "Documents" }}
       meta="Private · never on the website" actions={saved && !readOnly && !editing ? <StTextButton onClick={() => setEditing(true)}>Edit document</StTextButton> : undefined} />
     {!saved && !readOnly && transport.mode === "server" ? <div className="flex flex-wrap gap-3"><StPill type="button" variant="soft" onClick={() => setDrafting(true)}>Draft with Strelva</StPill>{drafting ? <StPill type="button" variant="soft" onClick={() => setDrafting(false)}>Write it myself</StPill> : null}</div> : null}
@@ -112,7 +112,7 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
     </div> : null}
     {saved && !editing ? <details><summary className="cursor-pointer text-sm">Read document</summary><StSurface><p className="whitespace-pre-wrap text-sm">{saved.document.text || "Empty document"}</p></StSurface></details> : null}
     </>}
-  </StPage>;
+  </StPage></section>;
 }
 
 function DocumentHistory({ saved, transport, receiptLabel, receiptActor }: { saved: DocumentSaved; transport: DocumentTransport; receiptLabel?: (receipt: DocumentReceipt) => ReactNode; receiptActor?: (receipt: DocumentReceipt) => ReactNode }) {

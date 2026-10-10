@@ -7,6 +7,7 @@ import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallba
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { tenantSignInNext } from "@/platform/owner-entry/env";
 import { WorkspaceSignIn } from "@/experience/workspace/WorkspaceSignIn";
@@ -58,12 +59,16 @@ async function getTenantAuthContext() {
   const tenantConfig = await getTenantConfig(tenant);
   if (tenantConfig && tenantConfig.active === false) return null;
 
+  // A missing or unavailable site theme is normal at entry. Never borrow the
+  // generic template brand just because this business has no saved theme.
+  const theme = tenantConfig ? await getStoredContent("theme", tenant).catch(() => null) : null;
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
     host: requestHeaders.get("host") || undefined,
+    brandFontFamily: theme?.fontDisplay?.trim().replaceAll("_", " ") || undefined,
   };
 }
 
@@ -103,7 +108,7 @@ export default async function SignInPage({
   if (tenantAuth) {
     const dashboardPath = tenantSignInNext(tenantAuth.clientFallbackRoot);
 
-    return <WorkspaceSignIn title={`Manage ${tenantAuth.siteName}`} description={`For the people ${tenantAuth.siteName} added. Visitors looking for the business should open its public website.`} next={dashboardPath} brand={tenantAuth.siteName} host={tenantAuth.host} />;
+    return <WorkspaceSignIn title={`Manage ${tenantAuth.siteName}`} description={`For the people ${tenantAuth.siteName} added. Visitors looking for the business should open its public website.`} next={dashboardPath} brand={tenantAuth.siteName} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} />;
   }
   return <WorkspaceSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} failed={searchValue(params.error) === "auth_callback"} />;
 }

@@ -96,16 +96,18 @@ export type DecisionPolicyState = State;
 export type DecisionPolicyChange = Change;
 
 /** The settings as rendered for a given state. Pure, so every state is testable. */
-export function DecisionPolicyPanel({ state, pending, notice, onChange, onRetry }: {
+export function DecisionPolicyPanel({ state, pending, notice, onChange, onRetry, showHeading = true }: {
   state: State;
   pending: ConfigurableKind | null;
   notice: { kind: ConfigurableKind; tone: "done" | "error"; text: string } | null;
   onChange: (item: PolicyKindView, change: Change, done: string) => void;
   onRetry: () => void;
+  /** Embedded settings need a heading; the standalone page already owns it. */
+  showHeading?: boolean;
 }) {
   if (state.status === "disabled") return null;
 
-  return <StSection id="who-decides" title="Who decides" meta="Only stricter than Strelva's default">
+  const content = <>
     <p className="text-sm text-gray-muted">You can always ask to see more before it happens. Dimmed choices are looser than Strelva allows for that kind.</p>
     {state.status === "loading" ? <><p role="status" className="text-sm text-gray-muted">Checking who decides…</p><StSkeleton /><StSkeleton width="70%" /></> : null}
     {state.status === "error" ? <StNotice tone="critical" action={<StTextButton onClick={onRetry}>Check again</StTextButton>}>{state.message}</StNotice> : null}
@@ -118,7 +120,8 @@ export function DecisionPolicyPanel({ state, pending, notice, onChange, onRetry 
       {!state.view.kinds.length ? <StEmpty>No decision settings have been recorded.</StEmpty> : null}
       <StSection title="Always yours"><p className="text-sm text-gray-muted">No setting changes these. Access, money and leaving need you signed in.</p><StRows>{state.view.kinds.filter(item => item.fixed).map(item => <StRow key={item.kind} title={item.label} detail={item.example} end="Ask me first" />)}</StRows></StSection>
     </> : null}
-  </StSection>;
+  </>;
+  return showHeading ? <StSection id="who-decides" title="Who decides" meta="Only stricter than Strelva's default">{content}</StSection> : <div className="flex min-w-0 flex-col gap-3">{content}</div>;
 }
 
 function PolicyRow({ item, canChange, busy, locked, notice, onChange }: {

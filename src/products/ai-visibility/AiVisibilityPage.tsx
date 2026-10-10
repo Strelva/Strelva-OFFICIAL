@@ -151,7 +151,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       </form>
       <StSection title="What you get back"><StCopy>What your website makes readable, whether Gemini names you in one sampled answer, and the one fix to start with.</StCopy></StSection>
     </> : null}
-    {state === "scanning" ? <><StHead titleRef={headingRef} title={`Checking ${business}`} meta="Your website stays unchanged." /><StSteps label="Business check" steps={[{ title: "Reading the public website", state: "active" }, { title: "Checking one Gemini answer when available", state: "pending" }, { title: "Finding the first fix", state: "pending" }]} /></> : null}
+    {state === "scanning" ? <><StHead titleRef={headingRef} title={`Checking ${business}`} meta="Your website stays unchanged." /><div role="status"><StSteps label="Business check" steps={[{ title: "Reading the public website", state: "active" }, { title: "Checking one Gemini answer when available", state: "pending" }, { title: "Finding the first fix", state: "pending" }]} /></div></> : null}
     {state === "done" && result ? <AiVisibilityResultView headingRef={headingRef} result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} /> : null}
   </StPage>;
 }

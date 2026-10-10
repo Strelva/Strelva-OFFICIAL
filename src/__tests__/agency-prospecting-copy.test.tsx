@@ -41,15 +41,22 @@ describe("agency copy across public artifacts", () => {
     }
     expect(renderAiVisibilityHtml(ai)).toContain("Prepared by Strelva.");
     const original = renderToStaticMarkup(<AiVisibilityResultView result={ai} scanId={null} shareUrl={null} onReset={() => {}} />);
-    expect(original).toContain("Strelva builds and manages"); expect(original).toContain("/access-request?ref=ai-visibility");
+    expect(original).toContain("The one fix that matters most");
+    expect(original).toContain('href="/access-request?ref=ai-visibility">Get this fixed</a>');
+    expect(original).not.toContain(agency.contactUrl);
   });
   it("states Strelva agent booking separately and keeps uncertain coverage explicit", () => {
     const available = renderToStaticMarkup(<AiVisibilityResultView result={{ ...ai, agentBookingAvailability: { status: "yes", detail: "A customer can confirm an agent-requested booking through Strelva." } }} scanId={null} shareUrl={null} onReset={() => {}} />);
-    expect(available).toContain("Can agents book you through Strelva?"); expect(available).toContain(">Yes</p>");
+    expect(available).toContain("Can an assistant request a booking through Strelva?");
+    expect(available).toMatch(/Available<\/span>/);
+    expect(available).toContain("A customer can confirm an assistant-requested booking through Strelva.");
     expect(renderAiVisibilityHtml({ ...ai, agentBookingAvailability: { status: "yes", detail: "A customer can confirm an agent-requested booking through Strelva." } })).toContain("Can agents book you through Strelva?");
     const unknown = renderToStaticMarkup(<AiVisibilityResultView result={{ ...ai, agentBookingAvailability: { status: "unknown", detail: "No matching Strelva business profile was found; booking through another provider was not checked." } }} scanId={null} shareUrl={null} onReset={() => {}} />);
-    expect(unknown).toContain(">Unknown</p>"); expect(unknown).toContain("booking through another provider was not checked");
-    expect(renderToStaticMarkup(<AiVisibilityResultView result={ai} scanId={null} shareUrl={null} onReset={() => {}} />)).not.toContain("Can agents book you through Strelva?");
+    expect(unknown).toContain("Can an assistant request a booking through Strelva?");
+    expect(unknown).toMatch(/Not verified<\/span>/);
+    expect(unknown).not.toMatch(/Available<\/span>/);
+    expect(unknown).toContain("booking through another provider was not checked");
+    expect(renderToStaticMarkup(<AiVisibilityResultView result={ai} scanId={null} shareUrl={null} onReset={() => {}} />)).not.toContain("Can an assistant request a booking through Strelva?");
   });
   it("puts the agency in email HTML/text and agency CTA, retaining default emails unchanged", () => {
     const opts = buildAuditReportEmailOptions({ name: "Jacob", url: audit.url }, attributedAudit(audit, agency), "https://app.example/audit/report/fixture");

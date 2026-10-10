@@ -20,7 +20,8 @@ describe("every place has the same way home and the same failure states", () => 
   it("permission, error and the no-site state", () => {
     const permission = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "permission" } }));
     expect(permission).toContain(`href="/workspace?workspaceId=${WS}"`);
-    expect(permission).toContain("This belongs to another business");
+    expect(permission).toContain("Your account isn&#x27;t a member of this business. Ask its owner to invite you.");
+    expect(permission).toContain('href="/workspace">Open your workspace</a>');
     expect(html(createElement(WorkspaceReviewsView, { workspaceId: WS, state: { kind: "error" } }))).toContain("Reviews couldn&#x27;t load");
     expect(html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [], denied: [] } } }))).toContain("No site is connected to this business yet");
   });
@@ -56,7 +57,7 @@ describe("Inquiries", () => {
     expect(page).toContain('href="mailto:pat@example.test"');
     expect(page).toContain("Your site&#x27;s form");
     const empty = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ ...connected, leads: [], lastThirtyDays: 0 }], denied: [] } } }));
-    expect(empty).toContain("Strelva takes it and it shows up here");
+    expect(empty).toContain("When someone contacts you through bakery.example, they show up here with their name and what they asked.");
   });
 });
 

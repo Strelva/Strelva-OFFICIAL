@@ -23,7 +23,7 @@ type MonitorState = "idle" | "saving" | "saved" | "error";
 
 /** Change legacy model terminology for display only; saved contracts stay unchanged. */
 function publicCopy(value: string) {
-  return value.replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagents?\b/gi, "assistants").replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
+  return value.replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagent(s?)\b/gi, (_, plural: string) => `assistant${plural.toLowerCase()}`).replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
 }
 
 export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef, sample, continuationHref }: AiVisibilityResultViewProps) {
@@ -98,7 +98,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
       <div className={styles.stack}>
         <StSection title="Can Google read your site?">{result.signals.length ? <StRows label="Website readability">{result.signals.map(signal => <StRow key={signal.id} title={publicCopy(signal.label)} detail={publicCopy(signal.detail)} lead={<StState kind={signal.pass ? "live" : "down"}>{signal.pass ? "Found" : "Missing"}</StState>} />)}</StRows> : <StEmpty>Website readability was not measured. Try a reachable public website.</StEmpty>}</StSection>
         {measured ? <StCopy muted>Website check: <StMono>{result.grade} · {result.score}/100</StMono></StCopy> : null}
-        {result.agentBookingAvailability ? <StSection title="Can an assistant request a booking?"><StState kind={result.agentBookingAvailability.status === "yes" ? "live" : "draft"}>{result.agentBookingAvailability.status === "yes" ? "Available" : result.agentBookingAvailability.status === "no" ? "Not available" : "Not verified"}</StState><StCopy muted>{publicCopy(result.agentBookingAvailability.detail)}</StCopy></StSection> : null}
+        {result.agentBookingAvailability ? <StSection title="Can an assistant request a booking through Strelva?"><StState kind={result.agentBookingAvailability.status === "yes" ? "live" : "draft"}>{result.agentBookingAvailability.status === "yes" ? "Available" : result.agentBookingAvailability.status === "no" ? "Not available" : "Not verified"}</StState><StCopy muted>{publicCopy(result.agentBookingAvailability.detail)}</StCopy></StSection> : null}
       </div>
     </div>
     {scanId && !continuationHref ? <StSection title={agency ? `Contact ${agency.name}` : "Recurring checks pilot"}><StCopy muted>{agency ? `Leave your email to ask ${agency.name} about recurring Gemini checks.` : "Recurring checks are a pilot. Leave your email to register your interest."}</StCopy>{monitorState === "saved" ? <StNotice>{agency ? `Your request was sent to ${agency.name}.` : "Your interest is saved."}</StNotice> : <form onSubmit={handleMonitor} className={styles.address}><StTextField label="Your email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" /><StPill variant="soft" type="submit" busy={monitorState === "saving"}>{agency ? "Send request" : "Join pilot"}</StPill></form>}{monitorError ? <StNotice tone="critical">{monitorError}</StNotice> : null}</StSection> : null}
