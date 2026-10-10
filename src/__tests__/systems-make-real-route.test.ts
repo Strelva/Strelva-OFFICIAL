@@ -17,7 +17,7 @@ vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces, listW
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: deps.exit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: async () => ({ managedWork: [{ id: "mooney-firm", domain: "www.attymooney.com" }] }) }));
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
-vi.mock("@/platform/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
+vi.mock("@/server/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
 const path = vi.hoisted(() => ({ makeRealPath: vi.fn() }));
 vi.mock("@/experience/systems/live-server", () => ({ googleMakeRealPorts: {} }));
 vi.mock("@/experience/systems/live-make-real", () => ({ liveMakeRealPorts: async () => ({}), makeRealPath: path.makeRealPath }));

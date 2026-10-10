@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
   bookingRepair: vi.fn(),
 }));
 vi.mock("@/platform/bookings/move", () => ({ repairPendingBookings: mocks.bookingRepair }));
-vi.mock("@/platform/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
+vi.mock("@/server/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
 vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile, runLeadReadParity: mocks.parity }));
 vi.mock("@/lib/lead-mirror", () => ({ purgeExpiredTenantLeads: mocks.purge }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));

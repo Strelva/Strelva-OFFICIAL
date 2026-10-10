@@ -6,14 +6,14 @@
  */
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
-import type { SourceAdapter } from "../adapters";
-import { agencyGrantAdapter, type PendingAgencyGrant } from "./agency-grant";
-import { providerDeliveryAdapter } from "./provider-delivery";
-import { standingResponsibilityAdapter } from "./standing-responsibility";
-import { websiteRebuildReleaseMayBeOn } from "@/products/websites/rebuild-release";
-import { websiteDomainAdapter } from "./website-domain";
-import { websiteDocumentAdapter } from "./website-document";
-import { workResponsibilityAdapter } from "./work-responsibility";
+import type { SourceAdapter } from "@/platform/needs-you/adapters";
+import { agencyGrantAdapter, type PendingAgencyGrant } from "@/platform/needs-you/sources/agency-grant";
+import { providerDeliveryAdapter } from "@/platform/needs-you/sources/provider-delivery";
+import { standingResponsibilityAdapter } from "@/platform/needs-you/sources/standing-responsibility";
+import { websiteRebuildReleaseMayBeOn } from "@/products/websites";
+import { websiteDomainAdapter } from "@/platform/needs-you/sources/website-domain";
+import { websiteDocumentAdapter } from "@/server/needs-you/sources/website-document";
+import { workResponsibilityAdapter } from "@/platform/needs-you/sources/work-responsibility";
 
 async function offeringServices() {
   const offerings = await import("@/platform/offerings");
@@ -31,9 +31,9 @@ async function offeringServices() {
 }
 
 async function websites() {
-  const release = await import("@/products/websites/rebuild-release");
+  const release = await import("@/products/websites");
   if (!release.websiteRebuildReleaseEnabled()) return null;
-  return import("@/products/websites/rebuild-service");
+  return import("@/products/websites");
 }
 
 function activeGrant(grant: { status: string; expiresAt: string } | null, now = Date.now()): boolean {
@@ -105,9 +105,9 @@ export function deliverySourceAdapters(): SourceAdapter[] {
     }),
     ...(websiteRebuildReleaseMayBeOn() ? [websiteDomainAdapter({
       async list(workspaceId) {
-        const release = await import("@/products/websites/rebuild-release");
+        const release = await import("@/products/websites");
         if (!release.websiteRebuildReleaseMayBeOn() || !(await release.websiteRebuildReleaseEnabledForWorkspace(workspaceId))) return [];
-        return (await import("./website-domain-store")).websiteDomainRequestStore.list(workspaceId);
+        return (await import("@/platform/needs-you/sources/website-domain-store")).websiteDomainRequestStore.list(workspaceId);
       },
       async approve(request, decisionId) {
         const service = await websites();
@@ -126,7 +126,7 @@ export function deliverySourceAdapters(): SourceAdapter[] {
     }),
     standingResponsibilityAdapter({
       list: async (actor, workspaceId) => (await import("@/platform/work-execution/standing-repository")).listStandingResponsibilities(actor, workspaceId),
-      approve: async (actor, standingId, expectedRevision) => (await import("@/products/operations/responsibilities")).commandStandingResponsibility(actor, standingId, { kind: "approve", expectedRevision }),
+      approve: async (actor, standingId, expectedRevision) => (await import("@/products/operations/server")).commandStandingResponsibility(actor, standingId, { kind: "approve", expectedRevision }),
     }),
     workResponsibilityAdapter({
       async list(actor, workspaceId) {
@@ -138,7 +138,7 @@ export function deliverySourceAdapters(): SourceAdapter[] {
         });
       },
       async approve(actor, workId, expectedRevision) {
-        const { workspaceResponsibilityCommands } = await import("@/products/operations/responsibilities");
+        const { workspaceResponsibilityCommands } = await import("@/products/operations/server");
         const saved = await workspaceResponsibilityCommands.command(actor, workId, { kind: "approve", expectedRevision });
         return { id: saved.id, workspaceId: saved.workspaceId, payload: saved.payload };
       },

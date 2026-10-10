@@ -1,7 +1,7 @@
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { OperatorQueueAccessError, type OperatorQueue } from "@/platform/operator-queue/contracts";
-import { readOperatorQueue } from "@/platform/operator-queue/service";
+import { readOperatorQueue } from "@/server/operator-queue/service";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 
 export type QueueLoad =

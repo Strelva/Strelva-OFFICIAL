@@ -6,7 +6,7 @@
  */
 import { uuidFromSeed } from "@/platform/business-record/tenant-import";
 import type { BusinessSystems } from "@/platform/systems/from-existing";
-import type { PublishingSnapshot } from "@/products/publishing/projection";
+import type { PublishingSnapshot } from "@/products/publishing/client";
 import type { PreviewScenario } from "./fixture";
 import { MOONEY_TENANT } from "./systems-fixture";
 

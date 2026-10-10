@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ManageBooking } from "@/experience/bookings/ManageBooking";
 import { bookingManagePageEnabled } from "@/platform/bookings/flags";
 import { loadManageState, type ManageBookingState } from "@/platform/bookings/manage";
-import { manageDeps } from "@/platform/bookings/manage-server";
+import { manageDeps } from "@/server/bookings/manage-server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your booking", robots: { index: false, follow: false }, referrer: "no-referrer" };

@@ -318,3 +318,5 @@ export const { create: createWorkspaceInvestigation, read: readWorkspaceInvestig
 
 /** Exact durable receipt, authorized by the history RPC even after snapshot eviction. */
 export const readWorkspaceInvestigationRun = investigationHistory.find;
+
+export { savedCheckObservations } from "./system-health";

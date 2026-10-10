@@ -1,5 +1,5 @@
 /** Owner-selected inquiry replies; discovery reads the same service and slot authority. */
-import { readLegacyBookingInquiry as getLeadById } from "@/platform/bookings/legacy-ports";
+import { readLegacyBookingInquiry as getLeadById } from "@/server/bookings/legacy-ports";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { assertWorkspaceCalendarManager } from "@/products/scheduling/server";
 import { bookingReadSource } from "@/platform/bookings/flags";

@@ -13,7 +13,7 @@ import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts
 import type { ProviderDelivery } from "@/platform/offerings/provider-delivery";
 import type { StandingResponsibilityRecord } from "@/platform/work-execution/standing-repository";
 import type { Responsibility } from "@/platform/work-execution/engine";
-import { websiteDocumentAdapter, type WebsiteDocumentPorts } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentAdapter, type WebsiteDocumentPorts } from "@/server/needs-you/sources/website-document";
 import { providerDeliveryAdapter, type ProviderDeliveryPorts } from "@/platform/needs-you/sources/provider-delivery";
 import { standingResponsibilityAdapter, type StandingResponsibilityPorts } from "@/platform/needs-you/sources/standing-responsibility";
 import { workResponsibilityAdapter, type WorkResponsibilityPorts, type WorkResponsibilityRecord } from "@/platform/needs-you/sources/work-responsibility";
@@ -323,7 +323,7 @@ describe("agency draft grants", () => {
 
 describe("wiring", () => {
   it("registers one adapter per lifecycle, each needing a member identity", async () => {
-    const { deliverySourceAdapters } = await import("@/platform/needs-you/sources/live-delivery");
+    const { deliverySourceAdapters } = await import("@/server/needs-you/sources/live-delivery");
     const adapters = deliverySourceAdapters();
     expect(adapters.map(adapter => adapter.lifecycle).sort()).toEqual(["agency_grant", "provider_delivery", "standing_responsibility", "website_document", "work_responsibility"]);
     expect(adapters.every(adapter => adapter.needsMemberActor)).toBe(true);

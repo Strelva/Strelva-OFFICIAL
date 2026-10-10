@@ -108,11 +108,15 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
   return summary;
 }
 
+let bookingRequestNotifier: ((booking: StoreBooking) => Promise<unknown>) | null = null;
+/** Runtime composition supplies the current Needs you delivery owner. */
+export function registerBookingRequestNotifier(notify: (booking: StoreBooking) => Promise<unknown>): void { bookingRequestNotifier = notify; }
+
 /** The booking is already durable. Owner delivery cannot fail its receipt. */
 export async function notifyBookingRequestNow(booking: StoreBooking) {
   if (booking.status !== "requested" || !bookingOwnerNoticeEnabled()) return;
   try {
-    const { notifyBookingRequestNow: notify } = await import("@/platform/needs-you/server");
-    await notify(booking);
+    if (!bookingRequestNotifier) throw new Error("booking_notice_unconfigured");
+    await bookingRequestNotifier(booking);
   } catch { /* The durable request will be reconciled by the cron. */ }
 }

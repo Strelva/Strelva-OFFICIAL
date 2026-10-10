@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { connectedSitesReleaseEnabled } from "@/products/connected-sites/server";
-import { connectedSitesStore } from "@/products/connected-sites/store";
+import { connectedSitesStore } from "@/products/connected-sites/server";
 
 export const maxDuration = 60;
 

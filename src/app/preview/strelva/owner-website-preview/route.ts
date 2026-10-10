@@ -1,7 +1,7 @@
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { renderOwnerWebsitePreview } from "@/app/api/owner-website-preview/preview";
 import { ownerDecisionSchema } from "@/platform/needs-you/contracts";
-import { websiteDocumentCopyItems } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentCopyItems } from "@/server/needs-you/sources/website-document";
 import { websiteRebuildSchema, siteDocumentHash, siteDocumentSchema, safeSitePathSchema } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readAssignmentOffers, readUnkeptLeads } from "@/platform/operator-queue/sources";
+import { readAssignmentOffers, readUnkeptLeads } from "@/server/operator-queue/sources";
 const mocks = vi.hoisted(() => ({ zrange: vi.fn(), from: vi.fn(), range: vi.fn() }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ zrange: mocks.zrange }) }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: mocks.from }) }));

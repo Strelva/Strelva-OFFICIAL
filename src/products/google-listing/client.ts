@@ -122,3 +122,6 @@ export async function listAllReviews(client: GoogleListingClient, location: Goog
 }
 
 export const STAR_RATING: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+
+export { listingHealth, listingObservation } from "./health";
+export type { ReviewView, SiteReviews, WorkspaceReviews } from "./linked-reviews";

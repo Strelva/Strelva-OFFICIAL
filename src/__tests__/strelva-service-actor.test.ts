@@ -10,7 +10,7 @@ const rpc = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc }) }));
 
 import { parseServiceSession, recordServiceAction, setServiceActorDb, startServiceSession, type ServiceSession } from "@/platform/needs-you/service-actor";
-import { activationRunner, listDueActivations } from "@/platform/make-real/live-server";
+import { activationRunner, listDueActivations } from "@/server/make-real/live-server";
 
 const WS = "dddddddd-0000-4000-8000-000000000001";
 const WS2 = "dddddddd-0000-4000-8000-000000000002";

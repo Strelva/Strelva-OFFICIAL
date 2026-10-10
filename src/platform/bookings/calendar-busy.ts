@@ -110,6 +110,11 @@ export function withoutBusy(slots: readonly string[], date: string, durationMinu
   });
 }
 
+type ProviderAvailabilityRead = (actor: { userId: string; verifiedEmail: string }, workspaceId: string, provider: "google" | "outlook", query: { start: string; end: string; timeZone: string }) => Promise<{ busy: BusyInterval[] }>;
+let providerAvailability: ProviderAvailabilityRead | null = null;
+/** The app edge supplies the scheduling product's provider operation. */
+export function registerCalendarBusyProviderRead(read: ProviderAvailabilityRead): void { providerAvailability = read; }
+
 type ConnectionRow = { provider?: unknown; status?: unknown };
 type Query = PromiseLike<{ data: unknown; error: unknown }> & {
   select(columns: string): Query;
@@ -146,7 +151,8 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
       const user = await db.from("users").select("email,verified_at").eq("id", userId).maybeSingle();
       const email = String((user.data as { email?: unknown } | null)?.email ?? "").trim().toLowerCase();
       if (!email || !(user.data as { verified_at?: unknown } | null)?.verified_at) throw new Error("calendar_owner_unverified");
-      const { readWorkspaceProviderAvailability } = await import("@/products/scheduling/server");
+      const readWorkspaceProviderAvailability = providerAvailability;
+      if (!readWorkspaceProviderAvailability) throw new Error("calendar_provider_unconfigured");
       const result = await readWorkspaceProviderAvailability({ userId, verifiedEmail: email }, workspaceId, provider, query);
       return result.busy.map((b) => ({ start: b.start, end: b.end }));
     },

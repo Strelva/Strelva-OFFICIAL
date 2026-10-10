@@ -3,3 +3,5 @@ export type * from "./contracts";
 export { StrelvaInquiryForm } from "../../../custom-repo-starter/StrelvaInquiryForm";
 export type { PublicInquiryForm } from "../../../custom-repo-starter/inquiry-client";
 export { commitPatternInstallationAfterVerification, getPatternInstallation, listPatternInstallations, proposePatternUpdate, resolvePatternUpdate, stagePatternUpdate } from "./inquiry-pattern-updates";
+
+export type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "./linked-leads";

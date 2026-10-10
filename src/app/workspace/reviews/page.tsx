@@ -2,7 +2,7 @@ import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import type { Metadata } from "next";
 import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
-import { readWorkspaceReviews } from "@/products/google-listing/linked-reviews";
+import { readWorkspaceReviews } from "@/products/google-listing/server";
 import { WorkspaceReviewsView } from "@/experience/places/WorkspaceReviews";
 
 export const dynamic = "force-dynamic";

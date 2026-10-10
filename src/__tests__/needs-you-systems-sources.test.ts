@@ -28,7 +28,7 @@ import { createNeedsYouService } from "@/platform/needs-you/service";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
 import { dedupeReadyPlans, makeRealAdapter, makeRealSourceId, needsYouMakeRealApprovals, type MakeRealSourcePorts, type ReadyPlan } from "@/platform/needs-you/sources/make-real";
 import { needsYouVersionReleaseApprovals, versionReleaseAdapter, versionReleaseRevision, type PendingVersionRelease, type VersionReleaseSourcePorts } from "@/platform/needs-you/sources/version-release";
-import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
+import { makeRealThroughNeedsYou } from "@/server/needs-you/systems-sources";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
 
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: vi.fn(), readyMakeRealPlans: vi.fn() }));

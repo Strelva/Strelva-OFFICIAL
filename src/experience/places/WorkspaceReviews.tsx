@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/Card";
 import { buildGoogleReviewLink, buildReviewShareMessage } from "@/lib/reviews/reputation";
-import type { ReviewView, SiteReviews, WorkspaceReviews } from "@/products/google-listing/linked-reviews";
+import type { ReviewView, SiteReviews, WorkspaceReviews } from "@/products/google-listing/client";
 import { NoSiteCard, SiteHeading, WorkspacePlace, whenLabel, type PlaceState } from "./WorkspacePlace";
 import { ReviewReplyForm } from "./ReviewReplyForm";
 

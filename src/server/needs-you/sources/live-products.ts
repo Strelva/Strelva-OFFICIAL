@@ -11,11 +11,11 @@ import { acceptPayerJob, commandPayerTransition, readPayerTransitionInbox, readP
 import { publishWorkspaceApplication, readWorkspaceApplication } from "@/products/applications/server";
 import { CUSTOM_APPLICATION_PRODUCT, CUSTOM_APPLICATION_RESOURCE_KIND, createCustomApplicationService, type CustomApplication } from "@/products/custom-applications/server";
 import { WORK_PLAN_PRODUCT_ID, WORK_PLAN_RESOURCE_KIND, executeWorkPlanOutput, listWorkPlanOutputs, readWorkPlan, workPlanSchema, type WorkPlan } from "@/products/work-plans";
-import type { SourceAdapter } from "../adapters";
-import { applicationReleaseAdapter, type CustomAppView, type NativeAppView } from "./application-release";
-import { workMoneyAdapter } from "./work-money";
-import { workPlanAdapter, type WorkPlanView } from "./work-plan";
-import { workspaceExitAdapter } from "./workspace-exit";
+import type { SourceAdapter } from "@/platform/needs-you/adapters";
+import { applicationReleaseAdapter, type CustomAppView, type NativeAppView } from "@/platform/needs-you/sources/application-release";
+import { workMoneyAdapter } from "@/platform/needs-you/sources/work-money";
+import { workPlanAdapter, type WorkPlanView } from "@/platform/needs-you/sources/work-plan";
+import { workspaceExitAdapter } from "@/platform/needs-you/sources/workspace-exit";
 
 const LIST_LIMIT = 50;
 

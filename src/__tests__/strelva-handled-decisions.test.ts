@@ -11,7 +11,7 @@ vi.mock("@/platform/catalog-reports/receipts", () => ({ readCatalogReportHandled
 vi.mock("@/platform/catalog-reports/tool-notices", () => ({ readToolNoticeHandled: events.notices }));
 
 import { approvedDecisionUndo, decidedTenantEventIds, handledFromStore, mergeHandled } from "@/platform/needs-you/handled";
-import { readStrelvaHandled } from "@/platform/needs-you/server";
+import { readStrelvaHandled } from "@/server/needs-you/server";
 import type { NeedsYouStore } from "@/platform/needs-you/repository";
 import type { UnifiedEvent } from "@/lib/types";
 

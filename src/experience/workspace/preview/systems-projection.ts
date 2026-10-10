@@ -22,7 +22,7 @@ import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, type 
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystems } from "../contracts";
 import { createPreviewRequest, type PreviewScenario } from "./fixture";
 import { MOONEY_TENANT, previewStoredVersions } from "./systems-fixture";
-import { addPublishingSystems } from "@/products/publishing/projection";
+import { addPublishingSystems } from "@/products/publishing/client";
 import { previewPublishingExtras, previewPublishingSnapshot, type PreviewPublishing } from "./publishing-fixture";
 import { withPreviewMakeReal, type PreviewMakeReal } from "./make-real-fixture";
 

@@ -6,7 +6,7 @@ import type { ConnectionKind, ConnectionState, ConnectionTarget, System, SystemC
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { Observation } from "@/platform/system-health/contracts";
 import { listingControlSchema } from "@/products/google-listing/contracts";
-import { listingHealth, listingObservation } from "@/products/google-listing/health";
+import { listingHealth, listingObservation } from "@/products/google-listing/client";
 import type { ListingHealth, ListingReceipt } from "@/products/google-listing/contracts";
 
 /**

@@ -40,3 +40,6 @@ export { authorizeGoogleServiceEvent } from "./make-real-service-authority";
 
 export { commandNativeGoogle } from "./native/server";
 export { beginNativeGoogleOAuth, finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "./native/oauth";
+
+export { readWorkspaceReviews } from "./linked-reviews";
+export { receiptHeadline } from "./service";

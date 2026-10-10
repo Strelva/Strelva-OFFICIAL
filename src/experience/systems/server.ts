@@ -27,11 +27,11 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
 import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/products/connected-sites/server";
-import { connectedSitesStore } from "@/products/connected-sites/store";
+import { connectedSitesStore } from "@/products/connected-sites/server";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
 import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
-import { savedCheckObservations } from "@/products/investigations/system-health";
+import { savedCheckObservations } from "@/products/investigations/server";
 import { readHomeFinderSystemObservations } from "@/products/home-finder/server";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
@@ -51,9 +51,9 @@ import { prepareIsolatedPossibility, type IsolatedSandbox, type SandboxRunOption
 import { planFingerprint } from "@/platform/make-real/approvals";
 import { bareHostname, websiteRebuildCandidate, readWebsiteRebuild, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
-import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
+import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/client";
 import { readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
-import { receiptHeadline } from "@/products/google-listing/service";
+import { receiptHeadline } from "@/products/google-listing/server";
 import {
   REBUILD_SOURCE_PREFIX,
   activationViews,
