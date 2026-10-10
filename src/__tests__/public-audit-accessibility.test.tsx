@@ -80,7 +80,7 @@ describe("public audit feedback", () => {
       await submit();
       expect(container.querySelector('[role="status"]')?.textContent).toMatch(kind === "ai" ? /Reading the public website/ : /Reading the website and running its checks/);
       expect(container.querySelector("form")).toBeNull();
-      expect(document.activeElement?.tagName).toBe(kind === "ai" ? "H1" : "H2");
+      expect(document.activeElement?.tagName).toBe("H1");
       await act(async () => finish(new Response(JSON.stringify({ error: "Try again later." }), { status: 503 })));
       const field = container.querySelector<HTMLInputElement>(selector)!;
       expect(field.value).toBe("bakery.example");

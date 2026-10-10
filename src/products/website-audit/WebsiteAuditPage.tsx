@@ -1,22 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
-import {
-  ArrowRight,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Globe,
-  Search,
-  Shield,
-  Smartphone,
-  Code2,
-  Lock,
-  Accessibility,
-  Loader2,
-  Download,
-} from "lucide-react";
+import { StCopy, StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StState, StSteps, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
+import styles from "./website-audit.module.css";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
@@ -26,122 +12,37 @@ import { workspaceHistoryState } from "@/platform/workspaces/location";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
-const categoryIcons: Record<string, React.ReactNode> = {
-  "web-vitals": <Globe className="size-5" />,
-  seo: <Search className="size-5" />,
-  mobile: <Smartphone className="size-5" />,
-  schema: <Code2 className="size-5" />,
-  ssl: <Lock className="size-5" />,
-  a11y: <Accessibility className="size-5" />,
-};
-
-const statusIcon: Record<CheckStatus, React.ReactNode> = {
-  pass: <CheckCircle2 className="size-4 shrink-0 text-m-success" />,
-  warn: <AlertTriangle className="size-4 shrink-0 text-[#e9a23b]" />,
-  fail: <XCircle className="size-4 shrink-0 text-m-danger" />,
-};
-
-function gradeColor(grade: string): string {
-  switch (grade) {
-    case "A":
-      return "var(--m-success)";
-    case "B":
-      return "var(--m-accent)";
-    case "C":
-      return "#e9a23b";
-    case "D":
-      return "#e97a3b";
-    default:
-      return "var(--m-danger)";
-  }
+/** Presentation wording only. The retained report and API payload are unchanged. */
+export function auditDisplayCopy(value: string): string {
+  return value.replace(/\bAI[- ]readability\b/gi, "Readability for assistants")
+    .replace(/\bAI[- ]ready\b/gi, "readable for assistants")
+    .replace(/\bAI agents?\b/gi, "assistants")
+    .replace(/\bAI\b/gi, "assistants")
+    .replace(/\buser-agent\b/gi, "browser signature")
+    .replace(/\bagents\b/gi, "assistants")
+    .replace(/\bagent\b/gi, "assistant")
+    .replace(/\bautomation\b/gi, "repeat actions")
+    .replace(/\bworkflows?\b/gi, "process")
+    .replace(/\btasks?\b/gi, "work");
 }
 
-function scoreBarColor(score: number): string {
-  if (score >= 80) return "var(--m-success)";
-  if (score >= 60) return "var(--m-accent)";
-  if (score >= 40) return "#e9a23b";
-  return "var(--m-danger)";
-}
+const checkState: Record<CheckStatus, { kind: "live" | "need" | "down"; label: string }> = {
+  pass: { kind: "live", label: "Passed" }, warn: { kind: "need", label: "Needs attention" }, fail: { kind: "down", label: "Failed" },
+};
 
-function CategoryCard({ category }: { category: CategoryResult }) {
+function CategoryChecks({ category }: { category: CategoryResult }) {
   const [expanded, setExpanded] = useState(false);
-  const icon = categoryIcons[category.slug] ?? <Shield className="size-5" />;
+  const checksId = useId();
+  return <StSection title={auditDisplayCopy(category.name)} meta={<StMono>{category.score}/100</StMono>} action={<StTextButton aria-expanded={expanded} aria-controls={checksId} onClick={() => setExpanded(!expanded)}>{expanded ? "Hide checks" : "See checks"}</StTextButton>}>
+    {expanded ? <div id={checksId}><StRows>{category.checks.map((check, index) => <StRow key={`${check.name}-${index}`} title={auditDisplayCopy(check.name)} detail={auditDisplayCopy(check.message)} end={<StState kind={checkState[check.status].kind}>{checkState[check.status].label}</StState>}>
+      {check.impact && check.status !== "pass" ? <StCopy>{auditDisplayCopy(check.impact)}</StCopy> : null}
+      {check.details ? <StCopy muted>{auditDisplayCopy(check.details)}</StCopy> : null}
+    </StRow>)}</StRows></div> : null}
+  </StSection>;
+}
 
-  return (
-    <div className="rounded-2xl border border-m-rule-soft bg-m-panel overflow-hidden">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        onClick={() => setExpanded(!expanded)}
-        className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-m-panel-strong"
-      >
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-m-accent-faint text-m-accent">
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[15px] font-medium text-m-text">
-              {category.name}
-            </h3>
-            <span
-              className="text-[15px] font-semibold tabular-nums"
-              style={{ color: scoreBarColor(category.score) }}
-            >
-              {category.score}
-            </span>
-          </div>
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-m-rule-soft">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${category.score}%`,
-                backgroundColor: scoreBarColor(category.score),
-              }}
-            />
-          </div>
-        </div>
-        <svg
-          className={`size-4 shrink-0 text-m-text-3 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-m-rule-soft px-5 py-4">
-          <ul className="grid gap-3">
-            {category.checks.map((check) => (
-              <li key={check.name} className="flex gap-3">
-                {statusIcon[check.status]}
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-m-text">
-                    {check.name}
-                  </p>
-                  <p className="text-[12px] text-m-text-3">
-                    {check.message}
-                  </p>
-                  {check.impact && check.status !== "pass" && (
-                    <p className="mt-1 text-[12px] leading-snug text-m-accent">
-                      {check.impact}
-                    </p>
-                  )}
-                  {check.details && (
-                    <p className="mt-1 truncate text-[11px] font-mono text-m-text-3 opacity-70">
-                      {check.details}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
+export function WebsiteAuditPending({ url, headingRef }: { url: string; headingRef?: React.Ref<HTMLHeadingElement> }) {
+  return <><StHead titleRef={headingRef} title="Checking your website" meta={<StMono>{url}</StMono>} /><div role="status"><StCopy>Reading the website and running its checks. Results appear when the scan completes.</StCopy><StSteps label="Website check" steps={[{ title: "Reading the public website", state: "active" }, { title: "Checking speed, search, mobile, security and accessibility", state: "pending" }, { title: "Preparing the findings", state: "pending" }]} /></div></>;
 }
 
 export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false, agency }: { agency?: AgencyAttribution; initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
@@ -260,242 +161,40 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
     }
   }
 
-  return (
-    <div className={saved ? "product-surface py-8" : "product-surface px-6 py-8 md:px-12"}>
-      <div className="relative z-10 mx-auto max-w-[960px] pb-16">
-        {agency && <div className="mb-6"><OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /></div>}
-        {/* Input form */}
-        {(state === "idle" || state === "error") && (
-          <div className="motion-rise">
-            <p className="text-[14px] font-medium text-m-text-3">
-              Free site health audit
-            </p>
-            <h1 className="mt-4 font-display text-[32px] font-medium leading-[1.15] text-m-text sm:text-[40px]">
-              How healthy is your website?
-            </h1>
-            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
-              Enter your website URL and get a health assessment. We check
-              speed, SEO, mobile experience, structured data, security, and
-              accessibility.
-            </p>
-
-            <form
-              onSubmit={handleScan}
-              aria-describedby={error ? errorId : undefined}
-              className="mt-8 flex flex-col gap-3 sm:flex-row"
-            >
-              <div className="relative flex-1">
-                <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-m-text-3" />
-                <input
-                  type="text"
-                  ref={addressRef}
-                  aria-label="Website address"
-                  aria-invalid={invalidUrl || undefined}
-                  aria-describedby={error ? errorId : undefined}
-                  required
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="example.com"
-                  autoComplete="url"
-                  inputMode="url"
-                  className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface pl-12 pr-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 hover:border-m-rule focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent"
-                />
-              </div>
-              <button
-                type="submit"
-                className="marketing-button-primary h-14 shrink-0 px-8 text-[15px]"
-              >
-                Scan My Site
-                <ArrowRight className="size-4" />
-              </button>
-            </form>
-
-            {error && (
-              <p
-                id={errorId}
-                role="alert"
-                className="mt-4 rounded-lg border px-4 py-3 text-[13px]"
-                style={{
-                  color: "var(--m-danger)",
-                  borderColor:
-                    "color-mix(in oklch, var(--m-danger) 38%, transparent)",
-                  background:
-                    "color-mix(in oklch, var(--m-danger) 10%, transparent)",
-                }}
-              >
-                {error}
-              </p>
-            )}
-
-            <p className="mt-4 text-[13px] text-m-text-3">
-              Free. No signup required. 3 scans per day.
-            </p>
-          </div>
-        )}
-
-        {/* Scanning state */}
-        {state === "scanning" && (
-          <div className="motion-rise">
-            <p className="text-[14px] font-medium text-m-text-3">
-              Scanning
-            </p>
-            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
-              Analyzing your site...
-            </h2>
-            <p className="mt-3 text-[15px] text-m-text-2">
-              {url}
-            </p>
-
-            <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
-              <span className="text-[14px] text-m-text-2">Reading the website and running its checks. Results appear when the scan completes.</span>
-            </div>
-          </div>
-        )}
-
-        {/* Results */}
-        {state === "done" && result && (
-          <div className="motion-rise">
-            {/* Score header */}
-            <div className="flex flex-col items-center text-center">
-              <div
-                className="flex size-28 items-center justify-center rounded-full border-4 sm:size-32"
-                style={{
-                  borderColor: gradeColor(result.grade),
-                  background: `color-mix(in oklch, ${gradeColor(result.grade)} 10%, transparent)`,
-                }}
-              >
-                <div>
-                  <div
-                    className="text-4xl font-bold tabular-nums sm:text-5xl"
-                    style={{ color: gradeColor(result.grade) }}
-                  >
-                    {result.overallScore}
-                  </div>
-                  <div
-                    className="text-[13px] font-semibold"
-                    style={{ color: gradeColor(result.grade) }}
-                  >
-                    {result.grade} Grade
-                  </div>
-                </div>
-              </div>
-
-              <h2 ref={headingRef} tabIndex={-1} className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
-                Site Health Report
-              </h2>
-              <p className="mt-2 text-[15px] text-m-text-2">
-                {result.url}
-              </p>
-              <p className="mt-1 text-[12px] text-m-text-3">
-                Scanned {new Date(result.scannedAt).toLocaleString()}
-              </p>
-            </div>
-
-            {/* Top priorities — the highest-impact fixes first */}
-            {(() => {
-              const fixes = topFixes(result.categories, 4);
-              if (fixes.length === 0) return null;
-              return (
-                <div className="mt-10">
-                  <h3 className="text-[15px] font-semibold text-m-text">
-                    Fix these first
-                  </h3>
-                  <ul className="mt-3 grid gap-2">
-                    {fixes.map((fix) => (
-                      <li
-                        key={`${fix.category}-${fix.name}`}
-                        className="rounded-xl border border-m-rule-soft bg-m-panel px-4 py-3"
-                      >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <p className="text-[13px] font-medium text-m-text">
-                            {fix.name}
-                          </p>
-                          {fix.quantified ? (
-                            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-m-text">
-                              {fix.quantified}
-                            </span>
-                          ) : (
-                            <span className="shrink-0 text-[11px] uppercase tracking-wide text-m-text-3">
-                              {fix.category}
-                            </span>
-                          )}
-                        </div>
-                        {fix.impact && (
-                          <p className="mt-1 text-[12px] leading-snug text-m-accent">
-                            {fix.impact}
-                          </p>
-                        )}
-                        {fix.guides && fix.guides.length > 0 && (
-                          <div className="mt-2 flex flex-col gap-1">
-                            {fix.guides.map((g) => (
-                              <Link
-                                key={g.slug}
-                                href={`/guides/${g.slug}`}
-                                className="text-[12px] font-medium text-m-accent transition-colors hover:text-m-text"
-                              >
-                                Fix it: {g.title} -&gt;
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })()}
-
-            {/* Category breakdown */}
-            <div className="mt-10 grid gap-3">
-              {result.categories.map((cat) => (
-                <CategoryCard key={cat.slug} category={cat} />
-              ))}
-            </div>
-
-            {/* CTA */}
-            <div className="mt-10 rounded-2xl border border-m-accent bg-m-accent-faint p-6 text-center sm:p-8">
-              <h3 className="text-xl font-semibold text-m-text sm:text-2xl">
-                Your site scored {result.overallScore}/100.
-              </h3>
-              <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">
-                Inspect the findings and export the report. This assessment does not change your website or activate monitoring.
-              </p>
-              {saved ? <p className="mt-4 text-sm text-m-text-2">Saved privately to this workspace.</p> : reportId && workspaceEnabled ? <Link className="marketing-button-primary mt-4 min-h-12 px-6" href={`/workspace?save=${reportId}`}>Save to my work</Link> : <p className="mt-4 text-sm text-m-text-2">Account saving is unavailable for this result. You can still export it.</p>}
-              {result.agency && <Link href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer" className="marketing-button-primary mt-4 min-h-12 px-6">Get this fixed by {result.agency.name}</Link>}
-              <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <Link
-                  href={result.agency ? `/ai-visibility?agency=${encodeURIComponent(result.agency.slug)}` : "/ai-visibility"}
-                  className="marketing-button-primary h-12 px-6"
-                >
-                  Check AI Visibility
-                  <ArrowRight className="size-4" />
-                </Link>
-                <button
-                  type="button"
-                  onClick={handleDownloadReport}
-                  disabled={reportLoading}
-                  className="marketing-button-secondary h-12 px-6 disabled:opacity-60"
-                >
-                  {reportLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Download className="size-4" />
-                  )}
-                  {reportLoading ? "Preparing..." : "Save as PDF"}
-                </button>
-                {!saved && <button
-                  type="button"
-                  onClick={handleReset}
-                  className="marketing-button-secondary h-12 px-6"
-                >
-                  Scan another site
-                </button>}
-              </div>
-            </div>
-          </div>
-        )}
+  const fixes = result ? topFixes(result.categories, 4) : [];
+  const statuses = result?.categories.flatMap(category => category.checks.map(check => check.status)) ?? [];
+  const summaryState = statuses.includes("fail") ? { kind: "down", label: "Some checks failed" } as const : statuses.includes("warn") ? { kind: "need", label: "Needs attention" } as const : statuses.length ? { kind: "live", label: "Checks passed" } as const : { kind: "draft", label: "No checks returned" } as const;
+  return <StPage className={state === "idle" || state === "error" ? styles.entry : undefined}>
+    {agency ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
+    {(state === "idle" || state === "error") ? <>
+      <StHead title="How healthy is your website?" meta="See what helps people find and use your site, and what needs attention. Free, no account." />
+      <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className={styles.form}>
+        <div className={styles.address}><StTextField label="Website address" aria-label="Website address" type="text" ref={addressRef} aria-invalid={invalidUrl || undefined} aria-describedby={error ? errorId : undefined} required value={url} onChange={event => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" /><StPill type="submit" size="lg">Check</StPill></div>
+        {error ? <div id={errorId}><StNotice tone="critical">{auditDisplayCopy(error)}</StNotice></div> : null}
+        <StCopy muted>Strelva reads the public website. This check does not change your site or turn on monitoring.</StCopy>
+      </form>
+      <StSection title="What you get back"><StCopy>Checks for speed, search, mobile use, structured data, security and accessibility, with the first fixes to consider and a report you can export.</StCopy></StSection>
+    </> : null}
+    {state === "scanning" ? <WebsiteAuditPending url={url} headingRef={headingRef} /> : null}
+    {state === "done" && result ? <>
+      <StHead titleRef={headingRef} title="Your website check" meta={<><StMono>{result.url}</StMono> · checked <StMono>{new Date(result.scannedAt).toLocaleString()}</StMono></>} />
+      <div className={styles.summary}><StMono tone="text" size="value">{result.overallScore}/100</StMono><StState kind={summaryState.kind}>Grade {result.grade} · {summaryState.label}</StState></div>
+      <div className={styles.split}>
+        <div className={styles.stack}>
+          <StSection title="Start here">{fixes.length ? <StRows>{fixes.map(fix => <StRow key={`${fix.category}-${fix.name}`} kind={auditDisplayCopy(fix.category)} title={auditDisplayCopy(fix.name)} detail={auditDisplayCopy(fix.message)}>
+            {fix.impact ? <StCopy>{auditDisplayCopy(fix.impact)}</StCopy> : null}
+            {fix.quantified ? <StCopy muted>Estimated impact: {auditDisplayCopy(fix.quantified)}</StCopy> : null}
+            {fix.guides?.map(guide => <StTextButton key={guide.slug} href={`/guides/${guide.slug}`}>Fix it: {auditDisplayCopy(guide.title)}</StTextButton>)}
+          </StRow>)}</StRows> : <StEmpty>No fixes were flagged in the checks that completed.</StEmpty>}</StSection>
+          <StCopy muted>This assessment does not change your website or activate monitoring.</StCopy>
+          {saved ? <StState kind="live">Saved privately to this workspace</StState> : reportId && workspaceEnabled ? <StPillLink href={`/workspace?save=${reportId}`}>Save to my work</StPillLink> : <StCopy muted>Account saving is unavailable for this result. You can still export it.</StCopy>}
+          {result.agency ? <StTextButton href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer">Get this fixed by {result.agency.name}</StTextButton> : null}
+          <div className={styles.actions}><StPill variant="soft" onClick={handleDownloadReport} busy={reportLoading}>{reportLoading ? "Preparing…" : "Save as PDF"}</StPill>{!saved ? <StTextButton onClick={handleReset}>Check another site</StTextButton> : null}</div>
+          <StTextButton href={result.agency ? `/ai-visibility?agency=${encodeURIComponent(result.agency.slug)}` : "/ai-visibility"}>Check what Gemini says about your business</StTextButton>
+          {error ? <StNotice tone="critical">{auditDisplayCopy(error)}</StNotice> : null}
+        </div>
+        <div className={styles.stack}>{result.categories.length ? result.categories.map(category => <CategoryChecks key={category.slug} category={category} />) : <StEmpty>No category checks were returned.</StEmpty>}</div>
       </div>
-    </div>
-  );
+    </> : null}
+  </StPage>;
 }
