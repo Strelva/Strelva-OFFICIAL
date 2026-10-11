@@ -16,7 +16,7 @@ export function DocumentHistoryFixture({ state }: { state: string }) {
     const receipts: DocumentReceipt[] = [];
     if (state !== "empty") for (let revision = 1; revision <= (state.startsWith("history-") || state === "off" ? 45 : 4); revision += 1) {
       document = changeDocument(document, { kind: "edit", expectedRevision: revision - 1, title: document.title,
-        text: `${["First version", "Replaced the fee table", "Fixed party numbering in section 2", "Added the confidentiality clause from the Erie County form"][(revision - 1) % 4]}.\nPrivate mediation agreement, revision ${revision}.` }, revision === 3 ? "preview-agency" : "preview-owner");
+        text: `${["First revision", "Replaced the fee table", "Fixed party numbering in section 2", "Added the confidentiality clause from the Erie County form"][(revision - 1) % 4]}.\nPrivate mediation agreement, revision ${revision}.` }, revision === 3 ? "preview-agency" : "preview-owner");
       const receipt = document.history.at(-1)!;
       receipt.at = ["2026-07-02T12:00:00Z", "2026-08-14T12:00:00Z", "2026-09-22T12:00:00Z", "2026-10-03T12:00:00Z"][(revision - 1) % 4]!;
       receipts.push(receipt);
@@ -54,7 +54,7 @@ export function DocumentHistoryFixture({ state }: { state: string }) {
     receiptActor={receipt => receipt.actorId === "preview-agency" ? "North Studio · edited" : "Sheri · uploaded"}
     context={<>
       <StSection title="Who can open it"><StRows><StRow title="Sheri · owner" /><StRow title="North Studio · agency" /></StRows></StSection>
-      <StSection title="Opened"><StRows><StRow title="Sheri downloaded v4" end={<StMono>Oct 3</StMono>} /><StRow title="North Studio viewed v3" end={<StMono>Sep 22</StMono>} /></StRows></StSection>
+      <StSection title="Opened"><StRows><StRow title="Sheri downloaded revision 4" end={<StMono>Oct 3</StMono>} /><StRow title="North Studio viewed revision 3" end={<StMono>Sep 22</StMono>} /></StRows></StSection>
       <StPill variant="soft" onClick={download}>Download preview text</StPill>
     </>} />;
 }

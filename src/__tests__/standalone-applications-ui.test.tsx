@@ -28,6 +28,12 @@ async function fillName(value: string) {
 }
 
 describe("standalone recipient and delegated application surfaces", () => {
+  it("preserves the authorized name when late route metadata replaces the browser title", async () => {
+    await renderNative(vi.fn<typeof fetch>().mockResolvedValue(json(snapshot)));
+    expect(document.title).toBe("Intake");
+    await act(async () => { document.title = "Internal tool · Strelva"; await Promise.resolve(); });
+    expect(document.title).toBe("Intake");
+  });
   it("keeps owner Ask fixture-only and treats a typed yes as no approval", async () => {
     const externalRequest = vi.fn<typeof fetch>();
     vi.stubGlobal("fetch", externalRequest);
@@ -42,7 +48,8 @@ describe("standalone recipient and delegated application surfaces", () => {
   });
   it("keeps the authenticated sign-in return destination and hides recipient records", async () => {
     await renderNative(vi.fn<typeof fetch>().mockResolvedValue(json({ error: "Sign in" }, 401)));
-    expect(container.textContent).toContain("This application link is unavailable");
+    expect(container.textContent).toContain("This internal tool link is unavailable");
+    expect(document.title).toBe("Internal tool");
     expect(container.querySelector("a")?.getAttribute("href")).toBe(`/sign-in?next=${encodeURIComponent(`/apps/${workId}`)}`);
     expect(container.querySelector("form")).toBeNull();
   });
@@ -53,7 +60,8 @@ describe("standalone recipient and delegated application surfaces", () => {
     await act(async () => button("Submit record").click());
     expect(container.querySelector<HTMLInputElement>('input[aria-label="Name"]')?.value).toBe("Pending intake");
     expect(container.textContent).toContain("Your current draft is still here");
-    expect(button("Reload application")).toBeDefined();
+    expect(button("Reload internal tool")).toBeDefined();
+    expect(document.title).toBe("Intake");
     const first = JSON.parse(request.mock.calls[1]![1]!.body as string);
     await act(async () => button("Submit record").click());
     const second = JSON.parse(request.mock.calls[2]![1]!.body as string);
@@ -68,7 +76,8 @@ describe("standalone recipient and delegated application surfaces", () => {
     await act(async () => button("Add a record").click());
     await fillName("Pending intake");
     await act(async () => button("Submit record").click());
-    expect(container.textContent).toContain("This application link is unavailable");
+    expect(container.textContent).toContain("This internal tool link is unavailable");
+    expect(document.title).toBe("Internal tool");
     expect(container.textContent).not.toContain("Private record");
     expect(container.querySelector("form")).toBeNull();
     expect(request).toHaveBeenCalledTimes(3);

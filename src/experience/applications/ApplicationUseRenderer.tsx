@@ -208,7 +208,7 @@ export function ApplicationUseRenderer({
             <div className="flex flex-wrap items-center gap-3">
               <StPill type="submit" variant={presentation === "preview" ? "soft" : "primary"} busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</StPill>
               {draft.editingRecordId ? <StPill type="button" variant="soft" disabled={busy} onClick={cancelEdit}>Cancel correction</StPill> : null}
-              {onReload && submitError ? <StPill type="button" variant="soft" disabled={busy} onClick={onReload}>Reload application</StPill> : null}
+              {onReload && submitError ? <StPill type="button" variant="soft" disabled={busy} onClick={onReload}>Reload internal tool</StPill> : null}
             </div>
           </form>
           </StSection>

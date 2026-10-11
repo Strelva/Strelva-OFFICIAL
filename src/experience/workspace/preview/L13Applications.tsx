@@ -31,7 +31,7 @@ export function L13Applications({ kind, state, mode, ownerPreview = false }: { k
     if (state === "loading") return new Promise<Response>(() => undefined);
     if (init?.method && init.method !== "GET") return json({ error: "This fictional preview does not save changes. Your draft remains here." }, 409);
     if (state === "error") return json({ error: "The fictional read failed. Try again to repeat this local failure." }, 503);
-    if (state === "denied") return json({ error: "This application is unavailable to this fictional account." }, 403);
+    if (state === "denied") return json({ error: "This internal tool is unavailable to this fictional account." }, 403);
     if (url.startsWith("/api/apps/")) {
       const readOnly = state === "read-only";
       const snapshot: ApplicationUseSnapshot = { workId, title: spec.title, releaseVersion: 2,

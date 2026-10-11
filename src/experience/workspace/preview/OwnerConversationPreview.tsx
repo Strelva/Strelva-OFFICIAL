@@ -84,7 +84,7 @@ function IntakeProposal() {
   const [accepted, setAccepted] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [fields, setFields] = useState({ name: "", company: "", conflict: "", people: "", dates: "" });
-  if (rejected) return <StEmpty action={<StTextButton onClick={() => setRejected(false)}>Open the proposal again</StTextButton>}>Rejected in this preview. No System was created.</StEmpty>;
+  if (rejected) return <StEmpty action={<StTextButton onClick={() => setRejected(false)}>Open the Possibility again</StTextButton>}>Rejected in this preview. No System was created.</StEmpty>;
   return <StSurface pad={false} label="Proposed HR intake form">
     <div className={styles.objectHeader}><strong>HR intake</strong><StMono>Proposed · based on Mediation intake</StMono></div>
     <form className={styles.intake} onSubmit={event => event.preventDefault()}>
@@ -127,12 +127,12 @@ function RefusalResult() {
 function HelpResult() {
   const [prepared, setPrepared] = useState(false);
   return <div className={styles.stack}>
-    <StSurface label="How to invite a viewer"><StSteps label="Viewer invitation instructions" steps={[
+    <StSurface label="Review invitation permissions"><StSteps label="Invitation permission review" steps={[
       { title: "Open the business menu, then People & access", state: "pending" },
-      { title: "Enter their email and pick Viewer", state: "pending" },
-      { title: "Review the invitation before it is sent", state: "pending" },
+      { title: "Review Member, Admin and Owner permissions; a read-only business role is not available", state: "pending" },
+      { title: "Invite only if one of those roles matches the access you want", state: "pending" },
     ]} /></StSurface>
-    <div className={styles.actions}><StPill onClick={() => setPrepared(true)}>Do it for me in this preview</StPill><StTextButton href="/preview/strelva?scenario=managed&view=access">Open People &amp; access</StTextButton></div>
-    {prepared ? <StNotice tone="need">A viewer invitation would need an exact recipient and its own approval. This preview has prepared no invitation and sends no email.</StNotice> : null}
+    <div className={styles.actions}><StPill onClick={() => setPrepared(true)}>Review supported roles in this preview</StPill><StTextButton href="/preview/strelva?scenario=managed&view=access">Open People &amp; access</StTextButton></div>
+    {prepared ? <StNotice tone="need">Read-only business access is not available. This preview has prepared no invitation and sends no email.</StNotice> : null}
   </div>;
 }

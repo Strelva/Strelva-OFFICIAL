@@ -1,5 +1,8 @@
 "use client";
+import { keepPageTitle } from "@/platform/presentation/page-title";
+import { PLACE_LABELS, KIND_LABELS, COLLECTION_LABELS } from "@/platform/presentation/place-labels";
 
+import { sectionFromView, sectionTitle } from "@/experience/app-frame/workspace-places";
 import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
@@ -12,7 +15,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
@@ -97,6 +100,16 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const [publicSaveResultId, setPublicSaveResultId] = useState<string | null>(null);
   const [publicSaveSaving, setPublicSaveSaving] = useState(false);
   const [publicSaveError, setPublicSaveError] = useState("");
+  const titleParams = useSearchParams();
+  useEffect(() => {
+    if (!snapshot) return;
+    const params = titleParams;
+    const system = snapshot.systems?.systems.find(item => item.ref.systemId === params.get("system"));
+    const opened = snapshot.work.find(item => item.id === selectedWorkId);
+    const title = home ? (params.get("view") === "system" ? system?.name : undefined) || sectionTitle(sectionFromView(params.get("view")), snapshot.releases?.systems === true)
+      : opened?.title || (view === "scheduling" ? KIND_LABELS.bookings : view === "investigations" ? COLLECTION_LABELS.investigations : view === "applications" || view === "custom-applications" ? KIND_LABELS.app : view === "operations" ? PLACE_LABELS.running : sectionTitle(sectionFromView(view), snapshot.releases?.systems === true));
+    return keepPageTitle(snapshot.ownerBrand?.name ? `${title} · ${snapshot.ownerBrand.name}` : title);
+  }, [snapshot, selectedWorkId, home, view, titleParams]);
   const workspaceStopped = workspaceExitIsStopped(snapshot?.workspaceExitState, snapshot?.workspaceExitReadStatus);
   const workspaceExitBlocks = workspaceExitBlocksChanges(snapshot?.workspaceExitState, snapshot?.workspaceExitReadStatus);
   const requestRef = useRef(0);
@@ -386,7 +399,23 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     void loadWorkspace(workspaceId, true);
   }
 
-  function horizontalSaved(workId: string) { workSaved(workId, view); }
+  function horizontalSaved(workId: string) {
+    const params = new URLSearchParams(window.location.search);
+    if (view !== "investigations" || params.get("returnTo") !== "running" || !snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) {
+      workSaved(workId, view);
+      return;
+    }
+    leaveCurrentWork();
+    setSelectedWorkId(null);
+    setHome(false);
+    setView("operations");
+    navigateWorkspace({ workspaceId: snapshot.workspaceId, view: "operations" }, "replace");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("returnTo");
+    url.searchParams.set("savedCheck", workId);
+    window.history.replaceState(window.history.state, "", url);
+    void loadWorkspace(snapshot.workspaceId, true);
+  }
 
   function goHome() {
     leaveCurrentWork();
@@ -480,7 +509,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
       <WorkspaceLayout previewRouteContext={previewRouteContext} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
-        workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
+        workingTitle={selectedWork?.title ?? (view === "websites" ? KIND_LABELS.website : view === "operations" ? finiteJobOpen ? KIND_LABELS.request : PLACE_LABELS.running : view === "applications" ? COLLECTION_LABELS.applications : view === "scheduling" ? KIND_LABELS.bookings : view === "investigations" ? COLLECTION_LABELS.investigations : view === "product-learning" ? "Learning" : undefined)}
         workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
         atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
         managedWork={snapshot.managedWork}

@@ -75,7 +75,7 @@ export const PRODUCT_CATALOG = [
         label: "Check AI Visibility",
         href: "/ai-visibility",
         status: "available",
-        description: "Public assessment entry in this application.",
+        description: "Public assessment entry in this workspace.",
       },
       {
         id: "shared_assessment",
@@ -116,7 +116,7 @@ export const PRODUCT_CATALOG = [
           id: "public_assessment_exists",
           label: "Public assessment path exists",
           state: "met",
-          evidence: "The application has public create and retained-result routes.",
+          evidence: "Strelva has public create and retained-result routes.",
         },
         {
           id: "account_saved_work",
@@ -204,7 +204,7 @@ export const PRODUCT_CATALOG = [
         label: "Agency handoff",
         href: null,
         status: "not_enabled",
-        description: "No scoped agency-to-client handoff route exists in the shared application yet.",
+        description: "No scoped agency-to-client handoff route exists in the shared workspace yet.",
       },
     ],
     controls: {
@@ -332,7 +332,7 @@ export const PRODUCT_CATALOG = [
       {
         mode: "external_experience",
         primary: true,
-        description: "A separate pilot experience, not a route or embedded surface in this application.",
+        description: "A separate pilot experience, not a route or embedded surface in this workspace.",
       },
     ],
     distribution: [
@@ -342,7 +342,7 @@ export const PRODUCT_CATALOG = [
         label: "External pilot",
         href: null,
         status: "not_enabled",
-        description: "The shared application has no enabled Homefinder entry or verified live inventory connection.",
+        description: "The shared workspace has no enabled Homefinder entry or verified live inventory connection.",
       },
       {
         id: "agency_handoff",
@@ -385,7 +385,7 @@ export const PRODUCT_CATALOG = [
           id: "platform_handoff",
           label: "Client-owned agency handoff",
           state: "unmet",
-          evidence: "The shared application does not yet have scoped delegation and handoff persistence.",
+          evidence: "The shared workspace does not yet have scoped delegation and handoff persistence.",
         },
       ],
       note: "Homefinder is recorded for compatibility with future product structure. It is not enabled or sold by this catalog.",
@@ -393,7 +393,7 @@ export const PRODUCT_CATALOG = [
   },
   {
     id: "tracker",
-    name: "Spreadsheet tracker",
+    name: "Internal tool from a spreadsheet",
     promise: "Turn a supported CSV into working data with saved edits and attributable history.",
     resources: [
       {

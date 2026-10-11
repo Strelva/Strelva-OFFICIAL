@@ -17,7 +17,7 @@ export interface WorkspaceComposerProps {
   onTemplates?: () => void;
   onChange?: (ask: string) => void;
   onEdited?: (ask: string) => void;
-  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Get or build an app" label. */
+  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Browse ready-made systems" label. */
   systemsReleased?: boolean;
   /** `glass`: the compact frosted composer on Home's dusk band (October 6, 2026). */
   tone?: "default" | "glass" | "dock";
@@ -83,7 +83,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
 
   if (tone === "dock") return <div className={styles.dockWrap}>
     <StComposerBar multiline textareaRef={textarea} scope={scope} placeholder={placeholder} value={ask} onChange={change} onSubmit={() => void submit()} disabled={disabled || pending} maxLength={3000} inputLabel="What do you want to accomplish?" />
-    {onTemplates ? <StTextButton disabled={pending} onClick={onTemplates}>{systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</StTextButton> : null}
+    {onTemplates ? <StTextButton disabled={pending} onClick={onTemplates}>{systemsReleased ? "Browse ready-made systems" : "Browse ready-made systems"}</StTextButton> : null}
     {pending ? <span role="status" className="sr-only">Opening your ask…</span> : null}
     {storageUnavailable ? <StNotice>Browser storage is unavailable. Keep this page open to retain your draft.</StNotice> : null}
     {error ? <div role="alert"><StNotice tone="critical">{error}</StNotice></div> : null}
@@ -99,7 +99,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
         }
       }} />
       <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending} aria-label={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined} title={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined}><LayoutGrid size={16} aria-hidden="true" />{tone === "glass" ? null : systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</Button> : <span />}
+        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending} aria-label={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Browse ready-made systems" : undefined} title={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Browse ready-made systems" : undefined}><LayoutGrid size={16} aria-hidden="true" />{tone === "glass" ? null : systemsReleased ? "Browse ready-made systems" : "Browse ready-made systems"}</Button> : <span />}
         <div className={styles.send}>
           {ask ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
           <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !ask.trim()} aria-label="Continue with this ask"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>

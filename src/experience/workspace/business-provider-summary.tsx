@@ -85,7 +85,7 @@ export function BusinessAgencyStatus({
   return <section className={styles.providerSummary} aria-labelledby="home-provider-status">
     <header><h3 id="home-provider-status">Agency requests</h3><span>Actual delivery status</span></header>
     {state.status === "loading" ? <p role="status">Checking agency delivery status…</p> : state.status === "error" ? <div className={styles.providerUnavailable}>
-      <p role="alert">Agency delivery status is unavailable. Acceptance cannot be inferred from the offering record.</p>
+      <p role="alert">Agency delivery status is unavailable. Setup does not mean the agency has accepted the work.</p>
       <button type="button" onClick={() => onOpen()}>Open agency details</button>
     </div> : <ul>{agencyInstallations.map((installation) => {
       const delivery = deliveryByInstallation.get(installation.id);

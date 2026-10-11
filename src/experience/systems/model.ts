@@ -1,3 +1,4 @@
+import { PLACE_LABELS, KIND_LABELS, STATE_LABELS, CONNECTION_LABELS } from "@/platform/presentation/place-labels";
 import type { RecordedActor } from "@/platform/presentation/actor";
 /**
  * Presentation view-model for the Systems, Connections, Possibilities and
@@ -15,9 +16,12 @@ import type { HealthStatus } from "@/platform/system-health/contracts";
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 /** Customer-facing name of the whole set. Jacob still owns the brand call; rename here only. */
-export const SYSTEMS_LABEL = "Systems";
-export const SYSTEMS_LIST_LABEL = "All systems and files";
+export const SYSTEMS_LABEL = PLACE_LABELS.systems;
+export const SYSTEMS_LIST_LABEL = PLACE_LABELS.systemsAndFiles;
 
+/** document/onboarding remain compatibility descriptors for stored System refs.
+ * Standalone documents and onboarding cases belong in Files and results; these
+ * descriptors never promote a saved file/case into a System. */
 export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding" | "listing" | "newsletter" | "home_finder";
 
 /** Intended operation only. Health is a separate signal (RULE_SYSTEM_PAUSE_HEALTH). */
@@ -172,39 +176,18 @@ export interface NeedsYouItem {
   systemId?: string;
 }
 
-export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
-  website: "Website",
-  inquiries: "Inquiries",
-  bookings: "Bookings",
-  document: "Document",
-  app: "Internal tool",
-  // Retired as a customer label: a tracker is an internal tool started from a list.
-  tracker: "Internal tool",
-  onboarding: "Client onboarding",
-  listing: "Google listing",
-  newsletter: "Newsletter",
-  home_finder: "HomeFinder",
-};
+export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = KIND_LABELS;
 
-export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = { draft: "Draft", live: "Live", paused: "Paused" };
+export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = STATE_LABELS.lifecycle;
 
-export const HEALTH_LABEL: Record<SystemHealthState, string> = {
-  healthy: "Working",
-  degraded: "Something is off",
-  blocked: "Not working",
-  unknown: "Unknown",
-};
+export const HEALTH_LABEL: Record<SystemHealthState, string> = STATE_LABELS.health;
 
-export const POSSIBILITY_STATUS_LABEL: Record<PossibilityStatus, string> = { exploring: "Exploring", ready: "Ready" };
+export const POSSIBILITY_STATUS_LABEL: Record<PossibilityStatus, string> = STATE_LABELS.possibility;
 
-export const CONNECTION_KIND_LABEL: Record<SystemConnectionKind, string> = {
-  read: "Reads", act: "Acts on", appear: "Appears on", share: "Shares with", depend: "Depends on", trigger: "Starts work in",
-};
+export const CONNECTION_KIND_LABEL: Record<SystemConnectionKind, string> = CONNECTION_LABELS.outgoing;
 
 /** The same Connection read from its target. */
-export const INCOMING_CONNECTION_LABEL: Record<SystemConnectionKind, string> = {
-  read: "Read by", act: "Acted on by", appear: "Shows", share: "Shared with", depend: "Needed by", trigger: "Started by",
-};
+export const INCOMING_CONNECTION_LABEL: Record<SystemConnectionKind, string> = CONNECTION_LABELS.incoming;
 
 /**
  * The Systems model renders only when the server's snapshot says
