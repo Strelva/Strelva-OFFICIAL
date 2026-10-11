@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import type { ServiceSession } from "@/platform/needs-you/service-actor";
-import { websiteDocumentAdapter, type WebsiteSelection } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentAdapter, type WebsiteSelection } from "@/server/needs-you/sources/website-document";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
 import { websiteRebuildSchema, type WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -149,7 +149,7 @@ describe("owner website fact email decisions", () => {
   });
 
   it("live ports call the existing exact fact confirmation command", async () => {
-    const { deliverySourceAdapters } = await import("@/platform/needs-you/sources/live-delivery");
+    const { deliverySourceAdapters } = await import("@/server/needs-you/sources/live-delivery");
     const adapter = deliverySourceAdapters().find(source => source.lifecycle === "website_document")!;
     const s = await setup();
     live.list.mockResolvedValue([s.row]);

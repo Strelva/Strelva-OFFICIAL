@@ -65,15 +65,3 @@ export async function getInvite(email: string): Promise<PendingInvite | null> {
   const key = `${INVITE_PREFIX}${email.toLowerCase()}`;
   return redis.get<PendingInvite>(key);
 }
-
-export async function consumeInvite(email: string): Promise<PendingInvite | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  const key = `${INVITE_PREFIX}${email.toLowerCase()}`;
-  const invite = await redis.get<PendingInvite>(key);
-  if (invite) {
-    await redis.del(key);
-  }
-  return invite;
-}

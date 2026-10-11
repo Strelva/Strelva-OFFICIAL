@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { createSupabaseSystemStore, mapSystemsError, SystemRuleError } from "@/platform/systems";
 import type { UpdateSystemInput } from "@/platform/systems";
+import type { SystemsDb, SystemRpcArgs, SystemRpcName } from "@/platform/systems/supabase-store";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "Owner@Example.com " };
@@ -19,6 +20,34 @@ function fake(data: unknown, error: { message?: string; code?: string } | null =
 }
 
 describe("Supabase system store", () => {
+  it("checks RPC identity and arguments against the generated schema", () => {
+    // These compile-only refusals must fail if this port becomes string/unknown.
+    // @ts-expect-error A misspelled SQL function is not a Systems operation.
+    const misspelled: SystemRpcName = "read_business_sytems";
+    // @ts-expect-error Unrelated SQL functions are not exposed by this port.
+    const unrelated: SystemRpcName = "update_connected_site";
+    // @ts-expect-error The actor cannot be omitted from a protected read.
+    const missingActor: SystemRpcArgs<"read_business_systems"> = { p_workspace_id: business };
+    const readArgs: SystemRpcArgs<"read_business_systems"> = {
+      p_workspace_id: business, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+    };
+    const incorrect: SystemRpcArgs<"read_business_systems"> = {
+      ...readArgs,
+      // @ts-expect-error UUID arguments cannot be numbers.
+      p_user_id: 1,
+    };
+    expectTypeOf<SystemRpcArgs<"record_system_revision">["p_expected_change"]>().toEqualTypeOf<number | null>();
+    expectTypeOf<SystemRpcArgs<"set_system_current_revision">["p_expected_current"]>().toEqualTypeOf<string | null>();
+    const checkCallSignature = (db: SystemsDb) => {
+      // @ts-expect-error The dispatcher must reject misspelled function names too.
+      void db.rpc("read_business_sytems", readArgs);
+      // @ts-expect-error Arguments belong to the named function, not another operation.
+      void db.rpc("read_business_system", readArgs);
+    };
+    void checkCallSignature;
+    void [misspelled, unrelated, missingActor, incorrect];
+  });
+
   it("sends a normalized actor and a digest bound to the command body", async () => {
     const { rpc, store } = fake({ ...system, replayed: true });
     const created = await store.createSystem(actor, business, { name: "Pricing", kind: "pricing" }, command);

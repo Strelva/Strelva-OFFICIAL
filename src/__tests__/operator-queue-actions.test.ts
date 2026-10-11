@@ -10,7 +10,7 @@ vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () =
   return signedIn ? { id: signedIn.userId, email: signedIn.verifiedEmail, email_confirmed_at: "2026-10-01T00:00:00Z" } : null;
 } }));
 vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: vi.fn() }));
-vi.mock("@/platform/operator-queue/service", () => ({ readOperatorQueue: mocks.read, markQueueItem: mocks.mark }));
+vi.mock("@/server/operator-queue/service", () => ({ readOperatorQueue: mocks.read, markQueueItem: mocks.mark }));
 vi.mock("@/platform/business-effort", () => ({ PostgresBusinessEffortStore: {}, recordBusinessEffort: mocks.effort }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mocks.resolve, escalateEventToOwner: mocks.escalate, operatorActorId: (id: string) => { if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("operator_actor_invalid"); return `operator:${id}`; } }));

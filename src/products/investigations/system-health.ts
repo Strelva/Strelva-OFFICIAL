@@ -1,5 +1,5 @@
 import type { Observation } from "@/platform/system-health/contracts";
-import { bareHostname } from "@/products/websites/rebuild-possibility";
+import { bareHostname } from "@/products/websites/client";
 import { investigationSchema } from "./contracts";
 
 /**

@@ -1,6 +1,6 @@
 import { assertActingProvider } from "@/platform/workspaces/acting-provider";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
-import { createServerLiveMakeReal, makeRealChannelEnabled } from "@/platform/make-real/live-server";
+import { createServerLiveMakeReal, makeRealChannelEnabled } from "@/server/make-real/live-server";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
 import { readGoogleBindingForTenant } from "@/platform/account-bindings/store";

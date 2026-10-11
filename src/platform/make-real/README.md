@@ -197,11 +197,11 @@ survive a process restart.
   re-read before every step; `resumeDue` for the workspace-work cron;
   `liveReadyPlan` / `startLiveApproved`, which feed the one `make_real`
   Needs you source (`src/platform/needs-you/sources/make-real.ts`, wired in
-  `systems-sources.ts`). Integration (Oct 6): there is no second adapter.
+  `src/server/needs-you/systems-sources.ts`). Integration (Oct 6): there is no second adapter.
   Isolated rebuild plans and live stored plans share that source, its
   `<possibility>@<revision>` item ids, one plan fingerprint (baseline
   revisions included) and one approval reader (`createNeedsYouApprovalRecords`).
-- `live-server.ts`: the server bindings, `readLiveReadyPlans` and
+- `src/server/make-real/live-server.ts`: the server bindings, `readLiveReadyPlans` and
   `startLiveMakeReal` for that source, `listDueActivations`
   (`due_make_real_activations_for_service`) and `activationRunner` /
   `activationStarter` for operator routes.

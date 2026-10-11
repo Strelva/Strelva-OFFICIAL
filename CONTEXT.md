@@ -1,5 +1,17 @@
 # Strelva interface and Managed Websites context
 
+## October 9 premerge quality integration
+
+Jacob authorized merging the verified deletion and architecture cleanup into
+`reborn-1.0`. The merge at `6edd7389c` preserves the four pending tenant-lead
+conflict resolutions after completing the existing `origin/main` merge at
+`47065b3fb`. The combined source passes full typecheck, boundary checks and
+63 focused tests. Earlier full coverage, build and browser receipts remain
+bound to the isolated quality candidate. The
+[quality integration record](docs/operations/premerge-code-quality-2026-10-09.md)
+owns changes and proof limits. Native, Auth, provider and main-release gates
+remain open; no production action or main merge is authorized by this integration.
+
 ## October 9 Reborn 1.0 publication
 
 Jacob authorized publishing the reviewed union as canonical `reborn-1.0`,

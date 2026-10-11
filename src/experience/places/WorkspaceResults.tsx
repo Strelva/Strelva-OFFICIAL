@@ -1,6 +1,6 @@
 import { StCopy, StEmpty, StHead, StMono, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSkeleton, StSplit, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 import type { RangeKey } from "@/lib/analytics/period";
-import type { SiteResults, WorkspaceResults } from "@/products/websites/linked-results";
+import type { SiteResults, WorkspaceResults } from "@/products/websites/client";
 import { placeHomeHref, whenLabel, type PlaceState } from "./WorkspacePlace";
 import { ResultsRetry } from "./ResultsRetry";
 import styles from "./workspace-results.module.css";

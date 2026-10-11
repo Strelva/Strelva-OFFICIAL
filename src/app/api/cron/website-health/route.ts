@@ -14,7 +14,7 @@ import { checkTenantDomains } from "@/lib/domain-monitor";
 import { getScanSummaries } from "@/lib/scan-store";
 import { collectDomainEvidence, deriveSiteCoverage } from "@/platform/operator-queue/site-coverage";
 import { saveSiteHealth } from "@/platform/operator-queue/site-health-store";
-import { currentHostedUrl } from "@/products/websites/hosted-routing";
+import { currentHostedUrl } from "@/products/websites";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 export const maxDuration=300;
 
