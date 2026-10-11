@@ -18,7 +18,6 @@ import { z } from "zod";
 import { inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleasedForCurrentUser, discoverInquiryPortfolio } from "@/products/inquiries";
 import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";
-import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { addAgencyOperatorOverview } from "./agency/operator-overview";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
@@ -61,8 +60,7 @@ export async function readAgencyClientsPage(
   cursor: string | null,
   db: VersionsDb = versionsDb(),
 ): Promise<AgencyClientsPage> {
-  const released = operatorQueueReleaseEnabled();
-  const data = await rpc(db, released ? "agency_client_overview_v2" : "agency_client_overview", {
+  const data = await rpc(db, "agency_client_overview_v3", {
     p_agency_workspace_id: uuid.parse(agencyWorkspaceId), ...actorArgs(actor),
     p_cursor: cursor ? uuid.parse(cursor) : null, p_limit: AGENCY_CLIENT_PAGE_SIZE,
   }, "Clients could not be loaded.");
@@ -70,7 +68,7 @@ export async function readAgencyClientsPage(
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
   const page = { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
     ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
-  return released ? addAgencyOperatorOverview(actor, page) : page;
+  return addAgencyOperatorOverview(actor, page);
 }
 
 const sourcesSchema = z.object({

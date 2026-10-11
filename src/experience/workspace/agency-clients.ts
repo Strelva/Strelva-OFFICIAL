@@ -45,6 +45,8 @@ export const agencyClientRowSchema = z.object({
   role: z.enum(["owner", "admin", "member", "agency"]).nullable(),
   /** A `workspace_providers` mark names this agency. It grants nothing. */
   provider: z.boolean(),
+  /** The existing authoring grant, checked by the server for this actor. */
+  canBuild: z.boolean().optional(),
   status: z.enum(["ready", "unavailable"]),
   systems: z.array(agencyClientSystemSchema).max(500),
   needsYou: z.object({ count: z.number().int().min(0), oldestAt: iso.nullable() }).strict(),
@@ -62,9 +64,11 @@ export const agencyQueueItemSchema = z.object({
   title: z.string().min(1).max(300),
   /** Opens the client's own System or work, never a copy. */
   systemId: uuid.nullable(),
+  decisionId: uuid.optional(),
+  deliveryId: uuid.optional(),
   workId: uuid.nullable(),
   since: iso,
-  label: z.string().max(120).optional(),
+  label: z.string().max(200).optional(),
   href: z.string().startsWith("/").max(500).optional(),
 }).strict();
 

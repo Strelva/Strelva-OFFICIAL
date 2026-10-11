@@ -17,7 +17,7 @@ describe("provider client queue route", () => {
   it("uses the confirmed session identity, bounded RPC and private no-store response", async () => {
     const response = await call(); expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(mocks.rpc).toHaveBeenCalledWith("read_provider_client_queue", { p_user_id: USER, p_verified_email: "staff@queue.example.test", p_agency_workspace_id: AGENCY, p_after_at: null, p_after_key: null, p_limit: 50 });
+    expect(mocks.rpc).toHaveBeenCalledWith("read_provider_client_queue_v2", { p_user_id: USER, p_verified_email: "staff@queue.example.test", p_agency_workspace_id: AGENCY, p_after_at: null, p_after_key: null, p_limit: 50 });
   });
   it("fails closed for flag off, unsigned and unconfirmed users", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", ""); expect((await call()).status).toBe(503);
