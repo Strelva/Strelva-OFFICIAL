@@ -1,5 +1,7 @@
 "use client";
 
+import { actorLabel } from "@/platform/presentation/actor";
+
 import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -147,7 +149,7 @@ function DocumentHistory({ saved, transport, receiptLabel, receiptActor }: { sav
   }
 
   return <>
-    {!receipts.length ? <StEmpty>Created {new Date(saved.document.createdAt).toLocaleString()}. {saved.document.revision === 0 || !saved.historyEnabled ? "No edits yet." : "Load earlier changes to read saved history."}</StEmpty> : <ol className={styles.history}>{receipts.map(receipt => <li key={receipt.revision} className={styles.historyRow}><StMono>v{receipt.revision}</StMono><div><p><span className="sr-only">Revision {receipt.revision}: </span>{receiptLabel?.(receipt) ?? (receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes")}</p>{receiptActor ? <p className="text-xs text-gray-muted">{receiptActor(receipt)}</p> : null}<details className="mt-2"><summary>Before and after</summary><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></details></div><StMono as="time" dateTime={receipt.at}>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono></li>)}</ol>}
+    {!receipts.length ? <StEmpty>Created {new Date(saved.document.createdAt).toLocaleString()}. {saved.document.revision === 0 || !saved.historyEnabled ? "No edits yet." : "Load earlier changes to read saved history."}</StEmpty> : <ol className={styles.history}>{receipts.map(receipt => <li key={receipt.revision} className={styles.historyRow}><StMono>v{receipt.revision}</StMono><div><p><span className="sr-only">Revision {receipt.revision}: </span>{receiptLabel?.(receipt) ?? (receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes")}</p><p className="text-xs text-gray-muted">{receiptActor?.(receipt) ?? actorLabel(receipt.actor)}</p><details className="mt-2"><summary>Before and after</summary><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></details></div><StMono as="time" dateTime={receipt.at}>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono></li>)}</ol>}
     {saved.historyEnabled && transport.history && before !== null ? <StPill type="button" variant="soft" disabled={busy} onClick={() => void loadOlder()}>{busy ? "Loading earlier changes…" : error ? "Retry earlier changes" : "Load earlier changes"}</StPill> : null}
     {busy ? <p role="status" className="text-sm text-gray-muted">Loading document history…</p> : null}
     {error ? <p role="alert" className="text-critical">{error}</p> : null}

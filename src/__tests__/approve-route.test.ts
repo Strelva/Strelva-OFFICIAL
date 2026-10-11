@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // be idempotent (already-resolved → friendly page, not an error).
 
 const mockResolveEventAction = vi.hoisted(() => vi.fn());
+const mockGetEventRaw = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/events", () => ({ getEventRaw: mockGetEventRaw }));
 const mockBrand = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mockBrand, resolveOwnerBrand: mockBrand }));
 
@@ -57,6 +59,7 @@ beforeEach(() => {
   process.env.APPROVE_LINK_SECRET = "test-approve-secret";
   mockGetTenantConfig.mockResolvedValue({ id: "gldf", siteName: "GLDF" });
   mockResolveEventAction.mockResolvedValue({ changed: true });
+  mockGetEventRaw.mockResolvedValue(null);
 });
 afterEach(() => vi.resetModules());
 
@@ -91,6 +94,26 @@ describe("GET /api/approve (confirm step — must NOT mutate)", () => {
 });
 
 describe("POST /api/approve (the real resolve)", () => {
+  it("shows the recorded legacy receipt and keeps an accepted effect non-retryable on failed read-back", async () => {
+    const { signApproveToken } = await import("@/lib/approve-link");
+    mockGetEventRaw.mockResolvedValue({ tenantId: "gldf", title: "North Studio posted the review reply", metadata: { actor: { kind: "agency", displayName: "North Studio" } } });
+    mockResolveEventAction.mockResolvedValue({ changed: true, reason: "accepted_unverified" });
+    const html = await (await postReq(signApproveToken(claims))).text();
+    expect(html).toContain("North Studio posted the review reply");
+    expect(html).toContain("Runs on Strelva");
+    expect(html).toContain("Confirmation is still pending");
+    expect(html).not.toContain('method="POST"');
+    expect(mockResolveEventAction).toHaveBeenCalledTimes(1);
+  });
+  it("keeps approval finished if the receipt presentation read fails", async () => {
+    const { signApproveToken } = await import("@/lib/approve-link");
+    mockGetEventRaw.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("read failed"));
+    const html = await (await postReq(signApproveToken(claims))).text();
+    expect(html).toContain("Approved");
+    expect(html).toContain("Actor not recorded");
+    expect(html).not.toContain('method="POST"');
+    expect(mockResolveEventAction).toHaveBeenCalledTimes(1);
+  });
   it("approves: verifies token and calls resolveEventAction with 'approved'", async () => {
     const { signApproveToken } = await import("@/lib/approve-link");
     const res = await postReq(signApproveToken(claims));

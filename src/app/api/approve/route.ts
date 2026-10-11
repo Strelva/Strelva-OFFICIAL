@@ -1,4 +1,4 @@
-import { actorCopy } from "@/platform/presentation/actor";
+import { actorCopy, actorLabel } from "@/platform/presentation/actor";
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
@@ -207,7 +207,10 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     case "done":
     case "done_unverified":
       return claims.action === "approve"
-        ? noticePage({ status: 200, heading: "Approved", body: result.status === "done" ? "Done." : "Done. Confirmation is still pending.", dashboardUrl: openItem, buttonLabel: "Open" })
+        ? noticePage({ status: 200, heading: "Approved", body: result.receipt
+            ? `${result.receipt.sentence}\n${actorLabel(result.receipt.actor)}\n${result.receipt.changed ?? result.item?.title ?? "Decision recorded"}\n${result.receipt.evidence?.readBack === "verified" ? "Confirmed live." : result.status === "done_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
+            : `Decision recorded: ${result.item?.title ?? "your approval"}. Actor not recorded. ${result.status === "done_unverified" ? "Confirmation is still pending." : "Completion recorded; the change receipt is unavailable here."}`,
+          dashboardUrl: openItem, buttonLabel: result.item?.systemId ? "Open System" : "Open item" })
         : noticePage({ status: 200, heading: "Not yet", body: "Nothing was done. It's still in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
     case "already_handled":
       return noticePage({ status: 200, ...HANDLED, dashboardUrl: openItem, buttonLabel: "Open" });
@@ -286,6 +289,7 @@ async function postPage(request: Request): Promise<NextResponse> {
   }
 
   let result: { changed: boolean; reason?: string };
+  let receiptEvent: Awaited<ReturnType<typeof import("@/lib/events").getEventRaw>> = null;
   try {
     // Tenant links predate recipient-bound workspace decisions. Keep those
     // live emails working; new workspace publishing requires the ws2 link.
@@ -295,6 +299,8 @@ async function postPage(request: Request): Promise<NextResponse> {
       return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
     }
     result = await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
+    // An accepted action is never replayed if its presentation read fails.
+    if (result.changed && claims.action === "approve") receiptEvent = await getEventRaw(claims.eventId).catch(() => null);
   } catch (err) {
     console.error(`[api/approve] resolveEventAction threw for ${claims.tenantId}/${claims.eventId}:`, err);
     return noticePage({
@@ -311,7 +317,9 @@ async function postPage(request: Request): Promise<NextResponse> {
       ? noticePage({
           status: 200,
           heading: "Approved",
-          body: `Done — your reply is being posted for ${businessName}. You can see it in your dashboard.`,
+          body: receiptEvent?.tenantId === claims.tenantId
+            ? `${actorCopy(receiptEvent.title, receiptEvent.metadata?.actor)}\n${actorLabel(receiptEvent.metadata?.actor)}\nFor ${businessName}. ${result.reason === "accepted_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
+            : `Decision recorded for ${businessName}. Actor not recorded. The change receipt is unavailable here.`,
           dashboardUrl,
           buttonLabel: "Open your dashboard",
         })

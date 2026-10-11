@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { recordedActorSchema, type RecordedActor } from "@/platform/presentation/actor";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 export const documentContentSchema = z.object({ title: z.string().trim().min(1).max(160), text: z.string().max(50000) });
 export const documentReceiptSchema = z.object({
+  actor: recordedActorSchema.nullable().optional().catch(null),
   revision: z.number().int().positive(), actorId: z.string().min(1), at: z.string().datetime(),
   kind: z.enum(["edit", "undo"]), before: documentContentSchema, after: documentContentSchema,
   undoesRevision: z.number().int().positive().optional(),
@@ -37,7 +39,7 @@ export function createDocument(input: unknown, actorId: string): WorkspaceDocume
 }
 
 /** Private document changes never publish a website or grant authority. */
-export function changeDocument(value: WorkspaceDocument, raw: unknown, actorId: string): WorkspaceDocument {
+export function changeDocument(value: WorkspaceDocument, raw: unknown, actorId: string, actor?: RecordedActor | null): WorkspaceDocument {
   const doc = documentSchema.parse(value);
   const command = documentCommandSchema.parse(raw);
   if (command.expectedRevision !== doc.revision) throw new WorkspaceConflictError("This document has a newer revision. Reload it before saving.");
@@ -50,7 +52,7 @@ export function changeDocument(value: WorkspaceDocument, raw: unknown, actorId: 
   if (doc.title === content.title && doc.text === content.text) throw new WorkspaceConflictError("There are no changes to save.");
   const revision = doc.revision + 1;
   const receipt = {
-    revision, actorId, at: new Date().toISOString(), kind: command.kind,
+    revision, actorId, actor, at: new Date().toISOString(), kind: command.kind,
     before: { title: doc.title, text: doc.text }, after: content,
     ...(command.kind === "undo" ? { undoesRevision: command.targetRevision } : {}),
   };

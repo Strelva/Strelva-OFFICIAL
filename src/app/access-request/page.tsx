@@ -4,7 +4,7 @@ import { AccessRequestPage } from "@/components/marketing/AccessRequestPage";
 export const metadata: Metadata = {
   title: "Request your build",
   description:
-    "Strelva builds your site, manages it for you, and sends a weekly plain-English report. You own everything.",
+    "Strelva Agency builds your site, manages it for you, and sends a weekly plain-English recap. You own everything. Runs on Strelva.",
 };
 
 export default function Page() {

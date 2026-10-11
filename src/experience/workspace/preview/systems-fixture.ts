@@ -145,7 +145,7 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
     { id: "applications", name: "Internal tools", description: "Private tools with working forms and records.", availability: "available" },
     { id: "inquiries", name: "Inquiries", description: "Keep customer requests moving.", availability: "available" },
     { id: "scheduling", name: "Bookings", description: "Time people can reserve.", availability: "available" },
-    { id: "managed_presence", name: "Managed website", description: "Your website, built and run by Strelva.", availability: "managed" },
+    { id: "managed_presence", name: "Managed website", description: "Your website, built and run by Strelva Agency · Runs on Strelva.", availability: "managed" },
   ];
   const requests = serviceRequests();
 

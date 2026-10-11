@@ -1,7 +1,9 @@
 "use client";
 
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { actorLabel, actorCopy, actorPresentation } from "@/platform/presentation/actor";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { Check } from "lucide-react";
 import { StBeacon, StEmpty, StHold, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
@@ -122,7 +124,7 @@ interface HandledProps {
 }
 
 /** What changed: the last 7 days of recorded changes, with honest undo. */
-export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback, title = "Strelva handled", headingId = "home-handled" }: HandledProps) {
+export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback, title = STRELVA_HANDLED_LABEL, headingId = "home-handled" }: HandledProps) {
   if (state.status === "disabled") return null;
   const canUndo = state.status === "ready" && state.role !== "member";
   return <StSection title={title} meta="Last 7 days" id={headingId}>
@@ -132,8 +134,9 @@ export function StrelvaHandledSection({ state, pending, notices, onUndo, fallbac
       : state.handled.length ? <StRows label="Recorded changes in the last 7 days">{state.handled.map(receipt => {
         const notice = notices[receipt.id];
         const actor = actorPresentation(receipt.actor);
+        const attribution = actor.name && receipt.sentence.startsWith(`${actor.name} `) ? actor.credit : actorLabel(receipt.actor);
         return <StRow key={receipt.id} title={receipt.sentence} lead={<Check size={16} aria-hidden="true" />} kind={<StMono>{when(receipt.at)}</StMono>}
-          detail={<>{actor.credit ? `${actor.credit} · ` : ""}{receipt.changed}{receipt.evidence ? receipt.evidence.readBack === "verified" ? " · Confirmed live" : receipt.evidence.readBack === "not_verified" ? " · Done, not yet confirmed" : " · Accepted" : ""}</>}
+          detail={<>{[attribution, receipt.changed].filter(Boolean).join(" · ")}{receipt.evidence ? receipt.evidence.readBack === "verified" ? " · Confirmed live" : receipt.evidence.readBack === "not_verified" ? " · Done, not yet confirmed" : " · Accepted" : ""}</>}
           end={receipt.undo.state === "undo" && canUndo ? <StTextButton disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${receipt.sentence}`}>{pending === receipt.id ? "Undoing…" : "Undo"}</StTextButton> : undefined}>
           {receipt.undo.state === "undo_needs_review" || receipt.undo.state === "not_undoable" ? <span className={styles.effects}>{receipt.undo.reason}</span> : receipt.undo.state === "undone" ? <span className={styles.effects}>Undone.</span> : null}
           {notice && receipt.undo.state !== "undone" ? <span className={styles.effects} role="status" data-error={notice.tone === "error" || undefined}>{notice.text}</span> : null}

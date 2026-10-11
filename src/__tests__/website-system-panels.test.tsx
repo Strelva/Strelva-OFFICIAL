@@ -29,8 +29,8 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     expect(page).toContain("Put the spring consultation offer at the top of the homepage until May 1");
     expect(page).toContain("A change to the questions and answers is ready for review");
     expect(page).toContain("Add a private consultations page"); expect(page).toContain("In progress");
-    expect(page).toContain("New office hours in the footer"); expect(page).toContain("Deploy · Strelva");
-    expect(page).toContain("Saved copy"); expect(page).toContain("Content · You");
+    expect(page).toContain("New office hours in the footer"); expect(page).toContain("Deploy · Actor not recorded");
+    expect(page).toContain("Saved copy"); expect(page).toContain("Content · Actor not recorded");
   });
   it("omits empty context blocks and keeps the one next-action link", () => {
     const page = html({ websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
@@ -76,7 +76,7 @@ describe("deployment read-back evidence", () => {
     ["not_checked", "Published; live page not checked"],
   ] as const)("keeps %s separate from publication", (readBack, label) => {
     const detail = previewWebsiteDetail(SITE, "empty");
-    detail.history = [{ id: "deploy-receipt:example", source: "deploy", at: "2026-10-07T12:00:00Z", by: "Strelva", title: "Updated fees", undo: null, deployment: { commitSha: "abc123", url: "https://example.com", readBack } }];
+    detail.history = [{ id: "deploy-receipt:example", source: "deploy", at: "2026-10-07T12:00:00Z", by: "Actor not recorded", title: "Updated fees", undo: null, deployment: { commitSha: "abc123", url: "https://example.com", readBack } }];
     const page = renderToStaticMarkup(createElement(WebsiteHistoryPanel, { workspaceId: BUSINESS, systemId: SITE, canRestore: false, state: { status: "ready", detail } }));
     expect(page).toContain(label);
     expect(page).toContain("abc123");
@@ -111,8 +111,8 @@ describe("website System page reads its lists from the server", () => {
     expect(node.textContent).toContain("could not be reached");
   });
   const restores: WebsiteHistoryItem[] = [
-    { id: "snapshot:copy", source: "snapshot", title: "Before rebuilding", at: "2026-10-01T00:00:00Z", by: "You", undo: "Ask Strelva to prepare the saved copy for review.", restore: { kind: "snapshot", snapshotId: "exact-copy" } },
-    { id: "document:1", source: "document", title: "Published site revision 1", at: "2026-10-01T00:00:00Z", by: "You", undo: "Save as a new candidate for review.", restore: { kind: "document", workId: BUSINESS, targetRevision: 1, targetContentHash: "a".repeat(64) } },
+    { id: "snapshot:copy", source: "snapshot", title: "Before rebuilding", at: "2026-10-01T00:00:00Z", by: "Actor not recorded", undo: "Ask Strelva to prepare the saved copy for review.", restore: { kind: "snapshot", snapshotId: "exact-copy" } },
+    { id: "document:1", source: "document", title: "Published site revision 1", at: "2026-10-01T00:00:00Z", by: "Actor not recorded", undo: "Save as a new candidate for review.", restore: { kind: "document", workId: BUSINESS, targetRevision: 1, targetContentHash: "a".repeat(64) } },
   ];
   async function history(item: WebsiteHistoryItem, request: typeof fetch, canRestore = true) {
     const node = document.createElement("div");document.body.appendChild(node);

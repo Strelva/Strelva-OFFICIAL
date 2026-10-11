@@ -31,6 +31,25 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("the Inquiries System's current form", () => {
+  it("keeps each form's recorded handler separate from other forms and the viewer", () => {
+    const current = state();
+    const first = current.capabilities[0]!;
+    current.capabilities.push({ ...first, id: "second-form", live: { ...first.live!, id: "second-form" } });
+    const receipt = current.actionReceipts[0]!;
+    current.actionReceipts.push(
+      { ...receipt, id: "first-publish", capabilityId: first.id, action: "make_live", actor: { kind: "person", id: "recorded-principal", label: "Sheri" } },
+      { ...receipt, id: "second-publish", capabilityId: "second-form", action: "make_live", actor: { kind: "person", id: "another-principal", label: "Alex" } },
+    );
+    const detail = projectInquirySystemDetail("Fixture", current);
+    expect(detail.handlerActors).toEqual({ [first.id]: { kind: "person", displayName: "Sheri" }, "second-form": { kind: "person", displayName: "Alex" } });
+    const html = renderToStaticMarkup(<InquirySystemDetailView details={[detail]} />);
+    expect(html).toContain("Handled by Sheri");
+    expect(html).toContain("Handled by Alex");
+    expect(html).not.toContain("recorded-principal");
+    const unknown = renderToStaticMarkup(<InquirySystemDetailView details={[projectInquirySystemDetail("Fixture", state())]} />);
+    expect(unknown).toContain("Actor not recorded");
+    expect(unknown).not.toContain("Handled by Strelva");
+  });
   it("shows a viewing copy, lifecycle and honest health without private routing or customer builder words", () => {
     const detail = projectInquirySystemDetail("Fixture", state());
     const html = renderToStaticMarkup(<InquirySystemDetailView details={[detail]} />);
@@ -82,11 +101,11 @@ describe("the Inquiries System's current form", () => {
     expect(projectInquiryRunning("Fixture", current, workspace)).toEqual([]);
     current.capabilities[0]!.live = current.requests[0]!.draft; current.capabilities[0]!.status = "live";
     const rows = projectInquiryRunning("Fixture", current, workspace);
-    expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ status: "active", sentence: expect.stringContaining("Strelva reviews ordinary replies") });
+    expect(rows).toHaveLength(1); expect(rows[0]).toMatchObject({ status: "active", sentence: expect.stringContaining("Ordinary replies are reviewed") });
     expect(rows[0]!.sentence).toContain("Mon, Wed, 09:00–17:00 America/New_York; up to 12");
     expect(JSON.stringify(rows)).not.toMatch(/private@example|sponsorId|answered within a day/);
     current.responsibilities[0]!.trust = "trusted"; current.responsibilities[0]!.preAuthorizedActions = ["reply"];
-    expect(projectInquiryRunning("Fixture", current, workspace)[0]!.sentence).toContain("may send ordinary replies");
+    expect(projectInquiryRunning("Fixture", current, workspace)[0]!.sentence).toContain("Ordinary replies may be sent");
     current.responsibilities[0]!.never = [{ action: "reply", sentence: "Do not reply" }];
     expect(projectInquiryRunning("Fixture", current, workspace)[0]!.sentence).toContain("Replies are blocked");
     current.capabilities[0]!.status = "paused";

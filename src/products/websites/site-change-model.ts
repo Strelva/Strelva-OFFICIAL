@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordedActorSchema } from "@/platform/presentation/actor";
 
 /**
  * The browser-safe half of website repo-change Requests (site-changes.ts):
@@ -16,6 +17,7 @@ export const siteChangeReceiptSchema = z.object({
   readBack: z.enum(["confirmed", "not_confirmed", "not_checked"]).nullable(),
   note: z.string().nullable(),
   recordedAt: z.string(),
+  actor: recordedActorSchema.nullable().optional().catch(null),
 });
 export type SiteChangeReceipt = z.infer<typeof siteChangeReceiptSchema>;
 

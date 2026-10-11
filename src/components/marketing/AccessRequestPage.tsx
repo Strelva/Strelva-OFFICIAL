@@ -20,7 +20,7 @@ const planOptions = [
 ] as const;
 
 const nextSteps = [
-  "Strelva reviews your business and site request.",
+  "Strelva Agency reviews your business and site request.",
   "Scope and timing are agreed after review.",
   "Nothing publishes without your review.",
 ];
@@ -131,6 +131,7 @@ function AccessRequestForm({ initialFeedback }: { initialFeedback?: InitialFeedb
   }
 
   return <StEntry>
+    <p className="text-sm text-gray-muted">Strelva Agency · Runs on Strelva</p>
     {state === "success" ? <>
       <StHead title="Request received" />
       <StState kind="live">Received</StState>
@@ -139,7 +140,7 @@ function AccessRequestForm({ initialFeedback }: { initialFeedback?: InitialFeedb
       {statusUrl ? <StPillLink href={statusUrl}>Track delivery status</StPillLink> : null}
       <StTextButton href="/">Back to launch page</StTextButton>
     </> : <>
-      <StHead title="Request your build" meta="Tell Strelva about your business and what your website should help customers do." />
+      <StHead title="Request your build" meta="Tell Strelva Agency about your business and what your website should help customers do." />
       <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate aria-describedby={message ? "intake-status" : undefined} aria-busy={state === "submitting"}>
         <StField label="Business"><input id="business-name" value={businessName} onChange={event => setBusinessName(event.target.value)} autoComplete="organization" required /></StField>
         <StField label="City"><input id="location" value={location} onChange={event => setLocation(event.target.value)} autoComplete="address-level2" /></StField>

@@ -18,6 +18,8 @@
  * A source that cannot be read is named in `unavailable`; it never reads as
  * empty.
  */
+import { personActor } from "@/platform/presentation/actor-server";
+import { recordedActor } from "@/platform/presentation/actor";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { listBusinessSystems } from "@/platform/systems/from-existing";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
@@ -152,6 +154,9 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
       .map(event => ({ id: event.id, title: event.title, detail: event.body || null, openedAt: event.createdAt, openHref: null }));
 
   const published = new Set((documents?.receipts ?? []).filter(receipt => receipt.status === "published").map(receipt => `${receipt.candidateRevision}:${receipt.artifactHash}`));
+  const principalIds = [...new Set([...(documents?.rows ?? []).map(row => row.createdBy), ...linked.map(row => row.publishedBy), ...snapshots.flatMap(row => row.actorUserId ? [row.actorUserId] : [])])];
+  const principalActors = new Map(await Promise.all(principalIds.map(async id => [id, await personActor(id)] as const)));
+  const eventActor = (requestId: string) => recordedActor(events.find(event => event.id === requestId)?.metadata?.actor);
   const reviewing = rebuild?.rebuild.status === "review_ready" && rebuild.rebuild.candidate ? rebuild.rebuild.candidate : null;
   const aboutThisSite = (context: Record<string, unknown>) => context.systemId === systemId || (tenantId !== null && (context.tenantId === tenantId || context.siteId === tenantId));
 
@@ -164,16 +169,16 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     decisions: decisionRows,
     draftSections: Object.entries(drafts).filter(([, present]) => present).map(([section]) => section),
     siteReview: reviewing && savedWorkId ? { workId: savedWorkId, revision: reviewing.revision, at: rebuild?.rebuild.history.at(-1)?.at ?? null, href: workspaceHref(savedWorkId) } : null,
-    changeRequests: selectWebsiteRequestHistory(events),
+    changeRequests: selectWebsiteRequestHistory(events).map(row => ({ ...row, actor: eventActor(row.requestId) })),
     serviceRequests: services.filter(row => row.status !== "draft" && aboutThisSite(row.context))
       .map(row => ({ id: row.id, outcome: row.outcome, createdAt: row.createdAt, status: row.status, commitment: row.deliveryCommitment?.status ?? null })),
-    contentVersions: versions,
-    snapshots,
-    documentRevisions: (documents?.rows ?? []).map(row => ({ revision: row.revision, contentHash: row.contentHash, createdAt: row.createdAt, createdBy: row.createdBy, published: published.has(`${row.revision}:${row.contentHash}`) })),
-    linkedPublications: linked,
+    contentVersions: versions.map(row => ({ ...row, actor: recordedActor((row as unknown as Record<string, unknown>).actor) })),
+    snapshots: snapshots.map(row => ({ ...row, actor: recordedActor((row as unknown as Record<string, unknown>).actor) ?? (row.actorUserId ? principalActors.get(row.actorUserId) : null) })),
+    documentRevisions: (documents?.rows ?? []).map(row => ({ revision: row.revision, contentHash: row.contentHash, createdAt: row.createdAt, createdBy: row.createdBy, actor: principalActors.get(row.createdBy), published: published.has(`${row.revision}:${row.contentHash}`) })),
+    linkedPublications: linked.map(row => ({ ...row, actor: principalActors.get(row.publishedBy) })),
     repoDeployments: repoChanges.flatMap(request => request.receipts.filter(receipt => receipt.kind === "deployed" && receipt.commitSha && receipt.deploymentUrl && receipt.readBack)
       .map(receipt => ({ id: receipt.id, requestId: request.id, title: request.request,
-        commitSha: receipt.commitSha!, deploymentUrl: receipt.deploymentUrl!, readBack: receipt.readBack!, recordedAt: receipt.recordedAt }))),
+        commitSha: receipt.commitSha!, deploymentUrl: receipt.deploymentUrl!, readBack: receipt.readBack!, recordedAt: receipt.recordedAt, actor: receipt.actor }))),
     ...(connectedSite ? { connectedSite: {
       siteId: connectedSite.id, siteHost: connectedSite.siteHost, verified: connectedSite.verifiedAt !== null,
       install: connectedSite.verifiedAt || !connectedSite.verificationToken ? null : connectedSite.snippet,

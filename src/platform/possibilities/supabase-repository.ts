@@ -1,5 +1,8 @@
-import { z } from "zod";
+import { captureActionActor } from "@/platform/presentation/actor-server";
 import { getSupabase } from "@/platform/infra/db/client";
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
+import { z } from "zod";
 import {
   WORKSPACE_EXIT_STOPPED_MESSAGE,
   WorkspaceAccessError,
@@ -100,7 +103,8 @@ export function createSupabasePossibilityRepository(actor: WorkspaceActor, db?: 
   }
 
   async function create(value: Possibility, sourceRef: string | null) {
-    const p = possibilitySchema.parse(value);
+    const parsed = possibilitySchema.parse(value);
+    const p = { ...parsed, proposingActor: await captureActionActor(actor, parsed.businessId) };
     const fallback = "The possibility could not be saved.";
     const data = await call("create_system_possibility", {
       p_workspace_id: uuid.parse(p.businessId), ...actorArgs(), p_body: { ...p, id: uuid.parse(p.id) }, p_source_ref: sourceRef,
@@ -133,7 +137,10 @@ export function createSupabasePossibilityRepository(actor: WorkspaceActor, db?: 
       return create(value, sourceRef);
     },
     async save(value, expectedRevision) {
-      const p = possibilitySchema.parse(value);
+      const parsed = possibilitySchema.parse(value);
+      const latest = parsed.history.at(-1);
+      const p = latest?.revision === parsed.revision && latest.actorId === actor.userId && latest.kind === "revise"
+        ? { ...parsed, proposingActor: await captureActionActor(actor, parsed.businessId) } : parsed;
       const fallback = "The possibility could not be saved.";
       const data = await call("save_system_possibility", {
         p_workspace_id: uuid.parse(p.businessId), ...actorArgs(), p_possibility_id: uuid.parse(p.id),
@@ -168,7 +175,7 @@ export function createSupabasePossibilityRepository(actor: WorkspaceActor, db?: 
 }
 
 /** The candidate a signed preview link may show: open, same candidate revision. No actor: the link is the authority. */
-export async function readPossibilityPreview(input: { businessId: string; possibilityId: string; candidateRevision: number }, db?: PossibilitiesDb): Promise<Omit<Possibility, "history" | "createdBy"> | null> {
+export async function readPossibilityPreview(input: { businessId: string; possibilityId: string; candidateRevision: number }, db?: PossibilitiesDb): Promise<(Omit<Possibility, "history" | "createdBy"> & { businessName?: string; agencyBrand?: OwnerBrand | null }) | null> {
   if (!uuid.safeParse(input.businessId).success || !isStoredPossibilityId(input.possibilityId)) return null;
   const { data, error } = await (db ?? possibilitiesDb()).rpc("read_system_possibility_preview", {
     p_workspace_id: input.businessId, p_possibility_id: input.possibilityId, p_candidate_revision: input.candidateRevision,
@@ -177,7 +184,17 @@ export async function readPossibilityPreview(input: { businessId: string; possib
   if (data === null || data === undefined) return null;
   const parsed = possibilitySchema.omit({ history: true, createdBy: true }).partial({ keyEpochs: true, consumedApprovalIds: true }).safeParse(data);
   if (!parsed.success || parsed.data.businessId !== input.businessId || parsed.data.id !== input.possibilityId) return null;
-  return parsed.data;
+  // This public presentation read happens only after the pinned candidate has
+  // been admitted. It never exposes the author's principal ID or email.
+  const client = getSupabase();
+  let businessName: string | undefined;
+  const proposingActor = parsed.data.proposingActor ?? null;
+  if (!db && client) {
+    const business = await Promise.resolve(client.from("workspaces").select("name").eq("id", input.businessId).maybeSingle()).catch(() => null);
+    if (business && !business.error) businessName = business.data?.name;
+  }
+  const brand = !db ? await resolveOwnerBrand(input.businessId).catch(() => null) : null;
+  return { ...parsed.data, businessName, proposingActor, agencyBrand: brand?.agencyId ? brand : null };
 }
 
 /** Strelva's 90-day idle withdraw (spec decision 6). Each withdraw is recorded as an event, the receipt. */

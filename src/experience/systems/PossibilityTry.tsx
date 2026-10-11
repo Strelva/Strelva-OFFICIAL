@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import { LogoMark } from "@/components/Logo";
+import { actorLabel, type RecordedActor } from "@/platform/presentation/actor";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { StEmpty, StHead, StNotice, StPage, StPill, StRows, StRow, StSection, StSkeleton, StSurface } from "@/components/ui/strelva/Kit";
 import styles from "./try.module.css";
@@ -9,6 +11,9 @@ import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
 
 export interface PossibilityTryView {
+  businessName?: string;
+  proposingActor?: RecordedActor | null;
+  agencyBrand?: OwnerBrand | null;
   title: string;
   intent: string;
   /** What each changed System would become, in plain words. */
@@ -47,14 +52,14 @@ export function PossibilityTryError({ onRetry }: { onRetry: () => void }) {
  * submission is a test: it goes nowhere and says so (spec behaviors 19-20).
  */
 export function PossibilityTry({ state, previewContent }: { state: PossibilityTryState; previewContent?: ReactNode }) {
-  if (state.kind === "expired") return <Shell><StPage><StHead title="This link has expired." /><StEmpty>Links in Strelva&apos;s emails last 14 days. The next email has a fresh one. Nothing changed.</StEmpty></StPage></Shell>;
-  if (state.kind === "changed") return <Shell><StPage><StHead title="This changed since we emailed you." /><StNotice tone="need">Strelva is refreshing it. The latest possibility comes in the next email. Nothing live changed.</StNotice></StPage></Shell>;
+  if (state.kind === "expired") return <Shell><StPage><StHead title="This link has expired." /><StEmpty>Preview links expire after 14 days. Ask the sender for a fresh link. Nothing changed.</StEmpty></StPage></Shell>;
+  if (state.kind === "changed") return <Shell><StPage><StHead title="This changed since we emailed you." /><StNotice tone="need">This preview no longer matches the saved Possibility. Ask the sender for the latest link. Nothing live changed.</StNotice></StPage></Shell>;
   const { view } = state;
   return <Shell>
     <header className={styles.topBar}>
-      <LogoMark className="size-6 shrink-0" />
+      <div><strong>{view.agencyBrand?.agencyId ? view.agencyBrand.name : "Agency not recorded"} · {view.businessName || "Business not recorded"}</strong>{view.agencyBrand?.agencyId ? <OwnerBrandIdentity brand={view.agencyBrand} rail /> : null}<p>Proposed by {actorLabel(view.proposingActor)}</p></div>
       <div><strong>You’re trying a Possibility: {view.title}</strong><p>Not live. Test submissions go nowhere. Only people with this link can open it.</p></div>
-      <StPill variant="soft" disabled title="Use the separate approval link in your email to make this real.">Make it real</StPill>
+      <StPill variant="soft" disabled title="Use the separate approval link in your email to make this real.">Make real</StPill>
     </header>
     <StPage width={view.websiteDocument ? "wide" : "column"}>
       {previewContent ? null : <StHead title={view.title} meta={view.intent} />}

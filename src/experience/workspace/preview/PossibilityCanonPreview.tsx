@@ -55,7 +55,7 @@ export function PossibilityCanonPreview({ state = "ready", mode = "light", makin
         live={<><BrowserLabel path="attymooney.com/contact" /><div className={styles.clientPage}><h2>Schedule a session</h2><p>Call the office or use the form below to find a date.</p><div className={styles.formLine} /><div className={styles.formMessage} /></div></>}
         candidate={<><BrowserLabel path="attymooney.com/sessions" /><CandidatePage /></>}
         scope="Adds 1 page and 1 System. Changes nothing on your other pages."
-        actions={<><StTextButton onClick={() => setLater(true)}>Not now</StTextButton><StPillLink variant="soft" href="/preview/strelva/try?state=sessions">Try it as a visitor</StPillLink><StPill disabled={permission || stale} title={stale ? "Refresh this Possibility first." : permission ? "Only the business owner can make it real." : undefined} onClick={() => setStarted(true)}>Make it real</StPill></>} />
+        actions={<><StTextButton onClick={() => setLater(true)}>Not now</StTextButton><StPillLink variant="soft" href="/preview/strelva/try?state=sessions">Try it as a visitor</StPillLink><StPill disabled={permission || stale} title={stale ? "Refresh this Possibility first." : permission ? "Only the business owner can make it real." : undefined} onClick={() => setStarted(true)}>Make real</StPill></>} />
     </>}
   </StPage></SystemsCanonShell>;
 }
@@ -64,7 +64,7 @@ export function SessionsVisitorTryFixture() {
   const [duration, setDuration] = useState("half");
   const [day, setDay] = useState(16);
   const [sent, setSent] = useState(false);
-  return <PossibilityTry state={{ kind: "ready", view: { title: "Attorneys request a session date", intent: "Fictional visitor preview. No real calendar, messages or approval access.", changes: [], introduces: [], takesSubmissions: true } }} previewContent={<>
+  return <PossibilityTry state={{ kind: "ready", view: { businessName: "The Mooney Firm", proposingActor: { kind: "agency", displayName: "Strelva Agency" }, agencyBrand: { agencyId: "fixture-strelva-agency", name: "Strelva Agency", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" }, title: "Attorneys request a session date", intent: "Fictional visitor preview. No real calendar, messages or approval access.", changes: [], introduces: [], takesSubmissions: true } }} previewContent={<>
     <div className={styles.clientHeader}><strong>The Mooney Firm</strong><span>Attorneys · Workplace mediation · About · Fees · Contact</span></div>
     <StSurface label="Fictional visitor booking page"><div className={styles.visitorColumns}>
       <div><p className={styles.muted}>The Mooney Firm</p><h2>Request a mediation session</h2><p>Pick an open date. The firm confirms every request before it’s booked.</p><div className={styles.durationChoices} role="radiogroup" aria-label="Test session length">{[{ value: "half", label: "Half-day", hours: "4 hours" }, { value: "full", label: "Full-day", hours: "8 hours" }].map(choice => <button key={choice.value} type="button" role="radio" aria-checked={duration === choice.value} onClick={() => { setDuration(choice.value); setSent(false); if (choice.value === "full") setDay(23); }}>{choice.label}<span>{choice.hours}</span></button>)}</div><p className={styles.muted}>Eastern time</p></div>

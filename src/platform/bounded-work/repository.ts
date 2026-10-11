@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { captureActionActor } from "@/platform/presentation/actor-server";
 import { baseSchema } from "./contracts";
 export { baseSchema } from "./contracts";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -17,12 +18,20 @@ export interface BoundedStore {
   createSystem?(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SavedWork>;
 }
 export const boundedStore: BoundedStore = {
-  member: assertWorkspaceMember, read: getWork, create: saveWork,
+  member: assertWorkspaceMember, read: getWork,
+  async create(actor, workspaceId, input) {
+    return saveWork(actor, workspaceId, await attributedInput(actor, workspaceId, input));
+  },
   // Wrapped so modules that mock the workspace repository without these
   // exports still load; the lookup happens only when a tool is made.
   makeSystems: (actor, workspaceId) => makeSystemsAuthority(actor, workspaceId),
-  createSystem: (actor, workspaceId, input) => saveSystemWork(actor, workspaceId, input),
+  createSystem: async (actor, workspaceId, input) => saveSystemWork(actor, workspaceId, await attributedInput(actor, workspaceId, input)),
   async update(actor, work, expectedRevision, payload) {
+    const parsed = baseSchema.safeParse(payload);
+    if (parsed.success && parsed.data.history.at(-1)?.actorId === actor.userId && parsed.data.history.at(-1)?.revision === expectedRevision + 1) {
+      const identity = await captureActionActor(actor, work.workspaceId);
+      payload = { ...(payload as Record<string, unknown>), history: parsed.data.history.map(item => item.revision === expectedRevision + 1 ? { ...item, actor: identity } : item) };
+    }
     const db = getSupabase();
     if (!db) throw new WorkspaceStoreError("Work storage is unavailable.");
     const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> };
@@ -45,4 +54,9 @@ export async function readBounded<T>(store: BoundedStore, actor: WorkspaceActor,
   const work = await store.read(actor, workId);
   if (!work || work.productId !== productId) throw new WorkspaceAccessError();
   return { ...work, payload: schema.parse(work.payload) };
+}
+
+async function attributedInput(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SaveWorkInput> {
+  if (input.productId !== "applications" || !input.payload || typeof input.payload !== "object") return input;
+  return { ...input, payload: { ...input.payload, maintenanceActor: await captureActionActor(actor, workspaceId) } };
 }

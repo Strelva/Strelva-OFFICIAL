@@ -1,3 +1,5 @@
+import { recordedActor, type RecordedActor } from "@/platform/presentation/actor";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 import type { PossibilityTryState } from "./PossibilityTry";
 import { siteDocumentSchema } from "@/products/websites/client";
@@ -14,7 +16,7 @@ import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 export async function possibilityTryState(token: string, deps: {
   enabled(workspaceId: string): Promise<boolean>;
   read(claims: { businessId: string; possibilityId: string; candidateRevision: number }): Promise<{
-    title: string; intent: string;
+    title: string; intent: string; businessName?: string; proposingActor?: RecordedActor | null; agencyBrand?: OwnerBrand | null;
     changes: Array<{ candidate: { summary: string; content: Record<string, unknown> } }>;
     introduces: Array<{ name: string; candidate?: { content: Record<string, unknown> } }>;
     effects: Array<{ channel?: string }>;
@@ -43,6 +45,9 @@ export async function possibilityTryState(token: string, deps: {
     kind: "ready",
     view: {
       title: p.title,
+      businessName: p.businessName,
+      proposingActor: recordedActor(p.proposingActor),
+      agencyBrand: p.agencyBrand?.agencyId ? p.agencyBrand : null,
       intent: p.intent,
       changes: p.changes.map((change) => change.candidate.summary.replace(/^the /, "The ")),
       introduces: p.introduces.map((intro) => intro.name),
