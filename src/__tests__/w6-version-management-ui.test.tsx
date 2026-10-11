@@ -15,7 +15,7 @@ async function render(request: typeof fetch, readOnly = false) {
   await act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(SystemVersionManagement, { workspaceId, systemId, versionId, readOnly }))));
   return node;
 }
-function prepare(node: HTMLElement) { return [...node.querySelectorAll("button")].find(button => button.textContent === "Prepare this draft for release")!; }
+function prepare(node: HTMLElement) { return [...node.querySelectorAll("button")].find(button => button.textContent === "Prepare this draft for review")!; }
 describe("Version draft management acknowledgment", () => {
   it.each([
     ["write", false], ["write", true], ["refresh", false], ["refresh", true],
@@ -37,7 +37,7 @@ describe("Version draft management acknowledgment", () => {
     expect(request.mock.calls.filter(([,init]) => init?.method === "POST")).toHaveLength(1);
   });
   it.each([
-    ["Save local value", "override"], ["Bind account", "bind"], ["Restore into draft", "restore"],
+    ["Save local value", "override"], ["Connect Business calendar", "bind"], ["Restore into draft", "restore"],
   ])("recovers focus after %s without keeping the old controls during refresh", async (label, action) => {
     const connectionId = crypto.randomUUID();
     const current = { ...view, bindingChoices: [{ kind: "booking_calendar", connectionId, label: "Business calendar" }] };

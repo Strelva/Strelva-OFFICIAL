@@ -13,6 +13,6 @@ describe("provider change owner presentation", () => {
   it.each([ ["customer", "member", "owner", true], ["customer", "member", "admin", false], ["customer", "delegated_read", "owner", false], ["customer", "provider_seat", "owner", false], ["agency", "member", "owner", false] ])("kind %s access %s role %s offers recovery %s", async (kind, access, role, allowed) => {
     mocks.list.mockResolvedValue([{ id, kind, access, role }]);
     const html = renderToStaticMarkup(await Page({ searchParams: Promise.resolve({ workspaceId: id }) }));
-    expect(html.includes("Cancel provider change")).toBe(allowed);
+    expect(html.includes("Cancel agency change")).toBe(allowed);
   });
 });

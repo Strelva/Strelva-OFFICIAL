@@ -1,3 +1,6 @@
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
+import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
 import { AgencyWebsiteDocumentDraftExperience } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
 
 import { AgencyManagedWebsiteDraftExperience } from "@/experience/agency-website/AgencyManagedWebsiteDraftExperience";
@@ -27,5 +30,8 @@ async function documentDraftReleased(bindingId: string): Promise<boolean> {
 
 export default async function AgencyManagedWebsiteDraftPage({ params }: { params: Promise<{ bindingId: string }> }) {
   const { bindingId } = await params;
-  return await documentDraftReleased(bindingId) ? <AgencyWebsiteDocumentDraftExperience bindingId={bindingId} /> : <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />;
+  const actor = await workspaceHttpActor();
+  const context = actor ? await readAgencyWebsiteContext(actor, bindingId).catch(() => null) : null;
+  if (!context) return <StPage><StHead title="Website preparation" /><StNotice tone="critical">Agency and client context could not be verified. Sign in with the assigned account and reopen this website from the client.</StNotice></StPage>;
+  return <StrelvaShell title="" systemsReleased workspaceId={context.businessWorkspaceId} businessContext={`${context.agencyName} → ${context.businessName} → ${context.websiteName}`} accountName={context.personName} accountDetail="Agency access"><StPage><StHead title={context.websiteName} crumb={{ label: `Back to ${context.businessName}`, href: `/workspace?workspaceId=${encodeURIComponent(context.businessWorkspaceId)}` }} meta={`${context.agencyName} → ${context.businessName} → ${context.websiteName}`} /></StPage>{await documentDraftReleased(bindingId) ? <AgencyWebsiteDocumentDraftExperience bindingId={bindingId} /> : <AgencyManagedWebsiteDraftExperience bindingId={bindingId} />}</StrelvaShell>;
 }

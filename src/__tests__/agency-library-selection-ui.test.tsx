@@ -43,7 +43,7 @@ describe("agency Library ready Version selection", () => {
     let resolve!: (response: Response) => void;
     const request = vi.fn<typeof fetch>(async (input, init) => init?.method === "POST" ? new Promise<Response>(done => { resolve = done; }) : transport(input, init));
     const node = await render(request);
-    const review = button(node, "Review all");
+    const review = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Prepare offers for"))!;
     await act(async () => { review.click(); review.click(); });
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
     const sources = [...node.querySelectorAll<HTMLButtonElement>('[aria-label="Sources"] button')];

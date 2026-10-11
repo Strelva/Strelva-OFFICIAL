@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";
+import { PackageDeclaration } from "./PackageDeclaration";
+import { systemHref } from "./model";
 import { BundlePackageInstall } from "./BundlePackageInstall";
 import { PackageInstallDelegation } from "./PackageInstallDelegation";
 import { Button } from "@/components/ui/Button";
@@ -58,10 +60,8 @@ function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, requ
   }
   const declaration = listing.revision.declaration, supported = listing.revision.definition.kind === "internal_app";
   return <article className="space-y-4 rounded-2xl border border-gray-border p-5">
-    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">Made by {listing.creatorName} · Source revision {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
-    <dl className="grid gap-3 text-sm sm:grid-cols-2">{([
-      ["Reads records", declaration.recordsRead], ["Writes records", declaration.recordsWritten], ["Business information", declaration.businessRecordFields], ["Outside actions", declaration.outsideEffects], ["Required accounts", declaration.bindingKinds], ["Data leaving your business", declaration.dataLeavingBusiness],
-    ] as const).map(([label, values]) => <div key={label} className="min-w-0"><dt className="text-gray-muted">{label}</dt><dd className="mt-1 break-words">{values.map(value => ({"application.records":"App records","internal_tool.notices":"Submission email notices","business.contacts":"Business contacts","business.people":"Business staff","business.record":"Business record","business.record.history":"Business record history","owner_recipient.email":"Owner email","owner_recipient.name":"Owner name","tenant.owner_email":"Linked owner email","contacts.email":"Contact emails","contacts.phone":"Contact phones","people.email":"Staff emails","people.active":"Current staff status","contacts.id":"Contact identity","contacts.name":"Contact names","people.id":"Staff identity","people.name":"Staff names","email_sender":"Business email account","booking_calendar":"Business calendar","inquiries":"Inquiry records","website.document":"Website pages","website":"Business website","email":"Business email","publish":"Public website publication"}[value] ?? value)).join(", ") || "None"}</dd></div>)}</dl>
+    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Source revision {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
+    <PackageDeclaration declaration={declaration} />
 
     <p className="text-xs text-gray-muted">This exact revision passed automated checks and human review. Your release still requires a separate decision.</p>
     {!supported && listing.revision.definition.kind !== "bundle" ? <p className="text-sm text-gray-muted">An install adapter for this package is still being prepared.</p> : null}
@@ -69,6 +69,6 @@ function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, requ
     {supported && !receipt ? <><TextInput label="Name in your business" value={name} maxLength={160} disabled={!canInstall || busy || Boolean(pending.current)} onChange={event => setName(event.target.value)} /><Button type="button" size="sm" disabled={!canInstall || busy || !name.trim()} loading={busy} onClick={() => void install()}>{pending.current ? "Retry this installation" : "Install private draft"}</Button></> : null}
     {canGrantInstall && (supported || listing.revision.definition.kind === "bundle") ? <PackageInstallDelegation workspaceId={workspaceId} revisionId={listing.revision.source.revisionId} agencyWorkspaceId={listing.source.creatorWorkspaceId} creatorName={listing.creatorName} request={request} bundleListing={listing.revision.definition.kind === "bundle" ? listing : undefined} /> : null}
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
-    {receipt ? <div className="space-y-2"><p role="status" className="text-sm">Your private Version is ready. Bind this business’s required accounts and prepare its release in Needs you.</p><Link className="text-sm underline" href={`/workspace?${new URLSearchParams({ workspaceId, system: receipt.systemId })}`}>Open your System</Link></div> : null}
+    {receipt ? <div className="space-y-2"><p role="status" className="text-sm">Your private Version is ready. Bind this business’s required accounts and prepare its release in Needs you.</p><Link className="text-sm underline" href={systemHref("", workspaceId, receipt.systemId)}>Open your System</Link></div> : null}
   </article>;
 }
