@@ -1,5 +1,7 @@
 "use client";
 
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
 import { StHead, StNotice, StPage, StSection } from "@/components/ui/strelva/Kit";
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
@@ -45,10 +47,10 @@ export function WorkspaceOngoing({
     <StHead title={finiteJobOpen ? selectedWork.title : "Running"}
       meta={finiteJobOpen
         ? "This has an end. Its steps, decisions and results are below; every request is listed in Requests."
-        : "What Strelva keeps true. Each one is named by its result, with its scope and latest evidence below."}
+        : "What stays true for your business. Each one is named by its result, with its scope and latest evidence below."}
     />
     {readOnly ? <StNotice>Shared with you. You can read the running work and its results.</StNotice> : null}
-    {!finiteJobOpen && monthlyRecap ? <StNotice>Monthly recap records appear in Strelva handled, including recorded sends, holds and failures.</StNotice> : null}
+    {!finiteJobOpen && monthlyRecap ? <StNotice>Monthly recap records appear in {STRELVA_HANDLED_LABEL}, including recorded sends, holds and failures.</StNotice> : null}
     {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
     {finiteJobOpen ? null : <StandingResponsibilityPicker

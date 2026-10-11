@@ -1,3 +1,5 @@
+import { handledFromStore } from "./handled";
+import type { HandledReceipt } from "./contracts";
 import { actorCopy, actorSentence } from "@/platform/presentation/actor";
 /**
  * Needs you: open items from each source, decide them through the source's
@@ -54,6 +56,7 @@ export type DecideStatus =
 export interface DecideResult {
   status: DecideStatus;
   item: OwnerDecision | null;
+  receipt?: HandledReceipt | null;
 }
 
 export interface ChaseSummary {
@@ -260,7 +263,11 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       : { kind: "session", actor: input.by.actor };
     const outcome = await adapter.resolve(ctx, claimed.item, input.decision, by).catch(() => ({ outcome: "failed" as const, reason: "resolver_threw" }));
     const finished = await deps.store.finish(input.workspaceId, item.id, outcome.outcome, outcome.reason ?? null, "receiptRef" in outcome ? outcome.receiptRef ?? null : null);
-    return { status: outcome.outcome, item: finished };
+    // Decode the finished record through the same receipt projection as the
+    // workspace feed. A one-tap link grants this decision, not the full feed.
+    const receipt = input.decision === "approve" && (outcome.outcome === "done" || outcome.outcome === "done_unverified")
+      ? handledFromStore({ ...finished, store: "owner_decisions", at: finished.decidedAt }) : null;
+    return { status: outcome.outcome, item: finished, ...(receipt ? { receipt } : {}) };
   }
 
   function links(row: OwnerDecision, recipient: string): EmailDecision {

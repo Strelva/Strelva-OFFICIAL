@@ -33,9 +33,9 @@ describe("website System page lists", () => {
       changeRequests: [{ requestId: "evt_1", title: "Private events page added", kind: "custom_request", status: "shipped", createdAt: "2026-09-30T10:00:00Z", resolvedAt: "2026-10-05T10:00:00Z" }],
     }));
     expect(detail.history.map(item => item.source)).toEqual(["deploy", "content", "document", "snapshot", "content"]);
-    expect(detail.history[0]).toMatchObject({ title: "Private events page added", by: "Strelva" });
-    expect(detail.history[1]).toMatchObject({ title: "Restored an earlier homepage banner", by: "You" });
-    expect(detail.history[2]).toMatchObject({ title: "Published site revision 2", by: "You" });
+    expect(detail.history[0]).toMatchObject({ title: "Private events page added", by: "Actor not recorded" });
+    expect(detail.history[1]).toMatchObject({ title: "Restored an earlier homepage banner", by: "Actor not recorded" });
+    expect(detail.history[2]).toMatchObject({ title: "Published site revision 2", by: "Actor not recorded" });
     expect(detail.history.filter(item => item.source !== "document").every(item => item.undo)).toBe(true);
     expect(detail.history[2]?.undo).toBeNull();
     // Issued rows never change here: History only reads them.

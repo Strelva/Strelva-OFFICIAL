@@ -1,5 +1,7 @@
 "use client";
 
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
 import { useMemo, useState } from "react";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StComposerBar, StComposerDock, StHead, StNotice, StPage, StPill, StSegmented, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
@@ -25,11 +27,11 @@ function DecisionContent({ view }: { view: "decision" | "receipts" }) {
   const [formNotice, setFormNotice] = useState("");
   const loaded = needs.state.status === "ready" ? needs.state : null;
   const ready = Boolean(loaded?.items.length);
-  return <StrelvaShell title={view === "receipts" ? "Strelva handled" : "Session date scope"} active="requests" systemsReleased accountName="Fictional owner" appBase="/preview/strelva" signOut={<span>Local preview</span>}
+  return <StrelvaShell title={view === "receipts" ? STRELVA_HANDLED_LABEL : "Session date scope"} active="requests" systemsReleased accountName="Fictional owner" appBase="/preview/strelva" signOut={<span>Local preview</span>}
     businessContext={<span>Fictional mediation firm</span>}
     notice={<p role="note" className={styles.fixtureNotice}>Fictional preview · decisions and Undo change this browser rehearsal only. No website, calendar, message or provider write.</p>}>
     <StPage>
-      <StHead title={view === "receipts" ? "Strelva handled" : "Let attorneys request a session date"} crumb={{ label: "Requests", href: "/preview/strelva/owner-request" }} meta={view === "receipts" ? "Fictional receipts from the last 7 days, grouped by source." : "This is the proposed form attorneys would see on the fictional website."} />
+      <StHead title={view === "receipts" ? STRELVA_HANDLED_LABEL : "Let attorneys request a session date"} crumb={{ label: "Requests", href: "/preview/strelva/owner-request" }} meta={view === "receipts" ? "Fictional receipts from the last 7 days, grouped by source." : "This is the proposed form attorneys would see on the fictional website."} />
       {view === "receipts" ? loaded && loaded.handled.length ? fictionalReceiptGroups.map((group, index) => <StrelvaHandledSection key={group.source} headingId={`fixture-handled-${index}`} title={group.source} state={{ ...loaded, handled: loaded.handled.filter(receipt => group.receipts.some(value => value.id === receipt.id)) }} pending={needs.pending} notices={needs.receiptNotices} onUndo={needs.undo} />)
         : <StrelvaHandledSection state={needs.state} pending={needs.pending} notices={needs.receiptNotices} onUndo={needs.undo} /> : <>
         {ready ? <StSurface label="Proposed session-date form"><div className={styles.proposedForm}>

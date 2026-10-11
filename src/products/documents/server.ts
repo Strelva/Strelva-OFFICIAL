@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { captureActionActor } from "@/platform/presentation/actor-server";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getWork, saveWork } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -67,7 +68,7 @@ export async function editWorkspaceDocument(actor: WorkspaceActor, workId: strin
     throw new WorkspaceConflictError("Private onboarding attachments are immutable. Supply a replacement from the onboarding case.");
   }
   const command = documentCommandSchema.parse(raw);
-  const document = changeDocument(saved.document, command, actor.userId);
+  const document = changeDocument(saved.document, command, actor.userId, await captureActionActor(actor, saved.workspaceId));
   const db = getSupabase();
   if (!db) throw new WorkspaceStoreError("Document storage is unavailable.");
   const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<{ payload: unknown }> | null; error: { message: string } | null }> };

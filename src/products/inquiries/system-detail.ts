@@ -1,3 +1,4 @@
+import { actorCopy, recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { PublicInquiryForm } from "../../../custom-repo-starter/inquiry-client";
 import { inquiryCapabilityLifecycle } from "@/platform/systems/invariants";
@@ -17,8 +18,9 @@ export interface InquirySystemDetail {
   lifecycle: "draft" | "live" | "paused";
   health: string;
   forms: PublicInquiryForm[];
+  handlerActors?: Record<string, RecordedActor | null>;
   connections: Array<{ kind: "reads" | "appears in" | "acts on" | "shares with"; target: string; sentence: string }>;
-  history: Array<{ id: string; sentence: string; at: string }>;
+  history: Array<{ id: string; sentence: string; at: string; actor?: RecordedActor | null }>;
   running?: InquiryRunningSentence[];
   unavailable?: boolean;
   formSource?: "external" | "native";
@@ -40,8 +42,8 @@ export function projectInquiryRunning(site: string, state: InquiryEngineState | 
     const trusted = policy.trust === "trusted" && policy.preAuthorizedActions.includes("reply")
       && !policy.approval.some(clause => clause.action === "reply");
     const action = !canReply ? "Replies are blocked by the approved policy."
-      : trusted ? "Strelva may send ordinary replies under the approved policy; stricter approvals still apply."
-      : "Strelva reviews ordinary replies before sending; stricter approvals still apply.";
+      : trusted ? "Ordinary replies may be sent under the approved policy; stricter approvals still apply."
+      : "Ordinary replies are reviewed before sending; stricter approvals still apply.";
     const days = policy.hours.days.map(day => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]).join(", ");
     const limits = `Policy hours: ${days}, ${policy.hours.start}–${policy.hours.end} ${policy.hours.timezone}; up to ${policy.budget.dailyMessages} messages per day. Current business hours and sending permissions also apply.`;
     return [{ id: `${businessId}:${capability.id}:${policy.id}`, title: `Handle inquiries from ${site}`, status,
@@ -55,14 +57,24 @@ export function projectInquirySystemDetail(site: string, state: InquiryEngineSta
   const lifecycle = capabilities.some(item => inquiryCapabilityLifecycle(item.status) === "live") ? "live"
     : capabilities.some(item => inquiryCapabilityLifecycle(item.status) === "paused") ? "paused" : "draft";
   const uncertain = capabilities.some(item => item.status === "live_unverified" || item.status === "failed");
-  return { site, lifecycle, health: uncertain ? "The form's publication has not been confirmed." : "Whether the form delivers on the site has not been checked.",
+  const receiptActor = (value: unknown): RecordedActor | null => {
+    const parsed = recordedActor(value);
+    if (parsed) return parsed;
+    const legacy = value as { kind?: string; label?: string } | null;
+    return legacy?.kind === "person" && legacy.label ? recordedActor({ kind: "person", displayName: legacy.label }) : null;
+  };
+  const handlerActors = Object.fromEntries(capabilities.map(capability => {
+    const latestHandler = state?.actionReceipts.filter(receipt => receipt.capabilityId === capability.id && ["make_live", "resume"].includes(receipt.action)).at(-1);
+    return [capability.id, receiptActor(latestHandler?.actor)];
+  }));
+  return { site, handlerActors, lifecycle, health: uncertain ? "The form's publication has not been confirmed." : "Whether the form delivers on the site has not been checked.",
     running: businessId ? projectInquiryRunning(site, state, businessId) : [],
     forms: capabilities.flatMap(item => projectPublishedInquiry(item) ?? []),
     connections: [{ kind: "appears in", target: site, sentence: "Receives the site's forms. Pausing replies keeps incoming inquiries." },
       { kind: "reads", target: "Business details", sentence: "Uses the current owner, people, hours and services." },
       { kind: "acts on", target: "Email", sentence: "Each reply follows its approval and sending permissions. A sent message is never sent again." }],
     history: (state?.actionReceipts ?? []).filter(receipt => receipt.capabilityId && ["make_live", "verify_live", "undo", "pause", "resume", "publication_accepted", "publication_failed"].includes(receipt.action))
-      .map(receipt => ({ id: receipt.id, sentence: receipt.what.replace(/capability/gi, "inquiry form").replace(/rehearsal/gi, "test").replace(/agent/gi, "Strelva"), at: receipt.createdAt }))
+      .map(receipt => ({ id: receipt.id, actor: receiptActor(receipt.actor), sentence: actorCopy(receipt.what.replace(/capability/gi, "inquiry form").replace(/rehearsal/gi, "test"), receiptActor(receipt.actor)), at: receipt.createdAt }))
       .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 10) };
 }
 

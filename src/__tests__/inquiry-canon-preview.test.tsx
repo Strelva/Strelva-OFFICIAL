@@ -12,7 +12,7 @@ describe("isolated canon inquiry previews", () => {
   it("labels fictional replies and exposes one send action for the selected draft", () => {
     const html = render();
     expect(html).toContain("Fictional preview · no live actions");
-    expect(html).toContain("Reply drafted by Strelva · not sent");
+    expect(html).toContain("Reply drafted by Strelva Agency · Runs on Strelva · not sent");
     expect(html.match(/>Send reply</g)).toHaveLength(1);
     expect(html).toContain("dana@example.invalid");
     expect(html).toContain("does not send email");

@@ -1,3 +1,5 @@
+import { actorLabel, type RecordedActor } from "@/platform/presentation/actor";
+
 /**
  * The website System page's own lists (website System spec 2026-10-06,
  * behaviors 3, 4, 5 and 10): domains with their verification state, what is
@@ -45,7 +47,8 @@ export interface WebsiteHistoryItem {
   id: string;
   source: WebsiteHistorySource;
   at: string;
-  /** "Strelva", "You", "Your team". */
+  /** Compatibility display text, derived only from the recorded actor. */
+  actor?: RecordedActor | null;
   by: string;
   title: string;
   /** Where undo exists, in words; null when it does not (stated, not faked). */
@@ -80,14 +83,14 @@ export interface WebsiteSystemDetail {
   unavailable: string[];
 }
 
-export interface ContentVersionRow { id: string; section: string; author: "user" | "ai" | "admin"; timestamp: string; status: string; changes?: Array<{ field: string }>; requestId?: string }
-export interface SnapshotRow { id: string; label: string; reason: string; author: string; createdAt: string; status: string; restoredAt?: string }
-export interface DocumentRevisionRow { revision: number; contentHash: string; createdAt: string; createdBy: string; published: boolean }
-export interface ChangeRequestRow { requestId: string; title: string; kind: "custom_request" | "content_update"; status: string; createdAt: string; resolvedAt?: string; section?: string }
+export interface ContentVersionRow { actor?: RecordedActor | null; id: string; section: string; author: "user" | "ai" | "admin"; timestamp: string; status: string; changes?: Array<{ field: string }>; requestId?: string }
+export interface SnapshotRow { actor?: RecordedActor | null; id: string; label: string; reason: string; author: string; createdAt: string; status: string; restoredAt?: string }
+export interface DocumentRevisionRow { actor?: RecordedActor | null; revision: number; contentHash: string; createdAt: string; createdBy: string; published: boolean }
+export interface ChangeRequestRow { actor?: RecordedActor | null; requestId: string; title: string; kind: "custom_request" | "content_update"; status: string; createdAt: string; resolvedAt?: string; section?: string }
 export interface DecisionRow { id: string; title: string; detail: string | null; openedAt: string; openHref: string | null }
-export interface LinkedPublicationRow { revision: number; tenantSlugAtPublication: string; publishedAt: string; fallbackUntil: string; priorDeliveryModel: string }
+export interface LinkedPublicationRow { actor?: RecordedActor | null; revision: number; tenantSlugAtPublication: string; publishedAt: string; fallbackUntil: string; priorDeliveryModel: string }
 export interface ServiceRequestRow { id: string; outcome: string; createdAt: string; status: string; commitment: string | null }
-export interface RepoDeploymentRow { id: string; requestId: string; title: string; commitSha: string; deploymentUrl: string; readBack: "confirmed" | "not_confirmed" | "not_checked"; recordedAt: string }
+export interface RepoDeploymentRow { actor?: RecordedActor | null; id: string; requestId: string; title: string; commitSha: string; deploymentUrl: string; readBack: "confirmed" | "not_confirmed" | "not_checked"; recordedAt: string }
 
 export interface WebsiteDetailInputs {
   systemId: string;
@@ -113,7 +116,6 @@ export interface WebsiteDetailInputs {
 
 const SECTION_WORDS: Record<string, string> = { hero: "homepage banner", settings: "site settings", theme: "look and colors", faq: "questions and answers" };
 const sectionWords = (section: string) => SECTION_WORDS[section] ?? section.replace(/[_-]+/g, " ");
-const authorWords = (author: string) => author === "user" ? "You" : "Strelva";
 
 function requestStage(status: string): WebsiteRequestItem["stage"] {
   if (status === "shipped") return "done";
@@ -155,24 +157,24 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
   const history = newestFirst<WebsiteHistoryItem>([
     ...input.contentVersions.map(row => {
       const restore = row.changes?.some(change => change.field === "_restore");
-      return { id: `content:${row.id}`, source: "content" as const, at: row.timestamp, by: authorWords(row.author),
+      return { id: `content:${row.id}`, source: "content" as const, at: row.timestamp, actor: row.actor, by: actorLabel(row.actor),
         title: restore ? `Restored an earlier ${sectionWords(row.section)}` : `Updated the ${sectionWords(row.section)}`,
         undo: "Restore this saved content as a draft for review.", restore: { section: row.section, versionId: row.id } };
     }),
-    ...input.snapshots.map(row => ({ id: `snapshot:${row.id}`, source: "snapshot" as const, at: row.createdAt, by: row.author === "user" ? "You" : "Strelva",
+    ...input.snapshots.map(row => ({ id: `snapshot:${row.id}`, source: "snapshot" as const, at: row.createdAt, actor: row.actor, by: actorLabel(row.actor),
       title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Ask Strelva to prepare this exact saved copy for review before restoring it." : null,
       ...(row.status === "available" && input.workspaceId ? { restore: { kind: "snapshot" as const, snapshotId: row.id } } : {}) })),
     ...input.documentRevisions.map(row => ({ id: `document:${row.revision}:${row.contentHash.slice(0, 12)}`, source: "document" as const, at: row.createdAt,
-      by: row.createdBy === input.actorId ? "You" : "Strelva or your team",
+      actor: row.actor, by: actorLabel(row.actor),
       title: row.published ? `Published site revision ${row.revision}` : `Saved site revision ${row.revision}`,
       undo: row.revision < latestDocumentRevision ? "Save this earlier revision as a new candidate; you approve it before it goes live." : null,
       ...(input.workspaceId && input.workId && row.revision < latestDocumentRevision ? { restore: { kind: "document" as const, workId: input.workId, targetRevision: row.revision, targetContentHash: row.contentHash } } : {}) })),
-    ...input.linkedPublications.map(row => ({ id: `cutover:${row.revision}:${row.publishedAt}`, source: "document" as const, at: row.publishedAt, by: "You",
+    ...input.linkedPublications.map(row => ({ id: `cutover:${row.revision}:${row.publishedAt}`, source: "document" as const, at: row.publishedAt, actor: row.actor, by: actorLabel(row.actor),
       title: `Replaced the site at ${row.tenantSlugAtPublication} with revision ${row.revision}`,
       undo: Date.parse(row.fallbackUntil) > Date.now() ? `The old site is kept until ${row.fallbackUntil.slice(0, 10)}; Strelva can switch back until then.` : null })),
-    ...input.changeRequests.filter(row => row.kind === "custom_request" && row.status === "shipped").map(row => ({ id: `deploy:${row.requestId}`, source: "deploy" as const, at: row.resolvedAt ?? row.createdAt, by: "Strelva",
+    ...input.changeRequests.filter(row => row.kind === "custom_request" && row.status === "shipped").map(row => ({ id: `deploy:${row.requestId}`, source: "deploy" as const, at: row.resolvedAt ?? row.createdAt, actor: row.actor, by: actorLabel(row.actor),
       title: row.title, undo: "Strelva can redeploy the previous version." })),
-    ...(input.repoDeployments ?? []).map(row => ({ id: `deploy-receipt:${row.id}`, source: "deploy" as const, at: row.recordedAt, by: "Strelva",
+    ...(input.repoDeployments ?? []).map(row => ({ id: `deploy-receipt:${row.id}`, source: "deploy" as const, at: row.recordedAt, actor: row.actor, by: actorLabel(row.actor),
       title: row.readBack === "confirmed" ? `${row.title} · live and checked` : `${row.title} · deployed, not yet confirmed`,
       undo: "Ask Strelva to prepare a redeploy of the previous commit for approval.",
       deployment: { commitSha: row.commitSha, url: row.deploymentUrl, readBack: row.readBack } })),
@@ -186,7 +188,7 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
 
 /** Native rows already describe their mirrored System revision. Handled
  * receipts and revisions without a native row join that same History. */
-export function mergeWebsiteHistory(native: WebsiteHistoryItem[], system: Array<{ id: string; sentence: string; at: string; releaseRef?: string; implementationKind?: string }>): WebsiteHistoryItem[] {
+export function mergeWebsiteHistory(native: WebsiteHistoryItem[], system: Array<{ id: string; sentence: string; at: string; releaseRef?: string; implementationKind?: string; actor?: RecordedActor | null }>): WebsiteHistoryItem[] {
   const extra = system.filter(row => !native.some(item => {
     if (item.title === row.sentence && item.at === row.at) return true;
     if (!row.releaseRef) return false;
@@ -194,7 +196,7 @@ export function mergeWebsiteHistory(native: WebsiteHistoryItem[], system: Array<
     if (item.source === "document" && row.implementationKind === "website_document") return row.releaseRef.endsWith(`@${item.id.split(":")[1]}`);
     if (item.id.startsWith("deploy-receipt:")) return row.releaseRef.startsWith(`deploy:${item.id.slice("deploy-receipt:".length)}@`);
     return false;
-  })).map(row => ({ id: row.id, source: "system" as const, at: row.at, by: "Strelva", title: row.sentence, undo: null }));
+  })).map(row => ({ id: row.id, source: "system" as const, at: row.at, actor: row.actor, by: actorLabel(row.actor), title: row.sentence, undo: null }));
   return newestFirst([...native, ...extra]);
 }
 

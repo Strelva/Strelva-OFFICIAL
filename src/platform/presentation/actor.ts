@@ -9,6 +9,14 @@ export const recordedActorSchema = z.discriminatedUnion("kind", [
 ]);
 export type RecordedActor = z.infer<typeof recordedActorSchema>;
 
+export const ACTOR_NOT_RECORDED = "Actor not recorded";
+
+/** A receipt always discloses whether its actor identity is available. */
+export function actorLabel(actor: unknown): string {
+  const { name, credit } = actorPresentation(actor);
+  return name ? `${name}${credit ? ` · ${credit}` : ""}` : ACTOR_NOT_RECORDED;
+}
+
 export function recordedActor(value: unknown): RecordedActor | null {
   const parsed = recordedActorSchema.safeParse(value);
   return parsed.success ? parsed.data : null;

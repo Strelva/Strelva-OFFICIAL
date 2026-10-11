@@ -203,6 +203,22 @@ describe("POST with a workspace link", () => {
     expect(await res.text()).toContain(text.replace("'", "&#39;"));
   });
 
+  it("shows the recorded receipt actor, changed item and failed read-back after approval", async () => {
+    const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+    mockDecide.mockResolvedValueOnce({ status: "done_unverified", item: item({ state: "approved", openHref: `/workspace?workspaceId=${WS}&view=system&system=${ITEM}`, systemId: ITEM }), receipt: {
+      sentence: "North Studio published the contact form", actor: { kind: "agency", displayName: "North Studio" }, changed: "Contact form: shorter intake",
+      evidence: { providerAccepted: true, readBack: "not_verified" },
+    } });
+    const html = await (await post(signWorkspaceApproveToken(claims))).text();
+    expect(html).toContain("North Studio published the contact form");
+    expect(html).toContain("Runs on Strelva");
+    expect(html).toContain("Contact form: shorter intake");
+    expect(html).toContain("Confirmation is still pending");
+    expect(html).toContain("Open System");
+    expect(html).not.toContain("Confirmed live");
+    expect(html).not.toContain('method="POST"');
+  });
+
   it("a failure after an accepted effect reports uncertainty without inviting a retry", async () => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockDecide.mockRejectedValueOnce(new Error("db down"));

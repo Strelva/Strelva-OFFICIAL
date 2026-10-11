@@ -169,6 +169,7 @@ describe("deciding", () => {
     expect(result.status).toBe("done");
     expect(resolveEventAction).toHaveBeenCalledWith("fixture-firm", "evt-1", "approved", "owner-link:owner@example.test");
     expect(result.item).toMatchObject({ state: "approved", outcome: "done", receiptRef: "tenant_event:evt-1" });
+    expect(result.receipt).toMatchObject({ id: `decision:${item.id}`, store: "owner_decisions", changed: item.approveEffect });
     const replay = await svc.decide({ workspaceId: WS, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test" } });
     expect(replay.status).toBe("already_handled");
     expect(resolveEventAction).toHaveBeenCalledTimes(1);

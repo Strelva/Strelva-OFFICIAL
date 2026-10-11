@@ -1,4 +1,5 @@
 "use client";
+import { actorLabel } from "@/platform/presentation/actor";
 import { useEffect, useState, type ReactNode } from "react";
 import { StPage, StSection, StRows, StRow, StState, StSurface, StNotice, StEmpty, StSkeleton, StPill, StMono } from "@/components/ui/strelva/Kit";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
@@ -14,7 +15,7 @@ export function InquirySystemDetailView({ details, records }: { details: Inquiry
           <h3 className="text-base font-medium">{form.form.title}</h3><p className="text-sm text-gray-muted">{form.form.intro}</p>
           <fieldset disabled className="grid gap-4"><legend className="mb-4 text-xs text-gray-muted">A viewing copy of the published form. Messages are sent from the site.</legend>{form.form.fields.map(field => <label key={field.id} className="grid gap-2 text-sm">{field.label}{field.required ? " (required)" : ""}
             {field.kind === "select" ? <SelectInput defaultValue="" options={[{ value: "", label: "Choose an option" }, ...(field.options ?? []).map(option => ({ value: option, label: option }))]} /> : field.kind === "textarea" ? <TextArea placeholder={field.placeholder} /> : <TextInput type={field.kind === "phone" ? "tel" : field.kind === "email" || field.kind === "date" ? field.kind : "text"} placeholder={field.placeholder} />}
-          </label>)}</fieldset><p className="text-xs text-gray-muted">Handled by Strelva.</p>
+          </label>)}</fieldset><p className="text-xs text-gray-muted">{detail.handlerActors?.[form.capabilityId] ? `Handled by ${actorLabel(detail.handlerActors[form.capabilityId])}.` : actorLabel(null)}</p>
         </form>
       </StSurface>) : <StEmpty>No published form is recorded here yet. Incoming site inquiries still appear below.</StEmpty>}
     </StSection>)}</>
@@ -22,7 +23,7 @@ export function InquirySystemDetailView({ details, records }: { details: Inquiry
     <>{details.map(detail => <details key={detail.site} className="border-t border-gray-border pt-4">
       <summary className="min-h-12 cursor-pointer text-sm font-medium">Connections and History · {detail.site}</summary>
       <div className="grid gap-6 pt-4"><StSection title="Connections"><StRows>{detail.connections.map(connection => <StRow key={`${connection.kind}:${connection.target}`} kind={connection.kind} title={connection.target} detail={connection.sentence} />)}</StRows></StSection>
-      <StSection title="History">{detail.history.length ? <StRows>{detail.history.map(row => <StRow key={row.id} title={row.sentence} end={<StMono as="time" dateTime={row.at}>{new Date(row.at).toLocaleDateString()}</StMono>} />)}</StRows> : <StEmpty>{detail.formSource ? "The form’s change history is unavailable here." : "No published changes are recorded yet."}</StEmpty>}</StSection></div>
+      <StSection title="History">{detail.history.length ? <StRows>{detail.history.map(row => <StRow key={row.id} title={row.sentence} detail={actorLabel(row.actor)} end={<StMono as="time" dateTime={row.at}>{new Date(row.at).toLocaleDateString()}</StMono>} />)}</StRows> : <StEmpty>{detail.formSource ? "The form’s change history is unavailable here." : "No published changes are recorded yet."}</StEmpty>}</StSection></div>
     </details>)}</>
   </StPage>;
 }

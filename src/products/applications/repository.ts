@@ -1,3 +1,4 @@
+import { recordedActor } from "@/platform/presentation/actor";
 import { isCreatorDraftSnapshot } from "@/platform/workspaces/creator-draft-snapshot";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
@@ -202,6 +203,7 @@ function toPayload(work: SavedWork, state: ApplicationState): ApplicationPayload
     title: candidate.spec.title,
     createdBy: work.createdBy,
     createdAt: work.createdAt,
+    maintenanceActor: recordedActor((work.payload as Record<string, unknown>).maintenanceActor),
     history: state.history,
     spec: candidate.spec,
     specVersion: candidate.specVersion,
