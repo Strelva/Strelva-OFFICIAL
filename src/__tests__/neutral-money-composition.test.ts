@@ -25,7 +25,11 @@ describe('exact additive neutral money composition',()=>{
   expect(new Set(physical).size).toBe(physical.length);
   const coherenceTail = manifest.proposed.find((entry:{id:string}) => entry.id === 'coherence-identity-and-client-projections');
   expect(coherenceTail.status).toContain('held and unqualified');expect(coherenceTail.batch).toBeUndefined();
-  expect(coherenceTail.items).toHaveLength(5);
+  expect(coherenceTail.items).toHaveLength(6);
+  const privacy = coherenceTail.items.find((entry:{file:string}) => entry.file === '20261023130000_provider_change_actor_privacy.sql');
+  expect(privacy).toBeDefined();expect(privacy.rollback).toBeUndefined();
+  expect(createHash('sha256').update(readFileSync(`supabase/migrations/${privacy.file}`)).digest('hex')).toBe(privacy.sha256);
+  expect(privacy.rollbackStatus).toContain('no production application authorized');
   const versions=inventory.forwardFiles.map((name:string)=>name.slice(0,14));expect(exactForwardLedger(inventory,versions)).toEqual(versions);
   expect(()=>exactForwardLedger(inventory,physical.map(name=>name.slice(0,14)))).toThrow();
   expect(()=>exactForwardLedger(inventory,versions.slice(0,-1))).toThrow();expect(()=>exactForwardLedger(inventory,inventory.forwardFiles.filter((name:string)=>!name.startsWith('20261021140200_')&&!name.startsWith('20261022175100_')).map((name:string)=>name.slice(0,14)))).toThrow();expect(()=>exactForwardLedger(inventory,[...versions.slice(0,-1),'20990000000000'])).toThrow();expect(()=>exactForwardLedger(inventory,[...versions].reverse())).toThrow();

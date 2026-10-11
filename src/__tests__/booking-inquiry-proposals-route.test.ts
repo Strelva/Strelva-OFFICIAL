@@ -3,10 +3,11 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { PublicBookingError } from "@/platform/bookings/errors";
 const WS = "cf000000-0000-4000-8000-000000000001";
 const m = vi.hoisted(() => ({ enabled: true, actor: { userId: "cf000000-0000-4000-8000-000000000002", verifiedEmail: "owner@example.test" } as unknown,
-  manage: vi.fn(), context: vi.fn(), inquiry: vi.fn(), prepare: vi.fn(), send: vi.fn(), emailAllowed: true, options: vi.fn(), requireOffers: vi.fn(), limited: false }));
+  business: vi.fn(), manage: vi.fn(), context: vi.fn(), inquiry: vi.fn(), prepare: vi.fn(), send: vi.fn(), emailAllowed: true, options: vi.fn(), requireOffers: vi.fn(), limited: false }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/workspaces/http", async (importOriginal) => ({ ...await importOriginal<typeof import("@/platform/workspaces/http")>(), workspaceHttpActor: async () => m.actor }));
 vi.mock("@/products/scheduling/server", () => ({ assertWorkspaceCalendarManager: m.manage }));
+vi.mock("@/platform/bookings/native", () => ({ nativeRpc: m.business }));
 vi.mock("@/platform/bookings/store", () => ({ readBookingContext: m.context }));
 vi.mock("@/lib/leads", () => ({ getLeadById: m.inquiry }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: async () => m.limited }));
@@ -21,7 +22,7 @@ function post(patch: Record<string, unknown> = {}, origin = "https://app.strelva
 function get() { return GET(new Request(`https://app.strelva.test/api/workspace/bookings/propose-times?${new URLSearchParams({ workspaceId: WS, tenantId: "fixture", inquiryId: "inquiry-fixture" })}`)); }
 beforeEach(() => {
   vi.clearAllMocks(); m.enabled = true; m.emailAllowed = true; m.limited = false; m.actor = { userId: "cf000000-0000-4000-8000-000000000002", verifiedEmail: "owner@example.test" };
-  m.manage.mockResolvedValue(undefined); m.context.mockResolvedValue({ workspaceId: WS }); m.inquiry.mockResolvedValue({ name: "Dana Reed", email: "dana@example.test" });
+  m.business.mockResolvedValue({ name: "Recorded Business" }); m.manage.mockResolvedValue(undefined); m.context.mockResolvedValue({ workspaceId: WS }); m.inquiry.mockResolvedValue({ name: "Dana Reed", email: "dana@example.test" });
   m.prepare.mockResolvedValue({ id: "offer-fixture", serviceName: "Consultation" }); m.send.mockResolvedValue({ status: "accepted" });
   m.requireOffers.mockResolvedValue(undefined); m.options.mockResolvedValue({ services: [], slots: [], paused: false });
 });
@@ -52,8 +53,25 @@ describe("owner inquiry suggested-times route", () => {
     const response = await post(); expect((await response.json()).delivery).toBe("suppressed"); expect(m.send).not.toHaveBeenCalled();
     expect(m.prepare).toHaveBeenCalledWith({ tenantId: "fixture", inquiryId: "inquiry-fixture", serviceId: "consult", starts: INPUT.starts, source: "owner", customer: { name: "Dana Reed", email: "dana@example.test" } });
   });
+  it("holds missing or unreadable business identity without sending or losing the offer", async () => {
+    for (const name of [undefined, "", "   "]) {
+      m.business.mockResolvedValue({ name });
+      expect(await (await post()).json()).toMatchObject({ offer: { id: "offer-fixture" }, delivery: "identity_held" });
+    }
+    m.business.mockRejectedValue(new Error("identity unavailable"));
+    expect((await (await post()).json()).delivery).toBe("identity_held");
+    expect(m.send).not.toHaveBeenCalled();
+    expect(m.business).toHaveBeenCalledWith("read_booking_business_details", { p_tenant_id: "fixture" });
+  });
+  it("preserves a transport identity hold separately from an email pause", async () => {
+    m.send.mockResolvedValue({ status: "suppressed", reason: "business_identity_unavailable" });
+    expect((await (await post()).json()).delivery).toBe("identity_held");
+    m.send.mockResolvedValue({ status: "suppressed", reason: "email_suppressed_or_unconfigured" });
+    expect((await (await post()).json()).delivery).toBe("suppressed");
+    expect((await post({ businessName: "Spoofed Business" })).status).toBe(400);
+  });
   it("reports email provider acceptance separately from delivery and never hides a send failure", async () => {
-    expect((await (await post()).json()).delivery).toBe("accepted"); expect(m.send).toHaveBeenCalledWith(expect.objectContaining({ to: "dana@example.test", audience: "customer", tenantId: "fixture", idempotencyKey: "inquiry-offer:offer-fixture" }));
+    expect((await (await post()).json()).delivery).toBe("accepted"); expect(m.send).toHaveBeenCalledWith(expect.objectContaining({ to: "dana@example.test", authorship: "business", businessName: "Recorded Business", fromName: "Recorded Business", audience: "customer", tenantId: "fixture", idempotencyKey: "inquiry-offer:offer-fixture" }));
     m.send.mockRejectedValue(new Error("provider unavailable")); expect((await (await post()).json()).delivery).toBe("unavailable");
   });
 });

@@ -11,8 +11,8 @@ const OPTIONS: InquiryProposalOptions = {
 };
 export function ProposeBookingTimesPreview({ state = "ready" }: { state?: string }) {
   const data = state === "empty" ? { ...OPTIONS, slots: [] } : state === "paused" ? { ...OPTIONS, paused: true, slots: [] } : state === "no-services" ? { ...OPTIONS, services: [], serviceId: null, slots: [] } : OPTIONS;
-  const phase = ["idle", "loading", "permission", "error", "accepted", "suppressed", "unavailable"].includes(state) ? state as "idle" | "loading" | "permission" | "error" | "accepted" | "suppressed" | "unavailable" : "ready";
+  const phase = ["idle", "loading", "permission", "error", "accepted", "suppressed", "identity_held", "unavailable"].includes(state) ? state as "idle" | "loading" | "permission" | "error" | "accepted" | "suppressed" | "identity_held" | "unavailable" : "ready";
   return <ProposeBookingTimes key={state} workspaceId="cf000000-0000-4000-8000-000000000001" tenantId="fictional" inquiryId="fictional-inquiry" customerName="Dana Reed"
-    initial={{ phase, options: phase === "loading" ? undefined : data, selected: ["ready", "accepted", "suppressed", "unavailable"].includes(state) ? [OPTIONS.slots[0]!.start, OPTIONS.slots[2]!.start] : [], ...(phase === "error" ? { error: "Open times couldn't be read. Reload to try again." } : {}) }}
-    request={async (_input, init) => new Response(JSON.stringify(init?.method === "POST" ? { delivery: state === "suppressed" ? "suppressed" : state === "unavailable" ? "unavailable" : "accepted" } : data), { status: 200, headers: { "content-type": "application/json" } })} />;
+    initial={{ phase, options: phase === "loading" ? undefined : data, selected: ["ready", "accepted", "suppressed", "identity_held", "unavailable"].includes(state) ? [OPTIONS.slots[0]!.start, OPTIONS.slots[2]!.start] : [], ...(phase === "error" ? { error: "Open times couldn't be read. Reload to try again." } : {}) }}
+    request={async (_input, init) => new Response(JSON.stringify(init?.method === "POST" ? { delivery: state === "identity_held" ? "identity_held" : state === "suppressed" ? "suppressed" : state === "unavailable" ? "unavailable" : "accepted" } : data), { status: 200, headers: { "content-type": "application/json" } })} />;
 }

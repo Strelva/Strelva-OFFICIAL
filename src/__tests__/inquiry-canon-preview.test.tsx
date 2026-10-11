@@ -22,6 +22,13 @@ describe("isolated canon inquiry previews", () => {
     expect(render(state)).not.toContain(">Send reply<");
   });
 
+  it("keeps the System name when its calendar Connection stops answering", () => {
+    const html = render("disconnected", "system");
+    expect(html).toMatch(/<h1[^>]*>Inquiries<\/h1>/);
+    expect(html).toContain("Google Calendar stopped answering");
+    expect(html).not.toMatch(/<h1[^>]*>Mediation sessions<\/h1>/);
+  });
+
   it("names read-only limits without offering a live send", () => {
     const html = render("permission");
     expect(html).toContain("You can read inquiries but not reply");

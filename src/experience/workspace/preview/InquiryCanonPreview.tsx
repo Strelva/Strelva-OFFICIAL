@@ -27,7 +27,7 @@ export function InquiryCanonPreview({ view, state, mode, showDetail = false }: {
   const href = (next: InquiryCanonView) => inquiryCanonHref(next, mode);
   const choose = (person: Person) => { setSelected(person); setDraft(person.draft); setEditing(false); setPhoneDetail(true); setToast(""); };
   const pending = !sent.includes("dana") && !held;
-  const title = activeView === "record" ? "Test Person · Legal matter mediation" : currentState === "disconnected" ? "Mediation sessions" : "Inquiries";
+  const title = activeView === "record" ? "Test Person · Legal matter mediation" : "Inquiries";
 
   function failureState() {
     if (currentState === "loading") return <div className={styles.stack} aria-busy="true"><StMono>Reading · last good read 2:01 PM</StMono><StSkeleton label="Reading inquiries" /><StSkeleton width="86%" /><StSkeleton width="72%" /><p className={styles.muted}>Strelva is reading your inquiries. Replies are unavailable until this read finishes.</p></div>;

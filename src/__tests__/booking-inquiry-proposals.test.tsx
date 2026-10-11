@@ -80,3 +80,10 @@ describe("owner proposal states", () => {
     expect(render({ phase: "ready", options: { ...OPTIONS, paused: true } })).toContain("Bookings are paused");
   });
 });
+
+it("distinguishes an identity hold from paused email in owner copy", () => {
+  const html = renderToStaticMarkup(createElement(ProposeBookingTimes, { workspaceId: WS, tenantId: "fixture", inquiryId: LEAD.id, customerName: LEAD.name, initial: { phase: "identity_held", options: OPTIONS, selected: [OPTIONS.slots[0]!.start] } }));
+  expect(html).toContain("business identity could not be verified");
+  expect(html).toContain("customer has not been notified");
+  expect(html).not.toContain("Email is paused");
+});

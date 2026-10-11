@@ -21,6 +21,7 @@ import { InquiryProvider, type InquiryExperienceProps, useInquiry } from "./cont
 import type { InquiryView } from "./contracts";
 import { ViewRouter } from "./views";
 import styles from "./inquiry.module.css";
+import { inquiryActorLabel } from "./recorded-actors";
 
 export type { InquiryExperienceProps } from "./context";
 
@@ -95,7 +96,7 @@ function MissingAdapter() {
 function titleForView(view: InquiryView, audience: "business" | "agency"): string {
   if (view === "home") return audience === "agency" ? "Attention" : "Inquiries";
   return {
-    new: "New", shape: "Shape", work: "Work", plan: "Plan", preview: "Preview", rehearsal: "Rehearsal", receipt: "Receipt", search: "Search", record: "Records", why: "Why", responsibility: "Responsibility", connections: "Connections", onboarding: "Onboarding", account: "Account", attention: "Attention", patterns: "Patterns", home: "Inquiries",
+    new: "New", shape: "Shape", work: "Recent changes", plan: "Plan", preview: "Preview", rehearsal: "Rehearsal", receipt: "Receipt", search: "Search", record: "Records", why: "Why", responsibility: "Running", connections: "Connections", onboarding: "Onboarding", account: "Account", attention: "Attention", patterns: "Patterns", home: "Inquiries",
   }[view];
 }
 
@@ -113,7 +114,7 @@ function InquiryFrame() {
   const rightRail = selectedRecord ? <RecordTimelineRail /> : null;
   return (
     <div className={styles.experience} data-dashboard data-audience={audience} data-rehearsal={snapshot.rehearsal || view === "rehearsal" || undefined}>
-      <a className={styles.skip} href="#inquiry-main">Skip to inquiry work</a>
+      <a className={styles.skip} href="#inquiry-main">Skip to inquiries</a>
       <AppFrame
         className={styles.frame}
         navigationLabel="Inquiry navigation"
@@ -150,10 +151,10 @@ export function InquiryEmbeddedContent() {
 
 function InquiryEmbeddedNavigation() {
   const { view, navigate } = useInquiry();
-  return <nav className={styles.embeddedNav} aria-label="Inquiry work">
+  return <nav className={styles.embeddedNav} aria-label="Inquiries">
     <button type="button" className={view === "new" ? styles.embeddedNavActive : undefined} onClick={() => navigate("new")}>New</button>
     <button type="button" className={view === "search" ? styles.embeddedNavActive : undefined} onClick={() => navigate("search")}>Search</button>
-    <button type="button" className={view === "work" || view === "receipt" || view === "record" ? styles.embeddedNavActive : undefined} onClick={() => navigate("work")}>Recent work</button>
+    <button type="button" className={view === "work" || view === "receipt" || view === "record" ? styles.embeddedNavActive : undefined} onClick={() => navigate("work")}>Recent changes</button>
     <button type="button" className={view === "account" ? styles.embeddedNavActive : undefined} onClick={() => navigate("account")}>Account</button>
   </nav>;
 }
@@ -206,7 +207,7 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
       <button className={styles.mobileClose} type="button" onClick={onClose} aria-label="Close inquiry navigation"><X size={18} /></button>
     </div>
     <div className={styles.scopeBlock}><span className={styles.eyebrow}>{agency ? "CLIENT" : "BUSINESS"}</span><strong>{snapshot.business.name}</strong><small>{snapshot.business.domain || "Website not recorded"}</small></div>
-    <nav className={styles.sidebarNav} aria-label="Inquiry work">
+    <nav className={styles.sidebarNav} aria-label="Inquiries">
       <SidebarButton icon={Plus} label="New" active={view === "new"} onClick={() => { navigate("new"); onClose(); }} />
       <SidebarButton icon={Search} label="Search" active={view === "search"} onClick={() => { navigate("search"); onClose(); }} />
       <Link className={`${styles.sidebarButton} ${view === "attention" ? styles.sidebarButtonActive : ""}`} href={agency ? "/business" : "/business"} onClick={onClose} aria-current={view === "attention" ? "page" : undefined}><LayoutList size={17} strokeWidth={1.6} aria-hidden="true" /><span>{agency ? "Clients" : "Businesses"}</span></Link>
@@ -225,7 +226,7 @@ function RecordTimelineRail() {
   const { selectedRecord, snapshot } = useInquiry();
   if (!selectedRecord) return null;
   const events = snapshot.state.timeline.filter((event) => event.inquiryId === selectedRecord.id).sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
-  return <section className={styles.recordRailContent}><span className={styles.eyebrow}>EVIDENCE</span><h2 className="font-display">Record timeline</h2><p>Each event is retained with the inquiry record.</p>{snapshot.deliveryEvidence?.available === false ? <p role="status">Delivery evidence is unavailable right now. Provider outcomes may be missing.</p> : null}{events.length > 0 ? <ol className={styles.railTimeline}>{events.map((event) => <li key={event.id}><span className={styles.eventDot} aria-hidden="true" /><div><strong>{event.type.replaceAll("_", " ")}</strong><small>{event.summary}</small><small>{event.actor.label || event.actor.id} · {formatRailDate(event.at)} · {event.outcome}</small></div></li>)}</ol> : <p>No timeline events are recorded for this inquiry.</p>}</section>;
+  return <section className={styles.recordRailContent}><span className={styles.eyebrow}>EVIDENCE</span><h2 className="font-display">Record timeline</h2><p>Each event is retained with the inquiry record.</p>{snapshot.deliveryEvidence?.available === false ? <p role="status">Delivery evidence is unavailable right now. Provider outcomes may be missing.</p> : null}{events.length > 0 ? <ol className={styles.railTimeline}>{events.map((event) => <li key={event.id}><span className={styles.eventDot} aria-hidden="true" /><div><strong>{event.type.replaceAll("_", " ")}</strong><small>{event.summary}</small><small>{inquiryActorLabel(event.actor)} · {formatRailDate(event.at)} · {event.outcome}</small></div></li>)}</ol> : <p>No timeline events are recorded for this inquiry.</p>}</section>;
 }
 
 function formatRailDate(value: string): string {

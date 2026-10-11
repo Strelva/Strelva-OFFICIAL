@@ -36,6 +36,8 @@ it("shows actual staffed clients, role controls, and protected owner/self member
 it("keeps members read only with no invitation or assignment controls", async () => {
   const { node } = await render("member");
   expect(node.textContent).toContain("Only agency owners and admins");
+  expect(node.textContent).toContain("Assigning a client does not unlock Build for a client");
+  expect(node.textContent).toContain("prepare existing drafts only through separately authorized access");
   expect(node.querySelectorAll("input, select")).toHaveLength(0);
   expect(node.textContent).not.toContain("Remove staff");
 });

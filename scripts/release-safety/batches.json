@@ -1966,6 +1966,11 @@
           "file": "20261023123500_public_payment_business_identity.sql",
           "sha256": "d34475d4c1f18429f6b0e5baa472665436587da2339bbec768ff776728d55c7f",
           "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        },
+        {
+          "file": "20261023130000_provider_change_actor_privacy.sql",
+          "sha256": "588810749ffdd8bcb7fe310bc27673933ee4b888a52e10cd7e4a8196b543643a",
+          "rollbackStatus": "Privacy correction replaces only presentation; no inverse restoring requester email is prepared. Ordered SQL/hosted qualification remains held; no production application authorized."
         }
       ]
     }

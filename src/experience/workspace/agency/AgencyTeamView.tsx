@@ -74,7 +74,7 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
 
   return <div aria-busy={busy || undefined} className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email can act as client operators while the agency has an active agency seat and they remain on this team. Clients can end the agency’s access.</p>
+      <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email open Clients to review permitted Systems while agency access and their team membership remain active. They can prepare existing drafts only through separately authorized access. Assigning a client does not unlock Build for a client: that requires an agency owner or admin with current owner or admin authoring access to that business. Clients can end the agency’s access.</p>
       <StTextButton disabled={busy} onClick={reload}>Reload team</StTextButton>
     </div>
     {!team.canManage ? <StNotice>Only agency owners and admins can invite people or change client assignments.</StNotice> : null}
