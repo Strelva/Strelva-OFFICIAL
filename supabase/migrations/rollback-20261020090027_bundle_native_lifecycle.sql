@@ -1,0 +1,26 @@
+-- Preserve real destination bindings, owner preparations and release receipts.
+begin;
+set local lock_timeout='2s';
+do $$ begin if exists(select 1 from public.system_bundle_native_bindings) or exists(select 1 from public.system_bundle_native_preparations) or exists(select 1 from public.system_bundle_native_release_receipts) then raise exception 'system_bundle_native_receipts_require_preservation';end if;end $$;
+drop function public.read_version_native_runtime(uuid,uuid,text,uuid);
+alter function public.read_version_native_runtime_bundle_core(uuid,uuid,text,uuid) rename to read_version_native_runtime;
+revoke all on function public.read_version_native_runtime(uuid,uuid,text,uuid) from public,anon,authenticated;
+grant execute on function public.read_version_native_runtime(uuid,uuid,text,uuid) to service_role;
+drop trigger system_bundle_inquiry_live_gate on public.inquiry_workspaces;
+drop function public.system_bundle_inquiry_live_gate();
+drop function public.publish_website_document(uuid,uuid,uuid,text,integer,text,text,jsonb);
+alter function public.publish_website_document_bundle_core(uuid,uuid,uuid,text,integer,text,text,jsonb) rename to publish_website_document;
+revoke all on function public.publish_website_document(uuid,uuid,uuid,text,integer,text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.publish_website_document(uuid,uuid,uuid,text,integer,text,text,jsonb) to service_role;
+drop function public.publish_website_document_to_linked_tenant(uuid,uuid,uuid,text,integer,text,text,jsonb);
+alter function public.publish_website_document_to_linked_tenant_bundle_core(uuid,uuid,uuid,text,integer,text,text,jsonb) rename to publish_website_document_to_linked_tenant;
+revoke all on function public.publish_website_document_to_linked_tenant(uuid,uuid,uuid,text,integer,text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.publish_website_document_to_linked_tenant(uuid,uuid,uuid,text,integer,text,text,jsonb) to service_role;
+drop function public.install_system_bundle(uuid,uuid,text,uuid,uuid,uuid,integer,uuid,text,jsonb,bigint,integer,integer,jsonb,jsonb);
+alter function public.install_system_bundle_native_binding_core(uuid,uuid,text,uuid,uuid,uuid,integer,uuid,text,jsonb,bigint,integer,integer,jsonb,jsonb) rename to install_system_bundle;
+revoke all on function public.install_system_bundle(uuid,uuid,text,uuid,uuid,uuid,integer,uuid,text,jsonb,bigint,integer,integer,jsonb,jsonb) from public,anon,authenticated;
+grant execute on function public.install_system_bundle(uuid,uuid,text,uuid,uuid,uuid,integer,uuid,text,jsonb,bigint,integer,integer,jsonb,jsonb) to service_role;
+drop function public.reconcile_bundle_inquiry_releases(uuid,text),public.reconcile_bundle_native_releases(uuid,uuid),public.system_bundle_assert_native_publication(uuid,uuid,jsonb),public.read_bundle_native_preparation(uuid,uuid,text,uuid,bigint),public.commit_bundle_native_preparation(uuid,uuid,text,uuid,bigint,integer,integer,jsonb),public.system_bundle_native_receipt(public.system_bundle_native_preparations),public.system_bundle_working_definition(public.system_versions);
+drop table public.system_bundle_native_release_receipts,public.system_bundle_native_preparations,public.system_bundle_native_bindings;
+drop function public.system_bundle_native_history_immutable();
+commit;

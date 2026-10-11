@@ -1,3 +1,5 @@
+import { DashboardBackBar } from "@/experience/workspace/DashboardBackBar";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -88,8 +90,8 @@ export default async function DashboardLayout({
   }
   const requestHost = requestHeaders.get("host") || "";
   const hostname = requestHost.toLowerCase().split(":")[0];
-  const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === "app.strelva.com" || hostname?.endsWith(".vercel.app")
-    ? "" : "https://app.strelva.com";
+  const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === new URL(CONTROL_PLANE_URL).hostname || hostname?.endsWith(".vercel.app")
+    ? "" : CONTROL_PLANE_URL;
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
   // The same framing the workspace website uses (src/lib/website-page-data.ts).
@@ -209,12 +211,7 @@ export default async function DashboardLayout({
           </div>
         )}
         {ownerEntry.kind === "render-with-back" && (
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black" data-owner-entry-back={ownerEntry.route}>
-            <span>This page hasn&apos;t moved to your workspace yet.</span>
-            <a href={ownerEntry.homeHref} className="font-semibold text-accent underline-offset-2 hover:underline focus-visible:underline">
-              Back to {siteName}
-            </a>
-          </div>
+          <DashboardBackBar businessName={siteName} homeHref={ownerEntry.homeHref} route={ownerEntry.route} />
         )}
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { QUEUE_KINDS, type QueueContext, type QueueItemRaw, type QueueKind, type QueueMark } from "@/platform/operator-queue/contracts";
 import { projectQueue, type SourceRead } from "@/platform/operator-queue/project";
-import { buildAgencyQueue } from "@/platform/operator-queue/agency-queue";
 import { EFFORT_CATEGORY_BY_KIND, prefillMinutes, priorityFor } from "@/platform/operator-queue/rules";
 import { UNDO_RULES } from "@/platform/operator-queue/undo";
 import { buildDomainView } from "@/platform/operator-queue/domain-view";
@@ -95,6 +94,12 @@ describe("operator queue projection", () => {
     expect(queue.items.some((item) => item.kind === "change_request")).toBe(false);
   });
 
+  it("a missing source is an explicit gap even if every attempted read succeeded", () => {
+    const queue = projectQueue({ reads: reads().filter((read) => read.kind !== "assignment_offer"), context: context(), tenants, emailPaused: false, now: NOW });
+    expect(queue.complete).toBe(false);
+    expect(queue.gaps).toEqual([{ kind: "assignment_offer", source: "assignment offer", reason: "Source was not read" }]);
+  });
+
   it("without Postgres the marks are unknown, so the list is incomplete", () => {
     const queue = projectQueue({ reads: reads(), context: null, contextFailure: "Queue storage is unavailable.", tenants, emailPaused: false, now: NOW });
     expect(queue.complete).toBe(false);
@@ -166,6 +171,9 @@ describe("operator queue projection", () => {
 });
 
 describe("priority and clocks", () => {
+  it("does not describe an uncertain provider dispatch as accepted", () => {
+    expect(priorityFor(raw("readback_failed", { facts: { writeAcceptance: "unknown" } }), NOW)).toMatchObject({ priority: "P1", reason: "The provider's acceptance is uncertain. Never re-sent automatically." });
+  });
   it("raises a draft older than 80 days to P2 with days left", () => {
     const opened = NOW - 85 * DAY;
     const result = priorityFor(raw("draft_review", { openedAt: iso(opened), facts: { expiresAt: iso(opened + 90 * DAY) } }), NOW);
@@ -213,19 +221,6 @@ describe("undo labels", () => {
     expect(UNDO_RULES.review_reply.label).toBe("Google review replies can't be undone from Strelva. You can edit or delete the reply in Google.");
     expect(UNDO_RULES.gbp_hours.undo).toBe("put_back_draft");
     expect(UNDO_RULES.content_publish.undo).toBe("available");
-  });
-});
-
-describe("agency queue view model", () => {
-  it("shows only delegated businesses and never Strelva-only kinds", () => {
-    const queue = projectQueue({ reads: reads(), context: context(), tenants, emailPaused: false, now: NOW });
-    const view = buildAgencyQueue(queue, context().delegations, AGENCY);
-    expect(view.groups.map((group) => group.workspaceId)).toEqual([WORKSPACE]);
-    const kinds = view.groups.flatMap((group) => group.items.map((item) => item.kind));
-    expect(kinds).not.toContain("lead_unkept");
-    expect(kinds).not.toContain("prospect_lead");
-    expect(kinds).toEqual(expect.arrayContaining(["operational_exception", "assignment_offer"]));
-    expect(buildAgencyQueue(queue, context().delegations, OTHER_WORKSPACE).total).toBe(0);
   });
 });
 

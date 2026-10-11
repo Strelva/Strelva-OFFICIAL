@@ -42,6 +42,8 @@ function createClient(cli: (...args: string[]) => unknown) {
     exists: async (...keys: string[]) => cli("EXISTS", ...keys),
     pttl: async (key: string) => cli("PTTL", key),
     type: async (key: string) => cli("TYPE", key),
+    hgetall: async <T = Record<string, unknown>>(key: string) => cli("HGETALL", key) as T | null,
+    lrange: async <T = unknown[]>(key: string, start: number, stop: number) => (cli("LRANGE", key, String(start), String(stop)) as unknown[]).map(decode) as T,
     sadd: async (key: string, ...members: string[]) => cli("SADD", key, ...members),
     srem: async (key: string, ...members: string[]) => cli("SREM", key, ...members),
     smembers: async (key: string) => cli("SMEMBERS", key),

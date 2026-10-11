@@ -9,6 +9,7 @@ import { createFixtureCalendarAdapter } from "./fixture";
 import type { CalendarEvent } from "./contracts";
 import {
   getWorkspaceCalendarConnection,
+  markWorkspaceCalendarConnectionError,
   readCalendarEventReceipt,
   saveCalendarEventReceipt,
   type CalendarEventReceipt,
@@ -74,7 +75,17 @@ export async function readWorkspaceProviderAvailability(actor: WorkspaceActor, w
   connectionReady(bound);
   const input = calendarAvailabilityQuerySchema.parse({ calendarId: bound.calendarId, start: query.start, end: query.end, timeZone: query.timeZone || bound.timeZone });
   const adapter = environmentAdapter(provider);
-  return { provider, timeZone: input.timeZone, ...(await adapter.availability(bound, input)) };
+  try {
+    return { provider, timeZone: input.timeZone, ...(await adapter.availability(bound, input)) };
+  } catch (error) {
+    if (error instanceof CalendarProviderError && error.code === "unauthorized") {
+      // Record authentication failure against only the connection we actually read.
+      // A newly reconnected calendar must not be marked bad by an older request.
+      await markWorkspaceCalendarConnectionError(actor, workspaceId, provider,
+        "Calendar authorization was rejected. Reconnect the calendar.", bound.updatedAt).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 function parseProvider(value: unknown): "outlook" | "google" {

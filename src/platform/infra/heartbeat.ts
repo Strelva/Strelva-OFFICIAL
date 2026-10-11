@@ -32,6 +32,7 @@ export interface Heartbeat {
  * literal keys so the two stay in sync automatically.
  */
 const _CRON_SCHEDULE = {
+  "split-payouts": 26 * 3600, // daily, dry-run only
   maintenance: 26 * 3600, // daily
   "portfolio-scan": 26 * 3600, // daily
   staleness: 26 * 3600, // daily
@@ -39,6 +40,8 @@ const _CRON_SCHEDULE = {
   "daily-summary": 26 * 3600, // daily
   "poll-yelp": 26 * 3600, // daily
   "poll-google-reviews": 26 * 3600, // daily
+  "google-content-retention": 3 * 3600, // hourly, independent provider snapshot expiry
+  "google-review-content-retention": 3 * 3600, // hourly, independent of Google release
   "poll-instagram": 26 * 3600, // daily
   "attention-digest": 26 * 3600, // daily
   "ops-digest": 26 * 3600, // daily
@@ -52,11 +55,14 @@ const _CRON_SCHEDULE = {
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h
   "inquiry-follow-ups": 3 * 3600, // hourly
+  "newsletter-sender": 30 * 60, // every 5 min, independently release-gated
   "needs-you": 3 * 3600, // hourly, independently release-gated
   "workspace-work": 30 * 60, // every 5 min, independently release-gated
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
+  "workspace-export-recovery": 30 * 60, // every ten minutes, default-off durable export recovery
   "lead-mirror-reconcile": 3 * 3600, // hourly — retries client leads not yet in Postgres
   "booking-reminders": 45 * 60, // every 15 min — reminders, request clock, hold sweep (release-gated)
+  "booking-parity": 26 * 3600, // daily — booking and 60-day slot parity, read-only
   "client-records-parity": 26 * 3600, // daily — read-only Redis/Postgres compare, records parity
   "connected-sites-purge": 26 * 3600, // daily — connected-site event and held-spam retention, release-gated
   "website-domain-verification": 10 * 60, // every minute, bounded domain polling

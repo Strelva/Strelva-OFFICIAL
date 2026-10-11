@@ -1,0 +1,1379 @@
+{
+  "date": "2026-10-07",
+  "browser": "installed Playwright Chromium; fallback after T3 host disconnected",
+  "transport": "ProposeBookingTimesPreview injected request returns local Response only; external resources blocked",
+  "bound": {
+    "checked": 3,
+    "unselectedDisabled": true
+  },
+  "focus": {
+    "tag": "INPUT",
+    "checked": true,
+    "outline": "rgb(124, 154, 142) dashed 2px",
+    "shadow": "none"
+  },
+  "captures": [
+    {
+      "state": "ready",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n2 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\n\nReply to Dana Reed · dana@example.test\n\nThe business suggested these times. Choose one to request it. The business will confirm your request.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST\nSend suggested times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Send suggested times",
+            "height": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 2
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "idle",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose booking times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Propose booking times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nReading current services and open times…",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nSign in as this business's owner or an admin to propose times.",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nOpen times couldn't be read. Reload to try again.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n0 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 32,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\n\nNo open times are available in the next 60 days.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nBookings are paused. Existing bookings stay kept; new times cannot be proposed.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "no-services",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nNo request-mode booking service is available. Ask Strelva to set one up.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 32,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "accepted",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe email provider accepted these suggestions. Customer delivery is not yet verified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "suppressed",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared. Email is disabled, so the customer has not been notified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "unavailable",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared, but email delivery could not be confirmed. Check the inquiry before trying again.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "ready",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n2 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\n\nReply to Dana Reed · dana@example.test\n\nThe business suggested these times. Choose one to request it. The business will confirm your request.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST\nSend suggested times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Send suggested times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 2
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "propose-ready-390.png"
+      }
+    },
+    {
+      "state": "idle",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose booking times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Propose booking times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nReading current services and open times…",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nSign in as this business's owner or an admin to propose times.",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nOpen times couldn't be read. Reload to try again.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n0 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\n\nNo open times are available in the next 60 days.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nBookings are paused. Existing bookings stay kept; new times cannot be proposed.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "no-services",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nNo request-mode booking service is available. Ask Strelva to set one up.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "accepted",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe email provider accepted these suggestions. Customer delivery is not yet verified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "suppressed",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared. Email is disabled, so the customer has not been notified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "propose-suppressed-390.png"
+      }
+    },
+    {
+      "state": "unavailable",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared, but email delivery could not be confirmed. Check the inquiry before trying again.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "ready",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n2 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\n\nReply to Dana Reed · dana@example.test\n\nThe business suggested these times. Choose one to request it. The business will confirm your request.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST\nSend suggested times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": true
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Send suggested times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 2
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "idle",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose booking times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Propose booking times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nReading current services and open times…",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "permission",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nSign in as this business's owner or an admin to propose times.",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "error",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nOpen times couldn't be read. Reload to try again.\n\nService\nConsultation · 30 min\nOpen times · America/New_York\n\n0 of 3 selected. Availability is checked again before the suggestions are prepared.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 12:00 PM EST\nFri, Nov 6, 2:00 PM EST\nMon, Nov 9, 10:00 AM EST\nMon, Nov 9, 12:00 PM EST\nMon, Nov 9, 2:00 PM EST\nTue, Nov 10, 10:00 AM EST\nTue, Nov 10, 12:00 PM EST\nTue, Nov 10, 2:00 PM EST\nWed, Nov 11, 10:00 AM EST\nWed, Nov 11, 12:00 PM EST\nWed, Nov 11, 2:00 PM EST\nShow more open times\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "",
+            "height": 16,
+            "disabled": false,
+            "checked": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Show more open times",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44,
+          44
+        ],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "empty",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nService\nConsultation · 30 min\n\nNo open times are available in the next 60 days.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "Consultation · 30 min",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "paused",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nBookings are paused. Existing bookings stay kept; new times cannot be proposed.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "no-services",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nNo request-mode booking service is available. Ask Strelva to set one up.\n\nReload open times",
+        "controls": [
+          {
+            "tag": "BUTTON",
+            "name": "Reload open times",
+            "height": 44,
+            "disabled": false
+          }
+        ],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "accepted",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe email provider accepted these suggestions. Customer delivery is not yet verified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "suppressed",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared. Email is disabled, so the customer has not been notified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "unavailable",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe suggestions are prepared, but email delivery could not be confirmed. Check the inquiry before trying again.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "interaction-accepted-three",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional inquiry · no provider sends\n\nDana's consultation inquiry\nPropose times for Dana Reed\n\nChoose up to three open times. They choose one to request it; the business confirms the booking.\n\nThe email provider accepted these suggestions. Customer delivery is not yet verified.\n\nFri, Nov 6, 10:00 AM EST\nFri, Nov 6, 2:00 PM EST\nFri, Nov 6, 12:00 PM EST",
+        "controls": [],
+        "labels": [],
+        "checked": 0
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    }
+  ]
+}

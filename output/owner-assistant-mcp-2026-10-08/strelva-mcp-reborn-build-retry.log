@@ -1,0 +1,667 @@
+▲ Next.js 16.3.6 (webpack)
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead.
+✓ Running next.config.ts took 297ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+[@sentry/nextjs] Could not find `onRequestError` hook in instrumentation file. This indicates outdated configuration of the Sentry SDK. Use `Sentry.captureRequestError` to instrument the `onRequestError` hook: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#errors-from-nested-react-server-components
+[@sentry/nextjs] It seems like you don't have a global error handler set up. It is recommended that you add a 'global-error.js' file with Sentry instrumentation so that React rendering errors are reported to Sentry. Read more: https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#react-render-errors-in-app-router (you can suppress this warning by setting SENTRY_SUPPRESS_GLOBAL_ERROR_HANDLER_FILE_WARNING=1 as environment variable)
+[@sentry/nextjs] DEPRECATION WARNING: It is recommended renaming your `sentry.client.config.ts` file, or moving its content to `instrumentation-client.ts`. When using Turbopack `sentry.client.config.ts` will no longer work. Read more about the `instrumentation-client.ts` file: https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation-client
+(node:12431) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/is-reference@1.2.1/node_modules/is-reference/dist/is-reference' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/is-reference@1.2.1/node_modules/is-reference/dist/is-reference.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/is-reference@1.2.1/node_modules/is-reference/dist/is-reference.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/is-reference@1.2.1/node_modules/is-reference/dist/is-reference
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/@rollup+rollup-darwin-arm64@4.60.0/node_modules/@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+rollup-darwin-arm64@4.60.0/node_modules/@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/@rollup+rollup-darwin-arm64@4.60.0/node_modules/@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/@rollup+rollup-darwin-arm64@4.60.0/node_modules/@rollup/rollup-darwin-arm64/rollup.darwin-arm64.node
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/native.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/native.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/rollup@4.60.0/node_modules/rollup/dist/rollup.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/picomatch@4.0.4/node_modules/picomatch/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/picomatch@4.0.4/node_modules/picomatch/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/picomatch@4.0.4/node_modules/picomatch/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/picomatch@4.0.4/node_modules/picomatch/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/fdir@6.5.0_picomatch@4.0.4/node_modules/fdir/dist/index.cjs
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/@sentry+core@10.51.0/node_modules/@sentry/core/build/cjs/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+core@10.51.0/node_modules/@sentry/core/build/cjs/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/@sentry+core@10.51.0/node_modules/@sentry/core/build/cjs/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/@sentry+core@10.51.0/node_modules/@sentry/core/build/cjs/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.umd' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.umd.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.umd.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/@jridgewell+sourcemap-codec@1.5.5/node_modules/@jridgewell/sourcemap-codec/dist/sourcemap-codec.umd
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/magic-string@0.30.21/node_modules/magic-string/dist/magic-string.cjs.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/commondir@1.0.1/node_modules/commondir/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/commondir@1.0.1/node_modules/commondir/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/commondir@1.0.1/node_modules/commondir/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/commondir@1.0.1/node_modules/commondir/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/picomatch@4.0.4/node_modules/picomatch/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/picomatch@4.0.4/node_modules/picomatch/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/picomatch@4.0.4/node_modules/picomatch/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/picomatch@4.0.4/node_modules/picomatch/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/estree-walker@2.0.2/node_modules/estree-walker/dist/umd/estree-walker
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w> [webpack.cache.PackFileCacheStrategy/webpack.FileSystemInfo] Resolving '.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index' in /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs for build dependencies doesn't lead to expected result '/private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js', but to '/Users/jacobrhinehart/Desktop/strelva/REB/node_modules/.pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index.js' instead. Resolving dependencies are ignored for this path.
+<w>  at unknown 4 .pnpm/@rollup+pluginutils@5.3.0_rollup@4.60.0/node_modules/@rollup/pluginutils/dist/cjs/index
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@rollup+plugin-commonjs@28.0.1_rollup@4.60.0/node_modules/@rollup/plugin-commonjs/dist/cjs/index.js
+<w>  at file dependencies /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at file /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+<w>  at resolve commonjs /private/tmp/strelva-money-apps-combined/node_modules/.pnpm/@sentry+nextjs@10.51.0_@opentelemetry+core@2.8.0_@opentelemetry+api@1.9.1__@opentelemet_062c02210a2e27f669f8d93b41940fa8/node_modules/@sentry/nextjs/build/cjs/config/loaders/wrappingLoader.js
+⚠ Compiled with warnings in 59s
+
+./src/lib/health.ts
+Should not import the named export 'version' (imported as 'productVersion') from default-exporting module (only default export is available soon)
+
+Import trace for requested module:
+./src/lib/health.ts
+./src/app/api/health/route.ts
+
+  Running TypeScript ...
+  Finished TypeScript in 21.3s ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/248) ...
+  Generating static pages using 13 workers (62/248)
+  Generating static pages using 13 workers (124/248)
+  Generating static pages using 13 workers (186/248)
+✓ Generating static pages using 13 workers (248/248) in 2.8s
+  Finalizing page optimization ...
+  Collecting build traces ...
+
+Route (app)
+┌ ƒ /
+├ ○ /_not-found
+├ ƒ /.well-known/oauth-authorization-server
+├ ƒ /.well-known/oauth-protected-resource
+├ ƒ /.well-known/oauth-protected-resource/api/mcp/public
+├ ƒ /[...sitePath]
+├ ƒ /about
+├ ○ /access-request
+├ ƒ /account
+├ ƒ /admin
+├ ƒ /admin/accounts
+├ ƒ /admin/actions
+├ ƒ /admin/analytics
+├ ƒ /admin/audit
+├ ƒ /admin/client-leads
+├ ƒ /admin/client-leads/inquiries
+├ ƒ /admin/clients
+├ ƒ /admin/clients/[id]
+├ ○ /admin/digests
+├ ƒ /admin/drafts
+├ ƒ /admin/leads
+├ ƒ /admin/needs-you
+├ ○ /admin/onboard
+├ ƒ /admin/ops
+├ ○ /admin/pay-links
+├ ƒ /admin/queue
+├ ○ /admin/tenants
+├ ƒ /admin/tenants/[id]
+├ ƒ /admin/uptime
+├ ƒ /admin/websites
+├ ƒ /admin/work
+├ ƒ /agency-applications/[workId]
+├ ƒ /agency-websites/[bindingId]
+├ ƒ /ai-visibility
+├ ƒ /ai-visibility/[id]
+├ ƒ /api/access-request/intake
+├ ƒ /api/activity
+├ ƒ /api/admin/accounts
+├ ƒ /api/admin/accounts/[id]
+├ ƒ /api/admin/agent
+├ ƒ /api/admin/audit
+├ ƒ /api/admin/businesses/[id]/booking-email
+├ ƒ /api/admin/client-leads
+├ ƒ /api/admin/client-leads/connected-owner-notice
+├ ƒ /api/admin/client-leads/held
+├ ƒ /api/admin/client-leads/owner-notice
+├ ƒ /api/admin/component-registry
+├ ƒ /api/admin/domain-monitor/scan
+├ ƒ /api/admin/domains
+├ ƒ /api/admin/drafts
+├ ƒ /api/admin/inspect
+├ ƒ /api/admin/invites
+├ ƒ /api/admin/leads/[token]/workflow
+├ ƒ /api/admin/mail-logs
+├ ƒ /api/admin/maintenance-digest
+├ ƒ /api/admin/make-real
+├ ƒ /api/admin/ops
+├ ƒ /api/admin/ops/retry-revalidation
+├ ƒ /api/admin/pay-links
+├ ƒ /api/admin/portfolio
+├ ƒ /api/admin/provision
+├ ƒ /api/admin/revalidation-status
+├ ƒ /api/admin/scan
+├ ƒ /api/admin/scan/all
+├ ƒ /api/admin/tenants
+├ ƒ /api/admin/tenants/[id]/analytics-config
+├ ƒ /api/admin/tenants/[id]/billing-portal
+├ ƒ /api/admin/tenants/[id]/cancel-subscription
+├ ƒ /api/admin/tenants/[id]/capability-manifest
+├ ƒ /api/admin/tenants/[id]/connections
+├ ƒ /api/admin/tenants/[id]/crm
+├ ƒ /api/admin/tenants/[id]/deprovision
+├ ƒ /api/admin/tenants/[id]/domains
+├ ƒ /api/admin/tenants/[id]/goal
+├ ƒ /api/admin/tenants/[id]/lifecycle-email
+├ ƒ /api/admin/tenants/[id]/members
+├ ƒ /api/admin/tenants/[id]/operator-settings
+├ ƒ /api/admin/tenants/[id]/owner-invitations
+├ ƒ /api/admin/tenants/[id]/redeploy
+├ ƒ /api/admin/tenants/[id]/release-flags
+├ ƒ /api/admin/tenants/[id]/rename
+├ ƒ /api/admin/tenants/[id]/reviews-intel
+├ ƒ /api/admin/tenants/[id]/visibility
+├ ƒ /api/admin/tenants/assign
+├ ƒ /api/admin/test-error
+├ ƒ /api/admin/workspaces/[id]/action-approvals
+├ ƒ /api/agency-application-draft-access
+├ ƒ /api/agency-applications
+├ ƒ /api/agency-brand/logo/[workspaceId]/[digest]
+├ ƒ /api/agency-onboarding
+├ ƒ /api/agency-website-draft-access
+├ ƒ /api/agent
+├ ƒ /api/agent-access
+├ ƒ /api/agent-access/work/[workId]
+├ ƒ /api/agent/usage
+├ ƒ /api/ai-visibility
+├ ƒ /api/ai-visibility/[id]
+├ ƒ /api/ai-visibility/[id]/monitor
+├ ƒ /api/analytics
+├ ƒ /api/approve
+├ ƒ /api/apps/[workId]
+├ ƒ /api/apps/[workId]/access
+├ ƒ /api/audit/lead
+├ ƒ /api/audit/report
+├ ƒ /api/audit/report/[id]
+├ ƒ /api/audit/scan
+├ ƒ /api/billing/create-subscription
+├ ƒ /api/billing/portal
+├ ƒ /api/billing/start-subscription
+├ ƒ /api/billing/webhook
+├ ƒ /api/booking
+├ ƒ /api/booking/[id]
+├ ƒ /api/booking/availability
+├ ƒ /api/booking/config
+├ ƒ /api/booking/list
+├ ƒ /api/booking/overrides
+├ ƒ /api/bounded-work
+├ ƒ /api/change-requests
+├ ƒ /api/chat
+├ ƒ /api/checkout
+├ ƒ /api/collections/[type]
+├ ƒ /api/connections
+├ ƒ /api/connections/calendly
+├ ƒ /api/connections/google
+├ ƒ /api/connections/google/resources
+├ ƒ /api/connections/instagram
+├ ƒ /api/connections/yelp
+├ ƒ /api/content/[section]
+├ ƒ /api/content/[section]/versions
+├ ƒ /api/content/testimonials/append
+├ ƒ /api/cron/attention-digest
+├ ƒ /api/cron/booking-parity
+├ ƒ /api/cron/booking-reminders
+├ ƒ /api/cron/client-records-parity
+├ ƒ /api/cron/connected-sites-purge
+├ ƒ /api/cron/daily-summary
+├ ƒ /api/cron/domain-monitor
+├ ƒ /api/cron/governed-work-reconcile
+├ ƒ /api/cron/heartbeat
+├ ƒ /api/cron/inquiry-follow-ups
+├ ƒ /api/cron/lead-mirror-reconcile
+├ ƒ /api/cron/maintenance
+├ ƒ /api/cron/maintenance-digest
+├ ƒ /api/cron/monthly-report
+├ ƒ /api/cron/needs-you
+├ ƒ /api/cron/newsletter-sender
+├ ƒ /api/cron/ops-digest
+├ ƒ /api/cron/order-review-request
+├ ƒ /api/cron/poll-google-reviews
+├ ƒ /api/cron/poll-instagram
+├ ƒ /api/cron/poll-yelp
+├ ƒ /api/cron/portfolio-scan
+├ ƒ /api/cron/portfolio-snapshot
+├ ƒ /api/cron/revalidation-reconcile
+├ ƒ /api/cron/review-auto-post
+├ ƒ /api/cron/review-nudge
+├ ƒ /api/cron/search-console
+├ ƒ /api/cron/staleness
+├ ƒ /api/cron/visibility
+├ ƒ /api/cron/website-domain-verification
+├ ƒ /api/cron/website-health
+├ ƒ /api/cron/weekly-report
+├ ƒ /api/cron/workspace-export-recovery
+├ ƒ /api/cron/workspace-work
+├ ƒ /api/custom-applications
+├ ƒ /api/custom-applications/[workId]
+├ ƒ /api/custom-applications/[workId]/access
+├ ƒ /api/custom-applications/[workId]/manage
+├ ƒ /api/custom-applications/[workId]/manage/preview
+├ ƒ /api/custom-repo/dependencies
+├ ƒ /api/customers
+├ ƒ /api/customers/[customerId]
+├ ƒ /api/customers/[customerId]/resources/[resourceId]
+├ ƒ /api/dashboard/content-autonomy
+├ ƒ /api/dashboard/goal
+├ ƒ /api/dashboard/onboarding-status
+├ ƒ /api/dashboard/reply-voice
+├ ƒ /api/dashboard/site-audit
+├ ƒ /api/dashboard/site-audit/history
+├ ƒ /api/documents
+├ ƒ /api/documents/history
+├ ƒ /api/edit-preview
+├ ƒ /api/events
+├ ƒ /api/events/[id]
+├ ƒ /api/gbp/state
+├ ƒ /api/health
+├ ƒ /api/inbox
+├ ƒ /api/inquiries
+├ ƒ /api/inquiry-workspace
+├ ƒ /api/inquiry-workspace/message-review
+├ ƒ /api/inquiry-workspace/portfolio
+├ ƒ /api/inquiry-workspace/records
+├ ƒ /api/inquiry-workspace/records/[id]
+├ ƒ /api/internal/domain-map
+├ ƒ /api/live-preview
+├ ƒ /api/mcp/bookings/[tenant]
+├ ƒ /api/mcp/oauth/authorize
+├ ƒ /api/mcp/oauth/revoke
+├ ƒ /api/mcp/oauth/token
+├ ƒ /api/mcp/public
+├ ƒ /api/media
+├ ƒ /api/my-properties
+├ ƒ /api/newsletter/send
+├ ƒ /api/newsletter/subscribe
+├ ƒ /api/newsletter/subscribers
+├ ƒ /api/newsletter/unsubscribe
+├ ƒ /api/oauth/calendly
+├ ƒ /api/oauth/calendly/callback
+├ ƒ /api/oauth/google
+├ ƒ /api/oauth/google/callback
+├ ƒ /api/oauth/instagram
+├ ƒ /api/oauth/instagram/callback
+├ ƒ /api/offboarding/request
+├ ƒ /api/offboarding/status
+├ ƒ /api/offerings
+├ ƒ /api/offerings/provider-delivery
+├ ƒ /api/offerings/websites
+├ ƒ /api/onboard/intake
+├ ƒ /api/onboarding
+├ ƒ /api/onboarding/file
+├ ƒ /api/onboarding/upload
+├ ƒ /api/operational-assignments
+├ ƒ /api/operations
+├ ƒ /api/operations/inbox
+├ ƒ /api/owner-website-preview
+├ ƒ /api/page-config
+├ ƒ /api/pay/[slug]
+├ ƒ /api/pay/rohlax
+├ ƒ /api/product-learning
+├ ƒ /api/public-continuation
+├ ƒ /api/public-continuation/import
+├ ƒ /api/publish
+├ ƒ /api/publishing/google/reconnect
+├ ƒ /api/publishing/google/reconnect/callback
+├ ƒ /api/queue
+├ ƒ /api/queue/[id]
+├ ƒ /api/reviews
+├ ƒ /api/reviews/draft-reply
+├ ƒ /api/reviews/reply
+├ ƒ /api/rewards/members
+├ ƒ /api/rewards/members/[email]
+├ ƒ /api/rewards/members/[email]/adjust
+├ ƒ /api/section-analytics
+├ ƒ /api/service-requests
+├ ƒ /api/service-requests/delivery
+├ ƒ /api/site-snapshots
+├ ƒ /api/social
+├ ƒ /api/suggestions
+├ ƒ /api/tenant-export/assets
+├ ƒ /api/tenant-export/content
+├ ƒ /api/tenant-settings
+├ ƒ /api/tenant/domains
+├ ƒ /api/threads
+├ ƒ /api/threads/[threadId]
+├ ƒ /api/track
+├ ƒ /api/tracker
+├ ƒ /api/upload
+├ ƒ /api/v1/bookings/[tenant]
+├ ƒ /api/v1/bookings/[tenant]/reservations
+├ ƒ /api/v1/bookings/[tenant]/reservations/[reservationId]
+├ ƒ /api/v1/bookings/[tenant]/reservations/[reservationId]/readback
+├ ƒ /api/v1/bookings/[tenant]/services
+├ ƒ /api/v1/bookings/[tenant]/slots
+├ ƒ /api/v1/bookings/[tenant]/status
+├ ƒ /api/v1/bookings/offers/[token]
+├ ƒ /api/v1/bookings/openapi.json
+├ ƒ /api/v1/collections/[tenant]/[type]
+├ ƒ /api/v1/collections/[tenant]/[type]/[slug]
+├ ƒ /api/v1/connect/[siteKey]/context
+├ ƒ /api/v1/connect/[siteKey]/events
+├ ƒ /api/v1/connect/[siteKey]/inquiries
+├ ƒ /api/v1/content/[tenant]/[section]
+├ ƒ /api/v1/inquiries/[tenant]
+├ ƒ /api/v1/leads/[tenant]
+├ ƒ /api/v1/page-config/[tenant]
+├ ƒ /api/v1/site-capabilities/[tenant]
+├ ƒ /api/v1/spam-pit/[tenant]
+├ ƒ /api/v1/track/[tenant]
+├ ƒ /api/webhooks/calendly
+├ ƒ /api/webhooks/resend
+├ ƒ /api/websites
+├ ƒ /api/websites/[workId]
+├ ƒ /api/websites/[workId]/approve
+├ ƒ /api/websites/[workId]/connections
+├ ƒ /api/websites/[workId]/cutover-undo
+├ ƒ /api/websites/[workId]/domain
+├ ƒ /api/websites/[workId]/domain/request
+├ ƒ /api/websites/[workId]/export
+├ ƒ /api/websites/[workId]/facts/[factId]
+├ ƒ /api/websites/[workId]/handoff
+├ ƒ /api/websites/[workId]/history
+├ ƒ /api/websites/[workId]/launch
+├ ƒ /api/websites/[workId]/patch
+├ ƒ /api/websites/[workId]/preview
+├ ƒ /api/websites/[workId]/progress
+├ ƒ /api/websites/[workId]/publish-linked
+├ ƒ /api/websites/[workId]/rebuild
+├ ƒ /api/websites/[workId]/report
+├ ƒ /api/websites/[workId]/share
+├ ƒ /api/websites/[workId]/undo
+├ ƒ /api/websites/rebuild
+├ ƒ /api/websites/shared/[token]
+├ ƒ /api/weekly-brief
+├ ƒ /api/work-allowances
+├ ƒ /api/work-allowances/accept
+├ ƒ /api/work-allowances/awards
+├ ƒ /api/work-context
+├ ƒ /api/work-economics
+├ ƒ /api/work-economics/payer-transition
+├ ƒ /api/work-participation
+├ ƒ /api/work-plans
+├ ƒ /api/work-plans/execute
+├ ƒ /api/work-plans/funding
+├ ƒ /api/workspace
+├ ƒ /api/workspace-claims/[token]
+├ ƒ /api/workspace-exit
+├ ƒ /api/workspace-exit/handoff
+├ ƒ /api/workspace-export
+├ ƒ /api/workspace-export/v3
+├ ƒ /api/workspace-export/v3/download
+├ ƒ /api/workspace-export/v3/owner-download
+├ ƒ /api/workspace-export/v3/status
+├ ƒ /api/workspace-invitations
+├ ƒ /api/workspace-invitations/accept/[token]
+├ ƒ /api/workspace-invitations/revoke
+├ ƒ /api/workspace/agency-authoring
+├ ƒ /api/workspace/agency-brand
+├ ƒ /api/workspace/agency-clients
+├ ƒ /api/workspace/agency-clients/added
+├ ƒ /api/workspace/agency-library
+├ ƒ /api/workspace/agency-team
+├ ƒ /api/workspace/agent-channel
+├ ƒ /api/workspace/agent-connections
+├ ƒ /api/workspace/agent-connections/[connectionId]
+├ ƒ /api/workspace/ask
+├ ƒ /api/workspace/bookings
+├ ƒ /api/workspace/bookings/hours
+├ ƒ /api/workspace/bookings/manual
+├ ƒ /api/workspace/bookings/propose-times
+├ ƒ /api/workspace/bookings/settings
+├ ƒ /api/workspace/businesses
+├ ƒ /api/workspace/calendar-availability
+├ ƒ /api/workspace/calendar-connections
+├ ƒ /api/workspace/calendar-connections/oauth/[provider]
+├ ƒ /api/workspace/calendar-connections/oauth/[provider]/callback
+├ ƒ /api/workspace/calendar-events
+├ ƒ /api/workspace/connected-sites
+├ ƒ /api/workspace/connected-sites/visibility
+├ ƒ /api/workspace/inquiries
+├ ƒ /api/workspace/inquiries/booking-offer
+├ ƒ /api/workspace/inquiries/held
+├ ƒ /api/workspace/inquiries/reply
+├ ƒ /api/workspace/inquiries/system
+├ ƒ /api/workspace/needs-you
+├ ƒ /api/workspace/needs-you/policy
+├ ƒ /api/workspace/needs-you/undo
+├ ƒ /api/workspace/owner-brand
+├ ƒ /api/workspace/prospects
+├ ƒ /api/workspace/public-bookings
+├ ƒ /api/workspace/publishing/content
+├ ƒ /api/workspace/publishing/google-versions
+├ ƒ /api/workspace/publishing/record
+├ ƒ /api/workspace/reviews/reply
+├ ƒ /api/workspace/site-changes
+├ ƒ /api/workspace/site-summary
+├ ƒ /api/workspace/systems/make-real
+├ ƒ /api/workspace/systems/possibilities
+├ ƒ /api/workspace/systems/website
+├ ƒ /api/workspace/systems/website/restore
+├ ƒ /api/workspace/versions
+├ ƒ /api/workspace/versions/manage
+├ ƒ /apple-icon
+├ ○ /apple-icon.jpg
+├ ƒ /apps/[workId]
+├ ƒ /audit
+├ ƒ /audit/report/[id]
+├ ƒ /auth/callback
+├ ƒ /auth/entry
+├ ƒ /b/[token]
+├ ƒ /b/[token]/action
+├ ƒ /biz/[handle]
+├ ƒ /biz/[handle]/llms.txt
+├ ƒ /blog
+├ ƒ /blog/[slug]
+├ ƒ /book-inquiry/[token]
+├ ƒ /book-inquiry/[token]/action
+├ ƒ /booking-confirm/[token]
+├ ƒ /booking-confirm/[token]/action
+├ ƒ /business
+├ ƒ /business/[tenant]
+├ ƒ /connect
+├ ƒ /connect/authorize
+├ ƒ /contact
+├ ƒ /custom-applications/[workId]
+├ ƒ /custom-applications/[workId]/manage
+├ ƒ /custom-applications/new
+├ ƒ /dashboard
+├ ƒ /dashboard/[...notFound]
+├ ƒ /dashboard/analytics
+├ ƒ /dashboard/assets
+├ ƒ /dashboard/brand-kit
+├ ƒ /dashboard/chat
+├ ƒ /dashboard/collections
+├ ƒ /dashboard/content
+├ ƒ /dashboard/google
+├ ƒ /dashboard/health
+├ ƒ /dashboard/history
+├ ƒ /dashboard/integrations
+├ ƒ /dashboard/leads
+├ ƒ /dashboard/members
+├ ƒ /dashboard/ownership
+├ ƒ /dashboard/reports
+├ ƒ /dashboard/review
+├ ƒ /dashboard/reviews
+├ ƒ /dashboard/roster
+├ ƒ /dashboard/schedule
+├ ƒ /dashboard/settings
+├ ƒ /dashboard/site
+├ ƒ /dashboard/sources
+├ ƒ /dashboard/sources/[id]
+├ ƒ /dashboard/store
+├ ƒ /delivery/[token]
+├ ƒ /embed/agency/[slug]/[tool]
+├ ƒ /events
+├ ƒ /faq
+├ ○ /guides
+├   /guides/[slug]
+│ ├ ● /guides/add-xml-sitemap-google-find-pages
+│ ├ ● /guides/add-ssl-https-secure-website
+│ ├ ● /guides/add-security-headers-website
+│ └ ● [+56 more paths]
+├ ○ /home
+├ ƒ /icon
+├ ƒ /inquiry-booking/[token]
+├ ƒ /inquiry-booking/[token]/action
+├ ƒ /links
+├ ƒ /llms.txt
+├ ○ /m-blog
+├ ƒ /no-access
+├ ƒ /onboard
+├ ƒ /opengraph-image
+├ ƒ /pay/[slug]
+├ ƒ /pay/rohlax
+├ ƒ /preview/strelva
+├ ○ /preview/strelva/agency-brand
+├ ƒ /preview/strelva/agency-team
+├ ○ /preview/strelva/agent-oauth
+├ ƒ /preview/strelva/booking-inquiry
+├ ƒ /preview/strelva/booking-manage
+├ ƒ /preview/strelva/booking-manual
+├ ƒ /preview/strelva/booking-propose
+├ ƒ /preview/strelva/booking-visitor
+├ ƒ /preview/strelva/bookings
+├ ƒ /preview/strelva/business-effort
+├ ƒ /preview/strelva/calendar-disconnect
+├ ƒ /preview/strelva/colors
+├ ƒ /preview/strelva/components
+├ ƒ /preview/strelva/customers
+├ ƒ /preview/strelva/customers/[customerId]
+├ ƒ /preview/strelva/documents
+├ ƒ /preview/strelva/inquiries
+├ ƒ /preview/strelva/inquiries/[inquiryId]
+├ ƒ /preview/strelva/inquiry-booking
+├ ƒ /preview/strelva/inquiry-booking/action
+├ ƒ /preview/strelva/inquiry-library
+├ ƒ /preview/strelva/inquiry-review
+├ ƒ /preview/strelva/inquiry-running
+├ ƒ /preview/strelva/inquiry-system
+├ ƒ /preview/strelva/operator-queue
+├ ƒ /preview/strelva/outcomes
+├ ƒ /preview/strelva/owner-invitations
+├ ƒ /preview/strelva/owner-website-preview
+├ ƒ /preview/strelva/places
+├ ƒ /preview/strelva/portability
+├ ƒ /preview/strelva/publishing
+├ ƒ /preview/strelva/rebuild
+├ ƒ /preview/strelva/rebuild/site
+├ ƒ /preview/strelva/recaps
+├ ƒ /preview/strelva/tool
+├ ƒ /preview/strelva/try
+├ ○ /preview/strelva/website
+├ ƒ /preview/strelva/website-entry
+├ ƒ /preview/strelva/website/[...path]
+├ ƒ /preview/strelva/website/api/[...path]
+├ ƒ /preview/strelva/who-decides
+├ ƒ /preview/strelva/workspace
+├ ƒ /preview/strelva/workspace-site
+├ ƒ /preview/strelva/workspace/[place]
+├ ƒ /preview/strelva/workspace/account
+├ ○ /privacy
+├ ƒ /providers
+├ ƒ /robots.txt
+├ ƒ /services
+├ ƒ /shop
+├ ƒ /sign-in/[[...sign-in]]
+├ ƒ /sign-up/[[...sign-up]]
+├ ƒ /sitemap.xml
+├ ○ /terms
+├ ƒ /try/[token]
+├ ƒ /workspace
+├ ƒ /workspace/account
+├ ƒ /workspace/agency/clients/new
+├ ƒ /workspace/agency/start
+├ ƒ /workspace/assignments
+├ ƒ /workspace/billing
+├ ƒ /workspace/bookings
+├ ƒ /workspace/business-details
+├ ƒ /workspace/business-drafts/[id]
+├ ƒ /workspace/business/new
+├ ƒ /workspace/claim/[token]
+├ ƒ /workspace/contribute/[workId]
+├ ƒ /workspace/delivery
+├ ƒ /workspace/delivery/[requestId]
+├ ƒ /workspace/exit
+├ ƒ /workspace/export
+├ ƒ /workspace/google
+├ ƒ /workspace/inquiries
+├ ƒ /workspace/invitations
+├ ƒ /workspace/invitations/accept/[token]
+├ ƒ /workspace/onboarding
+├ ƒ /workspace/prospects
+├ ƒ /workspace/recaps
+├ ƒ /workspace/results
+├ ƒ /workspace/reviews
+└ ƒ /workspace/site
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand

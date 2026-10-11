@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { operatorQueueReleaseEnabled } from "./release";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   OperatorQueueAccessError, OperatorQueueConflictError, OperatorQueueUnavailableError, OperatorQueueValidationError,
@@ -28,7 +29,7 @@ function identity(actor: QueueActor) {
 export function operatorQueueFailure(error: Failure): void {
   if (!error) return;
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-  if (detail.includes("operator_queue_access_denied")) throw new OperatorQueueAccessError();
+  if (detail.includes("operator_queue_access_denied") || detail.includes("platform_operator_read_access_denied")) throw new OperatorQueueAccessError();
   if (detail.includes("operator_queue_snooze_refused")) throw new OperatorQueueValidationError("Harm-now items can't be snoozed.");
   if (detail.includes("operator_queue_assignee_invalid")) throw new OperatorQueueValidationError("Hand items only to an active Strelva operator.");
   if (detail.includes("operator_queue_receipt_not_found")) throw new OperatorQueueValidationError("That receipt was not found.");
@@ -57,7 +58,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 }
 
 export async function readQueueContext(actor: QueueActor): Promise<QueueContext> {
-  return parse(queueContextSchema, await rpc("read_operator_queue_context", identity(actor)));
+  return parse(queueContextSchema, await rpc(operatorQueueReleaseEnabled() ? "read_audited_platform_operator_source" : "read_audited_platform_operator_detail", { ...identity(actor), p_reader_name: operatorQueueReleaseEnabled() ? "read_operator_queue_context_v2" : "read_operator_queue_context" }));
 }
 
 export interface MarkCommand {
@@ -78,7 +79,8 @@ export async function writeQueueMark(actor: QueueActor, command: MarkCommand): P
 }
 
 export async function readReceipts(actor: QueueActor, filter: { tenantId?: string; workspaceId?: string; limit?: number }): Promise<OutsideWriteReceipt[]> {
-  return parse(z.array(outsideWriteReceiptSchema), await rpc("read_outside_write_receipts", {
+  return parse(z.array(outsideWriteReceiptSchema), await rpc("read_audited_platform_operator_detail", {
+    p_reader_name: "read_outside_write_receipts",
     ...identity(actor), p_tenant_id: filter.tenantId ?? null, p_workspace_id: filter.workspaceId ?? null, p_limit: filter.limit ?? 50,
   }));
 }
@@ -86,6 +88,28 @@ export async function readReceipts(actor: QueueActor, filter: { tenantId?: strin
 /** Server-side: record an outside write once the provider has answered. */
 export async function insertReceipt(receipt: Record<string, unknown>): Promise<OutsideWriteReceipt> {
   return parse(outsideWriteReceiptSchema, await rpc("record_outside_write_receipt", { p_receipt: receipt }));
+}
+
+const googleAttemptSchema = z.object({
+  claimed: z.boolean(), attemptId: z.string().uuid(), acceptance: z.enum(["pending", "accepted", "rejected", "unknown"]),
+  receipt: outsideWriteReceiptSchema.nullable(),
+});
+
+/** Reserve before provider dispatch. Uncertain or accepted attempts never dispatch again. */
+export async function beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: string; request: Record<string, unknown> }) {
+  return parse(googleAttemptSchema, await rpc("begin_operator_google_write", { p_command: input }));
+}
+
+/** Receipt and attempt settlement share one transaction. */
+export async function completeGoogleWrite(attemptId: string, receipt: Record<string, unknown>): Promise<OutsideWriteReceipt> {
+  return parse(outsideWriteReceiptSchema, await rpc("complete_operator_google_write", { p_attempt_id: attemptId, p_receipt: receipt }));
+}
+
+export async function readGoogleWriteUncertainty(actor: QueueActor) {
+  return parse(z.array(z.object({
+    id: z.string().uuid(), tenantId: z.string(), writeKind: z.string(), acceptance: z.string(),
+    startedAt: z.string(), receiptId: z.string().uuid().nullable(), readback: z.string().nullable(),
+  })), await rpc("read_audited_platform_operator_source", { ...identity(actor), p_reader_name: "read_operator_google_uncertainty" }));
 }
 
 /** Server-side: the read-back, recorded once. Never re-sends the write. */
@@ -113,5 +137,6 @@ export type ListingReadbackFailure = z.infer<typeof listingReadbackFailureSchema
 
 /** Operator only: listing writes Google accepted whose read-back failed. Read only. */
 export async function readListingReadbackFailures(actor: QueueActor, limit = 200): Promise<ListingReadbackFailure[]> {
-  return parse(z.array(listingReadbackFailureSchema), await rpc("read_google_listing_readback_failures", { ...identity(actor), p_limit: limit }));
+  return parse(z.array(listingReadbackFailureSchema), await rpc("read_audited_platform_operator_detail", {
+    p_reader_name: operatorQueueReleaseEnabled() ? "read_google_listing_readback_failures_v2" : "read_google_listing_readback_failures", ...identity(actor), ...(operatorQueueReleaseEnabled() ? {} : { p_limit: limit }) }));
 }

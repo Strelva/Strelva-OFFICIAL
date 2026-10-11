@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
-import { readWorkspaceDocument, saveWorkspaceDocument, editWorkspaceDocument } from "@/products/documents/server";
+import { readWorkspaceDocument, saveWorkspaceDocument, editWorkspaceDocument, documentHistoryEnabled } from "@/products/documents/server";
 
 export const dynamic = "force-dynamic";
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
@@ -22,7 +22,8 @@ export async function GET(request: Request) {
   try {
     const current = await actor();
     if (!current) return json({ error: "Sign in to open your document." }, 401);
-    return json(await readWorkspaceDocument(current, new URL(request.url).searchParams.get("workId") ?? ""));
+    const saved = await readWorkspaceDocument(current, new URL(request.url).searchParams.get("workId") ?? "");
+    return json(documentHistoryEnabled() ? { ...saved, historyEnabled: true } : saved);
   } catch (error) { return failed(error); }
 }
 export async function POST(request: Request) {
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("create"), workspaceId: z.string().uuid(), input: z.unknown() }).strict(),
       z.object({ action: z.literal("command"), workId: z.string().uuid(), command: z.unknown() }).strict(),
     ]).parse(body);
-    return json(input.action === "create" ? await saveWorkspaceDocument(current, input.workspaceId, input.input) : await editWorkspaceDocument(current, input.workId, input.command));
+    const saved = input.action === "create" ? await saveWorkspaceDocument(current, input.workspaceId, input.input) : await editWorkspaceDocument(current, input.workId, input.command);
+    return json(documentHistoryEnabled() ? { ...saved, historyEnabled: true } : saved);
   } catch (error) { return failed(error); }
 }

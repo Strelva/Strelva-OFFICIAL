@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { getTenantConfig } from "@/lib/tenants";
 import { getRedis } from "@/platform/infra/redis";
-import { getSessionUser } from "@/platform/infra/db/server-client";
+import { getSessionAuthContext, getSessionUser } from "@/platform/infra/db/server-client";
+import type { WorkspaceActor } from "@/platform/workspaces/types";
 import {
   getMembershipRole,
   listMembershipsForUser,
@@ -163,6 +164,27 @@ export async function getCurrentUserTenants(): Promise<string[]> {
 export async function getCurrentUserEmail(): Promise<string | null> {
   const user = await getSessionUser();
   return user ? supabaseVerifiedEmail(user) : null;
+}
+
+export interface AuthenticatedOperatorContext {
+  actor: WorkspaceActor;
+  email: string;
+  /** Seconds since epoch from the verified Supabase access-token claim. */
+  authTime: number | null;
+}
+
+/** Resolve a real, verified operator identity and its signed session age. */
+export async function getAuthenticatedOperatorContext(): Promise<AuthenticatedOperatorContext | null> {
+  if (isDevAccessBypassEnabled()) return null;
+  const session = await getSessionAuthContext();
+  if (!session || !session.user.email_confirmed_at) return null;
+  const email = supabaseVerifiedEmail(session.user);
+  if (!email || !(await isSuperAdminUser(session.user.id))) return null;
+  return {
+    actor: { userId: session.user.id, verifiedEmail: email },
+    email,
+    authTime: session.authTime,
+  };
 }
 
 /** Check if current user is a super admin (via the super_admins table). */

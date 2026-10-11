@@ -70,6 +70,25 @@ insert into public.tenant_workspace_links(tenant_stable_id, tenant_slug_at_link,
   ('5a000000-0000-4000-8000-0000000000a2', 'sa-fixture-site-2', '5a000000-0000-4000-8000-000000000012',
     '5a000000-0000-4000-8000-000000000002', '5a000000-0000-4000-8000-0000000000b2', repeat('b', 64), '{}'::jsonb);
 
+-- Batch 7A (20261009153000): the service actor serves a business whose
+-- provider of record is an agency verified for the effect, Strelva's included.
+-- From 7A on, these converted fixtures are provided by a Strelva agency that
+-- is verified through the ordinary record; before 7A this block does nothing.
+do $$
+begin
+  if to_regprocedure('public.record_agency_verification(text,uuid,text,text,jsonb,text)') is null then return; end if;
+  insert into public.super_admins(user_id, email)
+    select '5a000000-0000-4000-8000-000000000002', 'sa-operator@strelva.example.test'
+    where not exists (select 1 from public.super_admins where user_id = '5a000000-0000-4000-8000-000000000002');
+  insert into public.workspaces(id, kind, name, created_by)
+    values ('5a000000-0000-4000-8000-000000000020', 'agency', 'Strelva agency fixture', '5a000000-0000-4000-8000-000000000002');
+  insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+    values ('5a000000-0000-4000-8000-000000000020', '5a000000-0000-4000-8000-000000000002', 'owner', '5a000000-0000-4000-8000-000000000002');
+  perform public.designate_strelva_agency_workspace('sa-operator@strelva.example.test', '5a000000-0000-4000-8000-000000000020');
+  perform public.record_agency_verification('sa-operator@strelva.example.test', '5a000000-0000-4000-8000-000000000020', 'email', 'verified', '{"fixture": true}', null);
+  perform public.record_agency_verification('sa-operator@strelva.example.test', '5a000000-0000-4000-8000-000000000020', 'publish', 'verified', '{"fixture": true}', null);
+end $$;
+
 -- Sessions: only for a business Strelva runs, read as its verified owner, else its verified admin.
 select pg_temp.sa_expect($$select public.strelva_service_reader('5a000000-0000-4000-8000-000000000010', 'decide')$$, 'strelva_service_invalid');
 select pg_temp.sa_assert(public.strelva_service_reader('5a000000-0000-4000-8000-000000000011', 'needs_you_sync') is null, 'no session for a business Strelva does not run');

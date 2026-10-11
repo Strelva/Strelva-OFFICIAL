@@ -20,7 +20,8 @@ describe("every place has the same way home and the same failure states", () => 
   it("permission, error and the no-site state", () => {
     const permission = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "permission" } }));
     expect(permission).toContain(`href="/workspace?workspaceId=${WS}"`);
-    expect(permission).toContain("This belongs to another business");
+    expect(permission).toContain("Your account isn&#x27;t a member of this business. Ask its owner to invite you.");
+    expect(permission).toContain('href="/workspace">Open your workspace</a>');
     expect(html(createElement(WorkspaceReviewsView, { workspaceId: WS, state: { kind: "error" } }))).toContain("Reviews couldn&#x27;t load");
     expect(html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [], denied: [] } } }))).toContain("No site is connected to this business yet");
   });
@@ -56,7 +57,7 @@ describe("Inquiries", () => {
     expect(page).toContain('href="mailto:pat@example.test"');
     expect(page).toContain("Your site&#x27;s form");
     const empty = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ ...connected, leads: [], lastThirtyDays: 0 }], denied: [] } } }));
-    expect(empty).toContain("Strelva takes it and it shows up here");
+    expect(empty).toContain("When someone contacts you through bakery.example, they show up here with their name and what they asked.");
   });
 });
 
@@ -121,6 +122,9 @@ describe("Business details", () => {
     expect(page).toContain("Nothing was saved");
     const invalid = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "invalid", field: "phone", state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [], denied: [] } } }));
     expect(invalid).toContain("7 to 15 digits");
+    const unreadableSave = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, result: "failed", state: { kind: "error" } }));
+    expect(unreadableSave).toContain("couldn&#x27;t confirm whether the save completed");
+    expect(unreadableSave).not.toContain("Nothing changed");
   });
 });
 
@@ -136,8 +140,9 @@ describe("Home's From your site", () => {
       leads: { count: 1, recent: [{ id: "l1", name: "Dana", message: "Do you ship?", createdAt: "2026-10-01" }] },
       activity: [{ id: "a1", label: "Updated your hours on Google", detail: null, time: "2026-10-02" }],
     }] } } }));
-    expect(page).toContain("120 people found you · 12 this week");
-    expect(page).toContain("booked or called: couldn&#x27;t check");
+    expect(page).toContain("People found you this week</dt><dd>12</dd><small>120 in all</small>");
+    expect(page).toContain("Booked or called</dt><dd class=");
+    expect(page).toContain("Couldn&#x27;t check");
     expect(page).toContain("Dana");
     expect(page).toContain("Updated your hours on Google");
     for (const place of ["inquiries", "results", "reviews", "recaps"]) expect(page).toContain(`/workspace/${place}?workspaceId=${WS}`);

@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
@@ -48,6 +49,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const blocked = await requireTenantPermission(tenant, "billing:manage");
   if (blocked) return blocked;
+  await authorizeTenantOperatorRead(tenant, ["billing:manage"]);
 
   const referencedUrls = new Set<string>();
   await Promise.all(

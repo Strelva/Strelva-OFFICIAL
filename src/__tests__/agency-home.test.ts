@@ -214,12 +214,13 @@ describe("agency home", () => {
     expect(agencyCreditPeriods(inspection)).toMatchObject([{ units: [{ unitKind: "completed_application_change", creditedUnits: 3 }] }]);
   });
 
-  it("renders private agency work and keeps unsupported offering ownership plain, with no invented revenue", () => {
+  it("renders private agency work and qualifies Library access without invented revenue", () => {
     const html = render({ work: [work("method", AGENCY, { title: "Intake method" })] });
     expect(html).toContain("Private agency work");
     expect(html).toContain("Intake method");
     expect(html).toContain("Loading clients");
-    expect(html).toContain("does not currently hold a private offering catalog");
+    expect(html).toContain("Each client owns its Systems and records.");
+    expect(html).toContain("Library is available when Systems are enabled for this agency.");
     expect(html).not.toContain("Previous clients");
     expect(html.toLowerCase()).not.toContain("earnings");
     expect(html.toLowerCase()).not.toContain("royalt");
@@ -231,7 +232,7 @@ describe("agency home", () => {
       expect(off).not.toMatch(/>Library<|>Team</);
       expect(off).not.toMatch(/possibilit|make[s]? it real/i);
       expect(off).toContain("Assigned website drafts");
-      expect(off).toContain("publishing stays with the customer");
+      expect(off).toContain("publishing stays with the client");
     }
     const on = render({ releases: { systems: true } });
     expect(on).toContain('role="tablist"');

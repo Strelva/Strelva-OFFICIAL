@@ -5,6 +5,7 @@ import {
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/platform/infra/email/layout";
 import { sendEmail } from "@/platform/infra/email/send";
 import { cleanSubjectText } from "@/platform/infra/email/text";
+import { actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 
 /**
  * Log a real client-comms send into the tenant's operator CRM activity timeline
@@ -17,11 +18,12 @@ import { cleanSubjectText } from "@/platform/infra/email/text";
 async function logSentEmailToCrm(
   tenantId: string | undefined,
   summary: string,
+  actor?: RecordedActor,
 ): Promise<void> {
   if (!tenantId) return;
   try {
     const { addTenantActivity } = await import("@/lib/tenant-crm");
-    await addTenantActivity(tenantId, { kind: "email", summary, author: "Strelva" });
+    await addTenantActivity(tenantId, { kind: "email", summary, author: actorPresentation(actor).name ?? "Actor not recorded" });
   } catch (err) {
     console.error("[delivery-email] CRM comms log failed (non-fatal):", err);
   }
@@ -43,26 +45,10 @@ function buildUpdateLiveEmailOptions(params: {
     heading,
     paragraphs: [
       lead,
-      "Want something else changed? Just reply or tell the assistant in your dashboard.",
+      "Want something else changed? Just reply or tell the assistant in your workspace.",
     ],
     button: { label: "See it on your site", url: params.siteUrl },
   };
-}
-
-function buildUpdateLiveEmailHtml(params: {
-  whatChanged: string;
-  siteUrl: string;
-  rollingOut?: boolean;
-}): string {
-  return renderEmailHtml(buildUpdateLiveEmailOptions(params));
-}
-
-function buildUpdateLiveEmailText(params: {
-  whatChanged: string;
-  siteUrl: string;
-  rollingOut?: boolean;
-}): string {
-  return renderEmailText(buildUpdateLiveEmailOptions(params));
 }
 
 /**
@@ -98,15 +84,8 @@ export async function sendUpdateLiveEmail(params: {
       tenantId: params.tenantId,
       to: params.email,
       subject,
-      html: buildUpdateLiveEmailHtml({
-        whatChanged: params.whatChanged,
-        siteUrl: params.siteUrl,
-        rollingOut: params.rollingOut,
-      }),
-      text: buildUpdateLiveEmailText({
-        whatChanged: params.whatChanged,
-        siteUrl: params.siteUrl,
-        rollingOut: params.rollingOut,
+      options: buildUpdateLiveEmailOptions({
+        whatChanged: params.whatChanged, siteUrl: params.siteUrl, rollingOut: params.rollingOut,
       }),
     });
     if (!sent) return false;
@@ -133,6 +112,7 @@ function buildBookingConfirmationOptions(params: {
     { label: "Time", value: cleanSubjectText(params.time) },
   ];
   return {
+    businessName: business,
     preheader: `Your ${cleanSubjectText(params.serviceName)} booking${withBusiness} is confirmed.`,
     heading: "You're booked",
     paragraphs: [
@@ -165,11 +145,13 @@ export async function sendBookingConfirmation(params: {
   try {
     const business = cleanSubjectText(params.businessName);
     // Send "from" the studio's name when we have it, but always over the verified domain.
-    const fromName = business || "Strelva";
+    const fromName = business;
     const opts = buildBookingConfirmationOptions(params);
 
     const sent = await sendEmail({
       audience: "customer",
+      authorship: "business",
+      businessName: business,
       fromName,
       to: params.to,
       subject: business ? `Your booking with ${business} is confirmed` : "Your booking is confirmed",
@@ -190,11 +172,11 @@ function buildPaymentPastDueOptions(params: {
 }): EmailOptions {
   const business = cleanSubjectText(params.businessName);
   return {
-    preheader: `We couldn't process your payment for ${business}.`,
+    preheader: `Strelva couldn't process your payment for ${business}.`,
     heading: "Your payment didn't go through",
     paragraphs: [
-      `We tried to charge your card for ${business} and it didn't go through. Your site is still live for now, but if the payment isn't updated in the next few days your dashboard access will pause.`,
-      "Updating your card takes a minute. Open your dashboard and click Manage billing.",
+      `Strelva tried to process the platform subscription payment for ${business} and it didn't go through. Your site is still live for now, but if the payment isn't updated in the next few days your workspace access will pause.`,
+      "Updating your card takes a minute. Open your workspace and click Manage billing.",
     ],
     button: { label: "Update your card", url: params.dashboardUrl },
     footerNote: `For ${business}`,
@@ -222,11 +204,13 @@ export async function sendPaymentPastDueEmail(params: {
       audience: "client",
       tenantId: params.tenantId,
       to: params.email,
+      authorship: "platform",
+      fromName: "Strelva billing",
       subject: `Action needed: your payment for ${cleanSubjectText(params.businessName)} didn't go through`,
       options: opts,
     });
     if (!sent) return false;
-    await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email");
+    await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email", { kind: "platform" });
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Payment-past-due email failed:`, err);
@@ -246,26 +230,8 @@ function buildNewLeadEmailOptions(params: {
   return {
     heading: "Someone reached out",
     rows,
-    button: { label: "See it in your dashboard", url: params.dashboardUrl },
+    button: { label: "See it in your workspace", url: params.dashboardUrl },
   };
-}
-
-function buildNewLeadEmailHtml(params: {
-  name: string;
-  email?: string;
-  message?: string;
-  dashboardUrl: string;
-}): string {
-  return renderEmailHtml(buildNewLeadEmailOptions(params));
-}
-
-function buildNewLeadEmailText(params: {
-  name: string;
-  email?: string;
-  message?: string;
-  dashboardUrl: string;
-}): string {
-  return renderEmailText(buildNewLeadEmailOptions(params));
 }
 
 /**
@@ -290,13 +256,7 @@ export async function sendNewLeadEmail(params: {
       tenantId: params.tenantId,
       to: params.email,
       subject: "Someone reached out through your website",
-      html: buildNewLeadEmailHtml({
-        name: params.lead.name,
-        email: params.lead.email,
-        message: params.lead.message,
-        dashboardUrl: params.dashboardUrl,
-      }),
-      text: buildNewLeadEmailText({
+      options: buildNewLeadEmailOptions({
         name: params.lead.name,
         email: params.lead.email,
         message: params.lead.message,
@@ -329,7 +289,7 @@ function buildNewBookingOwnerEmailOptions(params: {
     heading: "New booking",
     paragraphs: ["Someone booked through your website. It's confirmed and on your schedule."],
     rows,
-    button: { label: "See your bookings", url: params.dashboardUrl },
+    button: { label: "Open Bookings", url: params.dashboardUrl },
   };
 }
 
@@ -357,8 +317,7 @@ export async function sendNewBookingOwnerEmail(params: {
       tenantId: params.tenantId,
       to: params.email,
       subject: `New booking: ${cleanSubjectText(params.booking.customerName)}, ${cleanSubjectText(params.booking.when)}`,
-      html: renderEmailHtml(options),
-      text: renderEmailText(options),
+      options,
     });
     if (!sent) return false;
     await logSentEmailToCrm(params.tenantId, "Sent: new-booking email");
@@ -585,17 +544,17 @@ function buildWelcomeEmailOptions(params: {
   const business = cleanSubjectText(params.businessName);
   const owner = params.ownerName ? cleanSubjectText(params.ownerName) : "";
   const opener = owner
-    ? `Hi ${owner}, your Strelva dashboard for ${business} is ready.`
-    : `Your Strelva dashboard for ${business} is ready.`;
+    ? `Hi ${owner}, your workspace for ${business} is ready.`
+    : `Your workspace for ${business} is ready.`;
   return {
-    preheader: "Your dashboard is ready. Here's what happens next.",
-    heading: "Welcome to Strelva",
+    preheader: "Your workspace is ready. Here's what happens next.",
+    heading: `Your workspace for ${business} is ready`,
     paragraphs: [
       opener,
-      "From here, we manage your site for you. Tell the assistant in your dashboard what you want changed, in plain words, and we handle the update.",
-      "Once a month you'll get a report showing what's working: who found you, what they clicked, and what we changed. Reply to any of our emails anytime and a real person will get back to you.",
+      "Open your workspace to see your website, request a change and review anything that needs your decision. Your agreed service scope still applies.",
+      "When a monthly recap is available, it shows recorded visits and changes. Reply to this email with questions about your workspace.",
     ],
-    button: { label: "Open your dashboard", url: params.dashboardUrl },
+    button: { label: "Open your workspace", url: params.dashboardUrl },
     footerNote: `For ${business}`,
   };
 }
@@ -623,7 +582,7 @@ export async function sendWelcomeEmail(params: {
       audience: "client",
       tenantId: params.tenantId,
       to: params.email,
-      subject: "Welcome to Strelva",
+      subject: `Your workspace for ${cleanSubjectText(params.businessName)} is ready`,
       options: opts,
     });
     if (!sent) return false;
@@ -645,7 +604,7 @@ function buildSiteLiveEmailOptions(params: {
     preheader: `${business} is live and ready for visitors.`,
     heading: "Your site is live",
     paragraphs: [
-      `${business}'s new site is live and ready for visitors. Take a look, and if anything needs a tweak, just tell the assistant in your dashboard.`,
+      `${business}'s new site is live and ready for visitors. Take a look, and if anything needs a tweak, just tell the assistant in your workspace.`,
     ],
     rows: [{ label: "Your site", value: params.siteUrl }],
     button: { label: "View your site", url: params.siteUrl },
@@ -768,7 +727,7 @@ function buildReviewNeedsReplyEmailOptions(params: {
   // in one click. The Approve button resolves the pending reply-draft event via
   // the governed approval path — no auto-publish, the owner is the approver.
   if (params.draftedReply) {
-    paragraphs.push("We drafted a reply you can post as-is, or tweak in your dashboard:");
+    paragraphs.push("We drafted a reply you can post as-is, or tweak in your workspace:");
     rows.push({ label: "Suggested reply", value: cleanSubjectText(params.draftedReply) });
   }
 
@@ -785,7 +744,7 @@ function buildReviewNeedsReplyEmailOptions(params: {
     opts.button = { label: "Approve & post this reply", url: params.approveUrl };
     if (params.notYetUrl) opts.secondaryButton = { label: "Not yet", url: params.notYetUrl };
   } else {
-    opts.button = { label: "Reply in your dashboard", url: params.reviewsUrl };
+    opts.button = { label: "Reply in your workspace", url: params.reviewsUrl };
   }
   return opts;
 }
@@ -849,7 +808,7 @@ function buildHealthRegressionEmailOptions(params: {
     heading: "Your site health dropped",
     paragraphs: [
       `${greeting}our latest scan of ${business} found the site-health grade slipped from ${params.previousGrade} to ${params.currentGrade}. This usually means something changed: a slower page, a broken link, or an SEO signal that regressed.`,
-      "You don't need to do anything technical. Open your dashboard to see what changed, or just tell the assistant and we'll look into it for you.",
+      "You don't need to do anything technical. Open your workspace to see what changed, or just tell the assistant and we'll look into it for you.",
     ],
     rows: [
       { label: "Previous", value: `${params.previousGrade} (${params.previousScore})` },
@@ -935,76 +894,4 @@ export async function sendDeliveryStatusEmail(params: {
   }
 }
 
-/** One at-risk client line in the ops digest: business name + its top reason. */
-export interface OpsDigestAtRisk {
-  name: string;
-  reason: string;
-}
-
-function buildOpsDigestEmailOptions(params: {
-  totalLeads: number;
-  unworkedLeads: number;
-  atRisk: OpsDigestAtRisk[];
-  recentSignups: string[];
-  opsUrl: string;
-}): EmailOptions {
-  const plural = (n: number) => (n === 1 ? "" : "s");
-  const rows: EmailRow[] = [
-    { label: "Unworked leads", value: `${params.unworkedLeads} of ${params.totalLeads}` },
-    { label: "At-risk clients", value: String(params.atRisk.length) },
-  ];
-  // One row per at-risk client (name → top reason), capped so a bad day can't
-  // blow the email up.
-  for (const client of params.atRisk.slice(0, 12)) {
-    rows.push({ label: cleanSubjectText(client.name), value: cleanSubjectText(client.reason) });
-  }
-  rows.push({
-    label: "New signups (7d)",
-    value: params.recentSignups.length
-      ? params.recentSignups.map((n) => cleanSubjectText(n)).join(", ")
-      : "None",
-  });
-  const summary =
-    `${params.unworkedLeads} unworked lead${plural(params.unworkedLeads)} of ${params.totalLeads} total · ` +
-    `${params.atRisk.length} client${plural(params.atRisk.length)} at risk · ` +
-    `${params.recentSignups.length} new signup${plural(params.recentSignups.length)} this week.`;
-  return {
-    heading: "Strelva daily ops",
-    paragraphs: [summary],
-    rows,
-    button: { label: "Open the ops board", url: params.opsUrl },
-    footerNote: "Operator notification",
-  };
-}
-
-/**
- * "Strelva daily ops" — one digest a day summarizing the portfolio for the
- * operators (Noah + Jacob): unworked leads, at-risk clients (with the top
- * reason), and recent signups. OPERATOR notification: gates on
- * operatorEmailsEnabled() (ON by default), independent of the client email
- * pause. Recipients default to jacob@strelva.com via resolveLeadNotifyRecipients().
- * Fails soft: returns false on any error so a failed digest can never affect the
- * cron's 200.
- */
-export async function sendOpsDigestEmail(params: {
-  totalLeads: number;
-  unworkedLeads: number;
-  atRisk: OpsDigestAtRisk[];
-  recentSignups: string[];
-  opsUrl: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const opts = buildOpsDigestEmailOptions(params);
-
-    return await sendEmail({
-      audience: "operator",
-      to: resolveLeadNotifyRecipients(),
-      subject: "Strelva daily ops",
-      options: opts,
-    });
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} Ops-digest email failed:`, err);
-    return false;
-  }
-}
+export { sendOpsDigestEmail, type OpsDigestAtRisk } from "@/lib/ops-digest-email";

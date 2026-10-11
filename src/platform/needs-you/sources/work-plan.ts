@@ -90,6 +90,7 @@ export function workPlanAdapter(ports: WorkPlanPorts): SourceAdapter {
   return {
     lifecycle: "work_plan",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {
@@ -112,6 +113,7 @@ export function workPlanAdapter(ports: WorkPlanPorts): SourceAdapter {
       try {
         const found = await find(actor, ctx.workspaceId, item.sourceId);
         if (!found) return { outcome: "done", reason: "already_resolved" };
+        if (revision(found.plan, found.outputId) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         const result = await ports.execute(actor, { workspaceId: ctx.workspaceId, planWorkId: found.plan.workId, outputId: found.outputId, expectedPlanRevision: found.plan.revision });
         return { outcome: "done", ...(result.status === "already_completed" ? { reason: "already_resolved" } : {}), receiptRef: `work_plan_output:${found.plan.workId}:${found.outputId}:${result.nativeWorkId}` };
       } catch {

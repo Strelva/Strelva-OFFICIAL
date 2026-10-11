@@ -1,3 +1,5 @@
+import { publicBusinessProfile } from "@/platform/agent-channel/profile";
+import { publicFactsFromRecord, businessJsonLd } from "@/products/connected-sites/contracts";
 import type { Metadata } from "next";
 import { getHostedSite } from "@/products/websites/index";
 import { safeJsonLd, siteDocumentJsonLd, siteDocumentMetadata } from "@/products/websites/index";
@@ -222,9 +224,13 @@ export default async function TenantPublicLayout({
   }
 
   const hosted = await getHostedSite();
+  let hostedSchema = hosted ? siteDocumentJsonLd(hosted.document, hosted.origin, hosted.config?.industry) : null;
+  if (hosted && !hosted.preview && process.env.STRELVA_AGENT_READABLE === "1" && process.env.STRELVA_WORKSPACE_RELEASE === "1") {
+    try { const p = await publicBusinessProfile(hosted.tenant); const recordSchema = businessJsonLd({ ...publicFactsFromRecord(p), policies: p.policies, verification: p.verification }, hosted.origin); if (recordSchema) hostedSchema = { ...hostedSchema, ...recordSchema, "@type": hostedSchema?.["@type"] }; } catch { /* The issued page survives a record-read outage. */ }
+  }
   if (hosted) return <>
     <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]">Skip to content</a>
-    {!hosted.preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(siteDocumentJsonLd(hosted.document, hosted.origin, hosted.config?.industry)) }} />}
+    {!hosted.preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(hostedSchema) }} />}
     <main id="main-content">{children}</main>
   </>;
 

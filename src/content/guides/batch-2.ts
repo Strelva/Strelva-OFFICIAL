@@ -26,7 +26,7 @@ export const batch2: GuideArticle[] = [
 <li><strong>Find your listing.</strong> Search your exact business name plus city on Google. If a panel appears with a "Claim this business" or "Own this business?" link, click it. If nothing appears, go to <a href="https://business.google.com">business.google.com</a> and add your business.</li>
 <li><strong>Start the claim.</strong> Sign in with the Google account you want to own the profile long term (use a business account, not a personal one you might lose access to). Confirm the name, category, and address.</li>
 <li><strong>Verify ownership.</strong> Google offers verification by phone, text, email, video, or postcard depending on your business type. Video verification has become the most common method in 2026 for service businesses, so have your storefront, signage, or work vehicle ready to film.</li>
-<li><strong>Enter the code and confirm.</strong> Once verified, your dashboard unlocks. Check that name, address, phone, and website are correct before doing anything else.</li>
+<li><strong>Enter the code and confirm.</strong> Once verified, you can manage your Google Business Profile. Check that name, address, phone, and website are correct before doing anything else.</li>
 </ol>
 <h2>After you are verified</h2>
 <p>Set your hours, write a description, pick the most specific primary category, and add photos. A claimed but empty profile still underperforms, so treat verification as step one, not the finish line.</p>

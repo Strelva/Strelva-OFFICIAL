@@ -1,0 +1,2930 @@
+{
+  "date": "2026-10-07",
+  "server": "http://localhost:3026",
+  "renderer": "custom-repo-starter/website-generation/renderer.ts",
+  "runtime": "custom-repo-starter/website-generation/capability-runtime.mjs",
+  "transport": "browser-local global fetch replacement; no fallback; CSP connect-src none and form-action none",
+  "modeLimit": "off/on are identical synthetic contract envelopes, not server environment flag toggles",
+  "keyboard": [
+    {
+      "name": "name",
+      "tag": "INPUT",
+      "outline": "rgb(90, 38, 12) solid 3px"
+    },
+    {
+      "name": "email",
+      "tag": "INPUT",
+      "outline": "rgb(90, 38, 12) solid 3px"
+    }
+  ],
+  "parity": [
+    {
+      "width": 1280,
+      "state": "ready",
+      "textEqual": true
+    },
+    {
+      "width": 1280,
+      "state": "confirmed",
+      "textEqual": true
+    },
+    {
+      "width": 1280,
+      "state": "changed",
+      "textEqual": true
+    },
+    {
+      "width": 1280,
+      "state": "cancelled",
+      "textEqual": true
+    },
+    {
+      "width": 390,
+      "state": "ready",
+      "textEqual": true
+    },
+    {
+      "width": 390,
+      "state": "confirmed",
+      "textEqual": true
+    },
+    {
+      "width": 390,
+      "state": "changed",
+      "textEqual": true
+    },
+    {
+      "width": 390,
+      "state": "cancelled",
+      "textEqual": true
+    }
+  ],
+  "captures": [
+    {
+      "state": "ready",
+      "mode": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "confirmed",
+      "mode": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "changed",
+      "mode": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "cancelled",
+      "mode": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nThis reservation is cancelled.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "DELETE",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "ready",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "confirmed",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "changed",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "cancelled",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nThis reservation is cancelled.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "DELETE",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "loading",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nLoading booking times\u2026",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=loading"
+      }
+    },
+    {
+      "state": "error",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nBooking availability is unavailable. Please try again.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=error"
+      }
+    },
+    {
+      "state": "empty",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nNo booking times are available right now. Please contact the business directly.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=empty"
+      }
+    },
+    {
+      "state": "pending",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nWe could not confirm this reservation yet. Check the calendar before trying again.\n\nCheck booking status",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Check booking status",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending"
+      }
+    },
+    {
+      "state": "pending-readback-confirmed",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation/readback",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending"
+      }
+    },
+    {
+      "state": "reserve-error",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThat time could not be reserved. Please choose another time.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=reserve-error"
+      }
+    },
+    {
+      "state": "saving",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": true,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=saving"
+      }
+    },
+    {
+      "state": "ready",
+      "mode": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "confirmed",
+      "mode": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "changed",
+      "mode": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "cancelled",
+      "mode": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nThis reservation is cancelled.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "DELETE",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=off"
+      }
+    },
+    {
+      "state": "ready",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "confirmed",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "changed",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "cancelled",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\n\nThis reservation is cancelled.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "PATCH",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation",
+            "method": "DELETE",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "loading",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nLoading booking times\u2026",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=loading"
+      }
+    },
+    {
+      "state": "error",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nBooking availability is unavailable. Please try again.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=error"
+      }
+    },
+    {
+      "state": "empty",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nNo booking times are available right now. Please contact the business directly.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": []
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=empty"
+      }
+    },
+    {
+      "state": "pending",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nWe could not confirm this reservation yet. Check the calendar before trying again.\n\nCheck booking status",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Check booking status",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending"
+      }
+    },
+    {
+      "state": "pending-readback-confirmed",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation/readback",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending"
+      }
+    },
+    {
+      "state": "reserve-error",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThat time could not be reserved. Please choose another time.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=reserve-error"
+      }
+    },
+    {
+      "state": "saving",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": true,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=saving"
+      }
+    },
+    {
+      "state": "ready",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44.390625,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.984375,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "busy": null
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "busy": null
+          }
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": false,
+        "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on"
+      }
+    },
+    {
+      "state": "conflict",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThat time is no longer available. The next available times are shown above. Choose a time and try again.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-two"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake-saving",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": true,
+            "required": true,
+            "value": "Consultation goals"
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": true,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": true,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake-error",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nThat time could not be reserved. Please choose another time.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false,
+            "required": true,
+            "value": "Consultation goals"
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake-empty",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nNo booking times are available right now. Please contact the business directly.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [],
+        "slots": []
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "conflict",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nReserve time\n\nThat time is no longer available. The next available times are shown above. Choose a time and try again.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-two"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "visitor-conflict-390.png"
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "visitor-intake-390.png"
+      }
+    },
+    {
+      "state": "intake-saving",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": true,
+            "required": true,
+            "value": "Consultation goals"
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": true,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": true,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake-error",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nThat time could not be reserved. Please choose another time.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "Jordan Fixture"
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": "visitor@example.test"
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false,
+            "required": true,
+            "value": "Consultation goals"
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake-empty",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\n\nNo booking times are available right now. Please contact the business directly.",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [],
+        "slots": []
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM\u2013Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM\u2013Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false,
+            "required": false,
+            "value": "fixture-slot-one"
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false,
+            "required": true,
+            "value": ""
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false,
+            "required": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false,
+            "value": ""
+          }
+        ],
+        "slots": [
+          "fixture-slot-one",
+          "fixture-slot-two"
+        ]
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    }
+  ],
+  "followUpBrowser": "installed Playwright Chromium; fallback after T3 host disconnected",
+  "validation": {
+    "postRequests": 0,
+    "requiredMissing": true
+  }
+}

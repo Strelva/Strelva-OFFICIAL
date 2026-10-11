@@ -19,6 +19,7 @@
  *
  * Design: vault 1-projects/scaffold-web/org-layer-architecture.md.
  */
+import { readRecords } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import { workspacePorts, type ClientRecordsPort } from "./workspace-ports";
 
@@ -149,13 +150,47 @@ function normalize(raw: unknown): Account | null {
   };
 }
 
+function durableGroupingReadsRequested(): boolean {
+  return (process.env.STRELVA_CLIENT_RECORDS_READ ?? "").split(",").some(store => store.trim() === "account_grouping");
+}
+
 export async function getAccount(id: string): Promise<Account | null> {
+  if (durableGroupingReadsRequested()) return (await getAllAccounts()).find(account => account.id === id) ?? null;
+  return getRedisAccount(id);
+}
+
+async function getRedisAccount(id: string): Promise<Account | null> {
   const redis = getRedis();
   if (!redis) return null;
   return normalize(await redis.get(key(id)));
 }
 
 export async function getAllAccounts(): Promise<Account[]> {
+  if (!durableGroupingReadsRequested()) return getRedisAccounts();
+  // Stable tenant identity comes from the existing tenant registry. Redis's
+  // global index and reverse keys are caches, not required for linked accounts.
+  // Missing registry authority cannot turn a selected durable store into a
+  // stale Redis list. Propagate the failure before any grouping is returned.
+  const tenants = await (await import("./tenants")).getAllTenants();
+  const rows = await Promise.all(tenants.map(tenant => readRecords<Account>("account_grouping", tenant.id, async () => {
+    const account = await getRedisAccountForTenant(tenant.id);
+    return account ? [account] : [];
+  })));
+  const accounts = new Map<string, Account>();
+  for (const raw of rows.flat()) {
+    const account = normalize(raw);
+    if (!account) continue;
+    const prior = accounts.get(account.id);
+    if (!prior || prior.updatedAt < account.updatedAt) accounts.set(account.id, account);
+  }
+  // Empty groupings contain operator-only setup, with no client to mirror yet.
+  for (const account of await getRedisAccounts().catch(() => [])) {
+    if (!account.tenantIds.length && !accounts.has(account.id)) accounts.set(account.id, account);
+  }
+  return [...accounts.values()].sort((a, b) => a.createdAt < b.createdAt ? 1 : -1);
+}
+
+async function getRedisAccounts(): Promise<Account[]> {
   const redis = getRedis();
   if (!redis) return [];
   const ids = (await redis.smembers(INDEX_KEY).catch(() => [])) as string[];
@@ -170,11 +205,21 @@ export async function getAllAccounts(): Promise<Account[]> {
 
 /** Which account owns this site, if any. */
 export async function getAccountForTenant(tenantId: string): Promise<Account | null> {
+  if (!durableGroupingReadsRequested()) return getRedisAccountForTenant(tenantId);
+  const rows = await readRecords<Account>("account_grouping", tenantId, async () => {
+    const account = await getRedisAccountForTenant(tenantId);
+    return account ? [account] : [];
+  });
+  return rows.map(normalize).filter((account): account is Account => account !== null && account.tenantIds.includes(tenantId))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null;
+}
+
+async function getRedisAccountForTenant(tenantId: string): Promise<Account | null> {
   const redis = getRedis();
   if (!redis) return null;
   const accountId = (await redis.get(tenantLinkKey(tenantId))) as string | null;
   if (!accountId) return null;
-  return getAccount(accountId);
+  return getRedisAccount(accountId);
 }
 
 async function persist(account: Account): Promise<Account> {
@@ -307,9 +352,11 @@ export async function linkTenantToAccount(accountId: string, tenantId: string): 
   });
 }
 
-export async function unlinkTenant(accountId: string, tenantId: string): Promise<Account | null> {
+export async function unlinkTenant(accountId: string, tenantId: string, options: { readRedisForCleanup?: boolean } = {}): Promise<Account | null> {
   return withAccountLock(accountId, async () => {
-    const account = await getAccount(accountId);
+    // Teardown has already removed the tenant from Postgres. Its shared
+    // grouping still needs the actual Redis object under the same account lock.
+    const account = options.readRedisForCleanup ? await getRedisAccount(accountId) : await getAccount(accountId);
     if (!account) return null;
     const redis = getRedis();
     if (redis) {
@@ -368,3 +415,6 @@ export function accountMrrCents(account: Account): number {
   }
   return account.subscription?.amountCents ?? 0;
 }
+
+/** Pure legacy shape normalizer reused by operator source capture; no runtime read authority. */
+export { normalize as normalizeLegacyAccount };

@@ -5,6 +5,17 @@ const nextConfig: NextConfig = {
   // Instruction files are user-owned; next dev must not rewrite them.
   agentRules: false,
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  // Isolated release checks can avoid multi-gigabyte persistent compiler caches.
+  // This changes caching only; the production compilation still runs in full.
+  webpack(config) {
+    if (process.env.STRELVA_BUILD_CACHE === "off") config.cache = false;
+    return config;
+  },
+  // The email sanitizer creates jsdom at import time. Native package loading
+  // preserves jsdom's __dirname-relative CSS reads in dev and server builds.
+  // Next traces those reads. Explicit pnpm includes also traverse symlink
+  // aliases; rely on the native trace for these package-relative assets.
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
   // The generated website export copies this dependency into each client
   // repository and the private preview route reads it while building a
   // candidate. Keep it in standalone server output tracing as well as the

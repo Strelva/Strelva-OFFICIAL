@@ -94,4 +94,25 @@ describe("maybeAlertNewReview", () => {
       }),
     );
   });
+
+  it("a converted site's owner gets the alert without one-click links (the route refuses them)", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => ({ email: "trusted@gldf.com", name: null, from: "record", workspaceId: "w1", tenantId: "gldf" }));
+    try {
+      const { maybeAlertNewReview } = await import("@/lib/review-alert");
+      await maybeAlertNewReview({
+        tenant: tenant({ ownerEmail: "edited-by-operator@agency.example" }),
+        ...base,
+        draftedReply: "Thanks Jane!",
+        approveUrl: "https://admin.gldf.strelva.com/api/approve?token=A",
+        notYetUrl: "https://admin.gldf.strelva.com/api/approve?token=N",
+      });
+    } finally {
+      recipients.setOwnerRecipientResolver(null);
+    }
+    const sent = mockSend.mock.calls[0]![0];
+    expect(sent.email).toBe("trusted@gldf.com");
+    expect(sent).not.toHaveProperty("approveUrl");
+    expect(sent).not.toHaveProperty("notYetUrl");
+  });
 });

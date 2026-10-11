@@ -1,18 +1,63 @@
 # One place to operate
 
-Status: draft spec, 2026-10-06. Not approved. Built locally on branch
-`build/operator`, proven local only: health and domain crons over every site,
-the 15-source projection (`src/platform/operator-queue/`), marks and receipts
-migrations (not applied anywhere), `/admin/queue` beside today's `/admin`,
-receipts on review replies and domain add / claim removal, one domain view,
-close-with-minutes, and the agency Queue view model (no route). Not in
-production; the §9 clocks are proposals in `rules.ts` `PROPOSED_CLOCKS`.
+> **Changed by ADR 0013 / decisions 1–2.** Platform operators perform logged support,
+> incident and release work; they never sell to, serve or convert clients. Client delivery
+> uses the ordinary agency path, including Strelva's agency with no extra powers. The mixed
+> `/admin` queue described below is retained as local implementation history, not the
+> selected authority model. Engineering must reconcile client drafting/approval, quoting,
+> service acceptance, sales prospects, owner chasing, lead contents, assignment and
+> delivery-minute capture (§1, §3.1/3/5/8/12–14, §4, §9.1/5). Platform incident/check
+> coverage does not grant client-service authority. Receipts name the actual actor; agency
+> display names carry "Runs on Strelva". The decided place name is "What changed" (October 9).
 
-Strelva's main delivery cost is operator time. Today that time is spread over
-six queues in two stores and fifteen `/admin` pages, and some live sites are
-not checked at all. This spec defines the one queue a Strelva operator works
-from at 1.0.0, keyed to Business → System, and the receipts, checks and
-measures that make it trustworthy.
+Status: locally implemented for wave 6 on `w6/agency-operator`, October 7,
+2026. Not deployed. The operator rollout is selected by
+`STRELVA_OPERATOR_QUEUE_RELEASE=1`, default off: `/admin` becomes the queue,
+expanded checks cover custom-repo sites, and native source actions, strict
+source reads and per-business lead counts become available. With the flag off,
+the old `/admin` remains and health/domain crons keep their hosted-only rebuild
+gate. The earlier operator migrations and the wave 6 additions are local only.
+The §9 clocks remain proposals in `rules.ts` `PROPOSED_CLOCKS`; no working-hour
+promise or owner-chase send is activated. See the local evidence mapping at
+the end and [the stream handoff](../streams/w6-agency-operator.md) for full
+verification and rollout prerequisites.
+
+The platform queue contains logged support, incidents, platform checks and
+release work. Agency delivery has its own ordinary scoped **Queue**, including
+Strelva Agency. Platform access never supplies client-service authority.
+
+## Accepted operator contract — October 11
+
+- **Platform work:** the platform queue/Operator attention names platform
+  incidents and support, never the owner's Needs you collection. Platform
+  actions name Strelva only when the platform actually acted; unknown actors
+  read Actor not recorded. Client-service work names the recorded agency with
+  Runs on Strelva, including Strelva Agency.
+- **Agency work:** drafting, quoting, service acceptance, client chasing,
+  prospects and delivery-minute capture use ordinary agency grants and Queue.
+  A platform operator cannot approve owner decisions or configure agency
+  service policy. Agency Queue does not consume the platform queue.
+- **Three zooms:** All clients → agency inside a client → Your business has
+  the same nouns and decision titles. Agency views expose preparation and
+  Version/source controls within scope. Owner decisions are read-only
+  Waiting on [business], linked to the exact Needs you item. Owner-only
+  approval, exit, payer decisions and sensitive data stay owner-only.
+- **Identity:** a Client is a business, not a tenant/site. Retained site-level
+  support records are Sites until grouped under their business. Billing groups
+  name billing arrangements; Account remains personal sign-in/settings.
+  End-customer messages are Client inquiries; sales records are Agency
+  prospects, owned by the named agency, never an operator sales inbox.
+- **Navigation:** one destination names registry supplies rail, phone,
+  palette, heading and loading/error states. Checks, Operational health,
+  Site audits, Billing groups and Queue use the same names at each entrance.
+- **Brand:** owners see their agency's brand; end customers see the business's
+  name. Failed lookup is neutral and holds agency-authored sends. Audience
+  branding never changes the recorded actor of a platform billing/support action.
+
+[ADR 0014](../../../../docs/adr/0014-one-model-at-three-zooms.md) and the
+[glossary](../../../GLOSSARY.md) own these decisions. The dated rollout and
+source inventory below describe the earlier mixed implementation. They are
+retained evidence, not proof of the October 11 operator-lane separation.
 
 Sources read: `docs/architecture/operator-command-center.md`,
 `docs/product/strelva-reborn.md` §5, `docs/product/strelva-1.0.0.md` §5,
@@ -22,63 +67,42 @@ Sources read: `docs/architecture/operator-command-center.md`,
 
 ## 1. The moment
 
-Tuesday, 8:40 a.m. Jacob opens `admin.strelva.com`. One list.
+Jacob opens the platform console. McClear's website has a failed Postgres lead
+copy: a logged platform storage incident, with its exact System and evidence.
+He inspects the failure and uses the governed repair path only within that
+support scope. The receipt names the recorded platform actor and distinguishes
+accepted repair from successful read-back.
 
-At the top: **McClear's · website · a lead's Postgres copy failed 3 hours
-ago.** McClear's sends its contact form through `/api/v1/leads/mclears`
-(`release-manifest.json`). The lead is safe in Redis for 90 days, but not yet
-kept. The row says so, with the retry count, and offers **Retry now**. He
-clicks it. The row closes with a receipt: "Kept in Postgres 08:41, read back."
-
-Second: **gldf · website · change request, triage due 10:00 today.** The
-owner asked for a new wholesale page yesterday. Due time comes from the
-existing next-business-day rule (`getTriageDueAt`, `src/lib/custom-repos.ts`).
-He assigns it to himself, quotes it, and the owner gets the quote by email
-because gldf's owner has not signed in this month.
-
-Third: **The Mooney Firm · attymooney.com · 2 review replies drafted by
-Strelva, waiting on you.** He opens the diff, approves both. Each reply goes
-to Google, is read back, and leaves a receipt. The receipt says plainly:
-"Google review replies can't be undone from Strelva. You can edit or delete
-the reply in Google."
-
-Below the fold, grouped by business: Rohlax (a domain expires in 21 days,
-owner's call, emailed Monday, no answer), Twin Trees (site checks green, one
-draft maintenance digest), Leslie (nothing waiting).
-
-When he closes an item, a one-line prompt asks "Minutes on this?" prefilled
-from the time the item was open in front of him. He accepts 6. At the end of
-the month the console shows McClear's at 41 human minutes, gldf at 190, and
-the median business at 38.
-
-What he gets: one list that is complete, ordered by harm, with every outside
-write either undoable or honestly labeled as not undoable, and a measured cost
-per business.
+A wholesale-page request, draft review reply and unanswered owner decision
+belong to **Strelva Agency → the named client**, under ordinary agency grants.
+They are absent from the platform service queue. Across clients, owner decisions
+read **Waiting on [business]** and open that exact Needs you item. Agency delivery
+minutes and platform incident effort remain distinct measures.
 
 ## 2. In the model
 
-- The queue is **operator machinery**, not a customer noun. Owners never see
-  it. It sits under **Requests** (finite work: change requests, service
-  requests) and **Running** (what Strelva keeps true: site up, domain
-  verified, leads kept).
-- Every item is keyed **Business → System**. Business is the customer
-  workspace (`workspaces.id`). Before a tenant is converted, the business is
-  the tenant (`tenants.stable_id`) and the item says "not yet a workspace".
-  System is a row in `systems` (`supabase/migrations/20261004120000_systems.sql`)
-  or, for unconverted tenants, the managed website identified by tenant
-  `stable_id` (the rule in `systems-transition.md` row "websites").
-- A health or domain item is **health** of a System or of a **Connection**
-  (domain is an `appear` Connection with `target_type = 'domain'`). It never
-  changes lifecycle. "Live · domain unverified" is valid.
-- An item that waits on the owner is the owner's **Needs you** on their side,
-  and an "owner's call" item on the operator's side. The operator can see it
-  and chase it; the operator cannot decide it.
-- Every outside write produces a **Strelva handled** receipt the owner can
-  see, and the same receipt is the operator's evidence.
-- Proactive "Ready to work" ideas (`src/app/admin/actions/portfolio-opportunities.ts`)
-  are **Possibilities**, not queue items. They stay in their own lane.
+- The platform queue is operator machinery for logged platform support,
+  incidents and checks. It is not the agency's Queue or the owner's Needs you.
+- Items identify the business and System within explicit support scope.
+  Retained unconverted tenant records are Sites, not counted as Clients.
+- System Health and Connection health never change Draft/Live/Paused intent.
+  Missing or stale observations stay unknown, never green.
+- The agency sees owner decision status as Waiting on [business], with the
+  owner's same title and exact-item link. It cannot decide through that view;
+  the platform operator cannot decide or chase client-service items either.
+- What changed and History name whoever actually acted; unknown evidence reads
+  Actor not recorded. Platform and agency receipts do not infer authorship
+  from the viewer, brand or employment.
+- A suggestion stays a suggestion. A research response is a Proposal; only
+  a working alternative someone can open, use and compare is a Possibility.
 
-## 3. What it does at 1.0.0
+## 3. Historical October 6 mixed-queue contract — superseded
+
+The source kinds, actions and clocks below document the older implementation.
+They do not authorize a platform operator to review drafts, quote or accept
+service, read client inquiry contents, sell, chase owners or log agency delivery.
+The accepted contract above governs the operator lane; the historical 15-kind
+parity proof is not proof of the separated queue.
 
 1. **One list.** `/admin` shows one queue across every tenant and every
    workspace. It reads all sources in the table below. No source is left out
@@ -96,15 +120,15 @@ per business.
    | `domain_alert` (down, parked, expiring) | `domain-monitor` cron, `src/lib/domain-monitor-store.ts` | Redis |
    | `domain_unverified` (hosted domain waiting 7+ days) | `website-domain-verification` cron, `reb:website-domain-alert:*` | Postgres + Redis marker |
    | `site_health` (published revision not verified, scan grade drop) | `website_document_health`; `portfolio-scan` + `scan-store` | Postgres, Redis |
-   | `service_request` (asked of Strelva, acceptance pending) | `service_requests` where `provider_kind='strelva'` and `provider_acceptance='pending'` (`src/platform/service-requests`) | Postgres |
+   | `service_request` (Request sent to Strelva's agency, acceptance pending) | `service_requests` where `provider_kind='strelva'` and `provider_acceptance='pending'` (`src/platform/service-requests`) | Postgres |
    | `operational_exception` (failed or uncertain step) | `listOperationalExceptions` (`src/products/operations/inbox.ts`) | Postgres |
    | `assignment_offer` | `operational_assignments` status `offered` | Postgres |
    | `lead_unkept` (client lead whose Postgres copy failed) | `reb:lead-mirror:pending` (`src/lib/lead-mirror.ts`) | Redis |
-   | `prospect_lead` (Strelva's own sales leads, workflow `new`) | `lead-workflow:{token}` (`src/lib/lead-workflow.ts`) | Redis |
+   | `prospect_lead` (legacy kind; Strelva's agency prospects, workflow `new`) | `lead-workflow:{token}` (`src/lib/lead-workflow.ts`) | Redis |
    | `readback_failed` (provider accepted, read-back failed) | new: from the receipt ledger (behavior 6) | Postgres |
 
 2. **Every item has the same shape:** business, System (or "not attached"),
-   kind, one-line plain title, whose move it is (Strelva, owner, provider),
+   kind, one-line plain title, whose move it is (platform, owner, agency),
    priority, opened at, due at, assignee, state, source link, and the receipts
    it produced. Each row deep-links to the existing screen that works it
    (`/admin/clients/[id]`, `/admin/drafts`, the workspace job link).
@@ -134,7 +158,8 @@ per business.
    super admins keep using the exact-job assignment link
    (`operational_assignments`); they do not enter `/admin`.
 6. **One receipt for every outside write.** Every write to a provider or a
-   live site records: business, System, provider, what was asked, the
+   live site records: actor identity and display name, business, System, provider,
+   what was asked, the
    provider's acceptance, a read-back result (`matched`, `differs`,
    `failed`, `not_possible`), the before-state when one can be read, and
    whether undo exists. A failed read-back becomes its own `readback_failed`
@@ -153,7 +178,7 @@ per business.
 
    | Write | Undo at 1.0.0 |
    | --- | --- |
-   | Tenant content publish | Yes: restore prior version (`src/lib/storage/version-store.ts`, `/api/content/[section]/versions`) |
+   | Tenant content publish | Yes: restore prior state from History (`src/lib/storage/version-store.ts`, `/api/content/[section]/versions`) |
    | Hosted v2 website publish | Yes: republish the prior immutable revision (`website_document_publications`) — *inference, to verify* |
    | Inquiry capability publish | Yes: existing `inquiry_capability_undo` (`src/lib/event-actions.ts`) |
    | Calendar event | Per `workspace_calendar_event_receipts` |
@@ -209,7 +234,13 @@ per business.
     and domain → `recovery`, `prospect_lead` → `sales`). The operator can edit
     or skip. Work done outside the queue is still logged by the existing form.
     `/admin/work` shows the monthly median, per business, per kind and per
-    System.
+    System. Every in-scope client business appears in the effort measure.
+    Coverage means a non-voided log exists for that business and UTC month;
+    it does not certify all work was logged. Explicit 0-minute manual logs
+    confirm no human work; gaps remain "Not logged", including after a first
+    log. Portfolio median and average use all client businesses (denominator
+    shown), including explicit zeros, and require complete log coverage.
+    Partial sums are labeled logged minutes; incomplete months have no trend.
 14. **Owner reach outside the app.** An owner's-call item records how the
     owner was told (email, approve link, or not yet) and when. If client email
     is paused (`EMAIL_SENDING_ENABLED` unset), the row says "Owner not told:
@@ -222,14 +253,16 @@ Item states: `open` → `taken` → `waiting_on_owner` | `waiting_on_provider` �
 A source closing its own item (a draft approved on the client dashboard)
 closes the queue item with "closed elsewhere by {actor}".
 
-Authority:
+Current authority (replaces the older super-admin service model):
 
-- **Strelva operator** (verified user with an active `super_admins` row): sees
-  every business, takes and works items, approves Strelva-drafted changes
-  where policy allows, triggers checks.
-- **Owner:** decides owner's-call items: publish, launch, payment, exit,
-  anything set to owner review. The operator escalates; never decides.
-- **Member, agency:** no `/admin`. Agency queue is out of 1.0.0 (assumption 2).
+- **Platform operator:** logged support, incidents, checks and release only.
+  An active `super_admins` row never grants client-service authority.
+- **Owner:** decides owner-only approvals, exit and payer choices through the
+  owner's exact item and existing authentication/payer rules.
+- **Agency:** prepares and serves clients through ordinary scope, including
+  Strelva Agency. The agency Queue is in 1.0.0 and independent of `/admin`.
+- **Member:** uses only granted business functions. Neither agency/member
+  navigation nor platform employment widens sensitive-data access.
 
 Never:
 
@@ -326,7 +359,7 @@ stay addressable as redirects.
   queue total equals source totals; one source down marks the list incomplete.
 - Receipt tests per write path: accepted + read-back matched, accepted +
   read-back failed (no retry), rejected.
-- Undo tests: content version restore; domain claim removal leaves Vercel
+- Undo tests: content History restore; domain claim removal leaves Vercel
   untouched (assert no Vercel delete call).
 - Health coverage test: every active tenant, including all 9 custom repos in
   `release-manifest.json`, yields a health result with the rebuild flag off.
@@ -339,11 +372,10 @@ stay addressable as redirects.
 
 ## 9. Open decisions
 
-1. **Where the queue lives.** (a) `/admin` only; (b) the agency surface Queue
-   (`DESIGN.md` "Not built yet"), which Strelva uses as its own agency under
-   assumption 2; (c) one projection rendered in both. **Recommend (c)** with
-   `/admin` first. If partner agencies come into 1.0.0, (c) is required and the
-   projection must filter by delegation.
+1. **Where the queue lives — decided October 11, D4.** The platform queue
+   is separate from the agency Queue. Agency Queue reads ordinary delegated
+   scope, without an operator bucket or operator-access dependency. This
+   supersedes the older recommendation of one projection in both places.
 2. **Clocks.** Proposed: P1 acknowledged in 2 working hours; owner chase at 3
    and 7 days. Different numbers change only config.
 3. **Minutes capture.** (a) manual only (#205 today); (b) prompt on close with
@@ -352,9 +384,9 @@ stay addressable as redirects.
 4. **Undo for GBP hours.** (a) label only; (b) "Put back" drafts a new
    approved write from the stored before-state. **Recommend (b)**. It is a
    Google write, so it still needs approval and Google access.
-5. **Prospect leads in the same queue.** Strelva's sales leads are not a
-   client's business. Recommend in, as their own kind with no System, so one
-   list stays complete. If Jacob wants sales separate, drop the kind.
+5. **Agency prospects — changed by ADR 0013 / decision 2.** Sales belongs to
+   the agency path, never the platform operator queue. The local `prospect_lead`
+   kind is retained as implementation evidence; engineering must reconcile it.
 6. **Owner reach beyond email.** No SMS sender exists (no provider in
    `src/lib`; only a legacy `sms:pending:{tenant}` marker read by
    `src/lib/ops.ts`). Under assumption 6, email is the only channel and client
@@ -383,3 +415,29 @@ Inferences, to check:
   weeks and count items per kind per business.
 - Whether minutes per business are dominated by a few clients (gldf, custom
   repos). Unknown until #205 data exists for one full month.
+
+## Historical wave 6 local implementation and evidence
+
+The table maps launch behavior to implementation and local proof. Synthetic
+fixtures establish behavior under those inputs; they do not establish a live
+client conversion, provider access, operating parity or measured economics.
+
+| Launch behavior | Implementation and local evidence |
+| --- | --- |
+| §3.1–2 Complete list and one shape | `operator-queue/sources.ts`, `project.ts`, `contracts.ts`. Projection parity covers all 15 kinds; omitted kinds are explicit gaps. Enabled reads consume all events, assignment offers, exception pages and receipt sources; Postgres drafts use their creation time, Redis digests and ops failures use strict reads. `operator-queue-projection`, `operator-queue-source-integrity`, `operational-inbox-query` tests cover missing, failed and later pages. |
+| §3.3–4 Priority, due time and age | `rules.ts`; projection tests prove harm, owner calls, expiring drafts, pin/snooze and due ordering. Proposed acknowledgement and chase numbers remain configuration, not approved service terms. |
+| §3.5 Assignment | `store.ts`, operator marks RPC and `queue/actions.ts`; operator/auth schema and action tests reject non-operators and stale/P1 snoozes. Assignment never grants source authority. |
+| §3.6–7 Receipts and undo | Outside-write ledger plus existing native ledgers. Legacy Google writes reserve dispatch before calling Google; accepted or uncertain effects cannot be re-sent. Tenant content publication records its receipt atomically. Review reply, Google write, domain, content receipt and listing readback tests cover acceptance, rejection, uncertain dispatch and unavailable receipt storage. Existing website revision restore remains the hosted undo path; domain undo removes only Strelva's claim. |
+| §3.8 Work from the queue | `QueueBoard`, `QueueSourceActions`, server-derived identities in `source-actions.ts`; draft review/bulk partial results, triage/quote, lead repair, checks and reviewed-revision service acceptance reuse governed source paths. Action tests refuse owner decisions, cross-business targets, stale revisions and unconfirmed lead copies. Hosted rechecks read and save the exact current publication even without a tenant-workspace link. |
+| §3.9–10 Every-site health and domains | Existing crons gain operator rollout guards. Enabled coverage checks all nine synthetic custom-repo sites with rebuild off; no evidence is unknown. Stale cached healthy results and sites absent from a snapshot appear as unknown queue items. Flags-off tests preserve skipped responses and hosted-only behavior. Provider reads, failed probes and failed health storage are covered by cron tests. |
+| §3.11 One domain projection | `domain-view.ts`, `domain-view-loader.ts` combine hydrated claims, registration state and monitor observations for linked sites; projection and loader tests cover registration states, unknown monitor data and unavailable claims. |
+| §3.12 Client leads visible | Existing `/admin/client-leads`; `lead-counts.ts` reads only ids, deduplicates Postgres/Redis and combines linked sites by business. Queue rows show seven-day counts, and the business summary shows pending copies; an unread store produces unknown counts. Lead-count tests cover shared businesses, 501 records and store/page failures. Lead contents remain outside the list. |
+| §3.13 Human minutes | Close action writes marks, then business effort with source kind and System attribution; failed minutes are reported after a successful close. Action tests cover invalid minutes, absent workspace and storage failure. `/admin/work` remains the effort report. |
+| §3.14 Owner reach | Marks and `OwnerNotToldPanel` distinguish told, not told and paused email; projection tests cover paused email. The shared owner-recipient rule belongs to this stream's business-record work and remains behind its own default-off gates. |
+| Interface and authority states | Real route/loading state and local preview share `QueueLoadState`. Queue buttons use shared 48px controls, links have 48px targets. Root stream inspected desktop 1280px/mobile 390px, empty/incomplete/loading/error/denied states and visible keyboard focus; fixture actions refuse without a real operator session. Authenticated local journey remains a separate proof from the fixture preview. |
+
+Production still requires applying the migrations, explicit flag/deploy approval,
+read-only count parity for 14 days, a real governed write with provider read-back,
+and a month of minutes across live clients. Owner email stays paused until its
+separate sending gates are explicitly enabled. No queue action grants permission
+for Stripe, DNS, deployment, provider writes or production data fixes.

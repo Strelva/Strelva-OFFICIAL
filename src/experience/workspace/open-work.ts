@@ -4,7 +4,7 @@ import type { WorkspaceView } from "./workspace-selection";
 /** What the open view was started with. Starting anything replaces it; leaving the work clears it. */
 export interface OpenedStart {
   view: WorkspaceView;
-  /** Plan and horizontal products start from the request text alone. */
+  /** Plan and horizontal products start from the ask text alone. */
   request?: string;
   continuation?: WorkspaceStartContinuation;
 }
@@ -45,7 +45,10 @@ export function startContinuation(open: OpenWorkContext, view: WorkspaceView, ro
   return start?.view === view && start.continuation?.route === route ? start.continuation : null;
 }
 
-/** The request text this view was started with, if it was started for this view. */
-export function startRequest(open: OpenWorkContext, view: WorkspaceView): string | undefined {
+/** The ask text this view was started with, if it was started for this view. */
+export function startAsk(open: OpenWorkContext, view: WorkspaceView): string | undefined {
   return open.start?.view === view ? open.start.request : undefined;
 }
+
+/** @deprecated Use startAsk. The carried request key remains compatible. */
+export const startRequest = startAsk;

@@ -100,7 +100,7 @@ describe("leads store", () => {
     expect(mockSendNewLeadEmail.mock.calls[0]![0]).toMatchObject({ email: "pat@business.example", tenantId: "t1" });
   });
 
-  it("falls back to the tenant owner_email when the rule can't be read", async () => {
+  it("sends no lead notice when the rule can't be read (never the editable owner_email)", async () => {
     const { setOwnerRecipientResolver } = await import("@/lib/owner-recipient");
     setOwnerRecipientResolver(vi.fn().mockRejectedValue(new Error("db down")));
     try {
@@ -108,7 +108,7 @@ describe("leads store", () => {
     } finally {
       setOwnerRecipientResolver(null);
     }
-    expect(mockSendNewLeadEmail.mock.calls[0]![0].email).toBe("owner@example.com");
+    expect(mockSendNewLeadEmail).not.toHaveBeenCalled();
   });
 
   it("does not re-email the owner on a duplicate re-submission", async () => {

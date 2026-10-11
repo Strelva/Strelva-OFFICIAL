@@ -1,0 +1,164 @@
+{
+  "scope": "actual-harmless-local-child-faults",
+  "databaseExecuted": false,
+  "nativeSQLExecuted": false,
+  "fullReleaseQualified": false,
+  "status": "HOLD",
+  "cases": [
+    {
+      "case": "spawn-gap/repeated-signals/TERM-resistant/sibling",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 33702,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          },
+          {
+            "clientPid": 33703,
+            "forced": true,
+            "reaped": true,
+            "errors": [
+              "TERM wait: Bounded child timeout after 2 seconds"
+            ],
+            "returncode": -9
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 33702,
+            "backendPid": 33702,
+            "state": "CLOSED"
+          },
+          {
+            "clientPid": 33703,
+            "backendPid": 33703,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "retention-failure/signal-during-terminal-write",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 33710,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 33710,
+            "backendPid": 33710,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "retentionFailure": "[Errno 21] Is a directory: '/tmp/source-child-fault-l29y09so/retention-failure.json.terminal-c4628548662e4915842876b8019c42ac' -> '/tmp/source-child-fault-l29y09so/retention-failure.json'"
+      }
+    },
+    {
+      "case": "repeated-signals-inside-backend-closure",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 33711,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 33711,
+            "backendPid": 33711,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "final-handoff-signal-after-clean-natural-exit",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 33712,
+            "forced": false,
+            "reaped": true,
+            "errors": [],
+            "returncode": 0
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 33712,
+            "backendPid": 33712,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "observedFinalHandoff": {
+          "injected": [
+            {
+              "line": 384,
+              "depth": 1
+            }
+          ],
+          "pending": [
+            15
+          ],
+          "inMemoryStatus": "HOLD",
+          "mainAccepts": false,
+          "childNaturalExit": true
+        }
+      }
+    }
+  ],
+  "failure": "Writer-release gap lost durable HOLD invalidation",
+  "harnessSha256": "5ac0c88d62d2c6267d9ca0c02eb7449b75d94f578a8623b31a88f16e44026ae8"
+}

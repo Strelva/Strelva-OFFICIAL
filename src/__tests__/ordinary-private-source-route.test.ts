@@ -1,0 +1,23 @@
+import { randomUUID } from "node:crypto";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({ actor: vi.fn(), workspaces: vi.fn(), read: vi.fn(), create: vi.fn(), publish: vi.fn(), share: vi.fn(), grant: vi.fn(), install: vi.fn(), released: vi.fn(), guard: vi.fn() }));
+vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
+vi.mock("@/platform/systems-release", () => ({ systemsReleaseMayBeOn: () => true, systemsReleasedFor: mocks.released }));
+vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: () => false }));
+vi.mock("@/platform/workspaces/http", async (importOriginal) => ({ ...await importOriginal<typeof import("@/platform/workspaces/http")>(), workspaceHttpActor: mocks.actor, workspaceWriteGuard: mocks.guard }));
+vi.mock("@/experience/workspace/agency/private-definition-server", () => ({ readPrivateApplicationSources: mocks.read, createPrivateApplicationSource: mocks.create, publishPrivateApplicationSource: mocks.publish, sharePrivateApplicationSource: mocks.share, grantPrivateApplicationInstall: mocks.grant, installPrivateApplicationVersion: mocks.install }));
+import { GET, POST } from "@/app/api/workspace/version-sources/route";
+const workspaceId = randomUUID(), actor = { userId: randomUUID(), verifiedEmail: "owner@example.test" };
+const request = (data: unknown) => new Request("http://localhost/api/workspace/version-sources", { method: "POST", headers: { origin: "http://localhost", "Content-Type": "application/json" }, body: JSON.stringify(data) });
+beforeEach(() => { vi.clearAllMocks(); mocks.actor.mockResolvedValue(actor); mocks.released.mockResolvedValue(true); mocks.guard.mockReturnValue(undefined); mocks.workspaces.mockResolvedValue([{ id: workspaceId, kind: "customer", access: "member" }]); mocks.read.mockResolvedValue({ workspaceId, canAuthor: true, sources: [], shared: null }); });
+describe("ordinary source route current scope", () => {
+    it.each(["customer", "agency"])("returns private no-store summaries for a current %s membership", async (kind) => { mocks.workspaces.mockResolvedValue([{ id: workspaceId, kind, access: "member" }]); const result = await GET(new Request(`http://localhost/api/workspace/version-sources?workspaceId=${workspaceId}`)); expect(result.status).toBe(200); expect(result.headers.get("cache-control")).toBe("private, no-store"); expect(mocks.read).toHaveBeenCalledWith(actor, workspaceId, undefined); });
+    it("refuses personal or projected authority before reading source data", async () => { for (const workspace of [{ id: workspaceId, kind: "personal", access: "member" }, { id: workspaceId, kind: "customer", access: "provider_seat" }]) {
+        mocks.workspaces.mockResolvedValue([workspace]);
+        expect((await GET(new Request(`http://localhost/api/workspace/version-sources?workspaceId=${workspaceId}`))).status).toBe(403);
+    } expect(mocks.read).not.toHaveBeenCalled(); });
+    it("reauthorizes sign-in and release before reading", async () => { mocks.actor.mockResolvedValue(null); expect((await GET(new Request(`http://localhost/api/workspace/version-sources?workspaceId=${workspaceId}`))).status).toBe(401); mocks.actor.mockResolvedValue(actor); mocks.released.mockResolvedValue(false); expect((await GET(new Request(`http://localhost/api/workspace/version-sources?workspaceId=${workspaceId}`))).status).toBe(503); expect(mocks.read).not.toHaveBeenCalled(); });
+    it("preserves exact create wire and original install context while using current native producers", async () => { const commandId = randomUUID(); mocks.create.mockResolvedValue({ source: { businessId: workspaceId, systemId: commandId }, hidden: true }); const data = { action: "create", workspaceId, name: "Requests", commandId }; expect((await POST(request(data))).status).toBe(201); expect(mocks.create).toHaveBeenCalledWith(actor, data); const source = { businessId: randomUUID(), systemId: randomUUID(), revisionId: randomUUID(), number: 1 }; const install = { action: "install", workspaceId, source, name: "Requests", commandId }; mocks.install.mockResolvedValue({ workspaceId }); expect((await POST(request(install))).status).toBe(201); expect(mocks.install).toHaveBeenCalledWith(actor, { ...install, context: { kind: "agency_client", label: "Requests" } }); });
+    it("stops guarded writes before any producer dispatch", async () => { mocks.guard.mockReturnValue(new Response(null, { status: 403 })); expect((await POST(request({ action: "create", workspaceId, name: "Requests", commandId: randomUUID() }))).status).toBe(403); expect(mocks.create).not.toHaveBeenCalled(); });
+});

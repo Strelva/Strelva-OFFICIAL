@@ -50,6 +50,7 @@ const MESSAGES: Partial<Record<SystemRuleCode, string>> = {
   system_command_conflict: "This command id was already used for a different change.",
   system_origin_conflict: "That existing thing is already a System.",
   system_identity_immutable: "A System keeps its identity.",
+  system_kind_immutable: "A System keeps its kind for life.",
   system_lifecycle_invalid: "That lifecycle change is not allowed.",
   system_revision_required: "A System needs a revision before it can go live.",
   system_output_requires_revision: "Only a System with a revision can issue something.",

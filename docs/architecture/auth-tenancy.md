@@ -113,6 +113,29 @@ Public lead and telemetry writes are unauthenticated by design. They use schema
 validation, tenant resolution, rate limits, spam/dedup controls, and bounded
 retention instead of membership.
 
+## Public agent channel
+
+`src/proxy.ts` lets two MCP paths through without a session (#301): exactly
+`/api/mcp/public`, and the prefix `/api/mcp/bookings/` (the per-business alias,
+descendants included). Every other `/api/mcp/*` path, including owner and
+agency MCP (#302), stays session-gated; `proxy-route-matcher.test.ts` pins both
+sides. Behind the exception:
+
+- nothing runs until `STRELVA_BOOKING_AGENTS` and the Postgres booking store
+  are on; otherwise every call answers 503;
+- tools are reads plus `request_booking`, a 15-minute hold that only the
+  customer's emailed confirmation places. The caller receives a status token,
+  never a confirm or manage token, and the status token stops answering 24
+  hours after the booking ends (`STATUS_TOKEN_GRACE_MS`);
+- businesses are named by tenant id or, without a website, by `biz:<handle>`
+  while their `/biz` page is published and public. A raw `workspace:<id>`
+  scope is never accepted;
+- agent holds share the anonymous admission of website and inquiry requests
+  (`check_public_booking_budget`: business budget, one live request per
+  mailbox) plus ten live agent holds per business;
+- rate limits key on the caller (address or provider egress) and identity
+  buckets, never on arguments a tool does not take.
+
 ## Accounts and billing
 
 An Account groups one or more Tenants under a payer and bundled subscription. It

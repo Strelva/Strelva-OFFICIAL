@@ -25,7 +25,7 @@ test("admin operator surfaces: overview feed, client cockpit, drafts", async ({ 
   await expect(page.getByRole("heading", { name: "Internal work", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Staff delivery entry" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Managed-site delivery" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Customer support" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Support" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Offering development" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Operating costs" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Restricted system administration" })).toBeVisible();

@@ -9,13 +9,16 @@
  * and flags only.
  *
  * Read-only by construction: the dependencies below expose reads only
- * (Postgres head counts and column selects, Redis SCAN, TYPE and cardinality).
- * Nothing here can insert, update, delete, call an RPC, GET a Redis value or
+ * (Postgres head counts and column selects, Redis SCAN, TYPE, cardinality and
+ * one fixed-key client-email enum read per active tenant).
+ * Nothing here can insert, update, delete, call an RPC, read an arbitrary Redis value or
  * set a key. The report holds no secret values and no customer data: env
  * secrets are reported as present/absent, tenant slugs and sending domains are
  * business identifiers, and assertNoSensitiveOutput() refuses to print anything
  * that looks like an email address or a token.
  */
+
+import { silentRolloutEnvStops } from "./silent-rollout";
 
 export const JACOBS_YES = "--i-have-jacobs-yes";
 
@@ -30,6 +33,24 @@ export type DbFilter =
 export type DbCount = { ok: true; count: number } | { ok: false; missing: boolean; reason: string };
 export type DbRows<T> = { ok: true; rows: T[] } | { ok: false; missing: boolean; reason: string };
 
+export const missingTable = (error: { message?: string; code?: string }) =>
+  error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");
+
+export type CountResponse = { count: number | null; error: { message?: string; code?: string } | null; status?: number };
+
+/**
+ * A head-only count carries no response body, so a missing table can come back
+ * with no error at all: status 404 and a null count. Only a real count is
+ * "present"; a 404 or a null count never is.
+ */
+export function countResult({ count, error, status }: CountResponse): DbCount {
+  if (status === 404) return { ok: false, missing: true, reason: error?.message || "404: table not found" };
+  if (error) return { ok: false, missing: missingTable(error), reason: error.message || error.code || "unknown" };
+  if (count === null || count === undefined) return { ok: false, missing: false, reason: `no count returned (status ${status ?? "unknown"})` };
+  return { ok: true, count };
+}
+
+
 /** Postgres, read side only. Implemented with head counts and selects. */
 export interface ReadOnlyDb {
   count(table: string, filters?: DbFilter[]): Promise<DbCount>;
@@ -40,8 +61,9 @@ export interface ReadOnlyDb {
   ): Promise<DbRows<T>>;
 }
 
-/** Redis, read side only: SCAN, TYPE and a cardinality read per type. Never GET. */
+/** Redis reads only. The fixed-key email policy read returns an enum, never a raw value. */
 export interface ReadOnlyRedis {
+  clientEmailOverride(tenantId: string): Promise<"on" | "off" | "absent" | "unknown">;
   scan(cursor: string, options: { match: string; count: number }): Promise<[string, string[]]>;
   type(key: string): Promise<string>;
   /** ZCARD / LLEN / SCARD / HLEN by type; a number, never a value. */
@@ -84,6 +106,44 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  // Full-model additions: private/denied probes remain unknown.
+  "20261022175100": "legacy_google_operation_watermarks",
+  "20261022173000": "creator_version_paid_periods",
+  "20261022175000": "tenant_reward_mutations",
+  "20261021090031": "agent_business_discovery_days",
+  "20261021093000": "agency_release_flag_ceilings",
+  "20261021094000": "provider_client_queue_catalog_guard",
+  "20261021100000": "investigation_history_events",
+  "20261021100700": "google_listing_receipt_payloads",
+  "20261021140000": "native_google_oauth_attempts",
+  "20261022090100": "tenant_deprovision_cleanup",
+  "20261022120000": "agency_created_application_predecessors",
+  "20261022123000": "private_definition_function_receipts",
+  "20261022130000": "tenant_newsletter_teardown_function_journal",
+  "20261021110000": "enterprise_units",
+  "20261021112000": "home_finder_bindings",
+  "20261021112200": "home_finder_configuration_commands",
+  "20261021130100": "custom_sandbox_runtime_qualifications",
+  "20261021131100": "assistant_connections",
+  "20261021131200": "assistant_website_proposals",
+  "20261020090037": "provider_completion_rollback_state",
+  "20261020090033": "business_attributions",
+  // A denied private audit probe is unknown, not proof of absence.
+  "20261020090039": "platform_operator_read_audit",
+  "20261017111000": "inquiry_retention_receipts",
+  "20261016110000": "operator_action_approvals",
+  "20261015110000": "super_admin_access_events",
+  "20261012010000": "tenant_track_signing_keys",
+  "20261011180000": "provider_disconnect_receipts",
+  "20261011102000": "workspace_collection_entries",
+  "20261011101000": "business_booking_email_settings",
+  "20261011120000": "business_policies",
+  "20261011150000": "public_booking_requests",
+  "20261014100000": "client_resource_mandates",
+  "20261014112000": "acting_provider_gate_predecessors",
+  "20261010140000": "google_listing_controls",
+  "20261010142000": "workspace_newsletter_issues",
+  "20261010143000": "publishing_google_outages",
   "20260729180000": "accounts",
   "20260928130000": "business_effort_entries",
   "20261001120000": "website_documents",
@@ -116,6 +176,71 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261009151000": "provider_seats",
+  "20261009152000": "agency_verifications",
+  "20261010102000": "owner_decision_link_sessions",
+  "20261010103000": "ask_business_record_drafts",
+  "20261010110000": "website_cutover_undos",
+  "20261010113000": "website_rebuild_origins",
+  "20261010114000": "website_domain_requests",
+  "20261010115000": "website_model_allowances",
+  "20261010115700": "website_native_fact_reviews",
+  "20261010120000": "inquiry_workspace_messages",
+  "20261010125600": "inquiry_engine_reply_claims",
+  "20261010125800": "connected_inquiry_owner_notices",
+  "20261010125910": "inquiry_decision_notice_claims",
+  "20261010125915": "inquiry_decision_notice_events",
+  "20261010125930": "inquiry_business_fact_proposals",
+  "20261010125940": "inquiry_booking_offers",
+  "20261010125950": "connected_inquiry_owner_notice_repairs",
+  "20261010131000": "business_booking_access",
+  "20261010132000": "business_booking_update_epoch",
+  "20261010133000": "business_booking_calendar_mirrors",
+  "20261010134000": "booking_inquiry_offers",
+  "20261010135000": "booking_instant_policies",
+  "20261010135920": "booking_service_policies",
+  "20261010135950": "booking_calendar_health_actions",
+  "20261010150300": "internal_tool_contact_conflicts",
+  "20261010152000": "catalog_report_receipts",
+  "20261010153000": "newsletter_contact_sync",
+  "20261010160000": "agency_package_commands",
+  "20261010161000": "operator_google_write_attempts",
+  "20261010161100": "operator_queue_effort_context",
+  "20261010162100": "tenant_deprovision_retention_receipts",
+  "20261010163300": "system_version_native_applications",
+  "20261010165500": "business_outcome_report_deliveries",
+  "20261010165600": "workspace_exit_handoff_receipts",
+  "20261010165700": "workspace_export_recovery",
+  "20261011100000": "workspace_newsletter_batches",
+  "20261011133700": "business_record_confirmed",
+  "20261011170000": "prospects",
+  "20261012110000": "business_pages",
+  "20261015100000": "agency_client_additions",
+  "20261013120000": "business_owner_recipient_trust",
+  "20261020090003": "agency_billing_intents",
+  "20261020090006": "connected_accounts",
+  "20261020090007": "money_agreements",
+  "20261020090008": "provider_change_policy",
+  "20261020090009": "business_payment_requests",
+  "20261020090010": "agent_payment_policies",
+  "20261020090011": "platform_collection_prices",
+  "20261020090012": "invoice_split_sources",
+  "20261020090016": "agent_quote_receipts",
+  "20261020090018": "assistant_authorization_codes",
+  "20261020090019": "agent_channel_consents",
+  "20261020090021": "system_revision_reviewers",
+  "20261020090022": "system_package_install_grants",
+  "20261020090023": "offering_package_sources",
+  "20261020090025": "system_bundle_installations",
+  "20261020090027": "system_bundle_native_bindings",
+  "20261020090028": "responsibility_bundles",
+  "20261020090031": "provider_change_cancellations",
+  "20261020090032": "responsibility_meter_months",
+  "20261020090034": "invoice_split_attributions",
+  "20261020090036": "bundle_maintenance_attachments",
+  "20261020090013": "split_recovery_payouts",
+  "20261020090014": "invoice_money_evidence",
+  "20261020090015": "sandbox_build_attempts",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -137,7 +262,7 @@ export const SECRET_ENV = [
   "ANTHROPIC_API_KEY",
 ] as const;
 
-/** Flag names from src at 30dcba1b (release packet section 2). Values are printed when short and plain. */
+/** Flag names from src at 30dcba1b (release packet section 2). Only known enum values are printed. */
 export const FLAG_ENV = [
   "EMAIL_SENDING_ENABLED",
   "CUSTOMER_EMAIL_ENABLED",
@@ -155,6 +280,11 @@ export const FLAG_ENV = [
   "STRELVA_WEBSITE_REBUILD_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_SYSTEMS_RELEASE",
+  "STRELVA_AGENCY_SIGNUP_RELEASE",
+  "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+  "STRELVA_CATALOG_REPORTS_RELEASE",
+  "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+  "STRELVA_DOCUMENT_HISTORY_RELEASE",
   "STRELVA_ASK_RELEASE",
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_PUBLISHING_RELEASE",
@@ -163,17 +293,46 @@ export const FLAG_ENV = [
   "STRELVA_CLIENT_RECORDS_DUAL_WRITE",
   "STRELVA_CLIENT_RECORDS_READ",
   "STRELVA_EXPORT_SCHEMA_3",
+  "STRELVA_OPERATOR_QUEUE_RELEASE",
+  "STRELVA_BUSINESS_RECORD_READS",
+  "STRELVA_BUSINESS_OUTCOME_REPORTS",
+  "STRELVA_TENANT_RECEIPT_RETENTION",
+  "STRELVA_EXPORT_RECOVERY",
+  "STRELVA_EXPORT_LINK_EMAIL",
+  "STRELVA_EXIT_HANDOFF",
+  "STRELVA_FINITE_JOBS_RELEASE",
+  "STRELVA_APPROVAL_STORE_RELEASE",
   "STRELVA_LEADS_READ",
   "STRELVA_LEADS_AUTHORITY",
   "STRELVA_INQUIRY_RECORDS",
+  "STRELVA_INQUIRY_REPLIES",
+  "STRELVA_INQUIRY_OWNER_NOTICES",
+  "STRELVA_INQUIRY_BUSINESS_FACTS",
+  "STRELVA_INQUIRY_OUTCOMES",
+  "STRELVA_INQUIRY_BOOKING_HANDOFF",
   "STRELVA_BOOKING_STORE_WRITE",
   "STRELVA_BOOKING_STORE_READ",
   "STRELVA_BOOKING_OWNER_NOTICE",
   "STRELVA_BOOKING_REMINDERS",
   "STRELVA_BOOKING_MANAGE_PAGE",
   "STRELVA_BOOKING_CALENDAR_BUSY",
+  "STRELVA_BOOKING_AGENTS",
+  "STRELVA_AGENT_IDENTITY_LIMITS",
+  "STRELVA_BOOKING_MESSAGES",
+  "STRELVA_BOOKING_INQUIRY_OFFERS",
+  "STRELVA_BOOKING_SETTINGS",
+  "STRELVA_BOOKING_CALENDAR_MIRROR",
+  "STRELVA_BOOKING_CALENDAR_SCOPES",
+  "STRELVA_BOOKING_CALENDAR_REVOKE",
+  "STRELVA_BOOKING_RECORD_FALLBACK",
+  "STRELVA_BOOKING_MANUAL",
   "STRELVA_MAKE_REAL_LIVE",
   "STRELVA_CONNECTED_SITES_RELEASE",
+  "STRELVA_BUSINESS_PAGES",
+  "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
+  "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
+  "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+  "STRELVA_WEBSITE_NATIVE_FACTS_ENABLED",
   "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
   "REB_DEV_UNGATED_ACCESS",
 ] as const;
@@ -206,7 +365,7 @@ const SCAN_KEY_LIMIT = 200_000;
 
 /* ---------------------------------------------------------------- report -- */
 
-/** on/off for boolean-like values, the value itself when short and plain (e.g. "workspace"), else "set". */
+/** on/off for boolean-like values, a known release enum (e.g. "workspace"), else "set". */
 export type Tri = string;
 
 export interface SnapshotReport {
@@ -226,6 +385,7 @@ export interface SnapshotReport {
     tenants: { total: number | null; active: number | null };
     activeTenants: { id: string; features: string[]; resendDomain: string | null; hasSearchConsoleKey: boolean }[];
     workspaces: { total: number | null; byKind: Record<string, number | null> };
+    agencyReadiness: { providerRows: number | null; providersBySource: Record<string, number | null>; strelvaAgencyDesignationRows: number | null; accountsByPayerKind: Record<string, number | null>; batch7aPresent: boolean };
     workspaceMemberships: number | null;
     tenantMemberships: number | null;
     openTenantInvites: number | null;
@@ -244,7 +404,9 @@ export interface SnapshotReport {
     activeTenantsWithAnalyticsConfig: string[];
     activeTenantsWithGoogleConnection: string[];
     activeTenantsWithClientEmailOverride: string[];
+    clientEmailOverrides: Record<string, "on" | "off" | "absent" | "unknown">;
   } | null;
+  silentRollout: { safe: boolean; stopConditions: string[] };
   notes: string[];
 }
 
@@ -268,10 +430,21 @@ export function requireJacobsYes(options: { jacobsYes: boolean }): void {
 const EMAIL = /[^\s"'@]+@[^\s"'@]+\.[a-z]{2,}/i;
 const TOKENISH = /\b(?:sk_(?:live|test)_|rk_(?:live|test)_|whsec_|eyJ)[A-Za-z0-9_\-.]{8,}|\b[A-Za-z0-9+/_-]{40,}={0,2}/;
 
-/** Throws if the text would print an email address or something token-shaped. */
-export function assertNoSensitiveOutput(text: string): void {
+/**
+ * Only exact compiled identifiers and the caller's trusted repository migration
+ * inventory may resemble opaque tokens. Do not pass names from a report or a
+ * remote response: those are the values this guard must check.
+ */
+export function assertNoSensitiveOutput(text: string, repoMigrations: readonly string[] = []): void {
   if (EMAIL.test(text)) throw new Error("Refusing to print: the snapshot output contains an email address.");
-  if (TOKENISH.test(text)) throw new Error("Refusing to print: the snapshot output contains a token-shaped value.");
+  const identifiers = new Set<string>([...SECRET_ENV, ...FLAG_ENV, ...Object.values(MIGRATION_SENTINELS), ...repoMigrations]);
+  for (const match of text.matchAll(/[A-Za-z0-9+/_=.-]+/g)) {
+    // Check the whole lexeme, so adding a prefix, suffix or token punctuation
+    // cannot turn a supplied value into an allowed identifier substring.
+    if (TOKENISH.test(match[0]) && !identifiers.has(match[0])) {
+      throw new Error("Refusing to print: the snapshot output contains a token-shaped value.");
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ core -- */
@@ -281,7 +454,7 @@ function flagState(value: string | undefined): Tri {
   const v = value.trim().toLowerCase();
   if (["1", "true", "on", "yes"].includes(v)) return "on";
   if (["0", "false", "off", "no"].includes(v)) return "off";
-  return /^[a-z0-9_,-]{1,64}$/i.test(v) ? `value: ${v}` : "set (value hidden)";
+  return ["workspace", "operators", "legacy", "compare", "postgres"].includes(v) ? `value: ${v}` : "set (value hidden)";
 }
 
 function versionOf(migration: string): string {
@@ -366,11 +539,13 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     }
   }
 
+  let activeTenantReadComplete = false;
   /* postgres */
   const pg: SnapshotReport["postgres"] = {
     tenants: { total: null, active: null },
     activeTenants: [],
     workspaces: { total: null, byKind: {} },
+    agencyReadiness: { providerRows: null, providersBySource: {}, strelvaAgencyDesignationRows: null, accountsByPayerKind: {}, batch7aPresent: ["20261009151000", "20261009152000", "20261009153000", "20261009154000"].every(version => appliedSet ? appliedSet.has(version) : false) },
     workspaceMemberships: null,
     tenantMemberships: null,
     openTenantInvites: null,
@@ -395,6 +570,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     });
     const gscIds = new Set(gsc.ok ? gsc.rows.map((r) => r.id) : []);
     if (active.ok) {
+      activeTenantReadComplete = pg.tenants.active !== null && active.rows.length === pg.tenants.active;
       pg.activeTenants = active.rows.map((row) => ({
         id: row.id,
         features: Array.isArray(row.features) ? [...row.features].sort() : [],
@@ -406,6 +582,14 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     pg.workspaces.total = countOrNull(await db.count("workspaces"));
     for (const kind of ["personal", "customer", "agency"]) {
       pg.workspaces.byKind[kind] = countOrNull(await db.count("workspaces", [{ column: "kind", op: "eq", value: kind }]));
+    }
+    pg.agencyReadiness.providerRows = countOrNull(await db.count("workspace_providers"));
+    for (const source of ["tenant_conversion", "operator", "business_choice"]) {
+      pg.agencyReadiness.providersBySource[source] = countOrNull(await db.count("workspace_providers", [{ column: "source", op: "eq", value: source }]));
+    }
+    pg.agencyReadiness.strelvaAgencyDesignationRows = countOrNull(await db.count("strelva_agency_workspace"));
+    for (const kind of ["business", "agency"]) {
+      pg.agencyReadiness.accountsByPayerKind[kind] = countOrNull(await db.count("accounts", [{ column: "payer_kind", op: "eq", value: kind }]));
     }
     pg.workspaceMemberships = countOrNull(await db.count("workspace_memberships"));
     pg.tenantMemberships = countOrNull(await db.count("memberships"));
@@ -445,8 +629,14 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
       const present = new Set(Object.keys(family?.byTenant ?? {}));
       return activeIds.length ? activeIds.filter((id) => present.has(id)) : [...present].sort();
     };
+    const clientEmailOverrides: NonNullable<SnapshotReport["redis"]>["clientEmailOverrides"] = {};
+    for (const id of activeIds) {
+      try { clientEmailOverrides[id] = await redis.clientEmailOverride(id); }
+      catch { clientEmailOverrides[id] = "unknown"; }
+    }
     redisReport = {
       families,
+      clientEmailOverrides,
       activeTenantsWithAnalyticsConfig: tenantsIn("analytics config"),
       activeTenantsWithGoogleConnection: tenantsIn("google connections"),
       activeTenantsWithClientEmailOverride: tenantsIn("client email overrides"),
@@ -456,7 +646,19 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
 
   notes.push("Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe, Vercel logs, Google.");
 
+  const stopConditions = silentRolloutEnvStops(deps.env);
+  if ((pg.agencyReadiness.strelvaAgencyDesignationRows ?? 0) > 0 && !pg.agencyReadiness.batch7aPresent) {
+    stopConditions.push("Strelva agency designation exists before batch 7A is verified; stop and reconcile the agency provider model.");
+  }
+  if (!activeTenantReadComplete) stopConditions.push("Active tenant inventory is incomplete; silent rollout cannot be verified.");
+  if (!redisReport) stopConditions.push("Redis email overrides are unavailable; silent rollout cannot be verified.");
+  for (const [id, state] of Object.entries(redisReport?.clientEmailOverrides ?? {})) {
+    if (state === "on") stopConditions.push(`Active tenant ${id} has reb:client-email override on.`);
+    if (state === "unknown") stopConditions.push(`Active tenant ${id} email override is unknown; silent rollout cannot be verified.`);
+  }
+
   const report: SnapshotReport = {
+    silentRollout: { safe: stopConditions.length === 0, stopConditions },
     version: 1,
     observedAt: iso(now),
     sources: { postgres: Boolean(db), redis: Boolean(redis), auth: Boolean(auth), schemaMigrations: Boolean(applied) },
@@ -484,6 +686,9 @@ export function formatReport(report: SnapshotReport): string[] {
   lines.push(`Strelva production readiness snapshot, ${report.observedAt} (read-only)`);
   lines.push(`Sources: postgres=${report.sources.postgres} redis=${report.sources.redis} auth=${report.sources.auth} schema_migrations=${report.sources.schemaMigrations}`);
   lines.push("");
+  lines.push(`Silent rollout: ${report.silentRollout.safe ? "safe" : "STOP"}`);
+  for (const stop of report.silentRollout.stopConditions) lines.push(`  STOP: ${stop}`);
+  lines.push("");
   lines.push("Env (names only; secrets as present/absent):");
   for (const [name, state] of Object.entries(report.env.secrets)) lines.push(`  ${name}: ${state}`);
   for (const [name, state] of Object.entries(report.env.flags)) lines.push(`  ${name}: ${state}`);
@@ -499,6 +704,9 @@ export function formatReport(report: SnapshotReport): string[] {
     lines.push(`  ${t.id}: features [${t.features.join(", ")}], resend_domain ${t.resendDomain ?? "none"}, search console key ${t.hasSearchConsoleKey ? "yes" : "no"}`);
   }
   lines.push(`Workspaces: ${n(pg.workspaces.total)} (${Object.entries(pg.workspaces.byKind).map(([k, v]) => `${k} ${n(v)}`).join(", ")})`);
+  const agency = pg.agencyReadiness;
+  lines.push(`Agency readiness: ${n(agency.providerRows)} provider rows (${Object.entries(agency.providersBySource).map(([source, count]) => `${source} ${n(count)}`).join(", ")}); Strelva designation rows ${n(agency.strelvaAgencyDesignationRows)}; 7A ${agency.batch7aPresent ? "present" : "unproven"}`);
+  lines.push(`Accounts by payer kind: ${Object.entries(agency.accountsByPayerKind).map(([kind, count]) => `${kind} ${n(count)}`).join(", ")}`);
   lines.push(`Workspace memberships: ${n(pg.workspaceMemberships)}; tenant memberships: ${n(pg.tenantMemberships)}`);
   lines.push(`Open tenant invites: ${n(pg.openTenantInvites)}; pending workspace invitations: ${n(pg.pendingWorkspaceInvitations)}`);
   lines.push(`Workspace-tenant links: ${n(pg.workspaceTenantLinks)}; tenant_leads rows: ${n(pg.tenantLeads)}; account bindings: ${n(pg.workspaceAccountBindings)}`);
@@ -509,7 +717,7 @@ export function formatReport(report: SnapshotReport): string[] {
   if (report.auth) lines.push(`Auth users: ${report.auth.total}, ${report.auth.emailConfirmed} email-confirmed, ${report.auth.signedInLast30Days} signed in within 30 days`);
   lines.push("");
   if (report.redis) {
-    lines.push("Redis (SCAN/TYPE/cardinality only):");
+    lines.push("Redis (SCAN/TYPE/cardinality and fixed-key email policy enums only):");
     for (const f of report.redis.families) {
       const tenants = Object.entries(f.byTenant).sort(([a], [b]) => a.localeCompare(b)).map(([t, c]) => `${t} ${c}${f.entriesByTenant?.[t] !== undefined ? `/${f.entriesByTenant[t]} entries` : ""}`);
       lines.push(`  ${f.match}: ${f.keys} keys${f.truncated ? " (truncated)" : ""}${tenants.length ? `; ${tenants.join(", ")}` : ""}`);

@@ -68,9 +68,11 @@ describe("System identity", () => {
     expect(restored).toMatchObject({ id: v1.id, currentRevision: { number: 1 } });
   });
 
-  it("changes kind without changing identity", () => {
-    const next = applySystemUpdate(system(), { kind: "portal", name: "Catering portal" }, AT);
-    expect(next).toMatchObject({ id: ref(1).systemId, businessId: BUSINESS, kind: "portal", name: "Catering portal" });
+  it("grows its job while keeping identity, origin and lifetime kind", () => {
+    const original = system({ origin: { kind: "saved_work", ref: "original-proposal" } });
+    const next = applySystemUpdate(original, { purpose: "Proposal and onboarding", name: "Catering portal" }, AT);
+    expect(next).toMatchObject({ id: ref(1).systemId, businessId: BUSINESS, kind: "proposal", name: "Catering portal",
+      purpose: "Proposal and onboarding", origin: original.origin, changeNumber: 2 });
   });
 
   it("derives the same adoption id as the database", () => {

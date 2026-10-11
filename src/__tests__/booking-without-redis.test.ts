@@ -57,8 +57,7 @@ vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: vi.fn() }));
 
 import { POST as postBooking } from "@/app/api/booking/route";
 import { resetBookingFlagCache, bookingReadSource } from "@/platform/bookings/flags";
-import { readTenantBookings, readWorkspaceBookingRequests, setBookingStoreDb, upsertBookingSettings } from "@/platform/bookings/store";
-import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
+import { readTenantBookings, setBookingStoreDb, upsertBookingSettings } from "@/platform/bookings/store";
 import type { Booking } from "@/lib/types";
 
 const FRIDAY = "2026-11-06";
@@ -121,38 +120,24 @@ afterEach(() => {
 });
 
 describe("the one store serving, Redis absent", () => {
-  it("a request-mode booking is held in the store and reaches Needs you", async () => {
-    const { fake, tenant } = await world("request");
-    h.redis = "absent";
-    const res = await postBooking(bookingRequest("10:00"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ success: true, requested: true, confirmationSent: false, booking: { status: "requested", startTime: "10:00" } });
-    // The per-instance limit stood in for the Redis one.
-    expect(h.rateLimitCalls).toEqual(["redis", "instance"]);
-    expect(fake.rows).toEqual([expect.objectContaining({ status: "requested", origin: "site" })]);
-    expect(legacyRows()).toHaveLength(1);
-    // The owner's decision: the hourly chase reads the request by workspace.
-    const adapter = bookingRequestAdapter({ requests: (ws) => readWorkspaceBookingRequests(ws), decide: vi.fn() });
-    const proposal = await adapter.propose({ workspaceId: tenant.workspaceId! });
-    expect(proposal.items).toEqual([expect.objectContaining({ sourceLifecycle: "booking_request", kind: "customer.commitment", title: "Booking request: Jo Banks, Fri, Nov 6 10:00 AM" })]);
+  it("refuses request-mode writes before store, inquiry, activity or mail effects", async () => {
+    const { fake } = await world("request"); h.redis = "absent";
+    expect((await postBooking(bookingRequest("10:00"))).status).toBe(503);
+    expect(h.rateLimitCalls).toEqual(["redis"]); expect(fake.rows).toEqual([]); expect(legacyRows()).toEqual([]);
+    expect(h.logActivity).not.toHaveBeenCalled(); expect(h.sendBookingConfirmation).not.toHaveBeenCalled();
   });
 
-  it("the store still refuses a taken time", async () => {
+  it("the store still refuses a taken time with a working limiter", async () => {
     await world();
-    h.redis = "absent";
     expect((await postBooking(bookingRequest("10:00"))).status).toBe(200);
-    const second = await postBooking(bookingRequest("10:00", "Late Comer"));
-    expect(second.status).toBe(409);
+    expect((await postBooking(bookingRequest("10:00", "Late Comer"))).status).toBe(409);
     expect(legacyRows()).toHaveLength(1);
   });
 
-  it("the per-instance limit still limits", async () => {
-    const { fake } = await world();
-    h.redis = "absent";
-    h.perInstanceLimited = true;
-    const res = await postBooking(bookingRequest("10:00"));
-    expect(res.status).toBe(429);
-    expect(fake.rows).toEqual([]);
+  it("does not fall back to a weaker per-instance limit", async () => {
+    const { fake } = await world(); h.redis = "absent"; h.perInstanceLimited = true;
+    expect((await postBooking(bookingRequest("10:00"))).status).toBe(503);
+    expect(h.rateLimitCalls).toEqual(["redis"]); expect(fake.rows).toEqual([]);
   });
 
   it("with the store unreachable too, nothing is booked and the visitor is told so", async () => {
@@ -168,15 +153,11 @@ describe("the one store serving, Redis absent", () => {
 });
 
 describe("the one store serving, Redis down", () => {
-  it("an instant booking is confirmed from the store; the Redis lock is skipped, not fatal", async () => {
-    const { fake } = await world();
-    h.redis = "down";
-    const res = await postBooking(bookingRequest("11:00"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ success: true, booking: { status: "confirmed", startTime: "11:00" } });
-    expect(fake.rows).toEqual([expect.objectContaining({ status: "confirmed" })]);
-    expect(legacyRows()).toEqual([expect.objectContaining({ startTime: "11:00", status: "confirmed" })]);
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("Redis slot lock not written"), expect.anything());
+  it("fails closed on an instant booking even when the one store is healthy", async () => {
+    const { fake } = await world(); h.redis = "down";
+    expect((await postBooking(bookingRequest("11:00"))).status).toBe(503);
+    expect(fake.rows).toEqual([]); expect(legacyRows()).toEqual([]);
+    expect(h.rateLimitCalls).toEqual(["redis"]); expect(h.sendBookingConfirmation).not.toHaveBeenCalled();
   });
 
   it("with the store unreachable too, nothing is booked and the visitor is told so", async () => {

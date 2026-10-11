@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * GET /api/dashboard/site-audit
  *
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const config = await getTenantConfig(tenant);
   const target = config ? resolveSiteUrl(config) : null;

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationDraftEditor } from "@/experience/applications/ApplicationDraftEditor";
 import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
 import { APP_TEMPLATES, templateDraft, validateApplicationDraft, type AppTemplate, type ApplicationDraftSpec } from "@/experience/applications/app-templates";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import styles from "./template-library.module.css";
 
@@ -40,12 +41,19 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const listTrigger = useRef<string | null>(null);
   useEffect(() => {
-    const restore = () => setSelected(selectedTemplate());
+    const restore = () => {
+      const template = selectedTemplate();
+      if (template) listTrigger.current = template.id;
+      setSelected(template);
+    };
     const frame = window.requestAnimationFrame(restore);
     window.addEventListener("popstate", restore);
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("popstate", restore); };
   }, []);
-  useEffect(() => { if (selected) heading.current?.focus({ preventScroll: true }); }, [selected]);
+  useEffect(() => {
+    if (selected) heading.current?.focus({ preventScroll: true });
+    else if (listTrigger.current) document.getElementById(`template-${listTrigger.current}`)?.focus({ preventScroll: true });
+  }, [selected]);
   function select(template: AppTemplate | null) {
     setSelected(template);
     const url = new URL(window.location.href);
@@ -53,18 +61,17 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       listTrigger.current = template.id;
       url.searchParams.set("template", template.id);
     } else url.searchParams.delete("template");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    if (!template) window.requestAnimationFrame(() => document.getElementById(`template-${listTrigger.current}`)?.focus());
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
   if (selected) return <div className={styles.library}>
     <Button variant="ghost" onClick={() => select(null)}><ArrowLeft size={16} aria-hidden="true" />All templates</Button>
-    <header className={styles.heading}><p>{props.businessName} · Private app</p><h2 ref={heading} tabIndex={-1}>{selected.name}</h2><p>{selected.description}</p></header>
+    <header className={styles.heading}><p>{props.businessName} · Private internal tool</p><h2 ref={heading} tabIndex={-1}>{selected.name}</h2><p>{selected.description}</p></header>
     <TemplateSession key={`${props.actorEmail}:${props.workspaceId}:${selected.id}`} {...props} template={selected} />
   </div>;
   const normalized = query.trim().toLocaleLowerCase();
   const visible = APP_TEMPLATES.filter(template => (category === "All" || template.category === category) && `${template.name} ${template.description}`.toLocaleLowerCase().includes(normalized));
   return <section className={styles.library} aria-labelledby="template-library-title">
-    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Make it yours.</h1><p>Start with a working tool. Adjust the fields, try it, then save a private copy to your business.</p></header>
+    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Ready-made internal tools</h1><p>Start with a working tool. Adjust the fields, try it, then save a private copy to your business.</p></header>
     <div className={styles.filterbar}>
       <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search templates</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a template…" /></label>
       <div className={styles.categories} aria-label="Template categories">{categories.map(item => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>
@@ -77,7 +84,7 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       <span className={styles.open}>Preview &amp; customize<ArrowRight size={16} aria-hidden="true" /></span>
     </button>)}</div>
     {!visible.length ? <div className={styles.empty}><h2>No matching templates</h2><p>Try another search, or describe the tool you need.</p><Button variant="secondary" onClick={() => { setQuery(""); setCategory("All"); }}>Clear filters</Button></div> : null}
-    <div className={styles.custom}><div><h2>Need a different starting point?</h2><p>Describe the work. Review a proposed tool before anything is created.</p></div><Button variant="secondary" disabled={!props.canCreate} onClick={() => props.onRequest("Create a private application for our business.")}>Describe a tool<ArrowRight size={16} aria-hidden="true" /></Button></div>
+    <div className={styles.custom}><div><h2>Need a different starting point?</h2><p>Describe the work. Review a proposed tool before anything is created.</p></div><Button variant="secondary" disabled={!props.canCreate} onClick={() => props.onRequest("Create a private internal tool for our business.")}>Describe a tool<ArrowRight size={16} aria-hidden="true" /></Button></div>
   </section>;
 }
 
@@ -170,9 +177,9 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
     <div className={styles.editorGrid} data-mobile-view={mobileView}><div className={styles.editor}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /></div><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this tool.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
     <div className={styles.savebar}>
       <div><strong>{state === "created" ? "Your private tool is ready." : `Save to ${businessName}`}</strong><p>{state === "created" ? "Open it to check, publish, and choose who can use it." : "Starts with no records. Nothing is published or shared."}</p></div>
-      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open it<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open it<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" disabled={!canCreate} onClick={startAnother}>Start another</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private tool</Button>}
+      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open it<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=internal tools&work=${encodeURIComponent(workId)}`}>Open it<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" disabled={!canCreate} onClick={startAnother}>Start another</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create internal tool</Button>}
     </div>
-    {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this tool. The preview is still available.</p> : null}
+    {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with internal tools enabled to create this tool. The preview is still available.</p> : null}
     {invalid && state === "editing" ? <p role="status" className={styles.notice}>Check the proposed fields: {invalid}</p> : null}
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
     {askStrelva ? <div role="status" className={styles.notice}><strong>Ask Strelva to build this.</strong><p>Strelva builds and changes tools for your business. Send this one as a request and it shows up in Requests with its stage.</p><Button type="button" variant="secondary" onClick={() => onRequest(`Build this tool for us: ${draft.title}. Fields: ${draft.fields.map(field => field.label).join(", ")}.`)}>Ask Strelva to build this<ArrowRight size={16} aria-hidden="true" /></Button></div> : null}

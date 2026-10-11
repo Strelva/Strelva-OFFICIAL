@@ -1,0 +1,36 @@
+{
+  "pythonVersion": [
+    3,
+    9,
+    6
+  ],
+  "controls": [
+    {
+      "entry": "main",
+      "refused": true,
+      "reason": "Private source proof requires verified CPython3.14.6 via /opt/homebrew/bin/python3; unsupported interpreter HOLD before effects"
+    },
+    {
+      "entry": "signalInstall",
+      "refused": true,
+      "reason": "Private source proof requires verified CPython3.14.6 via /opt/homebrew/bin/python3; unsupported interpreter HOLD before effects"
+    },
+    {
+      "entry": "registryOwnership",
+      "refused": true,
+      "reason": "Private source proof requires verified CPython3.14.6 via /opt/homebrew/bin/python3; unsupported interpreter HOLD before effects"
+    },
+    {
+      "entry": "terminalFinish",
+      "refused": true,
+      "reason": "Private source proof requires verified CPython3.14.6 via /opt/homebrew/bin/python3; unsupported interpreter HOLD before effects"
+    }
+  ],
+  "effectCounters": {
+    "spawn": 0,
+    "signalMutation": 0
+  },
+  "databaseExecuted": false,
+  "status": "REFUSAL_CONTROLS_PASS",
+  "harnessSha256": "25d85bf5716a95b11ed55c35b5f0bbe047dfad75fa8ec70b421b4eecbcc065e9"
+}

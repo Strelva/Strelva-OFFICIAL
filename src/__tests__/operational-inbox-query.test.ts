@@ -4,11 +4,12 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 type Row = Record<string, unknown>;
 type Filter = { op: "eq" | "in" | "gt"; column: string; value: unknown };
-type Call = { table: string; filters: Filter[]; orders: string[]; limit?: number };
+type Call = { table: string; filters: Filter[]; orders: string[]; limit?: number; range?: [number, number] };
 
 const boundary = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   calls: [] as Call[],
+  failPage: false,
 }));
 
 function query(table: string) {
@@ -21,6 +22,7 @@ function query(table: string) {
     gt(column: string, value: unknown) { call.filters.push({ op: "gt", column, value }); return builder; },
     order(column: string) { call.orders.push(column); return builder; },
     limit(value: number) { call.limit = value; return builder; },
+    range(from: number, to: number) { call.range = [from, to]; return builder; },
     then(resolve: (value: { data: Row[]; error: null }) => unknown) {
       let data = (boundary.tables[table] ?? []).filter((row) => call.filters.every((filter) => {
         if (filter.op === "eq") return row[filter.column] === filter.value;
@@ -28,6 +30,8 @@ function query(table: string) {
         return String(row[filter.column]) > String(filter.value);
       }));
       if (call.limit !== undefined) data = data.slice(0, call.limit);
+      if (boundary.failPage && call.range?.[0] === 500) return Promise.resolve({ data: null, error: { message: "page unavailable" } }).then(resolve as (value: unknown) => unknown);
+      if (call.range) data = data.slice(call.range[0], call.range[1] + 1);
       return Promise.resolve({ data, error: null }).then(resolve);
     },
   };
@@ -36,7 +40,7 @@ function query(table: string) {
 
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: query }) }));
 
-const { listAuthorizedOperationalInbox } = await import("@/products/operations/inbox");
+const { listAuthorizedOperationalInbox, listOperationalExceptions } = await import("@/products/operations/inbox");
 
 const sponsor = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const actor: WorkspaceActor = { userId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", verifiedEmail: "Operator@Example.test" };
@@ -69,6 +73,7 @@ function scope(payload: ReturnType<typeof approvedWork>) {
 
 beforeEach(() => {
   boundary.calls = [];
+  boundary.failPage = false;
   const payload = approvedWork();
   const future = new Date(Date.now() + 86_400_000).toISOString();
   const unrelated: Row[] = Array.from({ length: 600 }, (_, index) => ({
@@ -118,6 +123,18 @@ beforeEach(() => {
 });
 
 describe("operational inbox queries", () => {
+  it("the released operator projection finds failed work beyond the legacy 500-row cap", async () => {
+    const work = boundary.tables.saved_product_work!.at(-1)!;
+    const payload = approvedWork(); payload.steps[0]!.status = "failed"; payload.steps[0]!.reason = "Local read failed";
+    work.payload = payload;
+    expect(await listOperationalExceptions()).toEqual([]);
+    boundary.calls = [];
+    const exceptions = await listOperationalExceptions({ all: true });
+    expect(exceptions).toEqual([expect.objectContaining({ workId, reason: "Local read failed" })]);
+    expect(boundary.calls.find(call => call.table === "saved_product_work" && call.range?.[0] === 500)).toBeDefined();
+    expect(boundary.calls.every(call => call.orders.includes("id") && !call.limit)).toBe(true);
+    boundary.failPage = true; await expect(listOperationalExceptions({ all: true })).rejects.toThrow("unavailable");
+  });
   it("finds the actor's assignment past 500 unrelated rows and only loads related records", async () => {
     const inbox = await listAuthorizedOperationalInbox(actor);
     expect(inbox.assignments.map((item) => item.assignmentId)).toEqual([assignmentId]);

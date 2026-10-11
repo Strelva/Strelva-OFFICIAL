@@ -20,7 +20,7 @@ const requested: ServiceRequest = {
   outcome: "A usable request form and review path.",
   context: { currentProcess: "email" },
   scope: ["prepare_staff_request_flow"],
-  provider: { kind: "strelva" },
+  provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" },
   providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null },
   installationId: null,
   deliveryId: null,
@@ -53,7 +53,7 @@ class MemoryServiceRequestStore implements ServiceRequestStore {
 }
 
 describe("service request service", () => {
-  it("persists a submitted need with explicit scope/provider and keeps acceptance pending", async () => {
+  it("persists a submitted need with explicit scope/agency and keeps acceptance pending", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
 
@@ -65,12 +65,12 @@ describe("service request service", () => {
       outcome: "A usable request form and review path.",
       context: { currentProcess: "email" },
       scope: ["prepare_staff_request_flow"],
-      provider: { kind: "strelva" },
+      provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" },
       idempotencyKey: "request:one",
     });
 
     expect(result.status).toBe("requested");
-    expect(result.provider).toEqual({ kind: "strelva" });
+    expect(result.provider).toEqual({ kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" });
     expect(result.providerAcceptance.status).toBe("pending");
     expect(store.lastSave).toMatchObject({ businessId, status: "requested", idempotencyKey: "request:one" });
   });
@@ -82,12 +82,12 @@ describe("service request service", () => {
     await service.execute(actor, {
       action: "save", businessId, requestId, expectedRevision: 1, status: "requested",
       request: "Changed need", outcome: "Changed outcome", context: {}, scope: ["scope"],
-      provider: { kind: "strelva" }, idempotencyKey: "request:update",
+      provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" }, idempotencyKey: "request:update",
     });
     expect(store.lastSave).toMatchObject({ requestId, expectedRevision: 1, request: "Changed need", outcome: "Changed outcome", scope: ["scope"] });
   });
 
-  it("forwards explicit provider responses and later delivery linkage as separate commands", async () => {
+  it("forwards explicit agency responses and later delivery linkage as separate commands", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await service.execute(actor, { action: "respond", requestId, expectedRevision: 1, decision: "accepted", idempotencyKey: "request:accept" });
@@ -99,7 +99,7 @@ describe("service request service", () => {
     expect(store.lastLink).toMatchObject({ requestId, installationId, deliveryId, expectedRevision: 2 });
   });
 
-  it("rejects an incomplete provider choice before persistence", async () => {
+  it("rejects an incomplete agency choice before persistence", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await expect(service.execute(actor, {
@@ -108,7 +108,17 @@ describe("service request service", () => {
     })).rejects.toBeInstanceOf(ServiceRequestValidationError);
   });
 
-  it("requires the provider to acknowledge the revision it reviewed", async () => {
+  it("rejects old special-provider callers before persistence while keeping historical rows readable", async () => {
+    const store = new MemoryServiceRequestStore();
+    const service = new ServiceRequestService(store);
+    store.request.provider = { kind: "strelva" };
+    expect((await service.read(actor, requestId)).provider).toEqual({ kind: "strelva" });
+    await expect(service.execute(actor, { action: "save", businessId, status: "requested", request: "Need", outcome: "Result", context: {}, scope: ["scope"], provider: { kind: "strelva" }, idempotencyKey: "retired" })).rejects.toBeInstanceOf(ServiceRequestValidationError);
+    expect(store.lastSave).toBeNull();
+    expect(() => service.list(actor, { providerKind: "strelva" })).toThrow("historical Strelva inbox is retired");
+  });
+
+  it("requires the agency to acknowledge the revision it reviewed", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await expect(service.execute(actor, {

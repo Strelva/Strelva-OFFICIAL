@@ -7,7 +7,6 @@ import { systemsReleasedFor } from "@/platform/systems-release";
 import {
   AskConversationNotFoundError,
   askReleaseMayBeOn,
-  createPossibilityAdapter,
   createNeedsYouAskAdapter,
   createServiceRequestAdapter,
   createSupabaseAskHistory,
@@ -17,25 +16,23 @@ import {
   type AskTurnDeps,
 } from "@/platform/ask";
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
+import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
+import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
-import { createInMemoryPossibilityRepository } from "@/platform/possibilities";
+import { createAskPossibilityPort } from "./possibilities-server";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
+import { createSupabaseSystemStore, listBusinessSystems } from "@/platform/systems";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { listWorkspaces } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { getEventRaw } from "@/lib/events";
-import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
+import { getEventRaw, updateEvent } from "@/lib/events";
+import { classifyTenantEvent } from "@/platform/needs-you/tenant-classify";
+import { evaluateRoute } from "@/platform/needs-you/evaluator";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/experience/workspace/needs-you-server";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Possibilities have only an in-memory repository today
- * (docs/product/specs/ask-strelva.md section 5, "New"). One opened here lasts
- * until the server restarts; the receipt marks it `durable: false`.
- */
-const possibilityRepository = createInMemoryPossibilityRepository();
 
 /**
  * With STRELVA_NEEDS_YOU_RELEASE on, Ask hands every draft to the real Needs
@@ -51,6 +48,25 @@ function askNeedsYou(actor: WorkspaceActor): { port: NeedsYouPort; path: string 
     port: createNeedsYouAskAdapter({
       fallback,
       linkedTenants: async (workspaceId) => (await needsYouStore.linkedTenants(workspaceId)).map((link) => link.tenantId),
+      async prepare(draft) {
+        const policies = await needsYouStore.policies(actor, draft.workspaceId);
+        for (const eventId of draft.eventIds) {
+          const updated = await updateEvent(eventId, (event) => {
+            if (event.tenantId !== draft.tenantId || event.status !== "pending") return event;
+            const classification = classifyTenantEvent(event);
+            if (!classification) return event;
+            const origin = draft.askedOnBehalf ? "owner_interpreted" : draft.origin;
+            const policy = evaluateRoute({ ...classification, origin, systemId: draft.systemId, policies });
+            // Ask only proposes. A policy that could handle routine work still
+            // goes to Strelva's review here; chat never becomes its own publisher.
+            const route = policy.route === "owner_decides" ? "owner_decides" : "strelva_reviews";
+            return { ...event, metadata: { ...event.metadata, reviewAudience: route === "owner_decides" ? "owner" : "operator",
+              askStrelva: { workspaceId: draft.workspaceId, systemId: draft.systemId, toolId: draft.toolId,
+                origin, askedOnBehalf: draft.askedOnBehalf, evaluatedRoute: policy.route, policyRule: policy.rule } } };
+          });
+          if (!updated.changed || updated.event?.tenantId !== draft.tenantId) throw new Error("The draft's decision could not be registered. It stays in the review queue.");
+        }
+      },
       sync: (workspaceId) => service.sync({ workspaceId, actor }),
       openItems: (workspaceId) => needsYouStore.list(actor, workspaceId, false),
       readEvent: getEventRaw,
@@ -84,20 +100,25 @@ export async function POST(request: Request) {
       isOperator: await isSuperAdmin(),
       async readMembership(current, workspaceId) {
         const workspace = (await listWorkspaces(current)).find((item) => item.id === workspaceId);
-        return workspace ? { role: workspace.role ?? null, access: workspace.access, kind: workspace.kind } : null;
+        return workspace && workspace.access !== "provider_seat" ? { role: workspace.role ?? null, access: workspace.access, kind: workspace.kind } : null;
       },
       async readExited(current, workspaceId) {
         const exit = await readWorkspaceExit(current, workspaceId);
         return exit.state?.status === "completed";
       },
       readSystems: (current, workspaceId) => readExistingSystemsSnapshot(current, workspaceId),
+      readSystemListings: async (current, workspaceId) => (await listBusinessSystems(current, workspaceId, { store: createSupabaseSystemStore() })).systems,
       loadTenantTools: loadTenantAskTools,
       googleWriteGranted: tenantGoogleWriteGranted,
       inquiriesEnabled: async (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor)),
       released: (current, workspaceId) => systemsReleasedFor(current, workspaceId),
       needsYou: needsYou.port,
+      workspaceDrafts: createAskWorkspaceDraftPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), needsYouStore }),
+      nativeSystems: createAskNativeSystemPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), decisions: needsYouStore }),
       requests,
-      possibilities: createPossibilityAdapter(possibilityRepository, { durable: false }),
+      possibilities: createAskPossibilityPort(actor, {
+        ...(needsYouReleaseEnabled() ? { sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }) } : {}),
+      }),
       async stream(input, consume, emitted) {
         await streamModelText(
           { purpose: "ask", ...input.context },
@@ -152,7 +173,8 @@ export async function GET(request: Request) {
     if (!(await systemsReleasedFor(actor, workspaceId))) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
     const history = createSupabaseAskHistory();
     if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
-    return workspaceJson({ conversations: await history.list(actor, { workspaceId, systemId, limit: 20 }) });
+    const conversations = await history.list(actor, { workspaceId, systemId, limit: 20 });
+    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin() });
   } catch (error) {
     if (error instanceof AskConversationNotFoundError) return workspaceJson({ error: error.message }, 404);
     return workspaceHttpFailure(error);

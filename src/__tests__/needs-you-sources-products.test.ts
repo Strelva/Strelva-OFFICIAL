@@ -152,14 +152,17 @@ describe("app releases", () => {
     expect(await applicationReleaseAdapter(ports).currentRevision({ workspaceId: WS, actor: OWNER }, item.sourceId)).toBeNull();
   });
 
-  it("approve on a custom app runs the custom release resolver; an email link works for a change but not as a non-member", async () => {
+  it("custom app release requires sign-in and preserves the authenticated release path", async () => {
     const state = { native: [], custom: [customApp()] };
     const ports = appPorts(state);
     const svc = service([applicationReleaseAdapter(ports)]);
     const [item] = (await svc.list(OWNER, WS)).items;
     const refused = await svc.decide({ workspaceId: WS, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "stranger@example.test" } });
     expect(refused.status).toBe("sign_in");
-    const done = await svc.decide({ workspaceId: WS, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test" } });
+    const blocked = await svc.decide({ workspaceId: WS, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test" } });
+    expect(blocked.status).toBe("sign_in");
+    expect(ports.releaseCustom).not.toHaveBeenCalled();
+    const done = await svc.decide({ workspaceId: WS, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "session", actor: OWNER } });
     expect(done.status).toBe("done");
     expect(ports.releaseCustom).toHaveBeenCalledWith(OWNER, CUSTOM_ID, { expectedCandidateRevision: 3, expectedReleaseVersion: null });
   });

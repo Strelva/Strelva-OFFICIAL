@@ -532,12 +532,20 @@ export interface ResponsibilityPolicy {
 
 export type ResponsibilityDecision = "allow" | "approval_required" | "block";
 
+/** Presentation from the trusted inquiry renderer, separate from permission. */
+export type ResponsibilityMessageDisclosure = { kind: "business" | "owner_notice"; name: string };
+export interface ResponsibilityEvaluationInput {
+  at?: string;
+  messageBody?: string;
+  messageDisclosure?: ResponsibilityMessageDisclosure;
+}
+
 export interface ResponsibilityEvaluation {
   decision: ResponsibilityDecision;
   action: ResponsibilityAction;
   reason: string;
   clause: string | null;
-  disclosedAs: "Strelva" | null;
+  disclosedAs: "Strelva" | "business" | "automatic_notice" | null;
 }
 
 export interface ResponsibilityActionReceipt {
@@ -571,6 +579,7 @@ export interface ResponsibilityActionInput {
   outcome?: "accepted" | "failed";
   outcomeEvidence?: string[];
   messageBody?: string;
+  messageDisclosure?: ResponsibilityMessageDisclosure;
 }
 
 export interface InquiryEngineState {

@@ -1,9 +1,9 @@
 \set ON_ERROR_STOP on
--- Strelva handled lists decided owner decisions (20261009130000). Fictional
+-- What changed lists decided owner decisions (20261009130000). Fictional
 -- rows inside a transaction that is rolled back.
 begin;
 create or replace function pg_temp.hd_assert(condition boolean, message text) returns void language plpgsql as $$
-begin if condition is not true then raise exception 'strelva handled assertion failed: %', message; end if; end; $$;
+begin if condition is not true then raise exception 'what changed assertion failed: %', message; end if; end; $$;
 create or replace function pg_temp.hd_expect(statement text, expected text) returns void language plpgsql as $$
 begin
   begin execute statement;
@@ -18,7 +18,7 @@ select pg_temp.hd_assert(
   has_function_privilege('service_role', 'public.read_strelva_handled(uuid,uuid,text,timestamptz)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.read_strelva_handled(uuid,uuid,text,timestamptz)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.read_strelva_handled(uuid,uuid,text,timestamptz)', 'EXECUTE'),
-  'only service_role reads Strelva handled');
+  'only service_role reads What changed');
 
 insert into public.users(id, email, verified_at) values
   ('ad000000-0000-4000-8000-000000000001', 'hd-owner@example.test', now()),
@@ -93,4 +93,4 @@ select pg_temp.hd_assert((select count(*) from jsonb_array_elements(public.read_
   'each business reads only its own decisions');
 
 rollback;
-\echo 'Strelva handled decisions SQL checks passed.'
+\echo 'What changed decisions SQL checks passed.'

@@ -8,6 +8,9 @@ export interface PossibilityRepository {
   get(businessId: string, id: string): Promise<Possibility | null>;
   create(value: Possibility): Promise<void>;
   save(value: Possibility, expectedRevision: number): Promise<void>;
+  /** Narrow database finalizer; generic save keeps completed plans closed. */
+  finalizeNativeGoogleCompletion?(value:Possibility,expectedRevision:number,activationId:string):Promise<void>;
+  finalizeNativeGoogleUndo?(value:Possibility,expectedRevision:number,activationId:string):Promise<void>;
   list(businessId: string): Promise<Possibility[]>;
 }
 

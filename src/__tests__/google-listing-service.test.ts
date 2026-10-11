@@ -13,7 +13,7 @@ import {
   withdrawReviewReply,
   type ListingContext,
 } from "@/products/google-listing/service";
-import { hoursToGoogle, recordDrift } from "@/products/google-listing/record";
+import { hoursToGoogle, infoToGoogle, recordDrift } from "@/products/google-listing/record";
 
 // The Google listing System's writes, against a fake Google. No live calls.
 
@@ -98,7 +98,7 @@ describe("review replies", () => {
     expect(result.status).toBe("posted");
     if (result.status !== "posted") return;
     expect(result.receipt).toMatchObject({ action: "reply_post", readback: "matched", before: { reply: null }, after: { reply: "Thank you, Dana." }, undo: { kind: "delete_reply" } });
-    expect(receiptHeadline(result.receipt, "Dana")).toBe("Strelva replied to Dana's review on Google.");
+    expect(receiptHeadline(result.receipt, "Dana")).toBe("Replied to Dana's review on Google.");
     expect(google.writes).toEqual(["updateReply:rev-dana"]);
   });
 
@@ -171,6 +171,18 @@ describe("review replies", () => {
     expect((await undoListingChange(ctx, { receiptId: posted.receipt.id, authority: UNDO })).status).toBe("posted");
     expect(google.writes).toEqual(["updateReply:rev-dana", "deleteReply:rev-dana"]);
   });
+  it("retries a definitively rejected undo but blocks an uncertain undo across retries", async () => {
+    const { ctx, google } = context();
+    const posted = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you.", authority: OWNER });
+    if (posted.status !== "posted") throw new Error("expected posted");
+    vi.mocked(google.client.deleteReply).mockResolvedValueOnce(fail(403, "Permission denied"));
+    const input = { receiptId: posted.receipt.id, authority: UNDO, retryFailed: true };
+    expect((await undoListingChange(ctx, input)).status).toBe("failed");
+    vi.mocked(google.client.deleteReply).mockRejectedValueOnce(new Error("Response lost"));
+    expect((await undoListingChange(ctx, input)).status).toBe("write_unconfirmed");
+    expect((await undoListingChange(ctx, input)).status).toBe("write_unconfirmed");
+    expect(google.client.deleteReply).toHaveBeenCalledTimes(2);
+  });
 
   it("refuses every write while the listing is paused", async () => {
     const { ctx, google } = context(undefined, { lifecycle: "paused" });
@@ -193,6 +205,15 @@ describe("review replies", () => {
 });
 
 describe("hours and info from the business record", () => {
+  it("clears removed hours using both update masks and supports undo", async () => {
+    const { ctx, google } = context();
+    const result = await syncHoursFromRecord(ctx, { hours: null, authority: OWNER });
+    expect(result.status).toBe("posted");
+    expect(google.client.patchLocation).toHaveBeenCalledWith(ctx.location, ["regularHours", "specialHours"], {});
+    if (result.status !== "posted") throw new Error("expected cleared hours");
+    await undoListingChange(ctx, { receiptId: result.receipt.id, authority: UNDO });
+    expect(google.location().regularHours?.periods[0]?.openDay).toBe("MONDAY");
+  });
   const hours = {
     timezone: "America/New_York",
     weekly: [{ day: 1, opens: "09:00", closes: "17:00" }, { day: 2, opens: "09:00", closes: "17:00" }],
@@ -209,7 +230,7 @@ describe("hours and info from the business record", () => {
     const result = await syncHoursFromRecord(ctx, { hours, authority: OWNER });
     expect(result.status).toBe("posted");
     if (result.status !== "posted") return;
-    expect(result.message).toBe("Strelva updated your hours on Google.");
+    expect(result.message).toBe("Updated your hours on Google.");
     expect(result.receipt.undo).toMatchObject({ kind: "patch_snapshot", updateMask: ["regularHours", "specialHours"] });
     expect(google.location().specialHours?.specialHourPeriods).toHaveLength(1);
     expect((await undoListingChange(ctx, { receiptId: result.receipt.id, authority: UNDO })).status).toBe("posted");
@@ -261,6 +282,12 @@ describe("hours and info from the business record", () => {
       .toMatchObject({ status: "refused", reason: "unsafe_url" });
   });
 
+  it("clears removed record facts without touching facts absent from the change", () => {
+    expect(infoToGoogle({ description: null })).toEqual({ body: { profile: { description: "" } }, updateMask: ["profile"] });
+    expect(infoToGoogle({ phone: null, links: null })).toEqual({ body: { phoneNumbers: {}, websiteUri: "" }, updateMask: ["phoneNumbers", "websiteUri"] });
+    expect(infoToGoogle({})).toEqual({ body: {}, updateMask: [] });
+  });
+
   it("names drift between the record and Google", () => {
     expect(recordDrift({ hours, phone: "(716) 555-0100" }, { regularHours: { periods: [] }, phoneNumbers: { primaryPhone: "+1 716-555-0100" } }))
       .toEqual(["Google hours differ from your record."]);
@@ -286,6 +313,14 @@ describe("posts", () => {
     const { ctx } = context();
     expect(await createListingPost(ctx, { post: { topicType: "EVENT", summary: "Open house" }, authority: OWNER })).toMatchObject({ reason: "invalid" });
     expect(await createListingPost(ctx, { post: { topicType: "STANDARD", summary: "Hi", callToAction: { actionType: "BOOK" } }, authority: OWNER })).toMatchObject({ reason: "invalid" });
+  });
+
+  it("refuses impossible calendar dates and an end before the start without a write", async () => {
+    const { ctx, google } = context();
+    for (const [startDate, endDate] of [["2026-02-30", "2026-03-01"], ["2026-11-30", "2026-11-01"]] as const) {
+      expect(await createListingPost(ctx, { post: { topicType: "EVENT", summary: "Open house", event: { title: "Open house", startDate, endDate } }, authority: OWNER })).toMatchObject({ reason: "invalid" });
+    }
+    expect(google.writes).toEqual([]);
   });
 });
 
@@ -320,5 +355,60 @@ describe("the HTTP client", () => {
     expect(urls[2]).toBe("https://mybusiness.googleapis.com/v4/accounts/111/locations/333/localPosts");
     expect(post).toMatchObject({ ok: false, kind: "setup_pending" });
     await expect(client.deletePost("accounts/1/locations/2/localPosts/../../x")).rejects.toThrow("google_post_name_invalid");
+  });
+});
+
+describe("an agency writing for the business (#255)", () => {
+  const AGENCY = { kind: "operator_instruction", actor: "staff@agency.example.test", instructionRef: "instruction-1" } as const;
+
+  it("refuses an operator instruction with no acting-provider check, and writes nothing", async () => {
+    const { ctx, google, receipts } = context();
+    const result = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY });
+    expect(result).toMatchObject({ status: "refused", reason: "provider" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("refuses when the person is not the acting provider for this location", async () => {
+    const { ctx, google, receipts } = context(undefined, { authorizeProvider: async () => { throw new Error("acting_provider_no_mandate"); } });
+    expect(await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY })).toMatchObject({ status: "refused", reason: "provider" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("rechecks just before the write; a mandate ended in between stops it with a failed receipt", async () => {
+    const authorizeProvider = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error("acting_provider_no_mandate"));
+    const { ctx, google } = context(undefined, { authorizeProvider });
+    const result = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY });
+    expect(result.status).toBe("failed");
+    if (result.status !== "failed") return;
+    expect(result.receipt.status).toBe("failed");
+    expect(result.receipt.error).toMatch(/permission ended before the write/);
+    expect(google.writes).toEqual([]);
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes for the acting provider, checking twice", async () => {
+    const authorizeProvider = vi.fn(async () => undefined);
+    const { ctx, google } = context(undefined, { authorizeProvider });
+    expect((await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY })).status).toBe("posted");
+    expect(google.writes).toEqual(["updateReply:rev-dana"]);
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the owner's path unchanged: no provider check", async () => {
+    const authorizeProvider = vi.fn(async () => { throw new Error("never"); });
+    const { ctx } = context(undefined, { authorizeProvider });
+    expect((await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: OWNER })).status).toBe("posted");
+    expect(authorizeProvider).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("Google receipt actor presentation", () => {
+  it("names the recorded executor and carries agency credit in the string projection", () => {
+    expect(receiptHeadline({ status: "posted", action: "hours_patch", actor: { kind: "agency", displayName: "Acme Marketing" } })).toBe("Acme Marketing updated your hours on Google. Runs on Strelva.");
+    expect(receiptHeadline({ status: "posted", action: "hours_patch", actor: { kind: "operator", displayName: "Taylor" } })).toBe("Taylor (platform support) updated your hours on Google.");
+    expect(receiptHeadline({ status: "posted_unverified", action: "hours_patch", actor: { kind: "agency", displayName: "Acme Marketing" } })).toBe("Acme Marketing posted. Google hasn't shown it yet. Runs on Strelva.");
   });
 });

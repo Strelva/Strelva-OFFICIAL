@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertNoSensitiveOutput,
+  countResult,
   formatReport,
   MIGRATION_SENTINELS,
   parseSnapshotArgs,
@@ -51,9 +52,10 @@ function fakeDb(tables: Record<string, Row[]>) {
 }
 
 /** Redis fake that only implements the read interface; values are never exposed. */
-function fakeRedis(keys: Record<string, { type: string; card?: number }>) {
+function fakeRedis(keys: Record<string, { type: string; card?: number; override?: "on" | "off" | "absent" | "unknown" }>) {
   const calls: string[] = [];
   const redis: ReadOnlyRedis = {
+    async clientEmailOverride(id) { calls.push(`policy ${id}`); return keys[`reb:client-email:${id}`]?.override ?? "absent"; },
     async scan(cursor, { match }) {
       calls.push(`scan ${match}`);
       const re = new RegExp(`^${match.split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
@@ -98,7 +100,7 @@ const tables: Record<string, Row[]> = {
 };
 
 const redisKeys = {
-  "reb:client-email:gldf": { type: "string" },
+  "reb:client-email:gldf": { type: "string", override: "on" as const },
   "orders:gldf": { type: "zset", card: 12 },
   "order:gldf:o1": { type: "string" },
   "reb:rewards:gldf:members": { type: "set" },
@@ -153,6 +155,20 @@ describe("production readiness snapshot", () => {
     expect(parseSnapshotArgs([])).toEqual({ jacobsYes: false, json: false });
     expect(parseSnapshotArgs(["--i-have-jacobs-yes", "--json"])).toEqual({ jacobsYes: true, json: true });
     expect(() => parseSnapshotArgs(["--apply"])).toThrow(/Unknown/);
+  });
+
+  it("reports agency counts and stops a designation before verified 7A", async () => {
+    const fixture = fakeDb({ ...tables, workspace_providers: [{ source: "tenant_conversion" }, { source: "operator" }, { source: "business_choice" }],
+      strelva_agency_workspace: [{}], accounts: [{ payer_kind: "business" }, { payer_kind: "agency" }] });
+    const options = deps({ db: fixture.db, env: {}, redis: fakeRedis({}).redis }).value;
+    const report = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(report.postgres.agencyReadiness).toEqual({ providerRows: 3, providersBySource: { tenant_conversion: 1, operator: 1, business_choice: 1 }, strelvaAgencyDesignationRows: 1, accountsByPayerKind: { business: 1, agency: 1 }, batch7aPresent: false });
+    expect(report.silentRollout.stopConditions).toContain("Strelva agency designation exists before batch 7A is verified; stop and reconcile the agency provider model.");
+    options.appliedVersions = async () => ["20261009151000", "20261009152000", "20261009153000", "20261009154000"];
+    const after = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(after.postgres.agencyReadiness.batch7aPresent).toBe(true);
+    expect(after.silentRollout.stopConditions.some(stop => stop.includes("designation"))).toBe(false);
+    expect(fixture.calls.filter(call => call.startsWith("rows ")).some(call => /workspace_providers|accounts|strelva_agency/.test(call))).toBe(false);
   });
 
   it("answers the open production facts with counts and flags", async () => {
@@ -225,6 +241,19 @@ describe("production readiness snapshot", () => {
     expect(withSql.notes.filter((n) => /disagree/.test(n))).toHaveLength(2);
   });
 
+  it("keeps private operator audit presence unknown when its probe is denied", async () => {
+    const fixture = deps();
+    const db = fixture.value.db!;
+    fixture.value.db = {
+      ...db,
+      count: async (table, filters) => table === "platform_operator_read_audit"
+        ? { ok: false, missing: false, reason: "permission denied" }
+        : db.count(table, filters),
+    };
+    const report = await runReadinessSnapshot({ jacobsYes: true }, fixture.value);
+    expect(report.migrations.sentinels["20261020090039"]).toBe("unknown");
+  });
+
   it("degrades to unknown, not zero, when Postgres or Redis is not configured", async () => {
     const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ db: null, redis: null, authUsers: null }).value);
     expect(report.postgres.tenants).toEqual({ total: null, active: null });
@@ -247,13 +276,50 @@ describe("production readiness snapshot", () => {
     expect(() => assertNoSensitiveOutput("c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=")).toThrow(/token/);
   });
 
-  it("only ever reads: no column with secrets or PII is selected and Redis values are never fetched", async () => {
+  it("guards both report formats with the actual repository migration inventory", async () => {
+    const repoMigrations = readdirSync(join(process.cwd(), "supabase/migrations"))
+      .filter((name) => /^\d{14}_.+\.sql$/.test(name)).map((name) => name.replace(/\.sql$/, ""));
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ repoMigrations, appliedVersions: async () => [] }).value);
+    for (const text of [formatReport(report).join("\n"), JSON.stringify(report)]) {
+      expect(() => assertNoSensitiveOutput(text, repoMigrations)).not.toThrow();
+    }
+  });
+
+  it("exempts only complete trusted identifiers and still rejects tokens around them", () => {
+    const migration = "20260930120000_revoke_public_execute_internal_functions";
+    expect(() => assertNoSensitiveOutput(migration)).toThrow(/token/);
+    expect(() => assertNoSensitiveOutput(migration, [migration])).not.toThrow();
+    for (const unsafe of [
+      `prefix${migration}`, `/${migration}`, `-${migration}`, `${migration}suffix`, `${migration}_suffix`, `${migration}/suffix`,
+      `${migration}=`, `sk_live_${migration}`, `eyJ${migration}`,
+      `${migration}.sk_live_abcdefghijklmnop`, `${migration}.owner@private.example`,
+      "20260930120001_revoke_public_execute_internal_functions",
+    ]) {
+      expect(() => assertNoSensitiveOutput(unsafe, [migration]), unsafe).toThrow(/token|email/);
+    }
+  });
+
+  it("hides unrecognized flag values even when they are short or resemble trusted identifiers", async () => {
+    const unknown = "private_opaque_value";
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {
+      EMAIL_SENDING_ENABLED: unknown,
+      STRELVA_OWNER_ENTRY: "workspace",
+      STRELVA_CLIENT_RECORDS_READ: "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+    } }).value);
+    expect(report.env.flags.EMAIL_SENDING_ENABLED).toBe("set (value hidden)");
+    expect(report.env.flags.STRELVA_OWNER_ENTRY).toBe("value: workspace");
+    expect(report.env.flags.STRELVA_CLIENT_RECORDS_READ).toBe("set (value hidden)");
+    expect(JSON.stringify(report)).not.toContain(unknown);
+    expect(report.silentRollout.safe).toBe(false);
+  });
+
+  it("only ever reads: no column with secrets or PII is selected and only the fixed-key email policy enum is fetched", async () => {
     const d = deps();
     await runReadinessSnapshot({ jacobsYes: true }, d.value);
     for (const call of d.pgCalls.filter((c) => c.startsWith("rows "))) {
       expect(call).not.toMatch(/owner_email|owner_name|owner_phone|google_search_console_key|email/);
     }
-    expect(d.redisCalls.every((c) => /^(scan|type|card) /.test(c))).toBe(true);
+    expect(d.redisCalls.every((c) => /^(scan|type|card|policy) /.test(c))).toBe(true);
     expect(d.redisCalls.some((c) => c.startsWith("scan "))).toBe(true);
   });
 
@@ -261,8 +327,68 @@ describe("production readiness snapshot", () => {
     for (const file of ["scripts/readiness-snapshot.ts", "scripts/production-readiness-snapshot.ts"]) {
       const source = readFileSync(join(process.cwd(), file), "utf8");
       expect(source, file).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
-      expect(source, file).not.toMatch(/redis\.(set|del|get|hset|zadd|expire|rename|unlink|incr|lpush|rpush|sadd|eval)\(/i);
+      expect(source, file).not.toMatch(/redis\.(set|del|hset|zadd|expire|rename|unlink|incr|lpush|rpush|sadd|eval)\(/i);
     }
+  });
+
+  it("stops silent rollout for active tenant overrides and either email gate", async () => {
+    const d = deps();
+    const report = await runReadinessSnapshot({ jacobsYes: true }, d.value);
+    expect(report.silentRollout.safe).toBe(false);
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("EMAIL_SENDING_ENABLED");
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("Active tenant gldf");
+    expect(formatReport(report).join("\n")).toContain("Silent rollout: STOP");
+    expect(d.redisCalls.filter((c) => c.startsWith("policy "))).toEqual(["policy gldf", "policy rohlax"]);
+    const customer = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: { CUSTOMER_EMAIL_ENABLED: "true" } }).value);
+    expect(customer.silentRollout.stopConditions.join(" ")).toContain("CUSTOMER_EMAIL_ENABLED");
+  });
+
+  it("allows off overrides, ignores inactive tenants, and fails closed on unknown policy reads", async () => {
+    const r = fakeRedis({
+      "reb:client-email:gldf": { type: "string", override: "off" },
+      "reb:client-email:old-client": { type: "string", override: "on" },
+    });
+    const options = deps({ env: {}, redis: r.redis }).value;
+    const safe = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(safe.silentRollout).toEqual({ safe: true, stopConditions: [] });
+    expect(safe.redis?.clientEmailOverrides).toEqual({ gldf: "off", rohlax: "absent" });
+    r.redis.clientEmailOverride = async () => { throw new Error("secret response must not print"); };
+    const failed = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(failed.silentRollout.safe).toBe(false);
+    expect(JSON.stringify(failed)).not.toContain("secret response");
+    expect(failed.silentRollout.stopConditions.join(" ")).toContain("unknown");
+    const missing = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {}, db: null, redis: null }).value);
+    expect(missing.silentRollout.safe).toBe(false);
+  });
+
+  it("stops silent rollout when the fixed head-count path leaves active inventory unknown", async () => {
+    const d = deps({ env: {}, redis: fakeRedis({}).redis });
+    const db = d.value.db!;
+    const count = db.count.bind(db);
+    db.count = async (table, filters) => table === "tenants" && filters?.some((f) => f.column === "active")
+      ? countResult({ count: null, error: null, status: 204 })
+      : count(table, filters);
+    const report = await runReadinessSnapshot({ jacobsYes: true }, d.value);
+    expect(report.postgres.tenants.active).toBeNull();
+    expect(report.postgres.activeTenants).toHaveLength(2);
+    expect(report.silentRollout).toEqual({
+      safe: false,
+      stopConditions: ["Active tenant inventory is incomplete; silent rollout cannot be verified."],
+    });
+  });
+
+  it("stops an active on override even when both global email gates are off", async () => {
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {
+      EMAIL_SENDING_ENABLED: "false", CUSTOMER_EMAIL_ENABLED: "false",
+    } }).value);
+    expect(report.silentRollout.stopConditions).toEqual(["Active tenant gldf has reb:client-email override on."]);
+  });
+
+  it("does not infer safety from an empty or incomplete active tenant listing", async () => {
+    const db = fakeDb(tables).db;
+    db.rows = async () => ({ ok: true, rows: [] });
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {}, db }).value);
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("inventory is incomplete");
   });
 
   it("has a sentinel table for every unapplied migration that creates a table", () => {
@@ -281,3 +407,37 @@ describe("production readiness snapshot", () => {
   });
 });
 
+
+describe("head-only table counts", () => {
+  it("accepts a real zero but never treats an absent count as a present table", () => {
+    expect(countResult({ count: 0, error: null, status: 200 })).toEqual({ ok: true, count: 0 });
+    expect(countResult({ count: null, error: null, status: 204 })).toMatchObject({ ok: false, missing: false });
+    expect(countResult({ count: null, error: null, status: 404 })).toMatchObject({ ok: false, missing: true });
+    expect(countResult({ count: null, error: { code: "PGRST205", message: "missing table" } })).toMatchObject({ ok: false, missing: true });
+  });
+});
+
+describe("countResult", () => {
+  it("never reads a head-only 404 as a present table", () => {
+    expect(countResult({ count: null, error: null, status: 404 })).toEqual({ ok: false, missing: true, reason: "404: table not found" });
+  });
+
+  it("treats a missing count as unknown, not as zero rows, including the production 204", () => {
+    for (const status of [200, 204]) {
+      expect(countResult({ count: null, error: null, status })).toMatchObject({ ok: false, missing: false });
+    }
+  });
+
+  it("reads a head-only 404 with an empty error as missing", () => {
+    expect(countResult({ count: null, error: { message: "" }, status: 404 })).toMatchObject({ ok: false, missing: true });
+  });
+
+  it("reads PostgREST's missing-table error as missing", () => {
+    expect(countResult({ count: null, error: { code: "PGRST205", message: "Could not find the table" }, status: 404 })).toMatchObject({ ok: false, missing: true });
+  });
+
+  it("returns a real count, including zero", () => {
+    expect(countResult({ count: 0, error: null, status: 200 })).toEqual({ ok: true, count: 0 });
+    expect(countResult({ count: 12, error: null, status: 206 })).toEqual({ ok: true, count: 12 });
+  });
+});

@@ -1,3 +1,5 @@
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+
 export type CheckStatus = "pass" | "warn" | "fail";
 
 export interface CheckResult {
@@ -32,6 +34,7 @@ export interface CategoryResult {
 export type LetterGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface AuditResult {
+  agency?: AgencyAttribution;
   url: string;
   scannedAt: string;
   overallScore: number;

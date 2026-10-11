@@ -1,0 +1,213 @@
+{
+  "scope": "actual-harmless-local-child-faults",
+  "pythonRuntime": {
+    "implementation": "CPython",
+    "version": "3.14.6",
+    "executable": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "entry": "/opt/homebrew/bin/python3"
+  },
+  "databaseExecuted": false,
+  "nativeSQLExecuted": false,
+  "fullReleaseQualified": false,
+  "status": "FAULT_CONTROLS_PASS",
+  "cases": [
+    {
+      "case": "spawn-gap/repeated-signals/TERM-resistant/sibling",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 45994,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          },
+          {
+            "clientPid": 45996,
+            "forced": true,
+            "reaped": true,
+            "errors": [
+              "TERM wait: Bounded child timeout after 2 seconds"
+            ],
+            "returncode": -9
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 45994,
+            "backendPid": 45994,
+            "state": "CLOSED"
+          },
+          {
+            "clientPid": 45996,
+            "backendPid": 45996,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "retention-failure/signal-during-terminal-write",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 46385,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 46385,
+            "backendPid": 46385,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "retentionFailure": "[Errno 21] Is a directory: '/tmp/source-child-fault-ynhvy2xj/retention-failure.json.terminal-e7015272f88e4cd891a089f20431191e' -> '/tmp/source-child-fault-ynhvy2xj/retention-failure.json'"
+      }
+    },
+    {
+      "case": "repeated-signals-inside-backend-closure",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 46389,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 46389,
+            "backendPid": 46389,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "final-handoff-signal-after-clean-natural-exit",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 46393,
+            "forced": false,
+            "reaped": true,
+            "errors": [],
+            "returncode": 0
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 46393,
+            "backendPid": 46393,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "observedFinalHandoff": {
+          "injected": [
+            {
+              "line": 404,
+              "depth": 1
+            }
+          ],
+          "pending": [
+            15
+          ],
+          "inMemoryStatus": "HOLD",
+          "mainAccepts": false,
+          "childNaturalExit": true
+        }
+      }
+    },
+    {
+      "case": "writer-release-signal-after-last-dirty-check",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 46398,
+            "forced": false,
+            "reaped": true,
+            "errors": [],
+            "returncode": 0
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 46398,
+            "backendPid": 46398,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "observedWriterRelease": {
+          "injected": [
+            {
+              "line": 389,
+              "depth": 1,
+              "writingBeforeRelease": true
+            }
+          ],
+          "pending": [
+            15
+          ],
+          "inMemoryStatus": "HOLD",
+          "retainedStatus": "HOLD",
+          "mainAccepts": false,
+          "childNaturalExit": true
+        }
+      }
+    }
+  ],
+  "harnessSha256": "25d85bf5716a95b11ed55c35b5f0bbe047dfad75fa8ec70b421b4eecbcc065e9"
+}

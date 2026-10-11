@@ -1,0 +1,177 @@
+{
+  "owner": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/acceptance.md",
+  "acceptanceLedgerSha256": "7160a30a40490cfc1d61940333ce7d1477635be9e5bda6b614be56bb43d1b73c",
+  "originalIssueBodies": [
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/278-batch-7a-the-payer-is-a-party-business-or-agency.md",
+      "sha256": "463592c23cb2b0b89ead4a1ed926d1dbbae7ae073fcc3b9dd9f37de4402e3943"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/279-agency-billing-account-with-one-line-per-client.md",
+      "sha256": "501aa77b40bdb2b9916860c9524b4ad8717b6bfe7a6d318f1cd3efacd5650232"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/280-plan-catalog-with-retail-and-wholesale-slots.md",
+      "sha256": "c17e65cf3f372e12b19aa72838a212804096876ae01a0c99a7e8480f3b7c835a"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/281-agency-rebills-its-client-at-its-own-price.md",
+      "sha256": "9bd6b5a4e83309889fb2adec119082c60dd739d453e9514b59c7c4a1afe2c5e5"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/282-pay-links-on-the-agency-path.md",
+      "sha256": "d17281545d274196528815916bb40dcbbc301895c7c628a955de50e5a2671bd2"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/283-stripe-connect-foundation-on-accounts-v2.md",
+      "sha256": "b0ebef4f88fa4e60a33f2d20bcaac625c70530085b44e47376638538fd940a9a"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/284-agency-of-record-attribution-record.md",
+      "sha256": "c2801b8603faec31c41a2bee59f455fcc6773b18a29e8778bef7b729e5a60491"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/285-one-split-ledger-for-agency-shares-and-creator-royalties.md",
+      "sha256": "3523de082a4aaeff33484dd9cee0f6c8cebfc5201c173933ca4501e5c5bbb519"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/286-payout-runner-dry-run-until-jacob-authorizes-the-first-payout.md",
+      "sha256": "d60bbd7159a8859909e5a4ef52461a51bb7fee514e4d746b94f8dbe4356eb98d"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/287-creator-listing-and-royalty-basis.md",
+      "sha256": "ecc5d39ed0daccfd2d614e5e2825289699f45d51e06ad4a4441d3ea4765befca"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/288-end-customer-payments-primitive-business-is-merchant.md",
+      "sha256": "453ad16f8481d277dc3e0d41505c68377ef69de8eb0ddd6cc09299b69c89838f"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/289-booking-deposits.md",
+      "sha256": "677436dcae7414fa6c8886aa1b77d0fa22850da89034f00d515949b60e815e26"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/290-quotes-inquiry-to-quote-to-accept-and-pay.md",
+      "sha256": "4fd98dc74c95029fb4c2b744f6e3782e29fbd7adcc35b5dee9c7cf93f84b613e"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/291-move-store-checkout-off-strelva-s-stripe-key.md",
+      "sha256": "32d849d18a19449593c8971558e7a019eacbb535849f9a1254dc1c5cb472a7d1"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/292-agent-initiated-payment.md",
+      "sha256": "566bf1a94f5ef9f58a487829d0b9ce895f54e25d5c3aff18749e28ec9bc49483"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/293-provider-change-and-end-agency-told-first.md",
+      "sha256": "31b5b2b1f35e35cef720831eead788e91b9f8d8b67703179158af10217651107"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/294-payer-and-provider-change-in-one-flow.md",
+      "sha256": "b0007cf76a5caa6a618eab45176860e96ca835696b0a9fdbf91bbc7085590c38"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/295-agency-side-of-export-and-exit.md",
+      "sha256": "020dba91c1dc08d4a4175e076eb7a25bac3f8a72f4c4c6cb01facdb280ab78cc"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/296-money-in-export.md",
+      "sha256": "4bf096049c3c71b352a6abf82a96e27c29776a9358cf6a821ace7fa0f8a692be"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/297-keep-me-found-bundle-with-the-agency-as-responsible-party.md",
+      "sha256": "4b81ca885fd848b95e9f1178d09866b444081a067ce3c9bc15f60f8739f7984f"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/298-proof-cards-and-weekly-verdict-cadence-set-by-the-provider.md",
+      "sha256": "89ff142a26e346edd3007f6d2f7517ac57fd4c40bc3a7816e8ce70d75af8e498"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/299-responsibility-meter-monthly-never-hours.md",
+      "sha256": "11780945ab7e1444e8f2c1b1c850b9fc46fe0bf06824a51c286b778be0cf2361"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/301-one-platform-mcp-on-the-current-spec.md",
+      "sha256": "5def6ba8d2548b2b2138caec81d0fa72d63ad1a7e0b12cc2a7a5067cf1717555"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/302-mixed-auth-on-the-platform-mcp.md",
+      "sha256": "ec36273e7d6fb77a0e066535a1e405eecc796dde3b870eaf3e40e4564a7e8876"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/303-unblock-the-agent-confirmation-path-from-the-silent-rollout.md",
+      "sha256": "65c8633d67b8da546b8e5ac14186ce53c6cd9ccaa66ce9f9684d4a6eeac28bb9"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/306-quote-request-as-an-inquiry-type.md",
+      "sha256": "4b3e2f716bdea81a680189e9d0e1b7ba331013cd45d2ef56a31c208a8485fb8e"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/307-send-inquiry-agent-contract.md",
+      "sha256": "da34e311fcdac5e413a8fe8862206ad5163aad1a1d9733979587b47be1511f63"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/308-verified-business-profile-block.md",
+      "sha256": "4a22c51aeef911d8c000068a335a7d999f017f65186255aaf211fb1d798d6d54"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/309-port-b-handle-and-llms-txt-to-integrate.md",
+      "sha256": "117fcf334225a1b0f4b7f24587cc1a6d16f426bb960a06923b883cacec8c3dad"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/310-abuse-hardening-for-agent-holds.md",
+      "sha256": "ceb4bf181feba05b9cc4b59703dd7d5e5f520573b9459c4e9d6a18e3dfd8a286"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/311-directory-packaging-gemini-claude-chatgpt.md",
+      "sha256": "e29640d7c935739be5ae33bfa5f785cc7baf7d038c91f841e94dec7ab83e5bbd"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/325-delegated-agency-installs-and-updates-versions-in-client-businesses.md",
+      "sha256": "bf4742344d19347cc640eff541637680e0144677cdd5273be9b61a0d8e839703"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/326-package-declarations-data-effects-bindings-data-leaving-the-business.md",
+      "sha256": "c94f3a379ba4a32c020ec403bd85c87ef8c436a96c644c401bc085ae6980cb8b"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/327-qualification-record-per-source-revision.md",
+      "sha256": "ae6000945a7fe7879691959a9abc8c0c3458e1279cf1a3761b29f1cfcd07f999"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/328-listing-state-private-clients-listed-no-ranking-boost-for-strelva.md",
+      "sha256": "9a48f155dff35999326a21220759a4220ec68b3ed18cbf7a8a9a067062acd790"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/329-install-an-app-from-a-listing.md",
+      "sha256": "20e30a65c959b5f674bf39f6d01bb8f41c5e7249fc54daf0a88ad953ff74adaf"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/330-creator-identity-and-made-by-on-the-system-page.md",
+      "sha256": "3d6cfaaa72ff362786af75901167685e92e50364f222ac9033d9644d6e0e3fca"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/331-re-qualify-updates-before-they-reach-installed-businesses.md",
+      "sha256": "df14664d2efe082ed665b17b845420c3f99e49a4b9c81c84ad73fcaed1475890"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/332-bundles-install-several-systems-as-one-package.md",
+      "sha256": "f5fa542e15238a71dcf13a6e23ebce898e07f51f9e57abde9f5ab68b1ec8a34d"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/333-fold-offerings-into-the-source-version-model.md",
+      "sha256": "bc73c8c1bd86381ffacd3ee17f1697071da4e453e758ac7169ea4b3d1eb8e2dc"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/334-custom-app-builds-on-vercel-sandbox-instead-of-docker.md",
+      "sha256": "c2654fe85de8dca1e1f3a0985a1d6f29eee7ec708a0774ca6d6e0e8106d8c0e2"
+    },
+    {
+      "file": "/Users/jacobrhinehart/Desktop/strelva/.scratch/agency-1.0/money-apps-2026-10-07/issues/496-billing-page-copy-assumes-strelva-is-every-client-s-payer.md",
+      "sha256": "3bd04a5d071c1e58682d9b23c03ecf7b74626c63ffaf4456c75951bb704ba171"
+    }
+  ],
+  "count": 42,
+  "allRetained": true,
+  "githubClosure": false
+}

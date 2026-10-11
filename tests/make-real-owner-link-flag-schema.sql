@@ -16,8 +16,10 @@ begin
   raise exception 'expected % but the statement succeeded: %', expected, statement;
 end; $$;
 
--- The full list, in order: every key from 20261009100000, then the new one.
-select pg_temp.ol_assert(public.workspace_release_flag_names() = array['owner_entry', 'inquiries', 'website_rebuild', 'systems',
+-- Every key from 20261009100000, plus the new one. Later migrations add keys
+-- (the upgrade rehearsal reruns this after them); none of these may be dropped.
+-- tests/release-flag-names-final-schema.sql owns the exact final list.
+select pg_temp.ol_assert(public.workspace_release_flag_names() @> array['owner_entry', 'inquiries', 'website_rebuild', 'systems',
   'make_real_live:hosted_website', 'make_real_live:tenant_content', 'make_real_live:inquiry_form',
   'make_real_live:booking_page', 'make_real_live:internal_app', 'connected_sites', 'make_real_owner_link'], 'flag names');
 select pg_temp.ol_assert(

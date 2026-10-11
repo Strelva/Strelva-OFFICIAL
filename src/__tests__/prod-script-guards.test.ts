@@ -111,14 +111,16 @@ describe("runSecretBackfill", () => {
 
 describe("workspace-release-flag script", () => {
   const WS = "7e000000-0000-4000-8000-000000000010";
-  const base = [WS, "systems", "on", "--operator-email=ops@example.test", "--reason=Agency library walk-through"];
+  const actor = { userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "ops@example.test" };
+  const auditContext = { source: "cli" as const, osUser: "jacob", machine: "laptop" };
+  const base = [WS, "systems", "on", "--reason=Agency library walk-through"];
 
   it("parses a command and defaults to a dry run", () => {
     expect(parseFlagArgs(base)).toMatchObject({ workspaceId: WS, flag: "systems", state: "on", apply: false, jacobsYes: false });
-    expect(() => parseFlagArgs([WS, "ask", "on", "--operator-email=a@b.test", "--reason=why"])).toThrow(/Flag must be/);
-    expect(() => parseFlagArgs([WS, "systems", "maybe", "--operator-email=a@b.test", "--reason=why"])).toThrow(/State must be/);
-    expect(() => parseFlagArgs(["not-a-uuid", "systems", "on", "--operator-email=a@b.test", "--reason=why"])).toThrow(/workspace id/);
-    expect(() => parseFlagArgs([WS, "systems", "on", "--reason=why"])).toThrow(/operator-email/);
+    expect(() => parseFlagArgs([WS, "ask", "on", "--reason=why"])).toThrow(/Flag must be/);
+    expect(() => parseFlagArgs([WS, "systems", "maybe", "--reason=why"])).toThrow(/State must be/);
+    expect(() => parseFlagArgs(["not-a-uuid", "systems", "on", "--reason=why"])).toThrow(/workspace id/);
+    expect(() => parseFlagArgs([...base, "--operator-email=a@b.test"])).toThrow(/Unknown/);
     expect(() => parseFlagArgs([...base, "--force"])).toThrow(/Unknown/);
   });
 
@@ -132,9 +134,10 @@ describe("workspace-release-flag script", () => {
   it("dry run reads only; apply writes with the current revision", async () => {
     const set = vi.fn(async () => ({ flags: { systems: { state: "on", revision: 3 } } }));
     const read = vi.fn(async () => ({ flags: { systems: { state: "operators", revision: 2 } } }));
-    expect(await runFlagCommand(parseFlagArgs(base), { read, set })).toEqual({ mode: "dry-run", from: "operators", to: "on" });
+    const deps = { actor, auditContext, read, set };
+    expect(await runFlagCommand(parseFlagArgs(base), deps)).toEqual({ mode: "dry-run", from: "operators", to: "on" });
     expect(set).not.toHaveBeenCalled();
-    expect(await runFlagCommand(parseFlagArgs([...base, "--apply"]), { read, set })).toEqual({ mode: "apply", from: "operators", to: "on" });
-    expect(set).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", expectedRevision: 2 }));
+    expect(await runFlagCommand(parseFlagArgs([...base, "--apply"]), deps)).toEqual({ mode: "apply", from: "operators", to: "on" });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ actor, auditContext, workspaceId: WS, flag: "systems", state: "on", expectedRevision: 2 }));
   });
 });

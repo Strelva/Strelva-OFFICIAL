@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { needsYouReleaseEnabled, needsYouService, readStrelvaHandled } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore, readStrelvaHandled } from "@/experience/workspace/needs-you-server";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ async function memberWorkspace(actor: { userId: string; verifiedEmail: string },
 }
 
 /**
- * Needs you and Strelva handled for one business: the owner's open
+ * Needs you and What changed for one business: the owner's open
  * decisions, oldest first, and the last week of what Strelva did. Direct
  * members only; the SQL rechecks membership on every read.
  */
@@ -59,8 +60,17 @@ export async function POST(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
     const body = decideInput.parse(await readWorkspaceBody(request, 2_000));
     if (await isRateLimitedWindowedAsync(`workspace:needs-you:${actor.userId}`, 30, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
-    if (!(await memberWorkspace(actor, body.workspaceId))) return workspaceJson({ error: "This business is unavailable to your account." }, 403);
-    const result = await needsYouService().decide({ ...body, by: { kind: "session", actor } });
+    const workspace = await memberWorkspace(actor, body.workspaceId);
+    if (!workspace) return workspaceJson({ error: "This business is unavailable to your account." }, 403);
+    // Every item here is the owner's. A Strelva operator holding another seat
+    // on the business never decides one (#530); claim_owner_decision refuses it too.
+    if (workspace.role !== "owner" && (await isSuperAdminUser(actor.userId))) {
+      return workspaceJson({ status: "forbidden", error: "The owner decides this. Nothing changed." }, 403);
+    }
+    // Confirmed business facts carry on to native websites (#509).
+    const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
+    const result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({ ...body, by: { kind: "session", actor } });
+
     const status = result.status === "forbidden" || result.status === "not_owner" ? 403
       : result.status === "not_found" ? 404
       : result.status === "changed" || result.status === "already_handled" || result.status === "expired" ? 409

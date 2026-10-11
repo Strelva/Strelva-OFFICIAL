@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+const admission = vi.hoisted(() => vi.fn(async (_actor: unknown, _power: string) => undefined));
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizePlatformOperatorRead: admission }));
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import type { NotToldRow, PolicyRows, PolicySettingsStore } from "@/platform/needs-you/policy";
 
@@ -57,6 +59,7 @@ function store(rows: PolicyRows = { settings: [], history: [] }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  admission.mockReset().mockResolvedValue(undefined);
   mocks.superAdmin.mockResolvedValue(true);
   mocks.actor.mockResolvedValue(OPERATOR);
   mocks.released.mockReturnValue(true);
@@ -64,6 +67,14 @@ beforeEach(() => {
 });
 
 describe("operator loaders", () => {
+  it("records the current actor before owner-decision reads and stops on audit loss", async () => {
+    await loadBusinessPolicy(WS);
+    expect(admission).toHaveBeenCalledWith(OPERATOR, "admin.owner-decisions.read");
+    admission.mockRejectedValueOnce(new Error("Audit unavailable"));
+    const source = store().value; mocks.store.current = source;
+    expect((await loadOwnerNotTold()).state).toBe("unavailable");
+    expect(source.notTold).not.toHaveBeenCalled();
+  });
   it("are off with the release, denied without a verified operator, and honest about outages", async () => {
     mocks.released.mockReturnValue(false);
     expect(await loadOwnerNotTold()).toEqual({ state: "off" });
@@ -133,7 +144,8 @@ describe("owner not told", () => {
     expect(notToldReason(row())).toMatch(/held back.*client email is off or not set up/);
     expect(notToldReason(row({ lastDelivery: { kind: "urgent", status: "bounced", reason: "mailbox_full", at: "2026-10-05T09:00:00Z" } }))).toBe("Email bounced (mailbox_full)");
     expect(notToldReason(row({ lastDelivery: null }))).toBe("Not emailed yet");
-    expect(notToldReason(row({ recipientKnown: false, lastDelivery: null }))).toMatch(/No owner email on file/);
+    expect(notToldReason(row({ recipientKnown: false, lastDelivery: null }))).toMatch(/^Not sent: no trusted owner address/);
+    expect(notToldReason(row({ lastDelivery: { kind: "digest", status: "suppressed", reason: "no_trusted_owner_recipient", at: "2026-10-05T09:00:00Z" } }))).toBe("Not sent: no trusted owner address");
   });
 
   it("renders the list, the empty state and the outage, and nothing when off or denied", () => {
@@ -151,8 +163,16 @@ describe("owner not told", () => {
 });
 
 describe("policy screen", () => {
+  it("keeps preview policy controls disabled while exposing every policy layer", async () => {
+    const ready = await loadBusinessPolicy(WS);
+    const html = renderToStaticMarkup(createElement(PolicyScreen, { load: ready, hrefFor: id => `/admin/needs-you?workspaceId=${id}`, readOnly: true }));
+    expect(html).toContain('role="table"');
+    expect(html).toContain("In force");
+    expect(html).toContain("Floor:");
+    expect(html.match(/<select[^>]*>/g)?.every(select => select.includes('disabled=""'))).toBe(true);
+  });
   it("shows the off, denied and ready states and is in the rail", async () => {
-    expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "off" }, hrefFor: () => "#" }))).toContain("Needs you is off");
+    expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "off" }, hrefFor: () => "#" }))).toContain("Decision settings are off");
     expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "denied" }, hrefFor: () => "#" }))).toContain("Operators only");
     const ready = await loadBusinessPolicy(WS);
     const html = renderToStaticMarkup(createElement(PolicyScreen, { load: ready, hrefFor: id => `/admin/needs-you?workspaceId=${id}` }));

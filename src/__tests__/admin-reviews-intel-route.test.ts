@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import type { ReviewItem } from "@/lib/types";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());

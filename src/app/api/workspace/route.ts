@@ -1,3 +1,6 @@
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
+import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
 import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
 import { initializeRebuildHandoff } from "@/products/websites/index";
@@ -11,10 +14,12 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
+import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 import type { ProductDefinition } from "@/platform/products";
 import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
-  acceptHandoff, createAgencyWorkspace, createHandoff, ensurePersonalWorkspace, getWork,
+  acceptHandoff, createAgencyWorkspace, createdAgencyApplicationWorkIds, makeSystemsAuthority, createHandoff, ensurePersonalWorkspace, getWork,
   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
   listWorkDelegations, listWorkspaces, revokeDelegation, revokeHandoff,
   WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError,
@@ -27,12 +32,14 @@ import {
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { publicHostname } from "@/products/managed-presence";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { listProvidedClients } from "@/platform/workspaces/business-ownership";
+import { oauthEnabled } from "@/platform/agent-channel/oauth";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { connectedSitesReleasedFor } from "@/products/connected-sites/server";
@@ -79,6 +86,7 @@ function failed(error: unknown) {
   if (error instanceof WorkspaceOperationPendingError) return json({ error: error.message }, 409);
   if (error instanceof Error && error.name === "PublicWebsiteAuditUnavailableError") return json({ error: "This website report has expired or is unavailable. Run another audit." }, 404);
   if (error instanceof WorkspaceAccessError) return json({ error: "This work or invitation is unavailable to your account." }, 403);
+  if (error instanceof WorkspaceConflictError && error.message === WORKSPACE_LIMIT_MESSAGE) return json({ error: WORKSPACE_LIMIT_MESSAGE, code: "workspace_limit_reached" }, 409);
   if (error instanceof WorkspaceConflictError) return json({ error: "This action is no longer available or a workspace limit has been reached. Refresh your workspace before continuing." }, 409);
   if (error instanceof Error && ["PrivateAiVisibilityAssessmentRateLimitError", "PublicAiVisibilityImportRateLimitError"].includes(error.name)) {
     return json({ error: error.name === "PublicAiVisibilityImportRateLimitError"
@@ -224,66 +232,58 @@ export async function GET(request: Request) {
     z.string().uuid().parse(selectedId);
     const selected = workspaces.find((workspace) => workspace.id === selectedId);
     if (!selected) return json({ error: "Workspace unavailable." }, 404);
-    let workspaceExitState = null;
-    let workspaceExitReadStatus: "available" | "completed" | "not_owner" | "unavailable" = selected.role === "owner" ? "available" : "not_owner";
-    if (selected.role === "owner") {
-      try {
-        workspaceExitState = (await readWorkspaceExit(current, selected.id)).state;
-      } catch {
-        // An owner must not be shown mutation controls when the durable stop
-        // state cannot be checked. The browser receives an explicit status so
-        // it can fail closed without claiming that an exit was completed.
-        workspaceExitReadStatus = "unavailable";
-      }
-    } else {
-      try {
-        workspaceExitReadStatus = await readWorkspaceExitCompleted(selected.id) ? "completed" : "available";
-      } catch {
-        // Members receive only the completion bit. A failed check still
-        // disables mutations instead of presenting an active workspace.
-        workspaceExitReadStatus = "unavailable";
-      }
-    }
-    // Managed presence is a compatibility projection of existing tenant
-    // entities. A transient tenant read must not make unrelated private work
-    // unavailable; the product reports a bounded status alongside successes.
-    const managedPresence = presentManagedWorkListing(
-      await listManagedPresenceWork().catch(() => ({ managedWork: [], unavailable: true })),
-    );
-    const allWork = await listWork(current, selected.id);
-    const work = allWork.some(item => item.productId === "product-learning") && !(await isSuperAdminUser(current.userId))
-      ? allWork.filter(item => item.productId !== "product-learning") : allWork;
-    const handoffs = selected.kind === "agency" && selected.access === "member"
-      ? await listAgencyHandoffs(current, selected.id) : [];
-    const agencyDelegations = selected.kind === "agency" && selected.access === "member"
-      ? await listAgencyDelegations(current, selected.id) : [];
-    // The provider mark grants nothing: the list is only businesses the actor
-    // already belongs to. A failed read (or the migration not yet applied)
-    // leaves the agency home on delegations alone, as before.
-    const providedClients = selected.kind === "agency" && selected.access === "member"
-      ? await Promise.resolve().then(() => listProvidedClients(current, selected.id))
-        .then((rows) => rows.map(({ customerWorkspaceId, name, startedAt }) => ({ customerWorkspaceId, name, startedAt })))
-        .catch(() => undefined)
-      : undefined;
-    const customerDelegations = selected.access === "member" && (selected.role === "owner" || selected.role === "admin")
-      ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
-    // Systems are business-level: the spine projection, its health and any
-    // Possibility a saved rebuild offers. A failed read is reported as such.
-    // Off (STRELVA_SYSTEMS_RELEASE, per workspace when the env says `workspace`),
-    // no projection is built and the browser renders the pre-Systems workspace.
-    const releaseViewer = { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId };
-    const [systemsReleased, inquiriesReleased, websiteRebuildReleased] = await Promise.all([
-      systemsReleaseEnabledForWorkspace(selected.id, releaseViewer),
-      inquiryReleaseEnabledForWorkspace(selected.id, releaseViewer),
-      websiteRebuildReleaseEnabledForWorkspace(selected.id, releaseViewer),
+    const providerSeat = selected.access === "provider_seat";
+    const agencyMember = selected.kind === "agency" && selected.access === "member";
+    const canWrite = selected.access === "member" && (selected.role === "owner" || selected.role === "admin");
+    // Start private reads only after verified identity and workspace selection.
+    // Work visibility and release targeting share one current operator check.
+    const operator = isSuperAdminUser(current.userId);
+    const visibleWork = Promise.all([listWork(current, selected.id), operator]).then(([allWork, isOperator]) =>
+      isOperator ? allWork : allWork.filter(item => item.productId !== "product-learning"));
+    // Tenant compatibility failures remain explicit and do not hide private work.
+    const managed = listManagedPresenceWork().catch(() => ({ managedWork: [], unavailable: true })).then(presentManagedWorkListing);
+    const releases = operator.then(isOperator => {
+      const viewer = { operator: isOperator, tester: false, userId: current.userId };
+      return Promise.all([systemsReleaseEnabledForWorkspace(selected.id, viewer),
+        inquiryReleaseEnabledForWorkspace(selected.id, viewer), websiteRebuildReleaseEnabledForWorkspace(selected.id, viewer)]);
+    });
+    // Attach every required read to the same aggregate before awaiting. Only
+    // visible work gates delegations; Systems also need managed domains/releases.
+    const [work, managedPresence, [systemsReleased, inquiryRelease, websiteRebuildReleased], exit,
+      handoffs, agencyDelegations, providedClients, customerDelegations, systems, connectedSitesReleased,
+      creatorDraftIds, makerAuthority, ownerBrand, pendingAssessments] = await Promise.all([
+      visibleWork, managed, releases,
+      (async () => {
+        try {
+          return selected.role === "owner"
+            ? { state: (await readWorkspaceExit(current, selected.id)).state, status: "available" as const }
+            : { state: null, status: await readWorkspaceExitCompleted(selected.id) ? "completed" as const : "available" as const };
+        } catch {
+          // An unconfirmed stop state disables mutation controls for every viewer.
+          return { state: null, status: "unavailable" as const };
+        }
+      })(),
+      agencyMember ? listAgencyHandoffs(current, selected.id) : [],
+      agencyMember ? listAgencyDelegations(current, selected.id) : [],
+      // A provider mark grants nothing. Keep the existing optional projection.
+      agencyMember ? Promise.resolve().then(() => listProvidedClients(current, selected.id))
+        .then(rows => rows.map(({ customerWorkspaceId, name, startedAt }) => ({ customerWorkspaceId, name, startedAt })))
+        .catch(() => undefined) : undefined,
+      canWrite ? visibleWork.then(items => Promise.all(items.map(item => listWorkDelegations(current, item.id))).then(rows => rows.flat())) : [],
+      Promise.all([visibleWork, managed, releases]).then(([savedWork, presence, [released]]) =>
+        released && selected.kind === "customer" ? readWorkspaceSystems({
+          actor: current, businessId: selected.id, savedWork, canWrite,
+          siteDomains: new Map(presence.managedWork.flatMap(site => site.domain ? [[site.id, site.domain] as const] : [])),
+        }) : undefined),
+      releases.then(([released]) => released && selected.kind === "customer" && selected.access === "member"
+        ? connectedSitesReleasedFor(current, selected.id).catch(() => false) : false),
+      providerSeat ? createdAgencyApplicationWorkIds(current, selected.id) : [],
+      releases.then(([released]) => released ? makeSystemsAuthority(current, selected.id) : null),
+      resolveOwnerBrand(selected.id),
+      selected.access === "member" ? listPendingAssessments(current, selected.id) : [],
     ]);
-    const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
-      actor: current, businessId: selected.id, savedWork: work,
-      canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
-      siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
-    }) : undefined;
-    const connectedSitesReleased = systemsReleased && selected.kind === "customer" && selected.access === "member"
-      ? await connectedSitesReleasedFor(current, selected.id).catch(() => false) : false;
+    // #241 remains undecided: a seat alone adds no inquiry entry or inbox grant.
+    const inquiriesReleased = inquiryRelease && !providerSeat;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
     const products: WorkspaceProduct[] = workspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
       availability: workspaceAvailability(product),
@@ -300,12 +300,15 @@ export async function GET(request: Request) {
     // off for this workspace. The route still enforces the flag per site.
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
+      canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency",
+      ownerBrand,
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
-      workspaceExitState,
-      workspaceExitReadStatus,
-      work: work.map((item) => presentWorkspaceWork(item, { access: workAccess(selected) })),
-      pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
+      workspaceExitState: exit.state,
+      workspaceExitReadStatus: exit.status,
+      work: work.map((item) => ({ ...presentWorkspaceWork(item, { access: workAccess(selected) }),
+        ...(creatorDraftIds.some(id => id === item.id) ? { creatorDraft: true } : {}) })),
+      pendingAssessments,
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
@@ -313,7 +316,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

@@ -23,7 +23,7 @@
   color: inherit;
   text-align: left;
   text-decoration: none;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color var(--motion-fast) var(--ease-settle), background-color var(--motion-fast) var(--ease-settle);
 }
 
 .card:hover {
@@ -556,4 +556,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
+}
+
+/* Match the owned control foundation for real touch hit boxes. */
+@media (pointer: coarse) {
+  .page button,
+  .back,
+  .linkAction,
+  .segmented button,
+  .lineage button,
+  .fold > summary {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+
+  .fold > summary { padding-block: 12px; }
 }

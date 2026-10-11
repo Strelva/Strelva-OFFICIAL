@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import {
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
     const config = isDraft

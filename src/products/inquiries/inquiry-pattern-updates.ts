@@ -874,7 +874,6 @@ function shapeForPatternUpdate(
 
 /** Stage a resolved definition as ordinary inquiry work and a normal receipt. */
 export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternUpdateInput): StagePatternUpdateResult {
-  const actorId = actor(input.actorId);
   assertResolvedPatternUpdate(input.proposal, input.resolution);
   if (input.proposal.sourceVersion <= input.proposal.baseSourceVersion || input.proposal.status === "up_to_date") {
     throw new Error("Only a newer pattern version can be staged.");
@@ -886,18 +885,25 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
   if (!installation.pendingUpdate || installation.pendingUpdate.proposalId !== input.proposal.id || installation.pendingUpdate.sourceVersion !== input.proposal.sourceVersion || installation.pendingUpdate.targetVersion !== input.proposal.targetVersion) {
     throw new Error("This pattern update is stale. Refresh the installation before staging it.");
   }
-  const target = clone(input.resolution.definition);
+  return stagePatternDefinition(host,{definition:input.resolution.definition,capabilityId:input.proposal.capabilityId,baseTargetVersion:input.proposal.baseTargetVersion,actorId:input.actorId,now:input.now});
+}
+
+/** Stages a complete destination-owned shape atomically so form and record
+ * fields remain equal. Source installation pins are untouched by local work. */
+export function stagePatternDefinition(host:InquiryEngineHost,input:{definition:InquiryCapabilityDefinition;capabilityId:string;baseTargetVersion:number;actorId:string;now?:string}):StagePatternUpdateResult {
+  const actorId=actor(input.actorId);
+  const target = clone(input.definition);
   ensureDefinition(target, host.businessId);
-  if (target.id !== input.proposal.capabilityId || target.version !== input.proposal.targetVersion) {
+  if (target.id !== input.capabilityId || target.version !== input.baseTargetVersion + 1) {
     throw new Error("The staged pattern definition does not match the proposed capability version.");
   }
-  const capability = host._capability(input.proposal.capabilityId);
+  const capability = host._capability(input.capabilityId);
   const currentWork = capability.activeRequestId ? host._request(capability.activeRequestId) : null;
   if (currentWork && ["publishing", "live_unverified"].includes(currentWork.state)) {
     throw new Error("Reconcile the current live boundary before staging a pattern update.");
   }
-  const currentDefinition = currentWork?.draft ?? capability.live ?? input.proposal.currentDefinition;
-  if (!currentDefinition || currentDefinition.version !== input.proposal.baseTargetVersion) {
+  const currentDefinition = currentWork?.draft ?? capability.live ?? input.definition;
+  if (!currentDefinition || currentDefinition.version !== input.baseTargetVersion) {
     throw new Error("This pattern update is stale. Refresh the current draft before staging it.");
   }
   const now = time(host, input.now);
@@ -908,7 +914,7 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
       const next: InquiryWork = {
         id: requestId,
         businessId: host.businessId,
-        capabilityId: input.proposal.capabilityId,
+        capabilityId: input.capabilityId,
         actorId,
         intent: `Update ${currentDefinition.name}`,
         shape: shapeForPatternUpdate(target, requestId, actorId, now),
@@ -971,9 +977,9 @@ export function stagePatternUpdate(host: InquiryEngineHost, input: StagePatternU
     responsibilityId: null,
     actor: { kind: "person", id: actorId },
     action: "stage_pattern_update",
-    what: `Staged inquiry pattern update version ${target.version}.`,
-    why: "A source update is staged as ordinary inquiry work after explicit conflict choices; local edits remain visible in the receipt.",
-    lookedAt: ["source pattern version", "local edits", `version ${target.version}`],
+    what: `Staged this business's inquiry draft version ${target.version}.`,
+    why: "Reusable shape and local choices are staged as ordinary inquiry work; publication still requires exact rehearsal and owner approval.",
+    lookedAt: ["current destination draft", "local edits", `version ${target.version}`],
     outcome: "recorded",
     evidence: ["explicit local/source conflict choices", "requires a new exact-version rehearsal"],
     createdAt: now,

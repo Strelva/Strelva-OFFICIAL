@@ -183,8 +183,11 @@ export const createWorkPlanRequestSchema = z.object({
   /** A payer-created and accepted work-economics job is required for model generation. */
   planningEconomics: z.object({
     jobId: z.string().uuid(),
+    fundingWorkspaceId: z.string().uuid().optional(),
     executionKey: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
     maximumCents: z.number().int().nonnegative().max(1_000_000),
+    /** Restricts server-selected models; never configures or overrides a provider. */
+    approvedModelLabels: z.array(z.string().regex(/^(google|anthropic|openai)\/[A-Za-z0-9_.:-]+$/)).min(1).max(2).optional(),
   }).strict().optional(),
 }).strict();
 export type CreateWorkPlanRequest = z.infer<typeof createWorkPlanRequestSchema>;

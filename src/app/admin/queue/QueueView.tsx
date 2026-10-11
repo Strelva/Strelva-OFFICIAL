@@ -1,62 +1,39 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { QUEUE_KIND_LABELS, type OperatorQueue } from "@/platform/operator-queue/contracts";
-import { Panel, PanelCount } from "../console";
+import { StEmpty, StHead, StMono, StPage, StRow, StRows, StSection, StState } from "@/components/ui/strelva/Kit";
 import { QueueBoard } from "./QueueBoard";
 
-/**
- * The queue page body: header, board, and the per-source counts the two-week
- * parity check compares. Shared by /admin/queue and its local fixture preview.
- */
-export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
+/** Shared by /admin/queue and its local fixture preview. Source counts remain
+ * available for the queue's parity check without competing with current work. */
+export function QueueView({ queue, me, actionsEnabled = false }: { queue: OperatorQueue; me: string; actionsEnabled?: boolean }) {
   const open = queue.items.length;
   const late = queue.items.filter((item) => item.late).length;
-  return (
-    <div className="mx-auto max-w-[920px] space-y-4">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[26px] font-medium tracking-[-0.02em] text-warm-white">Queue</h1>
-          <p className="mt-1 text-[13px] text-gray-muted">
-            {open} open{late ? ` · ${late} late` : ""} · ordered by harm. Every row opens the screen that works it.
-          </p>
-        </div>
-        <span className="text-[11px] font-mono text-gray-faint">Read {new Date(queue.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
-      </header>
-
-      <QueueBoard queue={queue} me={me} />
-
-      <Panel title="Per-source counts" trailing={<PanelCount>{queue.complete ? "all sources read" : `${queue.gaps.length} not read`}</PanelCount>}>
-        <div className="overflow-x-auto">
-          <table className="w-full border-t border-glass-border text-left text-[12px]">
-            <caption className="sr-only">Rows read from each source and where they landed</caption>
-            <thead className="text-gray-faint">
-              <tr>
-                <th scope="col" className="px-[18px] py-2 font-medium">Source</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Read</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Shown</th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">Closed</th>
-                <th scope="col" className="px-[18px] py-2 text-right font-medium">Snoozed</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-glass-border text-gray-muted tabular-nums">
-              {queue.counts.map((count) => {
-                const gap = queue.gaps.find((item) => item.kind === count.kind);
-                return (
-                  <tr key={count.kind}>
-                    <th scope="row" className="px-[18px] py-1.5 font-normal text-warm-white">{QUEUE_KIND_LABELS[count.kind]}</th>
-                    {gap
-                      ? <td colSpan={4} className="px-[18px] py-1.5 text-right text-warning">Not read: {gap.reason}</td>
-                      : <>
-                          <td className="px-2 py-1.5 text-right">{count.read}</td>
-                          <td className="px-2 py-1.5 text-right">{count.shown}</td>
-                          <td className="px-2 py-1.5 text-right">{count.closed}</td>
-                          <td className="px-[18px] py-1.5 text-right">{count.snoozed}</td>
-                        </>}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-    </div>
-  );
+  return <StPage>
+    <StHead title={OPERATOR_DESTINATIONS.queue.label} meta={<>Support, incidents and releases only Strelva staff can do. Every action here is logged.</>}
+      actions={<StMono>P1 harm now · P4 can wait</StMono>} />
+    <QueueBoard queue={queue} me={me} actionsEnabled={actionsEnabled} />
+    <details>
+      <summary className="cursor-pointer text-[13px] text-gray-muted">Queue details · <StMono>{open}</StMono> open{late ? <> · <StMono>{late}</StMono> late</> : null} · Read <StMono>{new Date(queue.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</StMono></summary>
+      <div className="mt-6 space-y-8">
+        {queue.businessLeads && <StSection title="Client inquiries" meta="Last 7 days">
+          {queue.businessLeads.length ? <StRows label="Client inquiry counts">{queue.businessLeads.map(summary => {
+            const entries = [...queue.items, ...queue.parked].filter(item => summary.businessKey === (item.business.kind === "workspace" ? `w:${item.business.workspaceId}` : item.business.kind === "tenant" ? `t:${item.business.tenantId}` : "strelva"));
+            const business = entries[0]?.business;
+            const label = business && business.kind !== "strelva" ? business.name : summary.businessName;
+            const unkept = entries.filter(item => item.kind === "lead_unkept").length;
+            const pendingUnknown = queue.gaps.some(gap => gap.kind === "lead_unkept" && gap.source !== "Client lead counts");
+            return <StRow key={summary.businessKey} title={label}
+              detail={<>{summary.lastSevenDays === null ? "Inquiry count unavailable" : <><StMono>{summary.lastSevenDays}</StMono> inquiries</>}{pendingUnknown ? " · pending copies unavailable" : unkept ? <> · <StMono>{unkept}</StMono> not kept</> : null}</>} />;
+          })}</StRows> : <StEmpty>No client sites are linked yet.</StEmpty>}
+        </StSection>}
+        <StSection title="Per-source counts" meta={queue.complete ? "All sources read" : <><StMono>{queue.gaps.length}</StMono> not read</>}>
+          <StRows label="Rows read from each source and where they landed">{queue.counts.map(count => {
+            const gap = queue.gaps.find(item => item.kind === count.kind && item.source !== "Client lead counts");
+            return <StRow key={count.kind} title={QUEUE_KIND_LABELS[count.kind]}
+              detail={gap ? <StState kind="need">Not read: {gap.reason}</StState> : <><StMono>{count.read}</StMono> read · <StMono>{count.shown}</StMono> shown · <StMono>{count.closed}</StMono> closed · <StMono>{count.snoozed}</StMono> snoozed</>} />;
+          })}</StRows>
+        </StSection>
+      </div>
+    </details>
+  </StPage>;
 }

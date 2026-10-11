@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   save: vi.fn(),
   edit: vi.fn(),
+  historyEnabled: vi.fn(),
 }));
 
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
@@ -14,9 +15,10 @@ vi.mock("@/products/documents/server", () => ({
   readWorkspaceDocument: mocks.read,
   saveWorkspaceDocument: mocks.save,
   editWorkspaceDocument: mocks.edit,
+  documentHistoryEnabled: mocks.historyEnabled,
 }));
 
-import { POST } from "@/app/api/documents/route";
+import { GET, POST } from "@/app/api/documents/route";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 const actorUser = {
@@ -43,9 +45,31 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.release.mockReturnValue(true);
   mocks.user.mockResolvedValue(actorUser);
+  mocks.historyEnabled.mockReturnValue(false);
 });
 
 describe("workspace document route", () => {
+  it("keeps document reads and writes unchanged with full history off", async () => {
+    const saved = { workId, workspaceId, document: { title: "Procedure" } };
+    mocks.read.mockResolvedValue(saved);
+    mocks.save.mockResolvedValue(saved);
+    expect(await (await GET(new Request(`https://app.strelva.com/api/documents?workId=${workId}`))).json()).toEqual(saved);
+    expect(await (await POST(postRequest({ action: "create", workspaceId, input: { title: "Procedure", text: "First" } }))).json()).toEqual(saved);
+  });
+
+  it("advertises history only after the dedicated flag is enabled", async () => {
+    mocks.historyEnabled.mockReturnValue(true);
+    const saved = { workId, workspaceId, document: { title: "Procedure" } };
+    mocks.read.mockResolvedValue(saved);
+    expect(await (await GET(new Request(`https://app.strelva.com/api/documents?workId=${workId}`))).json()).toEqual({ ...saved, historyEnabled: true });
+  });
+
+  it("does not authenticate or read with the workspace release off", async () => {
+    mocks.release.mockReturnValue(false);
+    expect((await GET(new Request(`https://app.strelva.com/api/documents?workId=${workId}`))).status).toBe(503);
+    expect(mocks.user).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled();
+  });
   it("denies an unconfirmed or signed-out actor before reading or writing", async () => {
     mocks.user.mockResolvedValue({ id: actorUser.id, email: actorUser.email });
 

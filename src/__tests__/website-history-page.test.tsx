@@ -58,7 +58,7 @@ describe("website history availability", () => {
     reads.snapshots.mockRejectedValue(new Error("offline"));
     reads.activity.mockRejectedValue(new Error("offline"));
     const html = renderToStaticMarkup(await SiteHistoryPage({}));
-    expect(html).toContain("Saved versions are temporarily unavailable.");
+    expect(html).toContain("History is temporarily unavailable.");
     expect(html).toContain("Recent changes are temporarily unavailable.");
     expect(html).not.toContain("Saved versions are available.");
     expect(html).not.toContain("No updates yet");

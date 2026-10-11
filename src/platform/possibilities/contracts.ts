@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordedActorSchema } from "@/platform/presentation/actor";
 import { connectionKindSchema } from "@/platform/systems/contracts";
 import { REVISION_ID, SYSTEM_ID, systemRefSchema, systemRevisionRefSchema } from "./refs";
 
@@ -164,6 +165,7 @@ export const possibilitySchema = possibilityInputSchema.extend({
   keyEpochs: z.record(z.string().max(120), z.number().int().positive()).optional(),
   /** Approval records already consumed by an accepted effect. Never reusable. */
   consumedApprovalIds: z.array(z.string().max(120)).max(200).optional(),
+  proposingActor: recordedActorSchema.nullable().optional().catch(null),
   createdBy: z.string().min(1),
   createdAt: DATE,
   updatedAt: DATE,

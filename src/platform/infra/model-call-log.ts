@@ -1,5 +1,6 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { getRedis } from "@/platform/infra/redis";
+import { recordAskCostAlert } from "./ask-cost-alert";
 import { logger } from "@/platform/infra/logger";
 import type { ModelCostSource } from "./model-prices";
 
@@ -104,6 +105,7 @@ function rowPayload(row: ModelCallRow) {
  * (local runs and tests); with env, every failure is counted as missing. */
 export const postgresModelCallSink: ModelCallSink = {
   async record(rows) {
+    await recordAskCostAlert(rows);
     if (rows.length === 0) return;
     const client = getSupabase();
     if (!client) return;

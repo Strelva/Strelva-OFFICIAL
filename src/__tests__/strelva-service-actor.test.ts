@@ -38,6 +38,12 @@ describe("service sessions", () => {
     expect(() => parseServiceSession({ ...row(), label: "Someone else" })).toThrow(/malformed/);
   });
 
+  it("names the verified provider of record the session served (batch 7A)", () => {
+    const provider = "eeeeeeee-0000-4000-8000-0000000000a1";
+    expect(parseServiceSession({ ...row(), providerWorkspaceId: provider })?.providerWorkspaceId).toBe(provider);
+    expect(() => parseServiceSession({ ...row(), providerWorkspaceId: "not-a-workspace" })).toThrow(/malformed/);
+  });
+
   it("starts one per business and purpose, and refuses a session for another business", async () => {
     rpc.mockResolvedValueOnce({ data: row(), error: null });
     await expect(startServiceSession(WS, "needs_you_sync")).resolves.toMatchObject({ workspaceId: WS });

@@ -38,7 +38,7 @@ describe("/api/workspace/site-changes", () => {
     mocks.released.mockResolvedValue(true);
     mocks.actor.mockResolvedValue(actor);
     mocks.snapshot.mockResolvedValue({ managedWebsites: [{ link: "tenant_link", tenantStableId: MCLEARS, tenantId: "mclears", siteName: "McClear's", tenantActive: true, linkedAt: "2026-10-01T00:00:00Z" }] });
-    mocks.rpc.mockResolvedValue({ data: [], error: null });
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "read_service_request_providers" ? [{ agencyWorkspaceId: MCLEARS, name: "Agency", providerOfRecord: true }] : [], error: null }));
   });
 
   it("is closed with the workspace release off, and with Systems off for the workspace", async () => {
@@ -62,10 +62,18 @@ describe("/api/workspace/site-changes", () => {
     const response = await post(ask({ page: "Home" }));
     expect(response.status).toBe(201);
     expect(mocks.execute).toHaveBeenCalledWith(actor, expect.objectContaining({
-      action: "save", businessId: WS, status: "requested", provider: { kind: "strelva" }, scope: ["website.repo_change"],
+      action: "save", businessId: WS, status: "requested", provider: { kind: "agency", agencyWorkspaceId: MCLEARS }, scope: ["website.repo_change"],
       context: { source: "website_change", systemId: SYSTEM, tenantStableId: MCLEARS, implementation: "custom_repo", page: "Home" },
     }));
     expect(await response.json()).toMatchObject({ requestId: REQUEST, requests: [] });
+  });
+
+  it("fails closed without an active agency seat or with ambiguous seats", async () => {
+    for (const options of [[], [{ agencyWorkspaceId: MCLEARS, name: "One", providerOfRecord: false }, { agencyWorkspaceId: WS, name: "Two", providerOfRecord: false }]]) {
+      mocks.rpc.mockResolvedValue({ data: options, error: null });
+      expect((await post(ask())).status).toBe(409);
+      expect(mocks.execute).not.toHaveBeenCalled();
+    }
   });
 
   it("refuses a System that isn't this business's site, and says who can ask", async () => {

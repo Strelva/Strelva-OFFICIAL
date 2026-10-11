@@ -93,7 +93,7 @@
   font-size: 12px;
   line-height: 24px;
   cursor: pointer;
-  transition: background-color 120ms ease, transform 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle);
 }
 
 .motionButton svg { flex-shrink: 0; }
@@ -103,7 +103,7 @@
   .motionButton:hover:not(:disabled) { background: var(--atmosphere-control-hover); }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .motionButton:active:not(:disabled) { transform: scale(0.96); }
+  .motionButton:active:not(:disabled) { transform: scale(var(--motion-press-scale)); }
 }
 
 .card[data-renderer="fallback"] .canvas { visibility: hidden; }

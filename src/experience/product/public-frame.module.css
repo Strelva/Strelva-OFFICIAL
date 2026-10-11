@@ -1,0 +1,7 @@
+.frame { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 40px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; color: var(--st-text); font-size: 16px; font-weight: 500; text-decoration: none; }
+.mark { width: 22px; height: 22px; }
+.header nav { display: flex; align-items: center; gap: 16px; }
+.brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
+@media (max-width: 767px) { .header { padding: 16px 20px; gap: 12px; } .header nav { gap: 12px; } }

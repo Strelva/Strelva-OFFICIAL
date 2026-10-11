@@ -16,6 +16,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 export interface ReviewView {
   id: string;
+  externalId?: string | null;
   source: ReviewItem["source"];
   author: string;
   rating: number;
@@ -77,7 +78,7 @@ export function reviewView(review: ReviewItem, drafts: ReadonlyMap<string, { rep
   // Drafts are keyed by the provider review id (what the poller queues), with the row id as a fallback.
   const draft = review.reply ? null : drafts.get(review.externalId ?? "") ?? drafts.get(review.id) ?? null;
   return {
-    id: review.id, source: review.source, author: review.author || "A customer", rating: Math.max(0, Math.min(5, Math.round(review.rating))),
+    id: review.id, externalId: review.externalId ?? null, source: review.source, author: review.author || "A customer", rating: Math.max(0, Math.min(5, Math.round(review.rating))),
     text: review.text, date: review.date, reply: review.reply ?? null, repliedAt: review.repliedAt ?? null, draft,
   };
 }

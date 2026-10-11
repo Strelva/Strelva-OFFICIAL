@@ -30,6 +30,9 @@ declare
   ws uuid := '62000000-0000-4000-8000-000000000110';
   other_ws uuid := '62000000-0000-4000-8000-000000000111';
   fresh_ws uuid := '62000000-0000-4000-8000-000000000112';
+  lp_agency uuid := '62000000-0000-4000-8000-000000000120';
+  acting boolean := to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null;
+  host text;
   work public.saved_product_work;
   second public.saved_product_work;
   fresh public.saved_product_work;
@@ -53,6 +56,19 @@ begin
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
     (ws,owner_id,'owner',owner_id),(ws,operator_id,'admin',owner_id),(ws,admin_id,'admin',owner_id),(ws,member_id,'member',owner_id),
     (other_ws,outsider_id,'owner',outsider_id),(fresh_ws,owner_id,'owner',owner_id);
+  -- After 20261014112000 the operator's provider path is an agency's, as for
+  -- every agency: a seat, a staff row, publish verification and the owner's
+  -- mandate for each hostname. super_admins alone grants nothing.
+  if acting then
+    insert into public.workspaces(id,kind,name,created_by) values(lp_agency,'agency','Linked fixture agency',operator_id);
+    insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(lp_agency,operator_id,'owner',operator_id);
+    insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by) values(ws,lp_agency,'owner',owner_id);
+    insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by) values(lp_agency,ws,operator_id,operator_id);
+    perform public.record_agency_verification('lp-operator@example.test',lp_agency,'publish','verified','{"fixture":true}',null);
+    foreach host in array array['www.linked-client.example.test','other.example.test','shop.linked-client.example.test','old.linked-client.example.test'] loop
+      perform public.grant_client_resource_mandate(owner_id,'lp-owner@example.test',ws,lp_agency,'publish','domain',host);
+    end loop;
+  end if;
   -- A custom-repo client site, converted into this business. The owner holds no native tenant membership.
   insert into public.tenants(id,site_name,template,industry,delivery_model) values('linked-client','Linked Client Co','restaurant','food','custom_repo');
   insert into public.tenants(id,site_name,template,industry,delivery_model) values('unlinked-client','Unlinked Client Co','trades','trades','custom_repo');
@@ -137,9 +153,17 @@ begin
   perform pg_temp.assert_true(authority='provider','refreshing an attached domain is checking');
   perform pg_temp.expect_error(format('select public.authorize_website_domain_change(%L,%L,%L,%L,%L,%L,%L)',ws,work.id,operator_id,'lp-operator@example.test','linked-client','shop.linked-client.example.test','attach'),'website_domain_owner_approval_required');
   -- A revoked operator loses it at once.
-  update public.super_admins set revoked_at=now() where user_id=operator_id;
+  if acting then
+    perform public.set_agency_client_staff(operator_id,'lp-operator@example.test',lp_agency,ws,operator_id,false);
+  else
+    update public.super_admins set revoked_at=now() where user_id=operator_id;
+  end if;
   perform pg_temp.expect_error(format('select public.authorize_website_domain_change(%L,%L,%L,%L,%L,%L,%L)',ws,work.id,operator_id,'lp-operator@example.test','linked-client','www.linked-client.example.test','attach'),'website_tenant_access_denied');
-  update public.super_admins set revoked_at=null where user_id=operator_id;
+  if acting then
+    perform public.set_agency_client_staff(operator_id,'lp-operator@example.test',lp_agency,ws,operator_id,true);
+  else
+    update public.super_admins set revoked_at=null where user_id=operator_id;
+  end if;
   -- An expired approval does not count.
   insert into public.website_domain_approvals(workspace_id,website_work_id,tenant_stable_id,hostname,approved_by,approved_at,expires_at)
     values(ws,work.id,stable,'old.linked-client.example.test',owner_id,now()-interval '20 days',now()-interval '6 days');

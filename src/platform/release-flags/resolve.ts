@@ -25,6 +25,7 @@ export const MAKE_REAL_LIVE_FLAGS = [
   "make_real_live:inquiry_form",
   "make_real_live:booking_page",
   "make_real_live:internal_app",
+  "make_real_live:google_listing",
 ] as const;
 export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
 
@@ -39,7 +40,7 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * business, under STRELVA_MAKE_REAL_OWNER_LINK_RELEASE, off by default. Off:
  * the link answers "Sign in to decide this", as before 20261009131000.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -49,6 +50,9 @@ export function isMakeRealLiveFlag(flag: string): flag is MakeRealLiveFlag {
 }
 
 export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
+  agent_channel: "STRELVA_AGENT_CHANNEL_RELEASE",
+  finite_jobs: "STRELVA_FINITE_JOBS_RELEASE",
+  approval_store: "STRELVA_APPROVAL_STORE_RELEASE",
   owner_entry: "STRELVA_OWNER_ENTRY",
   inquiries: "STRELVA_INQUIRIES_RELEASE",
   website_rebuild: "STRELVA_WEBSITE_REBUILD_RELEASE",
@@ -58,11 +62,21 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:booking_page": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:internal_app": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:google_listing": "STRELVA_GOOGLE_MAKE_REAL_RELEASE",
   connected_sites: "STRELVA_CONNECTED_SITES_RELEASE",
   make_real_owner_link: "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+  publishing: "STRELVA_PUBLISHING_RELEASE",
+  publishing_record_google_policy: "STRELVA_RECORD_GOOGLE_APPROVAL_POLICY",
+  internal_tool_notices: "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+  catalog_reports: "STRELVA_CATALOG_REPORTS_RELEASE",
+  newsletter_contacts: "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+  owner_decision_links: "STRELVA_OWNER_DECISION_LINKS_RELEASE",
 };
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
+  agent_channel: "Agent customer confirmation (owner consent required)",
+  finite_jobs: "Unified finite jobs",
+  approval_store: "Unified approval store",
   owner_entry: "Owner entry",
   inquiries: "Inquiries",
   website_rebuild: "Website rebuild",
@@ -72,8 +86,15 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "Make real live: inquiry form",
   "make_real_live:booking_page": "Make real live: booking page",
   "make_real_live:internal_app": "Make real live: internal app",
+  "make_real_live:google_listing": "Make real live: Google listing",
   connected_sites: "Connected sites",
   make_real_owner_link: "Make real by owner email link",
+  publishing: "Publishing",
+  publishing_record_google_policy: "Record approval includes Google write",
+  internal_tool_notices: "Internal tool submit notices",
+  catalog_reports: "Catalog reports",
+  newsletter_contacts: "Newsletter contacts",
+  owner_decision_links: "Owner decisions by email link",
 };
 
 export type ReleaseEnvironment = Partial<Record<string, string | undefined>>;

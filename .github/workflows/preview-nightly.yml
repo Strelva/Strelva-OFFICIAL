@@ -15,14 +15,14 @@ on:
       ref:
         description: "Branch to build"
         required: true
-        default: reborn
+        default: reborn-1.0
 
 concurrency:
   group: strelva-preview
   cancel-in-progress: false
 
 env:
-  REBORN_REF: ${{ inputs.ref || 'reborn' }}
+  REBORN_REF: ${{ inputs.ref || 'reborn-1.0' }}
   # The next Reborn version the reborn branch is building toward.
   REBORN_VERSION: 1.0.0
 

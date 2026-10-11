@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
-import { fetchSearchData } from "@/lib/search-console";
+import { fetchSearchData, fetchSearchDataWithStatus } from "@/lib/search-console";
+import { catalogReportsMayBeOn } from "@/platform/catalog-reports/receipts";
+import { recordSearchConnection } from "@/platform/catalog-reports/search-connection";
+import { tenantReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { setSearchData } from "@/lib/storage";
 import { generateSuggestionsForTenant } from "@/lib/suggestions";
 import { requireCronRequest } from "@/lib/cron-auth";
@@ -22,7 +25,11 @@ export async function GET(request: Request) {
 
   await mapPool(active, 8, async (tenant) => {
     try {
-      const data = await fetchSearchData(tenant.siteUrl!);
+      const catalog = catalogReportsMayBeOn() && await tenantReleaseFlagEnabled("catalog_reports", tenant.id).catch(() => false);
+      const read = catalog ? await fetchSearchDataWithStatus(tenant.siteUrl!, 7, tenant) : null;
+      const data = read?.data ?? await fetchSearchData(tenant.siteUrl!);
+      if (read) await recordSearchConnection(tenant.id, read.status, read.status === "available" ? { clicks: data.totalClicks, impressions: data.totalImpressions } : null)
+        .catch(() => console.error("[search-console] reachability receipt unavailable", { tenantId: tenant.id }));
       await setSearchData(tenant.id, data);
 
       if (data.queries.length > 0) {

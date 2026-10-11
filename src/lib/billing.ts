@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import Stripe from "stripe";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
@@ -92,9 +93,9 @@ export async function createTenantSubscriptionCheckout(
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     success_url:
-      input.successUrl || getTenantDashboardUrl(tenant, "/dashboard?checkout=success"),
+      input.successUrl || await ownerNoticeUrl(tenant, "/dashboard?checkout=success", getTenantDashboardUrl(tenant, "/dashboard?checkout=success")),
     cancel_url:
-      input.cancelUrl || getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled"),
+      input.cancelUrl || await ownerNoticeUrl(tenant, "/dashboard/settings?checkout=cancelled", getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled")),
     metadata: {
       tenantId: tenant.id,
       ...(input.planKey ? { planKey: input.planKey } : {}),

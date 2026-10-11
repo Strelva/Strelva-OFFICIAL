@@ -52,6 +52,7 @@ const KIND_VIEW: Record<string, SystemKind> = {
   pricing: "app",
   listing: "listing",
   newsletter: "newsletter",
+  home_finder: "home_finder",
 };
 
 function hostname(value: unknown): string | undefined {
@@ -66,16 +67,13 @@ function hostname(value: unknown): string | undefined {
 
 const bare = (host: string | undefined) => host?.replace(/^www\./, "");
 
-function provider(installation: OfferingInstallation | undefined): string | undefined {
-  if (!installation) return undefined;
-  return installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : undefined;
-}
 
 const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected", stale: "unknown" } as const;
 
 function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: WorkspaceSystemEntry): string {
   if (kind === "document" && work?.document) return `Revision ${work.document.revision}`;
   if (kind === "app") return work?.productId === "tracker" ? "Used by your team · started from a list" : "Used by your team";
+  if (kind === "home_finder") return "Home search installation";
   if (kind === "bookings") return "Time people can reserve";
   if (kind === "onboarding") return "New-client intake";
   if (kind === "website" && !entry.tenantId) return "Website draft";
@@ -150,6 +148,8 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
         : { kind: "listing", healthMessage: "Strelva couldn't read this listing just now.", receipts: [], unavailable: true };
     } else if (kind === "newsletter") {
       surface = { kind: "newsletter", audience: entry.basis ?? "Sent to active subscribers." };
+    } else if (kind === "home_finder") {
+      surface = { kind: "work", workId: entry.ref.systemId, productId: "home_finder" };
     } else if (work) {
       surface = { kind: "work", workId: work.id, productId: work.productId };
     }
@@ -160,13 +160,13 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const stored = versionBySystem.get(entry.ref.systemId);
     if (stored) {
       const sourceBusiness = stored.source.businessId === snapshot.workspaceId ? null : agencyNames.get(stored.source.businessId);
-      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your provider keeps");
+      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your agency keeps");
       const waiting = stored.latestRevision !== null && stored.latestRevision > stored.baselineRevision && !stored.declined.includes(stored.latestRevision);
       versions.push({ id: `${stored.id}:source`, relation: "source", context: stored.context.label, title: stored.source.name ?? "Source",
         lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
       for (const sibling of stored.siblings) {
         versions.push({ id: `${stored.id}->${sibling.id}`, relation: "version", context: sibling.context.label, title: sibling.context.label, systemId: sibling.systemId,
-          lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
+          comparison: sibling.comparison, lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
       }
     }
     return {
@@ -177,12 +177,15 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       detail: kind === "website" && entry.connectedSite ? "Connected site" : kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
       ...(entry.basis ? { basis: entry.basis } : {}),
       lifecycle: stopped ? "paused" : entry.lifecycle,
-      health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },
+      health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt, ...(entry.health.signals ? { signals: entry.health.signals } : {}) },
+      ...(publishing && (kind === "website" || kind === "newsletter") ? { publishing: true } : {}),
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
-      operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      operatedBy: projection?.providerOfRecord?.name,
+      providerIdentityStatus: projection?.providerOfRecord === undefined ? "unavailable" : projection.providerOfRecord === null ? "unassigned" : "recorded",
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
+      ...(stored ? { storedVersionId: stored.id } : {}),
       ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
       ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
         ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),
@@ -207,17 +210,46 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     }
   }
 
+  // Website contracts never imply that a repo-only site reads business facts.
+  // These are read-only presentation of the existing authorized delivery paths.
+  for (const entry of entries.filter(entry => entry.kind === "website")) {
+    const system = byId.get(entry.ref.systemId);
+    if (!system) continue;
+    const connectedOnly = Boolean(entry.connectedSite && !entry.tenantId);
+    const document = Boolean(entry.businessFactsConnected);
+    const automatic = document || (connectedOnly && entry.connectedSite?.verified);
+    const native = entry.editing === "native";
+    const facts: SystemConnection = {
+      id: `${system.id}:business-facts`, kind: "read", target: "Business record", status: automatic ? "connected" : "not_connected",
+      sentence: document ? "This website reads confirmed business facts when it renders."
+        : connectedOnly ? "Confirmed business facts are filled into the connected site after ownership is proven."
+          : entry.savedWorkId ? "This website uses its approved content. Business fact reads are not connected."
+          : native ? "Strelva prepares business fact changes as native website content for review and publishing."
+            : "Changes to this site go through its repository; it does not read the business record.",
+      contract: { sourceOfTruth: "The business record's confirmed facts", authority: "Only confirmed public business facts; no contacts, requests or owner-only details.",
+        freshness: automatic ? "Read when the website renders or the connected page loads." : "Changes reach the live site only after Strelva publishes them.",
+        failureBehavior: automatic ? "If facts cannot be read, the last approved website content stays available." : "A business record change does not automatically change this website." },
+    };
+    // The spine already projects the connected-site read. Enrich it once,
+    // including when that same System later becomes a hosted document.
+    const existing = system.connections.findIndex(connection => connection.kind === "read" && !connection.systemId && /business record/i.test(connection.sentence));
+    if (existing >= 0) system.connections[existing] = { ...facts, id: system.connections[existing]!.id };
+    else system.connections.push(facts);
+  }
+
   // A Possibility is business-level: show it from every System it would change.
   for (const possibility of ready?.possibilities ?? []) {
     const view: SystemPossibility = {
       id: possibility.id, title: possibility.title, summary: possibility.summary, status: possibility.status,
       affects: possibility.affects.filter(id => byId.has(id)),
+      ...(possibility.introduces ? { introduces: possibility.introduces } : {}),
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
-      openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      openHref: (possibility.tryHref && sameAppHref(possibility.tryHref)) || `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      ...(possibility.tryHref && sameAppHref(possibility.tryHref) ? { tryHref: sameAppHref(possibility.tryHref) || undefined } : {}),
       ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
-    for (const id of view.affects) byId.get(id)!.possibilities.push(view);
+    for (const id of new Set([...view.affects, ...(possibility.sourceSystemIds ?? []).filter(id => byId.has(id))])) byId.get(id)!.possibilities.push(view);
   }
 
   // Make real in progress or partly live, on every System it changes.
@@ -228,10 +260,10 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       if (system) system.activations = [...(system.activations ?? []), view];
     }
   }
-  // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
+  // History: the System's own changes and What changed receipts for it, newest first, last five.
   const history = new Map<string, SystemHistoryRow[]>();
-  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at }]);
-  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, actor: row.actor, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
+  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, actor: receipt.actor, at: receipt.at }]);
   for (const [id, rows] of history) {
     const system = byId.get(id);
     if (system) system.history = rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);

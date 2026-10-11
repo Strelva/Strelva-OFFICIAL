@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getClientLeadsForOperator } from "@/lib/client-leads";
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.client-leads.read");
   const url = new URL(request.url);
   const tenantParam = url.searchParams.get("tenant");
   if (tenantParam !== null && !isTenantId(tenantParam)) {

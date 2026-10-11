@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { StrelvaInquiryForm } from "../StrelvaInquiryForm";
-import { isPublicInquiryForm, loadInquiryForm, submitInquiryForm, type PublicInquiryForm } from "../inquiry-client";
+import { isPublicInquiryForm, loadInquiryForm, submitInquiryForm, isInquiryBookingOffer, type PublicInquiryForm } from "../inquiry-client";
 
 const definition: PublicInquiryForm = {
   schemaVersion: 1, capabilityId: "capability-example", version: 2, name: "Seller inquiries",
@@ -16,6 +16,16 @@ const definition: PublicInquiryForm = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("portable inquiry form contract", () => {
+  it("reads additive booking suggestions while keeping old receipts unchanged", async () => {
+    const offer = { serviceName:"Consultation", timeZone:"America/New_York", url:"https://app.example/book-inquiry/signed", slots:[{ start:"2026-11-03T15:00:00Z", end:"2026-11-03T15:30:00Z" }] };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(Response.json({ok:true})).mockResolvedValueOnce(Response.json({ok:true,bookingOffer:offer})));
+    await expect(submitInquiryForm("https://app.example","example",definition,{})).resolves.toBeUndefined();
+    await expect(submitInquiryForm("https://app.example","example",definition,{})).resolves.toEqual(offer);
+    expect(isInquiryBookingOffer({...offer,url:"javascript:alert(1)"})).toBe(false);
+    expect(isInquiryBookingOffer({...offer,timeZone:"Not/A_Zone"})).toBe(false);
+    expect(isInquiryBookingOffer({...offer,slots:[{start:"bad",end:"bad"}]})).toBe(false);
+  });
+
   it("renders the fixed fields, escaped content, labels, and Strelva disclosure", () => {
     const html = renderToStaticMarkup(createElement(StrelvaInquiryForm, { definition: { ...definition, form: { ...definition.form, title: "<script>unsafe</script>" } } }));
     expect(html).toContain("&lt;script&gt;unsafe&lt;/script&gt;");

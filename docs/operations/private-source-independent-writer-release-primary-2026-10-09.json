@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "scope": "harmless-local-child-only",
+  "fullReleaseQualified": false,
+  "terminalChildren": [
+    {
+      "clientPid": 69570,
+      "forced": false,
+      "reaped": true,
+      "errors": [],
+      "returncode": 0
+    }
+  ],
+  "terminalBackends": [
+    {
+      "clientPid": 69570,
+      "backendPid": 69570,
+      "state": "CLOSED"
+    }
+  ],
+  "signals": []
+}

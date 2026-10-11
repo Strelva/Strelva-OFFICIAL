@@ -6,7 +6,7 @@ import { z } from "zod";
  * A System is the enduring business-owned thing made in Strelva (a website, a
  * proposal, a booking flow, an internal app). Its identity is the pair
  * { businessId, systemId } and never changes. What it is built from changes
- * through immutable SystemRevisions; `kind` is a descriptor, not identity.
+ * through immutable SystemRevisions; its kind stays fixed for life.
  *
  * A SystemConnection is a typed, directional relation from one System to
  * another System or to a business resource, audience, external account
@@ -39,8 +39,8 @@ export const SYSTEM_LIFECYCLES = ["draft", "live", "paused"] as const;
 export const systemLifecycleSchema = z.enum(SYSTEM_LIFECYCLES);
 export type SystemLifecycle = z.infer<typeof systemLifecycleSchema>;
 
-/** Known descriptors. Any slug is accepted so a System can become something
- * we never named; these exist so the UI can label the common ones. */
+/** Known lifetime kinds. Creation accepts any valid slug; these let the UI
+ * label the common ones without defining a closed registry. */
 export const KNOWN_SYSTEM_KINDS = [
   "website", "booking", "inquiry", "proposal", "pricing", "portal", "onboarding",
   "internal_app", "document", "report", "tracker", "listing", "newsletter", "other",
@@ -200,7 +200,6 @@ export type CreateSystemInput = z.infer<typeof createSystemInputSchema>;
 export const updateSystemInputSchema = z.object({
   name: trimmed(1, 160).optional(),
   purpose: z.string().max(1000).nullable().optional(),
-  kind: systemKindSchema.optional(),
 }).strict().refine((patch) => Object.keys(patch).length > 0, "An update changes something");
 export type UpdateSystemInput = z.infer<typeof updateSystemInputSchema>;
 

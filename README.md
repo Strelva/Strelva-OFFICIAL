@@ -1,4 +1,10 @@
-# Strelva — managed business-presence control plane
+# Strelva — Reborn 1.0
+
+**Next-release source: [`reborn-1.0`](https://github.com/Strelva/Strelva-OFFICIAL/tree/reborn-1.0).**
+All reviewed Reborn work converges here before promotion to `main`. This is a
+prepared release candidate; publication does not approve production rollout.
+[Consolidation and proof boundaries](docs/operations/reborn-consolidation-2026-10-09.md)
+owns included source and remaining qualification.
 
 Strelva is transitioning toward a common conversational experience for Users,
 Paid Users, Clients, and Enterprise accounts. The description below covers the
@@ -119,3 +125,12 @@ pnpm check:prod     # production-readiness checklist
 pnpm version:check  # confirm app and marketing versions match
 pnpm provision-tenant   # CLI tenant provisioning
 ```
+
+## Owner assistant MCP preparation
+
+Business context and native website read/proposals are prepared behind the
+existing workspace and MCP OAuth gates. Owner connection management is at
+`/connect`; the universal endpoint is `/api/mcp/public`. See the
+[setup and client rehearsal](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+for exact flags, ordered migrations, proof commands and Claude/Croki/Codex setup.
+This preparation does not qualify production or actual native-client sign-in.

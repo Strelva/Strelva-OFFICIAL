@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`agency owner brand > escapes agency names and snapshots decision emails with retained credit 1`] = `
+"<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
+<body style="margin:0;padding:0;background:#f3f4f5;">
+
+<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:#f3f4f5;padding:32px 12px;">
+  <tr><td align="center">
+    <table role="presentation" cellpadding="0" cellspacing="0" width="560" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e6e7e9;border-radius:14px;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+      <tr><td style="padding:28px 32px 0;"><span style="font-size:16px;font-weight:600;">North &amp; Web &lt;&quot;Owner&quot;&gt;</span></td></tr>
+      <tr><td style="padding:20px 32px 0;">
+        <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:#14181c;">One decision</h1>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:2px 0 10px;"><tr><td style="padding:14px 0;"><div style="font-size:15px;font-weight:600;line-height:1.4;color:#14181c;">Publish the price?</div><div><a href="https://app.strelva.com/api/approve?token=fixture" style="display:inline-block;margin:6px 14px 0 0;font-size:14px;font-weight:600;color:#000000;background:#ffff00;padding:8px 18px;border-radius:999px;text-decoration:none;">Approve</a><a href="https://app.strelva.com/workspace" style="display:inline-block;margin:6px 14px 0 0;font-size:14px;font-weight:600;color:#14181c;padding:8px 0;text-decoration:underline;">Needs you</a></div></td></tr></table><table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 4px;"><tr><td style="border-radius:999px;border:1px solid #ffff00;">
+      <a href="https://app.strelva.com/workspace" style="display:inline-block;padding:11px 25px;font-size:15px;font-weight:600;color:#14181c;text-decoration:none;border-radius:999px;">Not yet</a>
+    </td></tr></table>
+      </td></tr>
+      <tr><td style="padding:12px 32px 26px;"><div style="border-top:1px solid #e6e7e9;"><div style="padding:24px 0 8px;"><span style="font-size:12px;color:#565d64;">Runs on Strelva.</span><div style="margin-top:10px;font-size:12px;line-height:1.5;color:#949aa1;">for The Mooney Firm</div></div></div></td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`agency owner brand > escapes agency names and snapshots decision emails with retained credit 2`] = `
+"One decision
+
+Publish the price?
+Approve: https://app.strelva.com/api/approve?token=fixture
+Needs you: https://app.strelva.com/workspace
+
+Not yet: https://app.strelva.com/workspace
+
+for The Mooney Firm
+North & Web <"Owner"> · Runs on Strelva."
+`;

@@ -33,6 +33,8 @@ export async function notifyOwnerOfBooking(tenant: string, booking: Booking): Pr
   if (!bookingOwnerNoticeEnabled()) return "off";
   if (booking.status === "requested") return "request";
   try {
+    const { bookingCustomerEmailAllowed } = await import("./updates");
+    if (!await bookingCustomerEmailAllowed(tenant)) return "not_sent";
     const config = await getTenantConfig(tenant);
     if (!config) return "no_recipient";
     const email = await ownerNoticeEmail(config);

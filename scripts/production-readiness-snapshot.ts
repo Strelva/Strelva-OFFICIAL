@@ -10,7 +10,7 @@
  *   - optional SNAPSHOT_DATABASE_URL: one READ ONLY transaction that lists
  *     supabase_migrations.schema_migrations versions via psql;
  *   - Auth: user counts (identities are never kept or printed);
- *   - Redis: SCAN, TYPE and ZCARD/LLEN/SCARD/HLEN. Never GET, never SET/DEL.
+ *   - Redis: SCAN, TYPE and ZCARD/LLEN/SCARD/HLEN. A fixed-key GET reads only the client-email policy enum. Never SET/DEL.
  * Prints counts and flags only: env secrets as present/absent, no customer data.
  * The logic and its tests live in scripts/readiness-snapshot.ts and
  * src/__tests__/production-readiness-snapshot.test.ts.
@@ -22,6 +22,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Redis } from "@upstash/redis";
 import {
   assertNoSensitiveOutput,
+  countResult,
+  type CountResponse,
+  missingTable,
   formatReport,
   parseSnapshotArgs,
   requireJacobsYes,
@@ -55,18 +58,19 @@ function applyFilters(query: Query, filters: DbFilter[] = []): Query {
   return q;
 }
 
-const missingTable = (error: { message?: string; code?: string }) =>
-  error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");
-
 /** Exposes `.from(t).select(...)` and nothing else: no insert/update/delete/rpc. */
 function readOnlyDb(url: string, key: string): ReadOnlyDb {
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const db = { from: (table: string) => ({ select: (columns: string, options?: { count?: "exact"; head?: boolean }) => client.from(table).select(columns, options) }) } as unknown as SelectOnly;
   return {
     async count(table, filters): Promise<DbCount> {
-      const { count, error } = await applyFilters(db.from(table).select("*", { count: "exact", head: true }), filters);
-      if (error) return { ok: false, missing: missingTable(error), reason: error.message ?? error.code ?? "unknown" };
-      return { ok: true, count: count ?? 0 };
+      const result = countResult((await applyFilters(db.from(table).select("*", { count: "exact", head: true }), filters)) as CountResponse);
+      if (result.ok || result.missing) return result;
+      // A head-only count of a missing table can come back 204 with no error and
+      // no count. A zero-row GET carries PostgREST's error body, so it can tell.
+      const probe = (await db.from(table).select("*").limit(0)) as CountResponse;
+      if (probe.error) return { ok: false, missing: missingTable(probe.error) || probe.status === 404, reason: probe.error.message || "unknown" };
+      return result;
     },
     async rows(table, columns, options) {
       let q = applyFilters(db.from(table).select(columns), options?.filters);
@@ -82,6 +86,10 @@ function readOnlyDb(url: string, key: string): ReadOnlyDb {
 function readOnlyRedis(url: string, token: string): ReadOnlyRedis {
   const redis = new Redis({ url, token });
   return {
+    async clientEmailOverride(tenantId) {
+      const value = await redis.get(`reb:client-email:${tenantId}`);
+      return value === "on" || value === "off" ? value : value === null ? "absent" : "unknown";
+    },
     async scan(cursor, options) {
       const [next, keys] = await redis.scan(cursor, options);
       return [String(next), keys];
@@ -141,8 +149,9 @@ async function main() {
     log: (line) => console.log(line),
   });
   const text = options.json ? JSON.stringify(report, null, 2) : formatReport(report).join("\n");
-  assertNoSensitiveOutput(text);
+  assertNoSensitiveOutput(text, repoMigrations);
   console.log(text);
+  if (!report.silentRollout.safe) process.exitCode = 1;
 }
 
 main().catch((error: unknown) => {

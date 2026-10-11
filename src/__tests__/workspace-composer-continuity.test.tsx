@@ -29,9 +29,9 @@ describe("request proposal continuity", () => {
       context: { products: [{ id: "applications", availability: "available" }, { id: "onboarding", availability: "available" }], native: { applications: true, onboarding: true } },
       onContinue, onHelp: vi.fn(),
     }));
-    expect(node.textContent).toContain("A private working application");
+    expect(node.textContent).toContain("A private internal tool");
     await edit(node, "Organize supplier onboarding requirements.");
-    expect(node.textContent).not.toContain("A private working application");
+    expect(node.textContent).not.toContain("A private internal tool");
     expect(onContinue).not.toHaveBeenCalled();
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.textContent).toContain("Onboarding requirements");

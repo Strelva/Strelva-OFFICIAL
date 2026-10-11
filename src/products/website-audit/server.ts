@@ -6,7 +6,9 @@ import { parseWebsiteAudit } from "./work";
 
 export async function getPublicWebsiteAudit(resultId: string) {
   if (!/^audit_[a-f0-9]{32}$/.test(resultId)) return null;
-  return parseWebsiteAudit((await getAuditReport(resultId.slice(6)))?.result);
+  const stored = await getAuditReport(resultId.slice(6));
+  const parsed = parseWebsiteAudit(stored?.result);
+  return parsed && stored?.result.agency ? { ...parsed, agency: stored.result.agency } : parsed;
 }
 
 export async function savePublicWebsiteAudit({ actor, workspaceId, resultId }: { actor: WorkspaceActor; workspaceId: string; resultId: string }) {

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Panel } from "@/app/admin/console";
-import { Field } from "@/app/admin/ui";
+import { StInput, StLabel, StNotice, StPill, StRow, StRows, StSegmented, StSection } from "@/components/ui/strelva/Kit";
 import type { ReportCadence } from "@/lib/report-cadence";
 import type { ReplyMode } from "@/lib/reviews/reply-voice";
 import type { ContentAutonomy } from "@/lib/content-autonomy";
@@ -36,51 +35,18 @@ export interface OperatorControlsInitial {
 
 type OperatorSettingKey = "reportCadence" | "replyMode" | "contentAutonomy" | "clientEmail";
 
-const labelCls = "text-[11px] font-semibold uppercase tracking-[0.1em] text-gray-faint";
-
-function Segmented<T extends string>({
-  value,
-  options,
-  onSelect,
-  disabled,
-}: {
+function Segmented<T extends string>({ value, options, onSelect, disabled, disabledValues = [] }: {
   value: T;
   options: { value: T; label: string }[];
-  onSelect: (v: T) => void;
+  onSelect: (value: T) => void;
   disabled?: boolean;
+  disabledValues?: T[];
 }) {
-  return (
-    <div className="inline-flex rounded-lg border border-glass-border bg-surface-base/40 p-0.5">
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            type="button"
-            disabled={disabled}
-            onClick={() => onSelect(o.value)}
-            className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:opacity-40 ${
-              active
-                ? "bg-accent text-on-accent"
-                : "text-gray-muted hover:text-warm-white"
-            }`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <StSegmented value={value} options={options} onChange={onSelect} label={options.map(option => option.label).join(" / ")} disabledValues={disabled ? options.map(option => option.value) : disabledValues} disabledReason={disabled ? "Saving the change." : "Owner emails are off globally during rollout."} />;
 }
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <p className={labelCls}>{label}</p>
-      {children}
-      {hint && <p className="text-[11px] leading-snug text-gray-faint">{hint}</p>}
-    </div>
-  );
+  return <StRow title={label} detail={hint} end={children} />;
 }
 
 export function OperatorControlsPanel({
@@ -171,7 +137,7 @@ export function OperatorControlsPanel({
     } else {
       const n = Number.parseInt(trimmed, 10);
       if (!Number.isFinite(n) || n < 0 || n > 50) {
-        setError("Auto-approve threshold must be a number between 0 and 50 (0 or empty = off).");
+        setError("Approval count must be a number between 0 and 50 (0 or empty = off).");
         return;
       }
       value = n;
@@ -203,141 +169,53 @@ export function OperatorControlsPanel({
   }
 
   const savedTag = (tag: string) => (saved === tag ? " ✓" : "");
-  const btnCls =
-    "rounded-md border border-glass-border px-3 py-1.5 text-xs font-medium text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white disabled:opacity-40";
 
-  return (
-    <Panel title="Operator controls" bodyClassName="px-[18px] pb-[18px] pt-1 space-y-5">
-      <p className="text-[12px] leading-relaxed text-gray-muted">
-        Founder-only per-client overrides. Every change here is audit-logged.
-      </p>
-
-      {/* Redis-backed, auto-save-on-click */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-        <Row label="Report cadence" hint="How often the report cron emails this client.">
-          <Segmented
-            value={reportCadence}
-            disabled={busy === "reportCadence"}
-            options={[
-              { value: "weekly", label: "Weekly" },
-              { value: "monthly", label: "Monthly" },
-            ]}
-            onSelect={(v) => {
-              const prev = reportCadence;
-              void postSetting("reportCadence", v, setReportCadence, () => setReportCadence(prev));
-            }}
-          />
+  return <details>
+    <summary className="cursor-pointer text-sm font-medium">Additional client settings</summary>
+    <div className="mt-4 space-y-5">
+      <StLabel>Per-client settings. Every change names your signed-in operator account.</StLabel>
+      <StRows label="Additional client settings">
+        <Row label="Report cadence" hint="How often reports are due for this client.">
+          <Segmented value={reportCadence} disabled={busy === "reportCadence"} options={[{ value: "weekly", label: "Weekly" }, { value: "monthly", label: "Monthly" }]} onSelect={value => {
+            const previous = reportCadence;
+            void postSetting("reportCadence", value, setReportCadence, () => setReportCadence(previous));
+          }} />
         </Row>
-
-        <Row label="Review replies" hint="Off · draft-only (approve) · auto-post after the safety window.">
-          <Segmented
-            value={replyMode}
-            disabled={busy === "replyMode"}
-            options={[
-              { value: "off", label: "Off" },
-              { value: "approve", label: "Draft only" },
-              { value: "auto", label: "Auto-post" },
-            ]}
-            onSelect={(v) => {
-              const prev = replyMode;
-              void postSetting("replyMode", v, setReplyMode, () => setReplyMode(prev));
-            }}
-          />
+        <Row label="Review replies" hint="Off, draft for review, or post after the safety window.">
+          <Segmented value={replyMode} disabled={busy === "replyMode"} options={[{ value: "off", label: "Off" }, { value: "approve", label: "Draft only" }, { value: "auto", label: "Strelva posts" }]} onSelect={value => {
+            const previous = replyMode;
+            void postSetting("replyMode", value, setReplyMode, () => setReplyMode(previous));
+          }} />
         </Row>
-
-        <Row label="AI content" hint="Auto-publish only ever touches low-risk copy — never hours, prices, or contact details.">
-          <Segmented
-            value={contentAutonomy}
-            disabled={busy === "contentAutonomy"}
-            options={[
-              { value: "approve", label: "Draft everything" },
-              { value: "auto", label: "Auto-publish low-risk" },
-            ]}
-            onSelect={(v) => {
-              const prev = contentAutonomy;
-              void postSetting("contentAutonomy", v, setContentAutonomy, () => setContentAutonomy(prev));
-            }}
-          />
+        <Row label="Content changes" hint="Strelva can publish low-risk copy. Hours, prices and contact details always need review.">
+          <Segmented value={contentAutonomy} disabled={busy === "contentAutonomy"} options={[{ value: "approve", label: "Draft everything" }, { value: "auto", label: "Publish low-risk copy" }]} onSelect={value => {
+            const previous = contentAutonomy;
+            void postSetting("contentAutonomy", value, setContentAutonomy, () => setContentAutonomy(previous));
+          }} />
         </Row>
-
-        <Row
-          label="Client email"
-          hint={
-            globalClientEmailPaused
-              ? "Global client email is currently PAUSED. Force ON arms this one verified client anyway."
-              : "Global client email is on. Force OFF silences this one client."
-          }
-        >
-          <Segmented
-            value={clientEmail}
-            disabled={busy === "clientEmail"}
-            options={[
-              { value: "inherit", label: "Inherit global" },
-              { value: "on", label: "Force ON" },
-              { value: "off", label: "Force OFF" },
-            ]}
-            onSelect={(v) => {
-              const prev = clientEmail;
-              void postSetting("clientEmail", v, setClientEmail, () => setClientEmail(prev));
-            }}
-          />
+        <Row label="Client email setting" hint={globalClientEmailPaused ? "Owner emails are off globally during rollout. This setting cannot enable them here." : "Use the global setting, enable for this client, or silence this client."}>
+          <Segmented value={clientEmail} disabled={busy === "clientEmail"} disabledValues={globalClientEmailPaused ? ["on"] : []} options={[{ value: "inherit", label: "Follow global" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]} onSelect={value => {
+            const previous = clientEmail;
+            void postSetting("clientEmail", value, setClientEmail, () => setClientEmail(previous));
+          }} />
         </Row>
-      </div>
-
-      {/* TenantConfig fields — explicit Save (PATCH) */}
-      <div className="space-y-4 border-t border-glass-border pt-4">
-        <Row
-          label="Auto-approve after N approvals"
-          hint="After N consecutive approved changes with no rejection, low-risk AI edits auto-promote. 0 or empty = off."
-        >
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={0}
-              max={50}
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              placeholder="off"
-              className="w-24 rounded-md border border-glass-border bg-gray-bg px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:border-accent/50 focus:outline-none"
-            />
-            <button type="button" onClick={saveThreshold} disabled={busy === "threshold"} className={btnCls}>
-              {busy === "threshold" ? "Saving…" : `Save${savedTag("threshold")}`}
-            </button>
-          </div>
-        </Row>
-
-        <div className="space-y-2">
-          <Field label="Google Place ID" value={googlePlaceId} onChange={setGooglePlaceId} placeholder="ChIJ…" />
-          <Field label="Yelp Business ID" value={yelpBusinessId} onChange={setYelpBusinessId} placeholder="business-slug" />
-          <button type="button" onClick={saveReviews} disabled={busy === "reviews"} className={btnCls}>
-            {busy === "reviews" ? "Saving…" : `Save review IDs${savedTag("reviews")}`}
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <Field
-            label="Visibility trade"
-            value={visTrade}
-            onChange={setVisTrade}
-            placeholder="plumber, HVAC, electrician…"
-          />
-          <Field
-            label="Visibility towns (comma-separated)"
-            value={visTowns}
-            onChange={setVisTowns}
-            placeholder="Buffalo, NY, Cheektowaga, NY"
-          />
-          <button type="button" onClick={saveVisibility} disabled={busy === "visibility"} className={btnCls}>
-            {busy === "visibility" ? "Saving…" : `Save visibility${savedTag("visibility")}`}
-          </button>
-          <p className="text-[11px] leading-snug text-gray-faint">
-            Sending the visibility block replaces the stored trade + towns. Competitors and queries-per-week are
-            left untouched by this panel.
-          </p>
-        </div>
-      </div>
-
-      {error && <p className="text-[12px] text-critical">{error}</p>}
-    </Panel>
-  );
+      </StRows>
+      <StSection as="div" title="Publish after repeated approvals">
+        <StInput type="number" label="Consecutive approvals" min={0} max={50} value={threshold} onChange={event => setThreshold(event.target.value)} placeholder="Off" hint="After this many consecutive approvals with no rejection, Strelva publishes low-risk copy. Zero or empty means off." />
+        <StPill variant="soft" onClick={saveThreshold} disabled={busy === "threshold"}>{busy === "threshold" ? "Saving…" : `Save${savedTag("threshold")}`}</StPill>
+      </StSection>
+      <StSection as="div" title="Review sources">
+        <StInput label="Google Place ID" value={googlePlaceId} onChange={event => setGooglePlaceId(event.target.value)} />
+        <StInput label="Yelp business ID" value={yelpBusinessId} onChange={event => setYelpBusinessId(event.target.value)} />
+        <StPill variant="soft" onClick={saveReviews} disabled={busy === "reviews"}>{busy === "reviews" ? "Saving…" : `Save review IDs${savedTag("reviews")}`}</StPill>
+      </StSection>
+      <StSection as="div" title="Visibility">
+        <StInput label="Trade" value={visTrade} onChange={event => setVisTrade(event.target.value)} />
+        <StInput label="Towns, separated by commas" value={visTowns} onChange={event => setVisTowns(event.target.value)} />
+        <StPill variant="soft" onClick={saveVisibility} disabled={busy === "visibility"}>{busy === "visibility" ? "Saving…" : `Save visibility${savedTag("visibility")}`}</StPill>
+        <StLabel>Replaces the stored trade and towns. Competitors and weekly query count stay as recorded.</StLabel>
+      </StSection>
+      {error && <StNotice tone="critical">{error}</StNotice>}
+    </div>
+  </details>;
 }

@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { keepPageTitle } from "@/platform/presentation/page-title";
+import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StSkeleton } from "@/components/ui/strelva/Kit";
+import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
+import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
   ApplicationUseRenderer,
   type ApplicationUseDraft,
@@ -22,13 +25,13 @@ function emptyDraft(): ApplicationUseDraft {
 function errorMessage(response: Response, body: unknown, fallback: string, editing: boolean): string {
   if (response.status === 409) return editing
     ? "That record changed. Your correction is still here. Reload before trying again."
-    : "This application changed. Your current draft is still here. Reload before trying again.";
+    : "This internal tool changed. Your current draft is still here. Reload before trying again.";
   if (body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string") {
     const detail = (body as { error: string }).error;
     return response.status >= 500 ? `${detail} Your current draft is still here.` : detail;
   }
-  if (response.status === 401) return "Sign in with a confirmed email to use this application.";
-  if (response.status === 403) return "This application link is no longer available to your account.";
+  if (response.status === 401) return "Sign in with a confirmed email to use this internal tool.";
+  if (response.status === 403) return "This internal tool link is no longer available to your account.";
   return fallback;
 }
 
@@ -39,26 +42,23 @@ function responseDetail(body: unknown): string | undefined {
 }
 
 function ErrorSurface({ kind, message, onRetry, signInHref }: { kind: "denied" | "error"; message: string; onRetry?: () => void; signInHref?: string }) {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-surface-base px-4 py-12 text-warm-black">
-      <section aria-labelledby="application-use-error-heading" className="w-full max-w-lg rounded-2xl border border-gray-border bg-surface p-6 shadow-sm sm:p-8">
-        <h1 id="application-use-error-heading" className="mt-3 font-display text-2xl font-medium">{kind === "denied" ? "This application link is unavailable" : "We could not open this application"}</h1>
-        <p role="alert" className="mt-3 text-sm leading-6 text-gray-fg">{message}</p>
-        {signInHref ? <a href={signInHref} className="mt-5 inline-flex min-h-11 items-center rounded-full bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent/85">Sign in</a> : null}
-        {kind === "denied" && !signInHref ? <p className="mt-4 text-sm leading-6 text-gray-muted">Ask the person who sent this link to issue a new one if you still need access.</p> : null}
-        {onRetry ? <Button type="button" className="mt-6" variant="secondary" onClick={onRetry}>Try again</Button> : null}
-      </section>
-    </main>
-  );
+  return <StandaloneApplicationShell><StPage>
+    <StHead title={kind === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} />
+    <div role="alert"><StNotice tone={kind === "denied" ? "need" : "critical"}>{message}</StNotice></div>
+    {signInHref ? <div><StPillLink href={signInHref}>Sign in</StPillLink></div> : null}
+    {kind === "denied" && !signInHref ? <StEmpty>Ask the person who sent this link to issue a new one if you still need access.</StEmpty> : null}
+    {onRetry ? <div><StPill variant="soft" onClick={onRetry}>Try again</StPill></div> : null}
+  </StPage></StandaloneApplicationShell>;
 }
 
 export function ApplicationUseExperience({ workId }: { workId: string }) {
+  const request = useWorkspaceRequest();
   const [state, setState] = useState<LoadState>("loading");
   const [snapshot, setSnapshot] = useState<ApplicationUseSnapshot | null>(null);
   const [draft, setDraft] = useState<ApplicationUseDraft>(() => emptyDraft());
   const [message, setMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [deniedMessage, setDeniedMessage] = useState("This application link is no longer available to your account.");
+  const [deniedMessage, setDeniedMessage] = useState("This internal tool link is no longer available to your account.");
   const [signInHref, setSignInHref] = useState<string | undefined>();
   const [canReload, setCanReload] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -67,13 +67,13 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
     setState("loading");
     setSubmitError(null);
     try {
-      const response = await fetch(`/api/apps/${encodeURIComponent(workId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
+      const response = await request(`/api/apps/${encodeURIComponent(workId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
       let body: unknown = null;
       try { body = await response.json(); } catch { /* a status still gives the user a recovery path */ }
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           setDraft(emptyDraft());
-          setDeniedMessage(response.status === 401 ? "Sign in with a confirmed email to use this application." : responseDetail(body) ?? "This application link is no longer available to your account.");
+          setDeniedMessage(response.status === 401 ? "Sign in with a confirmed email to use this internal tool." : responseDetail(body) ?? "This internal tool link is no longer available to your account.");
           setSignInHref(response.status === 401 ? `/sign-in?next=${encodeURIComponent(`/apps/${workId}`)}` : undefined);
         }
         setState(response.status === 401 || response.status === 403 ? "denied" : "error");
@@ -85,7 +85,7 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
     } catch {
       setState("error");
     }
-  }, [workId]);
+  }, [request, workId]);
 
   useEffect(() => {
     void load();
@@ -102,7 +102,7 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
     setMessage(null);
     setCanReload(false);
     try {
-      const response = await fetch(`/api/apps/${encodeURIComponent(workId)}`, {
+      const response = await request(`/api/apps/${encodeURIComponent(workId)}`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -121,11 +121,11 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
         if (response.status === 403) {
           // Re-read before rendering again. A revoke must remove stale records
           // from the browser even when it races a submit request.
-          const refreshed = await fetch(`/api/apps/${encodeURIComponent(workId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
+          const refreshed = await request(`/api/apps/${encodeURIComponent(workId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
           if (!refreshed.ok && (refreshed.status === 401 || refreshed.status === 403)) {
             setSnapshot(null);
             setDraft(emptyDraft());
-            setDeniedMessage(refreshed.status === 401 ? "Sign in with a confirmed email to use this application." : "This application link is no longer available to your account.");
+            setDeniedMessage(refreshed.status === 401 ? "Sign in with a confirmed email to use this internal tool." : "This internal tool link is no longer available to your account.");
             setSignInHref(refreshed.status === 401 ? `/sign-in?next=${encodeURIComponent(`/apps/${workId}`)}` : undefined);
             setState("denied");
             return;
@@ -150,20 +150,19 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
     } finally {
       setBusy(false);
     }
-  }, [busy, snapshot, updateDraft, workId]);
+  }, [busy, request, snapshot, updateDraft, workId]);
+
+  const pageTitle = state === "ready" ? snapshot?.title || "Internal tool" : "Internal tool";
+  useEffect(() => keepPageTitle(pageTitle), [pageTitle]);
 
   if (state === "loading") {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-surface-base px-4 py-12 text-warm-black">
-        <p role="status" aria-live="polite" className="text-sm text-gray-muted">Opening application…</p>
-      </main>
-    );
+    return <StandaloneApplicationShell><StPage><StHead title="Opening internal tool…" /><StSkeleton label="Opening internal tool" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
   }
   if (state === "denied") return <ErrorSurface kind="denied" message={deniedMessage} signInHref={signInHref} />;
-  if (state === "error" || !snapshot) return <ErrorSurface kind="error" message="This application could not be opened right now." onRetry={() => void load()} />;
+  if (state === "error" || !snapshot) return <ErrorSurface kind="error" message="This internal tool could not be opened right now." onRetry={() => void load()} />;
 
   return (
-    <main className="min-h-screen bg-surface-base text-warm-black">
+    <StandaloneApplicationShell>
       <ApplicationUseRenderer
         snapshot={snapshot}
         draft={draft}
@@ -174,6 +173,6 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
         onDraftChange={updateDraft}
         onSubmit={draftValue => void submit(draftValue)}
       />
-    </main>
+    </StandaloneApplicationShell>
   );
 }

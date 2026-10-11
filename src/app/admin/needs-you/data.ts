@@ -1,3 +1,4 @@
+import { authorizePlatformOperatorRead } from "@/platform/operator-read-audit/admission";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -33,6 +34,7 @@ async function asOperator<T>(deps: OperatorDeps, read: (actor: WorkspaceActor) =
   const actor = await deps.actor();
   if (!actor) return { state: "denied" };
   try {
+    await authorizePlatformOperatorRead(actor, "admin.owner-decisions.read");
     return { state: "ready", value: await read(actor) };
   } catch (error) {
     if (error instanceof WorkspaceAccessError) return { state: "denied" };

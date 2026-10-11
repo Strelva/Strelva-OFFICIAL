@@ -6,6 +6,7 @@ import { AgencyHome } from "@/experience/workspace/AgencyHome";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { AgencyClientRow, AgencyClientsPage, AgencyLibrary } from "@/experience/workspace/agency-clients";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
+import { agencyTeamFixture } from "@/experience/workspace/preview/agency-team-fixture";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 
@@ -67,9 +68,11 @@ async function settle() { await act(async () => { await new Promise((resolve) =>
 const clientCalls = (request: ReturnType<typeof vi.fn>) => request.mock.calls.filter(([input]) => String(input).startsWith("/api/workspace/agency-clients"));
 const button = (node: HTMLElement, name: string | RegExp) => [...node.querySelectorAll("button")].find((item) => typeof name === "string" ? item.textContent?.trim() === name || item.getAttribute("aria-label") === name : name.test(item.textContent || ""))!;
 
-function router(handlers: { clients?: () => Response | Promise<Response>; library?: () => Response; review?: (body: unknown) => Response }) {
+function router(handlers: { clients?: () => Response | Promise<Response>; library?: () => Response; team?: () => Response; review?: (body: unknown) => Response }) {
   return vi.fn<typeof fetch>(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/workspace/provider-client-queue")) return Response.json({ agencyWorkspaceId: AGENCY, items: [], nextCursor: null });
+    if (url.startsWith("/api/workspace/agency-team")) return handlers.team ? handlers.team() : Response.json(agencyTeamFixture(AGENCY));
     if (url.startsWith("/api/workspace/agency-clients")) return handlers.clients ? handlers.clients() : Response.json(page([]));
     if (url.startsWith("/api/workspace/agency-library") && (init?.method || "GET") === "POST") return handlers.review!(JSON.parse(String(init!.body)));
     if (url.startsWith("/api/workspace/agency-library")) return handlers.library ? handlers.library() : Response.json({ agencyWorkspaceId: AGENCY, sources: [] });
@@ -78,11 +81,33 @@ function router(handlers: { clients?: () => Response | Promise<Response>; librar
 }
 
 describe("agency home on the batched read", () => {
+  it("shows health independently of lifecycle and names incomplete Queue sources", async () => {
+    const request = router({ clients: () => Response.json(page([row(1, { systems: [{ id: uuid("51000000", 1), name: "Client website", kind: "website", lifecycle: "live", versionContext: null,
+      health: { status: "blocked", summary: "Domain is down", lastVerifiedAt: "2026-10-07T12:00:00.000Z" } }] })], {
+      queueComplete: false, queueGaps: ["Owner approvals: unavailable"], queue: [{ id: "decision:1", kind: "owner_email", workspaceId: uuid("c0000000", 1), clientName: "Client 1",
+        title: "Owner email bounced: new booking flow", systemId: uuid("51000000", 1), workId: null, since: "2026-10-07T12:00:00.000Z" }],
+    })) });
+    const { node } = await render(request);
+    expect(node.textContent).toContain("Client website · Live · Not working");
+    await act(async () => button(node, "Queue").click());
+    expect(node.textContent).toContain("Owner email bounced: new booking flow");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("Owner approvals: unavailable");
+  });
+  it("opens Team independently of failed client overview reads and loads it only on demand", async () => {
+    const request = router({ clients: () => Response.json({ error: "Unavailable" }, { status: 503 }) });
+    const { node } = await render(request);
+    expect(request.mock.calls.some(([url]) => String(url).includes("agency-team"))).toBe(false);
+    await act(async () => { button(node, "Team").click(); });
+    expect(node.textContent).toContain("sam@agency.example.test");
+    expect(node.textContent).toContain("Create invitation");
+    expect(request.mock.calls.filter(([url]) => String(url).includes("agency-team"))).toHaveLength(1);
+  });
   it("loads 50 clients with one request and renders every row", async () => {
     const request = router({ clients: () => Response.json(page(Array.from({ length: 50 }, (_, index) => row(index + 1)))) });
     const { node } = await render(request);
     expect(clientCalls(request)).toHaveLength(1);
-    expect(node.querySelectorAll('[aria-label="Clients"] > li')).toHaveLength(50);
+    expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(50);
     expect(node.textContent).toContain("50 clients");
     expect(node.textContent).not.toContain("Show more clients");
   });
@@ -104,6 +129,22 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).not.toContain("could not be loaded");
     await act(async () => { button(node, /^Twin Trees/).click(); });
     expect(onWorkspace).toHaveBeenCalledWith(row(1).workspaceId);
+  });
+
+  it("keeps a last good read visibly stale after a client read fails", async () => {
+    let reads = 0;
+    const request = router({ clients: () => {
+      reads += 1;
+      return Response.json(page([row(1, { name: "Known business", status: reads === 1 ? "ready" : "unavailable", openRequests: reads === 1 ? 3 : 0, systems: reads === 1 ? row(1).systems : [] })]));
+    } });
+    const { node } = await render(request);
+    expect(node.textContent).toContain("3 open requests");
+    await act(async () => { button(node, "Refresh").click(); });
+    await settle();
+    expect(node.textContent).toContain("Known business could not be loaded.");
+    expect(node.textContent).toContain("Showing the last good read");
+    expect(node.textContent).toContain("3 open requests");
+    expect(node.textContent).toContain("client1.example");
   });
 
   it("shows Show more clients only when the server returns a cursor", async () => {
@@ -139,7 +180,7 @@ describe("agency home on the batched read", () => {
     const request = router({
       clients: () => Response.json(page([row(1)])),
       library: () => Response.json(library),
-      review: (body) => { bodies.push(body); return Response.json({ sourceSystemId: library.sources[0]!.systemId, revision: 4, results: [{ versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", outcome: "prepared", detail: "" }] }); },
+      review: (body) => { bodies.push(body); return Response.json({ sourceSystemId: library.sources[0]!.systemId, revision: 4, results: [{ versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", outcome: "prepared", detail: "Ready for review", decisionId: uuid("54000000", 1) }] }); },
     });
     const { node } = await render(request);
     await act(async () => { button(node, "Library").click(); });
@@ -148,15 +189,31 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("“We'll call you within one business day”");
     expect(node.textContent).toContain("“Someone will reply by the end of the next business day.”");
     expect(node.textContent).toContain("Needs Google Calendar connected first");
-    await act(async () => { button(node, "Review all").click(); });
+    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
+    expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
+    await act(async () => { button(node, "Prepare offers for 1 client").click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);
+    const preparedReview = [...node.querySelectorAll("a")].find(link => link.textContent === "Open prepared review")!;
+    expect(preparedReview.getAttribute("href")).toBe(`/workspace/version-review?workspaceId=${uuid("c0000000", 1)}&systemId=${uuid("52000000", 1)}&decisionId=${uuid("54000000", 1)}`);
     const results = node.querySelector('[aria-label="Review all results"]')!.textContent!;
-    expect(results).toContain("Prepared. Waiting on the owner’s approval.");
+    expect(results).toContain("Prepared. Waiting on Lake Bakery.");
     expect(results).toContain("The Mooney FirmSkipped. Needs a choice on 1 change.");
     expect(results).toContain("Elmwood PTSkipped. Needs Google Calendar connected first.");
   });
 
+  it("shows existing inquiry Versions through the current agency Library tab", async () => {
+    const request = router({ clients: () => Response.json(page([])), library: () => Response.json({ agencyWorkspaceId: AGENCY, sources: [],
+      inquiryVersions: [{ id: "legacy-inquiry", tenantId: "lake-bakery", businessName: "Lake Bakery", name: "Ask us",
+        sourceBusinessId: AGENCY, sourceSystemId: "inquiry:source", sourceRevision: 2, currentRelease: 7, improvement: "blocked" }] }) });
+    const { node } = await render(request);
+    await act(async () => { button(node, "Library").click(); }); await settle();
+    expect(node.textContent).toContain("Inquiry Versions");
+    expect(node.textContent).toContain("Source revision 2 · this Version’s release 7");
+    expect(node.textContent).toContain("choice about local changes");
+    expect(node.querySelector('a[href="/business/lake-bakery?view=patterns"]')?.textContent).toContain("Lake Bakery");
+    expect(node.textContent).not.toContain("No sources yet");
+  });
   it("keeps Library and Team out when the Systems release is off, with clients still from one read", async () => {
     const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
     const { node } = await render(request, false);
@@ -166,4 +223,14 @@ describe("agency home on the batched read", () => {
     expect(clientCalls(request)).toHaveLength(1);
     expect(request.mock.calls.some(([input]) => String(input).startsWith("/api/workspace/agency-library"))).toBe(false);
   });
+});
+
+
+it("opens agent bookings for the selected client without nesting a link in the client button", async () => {
+  const request = router({ clients: () => Response.json(page([row(1, { agentBookings: true }), row(2)])) });
+  const { node } = await render(request);
+  const links = [...node.querySelectorAll<HTMLAnchorElement>('a[href*="/workspace/bookings"]')];
+  expect(links).toHaveLength(1);
+  expect(links[0]?.getAttribute("href")).toBe(`/workspace/bookings?workspaceId=${row(1).workspaceId}&view=week&source=agent`);
+  expect(links[0]?.closest("button")).toBeNull();
 });

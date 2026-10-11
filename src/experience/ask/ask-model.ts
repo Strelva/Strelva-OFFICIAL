@@ -1,3 +1,5 @@
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
 /**
  * Browser-side model for Ask Strelva (docs/product/specs/ask-strelva.md).
  *
@@ -103,9 +105,9 @@ export function sameAppPath(value: string | null | undefined): string | undefine
 
 const ROUTE_LINE: Record<string, string> = {
   owner_decides: "Waiting on the owner in Needs you. Nothing is live until they say yes.",
-  strelva_reviews: "Strelva reviews it first. Nothing is live yet.",
-  handle_after_notice: "Strelva will make it after a notice. Nothing is live yet.",
-  handle: "Strelva will make it and report it under Strelva handled.",
+  strelva_reviews: "It is reviewed first. Nothing is live yet.",
+  handle_after_notice: "The change will be made after a notice. Nothing is live yet.",
+  handle: `The change will be made and reported under ${STRELVA_HANDLED_LABEL}.`,
   never: "Nothing was sent anywhere.",
 };
 
@@ -150,4 +152,9 @@ export function askErrorMessage(status: number, fallback: string | null): string
   if (status === 429) return "Too many requests. Try again in a minute.";
   if (status === 503) return fallback?.includes("not enabled") ? "Ask Strelva isn't on for this business yet. Nothing was sent." : "Strelva can't answer right now. Nothing was changed.";
   return fallback || "Strelva can't answer right now. Nothing was changed.";
+}
+/** A storage outage is not a release switch. Only an explicit release refusal is off. */
+export function askHistoryFailure(status: number, body: unknown): "off" | "unavailable" {
+  const error = body && typeof body === "object" && "error" in body ? body.error : null;
+  return status === 503 && typeof error === "string" && /^Ask Strelva is not enabled\b/.test(error) ? "off" : "unavailable";
 }

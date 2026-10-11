@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { ImageField } from "./ImageField";
-import { VersionHistory } from "./VersionHistory";
+import { ContentHistory } from "./ContentHistory";
 
 // Composite sections that don't have their own content API —
 // they pull from other sections on the public site.
@@ -574,7 +574,7 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
       </div>
 
       {tab === "versions" ? (
-        <VersionHistory
+        <ContentHistory
           section={activeSection}
           onRestored={() => {
             // History recovery creates a draft. Keep the live site unchanged

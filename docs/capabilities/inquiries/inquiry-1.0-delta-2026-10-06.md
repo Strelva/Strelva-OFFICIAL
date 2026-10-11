@@ -5,6 +5,23 @@ recommendation as the working default on October 6
 ([product model](../../product/product-model.md#decisions-the-specs-need)).
 No production step is authorized by this page.
 
+**Wave 6 round 5, October 7 — current local implementation:** every retained
+acceptance criterion and C1–16 item has claim-specific evidence in the
+[wave 6 verification record](./inquiry-wave6-verification-2026-10-07.md), with
+flags, all 19 prepared migrations and rollout steps in the
+[stream handoff](../../product/streams/w6-inquiries.md). This includes durable
+held spam/operator repair, exact owner and assigned-member replies, current
+policy/facts, signed account-free decisions, System/Library/Running projections,
+booking handoff, complete answer/reply-time cohorts and the read cutover gate.
+The older wave 2/3 notes below are historical. Their “not built” lines are
+superseded by the evidence record, not removed from history.
+
+**Production state supplied by Jacob:** 0.2.1 is live, every lead dual-writes
+to `tenant_leads`, and 43 leads were backfilled. Step 0 is complete. This stream
+made no production calls. Seven real production parity days, the read and
+authority flips, live recipient/provider proof and deployment remain separately
+authorized rollout steps. Code and test doubles cannot provide those clocks.
+
 **Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
 applied or deployed):** section 6 steps 1 to 4. `src/lib/leads.ts` keeps the
 signatures of `getLeads`, `getLeadById` and `getLeadSummary` and reads through
@@ -92,7 +109,7 @@ contact form at 9:40pm on a Saturday asking about a private party for 30.
 - The owner gets an urgent Needs you email at once: the inquiry, the draft,
   and **Approve**, **Not yet** and **Open**. They tap Approve on their phone,
   confirm on the page it opens, and the reply sends. They never sign in.
-- Strelva handled shows "Strelva replied to Dana about a private party", with
+- What changed shows "Strelva replied to Dana about a private party", with
   the provider receipt.
 
 This is the target. Today the lead lives only in Redis for reads, the owner
@@ -107,7 +124,7 @@ exists.
 | Capability (one inquiry workflow) | The **Inquiries System** (kind `inquiry`, origin `inquiry_workspaces.id`, `src/platform/systems/from-existing.ts`) | **Changed** on screen. `capability` stays the engine's internal word |
 | Capability version | System **History** (each published version is a release) | **Changed** on screen. Never called "Version" |
 | Inquiry / Record | Records inside the Inquiries System. Each points at one **business contact** | **Changed**: one person, one contact across inquiries and bookings |
-| Change, preview, receipt | Kept underneath. Owner sees Needs you items and **Strelva handled** receipts | **Changed** on screen |
+| Change, preview, receipt | Kept underneath. Owner sees Needs you items and **What changed** receipts | **Changed** on screen |
 | Responsibility | The inquiry policy, one source of routes in the Needs you evaluator, plus a **Running** sentence ("Every inquiry is answered within a day") | **Changed** |
 | Connection | Typed Connections on the System page | **Changed** (see C13) |
 | Work, Shape, Go | Requests and Ask Strelva | **Changed** (see C4) |
@@ -142,7 +159,7 @@ the business menu, and Ask Strelva as the way in
 carries a draft, selection or approval across is **Kept**.
 
 **C3. Changed: Home.** (§1 Home)
-Home is Needs you, Strelva handled, In progress, Recent, with Systems by
+Home is Needs you, What changed, In progress, Recent, with Systems by
 their own names ("Inquiries · Live · 2 new"). Empty Needs you disappears.
 September 11's fixed four-section order and "empty sections stay" are
 superseded. "No metric cards, no invented activity" is **Kept**.
@@ -350,8 +367,7 @@ reversible until the last.
 
 **Step 0. Every lead is in Postgres (0.2.1).** Dual-write, backfill
 (`scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes`) and hourly
-reconcile. Built locally, waits on Jacob's yes for the migration, backfill
-and deploy.
+reconcile. Complete in production per Jacob's round-5 brief: 0.2.1 dual-writes every lead and 43 were backfilled. This thread did not read production. Do not repeat the backfill; the later read and authority steps remain separate.
 
 **Step 1. One read path.** Every reader goes through `src/lib/leads.ts`.
 `getLeads`, `getLeadById` and `getLeadSummary` keep their signatures and gain

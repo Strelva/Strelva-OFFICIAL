@@ -1,0 +1,6 @@
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.orderEnd { display: grid; grid-template-columns: 80px 90px 90px; gap: 16px; align-items: center; }
+.orderEnd > :last-child { text-align: right; }
+.status, .caption { color: var(--st-text-3); font-size: 13px; line-height: 20px; }
+.caption { margin: 0; }
+@media (max-width: 767px) { .orderEnd { width: 100%; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 75px; gap: 12px; } }

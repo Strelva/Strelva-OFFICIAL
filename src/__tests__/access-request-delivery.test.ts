@@ -71,7 +71,7 @@ describe("access request delivery flow", () => {
     });
     expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"Strelva" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
       html: expect.stringContaining(`href="${body.statusUrl}"`),

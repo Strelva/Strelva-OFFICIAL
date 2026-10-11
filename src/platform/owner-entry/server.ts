@@ -7,6 +7,7 @@ import { resolveTenantOwnerEntry, workspaceReleaseFlagEnabled } from "@/platform
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { decideOwnerEntry, entryDestination, routeDashboardRequest, type DashboardRouting, type OwnerEntryDecision } from "./decision";
+import { claimPendingBusinessOwner } from "@/platform/workspaces/business-ownership";
 import { ownerEntryPossible } from "./env";
 import { effectiveDisposition, routeForDashboardPath, type DispositionGate } from "./dispositions";
 
@@ -23,7 +24,15 @@ export const ownerEntryForTenant = cache(async (tenant: string): Promise<OwnerEn
   try {
     const user = await getSessionUser();
     if (!user?.id || !user.email || !user.email_confirmed_at) return { kind: "dashboard", reason: "signed_out" };
-    const resolution = await resolveTenantOwnerEntry(tenant, { userId: user.id, verifiedEmail: user.email });
+    const actor = { userId: user.id, verifiedEmail: user.email };
+    let resolution = await resolveTenantOwnerEntry(tenant, actor);
+    const before = decideOwnerEntry({ resolution });
+    // A verified address alone never grants ownership. This only accepts a
+    // still-pending operator-issued invitation, through its existing transaction.
+    if (resolution?.role !== "owner" && (before.kind === "workspace" || before.reason === "no_membership")
+      && process.env.STRELVA_OWNER_INVITATION_CLAIM === "1") {
+      if (await claimPendingBusinessOwner(actor, tenant)) resolution = await resolveTenantOwnerEntry(tenant, actor);
+    }
     return decideOwnerEntry({ resolution });
   } catch (error) {
     // Fails toward the old surface (spec §8), and says so.
@@ -65,4 +74,3 @@ export async function redirectIfDashboardPageMoved(tenant: string, route: string
 export async function ownerEntryLanding(tenant: string, clientFallbackRoot: string): Promise<string> {
   return entryDestination(await ownerEntryForTenant(tenant), withClientFallbackRoot(clientFallbackRoot, "/dashboard"));
 }
-

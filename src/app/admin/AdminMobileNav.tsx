@@ -11,7 +11,11 @@ import { RailBrand, NavList, RailFooter } from "./AdminRail";
 export function AdminMobileNav({
   operatorName = "Operator",
   badges = {},
+  moneyEnabled = false,
+  preview = false,
 }: {
+  moneyEnabled?: boolean;
+  preview?: boolean;
   operatorName?: string;
   badges?: Record<string, number | undefined>;
 }) {
@@ -46,9 +50,9 @@ export function AdminMobileNav({
     if (!el) return;
     const focusable = Array.from(
       el.querySelectorAll<HTMLElement>(
-        'a[href], button, input, [tabindex]:not([tabindex="-1"])'
+        'a[href], button, input, summary, [tabindex]:not([tabindex="-1"])'
       )
-    ).filter((n) => !n.hasAttribute("disabled"));
+    ).filter((n) => !n.hasAttribute("disabled") && (!n.closest("details:not([open])") || n.tagName === "SUMMARY"));
     if (focusable.length === 0) return;
     const first = focusable[0]!;
     const last = focusable[focusable.length - 1]!;
@@ -68,7 +72,7 @@ export function AdminMobileNav({
   return (
     <div className="md:hidden">
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-glass-border bg-surface-base px-4 py-2.5">
-        <RailBrand />
+        <RailBrand preview={preview} />
         <button
           ref={openButtonRef}
           type="button"
@@ -84,15 +88,17 @@ export function AdminMobileNav({
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
           <aside
+            data-workspace-theme="linen"
+            data-workspace-mode="dark"
             ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="absolute left-0 top-0 flex h-full w-[82%] max-w-[300px] flex-col border-r border-glass-border bg-surface-base px-3 py-[18px]"
+            className="absolute left-0 top-0 flex h-full w-[82%] max-w-[300px] flex-col overflow-y-auto border-r border-glass-border bg-surface-base px-3 py-[18px]"
             onKeyDown={trapFocus}
           >
             <div className="mb-5 flex items-center justify-between">
-              <RailBrand />
+              <RailBrand preview={preview} />
               <button
                 ref={closeButtonRef}
                 type="button"
@@ -103,7 +109,7 @@ export function AdminMobileNav({
                 <X className="h-[18px] w-[18px]" strokeWidth={1.8} />
               </button>
             </div>
-            <NavList badges={badges} onNavigate={() => setOpen(false)} />
+            <NavList preview={preview} moneyEnabled={moneyEnabled} badges={badges} onNavigate={() => setOpen(false)} />
             <RailFooter operatorName={operatorName} />
           </aside>
         </div>

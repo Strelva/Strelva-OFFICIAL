@@ -38,7 +38,7 @@ describe("requests", () => {
   it("tells members whose requests they can't see instead of showing an empty list as the truth", () => {
     const html = renderToStaticMarkup(createElement(WorkspaceRequests, { businessName: "The Mooney Firm", work: [job("Draft intake questions", "running")], agencyNames: new Map(), readOnly: false, busy: false, onOpenWork: noop, onAsk: noop }));
     expect(html).toContain("Requests");
-    expect(html).toContain("visible to the owners and admins of The Mooney Firm");
+    expect(html).toContain("outside your current shared scope cannot be checked for The Mooney Firm");
     expect(html).toContain("In progress");
     expect(html).toContain("Draft intake questions");
     expect(html).toContain("Ask Strelva for something</button>");

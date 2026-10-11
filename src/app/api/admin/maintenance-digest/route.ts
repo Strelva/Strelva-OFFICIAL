@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getCurrentUserEmail } from "@/platform/infra/auth";
 import { listPendingDigests, decideMaintenanceDigest } from "@/lib/maintenance-digest";
@@ -7,6 +8,7 @@ export async function GET() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.digests.read");
   return NextResponse.json({ digests: await listPendingDigests() });
 }
 

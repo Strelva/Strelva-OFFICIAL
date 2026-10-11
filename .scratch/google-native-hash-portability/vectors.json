@@ -1,0 +1,20 @@
+[
+  {
+    "bindingId": "e7140100-0000-4000-8000-000000000020",
+    "subject": "Fictional \"É\" \\ principal",
+    "refreshTokenCiphertext": "enc:v1:AAAA:BBBB:CCCC",
+    "createdAt": "2026-10-09T00:00:00.123456+00:00",
+    "wire": "[\"e7140100-0000-4000-8000-000000000020\",\"Fictional \\\"É\\\" \\\\ principal\",\"enc:v1:AAAA:BBBB:CCCC\",\"2026-10-09T00:00:00.123456+00:00\"]",
+    "grantGeneration": "cf343f3ac392b8053f98b60cb60f72fba29699d28ca10c0de8d19886ed83defd",
+    "subjectDigest": "d29a988f71ab8d5180710c1a49c375177df707c4ab22001e7f5aee3a894b0c69"
+  },
+  {
+    "bindingId": "e7140100-0000-4000-8000-000000000021",
+    "subject": null,
+    "refreshTokenCiphertext": null,
+    "createdAt": "2026-10-09T00:00:00.123456+00:00",
+    "wire": "[\"e7140100-0000-4000-8000-000000000021\",null,null,\"2026-10-09T00:00:00.123456+00:00\"]",
+    "grantGeneration": "24292c178112ef027f96168f702e37132dbef695019111d7f3d6c2ab3a37f7fb",
+    "subjectDigest": null
+  }
+]

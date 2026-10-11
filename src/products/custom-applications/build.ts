@@ -58,9 +58,9 @@ process.stdout.write('\\n${MARKER}'+JSON.stringify({html})+'\\n');`;
       CUSTOM_BUILD_IMAGE, "node", "--input-type=module", "-e", script,
     ], { timeout: 30_000, maxBuffer: 1_500_000, encoding: "utf8" });
     const output = stdout.split("\n").filter(line => line.startsWith(MARKER)).at(-1);
-    if (!output) throw new Error("The isolated build did not produce an application.");
+    if (!output) throw new Error("The isolated build did not produce an internal tool.");
     const result = z.object({ html: z.string().min(1) }).strict().parse(JSON.parse(output.slice(MARKER.length)));
-    if (Buffer.byteLength(result.html) > MAX_ARTIFACT_BYTES) throw new Error("The application exceeds the output limit.");
+    if (Buffer.byteLength(result.html) > MAX_ARTIFACT_BYTES) throw new Error("The internal tool exceeds the output limit.");
     const sourceDigest = createHash("sha256").update(JSON.stringify(Object.entries(input.files).sort(([a], [b]) => a.localeCompare(b)))).digest("hex");
     return {
       version: 1, workspaceId: input.workspaceId, resourceId: input.resourceId, applicationVersion: input.applicationVersion,
@@ -71,7 +71,7 @@ process.stdout.write('\\n${MARKER}'+JSON.stringify({html})+'\\n');`;
   } catch {
     // Untrusted stdout/stderr may contain arbitrary text. Do not surface it as
     // application instructions or copy it into customer-visible error output.
-    throw new Error("The isolated application build failed or exceeded its limits.");
+    throw new Error("The isolated internal tool build failed or exceeded its limits.");
   } finally {
     await exec("docker", ["rm", "--force", container], { timeout: 5000, maxBuffer: 16_000 }).catch(() => undefined);
     await rm(folder, { recursive: true, force: true });

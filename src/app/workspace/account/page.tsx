@@ -42,7 +42,7 @@ export default async function WorkspaceAccountPage({
   searchParams,
 }: {
   searchParams?: Promise<{ continue?: string | string[] }>;
-} = {}) {
+}) {
   // This route deliberately reads the verified server session directly. It
   // must never resolve a local/dev bypass into a personal identity page.
   const user = await getSessionUser() as UserIdentity | null;

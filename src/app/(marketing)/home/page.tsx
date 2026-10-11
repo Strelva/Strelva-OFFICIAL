@@ -18,7 +18,7 @@ export default function HomePage() {
         }
 
         .hero-word-single {
-          animation: hero-word-single 560ms var(--m-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
+          animation: hero-word-single var(--motion-long) var(--ease-settle) both;
         }
 
         @keyframes hero-word-single {

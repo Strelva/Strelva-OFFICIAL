@@ -1,3 +1,5 @@
+import { recordedActor } from "@/platform/presentation/actor";
+import { isCreatorDraftSnapshot } from "@/platform/workspaces/creator-draft-snapshot";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   WorkspaceAccessError,
@@ -201,6 +203,7 @@ function toPayload(work: SavedWork, state: ApplicationState): ApplicationPayload
     title: candidate.spec.title,
     createdBy: work.createdBy,
     createdAt: work.createdAt,
+    maintenanceActor: recordedActor((work.payload as Record<string, unknown>).maintenanceActor),
     history: state.history,
     spec: candidate.spec,
     specVersion: candidate.specVersion,
@@ -312,6 +315,7 @@ export async function load(store: BoundedStore, actor: WorkspaceActor, id: strin
   const db = durableDb(store);
   const work = await store.read(actor, id);
   if (!work || work.productId !== "applications" || work.resourceKind !== "application") throw new WorkspaceAccessError();
+  if (isCreatorDraftSnapshot(work)) return { work, state: parseStateFromPayload(work.payload) };
   if (db) {
     const state = await readDurable(db, work);
     return { work, state };

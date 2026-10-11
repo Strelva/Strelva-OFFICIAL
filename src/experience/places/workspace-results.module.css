@@ -1,0 +1,8 @@
+.paper { min-height: 100dvh; background: radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.stack { display: flex; flex-direction: column; gap: 32px; min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.chart { display: flex; align-items: flex-end; height: 180px; gap: 3px; border-bottom: 1px solid var(--st-line); }
+.bar { flex: 1; min-width: 0; background: color-mix(in srgb, var(--st-accent) 58%, var(--st-canvas)); border-radius: 4px 4px 0 0; }
+.bar:last-child { background: var(--st-accent); }
+.chartLabels { display: flex; justify-content: space-between; gap: 12px; }
+@media (max-width: 767px) { .chart { height: 160px; } .stack { gap: 28px; } }

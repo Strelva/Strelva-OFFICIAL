@@ -1,3 +1,4 @@
+import { projectGoogleReviewEvent } from "@/platform/infra/google-review-content";
 /**
  * Typed Postgres repositories — the Supabase side of the migration.
  *
@@ -100,7 +101,7 @@ export async function listEvents(tenantId: string, limit = 50): Promise<Row<"uni
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map(row => projectGoogleReviewEvent(row));
   }, []);
 }
 
@@ -280,6 +281,27 @@ export async function getMembershipRole(userId: string, tenantId: string): Promi
     if (error) throw error;
     return data?.role ?? null;
   }, null);
+}
+
+/**
+ * The agency this user decides for on a tenant: an agency with an active
+ * provider seat on the business the tenant is linked to, that the user is a
+ * member of (20261011153000). Null for the business's owner and everyone
+ * else. Throws when it can't be read, so a caller never mistakes agency staff
+ * for the owner.
+ */
+export async function getTenantAgencySeat(userId: string, tenantId: string): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return required(`getTenantAgencySeat ${userId}/${tenantId}`, async () => {
+    // Additive RPC, outside generated types until they are regenerated.
+    const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+    const { data, error } = await rpc.rpc("tenant_agency_seat", { p_tenant_id: tenantId, p_user_id: userId });
+    if (error) throw error;
+    if (data === null) return null;
+    if (typeof data !== "string") throw new Error("tenant_agency_seat returned a malformed agency");
+    return data;
+  });
 }
 
 /** User ids that are OWNER of a tenant, resolved in one indexed membership query. */
@@ -478,6 +500,24 @@ export async function upsertContentData(
       { onConflict: "tenant_id,section" }
     );
   if (error) throw error;
+}
+
+/** Release-only: content and its accepted/pending receipt share a transaction. */
+export async function upsertContentDataWithReceipt(
+  tenant: string,
+  section: string,
+  data: Record<string, unknown>,
+): Promise<string | null> {
+  const db = requiredDb(`upsertContentDataWithReceipt ${tenant}/${section}`);
+  // Additive RPC is deliberately outside generated types until migration
+  // integration regenerates them. No second content write is performed here.
+  const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+  const result = await rpc.rpc("write_operator_content", { p_tenant_id: tenant, p_section: section, p_data: data });
+  if (result.error) throw result.error;
+  const receipt = result.data as { id?: unknown } | null;
+  // A successful RPC already committed content and receipt. A malformed
+  // response cannot turn that acceptance into a caller retry.
+  return receipt && typeof receipt.id === "string" ? receipt.id : null;
 }
 
 // ---------------------------------------------------------------------------

@@ -3,9 +3,12 @@ import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { WorkspaceRecaps, type RecapPeriodFilter, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
 import type { RecapView } from "@/products/recaps/server";
+import { PublishingPreviewFrame } from "@/experience/workspace/preview/PublishingPreviewFrame";
+import { PUBLISHING_RECAP, PUBLISHING_RECAP_OUTCOME } from "@/experience/workspace/preview/publishing-fixture";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Recaps preview", robots: { index: false, follow: false } };
+
 
 const WORKSPACE = "5e000000-0000-4000-8000-000000000010";
 
@@ -16,16 +19,17 @@ const RECAPS: RecapView[] = [
   { id: "w39", period: "week", start: "2026-09-21", end: "2026-09-27", summary: "A steady week.", highlights: [], visits: 402, visitsDelta: -3, customerActions: 17, nextAction: null },
 ];
 
-export default async function RecapsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; period?: string }> }) {
+export default async function RecapsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; period?: string; mode?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
-  const { state: name, period: periodParam } = await searchParams;
+  const { state: name, period: periodParam, mode } = await searchParams;
   const period: RecapPeriodFilter = periodParam === "week" || periodParam === "month" ? periodParam : "all";
-  const site = { tenantId: "juniper", siteName: "Juniper Bakery", unavailable: false, recaps: RECAPS };
-  const state: WorkspaceRecapsState = name === "permission" ? { kind: "permission" }
+  const site = { tenantId: "juniper", siteName: "attymooney.com", unavailable: false, recaps: [PUBLISHING_RECAP, ...RECAPS.slice(1)] };
+  const state: WorkspaceRecapsState = name === "loading" ? { kind: "loading" }
+    : name === "permission" ? { kind: "permission" }
     : name === "error" ? { kind: "error" }
     : name === "empty" ? { kind: "ready", sites: [{ ...site, recaps: [] }] }
     : name === "unlinked" ? { kind: "ready", sites: [] }
     : name === "unavailable" ? { kind: "ready", sites: [{ ...site, recaps: [], unavailable: true }] }
     : { kind: "ready", sites: [site] };
-  return <WorkspaceRecaps workspaceId={WORKSPACE} state={state} period={period} />;
+  return <PublishingPreviewFrame place="Recaps" mode={mode}><WorkspaceRecaps workspaceId={WORKSPACE} state={state} period={period} preview outcomes={{ [PUBLISHING_RECAP.id]: PUBLISHING_RECAP_OUTCOME }} /></PublishingPreviewFrame>;
 }

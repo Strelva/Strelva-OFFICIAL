@@ -57,7 +57,8 @@ begin
     raise notice 'client record parity absent; lead parity ledger is checked in the full cluster';
     return;
   end if;
-  perform public.record_client_record_parity('tenant_leads', 'read-site-renamed', 2, 2, 0, 0);
+  -- A day counts only when every tenant was checked (20261010162000).
+  perform public.record_client_record_parity('tenant_leads', t.id, 2, 2, 0, 0) from public.tenants t;
   perform pg_temp.lr_assert((public.client_record_parity_streak('tenant_leads')->>'days')::int = 1, 'lead parity streak counts');
   perform public.record_client_record_parity('tenant_leads', 'read-other', 1, 0, 1, 0);
   perform pg_temp.lr_assert((public.client_record_parity_streak('tenant_leads')->>'days')::int = 0, 'one tenant out of parity breaks the day');

@@ -6,13 +6,14 @@ const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetTenantPrimaryDomain = vi.hoisted(() => vi.fn());
 const mockGetRecentFailures = vi.hoisted(() => vi.fn());
 const mockGetEvents = vi.hoisted(() => vi.fn());
+const mockGetEventsRaw = vi.hoisted(() => vi.fn());
 const mockGetQueueCount = vi.hoisted(() => vi.fn());
 
 vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mockGetAllTenants, getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantPrimaryDomain: mockGetTenantPrimaryDomain }));
 vi.mock("@/lib/revalidate-client", () => ({ getRecentFailures: mockGetRecentFailures }));
-vi.mock("@/lib/events", () => ({ getEvents: mockGetEvents, getQueueCount: mockGetQueueCount }));
+vi.mock("@/lib/events", () => ({ getEvents: mockGetEvents, getEventsRaw: mockGetEventsRaw, getQueueCount: mockGetQueueCount }));
 
 import { buildOpsReport } from "@/lib/ops";
 
@@ -27,11 +28,25 @@ beforeEach(() => {
   mockGetTenantConfig.mockResolvedValue({ id: "a" });
   mockGetTenantPrimaryDomain.mockReturnValue("greatlakesdriedfruit.com");
   mockGetEvents.mockResolvedValue([]);
+  mockGetEventsRaw.mockResolvedValue([]);
   mockGetQueueCount.mockResolvedValue(0);
   mockGetRedis.mockReturnValue(null);
 });
 
 describe("buildOpsReport", () => {
+  it("operator reads are strict, use the full raw event source, and retain every failure", async () => {
+    await expect(buildOpsReport({ requireStore: true })).rejects.toThrow("Redis unavailable");
+    mockGetRedis.mockReturnValue({ scan: vi.fn(async () => ["0", []]) });
+    mockGetRecentFailures.mockResolvedValue(Array.from({ length: 15 }, (_, index) => ({ tenantId: "a", timestamp: `time-${index}` })));
+    expect((await buildOpsReport({ requireStore: true })).revalidationFailures).toHaveLength(15);
+    expect(mockGetEventsRaw).toHaveBeenCalledWith("a", { all: true, requireStore: true });
+    expect(mockGetEvents).not.toHaveBeenCalled();
+    mockGetEventsRaw.mockRejectedValue(new Error("Events unavailable")); await expect(buildOpsReport({ requireStore: true })).rejects.toThrow("Events unavailable");
+  });
+  it("an unfinished webhook scan is a strict failure rather than a complete lower count", async () => {
+    mockGetRedis.mockReturnValue({ scan: vi.fn(async () => ["next", Array.from({ length: 10000 }, (_, index) => `failure:${index}`)]) });
+    await expect(buildOpsReport({ requireStore: true })).rejects.toThrow("scan incomplete");
+  });
   it("counts only active tenants and degrades without Redis", async () => {
     const report = await buildOpsReport();
     expect(report.activeTenants).toBe(2);

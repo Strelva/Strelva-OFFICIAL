@@ -1,0 +1,57 @@
+import {createHash} from 'node:crypto';
+import {readFileSync,readdirSync} from 'node:fs';
+import {describe,expect,it} from 'vitest';
+import {verifyReleaseInventory} from '../../scripts/release-safety/inventory';
+import {exactForwardLedger} from '../../scripts/lib/governed-creator-exit-proof.mjs';
+const read=(name:string)=>readFileSync(name,'utf8');
+const forward='20261022173000_neutral_creator_version_money.sql',inverse=`rollback-${forward}`;
+const inventory=JSON.parse(read('scripts/sql/historical-forward-inventory.json'));
+const ports=[...read(`supabase/migrations/${forward}`).matchAll(/create function public\.([a-z_]+)\(/g)].map(item=>item[1]!);
+describe('exact additive neutral money composition',()=>{
+ it('admits only the exact sorted unique354 historical ledger and covers registered unqualified tails separately',()=>{
+  const physical=readdirSync('supabase/migrations').filter(name=>/^\d{14}_.*\.sql$/.test(name)).sort();
+  // The native qualification remains bound to its frozen354 source. The
+  // separately prepared architecture tail does not extend that qualification.
+  const manifest=JSON.parse(read('scripts/release-safety/batches.json'));
+  const tail=manifest.proposed.find((item:{id:string})=>item.id==='lifetime-system-kind');
+  expect(tail.items).toHaveLength(1);expect(tail.status).toContain('UNRUN/held');
+  const item=tail.items[0];expect(item.file).toBe('20261022183000_lifetime_system_kind.sql');expect(item.rollback).toBe(`rollback-${item.file}`);
+  for(const [file,pin] of [[item.file,item.sha256],[item.rollback,item.rollbackSha256]])expect(createHash('sha256').update(readFileSync(`supabase/migrations/${file}`)).digest('hex')).toBe(pin);
+  expect(inventory.forwardCount).toBe(354);expect(inventory.forwardFiles).toHaveLength(354);expect(new Set(inventory.forwardFiles).size).toBe(354);expect(inventory.forwardFiles.at(-1)).toBe('20261022182000_booking_settings_atomic_patch.sql');
+  const historical = new Set(inventory.forwardFiles);
+  const registeredTails = manifest.proposed.flatMap((entry:{items:Array<{file:string}>}) => entry.items.map(item => item.file)).filter((name:string) => !historical.has(name));
+  expect(registeredTails).toContain(item.file);
+  expect(physical).toEqual([...inventory.forwardFiles, ...registeredTails].sort());
+  expect(new Set(physical).size).toBe(physical.length);
+  const coherenceTail = manifest.proposed.find((entry:{id:string}) => entry.id === 'coherence-identity-and-client-projections');
+  expect(coherenceTail.status).toContain('held and unqualified');expect(coherenceTail.batch).toBeUndefined();
+  expect(coherenceTail.items).toHaveLength(6);
+  const privacy = coherenceTail.items.find((entry:{file:string}) => entry.file === '20261023130000_provider_change_actor_privacy.sql');
+  expect(privacy).toBeDefined();expect(privacy.rollback).toBeUndefined();
+  expect(createHash('sha256').update(readFileSync(`supabase/migrations/${privacy.file}`)).digest('hex')).toBe(privacy.sha256);
+  expect(privacy.rollbackStatus).toContain('no production application authorized');
+  const versions=inventory.forwardFiles.map((name:string)=>name.slice(0,14));expect(exactForwardLedger(inventory,versions)).toEqual(versions);
+  expect(()=>exactForwardLedger(inventory,physical.map(name=>name.slice(0,14)))).toThrow();
+  expect(()=>exactForwardLedger(inventory,versions.slice(0,-1))).toThrow();expect(()=>exactForwardLedger(inventory,inventory.forwardFiles.filter((name:string)=>!name.startsWith('20261021140200_')&&!name.startsWith('20261022175100_')).map((name:string)=>name.slice(0,14)))).toThrow();expect(()=>exactForwardLedger(inventory,[...versions.slice(0,-1),'20990000000000'])).toThrow();expect(()=>exactForwardLedger(inventory,[...versions].reverse())).toThrow();
+ });
+ it('pins actual forward and retained-history inverse bytes without a qualification claim',()=>{
+  verifyReleaseInventory(process.cwd());const manifest=JSON.parse(read('scripts/release-safety/batches.json'));const batch=manifest.proposed.find((item:{id:string})=>item.id==='neutral-creator-version-money');expect(batch.items).toHaveLength(1);
+  const item=batch.items[0];expect(item.file).toBe(forward);expect(item.rollback).toBe(inverse);
+  for(const [file,pin] of [[item.file,item.sha256],[item.rollback,item.rollbackSha256]])expect(createHash('sha256').update(readFileSync(`supabase/migrations/${file}`)).digest('hex')).toBe(pin);
+  expect(batch.status).toContain('unqualified');expect(item.rollbackStatus).toContain('retains every immutable paid Version row');
+ });
+ it('includes native installation and exact catalog checks before final exposure and read-only scanning in both existing SQL owners',()=>{
+  for(const script of ['scripts/check-workspace-sql.sh','scripts/check-workspace-upgrade.sh']){
+   const source=read(script),position=source.lastIndexOf(`/supabase/migrations/${forward}`);expect(position).toBeGreaterThan(source.lastIndexOf('/tests/governed-money-operations-schema.sql'));expect(source.lastIndexOf('/scripts/sql/neutral-creator-version-money-contract.sql')).toBeGreaterThan(position);expect(source.lastIndexOf('/tests/function-exposure-schema.sql')).toBeGreaterThan(position);expect(source.lastIndexOf('/scripts/check-readonly-rpcs.mjs')).toBeGreaterThan(position);
+  }
+ });
+ it('keeps exact eight-port private exposure and retained-table/column protections alongside the original six-port group',()=>{
+  const exposure=read('tests/function-exposure-schema.sql');expect(ports).toHaveLength(8);for(const name of ports)expect(exposure).toContain(`public.${name}(`);
+  expect(exposure).toContain('installed not in(0,8)');expect(exposure).toContain('has_any_column_privilege');expect(exposure).toContain('neutral source money retained history exposed directly');expect(exposure).toContain('installed not in(0,6)');
+ });
+ it('keeps fixed native qualification counts and binds creator coordinator to new canonical checks before and after original inverse/reapply',()=>{
+  const authority=read('scripts/private-authority-journey-window.mjs');expect(authority).toContain('migrations?.length !== 354');expect(authority).toContain('ledger?.length !== 354');
+  const checkout=read('scripts/check-checkout-final-admission-races.mjs');expect(checkout).toContain('inventory.forwardCount !== 354');expect(checkout).toContain('JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)');
+  const creator=read('scripts/check-governed-creator-exit-races.mjs');expect(creator).toContain("'scripts/sql/neutral-creator-version-money-contract.sql'");expect(creator).toContain("'scripts/sql/private-source-current-contract.sql'");expect(creator).toContain("run('neutral-source-contract'");expect(creator).toContain("run('reapplied-neutral-source-contract'");
+ });
+});

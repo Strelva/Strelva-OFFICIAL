@@ -59,8 +59,8 @@ describe("owner journey copy and links", () => {
     // The sign-up page no longer carries the dead self-serve signup branch.
     expect(signUpPage).not.toContain("isSelfServeSignup");
     expect(signUpPage).not.toContain('redirectUrl?.startsWith("/onboard")');
-    expect(signUpPage).toContain('const title = "Dashboard access is invite-only.";');
-    expect(signUpPage).toContain("Request your build");
+    expect(signUpPage).toContain('<StHead title="Workspace access is invite-only"');
+    expect(signUpPage).toContain('<StPillLink href="/access-request">Request your build</StPillLink>');
   });
 
   it("lands new owners on a single onboarding card, not a wall of welcome panels", () => {
@@ -88,10 +88,10 @@ describe("owner journey copy and links", () => {
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
     expect(historyPage).toContain('snapshots.status === "fulfilled"');
     expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
-    expect(safetyPanel).toContain("Revert to a last good version");
-    expect(safetyPanel).toContain("Save a version now");
+    expect(safetyPanel).toContain("Restore from History");
+    expect(safetyPanel).toContain("Save to History");
     // Per-row restore over the whole version history, not just the latest.
-    expect(safetyPanel).toContain("Restore this version");
+    expect(safetyPanel).toContain("Restore this saved state");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");
@@ -220,7 +220,7 @@ describe("owner journey copy and links", () => {
     expect(chatPanel).not.toContain("Queued for review");
   });
 
-  it("uses tenant dashboard URLs in weekly report emails", () => {
+  it("uses the agency-hosted owner entrance and shared transport for weekly recaps", () => {
     const weeklyReportRoute = readRepoFile("src/app/api/cron/weekly-report/route.ts");
 
     expect(weeklyReportRoute).toContain("getTenantDashboardUrl");
@@ -232,10 +232,9 @@ describe("owner journey copy and links", () => {
     expect(weeklyReportRoute).toContain("buildReportHeading(report)");
     expect(weeklyReportRoute).not.toContain('heading: "Your weekly report"');
     expect(weeklyReportRoute).not.toContain("Your weekly site update");
-    expect(weeklyReportRoute).toContain("See your full report");
-    expect(weeklyReportRoute).toContain("function reportToText");
-    expect(weeklyReportRoute).toContain("renderEmailText");
-    expect(weeklyReportRoute).toContain("text,");
+    expect(weeklyReportRoute).toContain("Open Recaps");
+    expect(weeklyReportRoute).toContain("options: { brand, heading, paragraphs: reportSummaryParagraphs(report.summary)");
+    expect(weeklyReportRoute).toContain("resolveTenantBrand(report.tenant.id)");
     expect(weeklyReportRoute).not.toContain("NEXT_PUBLIC_APP_URL");
   });
 

@@ -4,6 +4,18 @@
   color-scheme: dark;
 }
 
+/* October 6, 2026: linen content in DM Sans beside the ink rail. */
+.root[data-workspace-theme="linen"] {
+  --font-body: var(--font-workspace, system-ui);
+  --font-display: var(--font-workspace, system-ui);
+  color-scheme: light;
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
+}
+
+.root[data-workspace-theme="linen"] .shell {
+  --app-navigation-width: 248px;
+}
+
 .shell {
   --app-navigation-width: 232px;
   position: relative;
@@ -156,8 +168,48 @@
   }
 }
 
+@media (pointer: coarse) {
+  .mobileMenu {
+    width: 44px;
+    height: 44px;
+  }
+
+  .context select,
+  .actions button,
+  .actions a {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell * {
     scroll-behavior: auto;
   }
+}
+
+/*
+ * October 9, 2026: paper with a 24px dot grid (the Pen canon's dot-paper),
+ * and a header that stays out of the way: no rule, no fill.
+ */
+.root[data-workspace-theme="linen"] {
+  --app-navigation-width: 264px;
+  background: var(--st-canvas);
+  color: var(--st-text);
+}
+
+.root[data-workspace-theme="linen"] .shell {
+  --app-navigation-width: 264px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px,
+    var(--st-canvas);
+}
+
+.root[data-workspace-theme="linen"] .shell > * {
+  background: transparent;
+}
+
+.root[data-workspace-theme="linen"] .title {
+  color: var(--st-text-3);
+  font-size: 13px;
 }

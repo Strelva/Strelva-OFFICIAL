@@ -28,7 +28,7 @@ const responsibility = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("customer_operated"), providerName: z.string().trim().min(1).max(120) }).strict(),
   z.object({
     kind: z.literal("provider_requested"),
-    providerKind: z.enum(["strelva", "agency", "named_third_party"]),
+    providerKind: z.literal("agency"),
     providerName: z.string().trim().min(1).max(120),
     agencyWorkspaceId: z.string().uuid().optional(),
     requestNote: z.string().trim().min(1).max(500).optional(),

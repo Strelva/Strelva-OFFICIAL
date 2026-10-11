@@ -11,7 +11,9 @@ import {
   createSupabaseVersionStore,
   readBusinessVersions,
   readVersionActor,
+  versionsDb,
 } from "@/platform/system-versions/supabase-store";
+import { readVersionRuntime, requireVersionRuntime } from "@/platform/system-versions/native-runtime";
 import { listWork } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
@@ -21,6 +23,7 @@ import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "./s
 import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "./sources/make-real";
 import { versionReleaseAdapter, type PendingVersionRelease } from "./sources/version-release";
+import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
 import { recordServiceAction } from "./service-actor";
 
 function systemsOn(workspaceId: string, actor: WorkspaceActor): Promise<boolean> {
@@ -50,6 +53,7 @@ async function pendingVersionReleases(actor: WorkspaceActor, workspaceId: string
     const view = await versions.readVersion(versionActor, item.id);
     const latest = row.releases.at(-1);
     if (latest && jsonEqual(latest.definition, view.workingDefinition)) continue;
+    if ((await readVersionRuntime(actor, row, versionsDb()))?.kind!=="internal_app") continue;
     pending.push({
       versionId: item.id,
       systemId: item.systemId,
@@ -75,7 +79,7 @@ async function liveReadyPlans(workspaceId: string): Promise<ReadyPlan[]> {
  * src/platform/make-real/live.ts). Same item shape, same
  * `<possibility>@<revision>` source id, same approval reader.
  */
-function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeRealResult) => void): SourceAdapter {
+function makeRealSource(store: NeedsYouStore, google: GoogleMakeRealPorts | undefined, onResult?: (result: WorkspaceMakeRealResult) => void): SourceAdapter {
   return makeRealAdapter({
     enabled: systemsOn,
     readyPlans: async (actor, workspaceId) => readyMakeRealPlans(await liveDeps(actor, workspaceId)),
@@ -83,11 +87,12 @@ function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeR
     policies: (actor, workspaceId) => store.policies(actor, workspaceId),
     // The one logged run for an owner with no account (owner-entry decision 6).
     recordLinkRun: (session, subject, detail) => recordServiceAction(session, "run", subject, detail),
-    async start(actor, workspaceId, possibilityId, approvalId) {
+    async start(actor, workspaceId, possibilityId, approvalId, service) {
       const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
       if (live) {
         const { startLiveMakeReal } = await import("@/platform/make-real/live-server");
-        return startLiveMakeReal({ actor, workspaceId, possibilityId, approvalId, title: live.title });
+        if (!google) throw new Error("Google Make real composition is unavailable.");
+        return startLiveMakeReal(google, { actor, workspaceId, possibilityId, approvalId, title: live.title, ...(service ? { service } : {}) });
       }
       const result = await makeRealForWorkspace(await liveDeps(actor, workspaceId), possibilityId, { canActivate: true }, {
         planApproval: { approvalId, approvals: needsYouMakeRealApprovals((ws, id) => store.read(ws, id)) },
@@ -107,13 +112,13 @@ export async function makeRealThroughNeedsYou(
   actor: WorkspaceActor,
   workspaceId: string,
   possibilityId: string,
-  deps: { store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
+  deps: { expectedPlan?: { candidateRevision: number; fingerprint: string }; google?: GoogleMakeRealPorts; store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
 ): Promise<{ status: DecideStatus; result: WorkspaceMakeRealResult | null; reason: string | null; receiptRef: string | null } | null> {
   let captured: WorkspaceMakeRealResult | null = null;
   const capture = (result: WorkspaceMakeRealResult) => { captured = result; };
   const service = createNeedsYouService({
     store: deps.store,
-    adapters: [deps.adapter ? deps.adapter(capture) : makeRealSource(deps.store, capture)],
+    adapters: [deps.adapter ? deps.adapter(capture) : makeRealSource(deps.store, deps.google, capture)],
     sendEmail: deps.sendEmail,
     appOrigin: deps.appOrigin,
     now: () => Date.now(),
@@ -122,13 +127,14 @@ export async function makeRealThroughNeedsYou(
   const item = (await deps.store.list(actor, workspaceId, false))
     .find((row) => row.state === "open" && row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`${possibilityId}@`));
   if (!item) return null;
+  if (deps.expectedPlan && (item.sourceId !== `${possibilityId}@${deps.expectedPlan.candidateRevision}` || item.revisionHash !== deps.expectedPlan.fingerprint)) throw new Error("The approved plan changed before the decision. Nothing was approved.");
   const decided = await service.decide({ workspaceId, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "session", actor } });
   return { status: decided.status, result: captured, reason: decided.item?.outcomeReason ?? null, receiptRef: decided.item?.receiptRef ?? null };
 }
 
-export function systemsSourceAdapters(store: NeedsYouStore): SourceAdapter[] {
+export function systemsSourceAdapters(store: NeedsYouStore, google?: GoogleMakeRealPorts): SourceAdapter[] {
   return [
-    makeRealSource(store),
+    makeRealSource(store, google),
     versionReleaseAdapter({
       enabled: systemsOn,
       pending: pendingVersionReleases,
@@ -136,11 +142,15 @@ export function systemsSourceAdapters(store: NeedsYouStore): SourceAdapter[] {
       read: (workspaceId, itemId) => store.read(workspaceId, itemId),
       async release(actor, input) {
         const store = createSupabaseVersionStore();
+        const versionActor = await readVersionActor(actor);
+        const lineage = await store.getLineage(versionActor, input.versionId);
+        if (!lineage) throw new Error("This Version is unavailable.");
+        await requireVersionRuntime(actor, lineage, versionsDb());
         const gate = createVersionReleaseGate({
           versions: createSystemVersions({ store, connections: createSupabaseConnectionOwnership() }),
           approvals: input.approvals,
         });
-        const released = await gate.release(await readVersionActor(actor), input.versionId, { expectedRowRevision: input.expectedRowRevision });
+        const released = await gate.release(versionActor, input.versionId, { expectedRowRevision: input.expectedRowRevision });
         return { releaseNumber: released.lineage.currentRelease };
       },
     }),

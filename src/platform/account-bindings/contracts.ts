@@ -55,6 +55,15 @@ export const bindingTargetSchema = z.object({
 export type BindingTarget = z.infer<typeof bindingTargetSchema>;
 
 /** The plaintext grant a caller hands the store. The store encrypts. */
+export interface LegacyGoogleOperationPin {
+  tenantId: string; tenantStableId: string; workspaceId: string | null;
+  bindingId: string | null; bindingUpdatedAt: string | null; locationDigest: string | null; startedAt: string;
+}
+export interface LegacyGoogleOperationInput {
+  grant?: GoogleGrantInput;
+  location?: { accountId: string; locationId: string; title?: string | null };
+}
+
 export interface GoogleGrantInput {
   workspaceId: string;
   originTenantStableId: string | null;

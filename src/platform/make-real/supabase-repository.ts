@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   WORKSPACE_EXIT_STOPPED_MESSAGE,
@@ -35,7 +36,7 @@ function activationsDb(): ActivationsDb {
 
 export function mapActivationError(error: DbError, fallback: string): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
-  if (detail.includes("make_real_activation_access_denied") || detail.includes("make_real_activation_not_found")) {
+  if (detail.includes("native_google_owner_denied") || detail.includes("make_real_activation_access_denied") || detail.includes("make_real_activation_not_found")) {
     throw new WorkspaceAccessError();
   }
   if (detail.includes("make_real_activation_revision_conflict")) {
@@ -87,6 +88,24 @@ export function createSupabaseActivationRepository(actor: WorkspaceActor, db?: A
         p_workspace_id: uuid.parse(activation.businessId), ...actorArgs(), p_activation: activation,
       }, fallback);
       parseRow(data, activation.businessId, activation.id, fallback);
+    },
+    async saveNativeGoogleRecovery(value,expectedRevision) {
+      const activation=activationSchema.parse(value),fallback="The native Google receipt recovery could not be saved.";
+      const data=await call("save_native_google_recovered_activation",{
+        p_workspace_id:uuid.parse(activation.businessId),...actorArgs(),p_activation_id:activation.id,
+        p_expected_revision:z.number().int().nonnegative().parse(expectedRevision),p_activation:activation,
+      },fallback);
+      const saved=parseRow(data,activation.businessId,activation.id,fallback);
+      if(canonicalJson(saved)!==canonicalJson(activation))throw new WorkspaceStoreError(`${fallback} The response was malformed.`);
+    },
+    async saveNativeGoogleUndo(value,expectedRevision) {
+      const activation=activationSchema.parse(value),fallback="The native Google undo could not be saved.";
+      const data=await call("save_native_google_undo_activation",{
+        p_workspace_id:uuid.parse(activation.businessId),...actorArgs(),p_activation_id:activation.id,
+        p_expected_revision:z.number().int().nonnegative().parse(expectedRevision),p_activation:activation,
+      },fallback);
+      const saved=parseRow(data,activation.businessId,activation.id,fallback);
+      if(canonicalJson(saved)!==canonicalJson(activation))throw new WorkspaceStoreError(`${fallback} The response was malformed.`);
     },
     async save(value, expectedRevision) {
       const activation = activationSchema.parse(value);

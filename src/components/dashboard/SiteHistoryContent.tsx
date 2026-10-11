@@ -47,11 +47,11 @@ export async function SiteHistoryContent({ tenant, dashboardHref, historyHref, s
           History &amp; safety
         </h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">
-          Recent website requests, saved versions and dated site checks.
+          Recent website requests, History and dated site checks.
         </p>
       </div> : null}
 
-      {snapshots.status === "fulfilled" ? <SiteSafetyPanel snapshots={snapshots.value} /> : unavailable("Saved versions are temporarily unavailable.")}
+      {snapshots.status === "fulfilled" ? <SiteSafetyPanel snapshots={snapshots.value} /> : unavailable("History is temporarily unavailable.")}
 
       {events.status === "fulfilled" ? <WebsiteRequestHistory events={events.value} dashboardHref={dashboardHref} selectedRequestId={selectedRequestId} /> : unavailable("Website request history is temporarily unavailable.")}
 

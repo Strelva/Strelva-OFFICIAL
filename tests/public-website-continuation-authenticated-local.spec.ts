@@ -44,6 +44,7 @@ test("a confirmed public brief can start one owned website draft after Auth", as
     workspaceId = await destination.inputValue();
 
     const createResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/websites" && response.request().method() === "POST");
+    const openedDraft = page.waitForResponse(response => /^\/api\/websites\/[0-9a-f-]{36}$/.test(new URL(response.url()).pathname) && response.request().method() === "GET", { timeout: 60_000 });
     await page.getByRole("button", { name: "Start website draft", exact: true }).click();
     const createdResponse = await createResponse;
     expect(createdResponse.status(), await createdResponse.text()).toBe(201);
@@ -51,6 +52,10 @@ test("a confirmed public brief can start one owned website draft after Auth", as
     expect(created.workspaceId).toBe(workspaceId);
     expect(created.website.status).toBe("preview_ready");
     expect(created.website.brief.description).toBe(request);
+    const opened = await openedDraft;
+    expect(opened.status(), await opened.text()).toBe(200);
+    expect(new URL(opened.url()).pathname).toBe(`/api/websites/${created.workId}`);
+    expect(new URL(opened.url()).searchParams.get("workspaceId")).toBe(workspaceId);
     await expect(page).toHaveURL(new RegExp(`/workspace\\?workspaceId=${workspaceId}.*view=websites.*work=${created.workId}`));
     await expect(page.getByLabel("Business name", { exact: true })).toHaveValue("Juniper Dental");
     const preview = page.frameLocator('iframe[title="Generated website preview for Juniper Dental"]');

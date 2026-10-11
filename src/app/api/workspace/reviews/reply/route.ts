@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireTenantAccess } from "@/platform/infra/auth";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { submitOwnerReviewReply } from "@/lib/reviews/owner-reply";
+import { sessionTenantDecider } from "@/lib/operator-decisions";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { ownerEntryHomesOpen, readLinkedSite } from "@/platform/owner-entry/linked-sites";
@@ -35,8 +36,11 @@ export async function POST(request: Request) {
     if (!site) return workspaceJson({ error: "This site is unavailable to your account." }, 403);
     const denied = await requireTenantAccess(site.tenantId);
     if (denied) return denied;
-    const result = await submitOwnerReviewReply(site.tenantId, body.reviewId, body.reply);
+    const decider = await sessionTenantDecider(site.tenantId);
+    if (!decider) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
+    const result = await submitOwnerReviewReply(site.tenantId, body.reviewId, body.reply, decider);
     if (result.status === "not_found") return workspaceJson({ error: "Review not found." }, 404);
+    if (result.status === "owner_decides") return workspaceJson({ error: "The owner decides this reply. Nothing was posted." }, 403);
     if (result.status === "publish_failed") return workspaceJson({ error: "Could not publish the reply to Google.", published: false }, 502);
     return workspaceJson({ review: result.review, published: result.published });
   } catch (error) {

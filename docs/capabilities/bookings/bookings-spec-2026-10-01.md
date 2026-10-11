@@ -8,6 +8,54 @@ page. Sibling of the
 [website rebuild spec](../website/website-rebuild-spec-2026-10-01.md), whose `Booking`
 and `InquiryForm` components this capability powers.
 
+## Current implementation status — wave 6, finished and verified, October 7
+
+Branch `w6/bookings`, code and local fixtures only. This status supersedes the
+historical wave-2/3/4 gap lists below; those describe their original checkpoints.
+No production step or notification is authorized here. Full results, switches,
+15 migrations/rollbacks and rollout order: [stream handoff](../../product/streams/w6-bookings.md).
+
+Final audit closure is locally verified: bookings work without a website tenant;
+native visitor phone and browser time-zone handling are implemented; native
+receipts credit the business. The native SQL kind and manual retry calendar-key
+lookup were corrected against real PostgreSQL, including rollback/reapply.
+MCP protocol tests and OpenAPI intake-answer coverage pass. Flags remain off.
+
+Built and locally tested: both visitor entry paths on one store; current record
+hours/services/phone; stable receipts, customer management and immutable history;
+per-service bookability/mode/buffer/intake; exact-revision owner-approved instant
+rules; inquiry three-slot offers and owner proposal replies; staff-entered requests
+without decision authority; agent API/MCP/OpenAPI/ReserveAction with customer
+confirmation and 15-minute holds; reminders and separate request clocks; calendar
+busy/mirror/recovery; owner history/no-shows/outside-hours/intake/health; bounded
+record fallback; pause and completed-workspace-exit admission rules. Agent bookings
+were required by this adopted spec and use no new dependency.
+
+A read-only daily booking-parity cron at `45 5 * * *` UTC compares bookings and
+60 days of slots, writes only parity/heartbeat evidence, and cannot advance the
+streak after a partial or failed run. It is authenticated and heartbeat-registered.
+Every notice remains behind its switch and all three existing email gates;
+flag-off visitor response/default regressions and client compatibility pass.
+
+Local proof: 6,423 tests pass (39 intentionally skipped across the repository),
+typecheck/lint/boundaries/build pass, client compatibility 196/196, and isolated
+PostgreSQL checks pass including 30 tests through both real booking route families.
+Desktop/mobile evidence and limits: [rendered fixture review](../../../output/w6-bookings-ui/README.md).
+The production build requires `NODE_ENV=production` on this host, whose inherited
+value is `development`; failures and corrective reruns are preserved in the handoff.
+
+Still unproven: production migration/backfill, seven consecutive parity days,
+real provider grants/event behavior, outside-client use and delivered/read-back
+email. The disposable real-provider suite is present but was not enabled.
+Google granular scopes and revoke-before-wipe are implemented behind flags.
+Microsoft disconnect wipes local credentials, while application consent must be
+removed in My Apps (or by an administrator for admin-granted consent). Automatic
+per-application Microsoft revocation is **not implemented** with the existing
+calendar permission. The [account-wide Graph revocation API](https://learn.microsoft.com/en-us/graph/api/user-revokesigninsessions?view=graph-rest-1.0)
+requires broader permission and affects all apps; no such permission was added.
+That literal spec line needs an accepted provider exception or separately authorized
+authority design. It is not silently marked complete.
+
 **Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
 applied or deployed; every switch off).** Phase 1a of the build plan:
 
@@ -262,7 +310,7 @@ being offered. Nobody edited a booking setting.
 At 10pm Tuesday a visitor requests a Thursday 2pm consult. The owner gets
 one email with **Approve** and **Suggest another time**, taps Approve on
 their phone, confirms on the page it opens, and the visitor gets the
-confirmation and calendar file. Strelva handled shows "Strelva confirmed
+confirmation and calendar file. What changed shows "Strelva confirmed
 Thursday's consult with Dana." The owner never signed in.
 
 This is the target. Today hours and services are copied into booking config
@@ -429,9 +477,9 @@ the visitor POST and keep it on owner routes.
 
 | Event | Route | Reaches the owner by |
 | --- | --- | --- |
-| Instant booking confirmed | Handled under the approved Running item | "New booking" email at once; Strelva handled receipt |
+| Instant booking confirmed | Handled under the approved Running item | "New booking" email at once; What changed receipt |
 | Booking request | `customer.commitment`, owner_decides, urgent | One email per request with Approve and Suggest another time; Home if signed in |
-| Customer cancels or reschedules | Handled | Email; Strelva handled |
+| Customer cancels or reschedules | Handled | Email; What changed |
 | Go live, pause, resume | `system.go_live`, `system.pause` | Morning Needs you email |
 | Turn on instant for a service | `running.approve` | Morning Needs you email |
 | Connect a calendar | `access.grant` | Magic-link sign-in; no one-tap |
@@ -599,7 +647,7 @@ Every status change writes a history row: actor, from, to, time and reason.
 - **[New Oct 6]** Instant mode is a standing approval. Choosing instant for a
   service is a **Running** item the owner approves once ("Strelva confirms
   Consultation bookings in your open hours", `running.approve`). Each
-  instant booking after that is handled and shows in Strelva handled.
+  instant booking after that is handled and shows in What changed.
 
 ### Notifications
 
@@ -667,18 +715,41 @@ pattern, `public-booking.ts:489-531`) and expires after the booking ends.
   - `POST .../reservations` with `origin: "agent"` and `agent.name`.
     Agent-made bookings always go through the customer confirmation email.
   - An OpenAPI document at `/api/v1/bookings/openapi.json`.
-- **MCP server** at `/api/mcp/bookings/[tenant]` with tools `list_services`,
-  `find_slots`, `request_booking` and `get_booking_status`. It covers the
-  same operations and limits as the public API. **Needs Jacob's yes for the
-  dependency (`@modelcontextprotocol/sdk`) or we hand-roll the protocol.**
+- **One platform MCP server** at `/api/mcp/public` for every business
+  (#301), hand-rolled with no dependency (`src/platform/agent-channel`). Tools:
+  `search_business`, `get_business`, then `list_services`, `find_slots`,
+  `request_booking` and `get_booking_status`, each taking a `business`
+  handle: a tenant id, or `biz:<handle>` for a business without a website
+  while its `/biz` page is published and public. It is dual-era: MCP 2026-07-28 (no `initialize`, per-request
+  `_meta`, `server/discover`, mirrored `MCP-Protocol-Version`/`Mcp-Method`/
+  `Mcp-Name` headers, `-32022` for unsupported versions) and the 2025-03-26,
+  2025-06-18 and 2025-11-25 `initialize` handshake. Search lists only
+  businesses whose assistant requests can be confirmed today. A status token
+  stops answering 24 hours after the booking ends.
+  `/api/mcp/bookings/[tenant]` stays as an alias with the business fixed by
+  the URL and the four booking tools. Owner and agency tools come later (#302).
 - **Site markup.** Hosted sites add JSON-LD `potentialAction: ReserveAction`
   pointing at the booking page. It's cheap; evidence that it helps is
   unproven.
 - **Google Business Profile booking link.** Set the profile's booking URL to
   the site's booking page. The GBP API write is blocked until Google approves
   API access, so until then an operator sets it by hand.
-- Rate limits: the existing 20-per-window limit per IP, plus [n] agent holds
-  per tenant per hour.
+- Admission and rate limits: an agent hold is an anonymous request, so it
+  shares the business budget (20 open) and one-live-request-per-mailbox rule
+  of website and inquiry requests (`check_public_booking_budget`, #547), and
+  `hold_agent_booking` admits at most 10 live agent holds per business.
+  Expired or cancelled holds stop counting. Mailbox caps fold plus tags and
+  Gmail dots; the stored address never changes. On top, 20 calls a minute per
+  caller address (per business and address on the alias). Hosted
+  assistants call from shared provider egress, so
+  `STRELVA_AGENT_IDENTITY_LIMITS=1` (off by default, #310) replaces the IP
+  quota with buckets per business, customer email, request id or status
+  token, declared agent name, address or published provider egress
+  (checked-in OpenAI and Anthropic ranges, refreshed by
+  `scripts/refresh-provider-egress.ts`), and a platform-wide cap. It also
+  refuses throwaway confirmation addresses. Agent names and provider
+  addresses only add caps; they never lift one. Limits in
+  `src/platform/agent-channel/limits.ts` are starting values.
 
 ### Reserve with Google (separate track)
 
@@ -730,6 +801,11 @@ outside the bar for a 5 because the timing is Google's.
 
 ## Done means proven: the bar for a 5
 
+Checked rows below mean local code/fixture proof only, as recorded in the current
+status and handoff. Production rows stay unchecked. The real-provider suite is
+implemented but its credentialed cases remain skipped; 429 is a deterministic
+contract test rather than a deliberately induced provider rate limit.
+
 - [ ] On tenant zero in production: book, reschedule and cancel through the
       site with a real Google calendar and a real Outlook calendar connected.
       Events appear and disappear in both.
@@ -738,27 +814,27 @@ outside the bar for a 5 because the timing is Google's.
 - [ ] An outside client books through the MCP server and the public API,
       and the customer confirmation gate holds.
 - [ ] Customer confirmation and reminder emails are delivered and read back.
-- [ ] Failure-path tests for every row above, including concurrency and DST.
-- [ ] A real-provider test suite behind a flag: revoked token, 429, deleted
+- [x] Failure-path tests for every row above, including concurrency and DST.
+- [x] A real-provider test suite behind a flag: revoked token, 429, deleted
       event, etag conflict.
-- [ ] Desktop and mobile review of the booking component, manage page, owner
+- [x] Desktop and mobile review of the booking component, manage page, owner
       setup and owner list in empty, loading, error and permission states.
-- [ ] `pnpm check`, `check:custom-repos` and the workspace SQL checks pass.
+- [x] `pnpm check`, `check:custom-repos` and the workspace SQL checks pass.
       `/api/v1` changes are additive, and contract tests cover the new
       routes.
-- [ ] `booking-reminders` and hold-expiry crons declared, authenticated and
+- [x] `booking-reminders` and hold-expiry crons declared, authenticated and
       registered.
-- [ ] **[New Oct 6]** One store: a legacy `/api/booking` booking and a
+- [x] **[New Oct 6]** One store: a legacy `/api/booking` booking and a
       `/api/v1/bookings` reservation land in the same table, and the slot
       each takes is refused to the other. Tested locally with both routes.
-- [ ] **[New Oct 6]** Changing Friday hours in the business record changes
+- [x] **[New Oct 6]** Changing Friday hours in the business record changes
       Friday slots on both routes with no booking-side edit.
-- [ ] **[New Oct 6]** Pausing the bookings System keeps every future
+- [x] **[New Oct 6]** Pausing the bookings System keeps every future
       booking, its reminder and its manage link, and offers no new slots.
 - [ ] **[New Oct 6]** A request reaches the owner recipient by email and is
       approved from the link without signing in, on the `strelva` test
       business in production after Jacob's yes on email.
-- [ ] **[New Oct 6]** `/dashboard/schedule` and `/dashboard/roster` show the
+- [x] **[New Oct 6]** `/dashboard/schedule` and `/dashboard/roster` show the
       same bookings before and after the store flip, for a wellness fixture.
 
 ## Build plan

@@ -5,7 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Your work",
+  title: "Your workspace",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

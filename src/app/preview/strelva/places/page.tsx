@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
@@ -51,7 +52,7 @@ function record(access: BusinessRecord["access"]): BusinessRecord {
   };
 }
 
-export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string; held?: string }> }) {
+export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string; held?: string; reply?: string; member?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const params = await searchParams;
   const { place, state, result } = params;
@@ -75,8 +76,8 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     const outcome = (["saved", "unchanged", "conflict", "invalid", "denied", "failed"] as const).find((item) => item === result) as DetailsSaveOutcome | undefined;
     const action = async () => { "use server"; };
     const data = { record: record(state === "member" ? "member" : "owner"), operator: false, sites: [SITE], denied: [] };
-    return <WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
-      state={frame(state === "member" ? undefined : state, data, { ...data, record: { ...record("owner"), facts: {}, services: [], people: [] }, sites: [] }, data, { ...data, denied: DENIED })} />;
+    return <StrelvaShell signedIn={false} appBase="/preview/strelva" active="settings" title="Business details" businessContext="Juniper Bakery" systemsReleased><WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
+      state={frame(state === "member" ? undefined : state, data, { ...data, record: { ...record("owner"), facts: {}, services: [], people: [] }, sites: [] }, data, { ...data, denied: DENIED })} /></StrelvaShell>;
   }
 
   const leads = [
@@ -86,6 +87,7 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
     { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
   ];
+  if (params.reply === "1") Object.assign(leads[0]!, { rowId: "5e000000-0000-4000-8000-0000000000d4", replyPermission: params.member === "1" ? "member" : params.member === "none" ? "none" : "owner" });
   const site = { key: "juniper", tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 2, unavailable: false };
   // A site the business connected itself (any builder): its form inquiries come in beside the managed site's.
   const connected = { key: "connected:juniper-pop-up", tenantId: null, connected: true as const, siteName: "juniperpopup.example", lastThirtyDays: 1, unavailable: false,
@@ -97,6 +99,6 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
       { rowId: "5e000000-0000-4000-8000-0000000000d2", tenantId: "juniper", name: "Ana", email: "ana@example.test", message: "hi do u do gluten free", reason: "content-score", createdAt: "2026-10-04T22:40:00Z" },
     ], unavailable: false }
     : params.held === "error" ? { items: [], unavailable: true } : undefined;
-  const withHeld = <T extends object>(data: T) => (held ? { ...data, held } : data);
+  const withHeld = <T extends object>(data: T) => ({ ...data, ...(held ? { held } : {}), ...(params.reply === "1" ? { workspaceReplies: true, durable: true } : {}) });
   return <WorkspaceInquiries workspaceId={WORKSPACE} state={frame(state, withHeld({ sites: [site, connected], denied: [] as typeof DENIED }), withHeld({ sites: [{ ...site, leads: [], lastThirtyDays: 0 }, { ...connected, leads: [], lastThirtyDays: 0 }], denied: [] as typeof DENIED }), { sites: [{ ...site, leads: [], unavailable: true }, { ...connected, leads: [], unavailable: true }], denied: [] as typeof DENIED }, { sites: [site], denied: DENIED })} />;
 }

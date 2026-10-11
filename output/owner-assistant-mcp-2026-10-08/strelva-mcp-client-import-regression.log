@@ -1,0 +1,10 @@
+(node:54920) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.11 /private/tmp/strelva-mcp-launch-20261008
+
+
+ Test Files  3 passed (3)
+      Tests  10 passed (10)
+   Start at  13:44:58
+   Duration  743ms (transform 177ms, setup 79ms, import 313ms, tests 48ms, environment 470ms)

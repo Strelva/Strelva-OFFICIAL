@@ -1,11 +1,14 @@
-import Link from "next/link";
-import type { ReactNode } from "react";
-import { Card } from "@/components/ui/Card";
+import { PLACE_LABELS } from "@/platform/presentation/place-labels";
+import { StPage, StHead, StSection, StRows, StRow, StNotice, StEmpty, StMono, StTextButton } from "@/components/ui/strelva/Kit";
+import { BusinessDetailsForm } from "./BusinessDetailsForm";
+import { recordSource } from "./business-details-presentation";
+import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
+import type { RecordGoogleSummary } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
-import { DETAIL_LABELS, detailText, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
+import { EDITABLE_DETAILS, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";
 import type { LinkedSite } from "@/platform/owner-entry/linked-sites";
-import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
+import { type PlaceState } from "./WorkspacePlace";
 
 /**
  * Business details, in the business menu: the home of /dashboard/settings.
@@ -17,6 +20,8 @@ import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
 
 export interface BusinessDetailsData {
   record: BusinessRecord;
+  googleApprovalCopy?: string | null;
+  publishing?: boolean;
   operator: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
@@ -28,7 +33,7 @@ const OUTCOME: Record<DetailsSaveOutcome, { tone: "status" | "alert"; text: stri
   conflict: { tone: "alert", text: "Someone changed these details while you were editing. Nothing was saved. Here is the latest; make your change again." },
   invalid: { tone: "alert", text: "That wasn't saved." },
   denied: { tone: "alert", text: "Only the owner can change these details. Nothing was saved." },
-  failed: { tone: "alert", text: "That didn't save. Nothing changed. Try again in a minute." },
+  failed: { tone: "alert", text: "We couldn't confirm whether the save completed. Reload the page and review the latest details before saving again." },
 };
 
 const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
@@ -37,33 +42,11 @@ const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
   owner_recipient: "Use a full email address. Strelva needs one to send your reports and alerts.",
 };
 
-function Field({ name, value, readOnly, multiline = false, type = "text", hint }: { name: EditableDetail; value: string; readOnly: boolean; multiline?: boolean; type?: string; hint?: string }) {
-  const id = `detail-${name}`;
-  const className = "mt-1 w-full rounded-lg border border-gray-border bg-surface px-3 py-2 text-sm leading-6 focus-visible:outline focus-visible:outline-2 read-only:bg-transparent";
-  return (
-    <div>
-      <label htmlFor={id} className="text-xs font-medium text-gray-muted">{DETAIL_LABELS[name]}</label>
-      {multiline
-        ? <textarea id={id} name={name} defaultValue={value} readOnly={readOnly} rows={4} maxLength={2000} className={className} />
-        : <input id={id} name={name} type={type} defaultValue={value} readOnly={readOnly} maxLength={254} className={className} autoComplete="off" />}
-      {hint ? <p className="mt-1 text-xs text-gray-muted">{hint}</p> : null}
-    </div>
-  );
-}
-
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section id={id} className="mt-10 scroll-mt-8" aria-labelledby={`${id}-title`}>
-      <h2 id={`${id}-title`} className="mb-3 text-lg font-medium">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-export function WorkspaceBusinessDetails({ workspaceId, state, result, field, action }: {
+export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action }: {
   workspaceId: string;
   state: PlaceState<BusinessDetailsData>;
   result?: DetailsSaveOutcome | null;
+  googleResult?: RecordGoogleSummary | null;
   field?: EditableDetail | null;
   /** The server action; absent in previews and tests. */
   action?: (formData: FormData) => Promise<void>;
@@ -74,78 +57,23 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
   const notice = result ? OUTCOME[result] : null;
   const services = data?.record.services.filter((service) => service.active) ?? [];
   const people = data?.record.people.filter((person) => person.active) ?? [];
-  return (
-    <WorkspacePlace workspaceId={workspaceId} eyebrow="Business" title="Business details"
-      intro="Your business record: the facts Strelva keeps about your business, who gets its emails, and where the rest of your settings live."
-      state={state} denied={data?.denied.map((site) => site.siteName)}
-      errorTitle="Business details couldn't load" errorBody="Nothing changed. Reload the page to try again.">
-      {notice ? (
-        <Card padding="md" className="mt-6" role={notice.tone}>
-          <p className="text-sm leading-6">{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</p>
-        </Card>
-      ) : null}
-      {data ? (
-        <>
-          <Section id="business" title="About the business">
-            <Card padding="lg">
-              <form action={action} className="grid gap-4">
-                <input type="hidden" name="workspaceId" value={workspaceId} />
-                <input type="hidden" name="revision" value={data.record.revision} />
-                <Field name="display_name" value={detailText(data.record, "display_name")} readOnly={readOnly} />
-                <Field name="phone" type="tel" value={detailText(data.record, "phone")} readOnly={readOnly} />
-                <Field name="email" type="email" value={detailText(data.record, "email")} readOnly={readOnly} />
-                <Field name="description" multiline value={detailText(data.record, "description")} readOnly={readOnly} />
-                <div id="notifications" className="scroll-mt-8 border-t border-gray-border pt-4">
-                  <Field name="owner_recipient" type="email" value={detailText(data.record, "owner_recipient")} readOnly={readOnly}
-                    hint="Weekly and monthly recaps, review alerts, new inquiries and anything that needs your decision go here." />
-                </div>
-                {readOnly
-                  ? <p className="text-sm text-gray-muted">Only the owner can change these details.</p>
-                  : <div><button type="submit" className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-4 text-sm font-medium text-warm-white focus-visible:outline focus-visible:outline-2">Save details</button></div>}
-              </form>
-            </Card>
-          </Section>
-
-          {services.length ? (
-            <Section id="services" title="Services">
-              <Card padding="md"><ul className="grid gap-2 text-sm leading-6">{services.map((service) => <li key={service.id}><span className="font-medium">{service.name}</span>{service.priceText ? <span className="text-gray-muted"> · {service.priceText}</span> : null}</li>)}</ul></Card>
-            </Section>
-          ) : null}
-
-          <Section id="people" title="People and access">
-            <Card padding="md">
-              {people.length ? <ul className="mb-3 grid gap-1 text-sm leading-6">{people.map((person) => <li key={person.id}>{person.name}{person.roleTitle ? <span className="text-gray-muted"> · {person.roleTitle}</span> : null}</li>)}</ul> : null}
-              <p className="text-sm leading-6 text-gray-muted">Who can open this business and what they can do.</p>
-              <a className="mt-2 inline-block text-sm font-medium underline-offset-4 hover:underline" href={workspaceHref("access")}>Open People and access</a>
-            </Card>
-          </Section>
-
-          <Section id="account" title="Your account">
-            <Card padding="md">
-              <p className="text-sm leading-6 text-gray-muted">The email you sign in with. It stays the same across every business you can open.</p>
-              <Link className="mt-2 inline-block text-sm font-medium underline-offset-4 hover:underline" href="/workspace/account?continue=public">Open your account</Link>
-            </Card>
-          </Section>
-
-          <Section id="plan" title="Plan, export and leaving">
-            <Card padding="md">
-              <p id="ownership" className="scroll-mt-8 text-sm leading-6 text-gray-muted">What you pay, what you own, a full export of your data, and how to leave cleanly.</p>
-              <a className="mt-2 inline-block text-sm font-medium underline-offset-4 hover:underline" href={workspaceHref("settings")}>Open plan and ownership</a>
-            </Card>
-          </Section>
-
-          <Section id="website" title="Your website">
-            <Card padding="md">
-              <span id="domains" /><span id="branding" /><span id="site-config" /><span id="dependencies" /><span id="shortcuts" />
-              {data.sites.length ? (
-                <ul className="grid gap-1 text-sm leading-6">{data.sites.map((site) => <li key={site.tenantId}>{site.siteName}</li>)}</ul>
-              ) : <p className="text-sm text-gray-muted">No website is connected to this business yet.</p>}
-              <p className="mt-2 text-sm leading-6 text-gray-muted">Your site&apos;s look, menu, domain and connected services are run by Strelva. Ask for a change from Home and Strelva handles it.</p>
-              <a className="mt-2 inline-block text-sm font-medium underline-offset-4 hover:underline" href={`/workspace/results?workspaceId=${encodeURIComponent(workspaceId)}`}>Results and site health</a>
-            </Card>
-          </Section>
-        </>
-      ) : null}
-    </WorkspacePlace>
-  );
+  const remainingFacts = Object.entries(data?.record.facts ?? {}).filter(([key]) => !(EDITABLE_DETAILS as readonly string[]).includes(key));
+  return <StPage>
+    <StHead crumb={{ label: "Business details", href: workspaceHref("settings") }} title="The business record" meta="What Strelva knows about your business. Each fact keeps its source." />
+    {state.kind === "permission" ? <StEmpty action={<StTextButton href="/workspace">Open your workspace</StTextButton>}>This belongs to another business. Ask its owner to invite you.</StEmpty> : state.kind === "error" ? <StNotice tone="critical">Business details couldn’t load. {result === "failed" ? OUTCOME.failed.text : "Nothing changed. Reload the page to try again."}</StNotice> : null}
+    {notice ? <StNotice tone={notice.tone === "alert" ? "critical" : undefined}>{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</StNotice> : null}
+    {data?.denied.length ? <StNotice>Your account can’t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
+    {data ? <>
+      <StSection id="business" title="About the business"><BusinessDetailsForm key={data.record.revision} record={data.record} workspaceId={workspaceId} readOnly={readOnly} approvalCopy={data.googleApprovalCopy} action={action} /></StSection>
+      <span id="notifications" />
+      {remainingFacts.length ? <StSection title="Other recorded facts"><StRows>{remainingFacts.map(([key, fact]) => fact ? <StRow key={key} title={key.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase())} value={<StMono tone="text">{typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value)}</StMono>} detail={`${recordSource(fact.source)} · ${fact.verified ? "Confirmed" : "Not confirmed"}`} end="Usage not recorded" /> : null)}</StRows></StSection> : null}
+      {data.publishing ? <StSection id="publishing-facts" title="Hours and website"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></StSection> : null}
+      {data.publishing && googleResult ? <StNotice>{{ needs_approval: "Record saved. Google changes are waiting for your approval.", confirmed: "Record saved. Google changes read back successfully.", unconfirmed: "Record saved. Google accepted the changes; confirmation is pending.", failed: "Record saved. At least one Google change did not land; each result is kept separately.", unavailable: "Record saved. Google listings could not be read; no Google update is confirmed." }[googleResult]} <StTextButton href={`/workspace/google?workspaceId=${encodeURIComponent(workspaceId)}`}>Review each Google change and receipt</StTextButton></StNotice> : null}
+      <StSection id="services" title="Services and prices"><StRows>{services.map(service => <StRow key={service.id} title={service.name} value={service.priceText || "Price not recorded"} detail={`${recordSource(service.source)} · ${service.verified ? "Confirmed" : "Not confirmed"}`} />)}</StRows>{!services.length ? <StEmpty>No services have been recorded yet.</StEmpty> : null}</StSection>
+      <StSection id="people" title={PLACE_LABELS.access}><StRows>{people.map(person => <StRow key={person.id} title={person.name} detail={person.roleTitle} />)}<StRow title="Who can open this business and what they can do" href={workspaceHref("access")} end="Open People & access" /></StRows></StSection>
+      <StSection id="account" title="Your account"><StRows><StRow title="The email you sign in with" detail="It stays the same across every business you can open." href="/workspace/account?continue=public" end="Open your account" /></StRows></StSection>
+      <StSection id="plan" title="Plan, export and leaving"><span id="ownership" /><StRows><StRow title="What you pay and what you own" detail="Export your business data or review how to leave." href={workspaceHref("settings")} end="Open plan and ownership" /></StRows></StSection>
+      <StSection id="website" title="Your website"><span id="domains" /><span id="branding" /><span id="site-config" /><span id="dependencies" /><span id="shortcuts" /><StRows>{data.sites.map(site => <StRow key={site.tenantId} title={site.siteName} />)}<StRow title="Results and site health" detail="Open the website System for its connections and publishing access." href={`/workspace/results?workspaceId=${encodeURIComponent(workspaceId)}`} end="Open" /></StRows>{!data.sites.length ? <StEmpty>No website is connected to this business yet.</StEmpty> : null}</StSection>
+    </> : null}
+  </StPage>;
 }

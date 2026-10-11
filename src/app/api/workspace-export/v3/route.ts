@@ -1,9 +1,13 @@
 import { after } from "next/server";
+import { exportRecoveryEnabled, enqueueExportRecovery, runExportRecovery } from "@/platform/workspace-exports/recovery";
+import { exportRecoveryDependencies } from "@/server/workspace-export-recovery";
+import { collectTenantMedia } from "@/lib/media-store";
 import { getSupabase } from "@/platform/infra/db/client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { exportWorkspace } from "@/platform/workspace-exports/repository";
+import { exportWorkspaceArchive } from "@/platform/workspace-exports/repository";
 import { startWorkspaceExportV3, WorkspaceExportV3Error, type V3Rpc } from "@/platform/workspace-exports/v3";
 import { deliverWorkspaceExportLink } from "@/platform/workspace-exports/v3-delivery";
+import { emailSendingEnabled, customerEmailEnabled } from "@/platform/infra/email/enabled";
 import { alert } from "@/platform/infra/monitoring";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
@@ -11,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /** Export schema 3. Off unless STRELVA_EXPORT_SCHEMA_3=1. The owner gets a
- *  small export inline; larger exports, and every export the Strelva operator
+ *  background archive; every export the Strelva operator
  *  starts for an owner, are built in the background and the link is emailed
  *  to the owner recipient only. */
 export async function POST(request: Request) {
@@ -28,16 +32,33 @@ export async function POST(request: Request) {
     const body = await readWorkspaceBody(request, 1_000) as { workspaceId?: unknown };
     const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
     const baseUrl = new URL(request.url).origin;
+    if (exportRecoveryEnabled()) {
+      const queued = await enqueueExportRecovery(actor, workspaceId, rpc);
+      after(async () => { await runExportRecovery(exportRecoveryDependencies(baseUrl), queued.buildId); });
+      return workspaceJson({ status: "building", ...queued, message: "Your export is queued. You can download it here when ready; email delivery follows your business’s settings." }, 202);
+    }
     const outcome = await startWorkspaceExportV3(actor, workspaceId, {
       rpc,
-      snapshot: exportWorkspace,
+      snapshot: exportWorkspaceArchive,
+      background: true,
+      includeOperatorSnapshot: true,
+      assets: async (tenantIds) => {
+        if (!process.env.BLOB_READ_WRITE_TOKEN) return { items: [], unavailable: [{ category: "assets_manifest", reason: "The media store is not configured; URLs referenced in content remain in the content export." }] };
+        const rows = await Promise.all(tenantIds.map(async tenantId => ({ tenantId, ...await collectTenantMedia(tenantId) })));
+        return {
+          items: rows.flatMap(row => row.assets.map(asset => ({ tenantId: row.tenantId, ...asset }))),
+          unavailable: rows.filter(row => row.degraded).map(row => ({ category: `assets_manifest:${row.tenantId}`, reason: "The media provider could not be read completely. Request this site's manifest again." })),
+        };
+      },
       schedule: (task) => after(task),
       deliver: async (input) => { await deliverWorkspaceExportLink({ ...input, baseUrl }); },
       onFailure: ({ buildId, reason }) => { alert("workspace_export_build_failed", "high", { buildId, workspaceId, reason }); },
     });
     if (outcome.kind === "build") {
       return workspaceJson({ status: "building", buildId: outcome.buildId, deliverTo: outcome.deliverTo,
-        message: "Your export is being prepared. A download link will be emailed when it's ready." }, 202);
+        message: process.env.STRELVA_EXPORT_LINK_EMAIL === "1" && emailSendingEnabled() && customerEmailEnabled()
+          ? "Your export is being prepared. You can download it here when ready; owner email delivery follows the business’s email settings."
+          : "Your export is being prepared. Download it here when ready. Email delivery is paused." }, 202);
     }
     return new Response(outcome.body, { status: 200, headers: {
       "Content-Type": "application/json; charset=utf-8",

@@ -1,10 +1,11 @@
 /**
- * Local fixture for Needs you and Strelva handled on Home. Fictional asks for
+ * Local fixture for Needs you and What changed on Home. Fictional asks for
  * The Mooney Firm (spec section 1). Nothing leaves the browser; decisions
  * only change this in-memory list.
  */
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
 import { handledFromStore } from "@/platform/needs-you/handled";
+import { projectRecordActors } from "@/platform/needs-you/record-attribution";
 import { buildPolicyView, ownerChangeSchema, planOwnerChange, REFUSAL_WORDS, type PlannedWrite, type PolicyRows } from "@/platform/needs-you/policy-model";
 
 /** The Mooney Firm has made Google posts its own call; Strelva lets routine edits through after notice. */
@@ -37,7 +38,7 @@ function item(n: number, over: Partial<OwnerDecision>): OwnerDecision {
   const at = new Date(Date.parse("2026-10-06T11:00:00Z") - n * 3_600_000).toISOString();
   return {
     id: `d0000000-0000-4000-8000-00000000000${n}`, workspaceId: MOONEY, systemId: null, kind: "customer.commitment", route: "owner_decides",
-    title: "", detail: null, approveEffect: "Strelva makes this change.", notYetEffect: "Nothing changes.", sourceLifecycle: "tenant_event",
+    title: "", detail: null, approveEffect: "The change is made.", notYetEffect: "Nothing changes.", sourceLifecycle: "tenant_event",
     sourceId: `mooney-firm:evt-${n}`, revisionHash: String(n).repeat(64).slice(0, 64), urgent: false, signInRequired: false, adminMayDecide: true,
     openHref: null, state: "open", outcome: null, outcomeReason: null, receiptRef: null, decidedByKind: null, decidedAt: null,
     deliveryState: "suppressed", operatorNote: null, openedAt: at, expiresAt: new Date(Date.parse(at) + 14 * 86_400_000).toISOString(),
@@ -50,6 +51,7 @@ function initialItems(): OwnerDecision[] {
     item(3, {
       kind: "customer.commitment", urgent: true,
       title: "Reply to Jordan's mediation inquiry, quoting the consult fee",
+      actor: { kind: "agency", displayName: "Strelva Agency" },
       detail: "\"Thanks for reaching out. An initial consultation is $150 and takes about an hour. I have openings Thursday afternoon.\"",
       approveEffect: "The reply sends to Jordan.", notYetEffect: "Nothing sends.",
     }),
@@ -58,7 +60,7 @@ function initialItems(): OwnerDecision[] {
       approveEffect: "The booking page goes live.", notYetEffect: "Nothing goes live.", openHref: "/workspace?view=apps",
     }),
     item(1, {
-      kind: "google.post", title: "Post this week's mediation tip on Google", operatorNote: "It mentions a price, so Sheri should see it first.",
+      kind: "google.post", title: "Post this week's mediation tip on Google", operatorNote: "It mentions a price, so Sheri should see it first.", noteActor: { kind: "operator", displayName: "Taylor" },
       approveEffect: "The post goes up on your Google listing.", notYetEffect: "Nothing is posted.",
     }),
   ];
@@ -69,11 +71,17 @@ const HANDLED: HandledReceipt[] = [
   ...[handledFromStore({
     store: "owner_decisions", id: "5f1c2a00-0000-4000-8000-000000000001", at: "2026-10-06T16:20:00Z", kind: "customer.commitment",
     title: "Booking request: Dana Reed, Tue, Oct 13 3:00 PM", state: "approved", outcome: "done", sourceLifecycle: "booking_request",
-    decidedByKind: "owner_link", approveEffect: "The booking is confirmed for this time.", systemId: null,
+    actor: { kind: "platform" }, decidedByKind: "owner_link", approveEffect: "The booking is confirmed for this time.", systemId: null,
   })].flatMap(receipt => receipt ?? []),
-  { id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
-  { id: "tenant_event:evt-9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
-  { id: "tenant_event:evt-7", store: "tenant_events", systemId: null, sentence: "Strelva updated your website: Friday hours", at: "2026-10-05T14:12:00Z", changed: "hours", evidence: null, undo: { state: "undo_needs_review", reason: "Undo drafts a revert that Strelva reviews before it goes live." } },
+  { actor: { kind: "agency", displayName: "Strelva Agency" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva Agency updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
+  // The supplemental History projection cannot prove global Undo recency.
+  ...projectRecordActors([], [{
+    sequence: 15, revision: 15, actorKind: "agency", actorId: "a0000000-0000-4000-8000-000000000003", source: "agency",
+    actor: { kind: "agency", displayName: "Strelva Agency" }, undoOf: null, undoneBy: null, createdAt: "2026-10-06T14:20:00Z",
+    changes: [{ entity: "fact", id: "phone", before: null, after: null }],
+  }], "2026-10-02T12:00:00Z").flatMap(row => handledFromStore(row) ?? []),
+  { actor: { kind: "platform" }, id: "tenant_event:evt-9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
+  { id: "tenant_event:evt-7", store: "tenant_events", systemId: null, sentence: "Updated your website: Friday hours", at: "2026-10-05T14:12:00Z", changed: "hours", evidence: null, undo: { state: "undo_needs_review", reason: "Undo drafts a revert for review before it goes live." } },
 ];
 
 /** Answers /api/workspace/needs-you for the Mooney scenarios and adds the release to snapshots. */

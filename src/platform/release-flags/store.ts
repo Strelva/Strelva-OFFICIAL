@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { recordOperatorActionApproval, type OperatorAuditContext } from "@/platform/workspaces/operator-approvals";
 import {
   NO_VIEWER,
   RELEASE_FLAGS,
@@ -83,12 +84,24 @@ export class ReleaseFlagValidationError extends Error {
 }
 
 const VALIDATION: Record<string, string> = {
+  agency_release_flag_not_permitted: "The platform has not permitted your agency to change this capability for this business.",
+  agency_release_flag_above_ceiling: "This change exceeds the platform's current permission. Nothing changed.",
+  agency_release_flag_unverified: "Your agency is not currently verified for the required effect. Nothing changed.",
+  agency_release_flag_system_mismatch: "This capability requires a different kind of System.",
+  agency_release_flag_operator_only: "This owner-consent policy remains controlled by a platform operator.",
   workspace_release_flag_unknown: "That is not a release flag.",
   workspace_release_state_invalid: "Choose off, operators, on or unset.",
   workspace_release_reason_required: "Give a reason of 3 to 500 characters.",
   workspace_release_workspace_invalid: "That is not a business workspace.",
   workspace_release_tester_unknown: "No verified Strelva account uses that email.",
   workspace_release_limit_invalid: "Ask for between 1 and 200 changes.",
+  workspace_release_approval_required: "Turning a client on needs a recorded operator approval.",
+  operator_action_approval_required: "A recorded approval is required for this action.",
+  operator_action_approval_used: "This approval has already been used.",
+  operator_action_approval_expired: "This approval has expired. Record a new one.",
+  operator_action_approval_not_distinct: "A different operator must apply the action they approved.",
+  operator_action_approval_mismatch: "This approval is for different action details.",
+  operator_action_approval_authority_inactive: "The approving operator no longer has approval authority.",
 };
 
 /** Shared by readers in this migration family (release flags, linked sites). */
@@ -96,7 +109,7 @@ export async function callReleaseFlagsRpc<T>(name: string, args: Record<string, 
   const { data, error } = await db().rpc(name, args);
   if (error) {
     const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-    if (detail.includes("workspace_release_operator_required") || detail.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+    if (detail.includes("workspace_release_operator_required") || detail.includes("workspace_access_denied") || detail.includes("platform_operator_read_access_denied")) throw new WorkspaceAccessError();
     if (detail.includes("workspace_release_revision_conflict")) throw new ReleaseFlagConflictError();
     for (const [code, message] of Object.entries(VALIDATION)) if (detail.includes(code)) throw new ReleaseFlagValidationError(code, message);
     throw new WorkspaceStoreError(fallback);
@@ -203,16 +216,27 @@ export async function tenantReleaseFlagEnabled(
 }
 
 export async function setWorkspaceReleaseFlag(input: {
-  operatorEmail: string; workspaceId: string; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number;
+  actor: WorkspaceActor; workspaceId: string; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; auditContext?: OperatorAuditContext;
 }): Promise<WorkspaceReleaseFlags> {
   if (!RELEASE_FLAGS.includes(input.flag)) throw new ReleaseFlagValidationError("workspace_release_flag_unknown", VALIDATION.workspace_release_flag_unknown!);
-  const value = await callReleaseFlagsRpc("set_workspace_release_flag", {
-    p_operator_email: operatorEmail(input.operatorEmail),
+  let approvalId: string | null = null;
+  if (input.state === "on") {
+    const before = await readWorkspaceReleaseFlags(input.workspaceId, { fresh: true });
+    if (before.flags[input.flag]?.state !== "on") {
+      const approval = await recordOperatorActionApproval(input.actor, input.workspaceId, {
+        kind: "workspace_release_flag.on", flag: input.flag, state: "on", reason: input.reason.trim(),
+      }, input.auditContext ?? { source: "web" });
+      approvalId = approval.approvalId;
+    }
+  }
+  const value = await callReleaseFlagsRpc("set_workspace_release_flag_approved", {
+    p_operator_user_id: uuid.parse(input.actor.userId),
     p_workspace_id: uuid.parse(input.workspaceId),
     p_flag: input.flag,
     p_state: input.state,
     p_reason: input.reason,
     p_expected_revision: z.number().int().min(0).parse(input.expectedRevision),
+    p_approval_id: approvalId ? uuid.parse(approvalId) : null,
   }, workspaceReleaseFlagsSchema, "The release flag could not be changed.");
   cache.set(value.workspaceId, { at: Date.now(), value });
   return value;

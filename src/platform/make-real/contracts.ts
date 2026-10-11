@@ -1,3 +1,4 @@
+import { activationProviderReferenceSchema } from "./google-provider-reference";
 import { z } from "zod";
 import { authorityScopeSchema, effectKindSchema, reversibilitySchema } from "@/platform/possibilities/contracts";
 
@@ -31,6 +32,22 @@ export const stepStatusSchema = z.enum([
 ]);
 export type StepStatus = z.infer<typeof stepStatusSchema>;
 
+/** Result of undoing an accepted outside effect. Optional on a step so
+ * activation rows written before this field existed remain readable. */
+export const compensationOutcomeSchema = z.object({
+  status: z.enum(["running", "failed", "unknown", "compensated", "unavailable"]),
+  detail: z.string().max(2000),
+  at: DATE,
+  /** CAS claim persisted before a provider call so concurrent rollback workers
+   * cannot both issue a non-idempotent compensation. */
+  claimId: z.string().min(1).max(120).optional(),
+}).strict().superRefine((outcome, context) => {
+  if (outcome.status === "running" && !outcome.claimId) {
+    context.addIssue({ code: "custom", message: "A running compensation needs a claim id.", path: ["claimId"] });
+  }
+});
+export type CompensationOutcome = z.infer<typeof compensationOutcomeSchema>;
+
 export const activationStepSchema = z.object({
   id: z.string().min(1).max(80),
   kind: stepKindSchema,
@@ -51,7 +68,7 @@ export const activationStepSchema = z.object({
   finishedAt: DATE.optional(),
   reason: z.string().max(2000).optional(),
   receipt: z.object({
-    providerRef: z.string().max(240).optional(),
+    providerRef: activationProviderReferenceSchema.optional(),
     adapterMode: z.enum(["isolated", "live", "internal"]),
     grantId: z.string().max(120).optional(),
     approvalId: z.string().max(120).optional(),
@@ -62,6 +79,9 @@ export const activationStepSchema = z.object({
   /** Read-back is recorded separately from acceptance and never makes the
    * accepted write retryable (AGENTS.md: outside writes). */
   readBack: z.object({ status: z.enum(["confirmed", "failed"]), detail: z.string().max(1000), at: DATE }).strict().optional(),
+  /** Undo is a separate outside action. Unknown compensation is never
+   * repeated without evidence; failed compensation can be retried. */
+  compensation: compensationOutcomeSchema.optional(),
 }).strict();
 export type ActivationStep = z.infer<typeof activationStepSchema>;
 

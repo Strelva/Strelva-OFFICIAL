@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -118,7 +119,7 @@ await mapPool(active, 8, async (tenant) => {
             tenant,
             reviewId: review.id,
             review: { author: review.user.name, rating: review.rating, text: review.text },
-            reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+            reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
             logPrefix: "[cron poll-yelp]",
           });
         } catch (err) {

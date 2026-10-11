@@ -13,12 +13,14 @@ import { getLeads, type LeadRecord } from "@/lib/leads";
 import type { TenantConfig } from "@/lib/types";
 import {
   DEFAULT_INQUIRY_ROUTING_POLICY,
+  createInquiryDeliveryMessage,
   deliverInquiryAction,
   evaluateInquiryDelivery,
   getInquiryDeliveryMessageDigest,
   getInquiryReplyTrackingAddress,
   gateResponsibilityAction,
   inquirySubmissionFromLead,
+  normalizeInquiryRoutingPolicy,
   resolveInquiryRoute,
   runInquiryFollowUp,
   sendInquiryReply,
@@ -246,6 +248,7 @@ export async function runDueInquiryFollowUps(
       const followUp = definition.followUp;
       const inquiry = {
         ...inquirySubmissionFromLead(tenant.id, lead),
+        businessId: inquiryBusinessId,
         businessName: tenant.siteName,
         staffDestination: definition.routing?.destination || null,
         followUpMessageTemplate: followUp?.messageTemplate ?? null,
@@ -316,21 +319,20 @@ export async function runDueInquiryFollowUps(
           }
           const responsibility = current ? currentResponsibility(current.state.responsibilities, currentInquiry.capabilityId) : null;
           if (!responsibility) return null;
-          // Evaluate the same disclosure shown by the email renderer. Owner
-          // notices put the Strelva disclosure in the footer, so checking
-          // paragraphs alone would incorrectly turn a valid route into an
-          // approval request.
+          // Evaluate the actual automatic notice and business identity from
+          // the trusted renderer. Presentation never replaces the current
+          // responsibility, approval or provider checks.
           const messageBody = [
             ...(message.options.paragraphs || []),
             message.options.footerNote || "",
-          ].filter(Boolean).join("\n") || "Strelva inquiry follow-up";
+          ].filter(Boolean).join("\n");
           const responsibilityAction = action === "schedule_follow_up"
             ? "schedule_follow_up"
             : action === "owner_notification"
               ? "send_message"
               : "reply";
           const evaluation = current
-            ? evaluateInquiryResponsibility(current, currentInquiry.capabilityId || lead.capabilityId!, responsibilityAction, messageBody, now.toISOString())
+            ? evaluateInquiryResponsibility(current, currentInquiry.capabilityId || lead.capabilityId!, responsibilityAction, messageBody, now.toISOString(), message.disclosure)
             : null;
           const gate = gateResponsibilityAction(action, responsibility, evaluation, now);
           if (action === "owner_notification" && gate.allowed && gate.evaluation?.decision === "allow") {
@@ -463,8 +465,10 @@ export async function runDueInquiryFollowUps(
       const retryInitialReply = !replyCheckpoint || (replyCheckpoint.status === "failed" && replyCheckpoint.retryable === true);
       if (retryInitialReply && snapshot) {
         const responsibility = currentResponsibility(snapshot.state.responsibilities, inquiry.capabilityId);
-        const evaluation = responsibility
-          ? evaluateInquiryResponsibility(snapshot, inquiry.capabilityId || lead.capabilityId!, "reply", "This acknowledgement is from Strelva.", now.toISOString())
+        const message = responsibility ? createInquiryDeliveryMessage(inquiry, await (dependencies.resolveRoute || resolveInquiryRoute)(inquiry, normalizeInquiryRoutingPolicy(policy)), "reply") : null;
+        const messageBody = message ? [...(message.options.paragraphs || []), message.options.footerNote || ""].filter(Boolean).join("\n") : "";
+        const evaluation = responsibility && message
+          ? evaluateInquiryResponsibility(snapshot, inquiry.capabilityId || lead.capabilityId!, "reply", messageBody, now.toISOString(), message.disclosure)
           : null;
         const gate = responsibility ? gateResponsibilityAction("reply", responsibility, evaluation, now) : null;
         if (gate?.allowed) {

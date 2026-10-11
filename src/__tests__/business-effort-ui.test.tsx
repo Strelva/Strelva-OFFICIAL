@@ -13,6 +13,9 @@ vi.mock("@/app/admin/work/effort-actions", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
 
 import { BusinessEffortForSite, BusinessEffortPortfolio } from "@/app/admin/work/BusinessEffort";
+import { InternalWorkView } from "@/app/admin/work/WorkView";
+import WorkLoading from "@/app/admin/work/loading";
+import WorkError from "@/app/admin/work/error";
 import type { BusinessEffortLoad } from "@/app/admin/work/effort-data";
 import { readBusinessEffortOverview, type BusinessEffortStore } from "@/platform/business-effort";
 import type { BusinessEffortEntry, EffortBusiness } from "@/platform/business-effort/types";
@@ -79,9 +82,9 @@ describe("human minutes on Internal work", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Human minutes per business");
     expect(text).toContain("August 2026");
-    // August: Mooney 45 (void excluded), Juniper 90 → median 67.5; July median 180.
+    // August: Mooney 45 (void excluded), Juniper 90 → median 67.5; July incomplete.
     expect(text).toContain("67.5");
-    expect(text).toContain("July 2026: 180 min");
+    expect(text).toContain("July 2026: Not enough data");
     expect(text).toContain("Falling");
     expect(text).toContain("The Mooney Firm");
     expect(text).toContain("attymooney");
@@ -92,10 +95,38 @@ describe("human minutes on Internal work", () => {
 
   it("shows an honest empty state", async () => {
     render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ entries: [], businesses: [] }) }));
-    expect(container.textContent).toContain("No human minutes recorded yet");
-    expect(container.textContent).toContain("No customer businesses exist yet");
+    expect(container.textContent).toContain("No client businesses exist yet");
+    expect(container.textContent).toContain("No client businesses exist yet");
     expect(container.textContent).toContain("No entries recorded yet.");
     expect(container.querySelector("form")).toBeNull();
+  });
+
+  it("shows never-logged businesses and per-period coverage without claiming portfolio statistics", async () => {
+    render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ businesses: [...businesses,
+      { id: "10000000-0000-4000-8000-00000000000c", name: "No logs yet", tenantIds: [], firstEffortOn: null }] }) }));
+    const rows = container.querySelector('ul[aria-label^="Human minutes by business"]')!;
+    expect(rows.children).toHaveLength(3);
+    expect(rows.textContent).toContain("No logs yet");
+    expect(rows.textContent).toContain("Not logged");
+    expect(container.textContent).toContain("Across 3 businesses");
+    expect(container.textContent).toContain("2 of 3 businesses logged; 1 not logged");
+    expect(container.textContent).toContain("Not enough data");
+    expect(container.textContent).not.toContain("67.5");
+    expect(container.querySelector('[aria-label="Monthly log coverage"]')?.textContent).toContain("July 2026: 1 of 3 logged, 2 not logged");
+  });
+
+  it("accepts explicit zero logs and shows a covered zero in business rows", async () => {
+    render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ entries: [entry(1, MOONEY, "2026-08-31", 0, "No human work")] }) }));
+    const rows = container.querySelector('ul[aria-label^="Human minutes by business"]')!;
+    const mooney = Array.from(rows.children).find((row) => row.textContent?.includes("The Mooney Firm"))!;
+    expect(mooney.textContent).toMatch(/Latest 0/);
+    const form = container.querySelector('form[aria-label="Record human minutes"]') as HTMLFormElement;
+    const minutes = form.querySelector('[inputmode="numeric"]') as HTMLInputElement;
+    act(() => { setValue(form.querySelector("select")!, JUNIPER); setValue(minutes, "0"); });
+    expect((form.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    mockRecord.mockResolvedValueOnce({ ok: true, message: "Recorded 0 minutes." });
+    await act(async () => { form.requestSubmit(); });
+    expect(mockRecord.mock.calls[0]![0]).toMatchObject({ businessId: JUNIPER, minutes: 0 });
   });
 
   it("shows unavailable storage instead of zero", () => {
@@ -118,8 +149,8 @@ describe("human minutes on Internal work", () => {
     const minutes = Array.from(form.querySelectorAll("input")).find((input) => input.getAttribute("inputmode") === "numeric") as HTMLInputElement;
     const submit = form.querySelector('button[type="submit"]') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
-    act(() => { setValue(business, MOONEY); setValue(minutes, "0"); });
-    expect(form.textContent).toContain("Enter whole minutes from 1 to 1440.");
+    act(() => { setValue(business, MOONEY); setValue(minutes, "-1"); });
+    expect(form.textContent).toContain("Enter whole minutes from 0 to 1440.");
     expect(submit.disabled).toBe(true);
     act(() => setValue(minutes, "35"));
     expect(submit.disabled).toBe(false);
@@ -159,6 +190,33 @@ describe("human minutes on Internal work", () => {
   });
 });
 
+describe("internal work paper presentation", () => {
+  it("keeps preview records read only and never opens the live inbox", async () => {
+    const network = vi.spyOn(globalThis, "fetch");
+    try {
+      render(createElement(InternalWorkView, { effort: await readyLoad(), workspaceOpen: true, learningOpen: false, operationsHref: "/workspace/operations", learningHref: "/workspace/product-learning", preview: true }));
+      expect(container.querySelector("h1")?.textContent).toBe("Internal work");
+      expect(container.querySelector("form")).toBeNull();
+      expect(container.textContent).toContain("Preview only");
+      expect(container.querySelector('ul[aria-label="Human-minute summary"]')).not.toBeNull();
+      expect(container.querySelector('a[href="/workspace/operations"]')).not.toBeNull();
+      expect(network).not.toHaveBeenCalled();
+      expect(mockRecord).not.toHaveBeenCalled();
+      expect(mockVoid).not.toHaveBeenCalled();
+    } finally { network.mockRestore(); }
+  });
+  it("shows a named loading state and retries the error boundary", () => {
+    render(createElement(WorkLoading));
+    expect(container.textContent).toContain("Reading recorded work and human minutes");
+    expect(container.querySelector('[role="status"]')).not.toBeNull();
+    const reset = vi.fn();
+    render(createElement(WorkError, { reset }));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("unconfirmed");
+    act(() => container.querySelector("button")!.click());
+    expect(reset).toHaveBeenCalledOnce();
+  });
+});
+
 describe("human minutes on a client", () => {
   it("measures the managed site's bound business with a fixed log form", async () => {
     render(createElement(BusinessEffortForSite, { load: await readyLoad(), tenantId: "attymooney" }));
@@ -166,14 +224,14 @@ describe("human minutes on a client", () => {
     expect(text).toContain("The Mooney Firm");
     expect(text).toContain("July 2026: 180 min");
     expect(text).toContain("Falling");
-    expect(text).toContain("Measured since");
+    expect(text).toContain("First log");
     expect(text).not.toContain("Menu page rebuild");
     expect(container.textContent).not.toContain("Choose a business");
   });
 
   it("explains an unattached site instead of guessing a business", async () => {
     render(createElement(BusinessEffortForSite, { load: await readyLoad(), tenantId: "gldf" }));
-    expect(container.textContent).toContain("not attached to a customer business");
+    expect(container.textContent).toContain("not attached to a client business");
     expect(container.querySelector("form")).toBeNull();
   });
 

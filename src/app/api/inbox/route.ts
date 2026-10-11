@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getInboxItems, markInboxRead, markAllInboxRead } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const url = new URL(request.url);
     const type = url.searchParams.get("type") || undefined;

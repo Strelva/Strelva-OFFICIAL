@@ -10,33 +10,14 @@ interface Cmd {
   href: string;
 }
 
-// Mirrors the rail so every section is reachable from the palette, in the same
-// grouped order (workspace → clients → review → system).
-const NAV: Cmd[] = [
-  { id: "nav-overview", label: "Overview", hint: "Section", href: "/admin" },
-  { id: "nav-clients", label: "Clients", hint: "Section", href: "/admin/clients" },
-  { id: "nav-leads", label: "Leads", hint: "Section", href: "/admin/leads" },
-  { id: "nav-onboard", label: "Onboard a client", hint: "Section", href: "/admin/onboard" },
-  { id: "nav-paylinks", label: "Pay links", hint: "Section", href: "/admin/pay-links" },
-  { id: "nav-analytics", label: "Analytics", hint: "Section", href: "/admin/analytics" },
-  { id: "nav-actions", label: "Actions", hint: "Section", href: "/admin/actions" },
-  { id: "nav-drafts", label: "Drafts", hint: "Section", href: "/admin/drafts" },
-  { id: "nav-maintenance", label: "Maintenance", hint: "Section", href: "/admin/digests" },
-  { id: "nav-ops", label: "Ops", hint: "Section", href: "/admin/ops" },
-  { id: "nav-audit", label: "Audit", hint: "Section", href: "/admin/audit" },
-];
+import { OPERATOR_DESTINATIONS, operatorDestinations } from "@/experience/operator/destinations";
 
-// Actions, not just jumps. Each routes to a surface that ALREADY performs the
-// work — either the real page (mint a pay link) or Mission Control with the ask
-// prefilled (`?ask=`), where the operator agent's propose_* → confirm flow
-// commits it. No new mutation path is created here; this is navigation only.
 const ACTIONS: Cmd[] = [
-  { id: "act-mc", label: "Open Mission Control", hint: "Action", href: "/admin#mission-control" },
-  { id: "act-ask", label: "Ask the operator agent…", hint: "Action", href: "/admin?ask=" },
-  { id: "act-paylink", label: "Mint a pay link", hint: "Action", href: "/admin/pay-links" },
+  { id: "act-mc", label: "Open Mission Control", hint: "Platform support", href: "/admin#mission-control" },
+  { id: "act-ask", label: "Ask Strelva about a platform incident…", hint: "Platform support", href: "/admin?ask=" },
 ];
 
-export function CommandPalette({ tenants }: { tenants: { id: string; siteName: string }[] }) {
+export function CommandPalette({ tenants, moneyEnabled = false }: { moneyEnabled?: boolean; tenants: { id: string; siteName: string }[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -47,13 +28,14 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
 
   const commands = useMemo<Cmd[]>(
     () => [
-      ...NAV,
+      ...operatorDestinations({ moneyEnabled }).map(item => ({ id: `nav-${item.href}`, label: item.label, hint: item.group, href: item.href })),
       ...ACTIONS,
       ...tenants.flatMap((t) => [
+        { id: `cleanup-${t.id}`, label: `${OPERATOR_DESTINATIONS.cleanup.label} · ${t.siteName}`, hint: "Site support", href: OPERATOR_DESTINATIONS.cleanup.href.replace("[id]", encodeURIComponent(t.id)) },
         {
           id: `tenant-${t.id}`,
           label: t.siteName,
-          hint: "Client",
+          hint: "Site",
           href: `/admin/clients/${t.id}`,
         },
         {
@@ -64,7 +46,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
         },
       ]),
     ],
-    [tenants]
+    [tenants, moneyEnabled]
   );
 
   const results = useMemo(() => {
@@ -185,7 +167,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
               setOpen(false);
             }
           }}
-          placeholder="Jump to a section or client…"
+          placeholder="Jump to a destination or site…"
           className="w-full bg-transparent border-b border-glass-border px-4 py-3 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none"
         />
         <ul className="max-h-80 overflow-y-auto py-1">

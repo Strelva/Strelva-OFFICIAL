@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Loader2, RotateCw, ArrowRight, CircleAlert } from "lucide-react";
-import { ClientLogo, Grade, LaunchBar } from "../console";
-
-/** Tone the score bar to match the letter grade (A/B good, C/D watch, F bad) so
- *  the bar and the badge never disagree — a B-grade site reads healthy, not amber. */
-function gradeTone(grade: string | null): "good" | "warn" | "crit" | undefined {
-  if (grade === "A" || grade === "B") return "good";
-  if (grade === "C" || grade === "D") return "warn";
-  if (grade === "F") return "crit";
-  return undefined;
-}
+import { StEmpty, StMono, StNotice, StPill, StSection, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 
 export interface AuditRow {
   id: string;
@@ -34,7 +23,7 @@ function ago(iso: string | null): string {
   return `${days}d ago`;
 }
 
-export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
+export function SiteAuditsBoard({ initialRows, request = fetch }: { initialRows: AuditRow[]; request?: typeof fetch }) {
   const [rows, setRows] = useState(initialRows);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [allRunning, setAllRunning] = useState(false);
@@ -44,7 +33,7 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
     setBusy((b) => new Set(b).add(id));
     setError("");
     try {
-      const res = await fetch("/api/admin/scan", {
+      const res = await request("/api/admin/scan", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ tenant: id }),
@@ -92,110 +81,19 @@ export function SiteAuditsBoard({ initialRows }: { initialRows: AuditRow[] }) {
     setAllRunning(false);
   }
 
-  return (
-    <div className="space-y-4">
-      {/* No section intro line — the page subtitle already explains this surface;
-          the "Scan all sites" action sits on its own header row. */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <button
-          type="button"
-          onClick={scanAll}
-          disabled={allRunning || busy.size > 0}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-colors hover:bg-accent/90 disabled:opacity-50"
-        >
-          {allRunning ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={2} /> : <RotateCw className="h-4 w-4" strokeWidth={2} />}
-          {allRunning ? "Scanning…" : "Scan all sites"}
-        </button>
-      </div>
-
-      {error && (
-        <p className="flex items-center gap-1.5 text-[12.5px] text-critical" role="alert">
-          <CircleAlert className="h-3.5 w-3.5" strokeWidth={2} /> {error}
-        </p>
-      )}
-
-      <div className="overflow-hidden rounded-2xl border border-glass-border bg-glass">
-        <div className="hidden grid-cols-[1fr_auto_150px_auto_auto] items-center gap-5 px-4 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-gray-faint md:grid">
-          <span>Client</span>
-          <span className="w-[52px] text-center">Grade</span>
-          <span>Score</span>
-          <span className="w-[120px] text-right">Fix first</span>
-          <span className="w-[92px] text-right">Audit</span>
-        </div>
-        <div className="divide-y divide-glass-border">
-          {rows.map((r) => {
-            const scanning = busy.has(r.id);
-            return (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3 md:grid md:grid-cols-[1fr_auto_150px_auto_auto] md:gap-5">
-                <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                  <ClientLogo name={r.siteName} size={34} className="shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/admin/clients/${r.id}`} className="block truncate text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white hover:text-accent">
-                      {r.siteName}
-                    </Link>
-                    <p className="mt-0.5 truncate text-[11px] text-gray-faint">{ago(r.scannedAt)}</p>
-                  </div>
-                </div>
-
-                <div className="hidden w-[52px] justify-center md:flex">
-                  {r.grade ? <Grade grade={r.grade} /> : <span className="text-[12px] text-gray-faint">&ndash;</span>}
-                </div>
-
-                <div className="hidden md:block">
-                  {r.score != null ? (
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-[11px] text-gray-muted">
-                        <span>Health</span>
-                        <span className="font-mono tabular-nums">{r.score}/100</span>
-                      </div>
-                      <LaunchBar pct={r.score} tone={gradeTone(r.grade)} />
-                    </div>
-                  ) : (
-                    <span className="text-[12px] text-gray-faint">not scanned yet</span>
-                  )}
-                </div>
-
-                <div className="hidden w-[120px] justify-end text-right text-[12px] md:flex">
-                  {r.issues == null ? (
-                    <span className="text-gray-faint">&mdash;</span>
-                  ) : r.issues === 0 ? (
-                    <span className="text-positive">all clear</span>
-                  ) : (
-                    <span className="text-gray-muted">
-                      {r.high > 0 && <span className="font-semibold text-critical">{r.high} high</span>}
-                      {r.high > 0 && " · "}
-                      {r.issues} to fix
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center justify-end gap-1 md:w-[92px]">
-                  <button
-                    type="button"
-                    onClick={() => scanOne(r.id)}
-                    disabled={scanning || allRunning}
-                    aria-label={`Re-scan ${r.siteName}`}
-                    className="inline-flex items-center gap-1.5 rounded-[8px] border border-glass-border px-2.5 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white disabled:opacity-50"
-                  >
-                    {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} /> : <RotateCw className="h-3.5 w-3.5" strokeWidth={1.9} />}
-                    {scanning ? "" : "Scan"}
-                  </button>
-                  <Link
-                    href={`/admin/clients/${r.id}#site-health`}
-                    aria-label={`Full audit detail for ${r.siteName}`}
-                    className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border text-gray-muted transition-colors hover:border-gray-border hover:text-warm-white"
-                  >
-                    <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.9} />
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-          {rows.length === 0 && (
-            <div className="px-4 py-8 text-center text-[13px] text-gray-muted">No client sites to audit yet.</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <StSection title="Client sites" meta={<StMono>{rows.length}</StMono>} action={rows.length > 0 ? <StPill onClick={scanAll} disabled={allRunning || busy.size > 0} busy={allRunning}>{allRunning ? "Scanning…" : "Scan all sites"}</StPill> : undefined}>
+    {error && <StNotice tone="critical">{error} Previous audit results are still shown.</StNotice>}
+    {rows.length === 0 ? <StEmpty>No client sites to audit yet.</StEmpty> : <StTable label="Site audits" columns={[
+      { key: "client", label: "Client" }, { key: "grade", label: "Grade" }, { key: "score", label: "Score", mono: true }, { key: "issues", label: "Fix first" }, { key: "actions", label: "Audit" },
+    ]} rows={rows.map(row => {
+      const scanning = busy.has(row.id);
+      return { key: row.id, cells: {
+        client: <><StTextButton href={`/admin/clients/${row.id}`}>{row.siteName}</StTextButton><br /><StMono as="time" dateTime={row.scannedAt ?? undefined}>{ago(row.scannedAt)}</StMono></>,
+        grade: row.grade ? <StState kind={row.grade === "A" || row.grade === "B" ? "live" : row.grade === "F" ? "down" : "need"}>Grade {row.grade}</StState> : <StState kind="draft">Not scanned</StState>,
+        score: row.score != null ? `${row.score}/100` : "Not measured",
+        issues: row.issues == null ? "Not checked" : row.issues === 0 ? <StState kind="live">All clear</StState> : <StState kind={row.high > 0 ? "down" : "need"}>{row.high > 0 ? `${row.high} high · ` : ""}{row.issues} to fix</StState>,
+        actions: <div className="flex flex-wrap items-center gap-2"><StPill variant="soft" onClick={() => scanOne(row.id)} disabled={scanning || allRunning} busy={scanning} aria-label={`Re-scan ${row.siteName}`}>{scanning ? "Scanning…" : "Scan"}</StPill><StTextButton href={`/admin/clients/${row.id}#site-health`} aria-label={`Full audit detail for ${row.siteName}`}>Detail</StTextButton></div>,
+      }};
+    })} />}
+  </StSection>;
 }

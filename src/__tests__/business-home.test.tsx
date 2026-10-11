@@ -6,6 +6,9 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, r
 import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import type { WorkspaceOfferingState } from "@/experience/workspace/WorkspaceOfferings";
+import type { SystemView } from "@/experience/systems/model";
+import { HomeOutcomesProvider } from "@/experience/workspace/outcomes/HomeOutcomes";
+import { BAKERY_LOOP } from "@/experience/workspace/preview/outcomes-fixture";
 
 const offeringState: WorkspaceOfferingState = {
   status: "unavailable",
@@ -64,6 +67,27 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
+  it("keeps the same agency brand and client Systems on shared Home and decision status", () => {
+    const shared = { ...snapshot([]), workspaces: [{ id: "business-1", name: "Harbor Dental", kind: "customer" as const, access: "provider_seat" as const, role: "admin" as const }, { id: "agency-1", name: "North Studio", kind: "agency" as const, role: "owner" as const }], releases: { systems: true, needsYou: true }, ownerBrand: { agencyId: "agency-1", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" as const } };
+    for (const view of ["home", "needs-you"] as const) {
+      const html = renderToStaticMarkup(createElement(BusinessHome, { snapshot: shared, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false, systemsReleased: true, view, onOpen: noop, onStart: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" }));
+      expect(html).toContain("North Studio"); expect(html).toContain("Runs on Strelva");
+      expect(html).toContain("All clients"); expect(html).toContain("Waiting on Harbor Dental");
+      expect(html).toContain("Checking shared decision status");
+      expect(html).not.toContain("Decisions only you can make");
+      expect(html).not.toContain("Hold to approve");
+    }
+  });
+
+  it("shows the outcome loop only when a preview provides it", () => {
+    expect(renderHome()).not.toContain('data-outcome="loop"');
+    const props = { snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" };
+    const html = renderToStaticMarkup(createElement(HomeOutcomesProvider, { value: { loop: BAKERY_LOOP } }, createElement(BusinessHome, props)));
+    expect(html).toContain('data-outcome="loop"');
+    expect(html).toContain("412 people found you. 9 became bookings.");
+  });
+
   it("presents the business's actual Systems and Needs you, and keeps Systems out of the files list", () => {
     const items = [work("Mediation intake", { productId: "applications" }), work("AI check", { productId: "ai_visibility" })];
     const html = renderToStaticMarkup(createElement(BusinessHome, {
@@ -72,14 +96,39 @@ describe("business home", () => {
       systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unknown", summary: "Nothing has checked this yet." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
       files: [items[1]!], systemsReleased: true,
     }));
-    expect(html).toContain("<h1 class=\"font-display\">Alder Workshop</h1>");
+    // October 9 A1: the business and open sections replace the dusk hero.
+    expect(html).toMatch(/<h1 id="business-start-title"[^>]*>Alder Workshop<\/h1>/);
     expect(html).toContain("1 live");
+    expect(html).not.toContain("Welcome back.");
     expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
-    expect(html).toContain("Open Mediation intake, Internal tool, Live, Unknown");
-    expect(html).toContain("What should happen next?");
+    expect(html).toContain("Mediation intake");
+    expect(html).toContain("Unknown");
+    expect(html).toContain("Ask Strelva to change or make something");
     expect(html).toContain("All systems and files");
+    const main = html.slice(html.indexOf('<main id="business-home-main"'));
+    const positions = ['id="home-attention"', 'id="home-systems"', 'id="home-handled"', '>In progress<', '>Files and results<'].map(marker => main.indexOf(marker));
+    expect(positions.every(position => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(html).not.toContain("Open Mediation intake\"");
-    expect(html).toContain("Open AI check");
+    expect(html).toContain("AI check");
+  });
+
+  it("orders not-working Systems before off and live, then by name within each group", () => {
+    function system(name: string, lifecycle: SystemView["lifecycle"], health: SystemView["health"]["state"]): SystemView {
+      return { id: name, name, kind: "app", detail: "", lifecycle, health: { state: health, summary: "Recorded check" }, surface: { kind: "work", workId: name, productId: "applications" }, connections: [], possibilities: [], versions: [] };
+    }
+    const html = renderToStaticMarkup(createElement(BusinessHome, {
+      snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased: true,
+      systems: [system("Zulu live", "live", "healthy"), system("Beta off", "paused", "unknown"), system("Zulu broken", "live", "blocked"), system("Alpha broken", "live", "degraded"), system("Alpha live", "live", "healthy")], files: [],
+    }));
+    const main = html.slice(html.indexOf('<main id="business-home-main"'));
+    const names = ["Alpha broken", "Zulu broken", "Beta off", "Alpha live", "Zulu live"];
+    const positions = names.map(name => main.indexOf(name));
+    expect(positions.every(position => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(main).toContain("Paused");
+    expect(main).toContain("Unknown");
   });
 
   it("tells an empty business that Strelva builds its systems, without a build-it-yourself prompt", () => {
@@ -102,6 +151,8 @@ describe("business home", () => {
     const website = { id: "site-1", kind: "website" as const, name: "alder.example", detail: "", lifecycle: "live" as const, health: { state: "unknown" as const, summary: "" }, surface: { kind: "website" as const, previewSrc: "", previewLabel: "", domain: "alder.example" }, connections: [], possibilities: [], versions: [] };
     const withSite = renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: on, systems: [website] as never }));
     expect(withSite).toContain("Have another website?");
+    const rebuild = { ...snapshot([]), releases: { systems: true, websiteRebuild: true } };
+    expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: rebuild, systems: [] }))).toContain("Open website options");
     // Off for this business, or a read-only agency view: no link.
     expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: { ...snapshot([]), releases: { systems: true } }, systems: [] }))).not.toContain("/workspace/site");
     const shared = { ...on, workspaces: [{ id: "business-1", kind: "customer" as const, name: "Alder Workshop", access: "delegated_read" as const }] };
@@ -120,7 +171,7 @@ describe("business home", () => {
     }));
     // The greeting and composer lead, as before Systems; no business header or Systems list.
     expect(html).toContain("id=\"business-start-title\"");
-    expect(html.indexOf("What should happen next?")).toBeLessThan(html.indexOf("Needs you"));
+    expect(html.indexOf("Ask Strelva for anything your business needs")).toBeLessThan(html.indexOf("Needs you"));
     for (const gone of ["id=\"home-systems\"", "Systems", "All systems and files", "Files and results", "live ·", "Nothing is running yet.", "Internal tool, Live"]) expect(html).not.toContain(gone);
     // Every saved result, the managed website and apps are where they were.
     expect(html).toContain("2 saved results");
@@ -141,7 +192,7 @@ describe("business home", () => {
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
-    expect(html).toContain("Strelva handled");
+    expect(html).toContain("What changed");
     expect(html).toContain("In progress");
     expect(html).toContain("All requests");
     expect(html).toContain("Files and results");
@@ -161,7 +212,7 @@ describe("business home", () => {
     expect(html).not.toContain("$0");
   });
 
-  it("with Systems released, Strelva handled is the receipt feed and In progress lists Make real", () => {
+  it("with Systems released, What changed is the receipt feed and In progress lists Make real", () => {
     const base = snapshot([work("Opening checklist")]);
     const props = { sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased: true };
@@ -187,7 +238,7 @@ describe("business home", () => {
     }));
     expect(html).toContain("Needs you");
     expect(html).toContain("Open Opening checklist");
-    expect(html).not.toContain("Strelva handled");
+    expect(html).not.toContain("What changed");
     expect(html).not.toContain("All requests");
   });
 });

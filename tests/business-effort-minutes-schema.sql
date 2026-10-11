@@ -89,7 +89,7 @@ select pg_temp.effort_assert(pg_temp.effort_error(format($q$select public.record
  'e9100000-0000-4000-8000-000000000010',%s,%L,%L::date,%L)$q$, v.minutes, v.category, v.occurred_on, v.note))
  ='business_effort_invalid', 'invalid input: ' || v.label)
 from (values
- (0,'support',(now() at time zone 'utc')::date,null::text,'zero minutes'),
+ (-1,'support',(now() at time zone 'utc')::date,null::text,'negative minutes'),
  (1441,'support',(now() at time zone 'utc')::date,null,'more than a day'),
  (10,'build',(now() at time zone 'utc')::date,null,'unknown category'),
  (10,'support',(now() at time zone 'utc')::date + 1,null,'future date'),

@@ -1,8 +1,9 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /** A same-tab draft handoff. This carries text only, never permission or a send. */
 const PREFIX = "strelva:website-request:";
 export function prepareWebsiteRequestDraft(site: { id: string; href: string }, request: string, storage: Pick<Storage, "setItem">, origin: string, token: string, now = Date.now()): string {
   const target = new URL(site.href, origin);
-  if (target.origin !== origin && target.origin !== "https://app.strelva.com") throw new Error("Open this website from Strelva to continue.");
+  if (target.origin !== origin && target.origin !== CONTROL_PLANE_URL) throw new Error("Open this website from Strelva to continue.");
   if (!/^\/((client\/[a-z0-9_-]+\/)?dashboard)(\/)?$/.test(target.pathname)) throw new Error("This website has no request destination.");
   if (!request.trim() || request.length > 12000 || !/^[a-zA-Z0-9-]{8,80}$/.test(token)) throw new Error("Check the website request before continuing.");
   storage.setItem(`${PREFIX}${token}`, JSON.stringify({ siteId: site.id, request, createdAt: now }));

@@ -11,12 +11,40 @@ the snapshot reads the new facts. Findings 12–17 are new. Wave 4's journey
 gaps add two migrations as batch 7 (50 unapplied in total). Wave 5
 (`w5/structure`) adds a third to batch 7, `20261009140000`, which gives
 finding 16 its own per-business flag (51 unapplied in total).
-Status: prepared, nothing executed. Every step below is a separate yes.
+Updated: 2026-10-07 for the agency model (company ADR 0012, accepted Oct 7),
+using audit H, "What ADR 0012 breaks or changes in the in-flight 1.0 release"
+(Oct 7; local evidence in `strelva/.scratch/agency-1.0/audit/H-release-impact.md`),
+tracked in [#315](https://github.com/Strelva/Strelva-OFFICIAL/issues/315).
+Status: steps 0–4 done Oct 7; later steps prepared, not executed by this
+amendment. Every remaining production step is a separate yes.
+
+**HOLD: steps 11–12 (S5 and conversions) until batch 7A lands.** The hold
+decision [#234](https://github.com/Strelva/Strelva-OFFICIAL/issues/234) is
+**pending**, not decided. This packet records the required stop; it does not
+record Jacob's approval of the hold or authorize any production action.
+Do not run the old designation or conversion path while that decision and
+the batch 7A gate are unresolved.
 
 This is every production step Strelva `1.0.0` needs, in order, written so
 Jacob can say yes one item at a time. Each step names the exact command, what
 it changes, how to verify it, and how to undo it. Saying yes to one step never
 implies the next.
+
+### Execution record · October 7, 2026
+
+These are the completed results supplied for this amendment, not new
+production checks run from this branch. Private dumps stay outside Git.
+
+| Step | Status | Evidence |
+| --- | --- | --- |
+| [0](https://github.com/Strelva/Strelva-OFFICIAL/issues/343) · snapshot | Done · 2026-10-07 | 31 migration sentinels missing; 14 tenants, 12 active |
+| [1](https://github.com/Strelva/Strelva-OFFICIAL/issues/344) · dump + local restore | Done · 2026-10-07 | Dump at `~/.strelva-prod-ops/dumps/2026-10-07`; restore matched 146/146 tables, 2,603 rows |
+| [2](https://github.com/Strelva/Strelva-OFFICIAL/issues/345) · batch 0 | Done · 2026-10-07 14:25Z | `tenant_leads` applied; 86 migrations applied in total |
+| [3](https://github.com/Strelva/Strelva-OFFICIAL/issues/346) · `0.2.1` | Done · 2026-10-07 14:53Z | Live deployment `dpl_9ViM5iWeCepPiio8k3AZ5NFwKFPx`; storefront parity 60/60 |
+| [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) · S1 lead backfill | Done · 2026-10-07 | 43/43 leads backfilled |
+
+Re-read the snapshot before the next production write. Completion of these
+steps does not qualify the 1.0 candidate or agency paths.
 
 Every step also passes the
 [release checklist](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
@@ -64,7 +92,10 @@ disagree, the checklist's stop conditions win.
    otherwise). The library is read for an agency workspace, and rows used to
    be allowed on business workspaces only; `20261008161000` (batch 3) allows
    them on agency workspaces too, set with `scripts/workspace-release-flag.ts`
-   (S10). Without the workspace release, link fields keep the env-only rule.
+   (S10). The command verifies the current operator's signed Supabase session;
+   an `on` write records that same operator's approval and includes the local
+   OS user and machine in its audit. Without the workspace release, link fields
+   keep the env-only rule.
 7. **"Stripe test mode first" can't run as specced.** The script picks its
    mode from the key prefix but reads Stripe ids from whatever Supabase is
    configured. A test key against production ids fails every update. A real
@@ -74,8 +105,11 @@ disagree, the checklist's stop conditions win.
    `--separate-business` (migration `20261008160000`, batch 4) converts a
    linked-account site into its own business instead. Ask the owner before
    converting either site (section 4).
-9. **No rollback SQL exists for any of the 51 migrations**, and production had
-   PITR off and no listed backups on Sept 21. A tested dump comes first.
+9. **A tested dump comes first.** Production had PITR off and no listed
+   backups on Sept 21. Step 1 now has the Oct 7 restore evidence above.
+   Audit H reports release-safety's rollback companions and restored-copy
+   rehearsal for the 51-file inventory. Integrate and check that evidence
+   before the next batch; batch 7A needs its own forward, reverse, forward run.
 10. **Fixed: client-records parity runs itself.** A daily cron
     (`client-records-parity`, 05:40 UTC) compares Redis with Postgres and
     records one parity row per store, tenant and day. It never writes client
@@ -110,7 +144,7 @@ disagree, the checklist's stop conditions win.
     7 days in a row of `booking-store-move.ts parity` results, and each run
     against production is a yes (S12). That means seven daily runs. Until
     then `postgres` behaves as `compare`.
-15. **The Needs you chase now reaches owners who never sign in.**
+15. **The Needs you chase reaches owners who never sign in; its scope needs 7A.**
     `20261009100000_strelva_service_actor` lets the hourly `needs-you` cron
     open workspace items for a business Strelva runs (converted, or provided
     by Strelva's agency), as "Strelva (system)", logged in
@@ -118,7 +152,10 @@ disagree, the checklist's stop conditions win.
     owner's signed link or session. The `workspace-work` cron resumes an
     approved Make real activation the same way. The chase stays a
     heartbeat until `STRELVA_NEEDS_YOU_RELEASE=1`; a resume only happens
-    for an activation an owner approved under Systems.
+    for an activation an owner approved under Systems. This is the original
+    batch 6 behavior, not the agency-neutral release contract: batch 7A and
+    step 16a must cover every business, including outside-agency and
+    self-serve businesses, with the same owner approvals and logging.
 16. **An owner with no account can now approve Make real by email link**
     (owner-entry decision 6, batch 7). The link's recipient must be the owner
     recipient on record and have no owner account; Strelva (system) then
@@ -162,38 +199,49 @@ disagree, the checklist's stop conditions win.
 
 | # | Step | Kind | Section |
 | --- | --- | --- | --- |
-| 0 | Read-only production snapshot | read | 0 |
-| 1 | Dump and test-restore the database | read + local | 1 |
-| 2 | Batch 0: `tenant_leads` | migration | 1 |
-| 3 | Deploy `0.2.1` from `main` (lead dual-write) | deploy | `strelva-reborn.md` |
-| 4 | Lead backfill | data | 3 · S1 |
-| 5 | Preview environment (optional, recommended before batch 2) | new env | 5 |
-| 6 | Batches 1 to 7 (7 is wave 4's) | migration ×7 | 1 |
-| 7 | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
-| 8 | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
-| 9 | Confirm `SECRETS_ENC_KEY` | env read | 2 |
-| 10 | Scrubbed copy and dry run for every active tenant | read + local | 3 · S4 |
-| 11 | Agency workspace + designate | data | 3 · S5 |
-| 12 | Conversions: test tenant, gldf, then the rest | data ×N | 4 |
-| 13 | Flags in order | env ×N | 2 |
-| 14 | Stripe `workspaceId` metadata | Stripe | 3 · S7 |
-| 15 | Google binding copy, verify, then read flag | data + Google | 3 · S8 |
-| 16 | Needs you policy seeding per converted tenant | data | 3 · S11 |
-| 17 | Booking store: dual-write, backfill, 7 days of parity, then reads | env + data | 3 · S12, 2 |
-| 18 | Lead reads: compare, 7 days of parity, then Postgres reads, then authority | env ×3 | 2 |
-| 19 | Owner invites, then email on per client | email | 3 · S6, 2 |
-| 20 | Release cut `1.0.0` with marketing | release | `VERSIONING.md` |
+| [0](https://github.com/Strelva/Strelva-OFFICIAL/issues/343) | Read-only production snapshot · done Oct 7 | read | 0 |
+| [1](https://github.com/Strelva/Strelva-OFFICIAL/issues/344) | Dump and test-restore the database · done Oct 7 | read + local | 1 |
+| [2](https://github.com/Strelva/Strelva-OFFICIAL/issues/345) | Batch 0: `tenant_leads` · done Oct 7 | migration | 1 |
+| [3](https://github.com/Strelva/Strelva-OFFICIAL/issues/346) | Deploy `0.2.1` from `main` (lead dual-write) · done Oct 7 | deploy | `strelva-reborn.md` |
+| [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) | Lead backfill · done Oct 7 | data | 3 · S1 |
+| [5](https://github.com/Strelva/Strelva-OFFICIAL/issues/348) | Preview environment (optional, recommended before batch 2) | new env | 5 |
+| [6](https://github.com/Strelva/Strelva-OFFICIAL/issues/349) | Batches 1 to 7 (unchanged, after release-safety's rehearsal) | migration ×7 | 1 |
+| 6b | Batch 8 (prepared; empty-only recovery proven locally): readers fix and w6 migrations, after 7A | migration | 1 |
+| [6a](https://github.com/Strelva/Strelva-OFFICIAL/issues/350) | Batch 7A: agency-neutral amendments, dated before w6 migrations | migration | 1 |
+| [7](https://github.com/Strelva/Strelva-OFFICIAL/issues/351) | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
+| [8](https://github.com/Strelva/Strelva-OFFICIAL/issues/352) | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
+| [9](https://github.com/Strelva/Strelva-OFFICIAL/issues/353) | Confirm `SECRETS_ENC_KEY` | env read | 2 |
+| [10](https://github.com/Strelva/Strelva-OFFICIAL/issues/354) | Scrubbed copy and dry run for every active tenant | read + local | 3 · S4 |
+| [10a](https://github.com/Strelva/Strelva-OFFICIAL/issues/355) | Create Strelva's agency through ordinary agency signup | data | 6 |
+| [10b](https://github.com/Strelva/Strelva-OFFICIAL/issues/356) | Verify Strelva's agency by the same bar as any agency | verification | 6 |
+| [11](https://github.com/Strelva/Strelva-OFFICIAL/issues/357) | Retire the designation · HOLD pending 7A and #234 | retirement | 6 · S5 retired |
+| [12](https://github.com/Strelva/Strelva-OFFICIAL/issues/358) | Convert with an explicit agency: test tenant, gldf, then the rest · HOLD | data ×N | 4 |
+| [12a](https://github.com/Strelva/Strelva-OFFICIAL/issues/359) | Re-route any business converted before 7A | data if needed | 6 |
+| [13](https://github.com/Strelva/Strelva-OFFICIAL/issues/360) | Flags in order | env ×N | 2 |
+| [14](https://github.com/Strelva/Strelva-OFFICIAL/issues/361) | Stripe `workspaceId` and `payerKind` metadata | Stripe | 3 · S7 |
+| [15](https://github.com/Strelva/Strelva-OFFICIAL/issues/362) | Google binding copy, verify, then read flag | data + Google | 3 · S8 |
+| [16](https://github.com/Strelva/Strelva-OFFICIAL/issues/363) | Needs you policy seeding per converted tenant | data | 3 · S11 |
+| [16a](https://github.com/Strelva/Strelva-OFFICIAL/issues/364) | Needs you chase covers every business | flag + verify | 6 |
+| [17](https://github.com/Strelva/Strelva-OFFICIAL/issues/365) | Booking store: dual-write, backfill, 7 days of parity, then reads | env + data | 3 · S12, 2 |
+| [18](https://github.com/Strelva/Strelva-OFFICIAL/issues/366) | Lead reads: compare, 7 days of parity, then Postgres reads, then authority | env ×3 | 2 |
+| [19](https://github.com/Strelva/Strelva-OFFICIAL/issues/367) | Owner invites, then email on per client | email | 3 · S6, 2 |
+| [19a](https://github.com/Strelva/Strelva-OFFICIAL/issues/368) | Open agency signup; outside effects off until verified | release gate | 6 |
+| [19b](https://github.com/Strelva/Strelva-OFFICIAL/issues/369) | Onboard and verify the first outside agency | onboarding | 6 |
+| [20](https://github.com/Strelva/Strelva-OFFICIAL/issues/370) | Release cut `1.0.0` with marketing: agencies are the customer | release | `VERSIONING.md` |
 
 Steps 8 and 9 can run in parallel with 10. Nothing from step 12 on starts
-before step 6 is complete. Steps 17 and 18 can start any time after step 7
+before steps 6 and 6a are complete and the hold decision is recorded.
+Steps 10a–10b use the same signup and verification paths as step 19b; no
+designation substitutes for them. Step 12a must be settled before flags or
+owner invites expose any earlier conversion. Steps 17 and 18 can start after step 7
 (leads after S1), in parallel with conversions.
 
 ---
 
 ## 0. Read-only snapshot (first yes)
 
-The Sept 30 record is six days old. Every count in this packet comes from it
-or from code. Re-read before the first write:
+Done Oct 7 (step 0): 31 sentinels missing, 14 tenants / 12 active.
+The Sept 30 record remains historical context. Re-read before the next write:
 
 ```sh
 # Names only, no values: what is set in production
@@ -252,9 +300,13 @@ Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe,
 Vercel logs, Google, approve-link counts.
 
 **Stop if** the snapshot shows any migration applied that the repo lacks,
-any 1.0 table already present, the `20260729180000` sentinel (`accounts`)
+any 1.0 table present outside the approved applied batches, the `20260729180000` sentinel (`accounts`)
 missing, any wave 2–3 flag already set, or a tenant count that differs from
-14/12 without an explanation.
+14/12 without an explanation. **Also stop if a `strelva_agency_workspace`
+row exists.** Before batch 3 the table can be absent; once present, read
+`select count(*) from public.strelva_agency_workspace;` and expect `0`.
+Never create a designation to satisfy a readiness check. An existing row
+needs an approved recovery plan; do not delete it ad hoc.
 
 ---
 
@@ -266,7 +318,8 @@ From the [Sept 30 record](./strelvav2-horizontal-acceptance.md#september-30-work
 `supabase migration list --linked` matched all 84 repository migrations through
 `20260921220000_customer_business_entry`, then
 `20260930120000_revoke_public_execute_internal_functions` was pushed alone.
-That is 85. The org layer (`20260729180000_org_layer_phase0_accounts`) is among
+That was 85. Batch 0 applied Oct 7 at 14:25Z brings the total to 86.
+The org layer (`20260729180000_org_layer_phase0_accounts`) is among
 them, applied 2026-07-30 per
 [persistence boundaries](../architecture/persistence-boundaries.md): dormant,
 nothing reads its tables. Batch 4 is the first thing to use them.
@@ -284,7 +337,7 @@ nothing reads its tables. Batch 4 is the first thing to use them.
   `supabase migration list --linked` lists it. Either missing: stop; nothing
   in this packet is pushed until it is explained.
 
-### What is unapplied: 51 files
+### Original pending inventory: 51 files (batch 0 now applied)
 
 `9e0bd441` held 117 migrations; `w2/release-hardening` added two
 (`20261008160000` in batch 4, `20261008161000` in batch 3); waves 2–3 added
@@ -294,10 +347,16 @@ below. Digest is the first 12 hex characters of SHA-256; every one of the
 before each push and stop on any difference. Wave 4's journey gaps add two
 more (`20261009130000`, `20261009131000`) as batch 7, on top: 50 in all.
 Wave 5 adds `20261009140000` (the owner-link flag key) to batch 7: 51.
+Batch 0 is done, leaving 50 files in batches 1–7 from this inventory.
+Batch 7A and w6 files are additional. The readers fix and w6 are listed as
+proposed batch 8 with digests. The October 7 reconciliation below pins proposed H and 7A and includes the later integrated files.
 
 ### Before batch 0: a backup you have restored
 
-The Sept 21 record found PITR disabled and no listed backups. Before batch 0:
+Done Oct 7 (step 1): dump at `~/.strelva-prod-ops/dumps/2026-10-07`,
+restored locally with 146/146 tables matching (2,603 rows).
+The Sept 21 record found PITR disabled and no listed backups. The recipe
+below is retained for the next fresh backup, not a request to repeat step 1:
 
 ```sh
 umask 077
@@ -357,18 +416,340 @@ After each batch:
 | 4 | `20261007155000`, `20261007180000`, `20261007182000`, `20261007190000`, `20261007190100`, `20261007190200`, `20261007192100`, `20261008160000` | Yes, the heaviest: non-concurrent index, FK swap that locks `tenants`, revokes, constraint swaps, replaced live functions, small backfills | Each statement reviewed for locks; grants captured first |
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
-| 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
+| 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | What changed lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
+| 8 (prepared; empty-only recovery proven locally) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
 `20261009113000` replaces functions `20261008140000` creates). Splitting
 them puts every change to a live or already-written table in one push.
 
+**Agency amendment (audit H, Oct 7): batches 1–7 are safe as written after
+release-safety's rehearsal.** The Strelva-only assumptions are empty tables
+or replaceable functions at apply time; none writes agency data until
+designation or conversion. Keep these checksum-pinned files unchanged.
+This does not authorize a push or prove hosted qualification.
+
 Each batch depends only on earlier batches. The Sept 30 app must keep
-working on every batch. That is Gate 2 step 4, rehearsed locally by
-`pnpm check:workspace-upgrade`, which applies the files in filename order, not
-in batches; it is not yet rehearsed against the old app. Preview (section 5)
-is the place to rehearse the batches on hosted Postgres 17.
+working on every batch. `pnpm check:workspace-upgrade` applies the files in
+filename order, not in batches. Audit H cites release-safety's restored-copy
+batch rehearsal for Gate 2 step 4; integrate its exact results rather than
+treating this older filename-order check as equivalent. Preview (section 5)
+is the place to qualify the batches against the old app on hosted Postgres 17.
+
+### October 7 prepared inventory reconciliation (local only)
+
+The approved baseline and batches 0–7 keep their existing files, indices and
+checksums. Prepared order is: baseline → batch 0 → **H** → batches 1–7 →
+**7A** → **8** → **9**. H and 7A are checksum-pinned under `proposed`; they are not
+asserted to be applied. Offline staging of approved batches 0–7 is unchanged;
+its output alone does not stage or qualify these proposed steps.
+
+H is `20261005100000_restrict_legacy_tenant_client_access.sql`, after batch 0
+and before batch 1. 7A is the four files `20261009151000_provider_seats`,
+`20261009152000_agency_verifications`, `20261009153000_platform_service_actor`
+and `20261009154000_payer_party`, in that order. Batch 8 follows the filename
+order in the table below, including the later confirmed-facts, recipient-trust,
+Ask confirmation, provider disconnect, agency branding, conversion and owner
+effect changes, including provider-seat website checkpoint access. The separately proposed batch 9 retains the audited super-admin
+grant/revoke migration and its post-event rollback refusal. Nothing here
+rewrites or applies a migration.
+
+`check:release-safety:batch8` now checks complete inventory coverage, unique
+migration versions, pinned forward digests and the named manual rollback helper
+digests before initializing its private cluster. It applies H between 0 and 1,
+and pinned 7A before 8. A new migration absent from the packet stops the check.
+The manual companions for effort coverage, newsletter sender and newsletter
+backfill are explicitly mapped; their untimestamped names are retained.
+Newsletter sender rollback drops delivery/receipt tables, so it is unsafe after
+receipt adoption without a separate preservation plan. Retention rollback serializes on purge receipts and restores the old functions
+only before its first marked purge; after that it refuses. Expired inquiry data
+cannot be recreated by rolling back its function implementation.
+
+Historical rehearsal at `d8604ce0` ran 114 forwards and every companion,
+but retained 20 evidence tables and 60 functions instead of restoring the
+catalog. The current 118-file rehearsal now preserves those companions and
+adds an **optional, explicitly authorized empty-only structural completion**.
+It proves full public catalog/ACL equality and an identical second forward;
+accepted evidence, four added fields, flag state/history, incompatible old rows,
+missing authority and function drift all refuse atomically. Independent review
+and repeat rehearsal pass. See `scripts/release-safety/README.md` for the exact
+capture/recovery contract. This does not qualify a populated rollback or
+production migration. Restored production-copy qualification remains pending.
+
+RL-14 readiness output now reports agency workspace counts, provider rows by
+source, Strelva designation row count, and accounts by `payer_kind`. An existing
+designation stops rollout unless the applied-version read verifies all four 7A
+versions. Missing applied-version access remains unproven; table presence alone
+cannot prove the payer or service-function amendments. This code was tested
+with local fixtures; no production readiness snapshot was taken.
+
+<!-- proposed-batch-8:start -->
+### Batch 8 · prepared, empty-only recovery qualified locally
+
+Current inventory: **118** pinned forwards, after H, batches 1–7 and 7A.
+`check:release-safety:batch8` verifies whole-inventory coverage and hashes before
+creating its isolated cluster. All 118 forwards and receipt-preserving companions
+pass. The optional empty-only helper restores the complete catalog/ACL inside one
+transaction, then 118 reapplications reproduce the original forward catalog.
+Legacy content/routing/billing/owner-access probes pass throughout. Independent
+review and an independent repeat rehearsal also pass.
+
+This preserves historical companion behavior: receipt/history tables remain
+until the separately authorized empty-only completion proves they contain no
+evidence. The helper requires target-specific before/forward catalog captures,
+exact body/ACL fingerprints, disabled callers and explicit recovery authority.
+It takes deterministic exclusive locks, refuses every populated retained table,
+non-null added field, new flag/history and incompatible old constraint, and uses
+no CASCADE or customer-row deletion. Populated production recovery remains a
+retention/forward-correction job; this proof grants no live rollback authority.
+
+Execution contract: [release-safety tools](../../scripts/release-safety/README.md).
+The prepared batch remains under `proposed`; offline staging and this local proof
+do not establish hosted application, delivered effects or broader 1.0 acceptance.
+Migration/source drift requires a fresh qualification. Newsletter delivery
+companions remain unsafe after receipt adoption without a preservation plan;
+inquiry retention refuses reversal after its first marked purge. Neither restores
+accepted provider effects or expired data.
+
+| Forward file | SHA-256 prefix | Rollback companion |
+| --- | --- | --- |
+| `20261009150000_reader_rpc_volatility` | `e0bb71275ff5` | `rollback-20261009150000_reader_rpc_volatility.sql` |
+| `20261009160000_business_effort_coverage` | `3e4c097db958` | `rollback-business-effort-coverage.sql` |
+| `20261010100000_owner_invitation_claim` | `f9f5d643cc0d` | `rollback-20261010100000_owner_invitation_claim.sql` |
+| `20261010102000_owner_decision_links` | `5b6a58caea0e` | `rollback-20261010102000_owner_decision_links.sql` |
+| `20261010102100_website_owner_link_launch` | `f6b16719de69` | `rollback-20261010102100_website_owner_link_launch.sql` |
+| `20261010103000_ask_business_fact_drafts` | `f50ff99f752a` | `rollback-20261010103000_ask_business_fact_drafts.sql` |
+| `20261010104000_owner_decision_website_preview` | `4836bf12d65c` | `rollback-20261010104000_owner_decision_website_preview.sql` |
+| `20261010110000_website_cutover_undo` | `2eed390b2abe` | `rollback-20261010110000_website_cutover_undo.sql` |
+| `20261010113000_website_system_releases` | `ce3aaa959b1a` | `rollback-20261010113000_website_system_releases.sql` |
+| `20261010114000_website_domain_requests` | `ce75612d024e` | `rollback-20261010114000_website_domain_requests.sql` |
+| `20261010115000_website_model_admission` | `148126b01ce2` | `rollback-20261010115000_website_model_admission.sql` |
+| `20261010115500_website_business_facts` | `65e60c5b1aff` | `rollback-20261010115500_website_business_facts.sql` |
+| `20261010115700_website_native_fact_reviews` | `39c0e5f10e4b` | `rollback-20261010115700_website_native_fact_reviews.sql` |
+| `20261010120000_inquiry_workspace_replies` | `0e8449ac0d69` | `rollback-20261010120000_inquiry_workspace_replies.sql` |
+| `20261010121000_inquiry_outcome_proof` | `f37be23868c6` | `rollback-20261010121000_inquiry_outcome_proof.sql` |
+| `20261010122000_inquiry_weekly_outcomes` | `d5313e628fe9` | `rollback-20261010122000_inquiry_weekly_outcomes.sql` |
+| `20261010123000_inquiry_context_notices` | `49b20de70665` | `rollback-20261010123000_inquiry_context_notices.sql` |
+| `20261010124000_connected_inquiry_records` | `25030cff72a2` | `rollback-20261010124000_connected_inquiry_records.sql` |
+| `20261010125000_inquiry_urgent_decisions` | `a0f1d7fe3007` | `rollback-20261010125000_inquiry_urgent_decisions.sql` |
+| `20261010125500_inquiry_inbox` | `eb9e8b5aa5e4` | `rollback-20261010125500_inquiry_inbox.sql` |
+| `20261010125600_inquiry_reply_purpose` | `b19132d4aac4` | `rollback-20261010125600_inquiry_reply_purpose.sql` |
+| `20261010125700_inquiry_cache_presence` | `a53475a1e250` | `rollback-20261010125700_inquiry_cache_presence.sql` |
+| `20261010125800_connected_inquiry_owner_notices` | `95cd063a1774` | `rollback-20261010125800_connected_inquiry_owner_notices.sql` |
+| `20261010125900_inquiry_export_before_teardown` | `b85199f551f9` | `rollback-20261010125900_inquiry_export_before_teardown.sql` |
+| `20261010125910_inquiry_decision_notice_claims` | `b6191189be01` | `rollback-20261010125910_inquiry_decision_notice_claims.sql` |
+| `20261010125915_inquiry_decision_notice_events` | `2cda63da9816` | `rollback-20261010125915_inquiry_decision_notice_events.sql` |
+| `20261010125920_tenant_lead_parity_completeness` | `593249eed7ff` | `rollback-20261010125920_tenant_lead_parity_completeness.sql` |
+| `20261010125925_inquiry_member_replies` | `31a4c93da1d2` | `rollback-20261010125925_inquiry_member_replies.sql` |
+| `20261010125930_inquiry_business_facts` | `853eb686c467` | `rollback-20261010125930_inquiry_business_facts.sql` |
+| `20261010125935_inquiry_operator_authority` | `b6f229cd3b57` | `rollback-20261010125935_inquiry_operator_authority.sql` |
+| `20261010125940_inquiry_booking_handoff` | `020a462a3978` | `rollback-20261010125940_inquiry_booking_handoff.sql` |
+| `20261010125950_inquiry_operator_review` | `d5b7c466cb42` | `rollback-20261010125950_inquiry_operator_review.sql` |
+| `20261010125955_inquiry_operator_revocation` | `8971490463a2` | `rollback-20261010125955_inquiry_operator_revocation.sql` |
+| `20261010130000_booking_parity` | `cb9400eeded0` | `rollback-20261010130000_booking_parity.sql` |
+| `20261010131000_booking_access` | `71ef42374f28` | `rollback-20261010131000_booking_access.sql` |
+| `20261010132000_booking_updates` | `2054f7b5fc9f` | `rollback-20261010132000_booking_updates.sql` |
+| `20261010133000_booking_calendar_mirror` | `bb78a005b074` | `rollback-20261010133000_booking_calendar_mirror.sql` |
+| `20261010134000_booking_inquiry_offers` | `90cc6a1262a9` | `rollback-20261010134000_booking_inquiry_offers.sql` |
+| `20261010135000_booking_setup` | `fbcd556ca5db` | `rollback-20261010135000_booking_setup.sql` |
+| `20261010135500_booking_receipt_history` | `6d56df538a38` | `rollback-20261010135500_booking_receipt_history.sql` |
+| `20261010135900_booking_receipt_lifecycle` | `2e55ddbe80e6` | `rollback-20261010135900_booking_receipt_lifecycle.sql` |
+| `20261010135910_booking_owner_evidence` | `938e6aff021e` | `rollback-20261010135910_booking_owner_evidence.sql` |
+| `20261010135920_booking_service_policies` | `7091ca705254` | `rollback-20261010135920_booking_service_policies.sql` |
+| `20261010135940_booking_manual` | `6c24b3ca00d7` | `rollback-20261010135940_booking_manual.sql` |
+| `20261010135945_booking_cancellation_cutoff` | `0268b1d85954` | `rollback-20261010135945_booking_cancellation_cutoff.sql` |
+| `20261010135950_booking_calendar_health` | `98538318b1e4` | `rollback-20261010135950_booking_calendar_health.sql` |
+| `20261010135955_booking_exit_admission` | `93a5c4e699d2` | `rollback-20261010135955_booking_exit_admission.sql` |
+| `20261010135956_booking_native_workspace` | `d0fdaf3d4d09` | `rollback-20261010135956_booking_native_workspace.sql` |
+| `20261010140000_google_listing_controls` | `bd73bdd48b95` | `rollback-20261010140000_google_listing_controls.sql` |
+| `20261010141000_publishing_release_flags` | `282390f4bba5` | `rollback-20261010141000_publishing_release_flags.sql` |
+| `20261010142000_workspace_publishing_content` | `a18b7644362e` | `rollback-20261010142000_workspace_publishing_content.sql` |
+| `20261010143000_publishing_reconnect` | `d8173afa1b76` | `rollback-20261010143000_publishing_reconnect.sql` |
+| `20261010150000_internal_tool_submit_notices` | `110c2d595560` | `rollback-20261010150000_internal_tool_submit_notices.sql` |
+| `20261010150100_internal_tool_use_links` | `cacee35a11ef` | `rollback-20261010150100_internal_tool_use_links.sql` |
+| `20261010150200_internal_tool_notice_delivery` | `d654c2e51b0d` | `rollback-20261010150200_internal_tool_notice_delivery.sql` |
+| `20261010150300_catalog_tool_evidence` | `d427152e9159` | `rollback-20261010150300_catalog_tool_evidence.sql` |
+| `20261010150400_internal_tool_use_edits` | `174d7aa326b4` | `rollback-20261010150400_internal_tool_use_edits.sql` |
+| `20261010152000_catalog_report_receipts` | `cf902ae50664` | `rollback-20261010152000_catalog_report_receipts.sql` |
+| `20261010153000_newsletter_contacts` | `73a4bab72d88` | `rollback-20261010153000_newsletter_contacts.sql` |
+| `20261010154000_system_work_plan_authority` | `cccc95d2332f` | `rollback-20261010154000_system_work_plan_authority.sql` |
+| `20261010155000_failed_system_plan_request` | `6743c34c637f` | `rollback-20261010155000_failed_system_plan_request.sql` |
+| `20261010155100_internal_tool_member_submit` | `06f32d312b7f` | `rollback-20261010155100_internal_tool_member_submit.sql` |
+| `20261010155200_internal_tool_use_link_labels` | `431012d2a7d8` | `rollback-20261010155200_internal_tool_use_link_labels.sql` |
+| `20261010160000_agency_authoring` | `3030d1e2c9c8` | `rollback-20261010160000_agency_authoring.sql` |
+| `20261010161000_operator_google_attempts` | `eb66a4a96832` | `rollback-20261010161000_operator_google_attempts.sql` |
+| `20261010161100_operator_effort_context` | `5b0778835065` | `rollback-20261010161100_operator_effort_context.sql` |
+| `20261010161200_operator_content_receipts` | `f13556ba7a61` | `rollback-20261010161200_operator_content_receipts.sql` |
+| `20261010161300_review_reply_reservations` | `fc52897ad419` | `rollback-20261010161300_review_reply_reservations.sql` |
+| `20261010161400_operator_complete_sources` | `cb1ce79c853b` | `rollback-20261010161400_operator_complete_sources.sql` |
+| `20261010162000_complete_client_record_stores` | `6cb73a159863` | `rollback-20261010162000_complete_client_record_stores.sql` |
+| `20261010162100_tenant_receipt_retention` | `6293e96d9a05` | `rollback-20261010162100_tenant_receipt_retention.sql` |
+| `20261010162200_inquiry_delivery_records` | `69215a26babb` | `rollback-20261010162200_inquiry_delivery_records.sql` |
+| `20261010163000_agency_operator_overview` | `682461fc3873` | `rollback-20261010163000_agency_operator_overview.sql` |
+| `20261010163100_version_management` | `dfc621fe3532` | `rollback-20261010163100_version_management.sql` |
+| `20261010163200_version_owner_grants` | `eb4ec7db41ac` | `rollback-20261010163200_version_owner_grants.sql` |
+| `20261010163300_version_native_applications` | `69bdaf48f912` | `rollback-20261010163300_version_native_applications.sql` |
+| `20261010163400_version_sibling_changes` | `512198a07d3b` | `rollback-20261010163400_version_sibling_changes.sql` |
+| `20261010164000_finite_job_adapters` | `f2c7780c61b6` | `rollback-20261010164000_finite_job_adapters.sql` |
+| `20261010165000_tenant_business_context` | `8f98460acd6b` | `rollback-20261010165000_tenant_business_context.sql` |
+| `20261010165500_business_portability` | `fdb1db1a4ae9` | `rollback-20261010165500_business_portability.sql` |
+| `20261010165600_exit_handoff_evidence` | `e28fd6bf9ef9` | `rollback-20261010165600_exit_handoff_evidence.sql` |
+| `20261010165700_export_recovery` | `7f0e03212cba` | `rollback-20261010165700_export_recovery.sql` |
+| `20261010165800_unbounded_export_archive` | `8bb45a0d6921` | `rollback-20261010165800_unbounded_export_archive.sql` |
+| `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
+| `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
+| `20261011100000_workspace_newsletter_sender` | `c53f48920610` | `rollback-workspace-newsletter-sender.sql` |
+| `20261011100100_newsletter_backfill_identity` | `e3ec0219feb9` | `rollback-newsletter-backfill-identity.sql` |
+| `20261011101000_business_booking_email` | `c9f4889b9625` | `rollback-20261011101000_business_booking_email.sql` |
+| `20261011102000_native_publishing_targets` | `98f947e5b89e` | `rollback-20261011102000_native_publishing_targets.sql` |
+| `20261011120000_business_policies` | `e6092e1868a4` | `rollback-20261011120000_business_policies.sql` |
+| `20261011133700_business_facts_owner_decision` | `8fc5767832a8` | `rollback-20261011133700_business_facts_owner_decision.sql` |
+| `20261011140000_agent_booking_visibility` | `5523269ee221` | `rollback-20261011140000_agent_booking_visibility.sql` |
+| `20261011150000_public_booking_admission` | `27276ac96199` | `rollback-20261011150000_public_booking_admission.sql` |
+| `20261011153000_operator_owner_decisions` | `1859f9b74b7c` | `rollback-20261011153000_operator_owner_decisions.sql` |
+| `20261011160000_agency_team` | `e36ff90f9bda` | `rollback-20261011160000_agency_team.sql` |
+| `20261011170000_agency_prospects` | `caf893113873` | `rollback-20261011170000_agency_prospects.sql` |
+| `20261011180000_provider_disconnect_receipts` | `c87d645cdbec` | `rollback-20261011180000_provider_disconnect_receipts.sql` |
+| `20261012010000_tenant_track_signing_keys` | `3e9e570d92ac` | `rollback-20261012010000_tenant_track_signing_keys.sql` |
+| `20261012110000_business_pages` | `f94551c649e5` | `rollback-20261012110000_business_pages.sql` |
+| `20261012120000_track_signing_key_rotation` | `b93843ae4d0b` | `rollback-20261012120000_track_signing_key_rotation.sql` |
+| `20261012180000_agency_brand` | `309f5b5fb0ca` | `rollback-20261012180000_agency_brand.sql` |
+| `20261013110000_public_facts_read_confirmed` | `298161ff4663` | `rollback-20261013110000_public_facts_read_confirmed.sql` |
+| `20261013115000_booking_reads_confirmed_facts` | `e341acdf38a5` | `rollback-20261013115000_booking_reads_confirmed_facts.sql` |
+| `20261013120000_owner_recipient_trust` | `8e063179f6e0` | `rollback-20261013120000_owner_recipient_trust.sql` |
+| `20261013130000_ask_confirms_owner_facts` | `b33ab699b6ea` | `rollback-20261013130000_ask_confirms_owner_facts.sql` |
+| `20261013210000_agent_booking_admission` | `3bc19183b7ba` | `rollback-20261013210000_agent_booking_admission.sql` |
+| `20261013220000_provider_seat_tenant_conversion` | `23138c80bf99` | `rollback-20261013220000_provider_seat_tenant_conversion.sql` |
+| `20261014100000_client_resource_mandates` | `07fc4948ba20` | `rollback-20261014100000_client_resource_mandates.sql` |
+| `20261014110000_owner_decision_effects` | `3f9864a58acc` | `rollback-20261014110000_owner_decision_effects.sql` |
+| `20261014112000_acting_provider_gates` | `399a95b0673d` | `rollback-20261014112000_acting_provider_gates.sql` |
+| `20261015100000_agency_add_client` | `d280795634bb` | `rollback-20261015100000_agency_add_client.sql` |
+| `20261015111000_website_owner_agency_publish` | `578e3fed1454` | `rollback-20261015111000_website_owner_agency_publish.sql` |
+| `20261015120000_owner_link_provider_identity` | `356023cc9e4b` | `rollback-20261015120000_owner_link_provider_identity.sql` |
+| `20261016110000_operator_action_approvals` | `e9e4a204e497` | `rollback-20261016110000_operator_action_approvals.sql` |
+| `20261017110000_inquiry_lead_retention` | `d0199c345492` | `rollback-20261017110000_inquiry_lead_retention.sql` |
+| `20261017120000_owner_decision_operator_refusal` | `616c861132f5` | `rollback-20261017120000_owner_decision_operator_refusal.sql` |
+| `20261018110000_provider_seat_website_access` | `b108d67d2d96` | `rollback-20261018110000_provider_seat_website_access.sql` |
+| `20261018120000_connected_site_schema_conflicts` | `c636ee4328ba` | `rollback-20261018120000_connected_site_schema_conflicts.sql` |
+
+<!-- proposed-batch-8:end -->
+
+<!-- proposed-batch-9:start -->
+### Batch 9 · proposed: audited super-admin grants
+
+Status: **proposed, not released or rehearsed against the restored production
+copy.** This migration follows batch 8 and contains the audited grant/revoke
+RPCs, the access-review view, the zero-active break-glass bootstrap, and the
+retirement of the unused bootstrap email table. The manifest entry is in
+`scripts/release-safety/batches.json` under `proposed`; it is not an approved
+production batch.
+
+| Forward file | SHA-256 | Rollback companion |
+| --- | --- | --- |
+| `20261015110000_super_admin_grants.sql` | `2804c89c47c905d12bb8a2b598207c31e16c1081a5983393257ca11966b94349` | `rollback-20261015110000_super_admin_grants.sql` |
+
+The migration is **one-way after the first successful grant, revoke, or
+bootstrap**. Every one of those appends an audit event; rollback refuses to
+discard even one event. Before any event, rollback restores the prior table
+grants, auth trigger and original bootstrap seed set. The forward migration
+stops if `super_admin_bootstrap` contains rows beyond its original Jacob and
+Noah seeds. It then drops the table because no runtime code reads it. The old
+email list is not an active grant and does not carry Noah's access forward.
+
+### Jacob's super-admin migration checks
+
+1. **Before migrating**, run:
+
+   ```sql
+   select user_id, email, revoked_at from public.super_admins;
+   ```
+
+   Confirm Jacob's exact current account row is present and `revoked_at` is
+   `null`. Also confirm his mirrored identity is verified:
+
+   ```sql
+   select id, email, verified_at
+   from public.users
+   where lower(email) = lower('<Jacob account email>');
+   ```
+
+   Stop if either check is missing, unverified, or revoked; do not rely on the
+   legacy bootstrap list as evidence of active access.
+
+2. **After migrating**, run:
+
+   ```sql
+   select * from public.super_admin_access_review;
+   ```
+
+   Confirm Jacob appears. The view intentionally includes only verified active
+   operators. The CLI also requires a non-null `public.users.verified_at`; this
+   is intentional because every grant and actor check has the same verified
+   identity gate. If it is null, complete Supabase Auth email verification and
+   confirm the auth-provisioning trigger has populated `users.verified_at`
+   before using the CLI. Do not update that column directly.
+
+3. **Confirm Noah retains access**, using:
+
+   ```sql
+   select user_id, email, revoked_at
+   from public.super_admins
+   where lower(email) = lower('noahowsh@gmail.com');
+   ```
+
+   Confirm one active row. If Noah was only present in the pre-migration
+   `super_admin_bootstrap` list, grant him after migration through the audited
+   CLI while Jacob is an active verified operator:
+
+   Replace the email placeholder with Jacob's exact verified account email.
+
+   ```sh
+   JACOB_VERIFIED_EMAIL='<Jacob verified account email>'
+   pnpm exec tsx scripts/manage-super-admin.ts grant noahowsh@gmail.com \
+     --actor "$JACOB_VERIFIED_EMAIL" \
+     --reason "Retain Noah's active operator access" --apply
+   ```
+
+For a fresh local, preview, or disaster-recovery database with **zero active
+super-admins**, follow [the first-operator runbook](./super-admin-access.md).
+Bootstrap uses the service-role key, accepts only a verified target, succeeds
+only while the active roster is empty, and appends `break_glass = true`.
+Ordinary grants and revokes remain separately attributed as service-role-key
+or signed-in-session actions. No production grant, revocation, migration, or
+deployment is authorized by this packet.
+
+<!-- proposed-batch-9:end -->
+
+### Step 6a · Batch 7A, before w6
+
+[Step issue #350](https://github.com/Strelva/Strelva-OFFICIAL/issues/350).
+
+- What: amend provider choice, maker/launch authority, the platform service
+  actor, payer choice, agency verification schema and the STABLE readers
+  identified by audit H (RL-02–06 and RL-12). Add new migrations; never
+  rewrite batches 0–7.
+- Command/approach: date 7A files `2026100915xxxx`, after
+  `20261009140000` and before w6's `20261010*`. Integrate the final 7A
+  manifest and rollback companions into release-safety's harness. Rehearse
+  forward, reverse, forward on the restored Oct 7 copy, then rebase and
+  rehearse w6 on top. Use the batch-directory recipe above with the exact
+  manifest: `npx supabase --workdir "$DIR" db push --linked --dry-run --include-all`,
+  then the same command without `--dry-run` on its own yes. A manifest or
+  companion that has not landed is a blocker, not an instruction to guess files.
+- Verify: matching pinned digests; dry run contains only 7A; forward,
+  reverse, forward results recorded; designation has zero rows (or the
+  retired table is absent); no automatic provider or operator-admin grant;
+  explicit provider choice and all-business service actor pass locally;
+  each effect stays off for an unverified agency. Run the section 1
+  after-batch checks, including storefront 60/60, on the approved apply.
+- Rollback: keep new flags off; use only 7A's rehearsed reverse companions,
+  in reverse dependency order. If w6 is already applied, reverse its
+  dependents first. After agency data exists, freeze effects and prepare a
+  data-preserving recovery instead of blindly reversing schema.
+- Who says yes: Jacob for the exact production batch and any rollback,
+  after release-safety supplies the rehearsal evidence. Step 6a alone does
+  not resolve decision #234 or authorize conversions.
 
 ### Per migration
 
@@ -544,7 +925,7 @@ grants revoked; every new function is service-role only unless noted.
 - Changes: `platform_workspaces`; `read_platform_workspace`,
   `set_platform_workspace`; an AFTER INSERT trigger on
   `strelva_agency_workspace` mirrors the designation; copies one if present
-  (none until S5).
+  (expected none; S5 is retired and must not be run).
 - Depends on: `20261007110000` (hard).
 - Rollback: drop the trigger, functions and table.
 - Verify: `select to_regclass('public.platform_workspaces'), (select count(*) from pg_trigger where tgname='strelva_agency_workspace_sync_platform');` → `…, 1`
@@ -975,7 +1356,7 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 | `STRELVA_SYSTEMS_RELEASE` | Systems Home, System page, Possibilities, Make real, Ask, link fields, agency Clients/Queue/Library/Team | off | `workspace` (per workspace row, business or agency), `1` | Yes: `off`/`operators`/`on`; agency rows need `20261008161000` and S10 | batches 2–4 | unset |
 | `STRELVA_ASK_RELEASE` | Ask Strelva | off | `1`; also needs WORKSPACE `1` and Systems on for the asked workspace (`1`, or `workspace` with its row on) | Through Systems | batch 1 (`model_call_log`), model keys | unset |
 | `STRELVA_WEBSITE_REBUILD_RELEASE` | Website rebuild, v2 documents, health and domain alerts | off | `workspace`, `1` | Yes: per business; a converted site follows its business (needs batch 4); public hosted pages never count as operators | batch 2; `VERCEL_API_TOKEN` | unset |
-| `STRELVA_NEEDS_YOU_RELEASE` | Needs you and Strelva handled; hourly cron does work | off (cron heartbeat only, routes 503) | `1` | No | batch 3 | unset |
+| `STRELVA_NEEDS_YOU_RELEASE` | Needs you and What changed; hourly cron does work for every business (step 16a) | off (cron heartbeat only, routes 503) | `1` | No | batches 3, 6–7 and 7A's neutral service actor; S11; step 16a | unset |
 | `STRELVA_PUBLISHING_RELEASE` | Listing and newsletter Systems, Connect Google | off | `1` | No; shows inside Systems | batch 3, S8 | unset |
 | `STRELVA_GOOGLE_BINDINGS` | Read the Postgres Google binding first, fall back to Redis (counted daily in `reb:google-binding:fallback:*`); OAuth callback writes both | off (Redis only) | `1` | No | batch 3, `SECRETS_ENC_KEY`, S8 | unset |
 | `STRELVA_BUSINESS_BILLING` | `workspaceId` on new checkout metadata; webhook copies payment status to the business | off | `1` | No | batch 4 | unset |
@@ -1020,7 +1401,8 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 
 ### Recommended production order
 
-1. Deploy the 1.0 candidate with every new flag unset, after batch 7. The new crons then: `lead-mirror-reconcile`
+1. Deploy the 1.0 candidate with every new flag unset, after batch 7A and
+   w6's rehearsed migrations. The new crons then: `lead-mirror-reconcile`
    hourly (also retries queued booking-store writes, none while the booking
    write is off); `client-records-parity` daily, heartbeat only until the
    dual-write is on; `needs-you` heartbeat only; `booking-reminders` and
@@ -1047,8 +1429,10 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
    `STRELVA_PUBLISHING_RELEASE=1`.
 8. `STRELVA_NEEDS_YOU_RELEASE=1`, only after `needs-you-parity` is clean
    and S11 has seeded each converted tenant's policies. From then the
-   hourly chase opens items as "Strelva (system)" for businesses Strelva
-   runs (finding 15). Owners get nothing while email is gated.
+   hourly chase opens items as "Strelva (system)" for every business,
+   including outside-agency and self-serve businesses (step 16a). Do not
+   enable it with the old `strelva_runs_business` restriction or operator-admin
+   fallback. Owners get nothing while email is gated.
 8a. Bookings, one yes each, any time after step 1 (independent of
    conversions): `STRELVA_BOOKING_STORE_WRITE=1`; S12 backfill and
    `schedules`; `STRELVA_BOOKING_STORE_READ=compare`; S12 parity daily for 7
@@ -1126,6 +1510,23 @@ module S12 loads). Every other file under `scripts/` that mentions
 `--i-have-jacobs-yes` is a listed command or the module behind one
 (checked by grep at `30dcba1b`).
 
+For S10, sign in as the active Strelva operator first. Copy the `access_token`
+from that browser's `sb-<project-ref>-auth-token` entry in Application → Local
+Storage, then enter it at a hidden shell prompt so it is not part of command
+history:
+
+```sh
+printf 'Current Strelva session access token: ' >&2
+read -r -s STRELVA_OPERATOR_SESSION_ACCESS_TOKEN
+printf '\n'
+export STRELVA_OPERATOR_SESSION_ACCESS_TOKEN
+```
+
+Run the S10 commands below, replacing `operators` with `on` when enabling
+Systems, then run `unset STRELVA_OPERATOR_SESSION_ACCESS_TOKEN`. The `on`
+write records an approval under the token's verified user ID; the browser or
+CLI cannot name another approver.
+
 | # | When | Dry run | Apply | Writes | Needs |
 | --- | --- | --- | --- | --- | --- |
 | S0 | Step 0 | — | `npx tsx scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` | nothing | — |
@@ -1133,13 +1534,13 @@ module S12 loads). Every other file under `scripts/` that mentions
 | S2 | After batch 1 | `npx tsx scripts/copy-report-analytics-state.ts` | `npx tsx scripts/copy-report-analytics-state.ts --apply --i-have-jacobs-yes` | `tenant_report_state`, `tenant_analytics_config` with `via='backfill'`, fills only what's missing | batch 1 |
 | S3 | After batch 3 and `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1` | `npx tsx scripts/client-records-move.ts backfill` | `… backfill --apply --i-have-jacobs-yes`; then the daily `client-records-parity` cron records parity on its own (no command). `client-records-move.ts parity --i-have-jacobs-yes` remains for an on-demand check | `tenant_client_records` (backfill only); parity rows (one per store/tenant/day) come from the cron | batch 3 |
 | S4 | After batch 6 | `pnpm check:scrubbed-copy` (local only, no yes) | `pnpm scrubbed-copy create --out=$HOME/strelva-copies/$(date +%F) --source=<pg host> --source-redis=<db>.upstash.io --grandfathered=gldf,rohlax --i-have-jacobs-yes`, then `pnpm scrubbed-copy dry-run --out=…` and `npx tsx scripts/needs-you-parity.ts` against the copy | nothing in production; a local copy outside every git checkout | read-only source credentials in a clean shell ([scrubbed copy](./scrubbed-production-copy.md)). Check free disk first (12 GB on Oct 6) |
-| S5 | Before the first real conversion | — | Jacob, signed in at `app.strelva.com/workspace`, creates the agency workspace "Strelva" (`create_agency`); read its id; then `npx tsx scripts/business-ownership.ts designate-agency <workspace-id> --operator-email=<super admin> --apply --i-have-jacobs-yes` | `strelva_agency_workspace`, mirrored to `platform_workspaces`; marks converted businesses as operated by Strelva. Set once; a second id is refused | batch 3 |
-| — | Conversions | section 4 | section 4 | section 4 | batches 0–7 |
-| S6 | Per client, after its conversion and walk-through | `npx tsx scripts/business-ownership.ts invite-owner <slug> --operator-email=<super admin>` | `… invite-owner <slug> --operator-email=<super admin> --apply --i-have-jacobs-yes` | owner invitation; **also attempts the email** (the yes sets both). It leaves only if `EMAIL_SENDING_ENABLED=true` or `reb:client-email:<slug>=on`; otherwise the accept link prints. Revoke: `… revoke-owner-invite <invitation-id> --operator-email=<e> --apply --i-have-jacobs-yes` | batch 3 |
-| S7 | After conversions and `STRELVA_BUSINESS_BILLING=1` | `npx tsx scripts/stripe-workspace-metadata.ts` (no Stripe call) | test key: `npx tsx scripts/stripe-workspace-metadata.ts --apply --i-have-jacobs-yes`; live key: add `--live` | Stripe `metadata.workspaceId` on subscriptions and customers, merge only. An object reachable from two businesses is a conflict and never written | batch 4. A dry run that lists every tenant as "Not converted" means batch 4 is missing: the RPC error is swallowed |
+| S5 | Retired · step 11 held pending 7A and #234 | Read-only check for a designation row | **Do not run `designate-agency`.** Create and verify the ordinary agency in steps 10a–10b instead | no designation or automatic provider rows | batch 7A; section 6 |
+| — | Conversions · HOLD | section 4, with explicit `--agency` | section 4, per-client yes | business + provider seat; no standing operator admin | batches 0–7A; steps 10a–11; #234 |
+| S6 | Per client, after its conversion, walk-through and any step 12a repair | Preview the ordinary active-provider agency's owner-invite flow after RL-09 lands; confirm recipient and final agency labels | Use that agency-issued flow on the client's own yes. The legacy super-admin `business-ownership.ts invite-owner` path is not the agency delivery path | owner invitation; **also attempts email**. Send only with the agency's `email_send` verification and the existing client/email gates; otherwise retain the accept link. Revoke through the same logged invitation path | batch 3 + 7A, agency-issued invitation implementation and verified email path; exact command/UI evidence must land before S6 |
+| S7 | After conversions and `STRELVA_BUSINESS_BILLING=1` | `npx tsx scripts/stripe-workspace-metadata.ts` (no Stripe call) | test key: `npx tsx scripts/stripe-workspace-metadata.ts --apply --i-have-jacobs-yes`; live key: add `--live` | Stripe `metadata.workspaceId` and `metadata.payerKind`, merge only, after the amended writer lands. The 9 existing clients stay `business` (pay Strelva directly); no payer migration. An object reachable from two businesses is a conflict and never written | batch 4 + 7A payer contract and amended metadata writer. A dry run that lists every tenant as "Not converted" means batch 4 is missing: the RPC error is swallowed |
 | S8 | After conversions | `npx tsx scripts/copy-google-bindings.ts` | `npx tsx scripts/copy-google-bindings.ts --apply --i-have-jacobs-yes`, then `npx tsx scripts/copy-google-bindings.ts --verify-google --i-have-jacobs-yes` | `workspace_account_bindings`, `workspace_google_locations`, re-encrypted, `migrated_from='redis'`; never overwrites. Verify mints one token per copy and makes one read-only Google call. Unconverted tenants are skipped | batch 3, `SECRETS_ENC_KEY` (apply refuses without it), conversion |
 | S9 | Around each step | — | `npx tsx scripts/storefront-parity.ts capture … --i-have-jacobs-yes` and `compare` | only the `--out` file | section 4 |
-| S10 | For a workspace with no client page (the Strelva agency workspace) | `npx tsx scripts/workspace-release-flag.ts <workspace-id> systems operators --operator-email=<super admin> --reason="<why>" --i-have-jacobs-yes` (reads the row) | same with `--apply` | one `workspace_release_flags` row and its change record, revision-checked | batch 3 incl. `20261008161000` |
+| S10 | For a workspace with no client page (the Strelva agency workspace) | `npx tsx --env-file=<prod env> scripts/workspace-release-flag.ts <workspace-id> systems operators --reason="<why>" --i-have-jacobs-yes` (reads the row) | same with `--apply`; use state `on` to enable Systems | one `workspace_release_flags` row and change record, revision-checked. `on` also records a same-operator approval and audit event. | batch 3 incl. `20261008161000`; signed operator session token |
 | S11 | After batch 5 and each tenant's conversion, before `STRELVA_NEEDS_YOU_RELEASE=1` | Against the S4 scrubbed copy only: `npx tsx scripts/needs-you-seed-tenant-policies.ts [<slug>] --json` (no yes needed on local stores) | `npx tsx scripts/needs-you-seed-tenant-policies.ts <slug> --operator-user-id=<uuid> --operator-email=<super admin> --i-have-jacobs-yes` | one `decision_policy_tenant_imports` receipt per tenant and kind (content autonomy, review reply mode), the owner's `decision_policies` row and its history. Redis keys never change; idempotent. A choice the new floor doesn't carry over is listed, not migrated | batch 5 (`20261008124000`), conversion. **There is no production dry run**: with the yes it writes, and without it it refuses a non-local store. Review the scrubbed-copy plan first |
 | S12 | After batch 6 and `STRELVA_BOOKING_STORE_WRITE=1` | `npx tsx scripts/booking-store-move.ts backfill --i-have-jacobs-yes` (reads client bookings, writes nothing) | Two yeses. S12a: `… backfill --apply --i-have-jacobs-yes`, then `… schedules --i-have-jacobs-yes` (dry run) and `… schedules --apply --i-have-jacobs-yes`. S12b, after `STRELVA_BOOKING_STORE_READ=compare`: `… parity --i-have-jacobs-yes` once a day for 7 days (finding 14) | `business_bookings` through `record_tenant_booking` (the dual-write RPC; reruns are no-ops, overlaps refused and listed); parity rows under store `bookings`. Legacy stores untouched | batch 6 (`20261008141000`) |
 | — | Not part of 1.0 | `npx tsx scripts/backfill-secret-encryption.ts --i-have-jacobs-yes`; `npx tsx scripts/count-client-redis-keys.ts --i-have-jacobs-yes` (read-only) | backfill: `--apply --i-have-jacobs-yes` | encrypted secret columns and `connections:*` | `SECRETS_ENC_KEY` |
@@ -1148,10 +1549,12 @@ module S12 loads). Every other file under `scripts/` that mentions
 production ids fails every update. Rehearse on Preview instead: seed one
 test-mode customer and subscription per converted Preview business with
 `tenantId` metadata, run the dry run, `--apply --i-have-jacobs-yes`, and read
-the metadata back in the Stripe test dashboard. Then the live dry run, then
-`--live` on Jacob's yes. Rollback: the script only adds `workspaceId`;
-removing it is a one-line `metadata[workspaceId]=""` update per object
-listed in the apply output.
+`workspaceId` and `payerKind` back in the Stripe test dashboard. The existing
+clients must read `payerKind=business`; do not switch their payer as part of
+conversion. Then the live dry run, then `--live` on Jacob's yes. Rollback:
+restore the prior values for these two metadata keys per object in the
+apply receipt (clear newly added keys with `metadata[<key>]=""`); preserve
+every other metadata key and never change a subscription or charge.
 
 ---
 
@@ -1159,8 +1562,47 @@ listed in the apply output.
 
 Conversion makes each live client a business workspace whose website is its
 first System. It never changes the tenant row, `reb:` keys, `/api/v1`,
-memberships, Stripe, and never emails anyone. The operator becomes the
-workspace's `admin`, not owner.
+legacy tenant memberships or Stripe, and never emails anyone. Under ADR 0012,
+the chosen agency receives an ordinary provider seat; the platform operator
+gets no standing business `admin` membership. Any platform support access is
+logged and time-boxed, separate from agency delivery.
+
+### Step 12 · HOLD until batch 7A and the pending decision
+
+[Step issue #358](https://github.com/Strelva/Strelva-OFFICIAL/issues/358);
+conversion implementation [#316](https://github.com/Strelva/Strelva-OFFICIAL/issues/316),
+provider-seat conversion [#246](https://github.com/Strelva/Strelva-OFFICIAL/issues/246),
+and removed-agency access [#535](https://github.com/Strelva/Strelva-OFFICIAL/issues/535).
+
+- What: convert each tenant with an explicit chosen agency. For the 9
+  existing managed clients, record `agencySelectionBasis=existing_contract`
+  only after Jacob confirms each client's existing agreement names Strelva's
+  agency. The provider attribution source is `tenant_conversion`. A test or
+  new business needs its own recorded owner choice; never infer a contract
+  from being in the active-tenant list.
+- Command/approach: pass `--agency=<workspace-id>`,
+  `--agency-staff=<verified-member-email[,email...]>` and
+  `--agency-basis=existing_contract|owner_choice` to both the preview and
+  apply commands below. No Strelva agency is selected by default. The named
+  people must already be verified agency members. The preview must show the
+  provider, basis, staff and absence of a personal operator-admin grant.
+  Conversion creates no owner invitation and sends no email. The existing
+  owner-invite command remains available through the conversion link, without
+  granting the operator customer-workspace membership.
+- Verify: chosen provider and `existing_contract` receipt per existing
+  client; ordinary agency queue access; no standing platform-operator admin;
+  owner data and exit intact; billing payer remains `business`; storefront
+  5/5, then the post-conversion checks below. Confirm the agency cannot read
+  a different agency's clients and that the owner can replace it without migration.
+- Rollback: preview and apply `--rollback` below using the amended script;
+  verify it also reverses the provider linkage without deleting approvals
+  or receipts. Capture storefront parity again. Rehearse this before each
+  production conversion; if subsequent work prevents unlink, freeze effects
+  and prepare a data-preserving recovery on its own yes.
+- Who says yes: Jacob for each conversion and rollback, after steps 6a,
+  10a–10b and 11 pass and [#234](https://github.com/Strelva/Strelva-OFFICIAL/issues/234)
+  has an explicit recorded decision. Owner choice/contract evidence is a
+  separate prerequisite, including Twin Trees' business structure below.
 
 ### Order
 
@@ -1180,6 +1622,7 @@ workspace's `admin`, not owner.
 ```sh
 SLUG=gldf
 OP=<super admin email>
+AGENCY=<ordinary agency workspace id from step 10a>
 D=/private/tmp/strelva-conversion/$SLUG && mkdir -p $D
 
 # a. Storefront before (read-only)
@@ -1187,10 +1630,15 @@ npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
   --tenants=$SLUG --out=$D/before.json --i-have-jacobs-yes
 
 # b. Dry run (reads production, writes nothing)
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --operator-email=$OP
+STAFF=<verified agency-member emails, comma-separated>
+BASIS=existing_contract # use owner_choice only when the owner made that choice
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS --operator-email=$OP
 
 # c. On the yes for this tenant
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --apply --operator-email=$OP --i-have-jacobs-yes
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+  --apply --operator-email=$OP --i-have-jacobs-yes
 
 # d. Prove nothing a site reads changed
 npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
@@ -1199,8 +1647,9 @@ npx tsx scripts/storefront-parity.ts compare $D/before.json $D/after.json   # 5 
 pnpm check:custom-repos
 ```
 
-Then: rerun the dry run (it reports "already converted"); check the business
-has a billing home (`read_business_billing` via the operator console); 24
+Then: rerun the dry run (it reports "already converted"); check the provider
+and membership receipts above and the billing home (`read_business_billing`
+through the authorized billing view, with payer `business` for the 9 clients); 24
 hours with `reb:lead-mirror:pending` empty and no new 5xx; set the workspace
 row to `operators`; Jacob walks every page; then S6 and `on`.
 
@@ -1212,7 +1661,8 @@ promotion, capture its protected URL with `VERCEL_AUTOMATION_BYPASS_SECRET`
 in the environment and compare against live.
 
 **Stop if** any read differs, the conversion receipt shows skipped fields
-the dry run didn't, or a lead fails to mirror.
+the dry run didn't, a lead fails to mirror, the agency was defaulted, a
+standing operator-admin row was granted, or a designation row exists.
 
 ### Rollback
 
@@ -1294,8 +1744,9 @@ Vercel preview deployments of the app project read production data, so they
 can't be used for this.
 
 **What it is for:** Jacob and named testers use 1.0 before clients see it, and
-it is the hosted rehearsal for this packet: batches 0–7 in order on hosted
-Postgres 17, conversions of synthetic tenants, flags in order, and S7's
+it is the hosted rehearsal for this packet: batches 0–7, 7A, then w6 in order
+on hosted Postgres 17, ordinary agency signup and verification, explicit-agency
+conversions of synthetic tenants, flags in order, and S7's
 test-mode Stripe run. That is checklist Gate 4, item 1 (isolated hosted
 qualification).
 
@@ -1334,23 +1785,216 @@ project. Nothing in production changes at any point.
 
 ---
 
+## 6. Agency-model release gates
+
+These are the ADR 0012 additions from audit H. They describe the required
+release behavior, not implemented or deployed completion. Steps that need
+new scripts, gates or screens wait for those implementations and their local
+and Preview evidence. Never substitute a service-role write or super-admin
+bypass for an ordinary agency action.
+
+### Step 10a · Create Strelva's agency through ordinary signup
+
+[Step issue #355](https://github.com/Strelva/Strelva-OFFICIAL/issues/355).
+
+- What: create the agency "Strelva" as the first ordinary agency on the
+  neutral platform, without a singleton designation or default-provider status.
+- Command/approach: after 7A and the candidate deploy, Jacob signs in at
+  `app.strelva.com/workspace` through the ordinary agency signup and uses
+  `create_agency`. Record its workspace id for explicit conversions. Set its
+  `systems` row with S10 for the agency library; this is not verification.
+- Verify: `workspaces.kind=agency`, ordinary membership and Clients/Queue/
+  Library/Team access; zero designation rows; no business provider selected
+  automatically; outside effects denied until step 10b. Repeat the same
+  signup with a synthetic outside agency on Preview.
+- Rollback: leave effect gates off and close access through the normal
+  membership/lifecycle controls. Only remove an unused synthetic workspace
+  through a rehearsed normal cleanup; preserve any production records.
+- Who says yes: Jacob for the production signup and S10 row, separately
+  from verification, conversion, or sending anything to clients.
+
+### Step 10b · Verify Strelva's agency by the same bar
+
+[Step issue #356](https://github.com/Strelva/Strelva-OFFICIAL/issues/356).
+
+- What: qualify Strelva's agency for outside effects by the same method,
+  evidence and review applied to every agency. Being Strelva is no exemption.
+- Command/approach: after Jacob selects the verification method and the
+  per-agency implementation lands, a logged platform operator reviews the
+  ordinary application and grants only approved effects (`publish_domain`,
+  `google_write`, `email_send`, `take_payment`) through that verification path.
+  Record the reviewer, evidence, effect and receipt. No direct SQL bypass.
+- Verify: an unverified Preview agency is denied every outside effect;
+  a verified one can use only its granted effects with the client's approval
+  and authority. Strelva passes the identical tests; platform support powers
+  cannot serve its clients. Verification does not itself publish, send or charge.
+- Rollback: revoke the affected effect grants through the logged path and
+  confirm fresh requests fail. Preserve receipts; reconcile effects already
+  accepted by providers rather than treating them as retryable or unsent.
+- Who says yes: Jacob on the verification bar and each production grant or
+  revocation; the platform operator records the review. The bar is still an
+  unresolved dependency, not selected by ADR 0012.
+
+### Step 11 · Retire the designation (S5)
+
+[Step issue #357](https://github.com/Strelva/Strelva-OFFICIAL/issues/357).
+**HOLD until 7A lands; decision #234 remains pending.**
+
+- What: retire `designate-agency`, not designate Strelva. Steps 10a–10b
+  replace S5; S10 still sets the ordinary agency's `systems` row.
+- Command/approach: do not run the old S5 command. After 7A, confirm the
+  deprecated designation path cannot write or auto-mark providers and its
+  callers have been replaced. Review the release-safety and readiness receipts.
+- Verify: no `strelva_agency_workspace` row; provider choice is explicit;
+  service actor and catalog no longer depend on the designation. A row found
+  at any stage is a stop condition and requires an approved recovery plan.
+- Rollback: leave the retirement in place and gates off. Do not restore a
+  designation as recovery; any schema reversal follows step 6a's rehearsed
+  rollback and its own yes.
+- Who says yes: Jacob records the decision in
+  [#234](https://github.com/Strelva/Strelva-OFFICIAL/issues/234) and approves
+  this production retirement after the evidence. ADR acceptance and this
+  documentation change do not settle that issue.
+
+### Step 12a · Re-route anything converted early
+
+[Step issue #359](https://github.com/Strelva/Strelva-OFFICIAL/issues/359).
+
+- What: move any earlier conversion onto an explicit provider seat and
+  remove the standing operator-admin path created by conversion. Expected
+  count: zero; verify it.
+- Command/approach: after batch 7A and migration
+  `20261013220000_provider_seat_tenant_conversion.sql`, and before client
+  flags or invites, inventory `tenant_workspace_links`, providers and
+  conversion-created operator memberships. Record a zero-result receipt if
+  none need repair. Otherwise preview each legacy conversion:
+
+  ```sh
+  AGENCY=<workspace-id>
+  STAFF=<verified-agency-member-emails>
+  BASIS=existing_contract # only with confirmed agreement evidence
+  npx tsx --env-file=<prod env> scripts/repath-provider.ts <slug> \
+    --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+    --operator-email=<super-admin>
+  ```
+
+  After the route and old-membership count are reviewed, apply on the client's
+  own yes with the same arguments plus `--apply --i-have-jacobs-yes`. The RPC
+  adds the seat and named staff, records the route, and ends a legacy
+  `tenant_conversion` provider attribution and its seat/staff rows when it
+  points at a different agency. It removes only an operator admin membership
+  whose original receipt proves conversion created it. An admin membership
+  that predated a joined conversion is preserved.
+- Verify: same business/System ids, data, billing payer and storefront reads;
+  explicit provider/source; ordinary agency access; no standing operator
+  admin; owner replacement and exit still work. Compare before/after receipts.
+- Rollback: freeze effects, use the tool's rehearsed inverse plan to restore
+  the prior approved provider relationship, and retain audit receipts. Do not
+  recreate a singleton or standing operator-admin privilege as a shortcut.
+- Who says yes: Jacob for the inventory and each production repair/rollback,
+  with the business's provider authority confirmed. Unexpected early data
+  blocks the normal rollout until its recovery is approved and verified.
+
+### Step 16a · Needs you chase covers every business
+
+[Step issue #364](https://github.com/Strelva/Strelva-OFFICIAL/issues/364).
+
+- What: the platform service actor chases decisions for every business under
+  `STRELVA_NEEDS_YOU_RELEASE`, including another agency's clients and
+  businesses with no agency. Owners still never need to sign in to receive
+  supported decision links; access, money and exit retain their sign-in bar.
+- Command/approach: after 7A's all-business scope and caller changes land,
+  rehearse the hourly `needs-you` cron with synthetic Strelva-agency,
+  outside-agency and self-serve businesses, including owners with no account.
+  Seed each converted tenant's policies with S11. Turn
+  `STRELVA_NEEDS_YOU_RELEASE=1` on only after the parity and scope checks;
+  retain the separate Make real owner-link and email gates.
+- Verify: all three business types receive the same eligible Needs you item
+  and logged service receipt; none relies on a Strelva provider or operator
+  admin. Only the owner can decide; an approved activation resumes once;
+  cross-business access is refused; email stays off while gated. Observe the
+  first production cron and compare its receipts to the approved scope.
+- Rollback: unset `STRELVA_NEEDS_YOU_RELEASE` with the required new deploy;
+  verify the cron returns to heartbeat only. Preserve open decisions and
+  receipts; disabling the chase does not undo an approved outside effect.
+- Who says yes: Jacob for the global flag and rollback after local/Preview
+  parity. Live email and effect channels remain separate yeses.
+
+### Step 19a · Open agency signup
+
+[Step issue #368](https://github.com/Strelva/Strelva-OFFICIAL/issues/368).
+
+- What: anyone can sign up as an agency and build immediately; outside
+  effects start off and unlock per agency after verification.
+- Command/approach: after steps 10a–10b and the neutral journeys pass,
+  release the ordinary agency signup through the implemented signup gate.
+  Review the final flag name, default and kill switch when that gate lands;
+  no new env name is assumed here. Publish only Jacob-approved agreement
+  terms and signup language. Verification uses step 10b's bar.
+- Verify: a fresh non-operator signs up, builds and sees only its own queue;
+  publish, Google writes, email and payments fail while unverified. A
+  single effect grant unlocks only that effect with client authority. Strelva
+  has no default matching or catalog-placement advantage; businesses can
+  still self-serve without an agency.
+- Rollback: close the signup gate through its verified kill switch and
+  revoke affected effect grants if needed; keep existing agency records,
+  client data and exit available. Closing signup does not cancel agreements.
+- Who says yes: Jacob on public signup, agreement terms and any rollback,
+  after local/Preview evidence. No pricing, rates or agency share are selected here.
+
+### Step 19b · First outside agency
+
+[Step issue #369](https://github.com/Strelva/Strelva-OFFICIAL/issues/369).
+
+- What: onboard and verify the first agency outside Strelva using the same
+  signup, workspace, queue, authority and qualification bar.
+- Command/approach: the agency accepts Jacob-approved terms, signs up itself
+  through step 19a, builds, then submits step 10b's verification. A business
+  explicitly chooses that agency; run one agreed workflow with the business's
+  approval. Select the payer per business without changing the 9 clients'
+  existing payer or commercial terms. No operator-admin shortcut.
+- Verify: receipts for signup, verification and chosen provider; isolation
+  from Strelva's clients; unverified effects denied and only approved verified
+  effects accepted; the same Needs you chase; owner replacement without data
+  migration; payer and billing reads match the chosen model. Record observed
+  use separately from journey tests; one onboarding is not proven economics.
+- Rollback: revoke effect grants, pause the agreed work and let the owner
+  end or switch the provider through the ordinary path. Preserve business
+  data, approvals and receipts. Unwind any commercial commitment only on its
+  agreed terms; never delete the business to remove an agency.
+- Who says yes: Jacob on terms, onboarding and any platform grant; the
+  outside agency accepts its agreement and the business chooses its provider,
+  payer and each outside action. No outreach or commitment is authorized by
+  this packet.
+
+---
+
 ## Still unproven
 
-- Every production fact here is from the Sept 30 record or code. Step 0 is
-  the first fresh read.
-- The batch-directory push recipe and the CLI flags were not run (no Supabase
-  CLI on this machine).
-- No migration has been rehearsed against the Sept 30 app on the same schema.
+- Steps 0–4 have the supplied Oct 7 evidence above. This docs-only amendment
+  did not re-read production or inspect private dumps. Later production
+  steps, including batch 7A and all agency gates, remain unexecuted here.
+- The hold decision #234 is pending. Verification method and agreement
+  terms still need Jacob; each of the 9 clients' `existing_contract` evidence
+  and Twin Trees' business structure must be confirmed before conversion.
+- Audit H reports release-safety's local restored-copy rehearsal and rollback
+  companions for batches 1–7. The current branch contains that harness and
+  pins proposed H, 7A, 8 and 9. The expanded packet still needs complete local
+  rollback/catalog qualification; hosted Postgres 17 remains a separate gate.
+- The exact signup kill switch, verification/re-path tools, amended
+  `--agency` conversion option and `payerKind` metadata writer are prerequisites,
+  not runnable completion claims in this checkout.
 - The `update_bounded_product_work` rewrite assumes production's function text
   matches the repo; the batch 2 pre-check settles it.
-- `storefront-parity.ts` and the snapshot are proven against fakes only.
+- The Oct 7 snapshot and `0.2.1` storefront 60/60 are production evidence.
+  They do not prove the candidate's agency behavior.
   The snapshot's new facts (wave 2–3 flags, sentinels incl. the org layer,
   legacy booking counts, booking Redis families) are covered by
   `src/__tests__/production-readiness-snapshot.test.ts`, which now also fails
   when a pending migration that creates a table has no sentinel.
-- Batches 5 and 6 were split and checked by reading the SQL (dependencies
-  by the objects each file uses), not by pushing them in batches anywhere.
-  `btree_gist` availability on production is unchecked (finding 12).
+- Batches 5 and 6's original split was checked by reading SQL dependencies;
+  audit H now cites the release-safety rehearsal. `btree_gist` availability
+  on production still needs the batch 6 pre-check (finding 12).
 - Booking parity needs seven daily production runs by hand (finding 14);
   a cron for it does not exist yet.
 - The `w2/release-hardening` fixes (findings 3, 5, 6, 8, 10, 11) are proven

@@ -11,6 +11,11 @@ import type {
   InquiryRoute,
 } from "./delivery-types";
 
+function bookingLink(path: string): string {
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  return new URL(path, origin).toString();
+}
+
 export function validEmail(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
@@ -54,7 +59,7 @@ export function deliveryActionLabel(action: InquiryDeliveryAction): string {
 }
 
 export function actorForAction(action: InquiryDeliveryAction): ReceiptActor {
-  return { kind: "strelva", id: `inquiry-delivery:${action}`, label: "Strelva" };
+  return { kind: "system", id: `inquiry-delivery:${action}`, label: "Actor not recorded" };
 }
 
 /** Render one provider-bound customer or owner message from trusted inquiry data. */
@@ -82,7 +87,7 @@ export function createInquiryDeliveryMessage(
         ...(source ? [{ label: "Source", value: source }] : []),
         ...(message ? [{ label: "Message", value: message }] : []),
       ],
-      footerNote: "Operator-configured inquiry notification · sent by Strelva",
+      footerNote: `Automatic inquiry notification for ${business}`,
     };
     return {
       tenantId: inquiry.tenantId,
@@ -91,6 +96,7 @@ export function createInquiryDeliveryMessage(
       capabilityId: inquiry.capabilityId,
       capabilityVersion: inquiry.capabilityVersion,
       audience: "client",
+      disclosure: { kind: "owner_notice", name: business },
       to: recipient,
       subject: `New inquiry from ${name}`,
       options,
@@ -104,19 +110,27 @@ export function createInquiryDeliveryMessage(
     ? cleanSubjectText(inquiry.followUpMessageTemplate).replaceAll("{name}", name).slice(0, 2000)
     : "";
   const options: EmailOptions = {
+    businessName: business,
     preheader: isFollowUp ? `Following up with ${business}` : `We received your message for ${business}`,
     heading: isFollowUp ? "Checking in" : "We received your message",
     paragraphs: isFollowUp
       ? [
           followUpTemplate || `Hi ${name}, we are checking in about your message to ${business}. If you still need help, reply to this email and we will take it from there.`,
-          "This is an automatic follow-up sent by Strelva for the business named above.",
+          `This is an automatic follow-up from ${business}.`,
         ]
       : [
           `Hi ${name}, ${business} received your message. Someone will review it and follow up as soon as they can.`,
-          "This is an automatic confirmation sent by Strelva for the business named above.",
+          `This is an automatic confirmation from ${business}.`,
         ],
     ...(message && !isFollowUp ? { rows: [{ label: "Your message", value: message }] } : {}),
-    footerNote: `Automatic ${isFollowUp ? "follow-up" : "reply"} · sent by Strelva for ${business}`,
+    ...(!isFollowUp && inquiry.bookingOffer ? {
+      rows: [
+        ...(message ? [{ label: "Your message", value: message }] : []),
+        ...inquiry.bookingOffer.slots.map((slot) => ({ label: "Request a time", value: `${slot.label}: ${bookingLink(slot.chooseUrl)}` })),
+      ],
+      button: { label: "Choose a time", url: bookingLink(inquiry.bookingOffer.chooseUrl) },
+    } : {}),
+    footerNote: `${inquiry.bookingOffer && !isFollowUp ? "Choosing a time requests an appointment; the business must confirm. " : ""}Automatic ${isFollowUp ? "follow-up" : "reply"} · from ${business}`,
   };
   const trackingReplyTo = getInquiryReplyTrackingAddress(inquiry);
   const fallbackReplyTo = validEmail(route.customerReplyTo);
@@ -127,6 +141,8 @@ export function createInquiryDeliveryMessage(
     capabilityId: inquiry.capabilityId,
     capabilityVersion: inquiry.capabilityVersion,
     audience: "customer",
+    disclosure: { kind: "business", name: business },
+    fromName: business,
     to: recipient,
     ...(trackingReplyTo || fallbackReplyTo ? { replyTo: trackingReplyTo || fallbackReplyTo! } : {}),
     subject: isFollowUp ? `Following up on your message to ${business}` : `We received your message for ${business}`,
@@ -134,4 +150,44 @@ export function createInquiryDeliveryMessage(
     tags: providerTags(inquiry, action),
     idempotencyKey: `inquiry:${inquiry.id}:${action}`,
   };
+}
+
+/** The review and delivery hash the same final receipt, including offered times. */
+export async function prepareInquiryDeliveryMessage(inquiry: InquiryDeliverySubmission, route: InquiryRoute, action: InquiryDeliveryAction) {
+  const message = createInquiryDeliveryMessage(inquiry, route, action);
+  if (message && action === "reply" && message.audience === "customer") {
+    const { readInquiryBookingOfferForReceipt, bookingOfferEmailOptions } = await import("@/platform/bookings/inquiry-offers");
+    const offer = await readInquiryBookingOfferForReceipt(inquiry.tenantId, inquiry.id);
+    if (offer) {
+      const booking = bookingOfferEmailOptions(offer);
+      message.options = { ...message.options, rows: [...(message.options.rows ?? []), ...(booking.rows ?? [])], button: booking.button };
+      message.tags = { ...message.tags, strelva_booking_offer: "1" };
+      message.fromName = inquiryBusinessName(inquiry, route.businessName);
+    }
+  }
+  return message;
+}
+
+/**
+ * Bind an approval to the exact message and capability revision. The provider
+ * idempotency key alone is not sufficient because an edited body could reuse
+ * the same inquiry/action key under the same policy version.
+ */
+export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
+  const canonical = JSON.stringify({
+    tenantId: message.tenantId,
+    inquiryId: message.inquiryId,
+    action: message.action,
+    capabilityId: message.capabilityId ?? null,
+    capabilityVersion: message.capabilityVersion ?? null,
+    audience: message.audience,
+    to: message.to,
+    replyTo: message.replyTo ?? null,
+    ...(message.fromName ? { fromName: message.fromName } : {}),
+    tags: message.tags ?? null,
+    subject: message.subject,
+    options: message.options,
+    idempotencyKey: message.idempotencyKey,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
 }

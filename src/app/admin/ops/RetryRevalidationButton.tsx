@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import { StState, StTextButton } from "@/components/ui/strelva/Kit";
 
 interface RetryRevalidationButtonProps {
   tenantId: string;
+  readOnly?: boolean;
 }
 
-export function RetryRevalidationButton({ tenantId }: RetryRevalidationButtonProps) {
+export function RetryRevalidationButton({ tenantId, readOnly = false }: RetryRevalidationButtonProps) {
   const [step, setStep] = useState<"idle" | "confirm" | "loading" | "done" | "skipped" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
 
   async function handleRetry() {
+    if (readOnly) return;
     setStep("loading");
     setError(null);
     try {
@@ -32,52 +35,9 @@ export function RetryRevalidationButton({ tenantId }: RetryRevalidationButtonPro
     }
   }
 
-  if (step === "done") {
-    return <span className="text-xs text-positive">Revalidated</span>;
-  }
-
-  if (step === "skipped") {
-    return <span className="text-xs text-gray-muted">Skipped (no revalidateUrl)</span>;
-  }
-
-  if (step === "error") {
-    return (
-      <span className="text-xs text-critical" title={error ?? undefined}>
-        Failed
-      </span>
-    );
-  }
-
-  if (step === "confirm") {
-    return (
-      <span className="inline-flex items-center gap-2">
-        <span className="text-xs text-warning">Re-trigger?</span>
-        <button
-          type="button"
-          onClick={handleRetry}
-          className="text-xs font-medium text-accent hover:underline"
-        >
-          Yes, retry
-        </button>
-        <button
-          type="button"
-          onClick={() => setStep("idle")}
-          className="text-xs text-gray-muted hover:text-warm-white"
-        >
-          Cancel
-        </button>
-      </span>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      disabled={step === "loading"}
-      onClick={() => setStep("confirm")}
-      className="text-xs text-gray-faint hover:text-accent disabled:opacity-40 transition-colors"
-    >
-      {step === "loading" ? "Retrying…" : "Retry"}
-    </button>
-  );
+  if (step === "done") return <span role="status"><StState kind="live">Revalidated</StState></span>;
+  if (step === "skipped") return <span role="status"><StState kind="draft">Skipped (no revalidation URL)</StState></span>;
+  if (step === "error") return <span role="alert" title={error ?? undefined}><StState kind="down">Failed: {error}</StState></span>;
+  if (step === "confirm") return <span className="flex flex-wrap items-center gap-4"><StState kind="need">Re-trigger?</StState><StTextButton tone="accent" onClick={() => void handleRetry()}>Yes, retry</StTextButton><StTextButton onClick={() => setStep("idle")}>Cancel</StTextButton></span>;
+  return <StTextButton disabled={readOnly || step === "loading"} onClick={() => setStep("confirm")}>{step === "loading" ? "Retrying…" : "Retry"}</StTextButton>;
 }

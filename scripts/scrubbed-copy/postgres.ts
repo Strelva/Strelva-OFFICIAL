@@ -337,12 +337,43 @@ export const LOCAL_OPERATOR = {
   email: "operator@scrubbed.strelva.test",
 };
 
+export const LOCAL_REHEARSAL_AGENCY = {
+  id: "5c0bbed0-0000-4000-8000-00000000c0af",
+  staffId: "5c0bbed0-0000-4000-8000-00000000c0f0",
+  email: "provider-staff@scrubbed.strelva.test",
+};
+
 /** A local-only super admin, so conversion can be rehearsed without any real operator identity. */
 export async function addLocalOperator(target: PsqlTarget): Promise<void> {
   await psql(target, `INSERT INTO auth.users (id, email, email_confirmed_at) VALUES ('${LOCAL_OPERATOR.id}', '${LOCAL_OPERATOR.email}', now()) ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.users (id, email, verified_at) VALUES ('${LOCAL_OPERATOR.id}', '${LOCAL_OPERATOR.email}', now())
   ON CONFLICT (id) DO UPDATE SET verified_at = COALESCE(public.users.verified_at, now());
 INSERT INTO public.super_admins (user_id, email) VALUES ('${LOCAL_OPERATOR.id}', '${LOCAL_OPERATOR.email}') ON CONFLICT DO NOTHING;`);
+}
+
+/** Only on the isolated copy, provide the explicit, synthetic route required
+ * by the current conversion contract. It is not a Strelva production agency. */
+export async function addLocalRehearsalAgency(target: PsqlTarget): Promise<void> {
+  const { id, staffId, email } = LOCAL_REHEARSAL_AGENCY;
+  await psql(target, `DO $$ BEGIN
+  IF to_regclass('public.provider_seats') IS NULL OR to_regprocedure('public.repath_converted_tenant_provider(text,text,uuid,jsonb,text,boolean)') IS NULL THEN
+    RAISE EXCEPTION 'provider_seat_conversion_migration_required';
+  END IF;
+END $$;
+INSERT INTO public.users (id, email, verified_at) VALUES ('${staffId}', '${email}', now())
+  ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.workspaces (id, kind, name, created_by)
+  VALUES ('${id}', 'agency', 'Scrubbed rehearsal agency', '${LOCAL_OPERATOR.id}') ON CONFLICT (id) DO NOTHING;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.workspaces WHERE id = '${id}' AND kind = 'agency') THEN
+    RAISE EXCEPTION 'scrubbed_rehearsal_agency_identity_conflict';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = '${staffId}' AND email = '${email}' AND verified_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'scrubbed_rehearsal_staff_identity_conflict';
+  END IF;
+END $$;
+INSERT INTO public.workspace_memberships (workspace_id, user_id, role, created_by)
+  VALUES ('${id}', '${staffId}', 'member', '${LOCAL_OPERATOR.id}') ON CONFLICT (workspace_id, user_id) DO NOTHING;`);
 }
 
 export interface RehearsalResult {

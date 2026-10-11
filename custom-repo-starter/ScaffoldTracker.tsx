@@ -42,7 +42,7 @@ const CONTRACT_VERSION = "v1";
 
 type TrackEvent = "page-view" | "booking-click" | "phone-click" | "order";
 
-/** Payload for an `order` beacon — mirrors the v1 track contract's order shape. */
+/** Legacy `order` beacon shape. Browser orders are acknowledged but stay unverified. */
 export interface TrackOrder {
   amountCents: number;
   currency?: string;
@@ -161,17 +161,17 @@ export function trackPhoneClick(): void {
 }
 
 /**
- * Record a completed order so the owner's dashboard Store shows revenue/orders.
+ * Send a browser-side order event using the legacy payload shape.
  * Call it after a successful checkout:
  *
  *   trackOrder({ amountCents: 2499, currency: "USD",
  *                items: [{ name: "Dried Mango", quantity: 1 }],
  *                externalId: stripeSessionId });
  *
- * NOTE: a SERVER-side fire from your Stripe webhook (see
- * commerce/stripe-webhook-route.ts) is more reliable than this client call — the
- * browser can close before checkout returns. Use this only when you don't run
- * the webhook. Pass `externalId` so a retry can't double-count.
+ * Browser events are not evidence of a completed payment. The API accepts this
+ * call for compatibility but does not save it as a Store outcome. Use the
+ * signed server-side Stripe webhook (commerce/stripe-webhook-route.ts) after a
+ * successful provider callback. Pass `externalId` so retries are deduplicated.
  */
 export function trackOrder(order: TrackOrder): void {
   sendEvent("order", { order });

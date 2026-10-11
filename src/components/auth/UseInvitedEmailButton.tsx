@@ -1,5 +1,6 @@
 "use client";
 
+import { StPill } from "@/components/ui/strelva/Kit";
 import type { CSSProperties } from "react";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
@@ -20,8 +21,8 @@ export function UseInvitedEmailButton({
     window.location.href = redirectUrl;
   }
   return (
-    <button type="button" className={className} style={style} onClick={signOut}>
+    <StPill type="button" className={className} style={style} onClick={signOut}>
       Use invited email
-    </button>
+    </StPill>
   );
 }

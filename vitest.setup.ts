@@ -11,3 +11,12 @@ process.env.EMAIL_SENDING_ENABLED = "true";
 // instrumentation.ts does for the Next.js server. The loaders resolve their
 // modules at call time, so each test's vi.mock still applies.
 import "./src/register-workspace-ports";
+
+// next/font loaders are replaced by the Next compiler and are not callable in
+// Vitest. Components that load a scoped font (outcome components use DM Sans)
+// get an inert binding with the same shape.
+import { vi } from "vitest";
+vi.mock("next/font/google", () => {
+  const font = (name: string) => () => ({ className: `font-${name}`, variable: `font-${name}`, style: { fontFamily: name } });
+  return { DM_Sans: font("DM_Sans"), Geist: font("Geist") };
+});

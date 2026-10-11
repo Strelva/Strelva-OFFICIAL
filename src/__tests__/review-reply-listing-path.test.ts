@@ -20,7 +20,15 @@ const mockFinishEventAction = vi.fn();
 const mockMark = vi.fn();
 const mockPublishReviewReply = vi.fn();
 const mockRecordOutsideWrite = vi.fn();
+const mockAssertActingAgency = vi.fn();
 let deps: TenantReplyDeps;
+
+vi.mock("@/platform/workspaces/acting-provider", () => ({
+  assertActingAgency: (...args: unknown[]) => mockAssertActingAgency(...args),
+}));
+vi.mock("@/platform/infra/db/client", () => ({
+  getSupabase: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { email: "staff@agency.example.test" } }) }) }) }) }),
+}));
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -38,6 +46,7 @@ vi.mock("@/products/inquiries", () => ({
   reconcileInquiryMessageReview: vi.fn(),
 }));
 vi.mock("@/products/inquiries/server", () => ({ executeInquiryPublication: vi.fn() }));
+vi.mock("@/products/publishing/server", () => ({ executePublishingEvent: async () => null, publishingReleaseEnabled: () => true }));
 vi.mock("../lib/suggestions", () => ({ updateSuggestion: vi.fn() }));
 vi.mock("../lib/agent-executor", () => ({ executeAgentPrompt: vi.fn() }));
 vi.mock("../lib/storage", () => ({
@@ -53,7 +62,7 @@ vi.mock("@/products/google-listing/tenant-replies", async (original) => ({
   defaultTenantReplyDeps: async () => deps,
 }));
 
-import { AUTO_REPLY_ACTOR, resolveEventAction } from "../lib/event-actions";
+import { AUTO_REPLY_ACTOR, agencyStaffActorId, isDelegateActor, isOperatorActor, operatorActorId, resolveEventAction } from "../lib/event-actions";
 
 const WORKSPACE = "ab000000-0000-4000-8000-000000000010";
 const ok = <T,>(data: T): GoogleResult<T> => ({ ok: true, data });
@@ -124,7 +133,7 @@ describe("review reply approve on the listing System", () => {
     expect(receipts.all()[0]).toMatchObject({
       workspaceId: WORKSPACE, bindingId: "binding-1", action: "reply_post", status: "posted", readback: "matched",
       authority: { kind: "owner_approval", actor: "owner-user-1", approvalRef: "event:evt_rr" },
-      idempotencyKey: "review-reply:evt_rr:attempt_1",
+      idempotencyKey: "review-reply:evt_rr",
     });
     expect(mockPublishReviewReply).not.toHaveBeenCalled();
     expect(mockRecordOutsideWrite).not.toHaveBeenCalled();
@@ -186,6 +195,102 @@ describe("review reply approve on the listing System", () => {
     expect(result).toEqual({ changed: false, reason: "review_reply_needs_owner" });
     expect(google.writes).toEqual([]);
     expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("an operator's reply is an operator instruction naming the operator, never the owner's approval", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    const authorizeProvider = vi.fn(async () => undefined);
+    const { google, receipts } = setup({ authorizeProvider });
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved", operator);
+    expect(result).toEqual({ changed: true });
+    expect(google.writes).toEqual(["Thank you!"]);
+    expect(receipts.all()).toHaveLength(1);
+    expect(receipts.all()[0]).toMatchObject({
+      authority: { kind: "operator_instruction", actor: "operator:10000000-0000-4000-8000-0000000000aa", instructionRef: "event:evt_rr" },
+    });
+    expect(receipts.all()[0]).not.toMatchObject({ authority: { kind: "owner_approval" } });
+    expect(mockClaimEventAction).toHaveBeenCalledWith("evt_rr", "approved", operator);
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+    // The operator acts for the business as its acting provider (#255), checked before the receipt and the write.
+    expect(authorizeProvider).toHaveBeenCalledWith(WORKSPACE, "10000000-0000-4000-8000-0000000000aa", expect.any(String));
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("an operator who is not the business's acting provider sends nothing (#255)", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    const { google, receipts } = setup({ authorizeProvider: async () => { throw new Error("acting_provider_no_mandate"); } });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).not.toEqual({ changed: true });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+    const unwired = setup();
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).not.toEqual({ changed: true });
+    expect(unwired.google.writes).toEqual([]);
+  });
+
+  it("an operator's reply on the legacy publisher names the operator in its receipt", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    setup({ bindingTarget: async () => null });
+    mockPublishReviewReply.mockResolvedValue({ published: true, verified: true });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).toEqual({ changed: true });
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!", { actor: `${operator} approved event evt_rr` });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+  });
+
+  it("agency staff's reply is an operator instruction naming the agency and the person, never the owner's approval", async () => {
+    const staff = agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb");
+    const authorizeProvider = vi.fn(async () => undefined);
+    const { google, receipts } = setup({ authorizeProvider });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", staff)).toEqual({ changed: true });
+    expect(google.writes).toEqual(["Thank you!"]);
+    expect(receipts.all()[0]).toMatchObject({
+      authority: { kind: "operator_instruction", actor: "agency-staff:10000000-0000-4000-8000-0000000000cc:10000000-0000-4000-8000-0000000000bb", instructionRef: "event:evt_rr" },
+    });
+    expect(receipts.all()[0]).not.toMatchObject({ authority: { kind: "owner_approval" } });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: staff });
+    expect(authorizeProvider).toHaveBeenCalledWith(WORKSPACE, "10000000-0000-4000-8000-0000000000bb", "333", "10000000-0000-4000-8000-0000000000cc");
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("agency staff without provider authorization sends nothing", async () => {
+    const staff = agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb");
+    const { google, receipts } = setup();
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", staff)).toEqual({ changed: false, reason: "review_reply_failed" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("rechecks the named agency before dispatch and keeps a provider swap from writing", async () => {
+    const agency = "10000000-0000-4000-8000-0000000000cc";
+    const userId = "10000000-0000-4000-8000-0000000000bb";
+    const staff = agencyStaffActorId(agency, userId);
+    const { defaultTenantReplyDeps } = await vi.importActual<typeof import("@/products/google-listing/tenant-replies")>("@/products/google-listing/tenant-replies");
+    const production = await defaultTenantReplyDeps();
+    mockAssertActingAgency.mockResolvedValueOnce(agency).mockResolvedValue("10000000-0000-4000-8000-0000000000dd");
+    const { google, receipts } = setup({ authorizeProvider: production.authorizeProvider });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", staff)).toEqual({ changed: false, reason: "review_reply_failed" });
+    expect(mockAssertActingAgency).toHaveBeenCalledTimes(2);
+    expect(mockAssertActingAgency).toHaveBeenCalledWith({ userId, verifiedEmail: "staff@agency.example.test" }, WORKSPACE, { effect: "google", kind: "google_location", ref: "333" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toEqual([expect.objectContaining({ status: "failed", error: expect.stringMatching(/permission ended before the write/) })]);
+    expect(mockMark).not.toHaveBeenCalled();
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("only a verified agency and user id become an agency staff actor", () => {
+    expect(() => agencyStaffActorId("not-a-uuid", "10000000-0000-4000-8000-0000000000bb")).toThrow("agency_staff_actor_invalid");
+    expect(() => agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "")).toThrow("agency_staff_actor_invalid");
+    expect(isDelegateActor("agency-staff:x:y")).toBe(false);
+    expect(isDelegateActor("10000000-0000-4000-8000-0000000000bb")).toBe(false);
+    expect(isDelegateActor(agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb"))).toBe(true);
+    expect(isOperatorActor(agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb"))).toBe(false);
+  });
+
+  it("only a verified operator id becomes an operator actor", () => {
+    expect(() => operatorActorId("user")).toThrow("operator_actor_invalid");
+    expect(() => operatorActorId("")).toThrow("operator_actor_invalid");
+    expect(isOperatorActor("owner-user-1")).toBe(false);
+    expect(isOperatorActor("operator:not-a-uuid")).toBe(false);
+    expect(isOperatorActor(operatorActorId("10000000-0000-4000-8000-0000000000aa"))).toBe(true);
   });
 
   it("an owner may still approve a 1-2 star reply", async () => {

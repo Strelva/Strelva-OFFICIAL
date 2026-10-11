@@ -5,7 +5,7 @@ The ledger below is authoritative; graphs and research reports are derived views
 ```json product-model
 {
   "schema_version": 1,
-  "revision": 6,
+  "revision": 7,
   "product": {
     "id": "STRELVA",
     "name": "Strelva",
@@ -43,11 +43,12 @@ The ledger below is authoritative; graphs and research reports are derived views
       {
         "area": "people, authority, and state",
         "state": "partial",
-        "note": "Membership, assignment, delivery acceptance, payer and provider roles inspected in source; complete authorization matrix remains unverified.",
+        "note": "Membership, provider-seat/staff access, conversion authority, delivery acceptance and payer roles inspected and tested locally; the full authorization matrix and live agency/client assignments remain unverified.",
         "evidence": [
           "SRC_AUTHORITY_CODE",
           "SRC_DOMAIN_CODE",
-          "SRC_ECONOMICS_CODE"
+          "SRC_ECONOMICS_CODE",
+          "SRC_A1_SEAT_CONVERSION"
         ]
       },
       {
@@ -489,6 +490,13 @@ The ledger below is authoritative; graphs and research reports are derived views
       "locator": "docs/operations/reborn-integration-audit-2026-10-05.md",
       "observed_at": "2026-10-05",
       "claim": "Independent branch audits, combined verification and explicit remaining release findings. Local checks and source inspection only; evidence never establishes production operation or new commercial authority."
+    },
+    {
+      "id": "SRC_A1_SEAT_CONVERSION",
+      "kind": "test",
+      "locator": "a1/seat-conversion: supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql; rollback-20261013220000_provider_seat_tenant_conversion.sql; tests/provider-seat-tenant-conversion-schema.sql; scripts/check-workspace-upgrade.sh; scripts/check-workspace-sql.sh",
+      "observed_at": "2026-10-07",
+      "claim": "Local isolated PostgreSQL contracts cover explicit-agency conversion through a provider seat and named staff, no conversion operator membership, denial for an agency member without a staff row, seat-end access removal, owner invitation separation and acceptance, idempotent legacy re-route, and timestamped rollback/reapply. Synthetic scrubbed-copy rehearsal is local only. No production migration or client conversion was run."
     }
   ],
   "nodes": [
@@ -577,13 +585,14 @@ The ledger below is authoritative; graphs and research reports are derived views
       "id": "CAP_CONVERT",
       "type": "capability",
       "label": "Convert tenant to business",
-      "claim": "Strelva operator runs one atomic convert_tenant_to_business; dry run default; apply refuses non-local DB without explicit flag",
+      "claim": "A Strelva operator converts a tenant into a customer workspace only with an explicit agency, explicit selection basis and named verified agency staff; access is granted through a provider seat, with no personal conversion admin membership. Owner invitation remains a separate explicit workflow. Dry-run is the default and apply stays guarded.",
       "status": "confirmed",
       "lifecycle": "active",
       "freshness": "current",
       "realization": "partial",
       "evidence": [
-        "SRC_REBORN_BR"
+        "SRC_REBORN_BR",
+        "SRC_A1_SEAT_CONVERSION"
       ],
       "rationale": "",
       "premise_ids": [],
@@ -591,8 +600,19 @@ The ledger below is authoritative; graphs and research reports are derived views
         "missing": [
           "full unlink rollback",
           "scrubbed prod copy",
-          "leads/bookings backfill"
-        ]
+          "leads/bookings backfill",
+          "production migration and conversion",
+          "confirmed agency, contract basis and staff roster for each of the nine clients",
+          "representative scrubbed production copy"
+        ],
+        "agency_seat_contract": {
+          "route": "Explicit agency workspace and basis (existing_contract or owner_choice); no implicit Strelva default.",
+          "staff": "Only named verified agency members receive active agency_client_staff rows through the seat.",
+          "operator_access": "Conversion creates no personal workspace admin membership; reroute removes only receipt-proven conversion-created admin memberships.",
+          "owner_invitation": "Conversion creates and sends no invite; the existing invitation may be explicitly issued and accepted through the conversion link.",
+          "legacy_repath": "Idempotently replaces old conversion attribution/seat/staff when the selected agency differs; preserves pre-existing admin membership from joined workspaces.",
+          "proof_scope": "Local SQL and synthetic scrubbed-copy rehearsal; no production deployment or client conversion."
+        }
       }
     },
     {
@@ -6174,6 +6194,15 @@ The ledger below is authoritative; graphs and research reports are derived views
       ],
       "next_check": "Jacob reviews ADR 0011 and marks accepted text.",
       "status": "open"
+    },
+    {
+      "id": "Q_PROVIDER_SEAT_ASSIGNMENTS",
+      "question": "For each of the nine existing clients, which agency is covered by the current contract and which verified agency staff should receive customer access?",
+      "affects": [
+        "CAP_CONVERT"
+      ],
+      "next_check": "Jacob confirms each client’s current agency/contract basis and names verified agency staff; rehearse from a scrubbed copy before any separately authorized production route.",
+      "status": "open"
     }
   ],
   "changes": [
@@ -6731,6 +6760,34 @@ The ledger below is authoritative; graphs and research reports are derived views
       "sources": [
         "SRC_REBORN_COMBINED",
         "SRC_REBORN_MERGE_AUDIT"
+      ]
+    },
+    {
+      "revision": 7,
+      "at": "2026-10-07",
+      "reason": "Implement and locally verify explicit provider-seat conversion and repair the conversion-created direct admin grant; retain production and per-client authority gates.",
+      "added": [
+        "SRC_A1_SEAT_CONVERSION",
+        "Q_PROVIDER_SEAT_ASSIGNMENTS"
+      ],
+      "updated": [
+        "CAP_CONVERT"
+      ],
+      "invalidated": [],
+      "retired": [],
+      "reviews": {
+        "overhang": "Done: explicit agency seats and named staff complete the local conversion access path and remove the conversion-created operator admin grant. This may reduce durable operator access while making agency staff the named delivery path. Real agency assignments, customer use, delivery cost and economic effect remain unproven; no offer change.",
+        "feature_vault": "No separate feature vault exists in this worktree. No new candidate: this is completion and security repair of the committed conversion capability, not a distinct customer job. Keep other proposed compositions unpromoted.",
+        "product_vault": "No separate product vault exists in this worktree. Buyer, offer and pricing are unchanged; activate no product future. Revisit only if client/agency delivery or economic evidence changes the offer."
+      },
+      "resume": {
+        "objective": "Complete local implementation and review of provider-seat tenant conversion for #246 and the security repair in #535.",
+        "next_action": "Confirm explicit agency, current contract basis and verified staff for each of the nine clients; use the scrubbed rehearsal before any Jacob-authorized production migration or conversion.",
+        "unknown": "No production migration, conversion, customer use or economic result is proven; actual agency assignments and staff rosters remain unverified.",
+        "record": "docs/operations/release-1.0-packet.md, steps 12 and 12a"
+      },
+      "sources": [
+        "SRC_A1_SEAT_CONVERSION"
       ]
     }
   ]

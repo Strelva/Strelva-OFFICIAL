@@ -1,5 +1,8 @@
 # Inquiry-first migration acceptance
 
+
+**Current implementation, wave 6 round 5 (October 7):** see [wave 6 local verification](./inquiry-wave6-verification-2026-10-07.md) for every retained IF-01–28 criterion and adopted C1–16 delta, exact local gates, failure history and rollout boundaries. The October delta supersedes the old customer builder/frame and partner-agency surfaces. Earlier status rows are historical evidence, not the current completion percentage. No production action is authorized.
+
 Prepared 2026-09-11. This checklist records evidence, not intention. A row is
 complete only when its named evidence exists and has been inspected. Local,
 preview, hosted, and production evidence must stay separate.

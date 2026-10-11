@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { authenticatedCronRequest } from "@/__tests__/support/cron";
 import type { DomainClaim, TenantConfig } from "@/lib/types";
 
-const deps = vi.hoisted(() => ({ release: vi.fn(), tenants: vi.fn(), all: vi.fn(), config: vi.fn(), update: vi.fn(), send: vi.fn(), heartbeat: vi.fn() }));
+const deps = vi.hoisted(() => ({ release: vi.fn(), tenants: vi.fn(), all: vi.fn(), config: vi.fn(), update: vi.fn(), send: vi.fn(), heartbeat: vi.fn(), proposals: vi.fn(), published: vi.fn() }));
+vi.mock("@/products/websites/domain-requests",()=>({reconcileWebsiteDomainRequests:deps.proposals}));
 vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release,websiteRebuildReleaseMayBeOn:(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForWorkspace:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForTenant:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleasedFor:async(...args:unknown[])=>deps.release(...args)}));
 vi.mock("@/lib/tenants", () => ({ getActiveTenants: deps.tenants, getAllTenants: deps.all, getTenantConfig: deps.config, updateTenant: deps.update, isActiveTenant: (tenant: { active?: boolean }) => tenant.active !== false, invalidateDomainMapCache: () => undefined }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: deps.send }));
 vi.mock("@/lib/delivery-email", () => ({ resolveLeadNotifyRecipients: () => ["operator@example.com"] }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: deps.heartbeat }));
+vi.mock("@/products/websites/document-store", () => ({ websiteDocumentStore: { listPublished: deps.published } }));
 import { GET } from "@/app/api/cron/website-domain-verification/route";
 
 const now = Date.now();
@@ -25,10 +27,13 @@ const fetchMock = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "1");
+  deps.published.mockResolvedValue([{workspaceId:"workspace",tenantId:"hosted"}]);
   vi.stubEnv("VERCEL_API_TOKEN", "test-token");
   vi.stubEnv("VERCEL_PROJECT_ID", "prj_test");
   vi.stubGlobal("fetch", fetchMock);
   deps.release.mockReturnValue(false);
+  deps.proposals.mockResolvedValue({checked:0,failed:0});
   deps.tenants.mockResolvedValue(Object.values(tenants));
   deps.all.mockResolvedValue(Object.values(tenants));
   deps.config.mockImplementation(async (id: string) => tenants[id] ?? null);
@@ -39,6 +44,20 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("domain verification cron over every site", () => {
+  it("keeps the rebuild-disabled response and performs no provider or tenant read while queue coverage is off", async () => {
+    vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0");
+    expect(await(await GET(authenticatedCronRequest())).json()).toEqual({ skipped: true, reason: "website_rebuild_or_provider_disabled" });
+    expect(fetchMock).not.toHaveBeenCalled(); expect(deps.tenants).not.toHaveBeenCalled(); expect(deps.published).not.toHaveBeenCalled(); expect(deps.send).not.toHaveBeenCalled();
+  });
+
+  it("checks only published hosted sites with rebuild on and queue coverage off", async () => {
+    vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0"); deps.release.mockReturnValue(true);
+    const body = await(await GET(authenticatedCronRequest())).json();
+    expect(body).toMatchObject({ processed: 1, refreshed: 1 }); expect(body.mode).toBeUndefined();
+    expect(deps.published).toHaveBeenCalledOnce(); expect(deps.tenants).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("gldf.example.test"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("hosted.example.test"))).toBe(true);
+  });
   it("polls custom-repo and hosted claims with the rebuild release off, reading Vercel only", async () => {
     const response = await GET(authenticatedCronRequest());
     expect(response.status).toBe(200);
@@ -52,6 +71,7 @@ describe("domain verification cron over every site", () => {
     for (const [, init] of fetchMock.mock.calls) expect((init as RequestInit | undefined)?.method ?? "GET").toBe("GET");
     // Report-only: the seven-day claim did not email anyone.
     expect(deps.send).not.toHaveBeenCalled();
+    expect(deps.proposals).not.toHaveBeenCalled();
     expect(deps.update).toHaveBeenCalledWith("gldf", expect.objectContaining({ domainClaims: expect.any(Array) }));
     expect(deps.heartbeat).toHaveBeenCalledWith("website-domain-verification", expect.objectContaining({ ok: true, processed: 2 }));
   });

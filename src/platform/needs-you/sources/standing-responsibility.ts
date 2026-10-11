@@ -52,6 +52,7 @@ export function standingResponsibilityAdapter(ports: StandingResponsibilityPorts
   return {
     lifecycle: "standing_responsibility",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor =>
       (await ports.list(actor, ctx.workspaceId)).filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => standingResponsibilityItem(row) ?? [])),
     async currentRevision(ctx, sourceId) {
@@ -67,6 +68,7 @@ export function standingResponsibilityAdapter(ports: StandingResponsibilityPorts
       try {
         const record = await find(actor, ctx.workspaceId, item.sourceId);
         if (!record) return { outcome: "done", reason: "already_resolved" };
+        if (standingRevision(record) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         if (record.policy.ownerId !== actor.userId) return { outcome: "failed", reason: "not_creator" };
         const approved = await ports.approve(actor, record.id, record.policy.revision);
         if (approved.policy.status !== "active") return { outcome: "failed", reason: "not_approved" };

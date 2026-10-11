@@ -314,7 +314,7 @@
   font-weight: 500;
   line-height: 20px;
   text-decoration: none;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), border-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .clearSearch {

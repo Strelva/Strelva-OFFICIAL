@@ -13,6 +13,7 @@ type Query = {
   gt(column: string, value: unknown): Query;
   order(column: string, options?: { ascending?: boolean }): Query;
   limit(value: number): Query;
+  range(from: number, to: number): Query;
   then<TResult1 = QueryResult, TResult2 = never>(
     onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -90,7 +91,16 @@ function db(): InternalDb {
   return value as unknown as InternalDb;
 }
 
-async function selectRows(table: string, columns: string, limit = MAX_ROWS): Promise<Row[]> {
+async function selectRows(table: string, columns: string, limit = MAX_ROWS, all = false): Promise<Row[]> {
+  if (all) {
+    const result: Row[] = [];
+    for (let offset = 0; ; offset += MAX_ROWS) {
+      const page = await db().from(table).select(columns).order("id", { ascending: true }).range(offset, offset + MAX_ROWS - 1);
+      if (page.error || !Array.isArray(page.data)) throw new WorkspaceStoreError(`Operational ${table} records are unavailable.`);
+      result.push(...rows(page.data));
+      if (page.data.length < MAX_ROWS) return result;
+    }
+  }
   const result = await db().from(table).select(columns).limit(limit);
   if (result.error) throw new WorkspaceStoreError(`Operational ${table} records are unavailable.`);
   return rows(result.data);
@@ -205,14 +215,14 @@ function exceptionLink(workspaceId: string, workId: string, stepId?: string): st
   return `/admin/work?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}${anchor}`;
 }
 
-export async function listOperationalExceptions(): Promise<OperationalExceptionProjection[]> {
+export async function listOperationalExceptions(options: { all?: boolean } = {}): Promise<OperationalExceptionProjection[]> {
   const [workRows, runRows, receiptRows, assignmentRows, userRows, workspaceRows] = await Promise.all([
-    selectRows("saved_product_work", "id,workspace_id,title,payload,updated_at"),
-    selectRows("standing_responsibility_runs", "id,workspace_id,finite_work_id,status,last_error,updated_at"),
-    selectRows("standing_responsibility_receipts", "id,run_id,step_id,attempt,status,effect,reason,finished_at,created_at"),
-    selectRows("operational_assignments", "id,work_id,assignee_user_id,assignee_email,assignee_kind,status,offered_at,expires_at"),
-    selectRows("users", "id,email"),
-    selectRows("workspaces", "id,name"),
+    selectRows("saved_product_work", "id,workspace_id,title,payload,updated_at", MAX_ROWS, options.all),
+    selectRows("standing_responsibility_runs", "id,workspace_id,finite_work_id,status,last_error,updated_at", MAX_ROWS, options.all),
+    selectRows("standing_responsibility_receipts", "id,run_id,step_id,attempt,status,effect,reason,finished_at,created_at", MAX_ROWS, options.all),
+    selectRows("operational_assignments", "id,work_id,assignee_user_id,assignee_email,assignee_kind,status,offered_at,expires_at", MAX_ROWS, options.all),
+    selectRows("users", "id,email", MAX_ROWS, options.all),
+    selectRows("workspaces", "id,name", MAX_ROWS, options.all),
   ]);
   const users = userMap(userRows);
   const workspaces = workspaceMap(workspaceRows);

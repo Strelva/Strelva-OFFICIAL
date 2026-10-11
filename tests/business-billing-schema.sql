@@ -19,7 +19,10 @@ create or replace function pg_temp.bb_convert(p_tenant text, p_billing jsonb, p_
 returns jsonb language sql as $$
   select public.convert_tenant_to_business('bb-operator@strelva.example.test', p_tenant,
     jsonb_strip_nulls(jsonb_build_object('tenantId', t.id, 'tenantStableId', t.stable_id, 'workspaceName', t.site_name,
-      'targetWorkspaceId', p_target)) || jsonb_build_object('billing', p_billing, 'account', p_account, 'patch', '{}'::jsonb, 'contacts', '[]'::jsonb),
+      'targetWorkspaceId', p_target)) || jsonb_build_object('billing', p_billing, 'account', p_account, 'patch', '{}'::jsonb, 'contacts', '[]'::jsonb)
+      || case when to_regprocedure('public.repath_converted_tenant_provider(text,text,uuid,jsonb,text,boolean)') is null then '{}'::jsonb
+        else jsonb_build_object('agencyWorkspaceId', 'bb000000-0000-4000-8000-000000000010',
+          'agencyStaffEmails', jsonb_build_array('bb-member@example.test'), 'agencySelectionBasis', 'existing_contract') end,
     gen_random_uuid(), encode(sha256(convert_to(t.id || clock_timestamp()::text, 'UTF8')), 'hex'))
   from public.tenants t where t.id = p_tenant
 $$;
@@ -31,6 +34,10 @@ $$;
 insert into public.users(id, email, verified_at) values
   ('bb000000-0000-4000-8000-000000000001', 'bb-operator@strelva.example.test', now()),
   ('bb000000-0000-4000-8000-000000000002', 'bb-member@example.test', now());
+insert into public.workspaces(id, kind, name, created_by)
+  values ('bb000000-0000-4000-8000-000000000010', 'agency', 'Fictional billing test agency', 'bb000000-0000-4000-8000-000000000001');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+  values ('bb000000-0000-4000-8000-000000000010', 'bb000000-0000-4000-8000-000000000002', 'member', 'bb000000-0000-4000-8000-000000000001');
 insert into public.super_admins(user_id, email) values ('bb000000-0000-4000-8000-000000000001', 'bb-operator@strelva.example.test');
 insert into public.tenants(id, stable_id, site_name, active, owner_email) values
   ('bb-tier', 'bb000000-0000-4000-8000-0000000000a1', 'Tier Client', true, 'tier-owner@example.test'),
@@ -73,7 +80,7 @@ select pg_temp.bb_assert(pg_temp.bb_billing('bb-gldf')->>'state' = 'grandfathere
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-none')->>'state' = 'none' and (pg_temp.bb_billing('bb-none')->>'openItem')::boolean, 'none is the open item');
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-null')->>'state' = 'none', 'no billing recorded -> none');
 select pg_temp.bb_assert(not (pg_temp.bb_billing('bb-tier')->>'openItem')::boolean, 'configured billing is not an open item');
-select pg_temp.bb_assert((select count(*) from public.accounts where workspace_id is not null) = 7, 'one billing row per business');
+select pg_temp.bb_assert((select count(*) from public.accounts a join public.workspaces w on w.id=a.workspace_id and w.kind='customer' where a.workspace_id in (select l.workspace_id from public.tenant_workspace_links l join public.tenants t on t.stable_id=l.tenant_stable_id where t.id like 'bb-%')) = 7, 'one billing row per business');
 
 -- The payer is the owner recipient, never a user: owners who never signed in still have one.
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-tier')#>>'{payer,email}' = 'tier-owner@example.test'

@@ -124,7 +124,7 @@ describe("WebsiteExperience", () => {
   it("reopens the saved artifact with its canonical preview URL and exact next action", async () => {
     const { container, root } = await render(transport(), { workId });
     expect(container.textContent).toContain("Harbor Dental");
-    expect(container.textContent).toContain("Preview version 4");
+    expect(container.textContent).toContain("Saved preview 4");
     expect(container.textContent).toContain("Approve this preview");
     expect(container.textContent).not.toContain("Prepare launch");
     expect(container.querySelector<HTMLIFrameElement>("iframe")?.getAttribute("src")).toBe("/preview/websites/4");
@@ -133,7 +133,7 @@ describe("WebsiteExperience", () => {
   });
 
   it("keeps the edited brief when regeneration conflicts", async () => {
-    const api = transport({ revise: vi.fn(async () => { throw new Error("This website changed while you were editing. Reload the latest version before trying again."); }) });
+    const api = transport({ revise: vi.fn(async () => { throw new Error("This website changed while you were editing. Reload the latest saved state before trying again."); }) });
     const { container, root } = await render(api, { workId });
     const description = [...container.querySelectorAll<HTMLTextAreaElement>("textarea")].find((field) => field.value.includes("family dental"));
     expect(description).toBeTruthy();
@@ -141,7 +141,9 @@ describe("WebsiteExperience", () => {
     const button = [...container.querySelectorAll("button")].find((item) => item.textContent?.includes("Generate a new preview"));
     expect(button).toBeTruthy();
     await act(async () => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(container.textContent).toContain("Reload the latest version before trying again.");
+    expect(container.textContent).toContain("The website change could not be confirmed. Check the current saved website before continuing.");
+    expect([...container.querySelectorAll("button")].some((item) => item.textContent === "Reload current state")).toBe(true);
+    expect(description!.readOnly).toBe(true);
     expect([...container.querySelectorAll<HTMLTextAreaElement>("textarea")].some((field) => field.value.includes("Add evening appointments"))).toBe(true);
     act(() => root.unmount()); container.remove();
   });
@@ -205,7 +207,11 @@ describe("WebsiteExperience", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined;
       requests.push({ url: String(input), body });
-      return new Response(JSON.stringify(record()), { status: 200, headers: { "Content-Type": "application/json" } });
+      const acknowledged = body?.action === "revise" ? record({ revision: 5, candidate: artifact(5) })
+        : body?.action === "approve" ? record({ revision: 5, status: "approved", approvedCandidateRevision: 4 })
+        : body?.action === "prepareLaunch" ? await transport().prepareLaunch({ workspaceId, workId, expectedRevision: 5, candidateRevision: 4, candidateContentHash: "a".repeat(64) })
+        : record();
+      return new Response(JSON.stringify(acknowledged), { status: 200, headers: { "Content-Type": "application/json" } });
     });
     const signal = new AbortController().signal;
     await serverWebsiteTransport.read({ workspaceId, workId }, signal);
@@ -226,5 +232,23 @@ describe("WebsiteExperience", () => {
     expect(requests[2]?.body).not.toHaveProperty("workId");
     expect(requests[4]?.body).toMatchObject({ action: "prepareLaunch", expectedRevision: 5, candidateRevision: 4 });
     fetchMock.mockRestore();
+  });
+});
+
+
+describe("retired first-party prepare-only creation fallback", () => {
+  it("keeps rollout-off new work unavailable instead of creating a v1 candidate", async () => {
+    const fetcher = vi.spyOn(globalThis, "fetch");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(WebsiteExperience, { workspaceId, rebuildEnabled: false })));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Website creation is unavailable");
+    expect(container.textContent).toContain("saved websites remain available");
+    expect(container.querySelector("button")).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+    fetcher.mockRestore();
+    container.remove();
   });
 });

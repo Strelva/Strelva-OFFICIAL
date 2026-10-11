@@ -1,0 +1,296 @@
+{
+  "scope": "local implementation/browser proof; no hosted actions or release approval",
+  "tested_runtime_base": "0479cdab",
+  "journey_branch_input": "bf5d8fd3",
+  "supabase_cli": "2.117.0 via npx",
+  "workers": 1,
+  "retries": 0,
+  "migration_files": 139,
+  "migration_set_sha256": "61e8692d060bbfaee5490c27cc4479acd4d42e2d56370139bddb4cead89d1fa1",
+  "migration_hash_method": "SHA256 of sorted SQL basename, NUL, file bytes, NUL",
+  "runs": [
+    {
+      "command": "pnpm check:journeys --reuse <local-stack> --only on",
+      "stats": {
+        "startTime": "2026-10-07T21:58:57.293Z",
+        "duration": 131133.128,
+        "expected": 8,
+        "skipped": 0,
+        "unexpected": 4,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 1440px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 390px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a visitor's request-mode booking on the tenant site reaches Needs you",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n\n  88 |     const offered = await site.goto(`${origin}/api/booking/availability?date=${date}&serviceId=consultation`);\n  89 |     expect(offered?.status()).toBe(200);\n> 90 |     const slots = ((await offered!.json()) as { slots: string[] }).slots;\n     |                     ^\n  91 |     expect(slots.length).toBeGreaterThan(0);\n  92 |     const booked = await site.evaluate(async (input) => {\n  93 |       const response = await fetch(\"/api/booking\", { method: \"POST\", headers: { \"content-type\": \"application/json\" }, body: JSON.stringify(input) });\n    at tests/booking-approval-authenticated-local.spec.ts:90:21"
+          ]
+        },
+        {
+          "file": "email-only-owner-authenticated-local.spec.ts",
+          "title": "an owner who never signs in decides a booking request by email link only",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "email-only-owner-authenticated-local.spec.ts",
+          "title": "an owner without an account approves Make real by email link",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "inquiries-1-0-authenticated-local.spec.ts",
+          "title": "a visitor's message reaches the owner's Inquiries; a held one is released by the owner",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: expect(locator).toBeVisible() failed\n\nLocator: getByRole('article').filter({ has: getByRole('heading', { name: 'Theo Park muyni2c7' }) }).getByText('Released from held messages.')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 5000ms\n  - waiting for getByRole('article').filter({ has: getByRole('heading', { name: 'Theo Park muyni2c7' }) }).getByText('Released from held messages.')\n\n\n  89 |     await page.screenshot({ path: testInfo.outputPath(\"inquiries-released-390.png\"), fullPage: true });\n  90 |     // A released message stays marked, with the way back to held.\n> 91 |     await expect(releasedCard.getByText(\"Released from held messages.\")).toBeVisible();\n     |                                                                          ^\n  92 |     await expect(releasedCard.getByRole(\"button\", { name: `Move the message from ${caught.name} back to held` })).toBeVisible();\n  93 |   } finally {\n  94 |     if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email, people: [setup.operator, setup.owner, ...(stranger ? [stranger] : [])] });\n    at tests/inquiries-1-0-authenticated-local.spec.ts:91:74"
+          ]
+        },
+        {
+          "file": "make-real-authenticated-local.spec.ts",
+          "title": "the owner makes a website Possibility real through Needs you and sees a partial, honest result",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "operator-queue-authenticated-local.spec.ts",
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 1440px",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: expect(locator).toContainText(expected) failed\n\nLocator: locator('li').filter({ hasText: 'Queue journey 1440: add our winter hours ddbe53' }).first()\nExpected substring: \"Taken by you\"\nReceived string:    \"P2 \u00b7 Waiting on StrelvaService requestQueue journey 1440: add our winter hours ddbe53Business \u00b7 Not attached \u00b7 1m oldOpenTakeClose\"\nTimeout: 5000ms\n\nCall log:\n  - Expect \"toContainText\" with timeout 5000ms\n  - waiting for locator('li').filter({ hasText: 'Queue journey 1440: add our winter hours ddbe53' }).first()\n    9 \u00d7 locator resolved to <li class=\"px-[18px] py-3.5\">\u2026</li>\n      - unexpected value \"P2 \u00b7 Waiting on StrelvaService requestQueue journey 1440: add our winter hours ddbe53Business \u00b7 Not attached \u00b7 1m oldOpenTakeClose\"\n\n\n  55 |       await take.click();\n  56 |       await expect(page.getByRole(\"status\").filter({ hasText: \"Taken.\" })).toBeVisible();\n> 57 |       await expect(row).toContainText(\"Taken by you\");\n     |                         ^\n  58 |\n  59 |       const marks = async () => {\n  60 |         const context = await admin.rpc(\"read_operator_queue_context\", { p_user_id: operator.userId, p_verified_email: operator.email });\n    at tests/operator-queue-authenticated-local.spec.ts:57:25"
+          ]
+        },
+        {
+          "file": "operator-queue-authenticated-local.spec.ts",
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 390px",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: expect(locator).toContainText(expected) failed\n\nLocator: locator('li').filter({ hasText: 'Queue journey 390: add our winter hours 2025be' }).first()\nExpected substring: \"Taken by you\"\nReceived string:    \"P2 \u00b7 Waiting on StrelvaService requestQueue journey 390: add our winter hours 2025beBusiness \u00b7 Not attached \u00b7 1m oldOpenTakeClose\"\nTimeout: 5000ms\n\nCall log:\n  - Expect \"toContainText\" with timeout 5000ms\n  - waiting for locator('li').filter({ hasText: 'Queue journey 390: add our winter hours 2025be' }).first()\n    9 \u00d7 locator resolved to <li class=\"px-[18px] py-3.5\">\u2026</li>\n      - unexpected value \"P2 \u00b7 Waiting on StrelvaService requestQueue journey 390: add our winter hours 2025beBusiness \u00b7 Not attached \u00b7 1m oldOpenTakeClose\"\n\n\n  55 |       await take.click();\n  56 |       await expect(page.getByRole(\"status\").filter({ hasText: \"Taken.\" })).toBeVisible();\n> 57 |       await expect(row).toContainText(\"Taken by you\");\n     |                         ^\n  58 |\n  59 |       const marks = async () => {\n  60 |         const context = await admin.rpc(\"read_operator_queue_context\", { p_user_id: operator.userId, p_verified_email: operator.email });\n    at tests/operator-queue-authenticated-local.spec.ts:57:25"
+          ]
+        },
+        {
+          "file": "owner-journey-1-0-authenticated-local.spec.ts",
+          "title": "operator converts and invites; the owner accepts, lands on the admin host and decides by one-tap link",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "owner-journey-1-0-authenticated-local.spec.ts",
+          "title": "Strelva handled lists the approved booking decision with its undo state",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "versions-authenticated-local.spec.ts",
+          "title": "an agency's improvement reaches a client's Version only when the owner approves it",
+          "status": "expected",
+          "attempts": 1
+        }
+      ],
+      "name": "plain-on",
+      "command_exit_code": 1,
+      "rpc_guard": {
+        "exit_code": 1,
+        "reader_lock_findings": 10
+      }
+    },
+    {
+      "command": "pnpm check:journeys --reuse <local-stack> --only on --with-proposed-fixes",
+      "stats": {
+        "startTime": "2026-10-07T22:01:26.060Z",
+        "duration": 67965.32800000001,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 1440px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 390px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "booking-approval-authenticated-local.spec.ts",
+          "title": "a visitor's request-mode booking on the tenant site reaches Needs you",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON\n\n  88 |     const offered = await site.goto(`${origin}/api/booking/availability?date=${date}&serviceId=consultation`);\n  89 |     expect(offered?.status()).toBe(200);\n> 90 |     const slots = ((await offered!.json()) as { slots: string[] }).slots;\n     |                     ^\n  91 |     expect(slots.length).toBeGreaterThan(0);\n  92 |     const booked = await site.evaluate(async (input) => {\n  93 |       const response = await fetch(\"/api/booking\", { method: \"POST\", headers: { \"content-type\": \"application/json\" }, body: JSON.stringify(input) });\n    at tests/booking-approval-authenticated-local.spec.ts:90:21"
+          ]
+        },
+        {
+          "file": "email-only-owner-authenticated-local.spec.ts",
+          "title": "an owner who never signs in decides a booking request by email link only",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "email-only-owner-authenticated-local.spec.ts",
+          "title": "an owner without an account approves Make real by email link",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "inquiries-1-0-authenticated-local.spec.ts",
+          "title": "a visitor's message reaches the owner's Inquiries; a held one is released by the owner",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: expect(locator).toBeVisible() failed\n\nLocator: getByRole('article').filter({ has: getByRole('heading', { name: 'Theo Park muynkbft' }) }).getByText('Released from held messages.')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n  - Expect \"toBeVisible\" with timeout 5000ms\n  - waiting for getByRole('article').filter({ has: getByRole('heading', { name: 'Theo Park muynkbft' }) }).getByText('Released from held messages.')\n\n\n  89 |     await page.screenshot({ path: testInfo.outputPath(\"inquiries-released-390.png\"), fullPage: true });\n  90 |     // A released message stays marked, with the way back to held.\n> 91 |     await expect(releasedCard.getByText(\"Released from held messages.\")).toBeVisible();\n     |                                                                          ^\n  92 |     await expect(releasedCard.getByRole(\"button\", { name: `Move the message from ${caught.name} back to held` })).toBeVisible();\n  93 |   } finally {\n  94 |     if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email, people: [setup.operator, setup.owner, ...(stranger ? [stranger] : [])] });\n    at tests/inquiries-1-0-authenticated-local.spec.ts:91:74"
+          ]
+        },
+        {
+          "file": "make-real-authenticated-local.spec.ts",
+          "title": "the owner makes a website Possibility real through Needs you and sees a partial, honest result",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "operator-queue-authenticated-local.spec.ts",
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 1440px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "operator-queue-authenticated-local.spec.ts",
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 390px",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "owner-journey-1-0-authenticated-local.spec.ts",
+          "title": "operator converts and invites; the owner accepts, lands on the admin host and decides by one-tap link",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "owner-journey-1-0-authenticated-local.spec.ts",
+          "title": "Strelva handled lists the approved booking decision with its undo state",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "versions-authenticated-local.spec.ts",
+          "title": "an agency's improvement reaches a client's Version only when the owner approves it",
+          "status": "expected",
+          "attempts": 1
+        }
+      ],
+      "name": "on-fixes",
+      "command_exit_code": 1,
+      "rpc_guard": {
+        "exit_code": 0,
+        "public_functions_checked": 786,
+        "reader_lock_findings": 0
+      }
+    },
+    {
+      "command": "pnpm check:journeys --only off --keep-stack; pnpm check:journeys --reuse <fresh-unmodified-local-stack> --only off",
+      "stats": {
+        "startTime": "2026-10-07T22:09:19.257Z",
+        "duration": 17012.441000000003,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 5,
+        "flaky": 0
+      },
+      "tests": [
+        {
+          "file": "application-use-authenticated-local.spec.ts",
+          "title": "a verified staff recipient uses one released version while a candidate changes, then survives rollback and revocation",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: {\"error\":\"Ask Strelva to build this.\",\"code\":\"make_systems_required\"}\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 201\nReceived: 403\n\n  14 |     data: body,\n  15 |   });\n> 16 |   expect(response.status(), await response.text()).toBe(status);\n     |                                                    ^\n  17 |   return response.json();\n  18 | }\n  19 |\n    at post (tests/application-use-authenticated-local.spec.ts:16:52)\n    at tests/application-use-authenticated-local.spec.ts:53:15"
+          ]
+        },
+        {
+          "file": "application-use-authenticated-local.spec.ts",
+          "title": "a verified recipient edits a date record through a stale correction and recovers it",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: {\"error\":\"Ask Strelva to build this.\",\"code\":\"make_systems_required\"}\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 201\nReceived: 403\n\n  14 |     data: body,\n  15 |   });\n> 16 |   expect(response.status(), await response.text()).toBe(status);\n     |                                                    ^\n  17 |   return response.json();\n  18 | }\n  19 |\n    at post (tests/application-use-authenticated-local.spec.ts:16:52)\n    at tests/application-use-authenticated-local.spec.ts:313:15"
+          ]
+        },
+        {
+          "file": "application-use-authenticated-local.spec.ts",
+          "title": "self-service template becomes a private native app, then a live app without copying preview records",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: {\"error\":\"Ask Strelva to build this.\",\"code\":\"make_systems_required\"}\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 201\nReceived: 403\n\n  440 |     await page.getByRole(\"button\", { name: \"Create private tool\", exact: true }).click();\n  441 |     const response = await createdResponse;\n> 442 |     expect(response.status(), await response.text()).toBe(201);\n      |                                                      ^\n  443 |     const app = await response.json();\n  444 |     expect(app.workspaceId).toBe(workspaceId);\n  445 |     expect(app.productId).toBe(\"applications\");\n    at tests/application-use-authenticated-local.spec.ts:442:54"
+          ]
+        },
+        {
+          "file": "launch-business-authenticated-local.spec.ts",
+          "title": "fresh business, native work, and agency delivery retain one owner at 1440px",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: {\"error\":\"Ask Strelva to build this.\",\"code\":\"make_systems_required\"}\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 201\nReceived: 403\n\n  47 |     await page.getByRole(\"button\",{name:\"Create private tool\",exact:true}).click();\n  48 |     const appResponse=await appCreation;\n> 49 |     expect(appResponse.status(),await appResponse.text()).toBe(201);\n     |                                                           ^\n  50 |     const app=await appResponse.json();\n  51 |     await expect(page.getByRole(\"heading\",{name:\"Team requests\",exact:true,level:1})).toBeVisible();\n  52 |     await page.getByRole(\"button\",{name:\"Review and publish\",exact:true}).click();\n    at tests/launch-business-authenticated-local.spec.ts:49:59"
+          ]
+        },
+        {
+          "file": "launch-business-authenticated-local.spec.ts",
+          "title": "fresh business, native work, and agency delivery retain one owner at 390px",
+          "status": "unexpected",
+          "attempts": 1,
+          "errors": [
+            "Error: {\"error\":\"Ask Strelva to build this.\",\"code\":\"make_systems_required\"}\n\nexpect(received).toBe(expected) // Object.is equality\n\nExpected: 201\nReceived: 403\n\n  47 |     await page.getByRole(\"button\",{name:\"Create private tool\",exact:true}).click();\n  48 |     const appResponse=await appCreation;\n> 49 |     expect(appResponse.status(),await appResponse.text()).toBe(201);\n     |                                                           ^\n  50 |     const app=await appResponse.json();\n  51 |     await expect(page.getByRole(\"heading\",{name:\"Team requests\",exact:true,level:1})).toBeVisible();\n  52 |     await page.getByRole(\"button\",{name:\"Review and publish\",exact:true}).click();\n    at tests/launch-business-authenticated-local.spec.ts:49:59"
+          ]
+        },
+        {
+          "file": "onboarding-authenticated-local.spec.ts",
+          "title": "real local Auth can create, review, accept, reopen, and isolate onboarding work",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "release-1-0-flags-off-authenticated-local.spec.ts",
+          "title": "with every 1.0 flag off, a converted business's owner sees the workspace as before 1.0",
+          "status": "expected",
+          "attempts": 1
+        },
+        {
+          "file": "service-request-authenticated-local.spec.ts",
+          "title": "persists, reopens, and reviews a service request through local Auth and Postgres",
+          "status": "expected",
+          "attempts": 1
+        }
+      ],
+      "name": "off-baseline",
+      "command_exit_code": 1,
+      "rpc_guard": {
+        "exit_code": 1,
+        "reader_lock_findings": 10
+      }
+    }
+  ]
+}

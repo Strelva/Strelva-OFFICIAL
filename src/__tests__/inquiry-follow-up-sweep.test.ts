@@ -178,6 +178,40 @@ function transport(): InquiryOutboundTransport {
 }
 
 describe("default inquiry follow-up status projection", () => {
+  it.each([
+    ["business", "Automatic reply from Acme.", "allow", "business"],
+    ["owner_notice", "Automatic inquiry notification for Acme.", "allow", "automatic_notice"],
+    ["business", "A reply from Acme.", "block", null],
+    ["business", "Automatic reply from another business.", "block", null],
+    ["owner_notice", "Automatic inquiry notification for another business.", "block", null],
+  ] as const)("evaluates %s disclosure against the actual automatic message: %s", (kind, messageBody, decision, disclosedAs) => {
+    const state = followUpState(undefined, true, true);
+    const engine = new InquiryEngine({ businessId: BUSINESS, state, now: () => RECEIVED_AT });
+    const result = engine.evaluateResponsibilityAction(state.responsibilities[0]!.id, kind === "business" ? "reply" : "send_message", { at: SWEEP_AT, messageBody, messageDisclosure: { kind, name: "Acme" } });
+    expect(result).toMatchObject({ decision, disclosedAs });
+  });
+
+  it("keeps a correctly disclosed business message behind the current supervision and explicit pre-authorization", () => {
+    const state = followUpState(undefined, true, true, true, false);
+    const engine = new InquiryEngine({ businessId: BUSINESS, state, now: () => RECEIVED_AT });
+    const input = { at: SWEEP_AT, messageBody: "Automatic reply from Acme.", messageDisclosure: { kind: "business" as const, name: "Acme" } };
+    expect(engine.evaluateResponsibilityAction(state.responsibilities[0]!.id, "reply", input).decision).toBe("approval_required");
+    const trusted = followUpState(undefined, false, true);
+    trusted.responsibilities[0]!.allowedActions.push("reply");
+    const noPreauthorization = new InquiryEngine({ businessId: BUSINESS, state: trusted, now: () => RECEIVED_AT });
+    expect(noPreauthorization.evaluateResponsibilityAction(trusted.responsibilities[0]!.id, "reply", input).decision).toBe("approval_required");
+  });
+
+  it("records the exact business disclosure in accepted receipts and keeps the daily budget", () => {
+    const state = followUpState(undefined, true, true);
+    state.responsibilities[0]!.budget.dailyMessages = 1;
+    const engine = new InquiryEngine({ businessId: BUSINESS, state, now: () => RECEIVED_AT });
+    const messageDisclosure = { kind: "business" as const, name: "Acme" };
+    const receipt = engine.recordResponsibilityAction({ responsibilityId: state.responsibilities[0]!.id, action: "reply", actorId: "owner-1", at: SWEEP_AT, what: "Automatic acknowledgement sent", why: "The current rule permits replies", messageBody: "Automatic reply from Acme.", messageDisclosure, outcome: "accepted", outcomeEvidence: ["Provider accepted the exact business message"], idempotencyKey: "business-disclosure" });
+    expect(receipt).toMatchObject({ status: "accepted", evaluation: { decision: "allow", disclosedAs: "business" } });
+    expect(engine.evaluateResponsibilityAction(state.responsibilities[0]!.id, "reply", { at: SWEEP_AT, messageBody: "Automatic reply from Acme.", messageDisclosure })).toMatchObject({ decision: "block", clause: "Budget: 1 messages per day" });
+  });
+
   it("does not send after the canonical inquiry status is handled", async () => {
     const mail = transport();
     const result = await runSweep(followUpState("handled"), mail);
@@ -284,7 +318,8 @@ describe("default inquiry follow-up status projection", () => {
     const first = await runSweep(followUpState(undefined, true), mail, { store });
     expect(first).toMatchObject({ due: 0, attempted: 0, accepted: 0 });
     expect(mail.send).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(mail.send).mock.calls[0]?.[0]?.action).toBe("reply");
+    expect(vi.mocked(mail.send).mock.calls[0]?.[0]).toMatchObject({ action: "reply", fromName: "Acme", disclosure: { kind: "business", name: "Acme" }, options: { businessName: "Acme", footerNote: "Automatic reply · from Acme" } });
+    expect(JSON.stringify(vi.mocked(mail.send).mock.calls[0]?.[0]?.options)).not.toContain("Strelva");
     const result = await runSweep(followUpState(undefined, true), mail, { store, now: "2026-09-11T12:04:00.000Z" });
     expect(result.accepted).toBe(1);
     expect(mail.send).toHaveBeenCalledTimes(2);
@@ -374,6 +409,8 @@ describe("default inquiry follow-up status projection", () => {
       action: "owner_notification",
       audience: "client",
       to: "team@acme.test",
+      disclosure: { kind: "owner_notice", name: "Acme" },
+      options: { footerNote: "Automatic inquiry notification for Acme" },
     });
   });
 

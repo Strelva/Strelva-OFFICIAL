@@ -47,7 +47,7 @@ describe("publishing in the workspace", () => {
     expect(listing.name).toBe("The Mooney Firm");
     expect(listing.surface).toMatchObject({ kind: "listing", healthMessage: "Google listing read recently." });
     const receipts = listing.surface.kind === "listing" ? listing.surface.receipts.map((r) => r.headline) : [];
-    expect(receipts).toEqual(["Strelva updated your hours on Google.", "Strelva replied to a review on Google.", "Posted. Google hasn't shown it yet."]);
+    expect(receipts).toEqual(["Updated your hours on Google.", "Replied to a review on Google.", "Posted. Google hasn't shown it yet."]);
     expect(all.find((item) => item.kind === "newsletter")?.name).toBe("The Mooney Firm newsletter");
     expect(all.find((item) => item.kind === "website")?.parts).toEqual([{ label: "Blog", published: 12, drafts: 1 }]);
     const text = JSON.stringify(all);
@@ -81,14 +81,28 @@ describe("publishing in the workspace", () => {
     expect(extras.newsletters).toEqual([]);
     expect(extras.collections).toEqual([{ tenantId: "mooney-firm", types: [] }]);
   });
+  it("keeps approved newsletter outputs discoverable after the last subscriber leaves", async () => {
+    const extras = await readPublishingExtras(base, { activeSubscribers: async () => 0, collections: async () => [], approvedIssues: async () => 1 });
+    const projected = await withPublishing(base, actor, NOW, { snapshot: async () => previewPublishingSnapshot(base, "mooney", "on", NOW), extras: async () => extras });
+    expect(projected.listing.systems.find(item => item.system.kind === "newsletter")?.basis).toContain("0 active subscribers");
+    expect(projected.listing.systems.find(item => item.system.kind === "newsletter")?.basis).toContain("approved issues and receipts stay here");
+  });
+  it("keeps newsletter history when subscriber reads fail without inventing a zero count", async () => {
+    const extras = await readPublishingExtras(base, { activeSubscribers: async () => { throw new Error("down"); }, collections: async () => [], approvedIssues: async () => 1 });
+    expect(extras.newsletters).toEqual([{ tenantId: "mooney-firm", activeSubscribers: null, approvedIssues: 1 }]);
+    const projected = await withPublishing(base, actor, NOW, { snapshot: async () => previewPublishingSnapshot(base, "mooney", "on", NOW), extras: async () => extras });
+    const newsletter = projected.listing.systems.find(item => item.system.kind === "newsletter");
+    expect(newsletter?.basis).toContain("Subscriber count is unavailable");
+    expect(newsletter?.basis).toContain("approved issues and receipts stay here");
+  });
 
-  it("renders the listing page with Strelva handled, and an empty state", async () => {
+  it("renders the listing page with What changed, and an empty state", async () => {
     const all = views(await project("on"));
     const listing = all.find((item) => item.kind === "listing")!;
     const props = { systems: all, workspaceId: BUSINESS, readOnly: false, sources: [], systemHref: (id: string) => id, onHome: () => undefined, onAsk: () => undefined };
     const html = renderToStaticMarkup(<SystemPage {...props} system={listing} />);
-    expect(html).toContain("Strelva handled");
-    expect(html).toContain("Strelva replied to a review on Google.");
+    expect(html).toContain("What changed");
+    expect(html).toContain("Replied to a review on Google.");
     const empty = renderToStaticMarkup(<SystemPage {...props} system={{ ...listing, surface: { kind: "listing", healthMessage: "Google listing read recently.", receipts: [] } }} />);
     expect(empty).toContain("Nothing yet.");
   });

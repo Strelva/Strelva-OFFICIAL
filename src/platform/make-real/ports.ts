@@ -4,6 +4,9 @@ import type { IsolatedEffectRehearsal, LiveSystemsReader } from "@/platform/poss
 import type { SystemRef } from "@/platform/systems/contracts";
 import type { Activation } from "./contracts";
 
+/** Private native owner inverse frame; it does not make generic closed plans undoable. */
+export interface NativeGoogleCompletedUndo { candidateRevision:number;planFingerprint:string;effectId:string;providerRef:string; }
+
 export type EffectPerformResult =
   | { status: "accepted"; providerRef: string; result?: Record<string, unknown> }
   | { status: "rejected"; reason: string };
@@ -32,6 +35,11 @@ export interface EffectAdapter extends IsolatedEffectRehearsal {
    * declared effect is passed when known, for providers keyed by its content. */
   find(input: { businessId: string; idempotencyKey: string; effect?: DeclaredEffect }): Promise<{ found: true; providerRef: string } | { found: false } | null>;
   readBack(input: { businessId: string; providerRef: string }): Promise<{ ok: boolean; detail: string }>;
+  /** Compensation may not be idempotent; the runner persists a CAS claim
+   * before invoking it. `ok: false` means it was refused without taking effect
+   * and may be retried. If the provider cannot establish its outcome, throw so
+   * the activation records it as unknown and requires evidence before retrying. */
+  verifyCompensation?(input: { businessId: string; providerRef: string }): Promise<{ ok: boolean; detail: string }>;
   compensate?(input: { businessId: string; providerRef: string; idempotencyKey: string }): Promise<{ ok: boolean; detail: string }>;
 }
 

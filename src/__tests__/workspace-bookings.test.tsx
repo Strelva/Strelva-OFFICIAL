@@ -72,6 +72,17 @@ describe("reading bookings through the business link", () => {
     await expect(readWorkspaceBookings(ACTOR, WS, { view: "day" }, deps())).rejects.toBeInstanceOf(WorkspaceAccessError);
   });
 
+  it("offers an additive upcoming range without changing existing day/week ranges", async () => {
+    links(LINK);
+    const bookings = vi.fn(async () => []);
+    const now = new Date("2026-10-07T12:00:00Z");
+    await readWorkspaceBookings(ACTOR, WS, { view: "week", now, upcomingDays: 30 }, deps({ bookings }));
+    expect(bookings).toHaveBeenCalledWith("twintrees-a", { from: "2026-10-07", to: "2026-11-06" });
+    bookings.mockClear();
+    await readWorkspaceBookings(ACTOR, WS, { view: "week", now }, deps({ bookings }));
+    expect(bookings).toHaveBeenCalledWith("twintrees-a", { from: "2026-10-05", to: "2026-10-11" });
+  });
+
   it("marks a site unavailable instead of empty when its booking store fails", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     links(LINK);

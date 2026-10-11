@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { evaluateInquiryResponsibility, recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
 import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
+import { inquiryCurrentness } from "@/products/inquiries/currentness";
+import { setInquiryRecordsDb } from "@/platform/infra/inquiry-records";
 
 const TENANT = "acme";
 const BUSINESS = "acme-business";
@@ -70,6 +72,41 @@ function snapshot() {
 const fields = { name: "Ada Rivera", email: "ada@example.test", timeline: "Soon" };
 
 describe("canonical inquiry receive seam", () => {
+  afterEach(() => { vi.unstubAllEnvs(); setInquiryRecordsDb(undefined); });
+  it("validates current confirmed business services without rewriting the captured form release", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_BUSINESS_FACTS", "1");
+    setInquiryRecordsDb({ rpc: vi.fn(async name => ({ error: null, data: name === "read_inquiry_business_context" ? {
+      workspaceId: "f6300000-0000-4000-8000-000000000010", facts: {}, people: [],
+      services: [{ id: "f6300000-0000-4000-8000-000000000020", name: "Current catering", description: null, priceText: null, active: true, verified: true }],
+    } : null })) });
+    const repository = createInMemoryInquiryRepository();
+    const value = snapshot(); const definition = value.state.capabilities[0]!.live!;
+    definition.form.fields[2] = { id: "service", label: "Service", kind: "select", component: "select_field", required: true, options: ["Old catering"] };
+    definition.record.fields[2] = definition.form.fields[2]!;
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state: value.state });
+    expect(await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_current_service", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields: { name: "Ada", email: "ada@example.test", service: "Current catering" }, receivedAt: RECEIVED_AT, repository })).toMatchObject({ status: "recorded" });
+    const saved = await repository.getSnapshot(TENANT, BUSINESS);
+    expect(saved?.state.capabilities[0]?.live?.form.fields[2]?.options).toEqual(["Old catering"]);
+    expect(saved?.state.timeline.some(event => event.inquiryId === "lead_current_service" && event.type === "record_created")).toBe(true);
+    expect(await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_removed_service", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields: { name: "Ada", email: "ada@example.test", service: "Old catering" }, receivedAt: RECEIVED_AT, repository })).toMatchObject({ status: "rejected" });
+  });
+  it("records paused intake without resuming its capability or authorizing customer work", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = "paused";
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_paused", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields, receivedAt: RECEIVED_AT, repository });
+    expect(result.status).toBe("recorded");
+    const saved = await repository.getSnapshot(TENANT, BUSINESS);
+    expect(saved?.state.capabilities[0]!.status).toBe("paused");
+    expect(saved?.state.timeline.filter((event) => event.inquiryId === "lead_paused").map((event) => event.type)).toEqual(["received", "record_created"]);
+    expect(inquiryCurrentness(saved!.state, BUSINESS, { capabilityId: CAPABILITY, capabilityVersion: 2 })).toMatchObject({ current: false, reason: "not_live" });
+  });
   it("records engine receipt and received/record-created timeline, then reads it idempotently", async () => {
     const repository = createInMemoryInquiryRepository();
     const seeded = await repository.compareAndSwap({
