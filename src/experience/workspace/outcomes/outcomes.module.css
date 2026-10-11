@@ -151,7 +151,7 @@
   min-width: 0;
   padding: 4px 0 8px;
   border-radius: 12px;
-  transition: background-color var(--motion-feedback) var(--motion-ease);
+  transition: background-color var(--motion-feedback) var(--motion-ease) var(--ease-settle);
 }
 
 .stage[data-active="true"] {
@@ -540,7 +540,7 @@ a.citation:hover {
   border: 2px solid var(--oc-surface);
   border-radius: 50%;
   background: var(--oc-live);
-  transition: transform var(--motion-feedback) var(--motion-ease), background-color var(--motion-feedback) var(--motion-ease);
+  transition: transform var(--motion-feedback) var(--motion-ease) var(--ease-settle), background-color var(--motion-feedback) var(--motion-ease) var(--ease-settle);
 }
 
 .pin[data-waiting="true"] > span {
@@ -1003,7 +1003,7 @@ a.citation:hover {
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: transform var(--motion-feedback) var(--motion-ease), background-color var(--motion-feedback) var(--motion-ease);
+  transition: transform var(--motion-feedback) var(--motion-ease) var(--ease-settle), background-color var(--motion-feedback) var(--motion-ease) var(--ease-settle);
 }
 
 .confirm:hover {
@@ -1011,7 +1011,7 @@ a.citation:hover {
 }
 
 .confirm:active {
-  transform: scale(0.98);
+  transform: scale(var(--motion-press-scale));
 }
 
 .confirm:disabled {
@@ -1124,7 +1124,7 @@ a.citation:hover {
   font-size: 15px;
   font-weight: 500;
   text-decoration: none;
-  transition: transform var(--motion-feedback) var(--motion-ease), box-shadow var(--motion-feedback) var(--motion-ease);
+  transition: transform var(--motion-feedback) var(--motion-ease) var(--ease-settle), box-shadow var(--motion-feedback) var(--motion-ease) var(--ease-settle);
 }
 
 .tile:hover,

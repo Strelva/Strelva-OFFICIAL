@@ -62,6 +62,8 @@ echo "== typecheck =="
 pnpm typecheck
 echo "== product boundaries =="
 pnpm check:boundaries
+echo "== motion ladder =="
+pnpm check:motion
 echo "== ontology invariants =="
 pnpm check:ontology
 echo "== workspace ownership SQL =="

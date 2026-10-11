@@ -110,7 +110,7 @@
   line-height: 20px;
   text-align: left;
   text-decoration: none;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .navItem:hover,

@@ -4,7 +4,7 @@ import { useId, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { Sparkle } from "lucide-react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { staggerDelay, strelvaMotion } from "@/platform/infra/motion";
+import { staggerDelay, strelvaDuration, strelvaMotion } from "@/platform/infra/motion";
 import { aiMirrorHeadline, aiMirrorMatrix, splitAnswer, type AiMirrorData } from "./ai-mirror";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";
@@ -44,11 +44,11 @@ export function AiMirror({ data, className }: { data: AiMirrorData; className?: 
           {parts ? <>
             {parts.before}
             <mark className={styles.highlight}>
-              {/* Draw role: the highlight sweeps in behind the name, 360–720 ms. */}
+              {/* Draw role: the highlight sweeps in behind the name, slow step, after a slow-step delay. */}
               <motion.span aria-hidden="true" className={styles.highlightFill}
                 initial={entrance.snap ? false : { scaleX: 0 }}
                 animate={{ scaleX: shown ? 1 : 0 }}
-                transition={entranceTransition(entrance, { ...strelvaMotion.draw, duration: 0.36 }, 0.36)} />
+                transition={entranceTransition(entrance, strelvaMotion.drawShort, strelvaDuration.slow)} />
               <span>{parts.match}</span>
             </mark>
             {data.answer.citations.length ? <span className={styles.citeRef} aria-label="source 1">1</span> : null}

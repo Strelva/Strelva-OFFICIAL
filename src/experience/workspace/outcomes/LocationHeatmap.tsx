@@ -76,7 +76,7 @@ export function LocationHeatmap({ eyebrow, rows, suggestion, actionLabel, onActi
                     style: { color: step.ink },
                     initial: entrance.snap ? false as const : { backgroundColor: HEAT_EMPTY.fill },
                     animate: { backgroundColor: shown ? step.fill : HEAT_EMPTY.fill },
-                    transition: entranceTransition(entrance, { duration: 0.24, ease: strelvaMotion.reveal.ease }, (rowIndex * WEEK_DAYS.length + dayIndex) * TILE_STEP),
+                    transition: entranceTransition(entrance, strelvaMotion.reveal, (rowIndex * WEEK_DAYS.length + dayIndex) * TILE_STEP),
                     onMouseEnter: () => setActive(key),
                     onMouseLeave: () => setActive(null),
                     onFocus: () => setActive(key),

@@ -4,7 +4,7 @@ import { useId, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { TrendingDown, TrendingUp, MoveRight } from "lucide-react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/platform/infra/motion";
+import { strelvaDuration, strelvaMotion } from "@/platform/infra/motion";
 import { ratingChartGeometry, ratingTrendWord, type RatingPoint } from "./rating-trend";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";
@@ -69,7 +69,7 @@ export function RatingTrend({ eyebrow = "Google rating", points, cutoff = 4.5, c
           <motion.path d={geometry.area} fill={`url(#${areaId})`}
             initial={entrance.snap ? false : { opacity: 0 }}
             animate={{ opacity: shown ? 1 : 0 }}
-            transition={entranceTransition(entrance, { duration: 0.4, ease: strelvaMotion.reveal.ease }, 0.3)} />
+            transition={entranceTransition(entrance, { ...strelvaMotion.reveal, duration: strelvaDuration.slow }, 0.3)} />
           <motion.path d={geometry.line} fill="none" stroke="#3F5E43" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke"
             initial={entrance.snap ? false : { pathLength: 0 }}
             animate={{ pathLength: shown ? 1 : 0 }}

@@ -49,6 +49,9 @@ jobs:
       - name: Product boundaries
         run: pnpm check:boundaries
 
+      - name: Motion ladder
+        run: pnpm check:motion
+
       - name: Ontology invariants
         run: pnpm check:ontology
 

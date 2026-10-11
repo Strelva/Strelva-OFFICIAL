@@ -316,7 +316,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
     return (
       <div
         className={cn(
-          "ai-prompt-box rounded-3xl border border-glass-border bg-surface-inset p-2 shadow-[0_10px_35px_rgba(0,0,0,0.22)] transition-colors duration-200 focus-within:border-white/12 focus-within:bg-surface-inset focus-within:shadow-[0_10px_35px_rgba(0,0,0,0.22)]",
+          "ai-prompt-box rounded-3xl border border-glass-border bg-surface-inset p-2 shadow-[0_10px_35px_rgba(0,0,0,0.22)] transition-colors focus-within:border-white/12 focus-within:bg-surface-inset focus-within:shadow-[0_10px_35px_rgba(0,0,0,0.22)]",
           isLoading && "border-white/12 bg-surface-inset",
           className,
         )}
@@ -348,7 +348,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                   onClick={() => setActionsOpen((current) => !current)}
                   disabled={isLoading}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+                    "flex h-8 w-8 items-center justify-center rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
                     actionsOpen
                       ? "border-white/16 bg-white/[0.04] text-warm-white"
                       : "border-transparent text-gray-muted hover:bg-white/[0.025] hover:text-gray-fg",
@@ -547,7 +547,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
               }}
               onBlur={closeUsage}
               className={cn(
-                "relative flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+                "relative flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
                 thinkMode
                   ? "border-white/16 bg-white/[0.04] text-gray-fg"
                   : "border-transparent text-gray-muted hover:bg-white/[0.025] hover:text-gray-fg",
@@ -556,7 +556,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
               aria-describedby="ai-think-usage"
             >
               <BrainCog className="h-4 w-4" strokeWidth={1.5} />
-              <span className={cn("overflow-hidden whitespace-nowrap transition-all duration-300", thinkMode ? "max-w-[64px] opacity-100" : "max-w-0 opacity-0")}>
+              <span className={cn("overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-(--motion-base)", thinkMode ? "max-w-[64px] opacity-100" : "max-w-0 opacity-0")}>
                 Think
               </span>
               {usageOpen && (
@@ -578,7 +578,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
             onClick={isLoading ? onStop : submit}
             disabled={!isLoading && !hasContent}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
+              "flex h-9 w-9 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/20",
               isLoading
                 ? "bg-white/[0.07] text-warm-white hover:bg-white/[0.09]"
                 : hasContent

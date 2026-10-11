@@ -13,7 +13,7 @@
   flex: 0 0 var(--app-navigation-width, 276px);
   min-width: 0;
   overflow: visible;
-  transition: width 180ms ease, flex-basis 180ms ease;
+  transition: width var(--motion-base) var(--ease-settle), flex-basis var(--motion-base) var(--ease-settle);
 }
 
 .frame[data-navigation-collapsed="true"] .navigation {
@@ -62,7 +62,7 @@
   flex: 0 0 36px;
   border-radius: 8px;
   color: var(--gray-muted);
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .navigationToggle {

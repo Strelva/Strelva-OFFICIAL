@@ -9,7 +9,7 @@
 .welcome h1,.pageHeader h1 { color:var(--warm-black); font-family:var(--font-display),serif; font-size:32px; line-height:40px; font-weight:500; letter-spacing:-.025em; text-wrap:balance; }
 .welcome>p:last-child,.pageHeader>p:last-child { margin-top:16px; max-width:600px; font-size:16px; line-height:1.65; color:var(--gray-muted); }
 .starts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:40px; }
-.starts>button { display:flex; align-items:center; gap:16px; text-align:left; padding:24px; min-height:104px; border:1px solid var(--gray-border); border-radius:24px; background:var(--surface); transition:background 120ms,border-color 120ms; }
+.starts>button { display:flex; align-items:center; gap:16px; text-align:left; padding:24px; min-height:104px; border:1px solid var(--gray-border); border-radius:24px; background:var(--surface); transition:background var(--motion-fast) var(--ease-settle),border-color var(--motion-fast) var(--ease-settle); }
 .starts>button:hover { background:var(--surface-raised); border-color:var(--accent); }
 .starts>button>span { flex:1; }
 .starts strong { display:block; font-size:16px; font-weight:500; }

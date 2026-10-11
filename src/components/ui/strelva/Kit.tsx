@@ -19,6 +19,7 @@ import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
 import { forwardRef, createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
+import { strelvaDuration } from "@/platform/infra/motion";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -223,7 +224,7 @@ export function StSegmented<T extends string>({ value, options, onChange, label,
 export type StepState = "done" | "active" | "pending" | "failed" | "unverified";
 
 export function StSteps({ steps, label }: { label: string; steps: readonly { title: ReactNode; state: StepState; time?: ReactNode; detail?: ReactNode }[] }) {
-  return <ol className={styles.steps} aria-label={label}>{steps.map((step, index) => <li key={index} className={styles.step} data-state={step.state} aria-current={step.state === "active" ? "step" : undefined}>
+  return <ol className={styles.steps} aria-label={label}>{steps.map((step, index) => <li key={index} className={styles.step} data-state={step.state} aria-current={step.state === "active" ? "step" : undefined} style={{ "--i": index } as CSSProperties}>
     <span className={styles.stepMark} aria-hidden="true">{step.state === "done" ? <Check size={13} strokeWidth={2.4} /> : step.state === "active" ? <Loader2 size={13} /> : step.state === "failed" ? <X size={13} strokeWidth={2.4} /> : <Circle size={7} fill="currentColor" />}</span>
     <span className={styles.stepTitle}>{step.title}<span className="sr-only">{step.state === "done" ? ", done" : step.state === "active" ? ", in progress" : step.state === "failed" ? ", failed" : step.state === "unverified" ? ", not yet confirmed" : ", not started"}</span></span>
     {step.time ? <StMono>{step.time}</StMono> : <span />}
@@ -236,13 +237,13 @@ export function StSteps({ steps, label }: { label: string; steps: readonly { tit
 export function StLedger({ path, count, lines, action }: { path: ReactNode; count?: ReactNode; lines: readonly { sign: "+" | "-"; text: ReactNode }[]; action?: ReactNode }) {
   return <div className={styles.ledger}>
     <div className={styles.ledgerHead}><StMono tone="text">{path}</StMono>{count ? <StMono>{count}</StMono> : null}{action ? <span style={{ marginLeft: "auto" }}>{action}</span> : null}</div>
-    {lines.map((line, index) => <div key={index} className={styles.ledgerLine} data-sign={line.sign}><span className={styles.ledgerSign} aria-hidden="true">{line.sign === "+" ? "+" : "−"}</span><span><span className="sr-only">{line.sign === "+" ? "Added: " : "Removed: "}</span>{line.text}</span></div>)}
+    {lines.map((line, index) => <div key={index} className={styles.ledgerLine} data-sign={line.sign} style={{ "--i": index + 1 } as CSSProperties}><span className={styles.ledgerSign} aria-hidden="true">{line.sign === "+" ? "+" : "−"}</span><span><span className="sr-only">{line.sign === "+" ? "Added: " : "Removed: "}</span>{line.text}</span></div>)}
   </div>;
 }
 
 /* ---------- Hold to accept ---------- */
 
-const HOLD_MS = 800;
+const HOLD_MS = strelvaDuration.hold * 1000;
 
 /**
  * For consequential yeses (publish, confirm a booking, leave). Press and hold
@@ -251,6 +252,7 @@ const HOLD_MS = 800;
  */
 export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
   const [progress, setProgress] = useState(0);
+  const [holding, setHolding] = useState(false);
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
   const done = useRef(false);
@@ -262,6 +264,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
     if (frame.current) cancelAnimationFrame(frame.current);
     frame.current = null;
     start.current = null;
+    setHolding(false);
     if (!done.current) setProgress(0);
   }, []);
 
@@ -269,11 +272,12 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
     if (disabled || frame.current) return;
     done.current = false;
     start.current = performance.now();
+    setHolding(true);
     const tick = (now: number) => {
       if (blocked.current) { stop(); return; }
       const value = Math.min(1, (now - (start.current ?? now)) / HOLD_MS);
       setProgress(value);
-      if (value >= 1) { done.current = true; frame.current = null; accept.current(); return; }
+      if (value >= 1) { done.current = true; frame.current = null; setHolding(false); accept.current(); return; }
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
@@ -282,7 +286,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
   useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
+  return <button type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
     style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
     onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
     onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}

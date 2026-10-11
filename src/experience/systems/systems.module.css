@@ -23,7 +23,7 @@
   color: inherit;
   text-align: left;
   text-decoration: none;
-  transition: border-color 120ms ease, background-color 120ms ease;
+  transition: border-color var(--motion-fast) var(--ease-settle), background-color var(--motion-fast) var(--ease-settle);
 }
 
 .card:hover {

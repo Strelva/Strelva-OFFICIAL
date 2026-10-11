@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { ChevronDown } from "lucide-react";
 
 const BASE =
-  "w-full min-h-10 bg-surface-inset border border-gray-border rounded-xl px-4 py-2 text-base sm:text-sm leading-5 text-warm-black placeholder-gray-subtle outline-none transition-colors duration-150 focus:border-accent-text focus-visible:ring-2 focus-visible:ring-accent-text/40 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full min-h-10 bg-surface-inset border border-gray-border rounded-xl px-4 py-2 text-base sm:text-sm leading-5 text-warm-black placeholder-gray-subtle outline-none transition-colors focus:border-accent-text focus-visible:ring-2 focus-visible:ring-accent-text/40 disabled:cursor-not-allowed disabled:opacity-60";
 
 function mergeDescribedBy(...ids: Array<string | undefined>) {
   const seen = new Set<string>();

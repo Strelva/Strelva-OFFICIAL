@@ -240,6 +240,16 @@
   --color-m-danger: var(--m-danger);
 }
 
+/* Motion (src/app/styles/motion.css). Bare `transition-*` utilities get the
+   fast step and the settle curve; `animate-spin` and `animate-pulse` use the
+   shared loops. Timed utilities: `duration-(--motion-base)`. */
+@theme inline {
+  --default-transition-duration: var(--motion-fast);
+  --default-transition-timing-function: var(--ease-settle);
+  --animate-spin: st-spin var(--motion-loop-fast) linear infinite;
+  --animate-pulse: st-breathe var(--motion-loop) var(--ease-breathe) infinite;
+}
+
 /* Display (heading) font. Replaces the arbitrary `font-display`
    class, which Turbopack's dev compiler mis-serialized on cold builds (the RSC payload
    bled into the CSS parse and crashed the dev server). A named utility carries no inline
@@ -389,7 +399,7 @@ body {
   content: "";
   transform: scaleX(0);
   transform-origin: left;
-  transition: transform 180ms ease;
+  transition: transform var(--motion-fast) var(--ease-settle);
 }
 
 .jada-nav a:hover::after {
@@ -504,7 +514,7 @@ body {
   border-radius: 999px;
   font-size: 0.9rem;
   font-weight: 700;
-  transition: transform 160ms ease, background 160ms ease, color 160ms ease;
+  transition: transform var(--motion-fast) var(--ease-settle), background var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .jada-button:hover,
@@ -706,7 +716,7 @@ body {
   display: grid;
   grid-template-rows: 300px auto;
   background: linear-gradient(180deg, var(--jada-white), rgba(255, 212, 228, 0.34));
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition: transform var(--motion-fast) var(--ease-settle), box-shadow var(--motion-fast) var(--ease-settle);
 }
 
 .jada-service-card:hover {
@@ -737,7 +747,7 @@ body {
   text-decoration: underline;
   text-underline-offset: 5px;
   cursor: pointer;
-  transition: transform 160ms ease;
+  transition: transform var(--motion-fast) var(--ease-settle);
 }
 
 .jada-portfolio-grid {
@@ -896,7 +906,7 @@ body {
   color: var(--jada-white);
   font-weight: 800;
   cursor: pointer;
-  transition: transform 160ms ease;
+  transition: transform var(--motion-fast) var(--ease-settle);
 }
 
 .jada-newsletter-form .jada-status {
@@ -1092,12 +1102,13 @@ body {
   --m-danger: oklch(66% 0.16 25);
   --m-button: oklch(92.5% 0.01 235);
   --m-button-text: oklch(10.5% 0.01 250);
-  --m-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --m-ease-quart: cubic-bezier(0.25, 1, 0.5, 1);
-  --m-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --m-duration-instant: 140ms;
-  --m-duration-state: 260ms;
-  --m-duration-enter: 720ms;
+  /* Marketing motion follows the product ladder (styles/motion.css). */
+  --m-ease-out: var(--ease-settle);
+  --m-ease-quart: var(--ease-settle);
+  --m-ease-expo: var(--ease-settle);
+  --m-duration-instant: var(--motion-fast);
+  --m-duration-state: var(--motion-base);
+  --m-duration-enter: var(--motion-long);
   background:
     radial-gradient(circle at 50% -18rem, oklch(33% 0.04 145 / 0.36), transparent 35rem),
     linear-gradient(180deg, oklch(16% 0.018 245 / 0.74), transparent 30rem),
@@ -1119,11 +1130,11 @@ body {
 }
 
 .launch-enter {
-  animation: launch-enter var(--m-duration-enter, 720ms) var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: launch-enter var(--motion-long) var(--ease-settle) both;
 }
 
 .launch-sweep {
-  animation: launch-sweep 5600ms cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  animation: launch-sweep var(--motion-ambient-slow) var(--ease-breathe) infinite;
 }
 
 @keyframes launch-enter {
@@ -1155,12 +1166,12 @@ body {
 }
 
 .motion-rise {
-  animation: launch-enter var(--m-duration-enter, 720ms) var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: launch-enter var(--motion-long) var(--ease-settle) both;
   animation-delay: var(--motion-delay, 0ms);
 }
 
 .motion-item {
-  animation: motion-item-enter 640ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  animation: motion-item-enter var(--motion-long) var(--ease-settle) both;
   animation-delay: calc(var(--i, 0) * 64ms + 180ms);
 }
 
@@ -1177,11 +1188,11 @@ body {
   font-weight: 500;
   line-height: 1;
   transition:
-    transform var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
-    border-color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
-    background-color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
-    color var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1)),
-    box-shadow var(--m-duration-state, 260ms) var(--m-ease-quart, cubic-bezier(0.25, 1, 0.5, 1));
+    transform var(--motion-base) var(--ease-settle),
+    border-color var(--motion-base) var(--ease-settle),
+    background-color var(--motion-base) var(--ease-settle),
+    color var(--motion-base) var(--ease-settle),
+    box-shadow var(--motion-base) var(--ease-settle);
 }
 
 .marketing-button-primary {
@@ -1208,7 +1219,7 @@ body {
 
 .marketing-button-primary:active,
 .marketing-button-secondary:active {
-  transform: translate3d(0, 0, 0) scale(0.985);
+  transform: translate3d(0, 0, 0) scale(var(--motion-press-scale));
 }
 
 .marketing-button-secondary:hover {
@@ -1238,7 +1249,7 @@ body {
   background: linear-gradient(90deg, transparent, oklch(82% 0.07 145 / 0.18), transparent);
   mix-blend-mode: screen;
   transform: skewX(-12deg) translate3d(-20%, 0, 0);
-  animation: receipt-scan 4200ms var(--m-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) 900ms infinite;
+  animation: receipt-scan var(--motion-ambient-slow) var(--ease-breathe) 900ms infinite;
 }
 
 .signal-dot {
@@ -1248,7 +1259,7 @@ body {
   border-radius: 999px;
   background: var(--m-accent);
   box-shadow: 0 0 0 0 var(--m-accent-soft);
-  animation: signal-dot 1800ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) infinite;
+  animation: signal-dot var(--motion-loop) var(--ease-breathe) infinite;
 }
 
 .process-line {
@@ -1259,13 +1270,13 @@ body {
   width: 1px;
   background: linear-gradient(180deg, var(--m-accent), var(--m-rule-soft));
   transform-origin: top;
-  animation: process-line 1200ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 360ms both;
+  animation: process-line var(--motion-long) var(--ease-settle) 360ms both;
 }
 
 .progress-run {
   width: 74%;
   transform-origin: left;
-  animation: progress-run 2100ms var(--m-ease-out, cubic-bezier(0.16, 1, 0.3, 1)) 460ms both;
+  animation: progress-run var(--motion-long) var(--ease-settle) 460ms both;
 }
 
 @keyframes motion-item-enter {
@@ -1464,7 +1475,7 @@ body {
   border: none;
   border-radius: 0;
   cursor: pointer;
-  transition: background 0.3s ease, transform 0.2s ease;
+  transition: background var(--motion-base) var(--ease-settle), transform var(--motion-base) var(--ease-settle);
 }
 .btn-primary:hover {
   background: var(--sage-dark);
@@ -1487,7 +1498,7 @@ body {
   border: 1.5px solid rgba(255,255,255,0.8);
   border-radius: 0;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--motion-base) var(--ease-settle);
 }
 .btn-ghost:hover {
   background: var(--pure-white);
@@ -1499,8 +1510,8 @@ body {
 .reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity var(--motion-long) var(--ease-settle),
+              transform var(--motion-long) var(--ease-settle);
 }
 .reveal.revealed {
   opacity: 1;
@@ -1522,7 +1533,7 @@ body {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .animate-toast {
-  animation: toast-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: toast-in var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* ===== SCROLL INDICATOR ===== */
@@ -1539,7 +1550,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-in-up {
-  animation: fade-in-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fade-in-up var(--motion-base) var(--ease-settle) forwards;
   opacity: 0;
 }
 
@@ -1549,7 +1560,7 @@ body {
   50% { opacity: 0.7; transform: scale(1.05); }
 }
 .animate-pulse-gentle {
-  animation: pulse-gentle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-gentle var(--motion-ambient) var(--ease-breathe) infinite;
 }
 
 /* Typing indicator — single violet dot */
@@ -1558,7 +1569,7 @@ body {
   50% { opacity: 1; transform: scale(1); }
 }
 .animate-typing-dot {
-  animation: typing-dot 1.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: typing-dot var(--motion-loop) var(--ease-breathe) infinite;
 }
 
 /* Strelva accent line — visual signature */
@@ -1569,7 +1580,7 @@ body {
 
 /* Card hover — subtle surface lift */
 .reb-card-glow {
-  transition: background-color 0.15s ease;
+  transition: background-color var(--motion-fast) var(--ease-settle);
 }
 .reb-card-glow:hover {
   background-color: rgba(124, 154, 142, 0.04);
@@ -1624,7 +1635,7 @@ body {
 
 /* Section row hover */
 .section-row {
-  transition: background-color 0.12s ease;
+  transition: background-color var(--motion-fast) var(--ease-settle);
 }
 .section-row:hover {
   background-color: rgba(255, 255, 255, 0.03);
@@ -1639,7 +1650,7 @@ body {
 /* Section expand/collapse spring */
 .section-expand {
   overflow: hidden;
-  animation: section-expand-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: section-expand-in var(--motion-base) var(--ease-settle) forwards;
 }
 @keyframes section-expand-in {
   from { opacity: 0; max-height: 0; }
@@ -1653,7 +1664,7 @@ body {
   100% { box-shadow: 0 0 0 0px oklch(70% 0.14 145 / 0); }
 }
 .preview-flash {
-  animation: preview-save-flash 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: preview-save-flash var(--motion-long) var(--ease-settle) forwards;
 }
 
 /* Preview section highlight ring — sage ring when switching sections */
@@ -1663,7 +1674,7 @@ body {
   100% { box-shadow: 0 0 0 0px rgba(255, 255, 255, 0); }
 }
 .preview-highlight {
-  animation: preview-highlight-ring 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: preview-highlight-ring var(--motion-long) var(--ease-settle) forwards;
 }
 
 /* Save checkmark settle */
@@ -1673,7 +1684,7 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 .animate-check-settle {
-  animation: check-settle 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: check-settle var(--motion-slow) var(--ease-settle) forwards;
 }
 
 /* Chat message entrance — slide in from sides */
@@ -1686,10 +1697,10 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 .msg-user {
-  animation: msg-slide-right 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: msg-slide-right var(--motion-base) var(--ease-settle) forwards;
 }
 .msg-bot {
-  animation: msg-slide-left 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: msg-slide-left var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* ===== DASHBOARD PANEL ANIMATIONS ===== */
@@ -1704,10 +1715,10 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 .animate-panel-left {
-  animation: panel-slide-left 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: panel-slide-left var(--motion-base) var(--ease-settle) forwards;
 }
 .animate-panel-right {
-  animation: panel-slide-right 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: panel-slide-right var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* Overlay entrance */
@@ -1716,7 +1727,7 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 .animate-overlay-enter {
-  animation: overlay-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: overlay-enter var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* Card stagger — use with animation-delay inline styles */
@@ -1725,7 +1736,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-card-enter {
-  animation: card-enter 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: card-enter var(--motion-base) var(--ease-settle) forwards;
   opacity: 0;
 }
 
@@ -1735,13 +1746,13 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-queue-card-enter {
-  animation: queue-card-enter 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: queue-card-enter var(--motion-base) var(--ease-settle) forwards;
   opacity: 0;
 }
 
 /* Queue tab crossfade */
 .queue-tab-content {
-  animation: queue-tab-fade 0.2s ease-out;
+  animation: queue-tab-fade var(--motion-base) var(--ease-settle);
 }
 @keyframes queue-tab-fade {
   from { opacity: 0; }
@@ -1754,7 +1765,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-page-enter {
-  animation: page-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: page-enter var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* Route slide-in from right */
@@ -1763,7 +1774,7 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 .animate-route-enter {
-  animation: route-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: route-slide-in var(--motion-base) var(--ease-settle) forwards;
 }
 
 /* ===== SKELETON LOADERS ===== */
@@ -1773,7 +1784,7 @@ body {
   100% { opacity: 1; }
 }
 .skeleton-shimmer {
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  animation: skeleton-shimmer var(--motion-loop) var(--ease-breathe) infinite;
 }
 
 /* Chat thinking state */
@@ -1798,11 +1809,11 @@ body {
 .ai-shining-text {
   display: inline-block;
   color: var(--accent-text);
-  animation: ai-text-shine 3.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  animation: ai-text-shine var(--motion-ambient-slow) var(--ease-breathe) infinite;
 }
 .ai-thinking-pop {
   transform-origin: left center;
-  animation: ai-thinking-pop 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ai-thinking-pop var(--motion-slow) var(--ease-settle) both;
 }
 @keyframes ai-output-enter {
   from {
@@ -1818,7 +1829,7 @@ body {
 }
 .ai-output-pop {
   transform-origin: left top;
-  animation: ai-output-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: ai-output-enter var(--motion-long) var(--ease-settle) both;
 }
 
 /* ===== CONNECTION STATUS ANIMATIONS ===== */
@@ -1827,12 +1838,12 @@ body {
   50% { box-shadow: 0 0 0 4px oklch(70% 0.14 145 / 0); }
 }
 .status-dot-pulse {
-  animation: status-pulse 2s ease-in-out infinite;
+  animation: status-pulse var(--motion-loop) var(--ease-breathe) infinite;
 }
 
 /* Connection toggle transition */
 .connection-toggle {
-  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  transition: background-color var(--motion-base) var(--ease-settle), border-color var(--motion-base) var(--ease-settle), transform var(--motion-fast) var(--ease-settle);
 }
 .connection-toggle:active {
   transform: scale(0.97);
@@ -1909,7 +1920,7 @@ body {
 [data-reb-edit="true"] [data-reb-section] {
   position: relative;
   cursor: pointer;
-  transition: outline 0.15s ease, outline-offset 0.15s ease;
+  transition: outline var(--motion-fast) var(--ease-settle), outline-offset var(--motion-fast) var(--ease-settle);
 }
 
 [data-reb-edit="true"] [data-reb-section]:hover {
@@ -1921,14 +1932,14 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   box-shadow: inset 0 0 0 1px oklch(73% 0.07 145 / 0.30), 0 0 0 4px oklch(73% 0.07 145 / 0.14);
-  animation: highlight-pulse 1.4s ease-out;
+  animation: highlight-pulse var(--motion-long) var(--ease-settle);
   z-index: 1;
 }
 
 /* Stage focus: when a section is selected, recede every other section so the
    selected one reads as the subject. */
 [data-reb-edit="true"]:has(.reb-highlighted) [data-reb-section] {
-  transition: opacity 0.28s ease, filter 0.28s ease;
+  transition: opacity var(--motion-base) var(--ease-settle), filter var(--motion-base) var(--ease-settle);
 }
 [data-reb-edit="true"]:has(.reb-highlighted) [data-reb-section]:not(.reb-highlighted) {
   opacity: 0.4;
@@ -1943,7 +1954,7 @@ body {
 
 /* Inline editable field styling */
 [data-reb-edit="true"] [data-reb-field] {
-  transition: outline 0.14s ease, background 0.14s ease;
+  transition: outline var(--motion-fast) var(--ease-settle), background var(--motion-fast) var(--ease-settle);
   border-radius: 3px;
 }
 
@@ -2004,7 +2015,7 @@ body {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
   text-align: left;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition: background var(--motion-press) var(--ease-settle), color var(--motion-press) var(--ease-settle);
   cursor: pointer;
 }
 .glass-menu-item:hover {
@@ -2050,9 +2061,9 @@ body {
 
 /* ===== MOBILE NAV PILL ANIMATION ===== */
 .mobile-nav-pill {
-  transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.15s ease;
+  transition: left var(--motion-base) var(--ease-settle),
+              width var(--motion-base) var(--ease-settle),
+              opacity var(--motion-fast) var(--ease-settle);
 }
 
 /* ===== QUEUE CARD SWIPE GESTURES (MOBILE) ===== */
@@ -2082,13 +2093,13 @@ body {
 /* Swipe hint backgrounds */
 .queue-card-swipe-container > .bg-success,
 .queue-card-swipe-container > .bg-gray-muted {
-  transition: opacity 0.1s ease-out;
+  transition: opacity var(--motion-press) var(--ease-settle);
 }
 
 /* ===== CTA HOVER MICRO-INTERACTION ===== */
 a[href*="booking"], a[href*="services#booking"],
 .cta-primary {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  transition: transform var(--motion-base) var(--ease-settle), box-shadow var(--motion-base) var(--ease-settle);
 }
 a[href*="booking"]:hover, a[href*="services#booking"]:hover,
 .cta-primary:hover {

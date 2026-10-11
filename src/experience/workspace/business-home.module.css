@@ -12,8 +12,8 @@
 }
 
 .reveal {
-  animation: homeRise 280ms cubic-bezier(.2, .8, .2, 1) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  animation: homeRise var(--motion-base) var(--ease-settle) both;
+  animation-delay: calc(var(--i, 0) * var(--motion-stagger));
 }
 
 .home {
@@ -233,7 +233,7 @@
   height: 100%;
   border-radius: inherit;
   background: var(--home-aurora);
-  transition: width 280ms cubic-bezier(.2, .8, .2, 1);
+  transition: width var(--motion-base) var(--ease-settle);
 }
 
 .steps {
@@ -299,7 +299,7 @@
   color: var(--home-ivory);
   font-size: 13px;
   line-height: 20px;
-  transition: background-color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle);
 }
 
 .starters button:hover:not(:disabled) {
@@ -406,8 +406,8 @@
   align-items: center;
   gap: 12px 16px;
   padding: 16px 18px;
-  animation: homeRise 280ms cubic-bezier(.2, .8, .2, 1) both;
-  animation-delay: calc(120ms + var(--i, 0) * 40ms);
+  animation: homeRise var(--motion-base) var(--ease-settle) both;
+  animation-delay: calc(120ms + var(--i, 0) * var(--motion-stagger));
 }
 
 .decisionIcon {
@@ -467,7 +467,7 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 20px;
-  transition: background-color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle);
 }
 
 .quietPill:hover:not(:disabled) {
@@ -676,7 +676,7 @@
   color: inherit;
   text-align: left;
   text-decoration: none;
-  transition: background-color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle);
 }
 
 a.row:hover,
@@ -912,8 +912,8 @@ button.row:hover {
   border-radius: 22px;
   background: var(--home-card);
   box-shadow: var(--home-card-shadow);
-  animation: homeRise 280ms cubic-bezier(.2, .8, .2, 1) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  animation: homeRise var(--motion-base) var(--ease-settle) both;
+  animation-delay: calc(var(--i, 0) * var(--motion-stagger));
 }
 
 .decisionCard[data-shape="price"] {
