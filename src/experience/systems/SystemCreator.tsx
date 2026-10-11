@@ -2,8 +2,10 @@
 import { useEffect, useState } from "react";
 import { packageCreatorSchema } from "@/platform/system-versions/listing-contracts";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-export function SystemCreator({ workspaceId, systemId }: { workspaceId: string; systemId: string }) {
-  const request = useWorkspaceRequest();
+type CreatorProps = { workspaceId: string; systemId: string; requestOverride?: typeof fetch };
+export function SystemCreator(props: CreatorProps) { return <ScopedSystemCreator key={`${props.workspaceId}:${props.systemId}`} {...props} />; }
+function ScopedSystemCreator({ workspaceId, systemId, requestOverride }: CreatorProps) {
+  const workspaceRequest = useWorkspaceRequest(), request = requestOverride ?? workspaceRequest;
   const [name, setName] = useState<string | null>(null), [failed, setFailed] = useState(false);
   useEffect(() => { const controller = new AbortController();
     void request(`/api/workspace/packages?${new URLSearchParams({ workspaceId, systemId })}`, { credentials: "same-origin", signal: controller.signal }).then(async response => {
@@ -13,5 +15,5 @@ export function SystemCreator({ workspaceId, systemId }: { workspaceId: string; 
     }).catch(() => { if (!controller.signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [request, workspaceId, systemId]);
-  return <p className="mt-2 text-sm text-gray-muted">{name ? `Made by ${name}` : failed ? "Creator lineage could not be verified." : "Reading creator lineage…"}</p>;
+  return <p className="mt-2 text-sm text-gray-muted">{name ? <a className="underline underline-offset-2" href={`/workspace/source-attribution?${new URLSearchParams({ workspaceId, systemId })}`}>Made by {name}</a> : failed ? "Creator lineage could not be verified." : "Reading creator lineage…"}</p>;
 }

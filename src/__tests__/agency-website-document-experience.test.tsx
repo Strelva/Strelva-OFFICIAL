@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
+import { act, createElement, isValidElement } from "react";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgencyWebsiteDocumentDraftExperience, agencyDocumentTransport, AgencyDocumentTransportError, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
@@ -7,6 +8,9 @@ import AgencyManagedWebsiteDraftPage from "@/app/agency-websites/[bindingId]/pag
 import { AgencyManagedWebsiteDraftExperience } from "@/experience/agency-website/AgencyManagedWebsiteDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
 
+const pageIdentity = vi.hoisted(() => ({ context: vi.fn() }));
+vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: async () => ({ userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "maya@example.test" }) }));
+vi.mock("@/platform/offerings/agency-website-context", () => ({ readAgencyWebsiteContext: pageIdentity.context }));
 let root: Root | undefined;
 let container: HTMLDivElement;
 const bindingId = "11111111-1111-4111-8111-111111111111";
@@ -121,8 +125,12 @@ describe("agency v2 document drafts", () => {
   it("bypasses document discovery and preserves the legacy surface when the release is disabled",async()=>{
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE","1"); vi.stubEnv("STRELVA_WEBSITE_REBUILD_RELEASE","0");
     const fetchMock=vi.fn();vi.stubGlobal("fetch",fetchMock);
+    pageIdentity.context.mockResolvedValue({ businessWorkspaceId: bindingId, businessName: "Harbor Dental", agencyName: "North Studio", websiteName: "Harbor website", personName: "maya@example.test" });
     const element=await AgencyManagedWebsiteDraftPage({params:Promise.resolve({bindingId})});
-    expect(element.type).toBe(AgencyManagedWebsiteDraftExperience);
+    expect(element.type).toBe(StrelvaShell);
+    expect(element.props.businessContext).toBe("North Studio → Harbor Dental → Harbor website");
+    const children = element.props.children as React.ReactElement[];
+    expect(isValidElement(children[1]) && children[1].type).toBe(AgencyManagedWebsiteDraftExperience);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("explains the owner limitation for governance-blocked navigation scopes",async()=>{

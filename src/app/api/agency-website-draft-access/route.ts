@@ -1,3 +1,4 @@
+import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
 import { z } from "zod";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn, readAgencyWebsiteDocument, patchAgencyWebsiteDocument, previewAgencyWebsiteDocument } from "@/products/websites/index";
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
       return workspaceJson({ websites: await service().list(actor, uuid.parse(agencyWorkspaceId)) });
     }
     const bindingId = uuid.parse(query.get("bindingId"));
+    if (query.get("context") === "1") return workspaceJson({ context: await readAgencyWebsiteContext(actor, bindingId, query.get("deliveryId")) });
     if(query.get("document")==="preview"){
       if(!websiteRebuildReleaseMayBeOn())return workspaceJson({error:"Website rebuilds are not enabled."},503);
       const result=await previewAgencyWebsiteDocument(actor,bindingId,{workId:query.get("websiteWorkId"),section:query.get("section"),revision:query.get("revision"),contentHash:query.get("contentHash"),page:query.get("page")??"/"});
@@ -78,7 +80,7 @@ export async function POST(request: Request) {
       return workspaceJson(await patchAgencyWebsiteDocument(actor,input),201);
     }
     const input = z.discriminatedUnion("action", [
-      z.object({ action: z.literal("grant"), deliveryId: uuid, bindingId: uuid }).strict(),
+      z.object({ action: z.literal("grant"), deliveryId: uuid, bindingId: uuid, agencyWorkspaceId: uuid.optional(), operatorUserId: uuid.optional() }).strict(),
       z.object({ action: z.literal("revoke"), grantId: uuid }).strict(),
       z.object({
         action: z.literal("prepare"), assignmentId: uuid, bindingId: uuid,
@@ -87,7 +89,11 @@ export async function POST(request: Request) {
       }).strict(),
     ]).parse(raw);
     const access = service();
-    if (input.action === "grant") return workspaceJson({ grant: await access.grant(actor, input.deliveryId, input.bindingId) }, 201);
+    if (input.action === "grant") {
+      if (Boolean(input.agencyWorkspaceId) !== Boolean(input.operatorUserId)) return workspaceJson({ error: "Confirm both the assigned agency and person before allowing draft access." }, 400);
+      const expected = input.agencyWorkspaceId && input.operatorUserId ? { agencyWorkspaceId: input.agencyWorkspaceId, operatorUserId: input.operatorUserId } : undefined;
+      return workspaceJson({ grant: await access.grant(actor, input.deliveryId, input.bindingId, expected) }, 201);
+    }
     if (input.action === "revoke") return workspaceJson({ grant: await access.revoke(actor, input.grantId) });
     return workspaceJson({ preparation: await access.prepare(actor, input.assignmentId, input.bindingId, input.section, input.data, input.expectedRevision, input.expectedHash) }, 201);
   } catch (error) {

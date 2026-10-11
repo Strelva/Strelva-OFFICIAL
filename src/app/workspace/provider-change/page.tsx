@@ -18,7 +18,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ w
     canCancel = workspace?.kind === "customer" && workspace.access === "member" && workspace.role === "owner";
     requests = await moneyRpc("read_provider_change_requests", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
   } catch {
-    return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas"><StPage><StHead title="Provider changes" /><StNotice tone="critical">Provider changes could not be loaded. Confirm your access and try again.</StNotice></StPage></main>;
+    return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas"><StPage><StHead title="Agency handoffs" /><StNotice tone="critical">Agency handoffs could not be loaded. Confirm your access and try again.</StNotice></StPage></main>;
   }
-  return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas"><StPage><StHead crumb={{ label: "Your workspace", href: `/workspace?workspaceId=${encodeURIComponent(workspaceId ?? "")}` }} title="Provider changes" /><ProviderChangeNotices key={workspaceId} workspaceId={workspaceId ?? ""} requests={requests} canCancel={canCancel} /></StPage></main>;
+  return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas"><StPage><StHead crumb={{ label: "Your workspace", href: `/workspace?workspaceId=${encodeURIComponent(workspaceId ?? "")}` }} title="Agency handoffs" /><ProviderChangeNotices key={workspaceId} workspaceId={workspaceId ?? ""} requests={requests} canCancel={canCancel} /></StPage></main>;
 }

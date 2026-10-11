@@ -180,7 +180,7 @@ describe("agency home on the batched read", () => {
     const request = router({
       clients: () => Response.json(page([row(1)])),
       library: () => Response.json(library),
-      review: (body) => { bodies.push(body); return Response.json({ sourceSystemId: library.sources[0]!.systemId, revision: 4, results: [{ versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", outcome: "prepared", detail: "" }] }); },
+      review: (body) => { bodies.push(body); return Response.json({ sourceSystemId: library.sources[0]!.systemId, revision: 4, results: [{ versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", outcome: "prepared", detail: "Ready for review", decisionId: uuid("54000000", 1) }] }); },
     });
     const { node } = await render(request);
     await act(async () => { button(node, "Library").click(); });
@@ -191,11 +191,13 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("Needs Google Calendar connected first");
     const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
     expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
-    await act(async () => { button(node, "Review all").click(); });
+    await act(async () => { button(node, "Prepare offers for 1 client").click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);
+    const preparedReview = [...node.querySelectorAll("a")].find(link => link.textContent === "Open prepared review")!;
+    expect(preparedReview.getAttribute("href")).toBe(`/workspace/version-review?workspaceId=${uuid("c0000000", 1)}&systemId=${uuid("52000000", 1)}&decisionId=${uuid("54000000", 1)}`);
     const results = node.querySelector('[aria-label="Review all results"]')!.textContent!;
-    expect(results).toContain("Prepared. Waiting on the owner’s approval.");
+    expect(results).toContain("Prepared. Waiting on Lake Bakery.");
     expect(results).toContain("The Mooney FirmSkipped. Needs a choice on 1 change.");
     expect(results).toContain("Elmwood PTSkipped. Needs Google Calendar connected first.");
   });
