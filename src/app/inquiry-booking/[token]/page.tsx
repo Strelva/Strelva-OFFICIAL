@@ -12,5 +12,5 @@ export default async function InquiryBookingPage({ params, searchParams }: { par
   let choice: Awaited<ReturnType<typeof loadInquiryBookingChoice>> = null;
   let unavailable = false;
   try { choice = await loadInquiryBookingChoice(token); } catch { unavailable = true; }
-  return <InquiryBookingChoice choice={choice} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} />;
+  return <InquiryBookingChoice businessName={choice?.businessName} choice={choice} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} />;
 }

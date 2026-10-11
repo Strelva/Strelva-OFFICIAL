@@ -15,13 +15,25 @@ import type { OpsReport } from "@/lib/ops";
 import { measureBusinessEffort } from "@/platform/business-effort/measure";
 import type { BusinessEffortEntry, EffortBusiness } from "@/platform/business-effort/types";
 import { buildPolicyView } from "@/platform/needs-you/policy-model";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { OPERATOR_CLIENTS, OPERATOR_TIME, OPERATOR_WORKSPACE } from "./operator-fixture";
 
 /** Fictional specimens only. No reader, database, provider or live payment is used. */
 export const OPERATOR_DEPTH_SURFACES = ["actions", "audit", "digests", "drafts", "leads", "needs-you", "onboard", "ops", "pay-links", "work"] as const;
 export type OperatorDepthSurface = typeof OPERATOR_DEPTH_SURFACES[number];
 export type OperatorDepthScenario = "ready" | "empty" | "loading" | "error" | "denied";
-export const OPERATOR_DEPTH_TITLES: Record<OperatorDepthSurface, string> = { actions: "Portfolio actions", audit: "Site audits", digests: "Maintenance digests", drafts: "Pending drafts", leads: "Leads", "needs-you": "Who decides", onboard: "Onboard a client", ops: "Operational health", "pay-links": "Pay links", work: "Internal work" };
+export const OPERATOR_DEPTH_TITLES: Record<OperatorDepthSurface, string> = {
+  actions: OPERATOR_DESTINATIONS.actions.label,
+  audit: OPERATOR_DESTINATIONS.audits.label,
+  digests: OPERATOR_DESTINATIONS.maintenance.label,
+  drafts: OPERATOR_DESTINATIONS.drafts.label,
+  leads: OPERATOR_DESTINATIONS.prospects.label,
+  "needs-you": OPERATOR_DESTINATIONS.policy.label,
+  onboard: OPERATOR_DESTINATIONS.onboard.label,
+  ops: OPERATOR_DESTINATIONS.health.label,
+  "pay-links": OPERATOR_DESTINATIONS.payLinks.label,
+  work: OPERATOR_DESTINATIONS.work.label,
+};
 
 export function operatorDepthActions(empty = false): PortfolioActionsSnapshot {
   return { availability: "complete", incomplete: [], totalItems: empty ? 0 : 1, totalClients: empty ? 0 : 1, groups: empty ? [] : [{ tenantId: "mooney", siteName: "The Mooney Firm", capped: false, items: [{ id: "fictional-about-change", tenantId: "mooney", label: "Content update", title: "Clarify how to request a session", createdAt: OPERATOR_TIME, type: "content_update", metadata: { diffs: [{ field: "Headline", before: "Contact the firm", after: "Request a mediation session", type: "changed" }] } }] }] };
@@ -37,7 +49,7 @@ export function operatorDepthAudits(empty = false): AuditRow[] {
   ];
 }
 export function operatorDepthActivity(empty = false): AuditEventView[] {
-  return empty ? [] : [{ id: "fictional-audit", time: OPERATOR_TIME, action: "content.draft.prepared", targetType: "content", targetId: "about", actorLabel: "Strelva", tenant: "mooney" }];
+  return empty ? [] : [{ id: "fictional-audit", time: OPERATOR_TIME, action: "content.draft.prepared", targetType: "content", targetId: "about", actorLabel: "Strelva Agency · Runs on Strelva", tenant: "mooney" }];
 }
 export function operatorDepthDigests(empty = false): MaintenanceDigest[] {
   return empty ? [] : [{ tenant: "mooney", siteName: "The Mooney Firm", weekOf: "2026-10-05", status: "pending", createdAt: OPERATOR_TIME, items: [{ id: "fictional-upkeep", type: "content", title: "Review the session description", detail: "The fictional page still describes the previous session format.", action: "Prepare a refreshed session description for owner review." }] }];

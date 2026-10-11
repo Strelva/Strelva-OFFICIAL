@@ -38,6 +38,8 @@ import { useHomeOutcomes } from "./outcomes/HomeOutcomes";
 import styles from "./business-home.module.css";
 
 interface Props {
+  needs?: ReturnType<typeof useNeedsYou>;
+  agencyHome?: ReturnType<typeof useAgencyClientHome>;
   appBase?: string;
   accountHref: string;
   onOfferings: (id?: string) => void;
@@ -138,7 +140,7 @@ function liveChips(siteSummary: SiteSummaryState, systems: readonly SystemView[]
 }
 
 /** The start and return surface, using the same frame as every saved result. */
-export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systemsUnavailable = false, systems: knownSystems = [], systemsReleased = false, view = "home" }: Props) {
+export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyHome, snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systemsUnavailable = false, systems: knownSystems = [], systemsReleased = false, view = "home" }: Props) {
   const [handledWorkspaceId, setHandledWorkspaceId] = useState<string | null>(null);
   const showHandled = handledWorkspaceId === snapshot.workspaceId;
   const needsYouHeading = useRef<HTMLHeadingElement>(null);
@@ -151,10 +153,12 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const name = current?.name || "Your business";
   const home = workspaceHome(snapshot.work);
   const eligibility = workspaceReadEligibility(current, snapshot.releases?.needsYou === true);
-  const sharedHome = useAgencyClientHome(agencySeat ? snapshot.workspaceId : undefined);
+  const localAgencyHome = useAgencyClientHome(!providedAgencyHome && agencySeat ? snapshot.workspaceId : undefined);
+  const sharedHome = providedAgencyHome ?? localAgencyHome;
   const locationParams = useSearchParams();
-  const readLocation = readWorkspaceLocation(new URLSearchParams(locationParams.toString()));
-  const selectedDecisionId = readLocation.decision;
+  const readLocation = readWorkspaceLocation(new URLSearchParams(locationParams?.toString() ?? ""));
+  const decisionHint = locationParams?.get("item") ?? (typeof window !== "undefined" && window.location.hash.startsWith("#decision-") ? window.location.hash.slice(10) : undefined);
+  const selectedDecisionId = readLocation.decision ?? (decisionHint && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decisionHint) ? decisionHint : undefined);
   const agencyWorkspace = clientAgencyWorkspace(snapshot);
   const deliveryScope = eligibility.deliveries && !agencySeat ? snapshot.workspaceId : undefined;
   const deliveries = useBusinessDeliveries(deliveryScope);
@@ -165,7 +169,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // policy model. Request decisions arrive there as items, so the delivery
   // list no longer adds its own.
   const needsYouReleased = eligibility.decisions;
-  const needsYou = useNeedsYou(needsYouReleased && eligibility.canDecide ? snapshot.workspaceId : undefined);
+  const localNeeds = useNeedsYou(!providedNeeds && needsYouReleased && eligibility.canDecide ? snapshot.workspaceId : undefined);
+  const needsYou = providedNeeds ?? localNeeds;
   // Owner entry: the linked site's numbers, inquiries and Strelva's work (the old Today page).
   // Outcome loop: preview-only until the loop is joined on the server (null by default).
   const outcomes = useHomeOutcomes();
@@ -391,8 +396,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // ---- The Needs you place: one card per decision, shaped for it.
   const deckCards = home.attention.map(({ work, reason }) => <StRow key={work.id} kind={workspaceWorkLabel(work)} title={work.title} detail={reason} end={<StTextButton onClick={() => onOpen(work.id)} aria-label={`Open ${work.title}`}>Open</StTextButton>} />);
   const needsYouPage = agencySeat ? <div className={styles.paperScroll}><StPage><StHead title={`Waiting on ${name}`} meta="Shared decision status · the business decides" />{decisions}</StPage></div> : <div className={styles.paperScroll} aria-busy={busy || undefined}><StPage>
-    <StHead title="Needs you" titleRef={needsYouHeading} meta={decisionsWaiting === null ? `Decisions only you can make for ${name}.` : decisionsWaiting ? `${decisionCount(decisionsWaiting)} only you can make.` : "Nothing is waiting on you."} />
-    <NeedsYouSection retryFocusTarget={needsYouHeading} variant="deck" state={selectedDecisionId && needsYou.state.status === "ready" ? { ...needsYou.state, items: needsYou.state.items.filter(item => item.id === selectedDecisionId) } : needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
+    <StHead title="Needs you" titleRef={needsYouHeading} meta={selectedDecisionId ? `Review this decision for ${name}.` : decisionsWaiting === null ? `Decisions only you can make for ${name}.` : decisionsWaiting ? `${decisionCount(decisionsWaiting)} only you can make.` : "Nothing is waiting on you."} />
+    <NeedsYouSection retryFocusTarget={needsYouHeading} variant="deck" selectedId={selectedDecisionId} state={selectedDecisionId && needsYou.state.status === "ready" ? { ...needsYou.state, items: needsYou.state.items.filter(item => item.id === selectedDecisionId) } : needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
       extraCount={selectedDecisionId ? 0 : home.attention.length} extra={!selectedDecisionId && home.attention.length ? deckCards : null}
       empty={selectedDecisionId ? <StEmpty>This decision is no longer waiting or is unavailable in this business.</StEmpty> : <StEmpty action={<StTextButton onClick={() => onNavigate("home")}>Back to Home</StTextButton>}><strong>Nothing needs you.</strong>When Strelva needs your yes, it shows here first, with what happens either way.</StEmpty>} />
     {policy}

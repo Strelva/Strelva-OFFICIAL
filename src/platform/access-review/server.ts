@@ -16,7 +16,7 @@ async function call(db: AccessReviewDb, name: string, args: Record<string, unkno
   if (error) {
     if (/access_review_denied|access_denied|assignment_denied/.test(error.message ?? "")) throw new WorkspaceAccessError();
     if (/access_review_protected/.test(error.message ?? "")) throw new WorkspaceConflictError("Owners are protected. Use ownership transfer before removing an owner.");
-    if (/provider_change_completion_required/.test(error.message ?? "")) throw new WorkspaceConflictError("Complete the provider change notice before ending this provider.");
+    if (/provider_change_completion_required/.test(error.message ?? "")) throw new WorkspaceConflictError("Complete the agency change notice before ending this provider.");
     throw new WorkspaceStoreError("The access change could not be confirmed.");
   }
   return data;

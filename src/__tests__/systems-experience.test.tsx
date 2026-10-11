@@ -388,7 +388,7 @@ describe("scoped System decisions", () => {
       complete: false, handled: [], handledAvailable: true };
     const html = render(state);
     expect(html).toContain("Publish Mediation intake");
-    expect(html).toContain(`view=needs-you&amp;item=${decision.id}`);
+    expect(html).toContain(`decision=${decision.id}#decision-${decision.id}`);
     expect(html).not.toContain("Other System decision");
     expect(html).not.toContain("Other business decision");
     expect(html).toContain("Some decisions could not be checked.");
@@ -396,6 +396,19 @@ describe("scoped System decisions", () => {
     expect(html).not.toMatch(/<button[^>]*>Approve/);
     const empty = render({ ...state, items: [], complete: true });
     expect(empty).toContain("No decisions are waiting for this System.");
+  });
+  it("shows agency-scoped decision status with the owner’s exact title and target while approval stays with the business", () => {
+    const decisionId = "60000000-0000-4000-8000-000000000001";
+    const html = renderToStaticMarkup(createElement(SystemPage, {
+      system, systems: [system], workspaceId: BUSINESS, sources: [], readOnly: true, businessName: "Fictional Workshop",
+      agencyDecisions: { status: "ready", data: { workspaceId: BUSINESS, changes: [], deliveryChecks: [], deliveries: [], decisions: [
+        { id: decisionId, systemId: system.id, title: "Publish Mediation intake", state: "open", since: "2026-10-11T00:00:00Z" },
+        { id: "60000000-0000-4000-8000-000000000002", systemId: SITE, title: "Another System decision", state: "open", since: "2026-10-11T00:00:00Z" }] } },
+      systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined,
+    }));
+    expect(html).toContain("Waiting on Fictional Workshop"); expect(html).toContain("Publish Mediation intake");
+    expect(html).toContain(`decision=${decisionId}#decision-${decisionId}`); expect(html).not.toContain("Another System decision");
+    expect(html).toContain("Read-only · the business decides."); expect(html).not.toMatch(/<button[^>]*>Approve/);
   });
   it("keeps loading and failed reads visible instead of claiming no decisions", () => {
     expect(render({ status: "loading" })).toContain("Checking decisions for this System");

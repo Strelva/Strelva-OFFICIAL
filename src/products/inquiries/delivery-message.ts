@@ -87,7 +87,7 @@ export function createInquiryDeliveryMessage(
         ...(source ? [{ label: "Source", value: source }] : []),
         ...(message ? [{ label: "Message", value: message }] : []),
       ],
-      footerNote: "Inquiry notification for the business owner",
+      footerNote: `Automatic inquiry notification for ${business}`,
     };
     return {
       tenantId: inquiry.tenantId,
@@ -96,6 +96,7 @@ export function createInquiryDeliveryMessage(
       capabilityId: inquiry.capabilityId,
       capabilityVersion: inquiry.capabilityVersion,
       audience: "client",
+      disclosure: { kind: "owner_notice", name: business },
       to: recipient,
       subject: `New inquiry from ${name}`,
       options,
@@ -140,6 +141,7 @@ export function createInquiryDeliveryMessage(
     capabilityId: inquiry.capabilityId,
     capabilityVersion: inquiry.capabilityVersion,
     audience: "customer",
+    disclosure: { kind: "business", name: business },
     fromName: business,
     to: recipient,
     ...(trackingReplyTo || fallbackReplyTo ? { replyTo: trackingReplyTo || fallbackReplyTo! } : {}),

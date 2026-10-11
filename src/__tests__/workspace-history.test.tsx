@@ -137,7 +137,7 @@ it.each(["tracker", "document"])("starting a %s leaves all prior System/search/s
   window.history.replaceState(null, "", `/workspace?workspaceId=${BUSINESS}&view=products&system=44444444-4444-4444-8444-444444444444&search=1&standingId=11111111-1111-4111-8111-111111111111`);
   const node = await render(productRequest());
   // Open the existing product choice before starting its tool.
-  const name = view === "tracker" ? "Spreadsheet tracker: Start" : "Documents: Start";
+  const name = view === "tracker" ? "Internal tool from a spreadsheet: Start" : "Documents: Start";
   await act(async () => button(node, name).click());
   await settle();
   await act(async () => button(node, `Start a ${view}`).click());

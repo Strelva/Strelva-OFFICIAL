@@ -20,6 +20,7 @@ function when(value: string): string {
 }
 
 interface NeedsYouProps {
+  selectedId?: string;
   state: NeedsYouState;
   pending: string | null;
   notices: Record<string, ItemNotice>;
@@ -45,8 +46,20 @@ interface NeedsYouProps {
  * and Not yet the email carries. Gone after a complete empty read. A member sees the asks but
  * can't decide them; asks that need editing open their own page.
  */
-export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget }: NeedsYouProps) {
+export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget, selectedId }: NeedsYouProps) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const selectedItem = useRef<HTMLSpanElement>(null);
+  const focusedId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (variant !== "deck" || state.status !== "ready") return;
+    const id = selectedId ?? (window.location.hash.startsWith("#decision-") ? window.location.hash.slice(10) : undefined);
+    if (!id || id === focusedId.current || !state.items.some(item => item.id === id)) return;
+    const target = selectedId ? selectedItem.current : document.getElementById(`decision-${id}`);
+    if (!target) return;
+    focusedId.current = id;
+    target.focus({ preventScroll: true });
+    target?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedId, variant, state]);
   const retryButton = useRef<HTMLButtonElement>(null);
   const recovery = useRef<FocusRecovery | null>(null);
   useEffect(() => {
@@ -93,7 +106,7 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
           {openHref ? <StTextButton href={openHref}>Open</StTextButton> : null}
           {decidable ? <StHold label={busy ? "Working…" : look.verb} aria-label={`${look.verb}: ${item.title}`} disabled={Boolean(pending)} onAccept={() => onDecide(item, "approve")} /> : null}
         </div>;
-        return <StRow key={item.id} align="start" lead={<StBeacon kind="need" />} kind={<>{look.source} · <StMono>{when(item.openedAt)}</StMono>{item.urgent ? " · Someone is waiting" : ""}</>} title={item.title} end={actions}>
+        return <StRow key={item.id} align="start" lead={<StBeacon kind="need" />} kind={<>{look.source} · <StMono>{when(item.openedAt)}</StMono>{item.urgent ? " · Someone is waiting" : ""}</>} selected={item.id === selectedId} title={<span id={`decision-${item.id}`} ref={item.id === selectedId ? selectedItem : undefined} tabIndex={-1}>{item.title}</span>} end={actions}>
           <div className={styles.review} data-shape={look.shape}>
             {deck && look.amount && !item.review?.length ? <p>{look.amount}</p> : null}
             {item.review?.length ? <ul className={styles.reviewLines} aria-label="Every change you approve">{item.review.map((line, row) => <li key={row}>{line}</li>)}</ul>

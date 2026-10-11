@@ -33,7 +33,7 @@ export class VercelSandboxBuildError extends Error {
   constructor(readonly cleanupRequired: boolean, readonly sandboxName?: string) {
     super(cleanupRequired
       ? "The isolated build requires operator cleanup verification."
-      : "The isolated application build failed or exceeded its limits.");
+      : "The isolated internal tool build failed or exceeded its limits.");
     this.name = "VercelSandboxBuildError";
   }
 }

@@ -1,13 +1,15 @@
 "use client";
 import { actorPresentation } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL, PLACE_LABELS, STATE_LABELS } from "@/platform/presentation/place-labels";
+import type { AgencyClientHomeState } from "@/experience/workspace/useAgencyClientHome";
+import { clientDecisionHref } from "@/platform/workspaces/location";
 import type { NeedsYouState } from "@/experience/workspace/useNeedsYou";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { z } from "zod";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -65,6 +67,8 @@ export interface SystemPageProps {
   sources: readonly WorkspaceWork[];
   /** Reuse the workspace's decision read, without creating another approval. */
   needsYou?: NeedsYouState;
+  agencyDecisions?: AgencyClientHomeState;
+  businessName?: string;
   localPreview?: boolean;
   workspaceStopped?: boolean;
   calendarRecoveryAllowed?: boolean;
@@ -117,15 +121,12 @@ export function SystemPage(props: SystemPageProps) {
       {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
       {system.operatedBy ? <p className={paper.meta}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={paper.meta}>Agency identity could not be loaded</p> : null}
       {system.lifecycle === "paused" ? <p className={paper.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
-      <SystemNeedsYou system={system} state={props.needsYou} workspaceId={props.workspaceId} appBase={props.appBase} />
+      <SystemNeedsYou system={system} state={props.needsYou} agencyState={props.agencyDecisions} businessName={props.businessName} workspaceId={props.workspaceId} appBase={props.appBase} />
       <section className={paper.object} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}><SystemSurface {...props} system={system} /></section>
       {showAside ? <div className={paper.context} aria-label={`About ${system.name}`}>
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
         {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={compareId} onCompare={compare} onAsk={onAsk} /> : null}
-        {system.connections.length || system.offers?.length ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.storedVersionId ? <StSection title="Version draft"><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? readOnly} /><SystemCreator workspaceId={props.workspaceId} systemId={system.id} /></StSection> : null}
-        {system.history?.length ? <HistoryPanel system={system} /> : null}
+        <SystemContextSections {...props} system={system} />
       </div> : <StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</StTextButton>}
     </div>
   </StPage>;
@@ -173,6 +174,7 @@ export function SystemPage(props: SystemPageProps) {
       </div>
     </header>}
 
+    <SystemNeedsYou system={system} state={props.needsYou} agencyState={props.agencyDecisions} businessName={props.businessName} workspaceId={props.workspaceId} appBase={props.appBase} />
     <div className={website ? canvasStyles.body : styles.body} data-context={(website ? showAside : hasContext(system)) ? undefined : "none"} aria-busy={website && loading || undefined}>
       <section className={website ? canvasStyles.surface : styles.surface} data-kind={system.surface.kind} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}>
         {system.surface.kind === "website" ? <>
@@ -186,12 +188,8 @@ export function SystemPage(props: SystemPageProps) {
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
         {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
-        {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
-        {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? readOnly} /></Panel> : null}
-        {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
-          : system.history?.length ? <HistoryPanel system={system} /> : null}
+        <SystemContextSections {...props} system={system} websiteDetail={websiteDetail ?? undefined} siteHref={siteHref} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside> : null}
     </div>
@@ -212,13 +210,14 @@ function ActivationsPanel({ system }: { system: SystemView }) {
   </Panel>;
 }
 
-function HistoryPanel({ system }: { system: SystemView }) {
+function HistoryPanel({ system, children }: { system: SystemView; children?: ReactNode }) {
   const rows = system.history ?? [];
   const when = (at: string) => {
     const date = new Date(at);
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
   return <Panel id={`${system.id}-history`} title={STATE_LABELS.history} count={0} intro="The last changes, newest first.">
+    {children}
     <StRows>{rows.map(row => <StRow key={row.id} title={row.sentence} detail={actorPresentation(row.actor).credit} end={<StMono as="time" dateTime={row.at}>{when(row.at)}</StMono>} />)}</StRows>
   </Panel>;
 }
@@ -298,7 +297,7 @@ function SystemLink({ id, label, systemHref, onOpenSystem }: { id?: string; labe
   return <Link href={systemHref(id)} onClick={event => { if (!onOpenSystem || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); onOpenSystem(id); }}>{label}</Link>;
 }
 
-function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void; siteHref?: (tab: "connections" | "google") => string }) {
+function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref, children }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void; siteHref?: (tab: "connections" | "google") => string; children?: ReactNode }) {
   // Anything disconnected or unconfirmed shows in full; connected ones fold into one line.
   const attention = system.connections.filter(connection => connection.status !== "connected");
   const working = system.connections.filter(connection => connection.status === "connected");
@@ -307,6 +306,7 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { syst
     {connection.contract ? <><small>Source: {connection.contract.sourceOfTruth}</small><small>{connection.contract.authority}</small><small>{connection.contract.freshness}</small><small>{connection.contract.failureBehavior}</small></> : null}
   </StRow>;
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
+    {children}
     {attention.length ? <StRows>{attention.map(item)}</StRows> : null}
     {working.length ? <details className={styles.fold}>
       <summary>Works with {working.length} {working.length === 1 ? "thing" : "things"}</summary>
@@ -437,7 +437,28 @@ function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemVie
 }
 
 /** Same decision identity/title as the owner deck; all actions stay in that deck. */
-function SystemNeedsYou({ system, state, workspaceId, appBase = "" }: { system: SystemView; state?: NeedsYouState; workspaceId: string; appBase?: string }) {
+function SystemContextSections(props: SystemPageProps & { system: SystemView; siteHref?: (tab: "connections" | "google") => string; onPrepared?: () => void; onAskRestore?: () => void }) {
+  const { system, websiteDetail, siteHref } = props;
+  const compose = ({ draft, connections, history }: { draft?: ReactNode; connections?: ReactNode; history?: ReactNode }) => <>
+    {system.connections.length || system.offers?.length || siteHref || system.storedVersionId || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref}>{connections}</ConnectionsPanel> : null}
+    {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
+    {draft ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes stay in this business’s working draft.">{draft}{system.surface.kind !== "website" ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}</Panel> : null}
+    {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!props.readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={props.onPrepared} onAskRestore={props.onAskRestore}>{history}</WebsiteHistoryPanel>
+      : system.history?.length || system.storedVersionId ? <HistoryPanel system={system}>{history}</HistoryPanel> : null}
+  </>;
+  return system.storedVersionId ? <SystemVersionManagement workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? props.readOnly} compose={compose} /> : compose({});
+}
+
+function SystemNeedsYou({ system, state, agencyState, businessName, workspaceId, appBase = "" }: { system: SystemView; state?: NeedsYouState; agencyState?: AgencyClientHomeState; businessName?: string; workspaceId: string; appBase?: string }) {
+  if (agencyState) {
+    if (agencyState.status === "disabled") return null;
+    const title = `Waiting on ${businessName || "the business"}`;
+    const decisions = agencyState.status === "ready" && agencyState.data.workspaceId === workspaceId ? agencyState.data.decisions.filter(item => item.systemId === system.id && item.state === "open") : [];
+    return <StSection title={title}>
+      {agencyState.status === "loading" ? <StSkeleton label="Checking shared decision status" /> : agencyState.status === "error" ? <StNotice tone="critical">Shared decisions could not be checked.</StNotice> : decisions.length ? <StRows label={title}>{decisions.map(item => <StRow key={item.id} title={item.title} href={`${appBase}${clientDecisionHref(workspaceId, item.id)}#decision-${item.id}`} end={title} />)}</StRows> : <StEmpty>No shared decisions are waiting for this System.</StEmpty>}
+      <p className="text-sm text-gray-muted">Read-only · the business decides.</p>
+    </StSection>;
+  }
   if (!state || state.status === "disabled") return null;
   const title = `${PLACE_LABELS.needsYou} for this System`;
   if (state.status === "loading") return <StSection title={title}><StSkeleton label="Checking decisions for this System" /></StSection>;
@@ -445,6 +466,6 @@ function SystemNeedsYou({ system, state, workspaceId, appBase = "" }: { system: 
   const items = state.items.filter(item => item.workspaceId === workspaceId && item.systemId === system.id);
   return <StSection title={title}>
     {!state.complete ? <StNotice>Some decisions could not be checked.</StNotice> : null}
-    {items.length ? <StRows label={title}>{items.map(item => <StRow key={item.id} title={item.title} detail={item.detail} href={`${appBase}/workspace?${new URLSearchParams({ workspaceId, view: "needs-you", item: item.id })}`} end="Review in Needs you" />)}</StRows> : state.complete ? <StEmpty>No decisions are waiting for this System.</StEmpty> : null}
+    {items.length ? <StRows label={title}>{items.map(item => <StRow key={item.id} title={item.title} detail={item.detail} href={`${appBase}${clientDecisionHref(workspaceId, item.id)}#decision-${item.id}`} end="Review in Needs you" />)}</StRows> : state.complete ? <StEmpty>No decisions are waiting for this System.</StEmpty> : null}
   </StSection>;
 }

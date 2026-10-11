@@ -71,7 +71,7 @@ export function PossibilityTry({ state, previewContent }: { state: PossibilityTr
         {view.changes.map(line => <StRow key={line} title={line} />)}
         {view.introduces.map(line => <StRow key={`new-${line}`} kind="New System" title={line} />)}
       </StRows></StSection> : null}
-      <StNotice>Nothing here changes your live site, sends a message or books anything. The separate approval link in your email is where you can make it real.</StNotice>
+      <StNotice>Nothing here changes your live site, sends a message or books anything. The separate approval link in your email is where you can make real.</StNotice>
     </StPage>
   </Shell>;
 }

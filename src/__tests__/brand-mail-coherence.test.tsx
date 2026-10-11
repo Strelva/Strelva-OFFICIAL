@@ -11,6 +11,7 @@ vi.mock("@/platform/agency-brand/server", () => ({
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 vi.mock("resend", () => ({ Resend: class { emails = { send: mock.send }; } }));
 
+import { StrelvaSidebar } from "@/experience/app-frame/StrelvaSidebar";
 import { StEntry } from "@/components/ui/strelva/Kit";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { renderPaperEmailHtml, renderPaperEmailText } from "@/platform/infra/email/paper";
@@ -175,5 +176,15 @@ describe("entry branding", () => {
     expect(html).toContain("Agency identity unavailable");
     expect(html).not.toContain("Strelva");
     expect(html).not.toContain('viewBox="0 0 48 48"');
+  });
+});
+
+describe("neutral owner navigation identity", () => {
+  it("keeps the provided neutral identity instead of rendering the platform brand", () => {
+    const html = renderToStaticMarkup(<StrelvaSidebar ownerBrand={unavailable} accountName="Owner" signedIn={false} />);
+    expect(html).toContain('aria-label="Agency identity unavailable navigation"');
+    expect(html).toContain('aria-label="Agency identity unavailable home"');
+    expect(html).not.toContain('aria-label="Strelva home"');
+    expect(html).not.toContain('>Strelva</span>');
   });
 });

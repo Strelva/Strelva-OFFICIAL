@@ -252,7 +252,7 @@ describe("release-one private workspace routes", () => {
     else mocks.brandRpc.mockRejectedValue(new Error("offline"));
     const response = await GET(new Request("https://strelva.com/api/workspace"));
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ownerBrand: { agencyId: null, name: "Strelva" }, work: [{ id: workId }] });
+    expect(await response.json()).toMatchObject({ ownerBrand: { agencyId: null, name: "Agency identity unavailable" }, work: [{ id: workId }] });
   });
   it("reports an owner exit-state read failure so the browser can fail closed", async () => {
     mocks.exitRead.mockRejectedValue(new Error("temporary exit-state store failure"));
@@ -302,10 +302,10 @@ describe("release-one private workspace routes", () => {
     expect(response.status).toBe(200);
     const products = (await response.json()).products as Array<{ id: string; availability: string }>;
     expect(products).toEqual(expect.arrayContaining([
-      { id: "applications", name: "Internal applications", description: "Collect and use business records in a private form and working list.", availability: "available" },
-      { id: "scheduling", name: "Scheduling", description: "Reserve available time and keep conflicting requests out of the schedule.", availability: "available" },
-      { id: "investigations", name: "Ongoing checks", description: "Compare two permitted records and notice when they disagree.", availability: "available" },
-      { id: "operations", name: "Delegated work", description: "Approve a bounded result and keep its progress, decisions, and evidence together.", availability: "available" },
+      { id: "applications", name: "Internal tools", description: "Collect and use business records in a private form and working list.", availability: "available" },
+      { id: "scheduling", name: "Bookings", description: "Reserve available time and keep conflicting requests out of the schedule.", availability: "available" },
+      { id: "investigations", name: "Saved checks", description: "Compare two permitted records and notice when they disagree.", availability: "available" },
+      { id: "operations", name: "Requests", description: "Approve a bounded result and keep its progress, decisions, and evidence together.", availability: "available" },
     ]));
   });
   it("includes authorized managed websites as tenant links without cloning saved work", async () => {

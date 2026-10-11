@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OperatorDepthPreview } from "@/experience/workspace/preview/OperatorDepthPreview";
-import { createOperatorDepthTransport, OPERATOR_DEPTH_SURFACES, operatorDepthPayLinks, type OperatorDepthScenario } from "@/experience/workspace/preview/operator-depth-fixture";
+import { createOperatorDepthTransport, OPERATOR_DEPTH_SURFACES, OPERATOR_DEPTH_TITLES, operatorDepthPayLinks, type OperatorDepthScenario } from "@/experience/workspace/preview/operator-depth-fixture";
 
 const calls = vi.hoisted(() => ({ fetch: vi.fn(), server: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: calls.refresh }), useSearchParams: () => new URLSearchParams() }));
@@ -24,7 +24,7 @@ describe("isolated operator depth specimens", () => {
   it.each(OPERATOR_DEPTH_SURFACES)("renders %s ready and empty without live reads or server actions", async surface => {
     for (const scenario of ["ready", "empty"] as const) {
       await act(async () => root.render(createElement(OperatorDepthPreview, { key: scenario, surface, scenario })));
-      expect(container.querySelector("h1")).not.toBeNull();
+      expect(container.querySelector("h1")?.textContent).toBe(OPERATOR_DEPTH_TITLES[surface]);
       expect(calls.fetch).not.toHaveBeenCalled();
       expect(calls.server).not.toHaveBeenCalled();
       expect(container.textContent).not.toMatch(/\b(AI|agent|automation|workflow|task)\b/i);
@@ -33,7 +33,7 @@ describe("isolated operator depth specimens", () => {
   it.each(["loading", "error", "denied"] as const)("renders every %s state without exposing live controls", async (scenario: OperatorDepthScenario) => {
     for (const surface of OPERATOR_DEPTH_SURFACES) {
       await act(async () => root.render(createElement(OperatorDepthPreview, { key: surface, surface, scenario })));
-      expect(container.querySelector("h1")).not.toBeNull();
+      expect(container.querySelector("h1")?.textContent).toBe(OPERATOR_DEPTH_TITLES[surface]);
       expect(container.querySelector("form")).toBeNull();
       expect(calls.fetch).not.toHaveBeenCalled();
       expect(calls.server).not.toHaveBeenCalled();
@@ -41,11 +41,19 @@ describe("isolated operator depth specimens", () => {
       if (scenario === "error") expect(container.querySelector('[role="alert"]')?.textContent).toContain("No changes were made");
     }
   });
-  it("rehearses approval locally without the actual server action", async () => {
-    await act(async () => root.render(createElement(OperatorDepthPreview, { surface: "actions" })));
-    const approve = [...container.querySelectorAll("button")].find(button => button.textContent === "Approve");
-    expect(approve).toBeDefined(); await act(async () => approve!.click());
-    expect(container.textContent).not.toContain("Clarify how to request a session");
+  it.each(["actions", "onboard"] as const)("routes %s through ordinary agency access without legacy service controls", async surface => {
+    await act(async () => root.render(createElement(OperatorDepthPreview, { surface })));
+    expect(container.textContent).toContain("Operator access grants no agency seat");
+    expect(container.textContent).toContain("owner decisions remain with the client business");
+    expect(container.querySelector('a[href="/workspace"]')?.textContent).toBe("Open workspace to check agency access");
+    expect(container.querySelector("form")).toBeNull();
+    expect([...container.querySelectorAll("button")].some(button => /Approve|Publish|Provision/.test(button.textContent ?? ""))).toBe(false);
+    expect(calls.server).not.toHaveBeenCalled(); expect(calls.fetch).not.toHaveBeenCalled();
+  });
+  it("labels the retained digest controls as a legacy local rehearsal", async () => {
+    await act(async () => root.render(createElement(OperatorDepthPreview, { surface: "digests" })));
+    expect(container.textContent).toContain("Retained legacy rehearsal");
+    expect(container.textContent).toContain("owner’s workspace");
     expect(calls.server).not.toHaveBeenCalled(); expect(calls.fetch).not.toHaveBeenCalled();
   });
   it("keeps payment creates and revokes in the transport instance only", async () => {
@@ -66,11 +74,12 @@ describe("isolated operator depth specimens", () => {
     expect((await request("/api/admin/provision", { method: "POST", body: "bad json" })).status).toBe(400);
     expect(calls.fetch).not.toHaveBeenCalled();
   });
-  it("shows fictional completion without restoring or saving a provisioning result", async () => {
+  it("ignores a retained completion query without restoring or saving a provisioning result", async () => {
     const storageRead = vi.spyOn(Storage.prototype, "getItem");
     const storageWrite = vi.spyOn(Storage.prototype, "setItem");
     await act(async () => root.render(createElement(OperatorDepthPreview, { surface: "onboard", result: true })));
-    expect(container.textContent).toContain("fictional-studio");
+    expect(container.textContent).not.toContain("fictional-studio");
+    expect(container.textContent).toContain("Open workspace to check agency access");
     expect(storageRead).not.toHaveBeenCalled(); expect(storageWrite).not.toHaveBeenCalled();
     storageRead.mockRestore(); storageWrite.mockRestore();
   });

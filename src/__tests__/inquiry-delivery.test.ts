@@ -293,8 +293,11 @@ describe("inquiry delivery connector", () => {
     expect(transport.send).toHaveBeenCalledTimes(1);
     const message = (transport.send as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(message.audience).toBe("customer");
-    expect(message.options.footerNote).toContain("sent by Strelva");
-    expect(renderInquiryMessage(message).text).toContain("Strelva");
+    expect(message.options.footerNote).toBe("Automatic reply · from Harbor Dental");
+    expect(message.fromName).toBe("Harbor Dental");
+    expect(message.options.businessName).toBe("Harbor Dental");
+    expect(renderInquiryMessage(message).text).toContain("Harbor Dental");
+    expect(renderInquiryMessage(message).text).not.toContain("sent by Strelva");
   });
 
   it("records provider acceptance before read-back and never sends twice after verification fails", async () => {

@@ -89,13 +89,13 @@ export function StrelvaSidebar({ agencyNavigation, ownerBrand, active, appBase =
       if (!onNavigate) onCloseMobile?.();
     }}><Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span>{badge ? <b className={styles.badge} aria-hidden="true">{badge > 99 ? "99+" : badge}</b> : null}</Link>;
   }
-  return <aside className={styles.sidebar} data-open={mobileOpen} data-standalone={standalone} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} navigation`}>
+  return <aside className={styles.sidebar} data-open={mobileOpen} data-standalone={standalone} aria-label={`${ownerBrand ? ownerBrand.name : "Strelva"} navigation`}>
     {businessContext ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.brandRow}>
-      <Link href={href("home")} className={styles.brand} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} home`} onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><>{ownerBrand?.agencyId ? <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{ownerBrand.logoUrl ? <img src={ownerBrand.logoUrl} alt="" width={132} style={{ maxWidth: "100%", maxHeight: 64, objectFit: "contain", background: "#ffffff" }} /> : null}{ownerBrand.name}</span> : <><LogoMark className={styles.brandMark} /><span>Strelva</span></>}</></Link>
+      <Link href={href("home")} className={styles.brand} aria-label={`${ownerBrand ? ownerBrand.name : "Strelva"} home`} onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><>{ownerBrand ? <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{ownerBrand.logoUrl ? <img src={ownerBrand.logoUrl} alt="" width={132} style={{ maxWidth: "100%", maxHeight: 64, objectFit: "contain", background: "#ffffff" }} /> : null}{ownerBrand.name}</span> : <><LogoMark className={styles.brandMark} /><span>Strelva</span></>}</></Link>
       <button className={styles.mobileClose} aria-label="Close navigation" type="button" onClick={onCloseMobile}><X size={20} /></button>
     </div>
-    {ownerBrand?.agencyId ? <OwnerBrandIdentity brand={ownerBrand} rail /> : null}
+    {ownerBrand ? <OwnerBrandIdentity brand={ownerBrand} rail /> : null}
     <div className={styles.body}>
       <div className={styles.utilities} aria-label="Workspace utilities">
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}

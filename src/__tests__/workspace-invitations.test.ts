@@ -12,7 +12,10 @@ const mocks = vi.hoisted(() => ({
   inspect: vi.fn(),
   accept: vi.fn(),
   revoke: vi.fn(),
+  brand: vi.fn(),
 }));
+
+vi.mock("@/platform/agency-brand/server", () => ({ resolveOwnerBrand: mocks.brand }));
 
 vi.mock("@/platform/workspaces/http", async importOriginal => {
   const original = await importOriginal<typeof import("@/platform/workspaces/http")>();
@@ -55,6 +58,7 @@ beforeEach(() => {
   mocks.inspect.mockResolvedValue({ ...invitation, workspaceName: "Example Business", recipientEmail: "p•••••@example.test" });
   mocks.accept.mockResolvedValue({ invitationId: invitation.id, workspaceId: invitation.workspaceId, workspaceName: "Example Business", invitedRole: "member", appliedRole: "member", status: "accepted", alreadyAccepted: false });
   mocks.revoke.mockResolvedValue("revoked");
+  mocks.brand.mockResolvedValue({ agencyId: "fixture-agency", name: "Example Agency", logoUrl: null, accentColor: "#565d64", replyTo: null, credit: "runs_on_strelva" });
 });
 
 describe("workspace invitation HTTP boundary", () => {
@@ -86,10 +90,24 @@ describe("workspace invitation HTTP boundary", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.invitation).toMatchObject({ workspaceName: "Example Business", recipientEmail: "p•••••@example.test", role: "member" });
+    expect(body.invitation.brand.name).toBe("Example Agency");
+    expect(mocks.brand).toHaveBeenCalledExactlyOnceWith(invitation.workspaceId);
     expect(body.invitation).not.toHaveProperty("createdBy");
     expect(body.invitation).not.toHaveProperty("members");
   });
 
+  it("preserves neutral agency identity and never reads a brand for an invalid token", async () => {
+    const route = await import("@/app/api/workspace-invitations/accept/[token]/route");
+    const neutral = { agencyId: null, name: "Agency identity unavailable", logoUrl: null, accentColor: "#565d64", replyTo: null, credit: "runs_on_strelva" };
+    mocks.brand.mockResolvedValueOnce(neutral);
+    const response = await route.GET(new Request(`https://strelva.com/api/workspace-invitations/accept/${token}?brand=Strelva`), { params: Promise.resolve({ token }) });
+    expect((await response.json()).invitation.brand).toEqual(neutral);
+    mocks.brand.mockClear();
+    const { WorkspaceAccessError } = await import("@/platform/workspaces/types");
+    mocks.inspect.mockRejectedValueOnce(new WorkspaceAccessError());
+    expect((await route.GET(new Request(`https://strelva.com/api/workspace-invitations/accept/${token}`), { params: Promise.resolve({ token }) })).status).toBe(404);
+    expect(mocks.brand).not.toHaveBeenCalled();
+  });
   it("requires the exact verified recipient and names wrong-account recovery", async () => {
     const route = await import("@/app/api/workspace-invitations/accept/[token]/route");
     mocks.accept.mockRejectedValueOnce(new WorkspaceInvitationRecipientError());

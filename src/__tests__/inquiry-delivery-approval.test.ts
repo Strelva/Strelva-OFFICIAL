@@ -348,7 +348,8 @@ describe("inquiry message review approval", () => {
     expect(mail.verify).toHaveBeenCalledTimes(1);
     const saved = await repository.getSnapshot(TENANT, BUSINESS);
     expect(saved?.state.responsibilityReceipts).toHaveLength(1);
-    expect(saved?.state.responsibilityReceipts[0]).toMatchObject({ action: action === "owner_notification" ? "send_message" : action, status: "accepted" });
+    expect(saved?.state.responsibilityReceipts[0]).toMatchObject({ action: action === "owner_notification" ? "send_message" : action, status: "accepted", evaluation: { disclosedAs: action === "owner_notification" ? "automatic_notice" : "business" } });
+    expect(metadata.messageDisclosure).toMatchObject({ kind: action === "owner_notification" ? "owner_notice" : "business" });
     expect((mail.send as ReturnType<typeof vi.fn>).mock.calls[0]?.[0].audience).toBe(audience);
 
     const replay = await executeInquiryMessageReview({

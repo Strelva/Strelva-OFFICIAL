@@ -4,9 +4,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BusinessPayment from "@/app/pay/business/BusinessPayment";
 import { DepositPreview } from "@/experience/workspace/preview/DepositPreview";
-import { businessDepositFixture as request } from "@/experience/workspace/preview/deposit-fixture";
+import { businessDepositFixture } from "@/experience/workspace/preview/deposit-fixture";
 
 const token = "a".repeat(64);
+const request = { ...businessDepositFixture, businessName: "Lakeview Yoga" };
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => { container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
@@ -24,6 +25,14 @@ describe("business deposit presentation", () => {
     expect(fetcher).toHaveBeenCalledWith("/api/v1/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
     expect(container.textContent).toContain("Payment received.");
     expect(payButton()).toBeUndefined();
+  });
+
+  it("withholds payment when the public request has no business identity", async () => {
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: businessDepositFixture })));
+    expect(container.textContent).toContain("The business identity is unavailable");
+    expect(payButton()).toBeUndefined();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it.each(["expired", "cancelled", "paid"] as const)("does not offer a charge for %s requests", async status => {

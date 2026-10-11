@@ -1,5 +1,4 @@
 "use client";
-import { packageDeclarationLabel } from "@/platform/presentation/package-declaration";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { z } from "zod";

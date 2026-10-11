@@ -38,9 +38,9 @@ export async function readBusinessProviderIdentity(actor: ServiceRequestActor, b
 export function siteChangeProviderFromOptions(options: Awaited<ReturnType<typeof readServiceRequestProviders>>) {
   const ofRecord = options.filter(option => option.providerOfRecord);
   const qualified = ofRecord.length ? ofRecord : options;
-  if (qualified.length !== 1) throw new ServiceRequestConflictError(qualified.length ? "Choose one agency for this website Request before continuing." : "No agency has an active provider seat for this business.");
+  if (qualified.length !== 1) throw new ServiceRequestConflictError(qualified.length ? "Choose one agency for this website Request before continuing." : "No active agency access is available for this business.");
   const selected = qualified[0];
-  if (!selected) throw new ServiceRequestConflictError("No agency has an active provider seat for this business.");
+  if (!selected) throw new ServiceRequestConflictError("No active agency access is available for this business.");
   return { kind: "agency" as const, agencyWorkspaceId: selected.agencyWorkspaceId };
 }
 export async function readSiteChangeProvider(actor: ServiceRequestActor, businessId: string) {

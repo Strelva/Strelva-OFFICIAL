@@ -74,7 +74,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ email: "owner@example.com" }),
     }));
 
-    expect(html).toContain("Dashboard access is invite-only");
+    expect(html).toContain("Workspace access is invite-only");
     expect(html).toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });
@@ -112,7 +112,7 @@ describe("auth access pages", () => {
     const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
     for (const page of [SignInPage, SignUpPage]) {
       const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) }));
-      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>Great Lakes Dried Fruit<\/a>/);
+      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>Agency identity unavailable<\/a>/);
       expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
     }
     expect(mockGetStoredContent).toHaveBeenCalledWith("theme", "gldf");

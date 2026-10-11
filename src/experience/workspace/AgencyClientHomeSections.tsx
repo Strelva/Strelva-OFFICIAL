@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { StEmpty, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import type { AgencyClientHomeState } from "./useAgencyClientHome";
@@ -6,10 +7,19 @@ import { clientDecisionHref } from "@/platform/workspaces/location";
 
 /** Same decision identity and title as the owner's item, with no approval controls. */
 export function AgencyClientDecisionStatus({ state, businessName, workspaceId, selectedId, onRetry }: { state: AgencyClientHomeState; businessName: string; workspaceId: string; selectedId?: string; onRetry: () => void }) {
+  const selectedItem = useRef<HTMLSpanElement>(null);
+  const focusedId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!selectedId || selectedId === focusedId.current || state.status !== "ready" || !state.data.decisions.some(item => item.id === selectedId)) return;
+    if (!selectedItem.current) return;
+    focusedId.current = selectedId;
+    selectedItem.current.focus({ preventScroll: true });
+    selectedItem.current?.scrollIntoView?.({ block: "nearest" });
+  }, [selectedId, state]);
   const title = `Waiting on ${businessName}`;
   const decisions = state.status === "ready" ? state.data.decisions.filter(item => selectedId ? item.id === selectedId : item.state === "open") : [];
   return <StSection title={title} id="client-decision-status" meta="Read-only · the business decides">
-    {state.status === "loading" ? <StSkeleton label="Checking shared decision status" /> : state.status === "error" ? <StNotice tone="critical">Shared decisions could not be checked. <StTextButton onClick={onRetry}>Check again</StTextButton></StNotice> : state.status === "ready" ? decisions.length ? <StRows label={title}>{decisions.map(item => <div id={`decision-${item.id}`} key={item.id}><StRow title={item.title} href={clientDecisionHref(workspaceId, item.id)} detail={<StMono as="time" dateTime={item.since}>{new Date(item.since).toLocaleDateString()}</StMono>} selected={item.id === selectedId} end={<StState kind={item.state === "open" ? "need" : "draft"}>{item.state === "open" ? title : item.state === "approved" ? "Approved by the business" : item.state === "declined" ? "Not yet" : item.state === "expired" ? "Expired" : "No longer waiting"}</StState>} /></div>)}</StRows> : <StEmpty>{selectedId ? "This decision is no longer available in your shared scope." : "No shared decisions are waiting."}</StEmpty> : null}
+    {state.status === "loading" ? <StSkeleton label="Checking shared decision status" /> : state.status === "error" ? <StNotice tone="critical">Shared decisions could not be checked. <StTextButton onClick={onRetry}>Check again</StTextButton></StNotice> : state.status === "ready" ? decisions.length ? <StRows label={title}>{decisions.map(item => <StRow key={item.id} title={<span id={`decision-${item.id}`} ref={item.id === selectedId ? selectedItem : undefined} tabIndex={-1}>{item.title}</span>} href={clientDecisionHref(workspaceId, item.id)} detail={<StMono as="time" dateTime={item.since}>{new Date(item.since).toLocaleDateString()}</StMono>} selected={item.id === selectedId} end={<StState kind={item.state === "open" ? "need" : "draft"}>{item.state === "open" ? title : item.state === "approved" ? "Approved by the business" : item.state === "declined" ? "Not yet" : item.state === "expired" ? "Expired" : "No longer waiting"}</StState>} />)}</StRows> : <StEmpty>{selectedId ? "This decision is no longer available in your shared scope." : "No shared decisions are waiting."}</StEmpty> : null}
     <p className="text-xs text-gray-muted">Approval, access, money, exit and sensitive customer details stay with the business. Only shared status appears here.</p>
   </StSection>;
 }

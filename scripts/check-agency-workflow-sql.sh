@@ -47,6 +47,7 @@ done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sq
 function_catalog_query="select p.oid::regprocedure::text,p.oid,p.proowner,coalesce(p.proacl,acldefault('f',p.proowner))::text,md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f' order by p.oid::regprocedure::text"
 psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/final-functions-before.catalog"
 psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-after.hashes"
+psql "${psql_args[@]}" --file="$repo_root/tests/application-actor-snapshots.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-workflow-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/website-owner-agency-publish-schema.sql" >/dev/null
 if [[ "$owner_runtime_installed" == true ]]; then

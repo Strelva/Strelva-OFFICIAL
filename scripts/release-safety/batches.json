@@ -1937,6 +1937,37 @@
           "rollbackStatus": "Conditioned disposable PostgreSQL 18 empty-schema inverse/reapply restores exact definitions and ACL; populated inverse refuses and preserves rows and forward fingerprints. PostgreSQL 17, managed/hosted ACL/Auth and live preflight/application UNRUN/held."
         }
       ]
+    },
+    {
+      "id": "coherence-identity-and-client-projections",
+      "status": "Merged source inventory only; held and unqualified. SQL execution, rollback preparation, hosted Auth and production migration application remain UNRUN; no packet batch or deployment authority granted.",
+      "items": [
+        {
+          "file": "20261021181000_application_actor_snapshots.sql",
+          "sha256": "e3744ad200824a72f156bb559060395dabfe9bec26468d5be15ff5795c59396c",
+          "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        },
+        {
+          "file": "20261022190000_agency_client_read_projection.sql",
+          "sha256": "d2a43c0c3c2909e83384ab562256ed8661fb0ae5cdf52b1a0f45b40d9e997a6e",
+          "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        },
+        {
+          "file": "20261023103000_coherence_agency_library.sql",
+          "sha256": "03cff2d36225cf0808c3aafe7e20d0c520561d9c2c2fc015e45210ebb2c3ad57",
+          "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        },
+        {
+          "file": "20261023123000_public_booking_confirmation_identity.sql",
+          "sha256": "01cc797dabc38fff6f4ab2f48ac586e20e5d6cebb649213c7acb0ba3fb25b946",
+          "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        },
+        {
+          "file": "20261023123500_public_payment_business_identity.sql",
+          "sha256": "d34475d4c1f18429f6b0e5baa472665436587da2339bbec768ff776728d55c7f",
+          "rollbackStatus": "No inverse migration prepared in the merged source; application remains held pending reviewed rollback or explicit forward-only recovery."
+        }
+      ]
     }
   ]
 }

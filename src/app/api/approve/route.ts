@@ -118,7 +118,7 @@ function confirmPage(params: {
       .map(line => `<li style="margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(line)}</li>`).join("")}</ul>`
     : "";
   const secondary = params.dashboardUrl
-    ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your dashboard instead</a></div>`
+    ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your workspace instead</a></div>`
     : "";
   const form = `<form method="POST" action="/api/approve" style="margin:22px 0 0;">
           <input type="hidden" name="token" value="${escapeHtml(params.token)}">
@@ -133,11 +133,11 @@ function confirmPage(params: {
 const INVALID = {
   missing: {
     heading: "This link is missing something",
-    body: "This approval link looks incomplete. Open your dashboard to review it there.",
+    body: "This approval link looks incomplete. Open your workspace to review it there.",
   },
   bad: {
     heading: "This link is invalid or expired",
-    body: "For your security, one-click approval links expire. Open your dashboard to review this in the approval queue.",
+    body: "For your security, one-click approval links expire. Open your workspace to review this in the approval queue.",
   },
 } as const;
 
@@ -151,7 +151,7 @@ function workspaceOpenUrl(origin: string, workspaceId: string, href?: string | n
   return `${origin.replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
 }
 
-const MOVED = { heading: "Decide this in Strelva", body: "This business now decides in Strelva. Nothing was done. Open your dashboard to decide it there." };
+const MOVED = { heading: "Decide this in Strelva", body: "This business now decides in Strelva. Nothing was done. Open your workspace to decide it there." };
 const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
 const HANDLED = { heading: "Already handled", body: "This was already taken care of. Nothing more to do." };
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
@@ -248,7 +248,7 @@ async function getPage(request: Request): Promise<NextResponse> {
   const businessName = tenant?.siteName || "your site";
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
-    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your workspace" });
   }
   const isApprove = claims.action === "approve";
 
@@ -285,7 +285,7 @@ async function postPage(request: Request): Promise<NextResponse> {
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
   if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
-    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your workspace" });
   }
 
   let result: { changed: boolean; reason?: string };
@@ -306,9 +306,9 @@ async function postPage(request: Request): Promise<NextResponse> {
     return noticePage({
       status: 200,
       heading: "We hit a snag",
-      body: "We couldn't complete that just now. Open your dashboard to finish it there.",
+      body: "We couldn't complete that just now. Open your workspace to finish it there.",
       dashboardUrl,
-      buttonLabel: "Open your dashboard",
+      buttonLabel: "Open your workspace",
     });
   }
 
@@ -321,14 +321,14 @@ async function postPage(request: Request): Promise<NextResponse> {
             ? `${actorCopy(receiptEvent.title, receiptEvent.metadata?.actor)}\n${actorLabel(receiptEvent.metadata?.actor)}\nFor ${businessName}. ${result.reason === "accepted_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
             : `Decision recorded for ${businessName}. Actor not recorded. The change receipt is unavailable here.`,
           dashboardUrl,
-          buttonLabel: "Open your dashboard",
+          buttonLabel: "Open your workspace",
         })
       : noticePage({
           status: 200,
           heading: "Skipped",
-          body: `No problem — we won't post that reply for ${businessName}. You can always reply yourself in your dashboard.`,
+          body: `No problem — we won't post that reply for ${businessName}. You can always reply yourself in your workspace.`,
           dashboardUrl,
-          buttonLabel: "Open your dashboard",
+          buttonLabel: "Open your workspace",
         });
   }
 
@@ -338,9 +338,9 @@ async function postPage(request: Request): Promise<NextResponse> {
     return noticePage({
       status: 200,
       heading: "Already handled",
-      body: `This was already taken care of for ${businessName} — nothing more to do. Open your dashboard to see the latest.`,
+      body: `This was already taken care of for ${businessName} — nothing more to do. Open your workspace to see the latest.`,
       dashboardUrl,
-      buttonLabel: "Open your dashboard",
+      buttonLabel: "Open your workspace",
     });
   }
 
@@ -348,9 +348,9 @@ async function postPage(request: Request): Promise<NextResponse> {
     return noticePage({
       status: 403,
       heading: "This link isn't for this account",
-      body: "This approval link doesn't match your account. Open your dashboard to review it there.",
+      body: "This approval link doesn't match your account. Open your workspace to review it there.",
       dashboardUrl,
-      buttonLabel: "Open your dashboard",
+      buttonLabel: "Open your workspace",
     });
   }
 
@@ -359,9 +359,9 @@ async function postPage(request: Request): Promise<NextResponse> {
   return noticePage({
     status: 200,
     heading: "We couldn't finish that",
-    body: `We couldn't complete this for ${businessName} automatically. Open your dashboard to finish it there.`,
+    body: `We couldn't complete this for ${businessName} automatically. Open your workspace to finish it there.`,
     dashboardUrl,
-    buttonLabel: "Open your dashboard",
+    buttonLabel: "Open your workspace",
   });
 }
 

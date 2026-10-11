@@ -47,3 +47,8 @@ test("checks lowercase display property values without treating wire enums as co
   assert.equal(check('const screen = { title: "capability" };')[0].word, "capability");
   assert.deepEqual(check('const contract = { kind: "capability", resourceKind: "application" };'), []);
 });
+
+test("allows an internal prompt array entry without swallowing its preceding comment as literal trivia", () => {
+  assert.deepEqual(check('const prompt = [\n  "Plan only.",\n  // words-allow: Private app -- Internal planning schema, never screen copy.\n  "Infer a private app from the request.",\n];'), []);
+  assert.equal(check('const prompt = [\n  "Plan only.",\n  // words-allow: Private app -- Internal planning schema, never screen copy.\n  "Infer a private app and Custom application.",\n];')[0].word, "Custom application");
+});

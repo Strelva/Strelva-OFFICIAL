@@ -62,6 +62,16 @@ async function home(responses: (Ready | { error: string })[], view: "home" | "ne
 function assertNoClear() { expect(text()).not.toMatch(/Nothing needs you|Nothing is waiting on you/); }
 
 describe("actual Needs-you reads on Home and its decision place", () => {
+  it("focuses the exact selected decision after its asynchronous read and leaves missing identities unavailable", async () => {
+    await mount(<NeedsYouSection variant="deck" selectedId={ask.id} state={{ status: "loading" }} pending={null} notices={{}} onDecide={noop} onRetry={noop} />);
+    await act(async () => root!.render(<NeedsYouSection variant="deck" selectedId={ask.id} state={ready({ items: [ask], complete: true })} pending={null} notices={{}} onDecide={noop} onRetry={noop} />));
+    expect(document.activeElement?.id).toBe(`decision-${ask.id}`);
+    expect(node.querySelector('[data-selected="true"]')?.textContent).toContain(ask.title);
+    const outside = document.createElement("button"); document.body.append(outside); outside.focus();
+    await act(async () => root!.render(<NeedsYouSection variant="deck" selectedId="unavailable" state={ready({ items: [], complete: true })} pending={null} notices={{}} onDecide={noop} onRetry={noop} empty="Decision unavailable" />));
+    expect(document.activeElement).toBe(outside); expect(text()).toContain("Decision unavailable"); outside.remove();
+  });
+
   it.each(["home", "needs-you"] as const)("keeps incomplete empty %s honest until a complete retry read", async view => {
     const { request, onNavigate } = await home([ready(), ready({ complete: true })], view);
     expect(text()).toContain("Some decisions could not be checked."); assertNoClear();

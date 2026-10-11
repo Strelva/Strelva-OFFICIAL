@@ -22,7 +22,7 @@ const SCHEMA_3_SCOPE: ExportManifestRow[] = [
 const LEGACY_SCOPE: ExportManifestRow[] = [
   { title: "Workspace and saved results", detail: "Current identity, supported records, releases, onboarding and economics receipts.", included: true },
   { title: "Uploads", detail: "Size, digest, extraction status and authenticated download references; uploaded bytes stay out of the JSON.", included: true },
-  { title: "Sites and outside services", detail: "Managed-site content, calendars, inquiries, agency handover and custom application artifacts are outside this snapshot.", included: false },
+  { title: "Sites and outside services", detail: "Managed-site content, calendars, inquiries, agency handover and Internal tool artifacts are outside this snapshot.", included: false },
   { title: "Credentials and internal records", detail: "Passwords, access tokens, command digests and internal learning stay out.", included: false },
 ];
 

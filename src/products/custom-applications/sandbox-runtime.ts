@@ -25,7 +25,7 @@ export function configureSandboxApplicationRuntime(actor: WorkspaceActor, app: C
       const result = await db.rpc("assert_custom_sandbox_runtime", { p_work: app.workId, p_version: app.candidate.version, p_revision: app.candidate.revision,
         p_digest: app.candidate.sourceDigest, p_team: config.teamId, p_project: config.projectId, p_image: config.image, p_policy: config.policyVersion,
         p_user: actor.userId, p_email: actor.verifiedEmail });
-      if (result.error || result.data !== true) throw new Error("The exact custom application runtime is not qualified.");
+      if (result.error || result.data !== true) throw new Error("The exact internal tool runtime is not qualified.");
     },
   });
   const port = createSandboxHttpPort({ ...config, approved: selected, token: () => process.env.VERCEL_OIDC_TOKEN || process.env.STRELVA_SANDBOX_PROVIDER_TOKEN || "" }, fetcher);

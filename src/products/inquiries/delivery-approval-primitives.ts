@@ -9,6 +9,7 @@ import type {
   InquiryRecord,
   InquiryRecordStatus,
   ResponsibilityAction,
+  ResponsibilityMessageDisclosure,
   ResponsibilityPolicy,
 } from "./contracts";
 import type { InquiryDeliverySubmission } from "./delivery";
@@ -47,6 +48,7 @@ export interface InquiryMessageReviewEventMetadata {
   replyTo: string | null;
   subject: string;
   messageBody: string;
+  messageDisclosure?: ResponsibilityMessageDisclosure;
   messageDigest: string;
   preparedAt: string;
   expiresAt: string | null;
@@ -118,6 +120,7 @@ export function tokenFor(metadata: Omit<InquiryMessageReviewEventMetadata, "revi
     replyTo: metadata.replyTo,
     subject: metadata.subject,
     messageBody: metadata.messageBody,
+    ...(metadata.messageDisclosure ? { messageDisclosure: metadata.messageDisclosure } : {}),
     messageDigest: metadata.messageDigest,
     preparedAt: metadata.preparedAt,
     expiresAt: metadata.expiresAt,

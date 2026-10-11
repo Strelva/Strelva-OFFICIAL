@@ -18,6 +18,13 @@ async function refresh(node: HTMLElement) { await act(async () => { const button
 describe("source package immutable uncertain command recovery", () => {
   beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
   afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
+  it("uses the shared declaration words for the agency source revision", async () => {
+    const declaration = { recordsRead: ["application.records", "business.contacts"], recordsWritten: ["internal_tool.notices"], businessRecordFields: ["owner_recipient.email"], outsideEffects: ["email"], bindingKinds: ["booking_calendar"], dataLeavingBusiness: ["people.email"] };
+    const request = vi.fn<typeof fetch>(async () => response({ ...view(), revision: { ...view().revision, declaration } }));
+    const { node } = await mount(request);
+    for (const label of ["Internal tool records", "Business contacts", "Submission email notices", "Owner email", "Business email", "Business calendar", "Staff emails"]) expect(node.textContent).toContain(label);
+    for (const value of ["application.records", "business.contacts", "internal_tool.notices", "owner_recipient.email", "booking_calendar", "people.email"]) expect(node.textContent).not.toContain(value);
+  });
   it("holds a lost listing response; current read confirms the state without resending", async () => {
     let state = "private";
     const request = vi.fn<typeof fetch>(async (_url, init) => { if (init?.method === "POST") { state = "listed"; throw new Error("response lost"); } return response(view(state)); });

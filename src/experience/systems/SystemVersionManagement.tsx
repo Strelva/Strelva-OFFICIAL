@@ -1,6 +1,6 @@
 "use client";
 import { declarationValue } from "./PackageDeclaration";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { z } from "zod";
 import {versionPreparationResultReceiptSchema,nativeVersionConflictSchema} from "@/platform/system-versions/native-preparation-contracts";
 import { StEmpty, StLabel, StMono, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
@@ -24,7 +24,9 @@ function failure(body: unknown, fallback: string) { return body && typeof body =
 
 /** Version changes stay in its working draft. Releasing, including restoring
  * an old release, is an explicit preparation through that business's Needs you. */
-function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readOnly }: { workspaceId: string; systemId: string; versionId: string; readOnly: boolean }) {
+export interface VersionSections { draft: ReactNode; connections: ReactNode; history: ReactNode }
+interface Props { workspaceId: string; systemId: string; versionId: string; readOnly: boolean; compose?: (sections: VersionSections) => ReactNode }
+function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readOnly, compose }: Props) {
   const request = useWorkspaceRequest();
   const [nativeConflict,setNativeConflict]=useState<z.infer<typeof nativeVersionConflictSchema>|null>(null),[nativeChoices,setNativeChoices]=useState<Record<string,"local"|"source">>({});
   const [view, setView] = useState<View | null>(null), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -43,7 +45,7 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
     return () => document.removeEventListener("focusin",moved);
   }, []);
   function beginFocusRecovery() {
-    focusOwner.current = containerRef.current?.contains(document.activeElement) ? document.activeElement : null;
+    focusOwner.current = document.activeElement === document.body ? null : document.activeElement;
   }
   useEffect(() => {
     if (!recoverFocus.current) return;
@@ -88,7 +90,9 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
     finally { inFlight.current = false; setBusy(false); }
   }
   const locked = busy || Boolean(pending.current);
-  return <div ref={containerRef} className="space-y-4 text-sm">
+  const connections = view ? <>{view.bindings.length ? <StRows label="Version Connections">{view.bindings.map(item => <StRow key={`${item.kind}:${item.connectionId}`} title={view.bindingChoices.find(choice => choice.connectionId === item.connectionId)?.label || declarationValue(item.kind)} detail={declarationValue(item.kind)} />)}</StRows> : <StEmpty>No accounts connected to this Version.</StEmpty>}{!readOnly && view.canManage ? <details><summary className="cursor-pointer">Connect an account from this business</summary><div className="mt-3 space-y-3"><SelectInput label="Account" disabled={locked} value={account} onChange={event => setAccount(event.target.value)} options={[{ value: "", label: "Choose this business’s account" }, ...view.bindingChoices.map(item => ({ value: item.connectionId, label: item.label }))]} /><StPill variant="soft" disabled={locked || !account} onClick={() => { const choice = view.bindingChoices.find(item => item.connectionId === account); if (choice) void save({ action: "bind", kind: choice.kind, connectionId: choice.connectionId }); }}>Connect {view.bindingChoices.find(item => item.connectionId === account)?.label || "account"}</StPill></div></details> : null}</> : null;
+  const history = view ? <>{view.releases.length ? <StRows label="Published states">{[...view.releases].sort((a,b) => b.number-a.number).map(item => <StRow key={item.number} title={`Published ${new Date(item.releasedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`} end={<StMono as="time" dateTime={item.releasedAt}>{new Date(item.releasedAt).toLocaleDateString("en-US", { month:"short", day:"numeric", timeZone:"UTC" })}</StMono>} />)}</StRows> : <StEmpty>Nothing published yet.</StEmpty>}{!readOnly && view.canManage && view.releases.length ? <details><summary className="cursor-pointer">Restore from History</summary><div className="mt-3 space-y-3"><SelectInput label="Earlier published state" value={release} disabled={locked} onChange={event => setRelease(event.target.value)} options={[{ value: "", label: "Choose a published state" }, ...view.releases.map(item => ({ value: String(item.number), label: `Published ${item.releasedAt.slice(0, 10)}` }))]} /><p className="text-gray-muted">Restoring replaces the working definition. History and the current live System stay in place until the owner approves a new publication.</p><StPill variant="soft" disabled={locked || !release} onClick={() => void save({ action: "restore", releaseNumber: Number(release) })}>Restore into draft</StPill></div></details> : null}</> : null;
+  const draft = <div ref={containerRef} className="space-y-4 text-sm">
     <h3 ref={headingRef} tabIndex={-1} className="font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Version draft</h3>
     {!view && !error ? <div role="status"><StLabel>Reading the Version’s draft…</StLabel><StSkeleton /></div> : null}
     {error ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-critical focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{error}</p> : null}
@@ -99,18 +103,15 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
       <StSection title="Local changes" meta={view.baselineRevision ? `From Library r${view.baselineRevision}` : undefined}>
         {view.overrides.length ? <StRows label="Local changes">{view.overrides.map(item => <StRow key={item.path} title={item.path === "*" ? "Restored into draft" : item.path.replaceAll(".", " › ")} kind="This Version" detail={item.path === "*" ? "Working definition restored from an earlier published state." : definitionValue(view.workingDefinition, item.path)} end={<StState kind="draft">Local draft</StState>} />)}</StRows> : <StEmpty>This Version has no local overrides.</StEmpty>}
       </StSection>
-      <div className="grid gap-8 md:grid-cols-2"><StSection title="Connections">{view.bindings.length ? <StRows label="Version Connections">{view.bindings.map(item => <StRow key={`${item.kind}:${item.connectionId}`} title={view.bindingChoices.find(choice => choice.connectionId === item.connectionId)?.label || declarationValue(item.kind)} detail={declarationValue(item.kind)} />)}</StRows> : <StEmpty>No accounts connected to this Version.</StEmpty>}</StSection>
-      <StSection title="History">{view.releases.length ? <StRows label="Published states">{[...view.releases].sort((a,b) => b.number-a.number).map(item => <StRow key={item.number} title={`Published ${new Date(item.releasedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })}`} end={<StMono as="time" dateTime={item.releasedAt}>{new Date(item.releasedAt).toLocaleDateString("en-US", { month:"short", day:"numeric", timeZone:"UTC" })}</StMono>} />)}</StRows> : <StEmpty>Nothing published yet.</StEmpty>}</StSection></div>
       <details><summary className="cursor-pointer text-gray-muted">Working definition</summary><StSurface label="Working definition"><pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(view.workingDefinition, null, 2)}</pre></StSurface></details>
       </div>
       {readOnly || !view.canManage ? <p ref={permissionRef} tabIndex={-1} className="text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">An owner or admin can change this Version’s draft.</p> : <>
         <details><summary className="cursor-pointer">Change a local value</summary><div className="mt-3 space-y-3"><TextInput label="Definition path" value={path} disabled={locked} onChange={event => setPath(event.target.value)} helperText="For example: title, or followUp.message" /><TextArea label="Local value as JSON" value={value} disabled={locked} rows={3} onChange={event => setValue(event.target.value)} /><div className="flex flex-wrap gap-3"><StPill variant="soft" disabled={locked || !path.trim()} onClick={() => { try { void save({ action: "override", path: path.trim(), value: JSON.parse(value) }); } catch { setError("Enter a valid JSON value."); } }}>Save local value</StPill><StPill variant="soft" disabled={locked || !path.trim()} onClick={() => void save({ action: "override", path: path.trim(), clear: true })}>Clear local change</StPill></div></div></details>
-        <details><summary className="cursor-pointer">Connect an account from this business</summary><div className="mt-3 space-y-3"><SelectInput label="Account" disabled={locked} value={account} onChange={event => setAccount(event.target.value)} options={[{ value: "", label: "Choose this business’s account" }, ...view.bindingChoices.map(item => ({ value: item.connectionId, label: item.label }))]} /><StPill variant="soft" disabled={locked || !account} onClick={() => { const choice = view.bindingChoices.find(item => item.connectionId === account); if (choice) void save({ action: "bind", kind: choice.kind, connectionId: choice.connectionId }); }}>Connect {view.bindingChoices.find(item => item.connectionId === account)?.label || "account"}</StPill></div></details>
-        {view.releases.length ? <details><summary className="cursor-pointer">Restore from History</summary><div className="mt-3 space-y-3"><SelectInput label="Earlier published state" value={release} disabled={locked} onChange={event => setRelease(event.target.value)} options={[{ value: "", label: "Choose a published state" }, ...view.releases.map(item => ({ value: String(item.number), label: `Published ${item.releasedAt.slice(0, 10)}` }))]} /><p className="text-gray-muted">Restoring replaces the working definition. History and the current live System stay in place until the owner approves a new publication.</p><StPill variant="soft" disabled={locked || !release} onClick={() => void save({ action: "restore", releaseNumber: Number(release) })}>Restore into draft</StPill></div></details> : null}
         <StPill disabled={locked} busy={busy} onClick={() => void save({ action: "prepare_release" })}>Prepare this draft for review</StPill>
       </>}
     </> : null}
   </div>;
+  return compose ? compose({ draft, connections, history }) : <>{draft}<StSection title="Connections">{connections}</StSection><StSection title="History">{history}</StSection></>;
 }
 
 export function SystemVersionManagement(props:Parameters<typeof ScopedSystemVersionManagement>[0]){return <ScopedSystemVersionManagement key={`${props.workspaceId}:${props.systemId}:${props.versionId}`} {...props}/>;}

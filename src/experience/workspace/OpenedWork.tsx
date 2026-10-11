@@ -44,7 +44,7 @@ export function OpenedWork(props: Props) {
     case "onboarding": return <OnboardingWorkspaceExperience {...props} initialCaseId={props.workId} />;
     case "custom-applications": return props.workId
       ? <CustomApplicationManageExperience workId={props.workId} readOnly={props.readOnly} />
-      : <p role="status">Select a saved custom application to review its delivery.</p>;
+      : <p role="status">Select a saved Internal tool to review its delivery.</p>;
     default: return <BoundedWorkExperience {...props} sources={[...props.sources]} onSaved={props.onSaved ?? stayInWork} />;
   }
 }

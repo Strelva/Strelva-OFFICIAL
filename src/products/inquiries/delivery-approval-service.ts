@@ -234,7 +234,9 @@ function assertEventBinding(
     context.message.to !== metadata.recipient ||
     (context.message.replyTo ?? null) !== metadata.replyTo ||
     context.message.subject !== metadata.subject ||
-    context.messageBody !== metadata.messageBody
+    context.messageBody !== metadata.messageBody ||
+    context.message.disclosure?.kind !== metadata.messageDisclosure?.kind ||
+    context.message.disclosure?.name !== metadata.messageDisclosure?.name
   ) throwCode("message_mismatch", "The reviewed message changed. Prepare a fresh review before sending.");
 }
 
@@ -290,7 +292,7 @@ async function buildContext(input: {
   if (input.authoredReply !== undefined) {
     if (input.action !== "reply") throwCode("message_mismatch", "Authored copy is only available for inquiry replies.");
     const authoredReply = text(input.authoredReply, "Reply body", 4096);
-    message.options = { heading: "A reply from your business", paragraphs: [authoredReply], footerNote: "Sent by Strelva for the business named above" };
+    message.options = { businessName: message.fromName, heading: "A reply from your business", paragraphs: [authoredReply], footerNote: `Automatic reply · from ${message.fromName}` };
   }
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);
@@ -303,6 +305,7 @@ async function buildContext(input: {
     evaluation = engine.evaluateResponsibilityAction(responsibility.id, responsibilityActionFor(input.action), {
       at: input.now.toISOString(),
       messageBody,
+      messageDisclosure: message.disclosure,
     });
   } catch (error) {
     throw new InquiryMessageReviewEngineError(errorMessage(error, "The current inquiry responsibility could not be evaluated."), "current_policy_unavailable");
@@ -363,6 +366,7 @@ function metadataFor(
     replyTo: context.message.replyTo ?? null,
     subject: context.message.subject,
     messageBody: context.messageBody,
+    ...(context.message.disclosure ? { messageDisclosure: context.message.disclosure } : {}),
     messageDigest: context.messageDigest,
     preparedAt: now.toISOString(),
     expiresAt: context.deliveryEvaluation.expiresAt ?? null,

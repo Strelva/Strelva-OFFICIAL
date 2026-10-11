@@ -19,6 +19,18 @@ describe("fictional agency canon surfaces", () => {
     expect(html).toContain("[amount]");
     expect(html).toContain("not earnings");
   });
+  it("uses common client navigation and actual Systems while sharing Request stages", () => {
+    const client = renderToStaticMarkup(createElement(AgencyCanonPreview, { frame: "client", state: "ready", mode: "light" }));
+    expect(client).toContain("All clients");
+    expect(client).toContain("New patient intake");
+    expect(client).not.toContain("North Coast Realty");
+    expect(client).not.toContain("Fieldwork Studio");
+    const requests = renderToStaticMarkup(createElement(AgencyCanonPreview, { frame: "requests", state: "ready", mode: "light" }));
+    expect(requests).toContain("Asked");
+    expect(requests).toContain("In progress");
+    expect(requests).not.toContain("With the client");
+    expect(requests).toContain("agency-library");
+  });
   it("keeps empty, unavailable and denied reads distinct for every frame", () => {
     for (const frame of agencyCanonFrames) {
       for (const state of ["loading", "empty", "error", "permission"] as const) {

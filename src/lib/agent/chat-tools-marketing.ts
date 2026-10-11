@@ -287,8 +287,8 @@ export function reviewReplyChatTools(deps: ChatToolDeps): ChatToolEntries {
               review: updated,
               agentResultStatus: "drafted" as const,
               message: platform
-                ? `I saved the reply to ${updated.author}'s review in your dashboard. I can't publish replies to ${platform} from here, so you'll need to post it on ${platform} yourself.`
-                : `I saved the reply to ${updated.author}'s review in your dashboard.`,
+                ? `I saved the reply to ${updated.author}'s review in your workspace. I can't publish replies to ${platform} from here, so you'll need to post it on ${platform} yourself.`
+                : `I saved the reply to ${updated.author}'s review in your workspace.`,
             };
           } catch (err) {
             const error = `Failed to reply: ${err instanceof Error ? err.message : "Unknown error"}`;

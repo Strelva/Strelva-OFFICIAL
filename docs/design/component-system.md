@@ -1854,3 +1854,63 @@ share an edge. Missing counts pair a dash with an explicit unavailable label;
 zero remains a recorded value. The kit specimen includes this count row.
 `StPillLink current` puts `aria-current="page"` on the actual link, including
 the recap period selector. Its current-link specimen is included too.
+
+### October 11 coherence integration
+
+The shared [screen-label registry](../../src/platform/presentation/place-labels.ts)
+keeps System kinds and workspace places consistent. Systems use **Internal tool**,
+**Bookings** and **Saved check**; owner places use **Requests**, **Running**,
+**What changed** and **People & access**. Discovery separates **Yours** and
+**Ready-made**. Phone navigation uses **Ask Strelva**. Running's saved-check
+entrance preserves `returnTo=running`. Running first offers **What should stay true?**
+and **Request an ongoing result**, opening the existing help route in the exact
+workspace. This click saves no Request and promises no accepted work. Supported
+saved-check configuration remains in a secondary native disclosure; read-only
+and stopped states expose no new Request action. Agency-native authoring of
+arbitrary ongoing outcomes is not implemented by this entrance.
+
+[StrelvaShell](../../src/experience/app-frame/StrelvaShell.tsx) and
+[StrelvaSidebar](../../src/experience/app-frame/StrelvaSidebar.tsx) carry optional
+`needsYou.label`, `allClients`, Team navigation and a grouped business scope
+picker. Agency client views use the business's common workspace within the
+recorded grant. Owner decisions remain read-only **Waiting on [business]**;
+labels and navigation grant no approval, payer or exit authority.
+
+[PackageDeclaration](../../src/experience/systems/PackageDeclaration.tsx) presents
+source and recipient permissions through one declaration mapping. Library,
+Ready-made and installed-Version rows retain their recorded source, creator and
+context lineage; built-in starters and services do not acquire Library lineage.
+Prepared Version receipts open the exact scoped review. Website preparation
+names the business, agency and assigned person; grant consent checks those
+identities on the server. Published states are **History** and accounts are
+**Connections**. Publication restore prepares a draft and does not change the
+live System.
+
+[Actor presentation](../../src/platform/presentation/actor.ts) uses recorded
+identity independently of viewer or serving brand. Missing identity says
+**Actor not recorded**. Native application commands capture action-time actor
+snapshots through the additive forward migration; historical gaps are not
+backfilled. Inquiry forms show their recorded handler. Signed previews carry
+separate business, proposing agency and serving agency identities.
+
+[StEntry](../../src/components/ui/strelva/Kit.tsx) accepts its original `ReactNode`
+brand or an additive `OwnerBrand` with verified name/logo and caller-supplied
+neutral identity. Public invitation presentation resolves the serving agency
+only after opaque-token inspection. Signed inquiry booking choices resolve the
+business from the recorded offer scope; lookup failure does not use an agency
+or platform name. Brand lookup failure holds agency-authored email sends.
+
+[Operator destinations](../../src/experience/operator/destinations.ts) own route
+labels for rails, mobile navigation, palette and page states. **Sites** are
+support records; **Billing groups** and **Accounts** keep their distinct meaning.
+Strelva Agency entries open ordinary agency client scope. Mobile navigation uses
+a disclosure with focus recovery and scroll visibility. The legacy agency
+payment-link exception is documented by that entry; it establishes no new
+subscription terms. Palette shortcuts into `/admin?ask=…` do not prove a
+conversation exists when Queue owns the enabled admin route.
+
+These are local code contracts. Lane fixtures and unit tests establish their
+bounded claims; ordinary-member authenticated navigation, hosted delivery,
+actual sent email and production rollout remain separate qualifications. The
+combined SQL rehearsal currently stops at the inherited legacy Google authority
+migration and does not establish full release readiness.

@@ -97,6 +97,7 @@ export async function writeMessageReceipt(input: {
           ...(input.providerResult.verificationEvidence ?? []),
         ],
         messageBody: input.metadata.messageBody,
+        messageDisclosure: input.metadata.messageDisclosure,
         idempotencyKey,
       });
       updatedState = engine.snapshot();

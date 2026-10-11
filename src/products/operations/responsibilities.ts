@@ -186,7 +186,7 @@ async function assertStandingScopeWorkspace(
   await Promise.all(policy.scope.steps.map(async (step) => {
     const target = await readWorkspaceInvestigation(actor, step.workId);
     if (target.workspaceId !== workspaceId) {
-      throw new WorkspaceConflictError("An ongoing check must use a saved investigation from the same workspace.");
+      throw new WorkspaceConflictError("An ongoing check must use a saved check from the same workspace.");
     }
   }));
 }
@@ -238,7 +238,7 @@ async function resolveStandingSteps(
     }
     const target = await readWorkspaceInvestigation(actor, step.workId);
     if (target.workspaceId !== policy.workspaceId) {
-      throw new WorkspaceConflictError("An ongoing check must use a saved investigation from the same workspace.");
+      throw new WorkspaceConflictError("An ongoing check must use a saved check from the same workspace.");
     }
     return {
       ...step,

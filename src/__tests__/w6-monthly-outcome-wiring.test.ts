@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ tenants: vi.fn(), recap: vi.fn(), send: vi.fn(), outcomes: vi.fn(), delivery: vi.fn(), html: vi.fn() }));
+const mocks = vi.hoisted(() => ({ tenants: vi.fn(), recap: vi.fn(), send: vi.fn(), outcomes: vi.fn(), delivery: vi.fn(), brand: vi.fn() }));
 vi.mock("@/products/websites/index", () => ({ runWebsiteMonthlyReports: async () => ({ tenants: [], sent: 0, suppressed: 0, errors: [] }) }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: async () => {} }));
 vi.mock("@/lib/storage/mail-log", () => ({ recordMailSend: async () => {} }));
@@ -11,7 +11,7 @@ vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async () => "owner@e
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: () => null }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/platform/infra/email/send", () => ({ sendEmail: mocks.send }));
-vi.mock("@/platform/infra/email/layout", () => ({ renderEmailHtml: mocks.html, renderEmailText: () => "fixture text" }));
+vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mocks.brand }));
 vi.mock("@/platform/business-outcomes/reports", () => ({ readBusinessOutcomeReports: mocks.outcomes, deliverBusinessOutcomeReport: mocks.delivery }));
 import { GET } from "@/app/api/cron/monthly-report/route";
 const report = { workspaceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", primaryTenantId: "a", tenantIds: ["a", "b"], line: { text: "9 inquiries. 3 bookings, 2 of them from a website inquiry.", figures: [] } };
@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("RESEND_API_KEY", "local-provider-double");
   mocks.tenants.mockResolvedValue([{ id: "a", siteName: "Fixture A", active: true }, { id: "b", siteName: "Fixture B", active: true }]);
   mocks.recap.mockResolvedValue({ weekStart: "2026-09-01", summary: "Existing monthly recap.", stats: { pageViews: 412, pageViewsDelta: 0 } });
-  mocks.send.mockResolvedValue(true); mocks.outcomes.mockResolvedValue([]); mocks.html.mockReturnValue("fixture html");
+  mocks.send.mockResolvedValue(true); mocks.outcomes.mockResolvedValue([]); mocks.brand.mockResolvedValue({ agencyId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: "agency@example.test", credit: "runs_on_strelva" });
   mocks.delivery.mockImplementation(async (_report, _month, send: () => Promise<{ status: string }>) => send());
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -27,13 +27,14 @@ describe("monthly report outcome integration", () => {
   it("retains both original tenant reports with unchanged paragraphs when outcomes are off", async () => {
     const response = await GET(new Request("https://fixture.example.test/api/cron/monthly-report"));
     expect((await response.json()).sent).toBe(2); expect(mocks.delivery).not.toHaveBeenCalled();
-    expect(mocks.html.mock.calls.every(call => JSON.stringify(call[0].paragraphs) === JSON.stringify(["Existing monthly recap."]))).toBe(true);
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    for (const [input] of mocks.send.mock.calls) expect(input.options.paragraphs).toEqual(["Existing monthly recap."]);
   });
   it("sends one grouped business report through the existing transport and durable receipt", async () => {
     mocks.outcomes.mockResolvedValue([report]);
     const response = await GET(new Request("https://fixture.example.test/api/cron/monthly-report"));
     expect((await response.json()).sent).toBe(1); expect(mocks.recap).toHaveBeenCalledWith("a"); expect(mocks.send).toHaveBeenCalledOnce();
-    expect(mocks.html).toHaveBeenCalledWith(expect.objectContaining({ paragraphs: ["Existing monthly recap.", `Across your business: ${report.line.text}`] }));
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ brand: expect.objectContaining({ name: "North Studio" }), paragraphs: ["Existing monthly recap.", `Across your business: ${report.line.text}`] }) }));
     expect(mocks.delivery).toHaveBeenCalledWith(report, expect.stringMatching(/^\d{4}-\d{2}$/), expect.any(Function));
   });
   it("does not contact the provider when the grouped report receipt refuses duplicate delivery", async () => {

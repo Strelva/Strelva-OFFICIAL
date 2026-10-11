@@ -47,7 +47,7 @@ export function screenWordProblems(source, filename) {
   const tree = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, filename.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const problems = [], literalRanges = [], allowances = [];
   function collect(node) {
-    if (ts.isStringLiteral(node) || ts.isJsxText(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) literalRanges.push([node.pos, node.end]);
+    if (ts.isStringLiteral(node) || ts.isJsxText(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) literalRanges.push([node.getStart(tree), node.end]);
     ts.forEachChild(node, collect);
   }
   collect(tree);

@@ -16,6 +16,7 @@ import type {
   InquiryRecord,
   ResponsibilityAction,
   ResponsibilityEvaluation,
+  ResponsibilityMessageDisclosure,
 } from "./contracts";
 import type {
   CompareAndSwapResult,
@@ -53,13 +54,14 @@ export function evaluateInquiryResponsibility(
   action: ResponsibilityAction,
   messageBody: string,
   at: string,
+  messageDisclosure?: ResponsibilityMessageDisclosure,
 ): ResponsibilityEvaluation | null {
   try {
     const state = stateForReceive(snapshot);
     const policy = currentResponsibility(state.responsibilities, capabilityId);
     if (!policy) return null;
     const engine = new InquiryEngine({ businessId: snapshot.businessId, state, now: () => at });
-    return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody });
+    return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody, messageDisclosure });
   } catch {
     return null;
   }

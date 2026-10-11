@@ -47,9 +47,25 @@ describe("inquiry to requested booking", () => {
     const offer = await prepareInquiryBookingOffer({ tenantId: "site", inquiryId: leadId }, d);
     expect(offer?.slots[0]?.label).toContain("9:00 AM");
     expect(d.rpc).toHaveBeenCalledTimes(1);
-    d.rpc = vi.fn(async () => ({ tenantId: "site", context, offer: saved, booking: null }));
+    d.rpc = vi.fn(async (name) => name === "read_booking_business_details" ? { name: "The Mooney Firm" } : { tenantId: "site", workspaceId: id, context, offer: saved, booking: null });
     expect((await loadInquiryBookingChoice(signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret"), d))?.offer.chooseUrl).toEqual(offer?.chooseUrl);
-    expect(d.rpc).toHaveBeenCalledExactlyOnceWith("read_inquiry_booking_offer", { p_offer_id: id });
+    expect(d.rpc).toHaveBeenCalledWith("read_inquiry_booking_offer", { p_offer_id: id });
+    expect(d.rpc).toHaveBeenLastCalledWith("read_booking_business_details", { p_tenant_id: "site" });
+    expect(d.rpc).toHaveBeenCalledTimes(2);
+  });
+  it("reads public business identity from the signed offer scope and fails closed when it is missing", async () => {
+    const token = signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret");
+    const d = deps();
+    d.workspaceReleased = vi.fn(async () => true);
+    d.rpc = vi.fn(async (name) => name === "read_booking_business_details" ? { name: "The Mooney Firm" } : { tenantId: null, workspaceId: id, offer: saved, booking: null });
+    expect((await loadInquiryBookingChoice(token, d))?.businessName).toBe("The Mooney Firm");
+    expect(d.rpc).toHaveBeenLastCalledWith("read_booking_business_details", { p_tenant_id: `workspace:${id}` });
+    d.rpc = vi.fn(async (name) => name === "read_booking_business_details" ? null : { tenantId: null, workspaceId: id, offer: saved, booking: null });
+    await expect(loadInquiryBookingChoice(token, d)).rejects.toThrow("business identity could not be verified");
+    d.rpc = vi.fn(async () => ({ tenantId: null, workspaceId: id, offer: saved, booking: null }));
+    d.workspaceReleased = async () => false;
+    expect(await loadInquiryBookingChoice(token, d)).toBeNull();
+    expect(d.rpc).toHaveBeenCalledTimes(1);
   });
   it("rechecks selected time before request and returns existing request without resetting status", async () => {
     vi.useFakeTimers(); vi.setSystemTime(now);

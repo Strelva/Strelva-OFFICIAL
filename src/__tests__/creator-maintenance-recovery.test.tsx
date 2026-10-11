@@ -106,9 +106,9 @@ describe("creator maintenance command and recovery", () => {
  it("accepts an exact offset-equivalent receipt and clears its notice when terms are deliberately edited", async () => {
   const transport = vi.fn<typeof fetch>().mockImplementation(async () => { const body = JSON.parse(String(transport.mock.calls[0]![1]!.body)); return success(transport, { effective_from: String(body.effectiveFrom).replace(".000Z", "+00:00") }); });
   vi.stubGlobal("fetch", transport); const node = await mount(); await prepare(node); await submit(node);
-  expect(node.textContent).toContain("No payment or provider change was made"); expect(mocks.refresh).toHaveBeenCalledTimes(1);
+  expect(node.textContent).toContain("No payment or agency change was made"); expect(mocks.refresh).toHaveBeenCalledTimes(1);
   await date(node, "2099-01-02T10:00");
-  expect(node.textContent).not.toContain("No payment or provider change was made");
+  expect(node.textContent).not.toContain("No payment or agency change was made");
  });
  it("recovers repeated local validation without dispatch or overriding outside focus", async () => {
   const transport = vi.fn<typeof fetch>(); vi.stubGlobal("fetch", transport); const node = await mount();

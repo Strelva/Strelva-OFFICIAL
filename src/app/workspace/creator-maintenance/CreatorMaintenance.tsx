@@ -97,7 +97,7 @@ export default function CreatorMaintenance({ graph }: { graph: CreatorMaintenanc
       if (!parsed.success || parsed.data.listing_id !== command.listingId || parsed.data.maintainer_state !== command.state || parsed.data.agreement_version !== (command.agreementVersion ?? null) || parsed.data.rate_reference !== (command.rateReference ?? null) || Date.parse(parsed.data.effective_from) !== Date.parse(command.effectiveFrom)) {
         blocked.current = true; setUnconfirmed(true); setError(unknownMessage); return;
       }
-      setReceipt(`Maintenance terms recorded for ${parsed.data.effective_from}. No payment or provider change was made.`);
+      setReceipt(`Maintenance terms recorded for ${parsed.data.effective_from}. No payment or agency change was made.`);
       submittedGraph.current = null;
       router.refresh();
     } catch {

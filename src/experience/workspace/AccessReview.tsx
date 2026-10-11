@@ -11,7 +11,7 @@ export function AccessReviewView({ review, pending, notice, onRevoke }: { review
     {review.units.map(unit => <StSection key={unit.workspaceId} title={unit.name}>
       <p className="text-sm text-gray-muted">Your role: {unit.role}. Owners are protected. {unit.role === "member" ? "Only an owner or administrator can revoke access." : "Revocations are recorded in audit."}</p>
       {unit.entries.length ? <StTable label={`${unit.name} access`} rows={unit.entries} rowKey={entry => `${entry.kind}:${entry.id}`} columns={[
-        { key: "person", label: "Person or connection", render: entry => <>{entry.label}{entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <div><StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`}>Review provider change notice</StTextButton></div> : null}</> },
+        { key: "person", label: "Person or connection", render: entry => <>{entry.label}{entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <div><StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`}>Review agency change notice</StTextButton></div> : null}</> },
         { key: "access", label: "Access", render: entry => kindLabel[entry.kind] },
         { key: "status", label: "State", render: entry => entry.status },
         { key: "last", label: "Last use", render: entry => entry.lastUsedAt ? <StMono as="time" dateTime={entry.lastUsedAt}>{new Date(entry.lastUsedAt).toLocaleString()}</StMono> : "Not recorded" },
@@ -61,7 +61,7 @@ function AccessReviewLoader({ scope, onScopeChange }: { scope: AccessReviewScope
     finally { if (alive.current) setPending(null); }
   }
   return <main data-workspace-theme="linen" className="min-h-dvh bg-canvas text-warm-black" style={{ fontFamily: "var(--font-workspace, system-ui)" }}><StPage width="wide">
-    <StHead crumb={{ label: "Workspace", href: `/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access` }} title="People and access review" meta="Review who can see or change each business. Removing access is recorded in audit." />
+    <StHead crumb={{ label: "Workspace", href: `/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access` }} title="People & access review" meta="Review who can see or change each business. Removing access is recorded in audit." />
     <StSegmented label="Review scope" value={scope.organization ? "organization" : "business"} options={[{ value: "business", label: "This business" }, ...(review?.units.find(unit => unit.workspaceId === scope.workspaceId)?.role !== "member" ? [{ value: "organization", label: "Organization and mapped businesses" }] : [])]} onChange={value => onScopeChange(value === "organization")} disabledValues={pending ? ["business", "organization"] : []} disabledReason="Wait for the current access change to finish." />
     {error ? <div className="grid gap-3"><StNotice tone="critical">{error}</StNotice><StTextButton onClick={() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : "Access review is unavailable.")); }}>Retry</StTextButton></div> : null}
     {review ? <AccessReviewView review={review} pending={pending} notice={notice} onRevoke={input => void revoke(input)} /> : !error ? <StSection title="Access records"><StSkeleton label="Loading access review" /><StSkeleton width="65%" /></StSection> : null}

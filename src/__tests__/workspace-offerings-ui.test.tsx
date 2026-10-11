@@ -117,7 +117,7 @@ describe("workspace offering experience", () => {
       onCommand: async () => null,
       onWebsiteCommand: async () => null,
     }));
-    expect(html).toContain("Useful outcomes for this workspace.");
+    expect(html).toContain("Ready-made systems");
     expect(html).toContain("Documents");
     expect(html).toContain("This work-share does not include business-wide offering access.");
   });
@@ -178,7 +178,7 @@ describe("workspace offering experience", () => {
       onCommand: async () => null,
       onWebsiteCommand: async () => null,
     }));
-    expect(html).toContain("Useful outcomes for this business.");
+    expect(html).toContain("Ready-made systems");
     expect(html).toContain("Applications");
     expect(html).toContain("Staff request application");
     expect(html).toContain("Start setup");
@@ -219,7 +219,7 @@ describe("workspace offering experience", () => {
     const html = renderDirectory(state, installationId);
     expect(html).toContain("Open Staff requests");
     expect(html).not.toContain(`<span>${applicationId}</span>`);
-    expect(html).toContain("I published the connected application through its review.");
+    expect(html).toContain("I published the connected internal tool through its review.");
     expect(html).toContain("disabled=\"\"");
     expect([...boundOfferingResourceIds(state)]).toEqual([applicationId]);
     const unavailable = renderDirectory(state, installationId, []);
@@ -314,9 +314,9 @@ describe("workspace offering experience", () => {
     };
     const state: WorkspaceOfferingState = { status: "ready", collection: installed, saving: false };
     expect([...boundManagedWebsiteIds(state)]).toEqual(["bound-site"]);
-    // Home's summary keeps the pre-Systems words until STRELVA_SYSTEMS_RELEASE is on.
+    // Both release states use the shared customer names.
     const html = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined }));
-    expect(html).toContain("Business offerings");
+    expect(html).toContain("Ready-made systems");
     expect(html).toContain("managed website");
     const released = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined, systemsReleased: true }));
     expect(released).toContain("Ready-made systems");
@@ -379,6 +379,6 @@ describe("workspace offering experience", () => {
     expect(renderSummary({ ...baseDelivery, status: "accepted", customerDecision: "confirmed" })).toContain("Your decision: confirmed");
     expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Agency delivery revoked");
     expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Your decision: changes requested");
-    expect(renderSummary(baseDelivery, "error")).toContain("Acceptance cannot be inferred from the offering record.");
+    expect(renderSummary(baseDelivery, "error")).toContain("Setup does not mean the agency has accepted the work.");
   });
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticatedCronRequest } from "@/__tests__/support/cron";
 import { verifyApproveToken } from "@/lib/approve-link";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import type { TenantConfig } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({
@@ -32,7 +33,10 @@ const mocks = vi.hoisted(() => ({
   scan: vi.fn(),
   summaries: vi.fn(),
   healthEmail: vi.fn(),
+  tenantBrand: vi.fn(),
 }));
+
+vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mocks.tenantBrand }));
 
 vi.mock("@/lib/workspace-ports", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/workspace-ports")>(),
@@ -87,6 +91,8 @@ const tenant: TenantConfig = {
   adminDomain: "admin.example.test", resendDomain: "updates.example.test",
 };
 const legacyUrl = (path: string) => `https://admin.example.test${path}`;
+const agencyBrand = { agencyId: "22222222-2222-4222-8222-222222222222", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: "agency@example.test", credit: "runs_on_strelva" as const };
+const agencyRecapsUrl = `${CONTROL_PLANE_URL}/client/${tenant.id}/dashboard/reports`;
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -102,6 +108,7 @@ beforeEach(() => {
   mocks.workspacePorts.mockReturnValue({ businessRecord: async () => ({ ownerNoticeWorkspaceUrl: mocks.workspaceUrl }) });
   mocks.workspaceUrl.mockResolvedValue("https://app.strelva.test/workspace");
   mocks.tenants.mockResolvedValue([tenant]);
+  mocks.tenantBrand.mockResolvedValue(agencyBrand);
   mocks.recipient.mockResolvedValue(tenant.ownerEmail);
   mocks.generateReports.mockResolvedValue({ reports: [{
     tenant, summary: "47 people found you.\n\nYour site is steady.", analyticsRows: [],
@@ -160,7 +167,7 @@ for (const flag of [undefined, "0"]) {
   describe(`owner-entry crons with flag ${flag ?? "unset"}`, () => {
     beforeEach(() => vi.stubEnv("STRELVA_OWNER_ENTRY", flag));
 
-    it("weekly-report retains the report send, response, cadence and dashboard email URLs", async () => {
+    it("weekly-report retains recap delivery and cadence with the agency-hosted owner entrance", async () => {
       const { GET } = await import("@/app/api/cron/weekly-report/route");
       const response = await GET(authenticatedCronRequest());
       expect(await response.json()).toEqual({
@@ -168,9 +175,8 @@ for (const flag of [undefined, "0"]) {
       });
       expect(mocks.sendEmail).toHaveBeenCalledOnce();
       expect(mocks.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-        audience: "client", tenantId: tenant.id, to: tenant.ownerEmail, fromAddress: "report@updates.example.test",
-        html: expect.stringContaining(`href="${legacyUrl("/dashboard/reports")}"`),
-        text: expect.stringContaining(legacyUrl("/dashboard/reports")),
+        audience: "client", tenantId: tenant.id, to: tenant.ownerEmail, fromAddress: "report@updates.strelva.com",
+        options: expect.objectContaining({ brand: agencyBrand, button: { label: "Open Recaps", url: agencyRecapsUrl } }),
       }));
       expect(mocks.weeklyBrief).toHaveBeenCalledWith(tenant.id);
       expect(mocks.markSent).toHaveBeenCalledWith(tenant.id);
@@ -178,7 +184,7 @@ for (const flag of [undefined, "0"]) {
       expectNoOwnerEntryLookup();
     });
 
-    it("monthly-report retains recap generation, dedup and dashboard email URLs", async () => {
+    it("monthly-report retains recap generation and dedup with the agency-hosted owner entrance", async () => {
       const { GET } = await import("@/app/api/cron/monthly-report/route");
       const body = await (await GET(authenticatedCronRequest())).json();
       const now = new Date();
@@ -188,9 +194,8 @@ for (const flag of [undefined, "0"]) {
       expect(mocks.monthlyRecap).toHaveBeenCalledWith(tenant.id);
       expect(mocks.recipient).toHaveBeenCalledWith(tenant);
       expect(mocks.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-        audience: "client", tenantId: tenant.id, to: tenant.ownerEmail, fromAddress: "report@updates.example.test",
-        html: expect.stringContaining(`href="${legacyUrl("/dashboard/reports")}"`),
-        text: expect.stringContaining(legacyUrl("/dashboard/reports")),
+        audience: "client", tenantId: tenant.id, to: tenant.ownerEmail, fromAddress: "report@updates.strelva.com",
+        options: expect.objectContaining({ brand: agencyBrand, button: { label: "Open Recaps", url: agencyRecapsUrl } }),
       }));
       expect(mocks.redisSet).toHaveBeenCalledWith(`reb:monthly-recap-sent:${tenant.id}:${month}`, "1", { ex: 3888000 });
       expect(mocks.heartbeat).toHaveBeenCalledWith("monthly-report", { ok: true });

@@ -289,7 +289,7 @@ it.each([
   const { systems } = readBusinessSystems({ snapshot: state, sites: [] });
   const request = vi.fn(async () => new Response(JSON.stringify(saved), { status: 200 }));
   await mount(createElement(WorkspaceRequestContext.Provider, { value: request as typeof fetch }, createElement(SystemPage, { system: systems[0], systems, workspaceId: work.workspaceId, sources: [work], readOnly: true, useReadOnly: true, canEditApplications: true, versionReadOnly, workspaceStopped, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop })));
-  expect(container.textContent?.includes("Edit proposed app")).toBe(editable);
+  expect(container.textContent?.includes("Edit proposed internal tool")).toBe(editable);
   expect(Boolean(button("Check proposed change"))).toBe(editable);
   expect(button("Publish")).toBeUndefined();
   expect(request.mock.calls.length).toBeGreaterThan(0);

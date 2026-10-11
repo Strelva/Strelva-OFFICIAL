@@ -29,6 +29,34 @@ describe("Running inquiry policy read", () => {
     expect(node.textContent).not.toContain("Juniper"); expect(node.textContent).toContain("Saved checks that can run again");
     expect(request.mock.calls.filter(([input]) => String(input).includes("inquiries/system"))).toHaveLength(1);
   });
+  it("starts with an outcome Request in the exact workspace and keeps saved-check setup secondary", async () => {
+    const request = vi.fn<typeof fetch>(async () => Response.json({ items: [], proof: { cards: [], verdict: "No observed receipts." }, state: { businessId: "one", providerWorkspaceId: null, canSetCadence: false, cadence: "monthly", mandates: [] } }));
+    vi.stubGlobal("fetch", request);
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
+    const props = { workspaceId: "business & one", sources: [], selectedWork: null, selectedStandingId: null, selectedAssignmentId: null,
+      creatingStanding: false, readOnly: false, onCreatingStandingChange: vi.fn(), onOpenStanding: vi.fn(), onSaved: vi.fn() };
+    const draw = async (overrides: Partial<typeof props> & { newWorkBlocked?: boolean } = {}) => act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceOngoing, { ...props, ...overrides }))));
+    await draw();
+    const link = Array.from(node.querySelectorAll("a")).find(item => item.textContent === "Request an ongoing result");
+    expect(link).toBeDefined();
+    const route = new URL(link!.href);
+    expect(route.pathname).toBe("/workspace");
+    expect(route.searchParams.get("workspaceId")).toBe(props.workspaceId);
+    expect(route.searchParams.get("view")).toBe("help");
+    expect(node.textContent).toContain("scope, limits and deadline before the request becomes accepted work");
+    const setup = node.querySelector("details");
+    expect(setup?.open).toBe(false);
+    expect(setup?.querySelector("summary")?.textContent).toBe("Configure a supported saved check");
+    expect(Array.from(node.querySelectorAll("h2")).map(item => item.textContent).indexOf("What should stay true?")).toBeLessThan(Array.from(node.querySelectorAll("h2")).map(item => item.textContent).indexOf("Saved checks that can run again"));
+    expect(request.mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+    expect(props.onSaved).not.toHaveBeenCalled();
+    await draw({ readOnly: true });
+    expect(node.querySelector('a[href*="view=help"]')).toBeNull();
+    await draw({ newWorkBlocked: true });
+    expect(node.querySelector('a[href*="view=help"]')).toBeNull();
+    await draw({ creatingStanding: true });
+    expect(node.querySelector("details")?.open).toBe(true);
+  });
   it("is absent and makes no request when off, then deduplicates the same canonical policy", async () => {
     const request = vi.fn(async () => Response.json({ details: [{ running: [row] }, { running: [row] }] }));
     const { node, draw } = await mount(request, "one", false); expect(node.textContent).toBe(""); expect(request).not.toHaveBeenCalled();

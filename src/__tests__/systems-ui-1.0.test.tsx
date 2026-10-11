@@ -24,6 +24,22 @@ async function render(element: React.ReactNode) {
 }
 
 describe("Systems 1.0 presentation boundaries", () => {
+  it("composes Version account controls and publication history into the System’s common destinations", async () => {
+    const workspaceId = "a0000000-0000-4000-8000-000000000001", systemId = "51000000-0000-4000-8000-000000000003", versionId = "51000000-0000-4000-8000-000000000004";
+    const system: SystemView = { id: systemId, name: "Team intake", detail: "", kind: "app", lifecycle: "draft", health: { state: "unknown", summary: "No checks yet." },
+      surface: { kind: "work", workId: "intake", productId: "unknown" }, connections: [], versions: [], possibilities: [], storedVersionId: versionId,
+      history: [{ id: "earlier-change", at: "2026-10-09T00:00:00Z", sentence: "The intake title changed.", actor: { kind: "platform" } }] };
+    const request = vi.fn<typeof fetch>(async input => String(input).includes("/versions/manage") ? Response.json({ workspaceId, systemId, versionId, rowRevision: 1, canManage: true, workingDefinition: {},
+      releases: [{ number: 1, releasedAt: "2026-10-01" }], overrides: [], bindings: [{ kind: "booking_calendar", connectionId: "calendar" }], bindingChoices: [{ kind: "booking_calendar", connectionId: "calendar", label: "Team calendar" }] }) : Response.json({ error: "Fixture unavailable" }, { status: 503 }));
+    const node = await render(<WorkspaceRequestContext.Provider value={request}><SystemPage system={system} systems={[system]} workspaceId={workspaceId} readOnly={false} sources={[]} systemHref={id => `/systems/${id}`} onHome={() => undefined} onAsk={() => undefined} /></WorkspaceRequestContext.Provider>);
+    const headings = [...node.querySelectorAll("h2")].map(heading => heading.textContent);
+    expect(headings.filter(title => title === "History")).toHaveLength(1); expect(headings.filter(title => title === "Connections")).toHaveLength(1);
+    const connections = node.querySelector(`[id="${systemId}-connections"]`)!.closest("section")!; expect(connections.textContent).toContain("Team calendar"); expect(connections.textContent).toContain("Connect an account");
+    const history = node.querySelector(`[id="${systemId}-history"]`)!.closest("section")!; expect(history.textContent).toContain("Published Oct 1"); expect(history.textContent).toContain("The intake title changed."); expect(history.textContent).toContain("Restore into draft");
+    expect(node.querySelector(`[id="${systemId}-version-draft"]`)!.closest("section")!.textContent).not.toContain("Published Oct 1");
+    expect(request.mock.calls.filter(([url]) => String(url).includes("/versions/manage"))).toHaveLength(1);
+  });
+
   it("keeps the signed visitor preview unable to approve or send a real submission", async () => {
     const request = vi.fn(); vi.stubGlobal("fetch", request);
     const node = await render(createElement(PossibilityTry, { state: { kind: "ready", view: {

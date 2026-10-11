@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicBookingError } from "@/platform/bookings/errors";
-const mocks = vi.hoisted(() => ({ limit: vi.fn(), read: vi.fn(), reserve: vi.fn(), confirm: vi.fn(), change: vi.fn(), cancel: vi.fn(), recover: vi.fn() }));
+const mocks = vi.hoisted(() => ({ limit: vi.fn(), read: vi.fn(), reserve: vi.fn(), confirm: vi.fn(), change: vi.fn(), cancel: vi.fn(), recover: vi.fn(), identity: vi.fn() }));
+vi.mock("@/platform/bookings/public-identity", () => ({ readPublicBookingIdentity: mocks.identity }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: mocks.limit, rateLimitKey: (_r: Request, prefix: string) => prefix + ":fixture-ip" }));
 vi.mock("@/products/scheduling/server", () => ({ PublicBookingError, publicBookingRangeSchema: { safeParse: (data: unknown) => ({ success: true, data }) }, publicBookingVisitorSchema: { safeParse: (data: unknown) => ({ success: true, data }) },
   recoverPublicWebsiteBooking: mocks.recover, createPublicWebsiteBookingService: () => ({ read: mocks.read, reserve: mocks.reserve, confirm: mocks.confirm, change: mocks.change, cancel: mocks.cancel }) }));
@@ -13,7 +14,7 @@ import confirmationPage from "@/app/booking-confirm/[token]/page";
 import { renderToStaticMarkup } from "react-dom/server";
 const params = { params: Promise.resolve({ tenant: "fixture" }) };
 const request = () => new Request("https://app.example.test/api/v1/bookings/fixture/reservations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ capabilityId: "consult", capabilityVersion: 1, slotId: "slot-abcdefgh", visitor: { name: "Dana", email: "dana@example.test" } }) });
-beforeEach(() => { vi.clearAllMocks(); mocks.limit.mockResolvedValue(false); mocks.read.mockResolvedValue({ slots: [] }); });
+beforeEach(() => { vi.clearAllMocks(); mocks.limit.mockResolvedValue(false); mocks.read.mockResolvedValue({ slots: [] }); mocks.identity.mockResolvedValue({ businessName: "Lakeview Yoga", start: "2026-11-08T10:00:00Z", end: "2026-11-08T11:00:00Z", state: "held", bookingStatus: "held" }); });
 describe("public booking route limits", () => {
   it.each([true, new Error("Redis down")])("denies reservation writes on rate limit or limiter error before placement", async result => {
     if (result instanceof Error) mocks.limit.mockRejectedValue(result); else mocks.limit.mockResolvedValue(result);
@@ -40,6 +41,13 @@ describe("public booking route limits", () => {
     const post = (origin: string) => new Request("https://app.example.test/booking-confirm/email-only-token", { method: "POST", headers: { origin } });
     expect((await confirm(post("https://other.example.test"), token)).status).toBe(403); expect(mocks.confirm).not.toHaveBeenCalled();
     mocks.confirm.mockResolvedValue({ status: "confirmed" }); expect((await confirm(post("https://app.example.test"), token)).headers.get("location")).toContain("done=confirmed"); expect(mocks.confirm).toHaveBeenCalledWith("email-only-token");
+  });
+  it("does not offer email confirmation when public business identity cannot be read", async () => {
+    mocks.identity.mockResolvedValue(null);
+    const html = renderToStaticMarkup(await confirmationPage({ params: Promise.resolve({ token: "email-only-token" }), searchParams: Promise.resolve({}) }));
+    expect(html).not.toContain('method="post"');
+    expect(html).toContain("This confirmation could not complete");
+    expect(mocks.confirm).not.toHaveBeenCalled();
   });
   it("accepts same-origin no-referrer form posts with Origin null, while refusing opaque cross-site origins", async () => {
     const params = { params: Promise.resolve({ token: "email-token" }) };

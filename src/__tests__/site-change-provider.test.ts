@@ -9,7 +9,7 @@ describe("site change current agency selection", () => {
     expect(siteChangeProviderFromOptions([seat("sole")])).toEqual({ kind: "agency", agencyWorkspaceId: "sole" });
   });
   it("refuses absent and ambiguous qualified agencies", () => {
-    expect(() => siteChangeProviderFromOptions([])).toThrow("active provider seat");
+    expect(() => siteChangeProviderFromOptions([])).toThrow("active agency access");
     expect(() => siteChangeProviderFromOptions([seat("one"), seat("two")])).toThrow("Choose one agency");
     expect(() => siteChangeProviderFromOptions([seat("one", true), seat("two", true)])).toThrow("Choose one agency");
   });

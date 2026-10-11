@@ -124,7 +124,7 @@ describe("business agency summary", () => {
     expect(pending).toHaveLength(1);
     await act(async () => pending[0]!.resolve(response({ error: { message: "Agency list unavailable" } }, 503)));
     expect(container.textContent).toContain("Agency delivery status is unavailable");
-    expect(container.textContent).toContain("Acceptance cannot be inferred from the offering record.");
+    expect(container.textContent).toContain("Setup does not mean the agency has accepted the work.");
     expect(container.textContent).not.toContain("Agency accepted");
   });
 

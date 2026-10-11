@@ -2,7 +2,7 @@
 
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 
-import { StHead, StNotice, StPage, StSection } from "@/components/ui/strelva/Kit";
+import { StHead, StNotice, StPage, StPillLink, StSection } from "@/components/ui/strelva/Kit";
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
 import { InquiryRunning } from "./InquiryRunning";
@@ -51,9 +51,13 @@ export function WorkspaceOngoing({
     />
     {readOnly ? <StNotice>Shared with you. You can read the running work and its results.</StNotice> : null}
     {!finiteJobOpen && monthlyRecap ? <StNotice>Monthly recap records appear in {STRELVA_HANDLED_LABEL}, including recorded sends, holds and failures.</StNotice> : null}
+    {finiteJobOpen ? null : <StSection title="What should stay true?"
+      meta="Describe the result you want kept true. Your agency agrees the scope, limits and deadline before the request becomes accepted work."
+      action={!readOnly && !newWorkBlocked ? <StPillLink href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Request an ongoing result</StPillLink> : undefined}
+    >{null}</StSection>}
     {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
-    {finiteJobOpen ? null : <StandingResponsibilityPicker
+    {finiteJobOpen ? null : <details open={creatingStanding || Boolean(selectedStandingId)}><summary className="cursor-pointer">Configure a supported saved check</summary><StandingResponsibilityPicker
       workspaceId={workspaceId}
       sources={sources}
       selectedId={selectedStandingId || undefined}
@@ -62,7 +66,7 @@ export function WorkspaceOngoing({
       onCreatingChange={onCreatingStandingChange}
       onOpen={onOpenStanding}
       onCreated={onOpenStanding}
-    />}
+    /></details>}
 
     {finiteJobOpen ? null : <StSection title="What the last seven days show"><ResponsibilityProof key={`proof:${workspaceId}`} workspaceId={workspaceId} readOnly={readOnly || newWorkBlocked} /></StSection>}
 

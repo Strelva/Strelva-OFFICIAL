@@ -283,15 +283,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const inviteEmail = readFileSync(path.join(process.cwd(), "src/lib/invite-email.ts"), "utf8");
 
     expect(invite).toContain("createInvite(email");
-    expect(invite).toContain("buildInviteEmailHtml");
-    expect(invite).toContain("buildInviteEmailText");
+    expect(invite).toContain("inviteEmailOptions");
     expect(invite).toContain("sanitizeEmailSubjectText");
-    expect(invite).toContain("text: buildInviteEmailText");
+    expect(invite).toContain("options: inviteEmailOptions");
     expect(invite).toContain("getInviteSignUpUrl");
     expect(invite).toContain("url.searchParams.set(\"email\", email)");
     expect(invite).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
-    expect(invite).toContain("buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })");
-    expect(invite).toContain("buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })");
+    expect(invite).toContain("inviteEmailOptions({ email, siteName: tenantConfig.siteName, signUpUrl })");
     // escapeHtml stays exported (weekly-report cron imports it); the two invite
     // builders now render through the shared email design system, which
     // auto-escapes the content they pass in. Dynamic values are still sanitized
@@ -303,7 +301,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteEmail).toContain("sanitizeEmailSubjectText(params.siteName)");
     expect(inviteEmail).toContain("replace(/<[^>]*>/g");
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
-    expect(inviteEmail).toContain('heading: "Your dashboard is ready"');
+    expect(inviteEmail).toContain('heading: "Your workspace is ready"');
     expect(inviteEmail).toContain('label: "Set up your login"');
     // The operator can invite the owner from the client detail page's editor.
     expect(tenantEditor).toContain("resendOwnerInvite");

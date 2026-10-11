@@ -8,7 +8,7 @@ const forward='20261022173000_neutral_creator_version_money.sql',inverse=`rollba
 const inventory=JSON.parse(read('scripts/sql/historical-forward-inventory.json'));
 const ports=[...read(`supabase/migrations/${forward}`).matchAll(/create function public\.([a-z_]+)\(/g)].map(item=>item[1]!);
 describe('exact additive neutral money composition',()=>{
- it('admits only the exact sorted unique354 historical ledger and covers the registered lifetime-kind tail separately',()=>{
+ it('admits only the exact sorted unique354 historical ledger and covers registered unqualified tails separately',()=>{
   const physical=readdirSync('supabase/migrations').filter(name=>/^\d{14}_.*\.sql$/.test(name)).sort();
   // The native qualification remains bound to its frozen354 source. The
   // separately prepared architecture tail does not extend that qualification.
@@ -18,7 +18,14 @@ describe('exact additive neutral money composition',()=>{
   const item=tail.items[0];expect(item.file).toBe('20261022183000_lifetime_system_kind.sql');expect(item.rollback).toBe(`rollback-${item.file}`);
   for(const [file,pin] of [[item.file,item.sha256],[item.rollback,item.rollbackSha256]])expect(createHash('sha256').update(readFileSync(`supabase/migrations/${file}`)).digest('hex')).toBe(pin);
   expect(inventory.forwardCount).toBe(354);expect(inventory.forwardFiles).toHaveLength(354);expect(new Set(inventory.forwardFiles).size).toBe(354);expect(inventory.forwardFiles.at(-1)).toBe('20261022182000_booking_settings_atomic_patch.sql');
-  expect(physical).toEqual([...inventory.forwardFiles,item.file]);expect(physical).toHaveLength(355);expect(new Set(physical).size).toBe(355);
+  const historical = new Set(inventory.forwardFiles);
+  const registeredTails = manifest.proposed.flatMap((entry:{items:Array<{file:string}>}) => entry.items.map(item => item.file)).filter((name:string) => !historical.has(name));
+  expect(registeredTails).toContain(item.file);
+  expect(physical).toEqual([...inventory.forwardFiles, ...registeredTails].sort());
+  expect(new Set(physical).size).toBe(physical.length);
+  const coherenceTail = manifest.proposed.find((entry:{id:string}) => entry.id === 'coherence-identity-and-client-projections');
+  expect(coherenceTail.status).toContain('held and unqualified');expect(coherenceTail.batch).toBeUndefined();
+  expect(coherenceTail.items).toHaveLength(5);
   const versions=inventory.forwardFiles.map((name:string)=>name.slice(0,14));expect(exactForwardLedger(inventory,versions)).toEqual(versions);
   expect(()=>exactForwardLedger(inventory,physical.map(name=>name.slice(0,14)))).toThrow();
   expect(()=>exactForwardLedger(inventory,versions.slice(0,-1))).toThrow();expect(()=>exactForwardLedger(inventory,inventory.forwardFiles.filter((name:string)=>!name.startsWith('20261021140200_')&&!name.startsWith('20261022175100_')).map((name:string)=>name.slice(0,14)))).toThrow();expect(()=>exactForwardLedger(inventory,[...versions.slice(0,-1),'20990000000000'])).toThrow();expect(()=>exactForwardLedger(inventory,[...versions].reverse())).toThrow();

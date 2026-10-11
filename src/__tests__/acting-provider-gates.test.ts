@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const send = vi.hoisted(() => vi.fn());
+const branding = vi.hoisted(() => ({
+  resolveOwnerBrand: vi.fn(), resolveTenantBrand: vi.fn(), resolveAgencyEmailIdentity: vi.fn(),
+  brand: { agencyId: "22222222-2222-4222-8222-222222222222", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: "staff@agency.example.test", credit: "runs_on_strelva" as const },
+}));
+vi.mock("@/platform/agency-brand/server", () => branding);
 vi.mock("resend", () => ({
   Resend: class {
     emails = { send };
@@ -36,6 +41,9 @@ beforeEach(() => {
   vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("RESEND_DOMAIN", "");
+  branding.resolveOwnerBrand.mockResolvedValue(branding.brand);
+  branding.resolveTenantBrand.mockResolvedValue(branding.brand);
+  branding.resolveAgencyEmailIdentity.mockResolvedValue({ name: branding.brand.name, replyTo: branding.brand.replyTo });
   send.mockResolvedValue({ data: { id: "mail_1" }, error: null });
 });
 
@@ -45,7 +53,7 @@ afterEach(() => {
 });
 
 const mail = (over: Partial<SendEmailInput> = {}): SendEmailInput => ({
-  audience: "client", to: "owner@example.test", subject: "Hello", html: "<p>Hi</p>", text: "Hi", ...over,
+  audience: "client", authorship: "agency", brand: branding.brand, to: "owner@example.test", subject: "Hello", html: "<p>Hi</p>", text: "Hi", ...over,
 } as SendEmailInput);
 
 describe("the acting-agency refusal words", () => {
@@ -81,17 +89,17 @@ describe("assertActingAgency", () => {
 });
 
 describe("email sent for a business by its agency", () => {
-  it("leaves sends without an agency unchanged", async () => {
+  it("leaves explicit platform sends without an agency unchanged", async () => {
     const db = gateDb(false);
     setAgencyGateDb(db);
-    expect((await sendEmailWithReceipt(mail())).status).toBe("accepted");
+    expect((await sendEmailWithReceipt(mail({ authorship: "platform", brand: undefined }))).status).toBe("accepted");
     expect(db.calls).toHaveLength(0);
   });
 
   it("needs the agency's gate for the actual sending domain", async () => {
     const db = gateDb(true);
     setAgencyGateDb(db);
-    const result = await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business, agencyWorkspaceId: agency }, fromAddress: "report@Mail.Strelva.com" }));
+    const result = await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business, agencyWorkspaceId: agency }, fromAddress: "report@mail.strelva.com" }));
     expect(result.status).toBe("accepted");
     expect(db.calls).toEqual(Array(2).fill({ p_workspace_id: business, p_agency_workspace_id: agency, p_sender: "mail.strelva.com" }));
     await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }));
@@ -111,6 +119,15 @@ describe("email sent for a business by its agency", () => {
       setAgencyGateDb(gateDb(answer));
       expect(await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }))).toEqual({ status: "suppressed", reason: "email_suppressed_or_unconfigured" });
     }
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("holds an agency-authored send when current agency identity cannot be verified", async () => {
+    const db = gateDb(true);
+    setAgencyGateDb(db);
+    branding.resolveAgencyEmailIdentity.mockResolvedValue(null);
+    expect(await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business, agencyWorkspaceId: agency } }))).toEqual({ status: "suppressed", reason: "agency_identity_unavailable" });
+    expect(db.calls).toHaveLength(0);
     expect(send).not.toHaveBeenCalled();
   });
 

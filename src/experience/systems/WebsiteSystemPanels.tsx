@@ -2,7 +2,7 @@
 
 import { actorLabel } from "@/platform/presentation/actor";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import type { WebsiteHistoryItem, WebsiteRequestItem, WebsiteSystemDetail, WebsiteWaitingItem } from "./website-detail";
@@ -185,18 +185,19 @@ function WebsiteHistoryRow({ item, workspaceId, systemId, canRestore, appBase, o
 }
 
 /** One History, after Connections and Possibilities, with five recent rows. */
-export function WebsiteHistoryPanel({ workspaceId, systemId, state, systemHistory = [], canRestore, appBase = "", onPrepared, onAskRestore }: {
+export function WebsiteHistoryPanel({ workspaceId, systemId, state, systemHistory = [], canRestore, appBase = "", onPrepared, onAskRestore, children }: {
   workspaceId: string; systemId: string; state: WebsiteDetailState; systemHistory?: SystemHistoryRow[]; canRestore: boolean;
-  appBase?: string; onPrepared?: () => void; onAskRestore?: () => void;
+  appBase?: string; onPrepared?: () => void; onAskRestore?: () => void; children?: ReactNode;
 }) {
   const [showAll, setShowAll] = useState(false);
   if (state.status !== "ready") return null;
   const detail = state.detail;
   const missing = detail.unavailable.filter(name => ["Content history", "Saved copies", "Site revisions", "Site replacements", "Repo deploy history", "System release history"].includes(name));
   const history = mergeWebsiteHistory(detail.history, systemHistory);
-  if (!history.length && !missing.length) return null;
+  if (!history.length && !missing.length && !children) return null;
   return <StSection id={`${systemId}-history`} title="History" meta={<StMono>{history.length}</StMono>}>
     <p className={styles.description}>Every release of this site, newest first. Issued changes are never rewritten; undo is a new release.</p>
+    {children}
     {history.length ? <StRows label="History">{(showAll ? history : history.slice(0, 5)).map(item => <WebsiteHistoryRow key={item.id} item={item} workspaceId={workspaceId} systemId={systemId} canRestore={canRestore} appBase={appBase} onPrepared={onPrepared} onAskRestore={onAskRestore} />)}</StRows> : null}
     {history.length > 5 ? <StTextButton onClick={() => setShowAll(value => !value)}>{showAll ? "Show recent changes" : "Show more history"}</StTextButton> : null}
     <Unavailable names={missing} />

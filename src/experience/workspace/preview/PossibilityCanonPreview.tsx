@@ -48,14 +48,14 @@ export function PossibilityCanonPreview({ state = "ready", mode = "light", makin
       <MakeRealProgress activation={state === "partly" ? { ...running, partlyLive: true, headline: "Partly live in this fictional example", lines: [...running.lines.slice(0, 2), { label: "Add the booking link on Google", state: "Waiting", detail: "Fictional provider access has not been approved." }, ...running.lines.slice(3)] } : running} />
       <div className={styles.sideNote}><StNotice>This is a local rehearsal. In a real release, Strelva records every outside effect that lands and every step that stops.</StNotice><StSurface label="Confirmation email wording"><strong>Confirmation email wording</strong><p className="mt-3 text-sm text-gray-muted">“The firm has your request for Fri, Oct 16 and will confirm by email.”</p><div className="mt-4"><StPill variant="soft" disabled>Needs a separate review</StPill></div></StSurface></div>
     </div> : <>
-      {permission ? <StNotice>You can compare this Possibility. Only the business owner can make it real.</StNotice> : null}
+      {permission ? <StNotice>You can compare this Possibility. Only the business owner can make real.</StNotice> : null}
       {later ? <StNotice>Kept for later in this preview. Nothing changed.</StNotice> : null}
       <PossibilityComparison title="Attorneys request a session date" livePath="attymooney.com/contact" candidatePath="attymooney.com/sessions"
         staleReason={stale ? "Your hours changed on Oct 8." : undefined} onRefresh={stale ? () => setRefresh(true) : undefined}
         live={<><BrowserLabel path="attymooney.com/contact" /><div className={styles.clientPage}><h2>Schedule a session</h2><p>Call the office or use the form below to find a date.</p><div className={styles.formLine} /><div className={styles.formMessage} /></div></>}
         candidate={<><BrowserLabel path="attymooney.com/sessions" /><CandidatePage /></>}
         scope="Adds 1 page and 1 System. Changes nothing on your other pages."
-        actions={<><StTextButton onClick={() => setLater(true)}>Not now</StTextButton><StPillLink variant="soft" href="/preview/strelva/try?state=sessions">Try it as a visitor</StPillLink><StPill disabled={permission || stale} title={stale ? "Refresh this Possibility first." : permission ? "Only the business owner can make it real." : undefined} onClick={() => setStarted(true)}>Make real</StPill></>} />
+        actions={<><StTextButton onClick={() => setLater(true)}>Not now</StTextButton><StPillLink variant="soft" href="/preview/strelva/try?state=sessions">Try it as a visitor</StPillLink><StPill disabled={permission || stale} title={stale ? "Refresh this Possibility first." : permission ? "Only the business owner can make real." : undefined} onClick={() => setStarted(true)}>Make real</StPill></>} />
     </>}
   </StPage></SystemsCanonShell>;
 }

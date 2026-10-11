@@ -26,6 +26,13 @@ export function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEven
   try {
     if (row.reviewAudience !== "owner" && row.reviewAudience !== "operator") return null;
     const action = reviewAction(row.action);
+    let messageDisclosure: InquiryMessageReviewEventMetadata["messageDisclosure"];
+    if (row.messageDisclosure !== undefined) {
+      if (!row.messageDisclosure || typeof row.messageDisclosure !== "object" || Array.isArray(row.messageDisclosure)) return null;
+      const disclosure = row.messageDisclosure as Record<string, unknown>;
+      if (disclosure.kind !== "business" && disclosure.kind !== "owner_notice") return null;
+      messageDisclosure = { kind: disclosure.kind, name: text(disclosure.name, "Message business", 256) };
+    }
     const metadata: InquiryMessageReviewEventMetadata = {
       kind: INQUIRY_MESSAGE_REVIEW_KIND,
       schemaVersion: INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION,
@@ -44,6 +51,7 @@ export function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEven
       replyTo: row.replyTo === null ? null : text(row.replyTo, "Reply address", 320),
       subject: text(row.subject, "Subject", 500),
       messageBody: text(row.messageBody, "Message body", 10_000, true),
+      ...(messageDisclosure ? { messageDisclosure } : {}),
       messageDigest: text(row.messageDigest, "Message digest", 128),
       preparedAt: text(row.preparedAt, "Prepared time", 80),
       expiresAt: row.expiresAt === null ? null : text(row.expiresAt, "Expiry", 80),

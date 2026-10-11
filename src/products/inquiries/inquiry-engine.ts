@@ -30,6 +30,7 @@ import type {
   ResponsibilityActionInput,
   ResponsibilityActionReceipt,
   ResponsibilityEvaluation,
+  ResponsibilityEvaluationInput,
   ResponsibilityPolicy,
   ResponsibilityCreateInput,
   ResponsibilityUpdateInput,
@@ -679,7 +680,7 @@ export class InquiryEngine {
     return updateResponsibilityOperation(this, responsibilityId, input);
   }
 
-  evaluateResponsibilityAction(responsibilityId: string, action: ResponsibilityAction, input: { at?: string; messageBody?: string } = {}): ResponsibilityEvaluation {
+  evaluateResponsibilityAction(responsibilityId: string, action: ResponsibilityAction, input: ResponsibilityEvaluationInput = {}): ResponsibilityEvaluation {
     return evaluateResponsibilityActionOperation(this, responsibilityId, action, input);
   }
 

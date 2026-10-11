@@ -17,12 +17,12 @@ export function AgencyClientAvailability({ agencyWorkspaceId, workspaceId, reque
     finally { setBusy(false); }
   }
   return <details className="mx-2 mb-4" onToggle={event => { const next = event.currentTarget.open; setOpen(next); if (next) void load(); }}>
-    <summary className="flex min-h-11 cursor-pointer items-center text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Client capability availability</summary>
-    {open ? <section aria-label="Client capability availability" className="grid gap-4 py-4">
+    <summary className="flex min-h-11 cursor-pointer items-center text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Client feature availability</summary>
+    {open ? <section aria-label="Client feature availability" className="grid gap-4 py-4">
       <p className="max-w-prose text-sm text-gray-muted">Choose availability within the platform’s permission for this business. Customer approvals and connected-account permissions still apply.</p>
       {saved ? <p role="status" className="text-sm">Availability saved.</p> : null}
       <Button variant="ghost" size="sm" disabled={busy} onClick={() => void load()}>Refresh permissions</Button>
-      {busy ? <p role="status">Checking current permissions…</p> : error ? <div role="alert"><p>{error}</p><Button variant="secondary" size="sm" onClick={() => void load()}>Retry</Button></div> : currentData ? currentData.flags.length ? currentData.flags.map(flag => <FlagControl key={`${flag.flag}:${flag.revision}:${flag.ceilingRevision}`} flag={flag} agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} changed={value => { setData(value); setSaved(true); }} />) : <p className="text-sm text-gray-muted">The platform has not permitted any capability changes for this business. Each permission must name a capability and System.</p> : null}
+      {busy ? <p role="status">Checking current permissions…</p> : error ? <div role="alert"><p>{error}</p><Button variant="secondary" size="sm" onClick={() => void load()}>Retry</Button></div> : currentData ? currentData.flags.length ? currentData.flags.map(flag => <FlagControl key={`${flag.flag}:${flag.revision}:${flag.ceilingRevision}`} flag={flag} agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} changed={value => { setData(value); setSaved(true); }} />) : <p className="text-sm text-gray-muted">The platform has not permitted any feature changes for this business. Each permission must name a feature and System.</p> : null}
     </section> : null}
   </details>;
 }

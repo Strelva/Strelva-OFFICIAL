@@ -325,7 +325,7 @@ async function delegatedWorkIds(userId: string, workspaceId?: string): Promise<s
     .in("agency_workspace_id", agencyIds).eq("status", "active");
   if (workspaceId) query = query.eq("customer_workspace_id", workspaceId);
   const { data, error } = await query;
-  if (error) workspaceDbFailure(error, "Delegated work is unavailable");
+  if (error) workspaceDbFailure(error, "Request is unavailable");
   return (data ?? []).map((row) => asString((row as DbRow).customer_work_id)).filter(Boolean);
 }
 

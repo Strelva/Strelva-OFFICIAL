@@ -31,7 +31,7 @@ describe("owner paper controls", () => {
     expect(node.textContent).not.toContain("Nothing is in progress.");
     const receipts = [...node.querySelectorAll("button")].find(button => button.textContent === "All receipts")!;
     await act(async () => receipts.click());
-    expect(node.querySelector("#business-start-title")?.textContent).toBe("Strelva handled");
+    expect(node.querySelector("#business-start-title")?.textContent).toBe("What changed");
     const home = [...node.querySelectorAll('nav[aria-label="Phone workspace navigation"] button')].find(button => button.textContent === "Home") as HTMLButtonElement;
     await act(async () => home.click());
     expect(node.querySelector("#business-start-title")?.textContent).toBe("First business");

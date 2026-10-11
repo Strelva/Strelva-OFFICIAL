@@ -6,6 +6,7 @@ import type {
   ResponsibilityBudget,
   ResponsibilityCreateInput,
   ResponsibilityEvaluation,
+  ResponsibilityEvaluationInput,
   ResponsibilityHours,
   ResponsibilityNeverClause,
   ResponsibilityPolicy,
@@ -123,7 +124,7 @@ function insideHours(policy: ResponsibilityPolicy, at: string): boolean {
 const OUTBOUND_ACTIONS = new Set<ResponsibilityAction>(["reply", "ask_question", "send_message"]);
 const ALWAYS_REVIEW_ACTIONS = new Set<ResponsibilityAction>(["publish", "delete", "change_permissions", "charge", "quote_price", "promise_date"]);
 
-export function evaluateResponsibilityAction(host: InquiryEngineHost, responsibilityId: string, action: ResponsibilityAction, input: { at?: string; messageBody?: string } = {}): ResponsibilityEvaluation {
+export function evaluateResponsibilityAction(host: InquiryEngineHost, responsibilityId: string, action: ResponsibilityAction, input: ResponsibilityEvaluationInput = {}): ResponsibilityEvaluation {
   const policy = host._responsibility(responsibilityId);
   const at = time(host, input.at);
   if (policy.status === "paused") return { decision: "block", action, reason: "This responsibility is paused.", clause: "Status: paused", disclosedAs: null };
@@ -134,16 +135,24 @@ export function evaluateResponsibilityAction(host: InquiryEngineHost, responsibi
   const dateKey = timeParts(at, policy.budget.timezone)?.dateKey;
   const used = host._state().responsibilityReceipts.filter((receipt) => receipt.responsibilityId === policy.id && receipt.status === "accepted" && OUTBOUND_ACTIONS.has(receipt.action) && dateKey !== undefined && timeParts(receipt.createdAt, policy.budget.timezone)?.dateKey === dateKey).length;
   if (OUTBOUND_ACTIONS.has(action) && used >= policy.budget.dailyMessages) return { decision: "block", action, reason: `The daily message budget is used. Escalate to ${policy.escalation.primary}.`, clause: `Budget: ${policy.budget.dailyMessages} messages per day`, disclosedAs: null };
-  if (OUTBOUND_ACTIONS.has(action)) {
+  let disclosedAs: ResponsibilityEvaluation["disclosedAs"] = null;
+  if (input.messageDisclosure) {
+    const name = input.messageDisclosure.name.trim().replace(/\s+/g, " ");
+    const body = input.messageBody?.replace(/\s+/g, " ").toLowerCase() || "";
+    const identity = `${input.messageDisclosure.kind === "business" ? "from" : "for"} ${name}`.toLowerCase();
+    if (!name || !/\bautomatic\b/.test(body) || !body.includes(identity)) return { decision: "block", action, reason: "The automatic message must identify its business and say it is automatic.", clause: "Disclosure: automatic message and business identity", disclosedAs: null };
+    disclosedAs = input.messageDisclosure.kind === "business" ? "business" : "automatic_notice";
+  } else if (OUTBOUND_ACTIONS.has(action)) {
     if (!input.messageBody || !/strelva/i.test(input.messageBody)) return { decision: "block", action, reason: "Every customer message must say it is from Strelva.", clause: "Disclosure: messages identify Strelva", disclosedAs: null };
+    disclosedAs = "Strelva";
   }
   const clause = policy.approval.find((item) => item.action === action);
-  if (policy.trust === "supervised") return { decision: "approval_required", action, reason: "This responsibility is supervised, so every action needs approval.", clause: clause?.sentence ?? "Trust: supervised", disclosedAs: OUTBOUND_ACTIONS.has(action) ? "Strelva" : null };
-  if (clause) return { decision: "approval_required", action, reason: clause.sentence, clause: `Approval: ${clause.sentence}`, disclosedAs: OUTBOUND_ACTIONS.has(action) ? "Strelva" : null };
+  if (policy.trust === "supervised") return { decision: "approval_required", action, reason: "This responsibility is supervised, so every action needs approval.", clause: clause?.sentence ?? "Trust: supervised", disclosedAs };
+  if (clause) return { decision: "approval_required", action, reason: clause.sentence, clause: `Approval: ${clause.sentence}`, disclosedAs };
   if (ALWAYS_REVIEW_ACTIONS.has(action)) return { decision: "approval_required", action, reason: "This consequential action needs an explicit approval rule.", clause: "Consequential action", disclosedAs: null };
-  if (OUTBOUND_ACTIONS.has(action) && !policy.preAuthorizedActions.includes(action)) return { decision: "approval_required", action, reason: "Outbound messaging needs a written pre-authorization in this responsibility.", clause: "Pre-authorized actions", disclosedAs: "Strelva" };
-  if (!policy.preAuthorizedActions.includes(action) && policy.trust === "trusted") return { decision: "approval_required", action, reason: "Trusted status does not extend beyond the actions explicitly pre-authorized here.", clause: "Pre-authorized actions", disclosedAs: OUTBOUND_ACTIONS.has(action) ? "Strelva" : null };
-  return { decision: "allow", action, reason: "This action is inside the active responsibility policy.", clause: null, disclosedAs: OUTBOUND_ACTIONS.has(action) ? "Strelva" : null };
+  if (OUTBOUND_ACTIONS.has(action) && !policy.preAuthorizedActions.includes(action)) return { decision: "approval_required", action, reason: "Outbound messaging needs a written pre-authorization in this responsibility.", clause: "Pre-authorized actions", disclosedAs };
+  if (!policy.preAuthorizedActions.includes(action) && policy.trust === "trusted") return { decision: "approval_required", action, reason: "Trusted status does not extend beyond the actions explicitly pre-authorized here.", clause: "Pre-authorized actions", disclosedAs };
+  return { decision: "allow", action, reason: "This action is inside the active responsibility policy.", clause: null, disclosedAs };
 }
 
 export function recordResponsibilityAction(host: InquiryEngineHost, input: ResponsibilityActionInput): ResponsibilityActionReceipt {
@@ -156,7 +165,7 @@ export function recordResponsibilityAction(host: InquiryEngineHost, input: Respo
     const previous = host._state().responsibilityReceipts.find((receipt) => receipt.responsibilityId === policy.id && receipt.idempotencyKey === idempotencyKey);
     if (previous) return clone(previous);
   }
-  const evaluation = evaluateResponsibilityAction(host, policy.id, input.action, { at: now, messageBody: input.messageBody });
+  const evaluation = evaluateResponsibilityAction(host, policy.id, input.action, { at: now, messageBody: input.messageBody, messageDisclosure: input.messageDisclosure });
   const approvedBy = input.approvedBy?.trim() || null;
   if (approvedBy && approvedBy !== policy.sponsorId) throw new Error("Only the responsibility sponsor can authorize this action.");
   const outcomeEvidence = (input.outcomeEvidence ?? []).map((value) => clean(value, "outcome evidence", 1000));

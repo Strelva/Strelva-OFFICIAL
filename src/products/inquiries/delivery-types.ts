@@ -3,6 +3,7 @@
 import type {
   InquiryTimelineEventType,
   ResponsibilityEvaluation,
+  ResponsibilityMessageDisclosure,
   ReceiptActor,
 } from "./contracts";
 import type { EmailOptions } from "@/platform/infra/email/layout";
@@ -116,6 +117,7 @@ export interface InquiryDeliveryMessage {
   fromName?: string;
   subject: string;
   options: EmailOptions;
+  disclosure?: ResponsibilityMessageDisclosure;
   /** Non-sensitive provider metadata used to correlate signed delivery events. */
   tags?: Record<string, string>;
   /** Stable in Strelva, even when the provider does not expose an idempotency API. */

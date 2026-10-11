@@ -1,3 +1,4 @@
+import type { BusinessRequestStage } from "../business-delivery-summary";
 /** Fictional canon examples only. No telemetry, client terms or royalty rates. */
 export const agencyCanonFrames = ["client", "requests", "approval", "minutes", "attribution"] as const;
 export type AgencyCanonFrame = (typeof agencyCanonFrames)[number];
@@ -19,8 +20,8 @@ export const FICTIONAL_AGENCY_CREDIT = [
   { source: "Intake form", usage: "2 of your clients · 5 businesses through other agencies", credit: "North Studio" },
   { source: "Review asks", usage: "1 of your clients", credit: "North Studio, from Strelva’s starter" },
 ];
-export const FICTIONAL_AGENCY_REQUESTS = [
-  { title: "New patient intake", client: "Harbor Dental", stage: "Ready for your review" },
-  { title: "Request from North Coast Realty", client: "North Coast Realty", stage: "Open" },
-  { title: "Request from Fieldwork Studio", client: "Fieldwork Studio", stage: "Open" },
+export const FICTIONAL_AGENCY_REQUESTS: { title: string; client: string; stage: BusinessRequestStage }[] = [
+  { title: "New patient intake", client: "Harbor Dental", stage: "ready_for_review" },
+  { title: "Request from North Coast Realty", client: "North Coast Realty", stage: "asked" },
+  { title: "Request from Fieldwork Studio", client: "Fieldwork Studio", stage: "asked" },
 ];
