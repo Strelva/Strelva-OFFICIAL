@@ -22,7 +22,7 @@ export function ProposeBookingTimes({ workspaceId, tenantId, inquiryId, customer
   const [visible, setVisible] = useState(12);
   const [error, setError] = useState(initial?.error ?? "");
   const busy = phase === "loading" || phase === "sending";
-  const complete = phase === "accepted" || phase === "suppressed" || phase === "unavailable";
+  const complete = phase === "accepted" || phase === "suppressed" || phase === "identity_held" || phase === "unavailable";
   function slotLabel(start: string) {
     return new Intl.DateTimeFormat("en-US", { timeZone: options?.timeZone ?? "UTC", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(start));
   }
@@ -48,7 +48,7 @@ export function ProposeBookingTimes({ workspaceId, tenantId, inquiryId, customer
       const body = await response.json().catch(() => null);
       if (response.status === 401 || response.status === 403) { setPhase("permission"); return; }
       if (!response.ok) throw new Error(body?.error ?? "The suggestions couldn't be prepared. Reload open times before trying again.");
-      if (!["accepted", "suppressed", "unavailable"].includes(body?.delivery)) throw new Error("Email delivery couldn't be confirmed. Check the inquiry before trying again.");
+      if (!["accepted", "suppressed", "identity_held", "unavailable"].includes(body?.delivery)) throw new Error("Email delivery couldn't be confirmed. Check the inquiry before trying again.");
       setPhase(body.delivery);
     } catch (cause) { setPhase("error"); setError(cause instanceof Error ? cause.message : "Email delivery couldn't be confirmed. Check the inquiry before trying again."); }
   }
@@ -60,7 +60,7 @@ export function ProposeBookingTimes({ workspaceId, tenantId, inquiryId, customer
     {phase === "permission" ? <p role="alert" className="mt-3 text-sm text-critical">Sign in as this business&apos;s owner or an admin to propose times.</p> : null}
     {error ? <p role="alert" className="mt-3 text-sm text-critical">{error}</p> : null}
     {complete ? <div className="mt-3 text-sm leading-6" role="status">
-      <p>{phase === "accepted" ? "The email provider accepted these suggestions. Customer delivery is not yet verified." : phase === "suppressed" ? "The suggestions are prepared. Email is disabled, so the customer has not been notified." : "The suggestions are prepared, but email delivery could not be confirmed. Check the inquiry before trying again."}</p>
+      <p>{phase === "accepted" ? "The email provider accepted these suggestions. Customer delivery is not yet verified." : phase === "identity_held" ? "The suggestions are prepared. Email is held because the business identity could not be verified. The customer has not been notified." : phase === "suppressed" ? "The suggestions are prepared. Email is paused or unavailable, so the customer has not been notified." : "The suggestions are prepared, but email delivery could not be confirmed. Check the inquiry before trying again."}</p>
       <ul className="mt-2 text-gray-muted">{selected.map((start) => <li key={start}>{slotLabel(start)}</li>)}</ul>
     </div> : options && phase !== "permission" ? <>
       {options.paused ? <p className="mt-3 text-sm text-gray-muted">Bookings are paused. Existing bookings stay kept; new times cannot be proposed.</p> : options.services.length === 0 ? <p className="mt-3 text-sm text-gray-muted">No request-mode booking service is available. Ask Strelva to set one up.</p> : <>

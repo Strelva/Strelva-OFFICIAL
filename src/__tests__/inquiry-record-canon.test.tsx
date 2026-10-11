@@ -25,12 +25,20 @@ describe("inquiry record on the canon kit", () => {
     expect(html).toContain("Test Person");
     expect(html).toContain("A submitted message");
     expect(html).toContain("What happened");
+    expect(html).toContain("Form at time of submission: revision");
     for (const outcome of ["recorded", "accepted", "failed", "blocked"]) expect(html).toContain(`${outcome} outcome evidence`);
     expect(html).toContain("Recorded owner");
     expect(html).toContain("test-receipt-3");
     expect(html).toContain("source-3");
     expect(html).not.toContain("0:00");
     expect(html).not.toContain("Delivered");
+  });
+
+  it("does not render internal actor IDs when a historical event has no name", () => {
+    const unnamed = { ...event("recorded", 0), actor: { id: "actor-private-uuid", kind: "person" as const } };
+    const html = render({ events: [unnamed] });
+    expect(html).toContain("Actor not recorded");
+    expect(html).not.toContain("actor-private-uuid");
   });
 
   it("keeps record permission checks on both changes and contextual requests", () => {

@@ -45,7 +45,8 @@ export const agencyClientRowSchema = z.object({
   role: z.enum(["owner", "admin", "member", "agency"]).nullable(),
   /** A `workspace_providers` mark names this agency. It grants nothing. */
   provider: z.boolean(),
-  /** The existing authoring grant, checked by the server for this actor. */
+  /** Existing agency owner/admin and client owner/admin authoring eligibility.
+   * A staff assignment alone grants no general Build access. */
   canBuild: z.boolean().optional(),
   status: z.enum(["ready", "unavailable"]),
   systems: z.array(agencyClientSystemSchema).max(500),

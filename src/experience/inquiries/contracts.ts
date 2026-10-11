@@ -88,7 +88,7 @@ export const REQUEST_STATE_LABELS: Record<InquiryRequestState, string> = {
   planned: "Plan ready",
   editing: "Editing the result",
   rehearsing: "Rehearsal running",
-  ready_to_publish: "Ready to make live",
+  ready_to_publish: "Ready to make real",
   publishing: "Making live",
   live_unverified: "Live, verification pending",
   handled: "Handled",
@@ -110,10 +110,10 @@ export function phaseForWork(work: InquiryWork): "problem" | "work" | "result" |
 
 export function phaseLabel(phase: ReturnType<typeof phaseForWork>): string {
   return {
-    problem: "Problem",
-    work: "Work",
-    result: "Result",
+    problem: "Asked",
+    work: "In progress",
+    result: "Ready for review",
     system: "Your system",
-    handled: "Handled",
+    handled: "Done",
   }[phase];
 }

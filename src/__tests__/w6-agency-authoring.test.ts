@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { WorkspaceAccessError } from "@/platform/workspaces";
+import { createSupabaseSystemStore } from "@/platform/systems";
 import { createInMemoryConnectionOwnership, createInMemoryVersionStore, createSystemVersions, VersionStaleError, type VersionActor, type VersionStore } from "@/platform/system-versions";
 const deps = vi.hoisted(() => ({ store: null as VersionStore | null, actor: null as VersionActor | null, list: vi.fn(), create: vi.fn() }));
 vi.mock("@/platform/systems", () => ({ createSupabaseSystemStore: () => ({ createSystem: deps.create }), listBusinessSystems: deps.list }));
@@ -7,7 +9,7 @@ vi.mock("@/platform/system-versions/supabase-store", async () => {
   const actual = await vi.importActual<typeof import("@/platform/system-versions/supabase-store")>("@/platform/system-versions/supabase-store");
   return { ...actual, createSupabaseVersionStore: () => deps.store, createSupabaseConnectionOwnership: () => createInMemoryConnectionOwnership(), readVersionActor: async () => deps.actor };
 });
-import { packageAgencySystem } from "@/experience/workspace/agency/authoring-server";
+import { executeAgencyBuild, packageAgencySystem, requireAgencyAuthoring } from "@/experience/workspace/agency/authoring-server";
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID();
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "authoring-operator@example.test" };
 const versionActor: VersionActor = { ...actor, memberships: [{ businessId: workspaceId, role: "owner" }] };
@@ -64,5 +66,31 @@ describe("agency Package command receipts", () => {
       : { data: { source: { businessId: crypto.randomUUID(), systemId, revisionId: crypto.randomUUID(), number: 2 } }, error: null });
     await expect(packageAgencySystem(actor, input, { rpc })).rejects.toThrow("receipt could not be confirmed");
     expect(deps.list).not.toHaveBeenCalled();
+  });
+});
+
+describe("agency Build authority boundary", () => {
+  it("passes the exact actor, agency and client into the existing authoring gate", async () => {
+    const clientId = crypto.randomUUID();
+    const rpc = vi.fn().mockResolvedValue({ data: true, error: null });
+    await requireAgencyAuthoring(actor, workspaceId, clientId, { rpc });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("require_agency_authoring_scope", {
+      p_agency_workspace_id: workspaceId, p_workspace_id: clientId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+    });
+  });
+  it("rejects an absent authoring permission instead of inferring one from client visibility", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: false, error: null });
+    await expect(requireAgencyAuthoring(actor, workspaceId, crypto.randomUUID(), { rpc })).rejects.toBeInstanceOf(WorkspaceAccessError);
+  });
+  it("denies native execution and System adoption when the authoring gate denies the actor", async () => {
+    const clientId = crypto.randomUUID();
+    const scope = vi.fn().mockRejectedValue(new Error("business_record_access_denied"));
+    const execute = vi.fn();
+    await expect(executeAgencyBuild(actor, workspaceId, {
+      workspaceId: clientId, planWorkId: crypto.randomUUID(), outputId: "draft", expectedPlanRevision: 1, inputs: {}, decisions: {},
+    }, { scope, execute, systems: createSupabaseSystemStore() })).rejects.toThrow("business_record_access_denied");
+    expect(scope).toHaveBeenCalledExactlyOnceWith(actor, workspaceId, clientId);
+    expect(execute).not.toHaveBeenCalled();
+    expect(deps.create).not.toHaveBeenCalled();
   });
 });

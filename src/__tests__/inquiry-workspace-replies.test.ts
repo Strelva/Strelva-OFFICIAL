@@ -24,7 +24,7 @@ describe("owner workspace replies", () => {
     const d = deps({ readback: vi.fn(async () => ({ status: "unavailable" as const, reason: "offline" })) });
     expect(await replyFromWorkspace(actor,input,d)).toMatchObject({ status: "accepted" as const, retryable: false, providerMessageId: "mail-1" });
     expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply_v2",expect.objectContaining({ p_user_id: actor.userId,p_verified_email: actor.verifiedEmail,p_lead_row_id:input.rowId,p_body:input.body,p_is_commitment:true }),expect.any(Function));
-    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "customer",fromAddress:"hello@mail.strelva.com",replyTo:"owner@example.test",idempotencyKey:expect.stringContaining(claim.id) }));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "customer",authorship: "business",businessName: claim.businessName,fromName: claim.businessName,fromAddress:"hello@mail.strelva.com",replyTo:"owner@example.test",idempotencyKey:expect.stringContaining(claim.id) }));
     expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId } }));
     expect(d.rpc).toHaveBeenNthCalledWith(2,"finish_workspace_inquiry_reply",expect.objectContaining({ p_status:"accepted" as const,p_provider_message_id:"mail-1" }));
   });

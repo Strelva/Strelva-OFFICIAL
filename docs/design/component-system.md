@@ -1914,3 +1914,41 @@ bounded claims; ordinary-member authenticated navigation, hosted delivery,
 actual sent email and production rollout remain separate qualifications. The
 combined SQL rehearsal currently stops at the inherited legacy Google authority
 migration and does not establish full release readiness.
+
+
+### October 11 · inquiry review corrections
+
+`InquiryExperience` and its embedded navigation call saved inquiry Requests
+**Recent changes**; request stages use Asked, In progress, Ready for review,
+Your system and Done. The inspector names the authorized business and inquiry
+form, keeping capability/work identifiers underneath. Rehearsal labels use
+Revision, and submitted records say **Form at time of submission**. A record
+does not substitute today's form name for an uncaptured historical name.
+
+Inquiry change receipts resolve actor IDs only against retained, labelled
+action receipts for the same business, Request and form, within the Change
+receipt’s valid recorded time window. Later Changes cannot supply a missing
+historical name. The shared
+`actorPresentation` supplies the visible identity; missing or conflicting
+snapshots say **Actor not recorded**. Timeline/History rows also use the neutral
+fallback instead of actor IDs. No current viewer, membership or email lookup
+backfills historical attribution. The disconnected inquiry canon keeps its
+**Inquiries** title and describes the unavailable Google Calendar Connection.
+
+### October 11 review correction: booking mail and agency Build
+
+[ProposeBookingTimes](../../src/experience/bookings/ProposeBookingTimes.tsx)
+keeps saved suggestions visible when mail is held. Its `identity_held` result
+names unavailable business identity separately from paused/unconfigured email
+and from unknown provider delivery. The preview includes this held state.
+The route reads business identity from the already-authorized booking scope;
+request input cannot choose the sender identity. Business inquiry replies use
+the business name through the shared email transport; platform credit remains
+only the shared **Runs on Strelva** footer.
+
+AgencyOnboarding, AgencyTeamView and AgencyAuthoring name the current Build
+path: agency owner/admin plus current client owner/admin authoring access.
+A staff assignment permits scoped client reads, not arbitrary new-System
+authoring. Exact existing drafts need their separate client authorization.
+No writer or eligibility grant is widened by this presentation correction.
+Local fixtures and unit tests do not qualify hosted authority or email delivery.

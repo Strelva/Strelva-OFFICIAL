@@ -76,11 +76,11 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
   let sent: SendEmailResult;
   try {
     sent = await dependencies.send({
-      audience: "customer", tenantId: claim.tenantId ?? undefined,
+      audience: "customer", authorship: "business", businessName: claim.businessName, tenantId: claim.tenantId ?? undefined,
       to: claim.recipient, subject: claim.subject,
-      fromName: `${claim.businessName} via Strelva`, fromAddress: `hello@${CLIENT_MAIL_DOMAIN}`,
+      fromName: claim.businessName, fromAddress: `hello@${CLIENT_MAIL_DOMAIN}`,
       ...(claim.replyTo ? { replyTo: claim.replyTo } : {}),
-      options: { heading: claim.subject, paragraphs: [claim.body], footerNote: `Sent by Strelva for ${claim.businessName}, approved by ${claim.isOwner === false ? "the assigned team member" : "the business owner"}.` },
+      options: { heading: claim.subject, paragraphs: [claim.body], footerNote: `Approved by ${claim.isOwner === false ? "the assigned team member" : "the business owner"}.` },
       idempotencyKey: `inquiry-workspace-${claim.id}`,
       tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId },
     });

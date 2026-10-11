@@ -9,6 +9,9 @@ import { bookingInquiryOffersEnabled, bookingOfferEmailOptions, prepareInquiryBo
 import { bookingCustomerEmailAllowed } from "@/platform/bookings/updates";
 import { readInquiryProposalOptions } from "@/products/bookings/server";
 import { PublicBookingError } from "@/platform/bookings/errors";
+import { nativeRpc } from "@/platform/bookings/native";
+import { cleanSubjectText } from "@/platform/infra/email/text";
+import type { InquiryProposalDelivery } from "@/products/bookings/contracts";
 import { readBookingContext } from "@/platform/bookings/store";
 const schema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().regex(/^[a-z0-9-]+$/), inquiryId: z.string().min(1).max(200), serviceId: z.string().min(1).max(200), starts: z.array(z.string().datetime({ offset: true })).min(1).max(3), expectedCustomerEmail: z.string().email().max(320).optional() }).strict();
 function failure(error: unknown) {
@@ -42,13 +45,20 @@ export async function POST(request: Request) {
     if (input.expectedCustomerEmail && inquiry.email.trim().toLowerCase() !== input.expectedCustomerEmail.trim().toLowerCase()) return workspaceJson({ error: "The customer's email changed. Reload the inquiry before sending." }, 409);
     const offer = await prepareInquiryBookingOffer({ tenantId: input.tenantId, inquiryId: input.inquiryId, serviceId: input.serviceId, starts: input.starts, source: "owner", customer: { name: inquiry.name, email: inquiry.email } });
     if (!offer) return workspaceJson({ error: "No request-mode times are available." }, 409);
-    let delivery: "accepted" | "suppressed" | "unavailable" = "suppressed";
+    let delivery: InquiryProposalDelivery = "suppressed";
     if (await bookingCustomerEmailAllowed(input.tenantId)) {
+      // Identity comes from the already-authorized booking scope, never input.
+      let businessName = "";
       try {
-        const sent = await sendEmailWithReceipt({ audience: "customer", tenantId: input.tenantId, to: inquiry.email,
+        const business = await nativeRpc("read_booking_business_details", { p_tenant_id: input.tenantId }) as { name?: string } | null;
+        businessName = cleanSubjectText(typeof business?.name === "string" ? business.name : "");
+      } catch { /* Saved suggestions remain available; hold mail without identity. */ }
+      if (!businessName) delivery = "identity_held";
+      else try {
+        const sent = await sendEmailWithReceipt({ authorship: "business", businessName, fromName: businessName, audience: "customer", tenantId: input.tenantId, to: inquiry.email,
           fromAddress: "bookings@mail.strelva.com", subject: `Suggested times: ${offer.serviceName}`,
           idempotencyKey: `inquiry-offer:${offer.id}`, options: { heading: "Choose a time to request", paragraphs: ["The business suggested these times. Choose one to request it. The business will confirm your request."], ...bookingOfferEmailOptions(offer) } });
-        delivery = sent.status;
+        delivery = sent.status === "suppressed" && sent.reason === "business_identity_unavailable" ? "identity_held" : sent.status;
       } catch { delivery = "unavailable"; }
     }
     return workspaceJson({ offer, delivery });
