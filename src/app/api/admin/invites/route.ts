@@ -12,7 +12,7 @@ import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { createInvite } from "@/lib/invites";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
-import { buildInviteEmailHtml, buildInviteEmailText, sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { inviteEmailOptions, sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { sendEmail } from "@/platform/infra/email/send";
 import { sendWelcomeEmail } from "@/lib/delivery-email";
@@ -163,6 +163,7 @@ export async function POST(req: Request) {
       await sendWelcomeEmail({
         email,
         businessName: tenantConfig.siteName,
+        tenantId,
         ownerName: tenantConfig.ownerName?.trim() || undefined,
         dashboardUrl: getTenantDashboardUrl(tenantConfig, "/dashboard", "production"),
         logPrefix: "[invite]",
@@ -174,10 +175,10 @@ export async function POST(req: Request) {
     try {
       sent = await sendEmail({
         audience: "client",
+        tenantId,
         to: email,
         subject: `You're invited to manage ${siteNameText}`,
-        html: buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl }),
-        text: buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl }),
+        options: inviteEmailOptions({ email, siteName: tenantConfig.siteName, signUpUrl }),
       });
     } catch (err) {
       sendError = err instanceof Error ? err.message : "Resend send failed";

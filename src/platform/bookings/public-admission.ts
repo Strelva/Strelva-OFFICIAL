@@ -7,10 +7,12 @@ import type { PublicBookingAdmission } from "./public-request";
 import { PublicBookingError } from "./errors";
 import { nativeRpc, tokenHash } from "./native";
 import { bookingCustomerEmailAllowed } from "./updates";
+import { cleanSubjectText } from "@/platform/infra/email/text";
 import { bookingAppOrigin } from "./lifecycle-ports";
 
 const requestSchema = z.object({ tenantId: z.string(), requestId: z.string(),
   visitor: z.object({ name: z.string(), email: z.string().email(), phone: z.string().optional(), message: z.string().optional(), intakeAnswers: z.record(z.string(), z.string()).optional() }),
+  start_at: z.string().optional(), end_at: z.string().optional(),
   token_ciphertext: z.string(), state: z.string(), expires_at: z.string() });
 
 export const publicBookingAdmission: PublicBookingAdmission = {
@@ -29,10 +31,14 @@ export const publicBookingAdmission: PublicBookingAdmission = {
     if (row.state !== "held" || Date.parse(row.expires_at) <= Date.now()) return;
     const token = decryptSecret(row.token_ciphertext);
     if (!token) throw new PublicBookingError("unavailable", "The confirmation email is unavailable.");
+    const details = await nativeRpc("read_booking_business_details", { p_tenant_id: input.tenantId }) as { name?: string } | null;
+    const business = cleanSubjectText(details?.name || "");
+    if (!business) throw new PublicBookingError("unavailable", "The business identity could not be verified. Contact the business to book.");
     const result = await sendEmailWithReceipt({ audience: "customer", tenantId: input.tenantId, to: row.visitor.email,
-      fromName: "Strelva Bookings", fromAddress: "bookings@mail.strelva.com", subject: "Confirm your booking request",
+      authorship: "business", businessName: business, fromName: business, fromAddress: "bookings@mail.strelva.com", subject: `Confirm your booking request with ${business}`,
       idempotencyKey: `public-booking-confirm:${tokenHash(token)}`,
-      options: { heading: "Confirm your booking request", paragraphs: ["Confirm within 15 minutes. Nothing is booked until you confirm your email."],
+      options: { businessName: business, heading: `Confirm your booking request with ${business}`,
+        ...(row.start_at ? { rows: [{ label: "Requested time", value: new Date(row.start_at).toISOString() }] } : {}), paragraphs: ["Confirm within 15 minutes. Nothing is booked until you confirm your email."],
         button: { label: "Review and confirm", url: `${bookingAppOrigin()}/booking-confirm/${token}` } } });
     if (result.status !== "accepted") throw new PublicBookingError("unavailable", "The confirmation email could not be sent. Contact the business to book.");
   },

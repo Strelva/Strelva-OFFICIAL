@@ -79,16 +79,25 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const when = bookingWhen(booking);
       const state = booking.status;
       const rescheduled = row.reason === "Customer rescheduled";
-      const title = row.audience === "client" && state === "confirmed" && !rescheduled ? "New booking" : state === "held" ? "Confirm your booking request" : state === "cancelled" ? "Booking cancelled" : state === "declined" ? "Your time wasn't confirmed"
+      const title = row.audience === "client"
+        ? state === "held" ? "Customer email confirmation pending" : state === "requested" ? "New booking request"
+        : state === "declined" ? "Booking request declined" : state === "cancelled" ? "Booking cancelled"
+        : rescheduled ? "Booking rescheduled" : "New booking"
+        : state === "held" ? "Confirm your booking request" : state === "cancelled" ? "Booking cancelled" : state === "declined" ? "Your time wasn't confirmed"
         : state === "requested" ? "Request received" : rescheduled ? "Booking rescheduled" : "Booking confirmed";
       const tokenCipher = state === "held" ? row.access?.confirm_ciphertext : row.access?.manage_ciphertext;
       const token = typeof tokenCipher === "string" ? decryptSecret(tokenCipher) : null;
       const url = row.audience === "client" ? `${bookingAppOrigin()}/workspace/bookings?${new URLSearchParams({ workspaceId: booking.workspaceId ?? "", date: booking.localDate })}` : bookingManagePageEnabled() ? token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : await deps.manageUrl?.(booking).catch(() => null) : null;
-      const result = await deps.send({ audience: row.audience, tenantId: booking.tenantId ?? undefined, to,
-        fromName: business.name || "Strelva", fromAddress: "bookings@mail.strelva.com",
+      const result = await deps.send({ audience: row.audience, authorship: row.audience === "client" ? "agency" : "business", workspaceId: booking.workspaceId ?? undefined, tenantId: booking.tenantId ?? undefined, to,
+        fromName: business.name, businessName: row.audience === "customer" ? business.name : undefined, fromAddress: "bookings@mail.strelva.com",
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
         idempotencyKey: `booking-update:${row.messageId}`,
-        options: { heading: title, paragraphs: [state === "held"
+        options: { heading: title, paragraphs: [row.audience === "client"
+          ? state === "requested" ? `${booking.customer.name} requested ${booking.serviceName} on ${when.day} at ${when.time}. Confirm or decline in Bookings.`
+          : state === "confirmed" ? `${booking.customer.name} ${rescheduled ? "rescheduled" : "booked"} ${booking.serviceName} on ${when.day} at ${when.time}.`
+          : state === "held" ? `${booking.customer.name} requested this time and still needs to confirm their email.`
+          : `${booking.customer.name}’s booking is ${state}.`
+          : state === "held"
           ? "You requested this time. Confirm below within 15 minutes. Nothing is booked until you confirm."
           : state === "requested" ? "The business will confirm this request. This time is not confirmed yet."
           : state === "cancelled" ? "This booking is cancelled."

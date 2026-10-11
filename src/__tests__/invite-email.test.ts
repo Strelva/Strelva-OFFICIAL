@@ -34,11 +34,11 @@ describe("invite email rendering", () => {
       signUpUrl: "https://admin.example.com/sign-up",
     });
 
-    expect(text).toContain("Your dashboard is ready");
+    expect(text).toContain("Your workspace is ready");
     expect(text).toContain("You now have access to manage Client Bcc: attacker@example.com.");
     expect(text).toContain("Set up your login: https://admin.example.com/sign-up");
     expect(text).toContain(
-      "Use owner@example.com when signing up so your dashboard access connects automatically.",
+      "Use owner@example.com when signing up so your workspace access connects automatically.",
     );
     expect(text).not.toContain("\r");
   });

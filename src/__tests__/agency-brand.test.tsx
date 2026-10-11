@@ -5,8 +5,8 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mock.r
 vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: mock.tenant }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 vi.mock("resend", () => ({ Resend: class { emails = { send: mock.send }; } }));
-import { brandColors, contrastRatio, STRELVA_BRAND } from "@/platform/infra/agency-brand";
-import { manageAgencyBrand, presentBrand, resolveOwnerBrand, resolveTenantBrand, validateBrand } from "@/platform/agency-brand/server";
+import { brandColors, contrastRatio } from "@/platform/infra/agency-brand";
+import { manageAgencyBrand, presentBrand, resolveOwnerBrand, resolveTenantBrand, AGENCY_IDENTITY_UNAVAILABLE, validateBrand } from "@/platform/agency-brand/server";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
@@ -17,19 +17,19 @@ const brand = presentBrand(row);
 const options = { brand, heading: "One decision", decisions: [{ title: "Publish the price?", approve: { label: "Approve", url: "https://app.strelva.com/api/approve?token=fixture" }, open: { label: "Needs you", url: "https://app.strelva.com/workspace" } }], secondaryButton: { label: "Not yet", url: "https://app.strelva.com/workspace" }, footerNote: "for The Mooney Firm" };
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
 describe("agency owner brand", () => {
-  it("uses the service-resolved seat, independently per business; null stays Strelva", async () => {
+  it("uses the service-resolved seat, independently per business; missing identity stays neutral", async () => {
     mock.rpc.mockResolvedValueOnce({ data: row, error: null }).mockResolvedValueOnce({ data: null, error: null });
     expect(await resolveOwnerBrand(id)).toEqual(brand);
-    expect(await resolveOwnerBrand("b2640000-0000-4000-8000-000000000020")).toEqual(STRELVA_BRAND);
+    expect(await resolveOwnerBrand("b2640000-0000-4000-8000-000000000020")).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
     expect(mock.rpc.mock.calls.map(c => c[1])).toEqual([{ p_workspace_id: id }, { p_workspace_id: "b2640000-0000-4000-8000-000000000020" }]);
   });
-  it("links tenant reports to the business and keeps unconverted tenants Strelva", async () => {
+  it("links tenant reports to the business and keeps unconverted tenants neutral", async () => {
     mock.tenant.mockResolvedValueOnce(id).mockResolvedValueOnce(null); mock.rpc.mockResolvedValue({ data: row, error: null });
-    expect(await resolveTenantBrand("agency-client")).toEqual(brand); expect(await resolveTenantBrand("self-serve")).toEqual(STRELVA_BRAND);
+    expect(await resolveTenantBrand("agency-client")).toEqual(brand); expect(await resolveTenantBrand("self-serve")).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
   });
   it("never hides read failures with another agency's brand", async () => {
     mock.rpc.mockResolvedValue({ data: null, error: { message: "database offline" } });
-    expect(await resolveOwnerBrand(id)).toEqual(STRELVA_BRAND);
+    expect(await resolveOwnerBrand(id)).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
   });
   it("passes verified identity to owner-only configuration, and surfaces revocation", async () => {
     mock.rpc.mockResolvedValue({ data: null, error: { message: "agency_brand_access" } });
@@ -69,7 +69,7 @@ describe("agency owner brand", () => {
     vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("RESEND_API_KEY", "fixture"); vi.stubEnv("RESEND_DOMAIN", "unverified.example");
     mock.rpc.mockResolvedValue({ data: row, error: null }); mock.send.mockResolvedValue({ data: { id: "sent" }, error: null });
     await sendEmailWithReceipt({ audience: "client", workspaceId: id, to: "owner@example.test", subject: "Decision", fromAddress: "hello@agency.example", options: { heading: "Strelva needs one decision" } });
-    expect(mock.send.mock.calls[0]![0]).toMatchObject({ from: '"North & Web <\\"Owner\\"> via Strelva" <hello@updates.strelva.com>', replyTo: input.replyTo });
+    expect(mock.send.mock.calls[0]![0]).toMatchObject({ from: '"North & Web <\\"Owner\\">" <hello@updates.strelva.com>', replyTo: input.replyTo });
     expect(mock.send.mock.calls[0]![0].html).toContain("North &amp; Web &lt;&quot;Owner&quot;&gt;");
     vi.stubEnv("EMAIL_SENDING_ENABLED", "false"); mock.rpc.mockClear();
     expect(await sendEmailWithReceipt({ audience: "client", workspaceId: id, to: "owner@example.test", subject: "Decision", options: { heading: "Decision" } })).toMatchObject({ status: "suppressed" }); expect(mock.rpc).not.toHaveBeenCalled();

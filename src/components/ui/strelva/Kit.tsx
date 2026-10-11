@@ -1,4 +1,5 @@
 "use client";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 /*
  * Strelva 1.0 kit (October 9, 2026). One owned set of pieces for every
@@ -58,8 +59,10 @@ export function StSplit({ children, aside, balance = "main" }: { children: React
 }
 
 /** Account entry uses the same paper and controls, at a focused reading width. */
-export function StEntry({ children, brand, brandFontFamily, host, width = "form", helpHref = "/workspace?view=help" }: { children: ReactNode; brand?: ReactNode; brandFontFamily?: string; host?: string; width?: "form" | "account"; helpHref?: string }) {
-  return <main className={styles.entry} data-workspace-theme="linen"><header className={styles.entryHeader}><Link href="/" className={styles.entryBrand} style={brandFontFamily ? { fontFamily: brandFontFamily } : undefined}>{brand ?? <><LogoMark className="size-6" />Strelva</>}</Link>{host ? <StMono>{host}</StMono> : <StTextButton href={helpHref}>Help</StTextButton>}</header><div className={styles.entryColumn} data-width={width}>{children}</div></main>;
+export function StEntry({ children, brand, brandFontFamily, host, width = "form", helpHref = "/workspace?view=help" }: { children: ReactNode; brand?: ReactNode | OwnerBrand; brandFontFamily?: string; host?: string; width?: "form" | "account"; helpHref?: string }) {
+  const ownerBrand = brand && typeof brand === "object" && "name" in brand && "agencyId" in brand ? brand as OwnerBrand : null;
+  const brandContent = ownerBrand ? <>{ownerBrand.logoUrl ? <img src={ownerBrand.logoUrl} alt={ownerBrand.name} className="size-6 object-contain" /> : null}{ownerBrand.name}</> : brand as ReactNode;
+  return <main className={styles.entry} data-workspace-theme="linen"><header className={styles.entryHeader}><Link href="/" className={styles.entryBrand} style={brandFontFamily ? { fontFamily: brandFontFamily } : undefined}>{brandContent ?? <><LogoMark className="size-6" />Strelva</>}</Link>{host ? <StMono>{host}</StMono> : <StTextButton href={helpHref}>Help</StTextButton>}</header><div className={styles.entryColumn} data-width={width}>{children}</div></main>;
 }
 
 /** Own field geometry while preserving native input semantics. */

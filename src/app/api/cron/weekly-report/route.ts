@@ -1,5 +1,4 @@
 import { resolveTenantBrand } from "@/platform/agency-brand/server";
-import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -11,8 +10,6 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
-import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
-import type { EmailRow } from "@/platform/infra/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { sendEmail } from "@/platform/infra/email/send";
@@ -33,33 +30,6 @@ function reportSummaryParagraphs(summary: string): string[] {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter(Boolean);
-}
-
-function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
-  const paragraphs = reportSummaryParagraphs(summary);
-  return renderEmailHtml({
-    brand,
-    preheader: paragraphs[0],
-    // Verdict-first h1 (from buildReportHeading) — the plain verdict the body
-    // proves, never the generic "Your weekly report" label.
-    heading,
-    paragraphs,
-    // Compact Search & Analytics block — only present when a Google surface read
-    // "ok" (buildAnalyticsRows returns []), so unconnected tenants omit it.
-    rows: analyticsRows.length ? analyticsRows : undefined,
-    button: { label: "See your full report", url: dashboardUrl },
-    footerNote: `Sent for ${siteName}`,
-  });
-}
-
-function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
-  return renderEmailText({
-    brand,
-    heading,
-    paragraphs: reportSummaryParagraphs(summary),
-    rows: analyticsRows.length ? analyticsRows : undefined,
-    button: { label: "See your full report", url: dashboardUrl },
-  });
 }
 
 export async function GET(request: Request) {
@@ -139,26 +109,11 @@ await mapPool(reports, 8, async (report) => {
 
       // Verdict-first subject + heading — lead with the proof, frame a quiet
       // week as steady (never empty), stay honest before tracking data lands.
-      const subject = buildReportSubject(report);
+      const subject = `Your weekly recap: ${buildReportSubject(report)}`;
       const heading = buildReportHeading(report);
 
       const brand = await resolveTenantBrand(report.tenant.id);
       const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports"));
-      const html = reportToHtml(
-        heading,
-        report.summary,
-        report.tenant.siteName,
-        dashboardUrl,
-        report.analyticsRows,
-        brand,
-      );
-      const text = reportToText(
-        heading,
-        report.summary,
-        dashboardUrl,
-        report.analyticsRows,
-        brand,
-      );
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {
@@ -175,10 +130,7 @@ await mapPool(reports, 8, async (report) => {
             tenantId: report.tenant.id,
             to: email,
             subject,
-            html,
-            text,
-            brand,
-            fromName: report.tenant.siteName,
+            options: { brand, heading, paragraphs: reportSummaryParagraphs(report.summary), rows: report.analyticsRows, button: { label: "Open Recaps", url: dashboardUrl }, footerNote: `Your weekly recap for ${report.tenant.siteName}` },
             fromAddress: `report@${domain}`,
           });
         } catch (err) {

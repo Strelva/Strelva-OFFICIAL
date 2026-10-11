@@ -59,7 +59,7 @@ export function deliveryActionLabel(action: InquiryDeliveryAction): string {
 }
 
 export function actorForAction(action: InquiryDeliveryAction): ReceiptActor {
-  return { kind: "strelva", id: `inquiry-delivery:${action}`, label: "Strelva" };
+  return { kind: "system", id: `inquiry-delivery:${action}`, label: "Actor not recorded" };
 }
 
 /** Render one provider-bound customer or owner message from trusted inquiry data. */
@@ -87,7 +87,7 @@ export function createInquiryDeliveryMessage(
         ...(source ? [{ label: "Source", value: source }] : []),
         ...(message ? [{ label: "Message", value: message }] : []),
       ],
-      footerNote: "Operator-configured inquiry notification · sent by Strelva",
+      footerNote: "Inquiry notification for the business owner",
     };
     return {
       tenantId: inquiry.tenantId,
@@ -109,16 +109,17 @@ export function createInquiryDeliveryMessage(
     ? cleanSubjectText(inquiry.followUpMessageTemplate).replaceAll("{name}", name).slice(0, 2000)
     : "";
   const options: EmailOptions = {
+    businessName: business,
     preheader: isFollowUp ? `Following up with ${business}` : `We received your message for ${business}`,
     heading: isFollowUp ? "Checking in" : "We received your message",
     paragraphs: isFollowUp
       ? [
           followUpTemplate || `Hi ${name}, we are checking in about your message to ${business}. If you still need help, reply to this email and we will take it from there.`,
-          "This is an automatic follow-up sent by Strelva for the business named above.",
+          `This is an automatic follow-up from ${business}.`,
         ]
       : [
           `Hi ${name}, ${business} received your message. Someone will review it and follow up as soon as they can.`,
-          "This is an automatic confirmation sent by Strelva for the business named above.",
+          `This is an automatic confirmation from ${business}.`,
         ],
     ...(message && !isFollowUp ? { rows: [{ label: "Your message", value: message }] } : {}),
     ...(!isFollowUp && inquiry.bookingOffer ? {
@@ -128,7 +129,7 @@ export function createInquiryDeliveryMessage(
       ],
       button: { label: "Choose a time", url: bookingLink(inquiry.bookingOffer.chooseUrl) },
     } : {}),
-    footerNote: `${inquiry.bookingOffer && !isFollowUp ? "Choosing a time requests an appointment; the business must confirm. " : ""}Automatic ${isFollowUp ? "follow-up" : "reply"} · sent by Strelva for ${business}`,
+    footerNote: `${inquiry.bookingOffer && !isFollowUp ? "Choosing a time requests an appointment; the business must confirm. " : ""}Automatic ${isFollowUp ? "follow-up" : "reply"} · from ${business}`,
   };
   const trackingReplyTo = getInquiryReplyTrackingAddress(inquiry);
   const fallbackReplyTo = validEmail(route.customerReplyTo);
@@ -139,6 +140,7 @@ export function createInquiryDeliveryMessage(
     capabilityId: inquiry.capabilityId,
     capabilityVersion: inquiry.capabilityVersion,
     audience: "customer",
+    fromName: business,
     to: recipient,
     ...(trackingReplyTo || fallbackReplyTo ? { replyTo: trackingReplyTo || fallbackReplyTo! } : {}),
     subject: isFollowUp ? `Following up on your message to ${business}` : `We received your message for ${business}`,

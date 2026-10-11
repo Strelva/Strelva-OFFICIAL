@@ -1,3 +1,5 @@
+import { actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import type { PaperAction, PaperBlock, PaperEmail } from "./paper";
 
 export interface EmailIdentity { sender: string; senderDetail: string }
@@ -10,22 +12,28 @@ const p = (text: string, muted = false): PaperBlock => ({ kind: "paragraph", tex
 const a = (actions: readonly PaperAction[], full = true): PaperBlock => ({ kind: "actions", actions, full });
 
 export function urgentNeedsYouEmail(input: EmailIdentity & {
+  actor?: RecordedActor | null;
   subject: string; person: string; source: string; inquiry: string; draft: string;
   send: PaperAction; notYet: PaperAction; change: PaperAction; policyNote: string; white?: boolean;
 }): PaperEmail {
-  return { ...input, footer: input.policyNote, blocks: [
+  const actor = actorPresentation(input.actor);
+  return { ...input, footer: [input.policyNote, actor.credit].filter(Boolean).join(" · "), blocks: [
     { kind: "label", text: `${input.person} · ${input.source}` }, p(input.inquiry),
-    { kind: "draft", label: "Your reply, written by Strelva", text: input.draft },
+    { kind: "draft", label: actor.name ? `Your reply, drafted by ${actor.name}` : "Your reply · Actor not recorded", text: input.draft },
     a([{ ...input.send, style: "primary" }]), a([{ ...input.notYet, style: "soft" }, { ...input.change, style: "soft" }]),
     p("Each button opens a page where you confirm. Nothing sends from this email alone.", true),
   ] };
 }
 
-export function morningNeedsYouEmail(input: EmailIdentity & { subject: string; items: readonly DecisionMailItem[]; handled: string; white?: boolean }): PaperEmail {
+export function morningNeedsYouEmail(input: EmailIdentity & { subject: string; items: readonly DecisionMailItem[]; handled: string; receipts?: readonly { actor: RecordedActor | null; action: string }[]; white?: boolean }): PaperEmail {
   return { ...input, footer: "One email at 7:00 in your business’s timezone, only when something waits on you. Urgent items come right away.", blocks: [
     ...input.items.map((item): PaperBlock => ({ kind: "decision", category: item.category, title: item.title, detail: item.detail,
       actions: [...(item.approve ? [{ ...item.approve, style: "primary" as const }] : []), ...(item.notYet ? [{ ...item.notYet, style: "text" as const }] : []), { ...item.open, style: "text" }] })),
-    { kind: "label", text: "Strelva handled yesterday" }, p(input.handled, true),
+    { kind: "label", text: `${STRELVA_HANDLED_LABEL} yesterday` },
+    p(input.receipts ? input.receipts.map(receipt => {
+      const actor = actorPresentation(receipt.actor);
+      return `${actor.name ?? "Actor not recorded"} · ${receipt.action}${actor.credit ? ` · ${actor.credit}` : ""}`;
+    }).join("\n") : input.handled, true),
   ] };
 }
 
@@ -43,7 +51,7 @@ export function weeklyRecapEmail(input: EmailIdentity & { subject: string; metri
 export function ownerInvitationPaperEmail(input: EmailIdentity & { business: string; greeting: string; systems: Extract<PaperBlock, { kind: "rows" }>["rows"]; accept: PaperAction; expires: string; invitedBy: string }): PaperEmail {
   return { ...input, subject: `Your workspace for ${input.business} is ready`, footer: `Invited by ${input.invitedBy}. Not expecting this? Ignore it and nothing changes.`, blocks: [
     p(input.greeting), { kind: "rows", rows: input.systems }, a([{ ...input.accept, style: "primary" }]),
-    p(`Accept this invitation with the email address it was sent to. You’ll be asked to sign in. This invitation expires ${input.expires}. You can also answer Strelva’s decision emails without opening the workspace.`, true),
+    p(`Accept this invitation with the email address it was sent to. You’ll be asked to sign in. This invitation expires ${input.expires}. You can also answer decision emails without opening the workspace.`, true),
   ] };
 }
 

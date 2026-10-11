@@ -75,7 +75,7 @@ export async function chaseBookingCalendarHealth(workspaceId: string, input: {
     if (!recipient?.email?.trim()) { status = "suppressed"; reason = "no_owner_recipient"; }
     else {
       try {
-        const result = await input.sendEmail({ audience: "client", to: recipient.email.trim().toLowerCase(),
+        const result = await input.sendEmail({ audience: "client", authorship: "agency", workspaceId, to: recipient.email.trim().toLowerCase(),
           ...(recipient.tenantId ? { tenantId: recipient.tenantId } : {}),
           subject: `${snapshot.businessName}: reconnect your booking calendar`,
           idempotencyKey: `needs-you:booking-calendar:${action.id}`,

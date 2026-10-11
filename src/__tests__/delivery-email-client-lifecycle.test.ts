@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 // Client lifecycle senders (welcome / site-live / review-request). Each must:
 //  - render through the SHARED email design system (never hand-rolled markup),
@@ -24,7 +29,7 @@ vi.mock("resend", () => ({
 
 // A marker only the shared layout emits (the hosted logo lockup). If a sender
 // hand-rolled its own HTML this would be absent — so it proves the design system.
-const DESIGN_SYSTEM_MARKER = 'alt="Strelva"';
+const DESIGN_SYSTEM_MARKER = 'alt="North Studio"';
 
 describe("client lifecycle emails render through the shared design system", () => {
   const original = { ...process.env };
@@ -45,6 +50,7 @@ describe("client lifecycle emails render through the shared design system", () =
     const { sendWelcomeEmail } = await import("@/lib/delivery-email");
     const ok = await sendWelcomeEmail({
       email: "chelsea@example.com",
+      tenantId: "rohlax",
       businessName: "Rohlax Wellness",
       ownerName: "Chelsea",
       dashboardUrl: "https://admin.rohlax.com/dashboard",
@@ -52,20 +58,21 @@ describe("client lifecycle emails render through the shared design system", () =
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
     const call = sendMock.mock.calls[0]![0]!;
-    expect(call.subject).toBe("Welcome to Strelva");
+    expect(call.subject).toBe("Your workspace for Rohlax Wellness is ready");
     expect(call.html).toContain(DESIGN_SYSTEM_MARKER);
-    expect(call.html).toContain("Welcome to Strelva");
+    expect(call.html).toContain("Your workspace for Rohlax Wellness is ready");
     expect(call.html).toContain("Chelsea");
-    expect(call.html).toContain("Open your dashboard");
+    expect(call.html).toContain("Open your workspace");
     expect(call.html).toContain("https://admin.rohlax.com/dashboard");
-    expect(call.text).toContain("Welcome to Strelva");
-    expect(call.text).toContain("Open your dashboard: https://admin.rohlax.com/dashboard");
+    expect(call.text).toContain("Your workspace for Rohlax Wellness is ready");
+    expect(call.text).toContain("Open your workspace: https://admin.rohlax.com/dashboard");
   });
 
   it("sendSiteLiveEmail carries the live URL as a row and a View-your-site button", async () => {
     const { sendSiteLiveEmail } = await import("@/lib/delivery-email");
     const ok = await sendSiteLiveEmail({
       email: "chelsea@example.com",
+      tenantId: "rohlax",
       businessName: "Rohlax Wellness",
       siteUrl: "https://rohlaxwellness.com",
       dashboardUrl: "https://admin.rohlax.com/dashboard",
@@ -86,6 +93,7 @@ describe("client lifecycle emails render through the shared design system", () =
     const { sendReviewRequestEmail } = await import("@/lib/delivery-email");
     const ok = await sendReviewRequestEmail({
       email: "chelsea@example.com",
+      tenantId: "rohlax",
       businessName: "Rohlax Wellness",
       reviewUrl: "https://g.page/r/rohlax/review",
       ownerName: "Chelsea",
@@ -122,6 +130,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendWelcomeEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         dashboardUrl: "https://admin.rohlax.com/dashboard",
       }),
@@ -129,6 +138,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendSiteLiveEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         siteUrl: "https://rohlaxwellness.com",
         dashboardUrl: "https://admin.rohlax.com/dashboard",
@@ -137,6 +147,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendReviewRequestEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         reviewUrl: "https://g.page/r/rohlax/review",
       }),
@@ -154,6 +165,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendWelcomeEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         dashboardUrl: "https://admin.rohlax.com/dashboard",
       }),
@@ -161,6 +173,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendSiteLiveEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         siteUrl: "https://rohlaxwellness.com",
         dashboardUrl: "https://admin.rohlax.com/dashboard",
@@ -169,6 +182,7 @@ describe("client lifecycle emails obey the client kill-switch", () => {
     expect(
       await sendReviewRequestEmail({
         email: "a@example.com",
+        tenantId: "rohlax",
         businessName: "Rohlax Wellness",
         reviewUrl: "https://g.page/r/rohlax/review",
       }),

@@ -16,6 +16,19 @@ function fixture(audience: "customer" | "client" = "customer", status = "confirm
 beforeEach(() => { vi.stubEnv("SECRETS_ENC_KEY", "11".repeat(32)); vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_MESSAGES", "1"); vi.stubEnv("STRELVA_BOOKING_MANAGE_PAGE", "1"); mocks.override.mockResolvedValue("inherit"); mocks.business.mockResolvedValue(false); });
 afterEach(() => vi.unstubAllEnvs());
 describe("booking messages", () => {
+ it.each([
+   ["client", "held", "Customer email confirmation pending"], ["client", "declined", "Booking request declined"],
+   ["client", "requested", "New booking request"], ["customer", "held", "Confirm your booking request"],
+   ["customer", "declined", "Your time wasn't confirmed"],
+ ] as const)("uses %s voice for a %s booking", async (audience, status, heading) => {
+   const deps = fixture(audience, status);
+   await deliverBookingUpdates("b1", deps);
+   const input = vi.mocked(deps.send).mock.calls[0]![0];
+   expect(input).toMatchObject({ workspaceId: "ws1", authorship: audience === "client" ? "agency" : "business", options: { heading } });
+   if (audience === "client") expect(input.options?.paragraphs?.[0]).toContain("Dana");
+   else expect(input.businessName).toBe("Fixture Firm");
+ });
+
  it("native email requires the logged business switch, never a workspace Redis override", async () => {
    const workspaceId = "ab000000-0000-4000-8000-000000000010";
    vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");

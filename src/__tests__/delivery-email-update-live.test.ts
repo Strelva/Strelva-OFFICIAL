@@ -1,4 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 const mockSendEmail = vi.hoisted(() => vi.fn());
 
@@ -31,6 +36,7 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
 
     const ok = await sendUpdateLiveEmail({
       email: "owner@example.com",
+      tenantId: "rohlax",
       siteName: "Rohlax Wellness",
       whatChanged: "your hours",
       siteUrl: "https://rohlaxwellness.com",
@@ -50,6 +56,7 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
 
     const ok = await sendUpdateLiveEmail({
       email: "owner@example.com",
+      tenantId: "rohlax",
       siteName: "Rohlax Wellness",
       whatChanged: "your hours",
       siteUrl: "https://rohlaxwellness.com",

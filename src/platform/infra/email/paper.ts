@@ -1,3 +1,4 @@
+import { BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { escapeEmailHtml } from "./escape";
 import { PAPER_EMAIL as t } from "./paper-tokens";
 
@@ -18,6 +19,8 @@ export type PaperBlock =
  * Rendering never creates a signed link, claims an item or sends mail. */
 export interface PaperEmail {
   subject: string;
+  brand?: OwnerBrand;
+  businessName?: string;
   sender: string;
   senderDetail: string;
   preheader?: string;
@@ -27,6 +30,8 @@ export interface PaperEmail {
   white?: boolean;
 }
 
+function paperIdentity(email: PaperEmail): string { return email.businessName || email.brand?.name || email.sender; }
+function paperFooter(email: PaperEmail): string { return [email.footer, email.businessName || email.brand?.agencyId ? BRAND_CREDIT : ""].filter(Boolean).join(" "); }
 const e = escapeEmailHtml;
 function url(value: string): string {
   // Refuse active schemes and protocol-relative URLs, including hidden controls.
@@ -70,10 +75,10 @@ export function renderPaperEmailBody(email: PaperEmail): string {
   const bg = email.white ? t.surface : t.canvas;
   return table(`<tr><td align="center">${table(`<tr><td valign="top" style="padding:20px 20px 0;">
     <h1 style="margin:0 0 16px;font-size:22px;line-height:27px;letter-spacing:-0.3px;font-weight:600;color:${t.text};overflow-wrap:anywhere;">${e(email.subject)}</h1>
-    <p style="margin:0 0 2px;font-size:${email.clientBranded ? "13" : "14"}px;line-height:20px;font-weight:${email.clientBranded ? "400" : "600"};color:${email.clientBranded ? t.faint : t.text};">${e(email.sender)}</p>
+    <p style="margin:0 0 2px;font-size:${email.clientBranded ? "13" : "14"}px;line-height:20px;font-weight:${email.clientBranded ? "400" : "600"};color:${email.clientBranded ? t.faint : t.text};">${email.brand?.logoUrl && !email.businessName ? `<img src="${url(email.brand.logoUrl)}" alt="${e(email.brand.name)}" width="132" style="display:block;max-width:132px;margin-bottom:12px;">` : ""}${e(paperIdentity(email))}</p>
     ${email.senderDetail ? `<p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};overflow-wrap:anywhere;">${e(email.senderDetail)}</p>` : ""}
     ${table(email.blocks.map(b => `<tr><td style="padding-top:16px;">${block(b)}</td></tr>`).join(""), "margin-top:8px;")}
-    </td></tr><tr><td valign="bottom" style="padding:32px 20px 24px;"><p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};">${e(email.footer)}</p></td></tr>`, `max-width:560px;width:100%;height:760px;background:${bg};font-family:${t.font};color:${t.text};`, "560")}</td></tr>`, `background:${bg};`);
+    </td></tr><tr><td valign="bottom" style="padding:32px 20px 24px;"><p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};">${e(paperFooter(email))}</p></td></tr>`, `max-width:560px;width:100%;height:760px;background:${bg};font-family:${t.font};color:${t.text};`, "560")}</td></tr>`, `background:${bg};`);
 }
 
 export function renderPaperEmailHtml(email: PaperEmail): string {
@@ -81,7 +86,7 @@ export function renderPaperEmailHtml(email: PaperEmail): string {
 }
 
 export function renderPaperEmailText(email: PaperEmail): string {
-  const lines = [email.subject, email.sender, email.senderDetail, ""];
+  const lines = [email.subject, paperIdentity(email), email.senderDetail, ""];
   for (const b of email.blocks) {
     switch (b.kind) {
       case "paragraph": case "label": lines.push(b.text); break;
@@ -96,6 +101,6 @@ export function renderPaperEmailText(email: PaperEmail): string {
     }
     lines.push("");
   }
-  lines.push(email.footer);
+  lines.push(paperFooter(email));
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }

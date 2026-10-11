@@ -3,9 +3,9 @@ import type { InquiryBookingChoice as Choice } from "@/products/inquiries";
 import { VisitorBookingShell } from "./VisitorBookingShell";
 import styles from "./visitor.module.css";
 /** Signed inquiry handoff. Read-only until the customer explicitly posts one time. */
-export function InquiryBookingChoice({ choice, actionUrl, unavailable, error }: { choice: Choice | null; actionUrl: string; unavailable?: boolean; error?: string }) {
+export function InquiryBookingChoice({ choice, actionUrl, unavailable, error, businessName }: { businessName?: string; choice: Choice | null; actionUrl: string; unavailable?: boolean; error?: string }) {
   const booking = choice?.booking;
-  return <VisitorBookingShell>
+  return <VisitorBookingShell siteName={businessName}>
     <div className={`${styles.surface} ${booking ? styles.receipt : ""}`}>
       {booking?.status === "requested" ? <div className={styles.clock}><Clock3 size={22} aria-hidden="true" /></div> : null}
       <h1 className={styles.title}>{booking?.status === "confirmed" ? "Your appointment is confirmed" : booking?.status === "requested" ? "Requested, not booked yet" : booking ? "Your appointment" : "Choose an appointment time"}</h1>

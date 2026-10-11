@@ -8,6 +8,7 @@
  *   one button that POSTs.
  * The answer never says whether an address was on the list.
  */
+import { getTenantConfig } from "@/lib/tenants";
 import { NextResponse } from "next/server";
 import { verifyUnsubscribeToken } from "@/lib/newsletter-unsubscribe";
 import { unsubscribeSubscriber } from "@/lib/storage/newsletter-store";
@@ -36,9 +37,11 @@ button:focus-visible{outline:2px solid var(--st-accent);outline-offset:3px}.note
 
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get("token") ?? "";
-  if (!verifyUnsubscribeToken(token)) return page(400, "This link doesn't work", "The unsubscribe link is incomplete or was changed.");
+  const claims = verifyUnsubscribeToken(token);
+  if (!claims) return page(400, "This link doesn't work", "The unsubscribe link is incomplete or was changed.");
   const form = `<form method="post" action="/api/newsletter/unsubscribe?token=${encodeURIComponent(token)}"><button type="submit">Unsubscribe</button></form>`;
-  return page(200, "Unsubscribe from this newsletter?", "You won't get further issues.", form);
+  const business = (await getTenantConfig(claims.tenantId).catch(() => undefined))?.siteName;
+  return page(200, business ? `Unsubscribe from ${business} newsletter?` : "Unsubscribe from this newsletter?", "You won't get further issues.", form);
 }
 
 export async function POST(req: Request) {
@@ -53,5 +56,6 @@ export async function POST(req: Request) {
   } catch {
     return page(503, "That didn't go through", "Please try the link again in a few minutes.");
   }
-  return page(200, "You're unsubscribed", "You won't get further issues of this newsletter.");
+  const business = (await getTenantConfig(claims.tenantId).catch(() => undefined))?.siteName;
+  return page(200, "You're unsubscribed", business ? `You won't get further issues of ${business} newsletter.` : "You won't get further issues of this newsletter.");
 }

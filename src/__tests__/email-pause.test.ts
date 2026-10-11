@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
+
 // Assert the global email kill-switch: when EMAIL_SENDING_ENABLED is not
 // "true", no outbound email is sent. The prod default (unset) is paused.
 
@@ -51,6 +57,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
     const ok = await sendUpdateLiveEmail({
       email: "chelsea@example.com",
       siteName: "Rohlax Wellness",
+      tenantId: "rohlax",
       whatChanged: "hours",
       siteUrl: "https://rohlax.example.com",
     });
@@ -64,6 +71,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
     const ok = await sendUpdateLiveEmail({
       email: "chelsea@example.com",
       siteName: "Rohlax Wellness",
+      tenantId: "rohlax",
       whatChanged: "hours",
       siteUrl: "https://rohlax.example.com",
     });

@@ -1,3 +1,5 @@
+import { invitationEntryIdentity } from "@/platform/agency-brand/entry";
+import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -44,6 +46,7 @@ async function getInviteContext(searchParams: AuthSearchParams) {
   return {
     email,
     siteName: tenantConfig.siteName || invite.tenant,
+    brand: await resolveTenantBrand(invite.tenant),
   };
 }
 
@@ -57,7 +60,7 @@ async function getTenantAuthContext() {
   if (!tenant) return null;
 
   const tenantConfig = await getTenantConfig(tenant);
-  if (tenantConfig && tenantConfig.active === false) return null;
+  if (!tenantConfig || tenantConfig.active === false) return null;
 
   // A missing or unavailable site theme is normal at entry. Never borrow the
   // generic template brand just because this business has no saved theme.
@@ -65,6 +68,7 @@ async function getTenantAuthContext() {
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
+    brand: await resolveTenantBrand(tenant),
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
     host: requestHeaders.get("host") || undefined,
@@ -88,7 +92,7 @@ export default async function SignInPage({
     : accountTarget || "/account";
   const invite = await getInviteContext(params);
   if (invite) {
-    return <WorkspaceSignIn title={`Sign in to manage ${invite.siteName}`} description={`Use ${invite.email}, the email your invitation was sent to.`} next={inviteNext} prefillEmail={invite.email} />;
+    return <WorkspaceSignIn brand={invite.brand} title={`Sign in to manage ${invite.siteName}`} description={`Use ${invite.email}, the email your invitation was sent to.`} next={inviteNext} prefillEmail={invite.email} />;
   }
 
   // Public product starts also serve returning customers. Revalidate the user
@@ -102,13 +106,16 @@ export default async function SignInPage({
     if (user?.id && user.email && user.email_confirmed_at) redirect(resumeTarget);
   }
 
-  if (workspaceOpen && (workspaceTarget || invitationTarget)) return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} />;
+  if (workspaceOpen && (workspaceTarget || invitationTarget)) {
+    const identity = await invitationEntryIdentity(invitationTarget);
+    return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} title={identity ? `Sign in for ${identity.businessName}` : "Sign in"} />;
+  }
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
     const dashboardPath = tenantSignInNext(tenantAuth.clientFallbackRoot);
 
-    return <WorkspaceSignIn title={`Manage ${tenantAuth.siteName}`} description={`For the people ${tenantAuth.siteName} added. Visitors looking for the business should open its public website.`} next={dashboardPath} brand={tenantAuth.siteName} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} />;
+    return <WorkspaceSignIn title={`Manage ${tenantAuth.siteName}`} description={`For the people ${tenantAuth.siteName} added. Visitors looking for the business should open its public website.`} next={dashboardPath} brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} />;
   }
   return <WorkspaceSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} failed={searchValue(params.error) === "auth_callback"} />;
 }
