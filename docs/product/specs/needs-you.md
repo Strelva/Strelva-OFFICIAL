@@ -7,6 +7,22 @@
 > below are older implementation, needing engineering follow-up (§3.3/12/16, §4, §6–7). Do
 > not use platform authority for client service. "What changed" is the decided place label (October 9).
 
+## October 11 coherence contract
+
+At the owner zoom this place is **Needs you**. An agency inside a client sees
+its decision status through granted scope without owner controls; across clients
+**Queue** shows **Waiting on [business]**, the owner's same title and a link to
+that exact item. Approval, exit, payer decisions and sensitive data stay
+owner-only. The agency never decides or chases through platform-operator powers.
+
+**Running** names the maintained outcome and reviewed limits. The owner asks
+for that result; the agency configures supported Saved checks and cadence.
+Unsupported outcomes remain Requests, not an empty check builder the owner must
+assemble. Receipts name the recorded actor; unknown attribution is **Actor not
+recorded**. Brand lookup failure is neutral and holds agency-authored sends.
+**Possibility** remains a working alternative; a suggestion and a research
+Proposal are not screen synonyms for it.
+
 Status: draft spec, 2026-10-06; working default per the product model. Built
 and proven **locally** on branch `build/needs-you` (2026-10-06), behind
 `STRELVA_NEEDS_YOU_RELEASE` (off). Nothing is in production and client email
@@ -53,8 +69,8 @@ stays gated.
   Make real item per rebuild (live plan wins). The leftover SMS check
   (`staleSmsApprovals`, `ClearSmsButton`, `/api/admin/ops/clear-stale-sms`) is
   gone.
-- **Built locally on `w4/journey-gaps` (2026-10-06), same flags:** Strelva
-  handled lists decided items (approved and Not yet, not only lapses) with
+- **Built locally on `w4/journey-gaps` (2026-10-06), same flags:** the receipt
+  feed (then named Strelva handled; current contract: What changed) lists decided items (approved and Not yet, not only lapses) with
   an honest undo state per lifecycle; none is one tap, each says why
   (migration `20261009130000`). Open decision 1 (a) is applied to Make real:
   an owner with no account approves a Make real plan by signed link; Strelva
@@ -65,7 +81,7 @@ stays gated.
 - **Not built:** operational assignment offers (nothing waits on the owner
   today; it needs a new proposed-assignment record) and exit/export (no
   pending state; the adapter proposes nothing); per-System policy overrides
-  in the UI; the monthly report's handled list with signed undo links. Money
+  in the UI; the monthly recap's handled list with signed undo links. Money
   read by the session is the reader's own: a payer change or job limit the
   owner hasn't accepted reaches them only when the session reads as that
   owner (a verified owner member), not as Strelva's admin.
@@ -82,10 +98,10 @@ Today every change asks its own question. A Google post asks, a review reply
 asks, a site edit asks, a delivery asks, and each asks in its own store with
 its own rules. The owner sees whichever of those reach the screen they never
 open. This spec replaces that with one **policy** that decides, per System and
-per kind of change, who decides: Strelva does it and reports it, a Strelva
-operator reviews it, or the owner decides. It also covers how the owner's
-decisions reach someone who never signs in, and what Strelva shows after it
-acts.
+per kind of change, who decides: the named agency handles agreed work, an authorized agency
+team member reviews it, or the owner decides. Platform checks and support
+remain separate. It also covers how decisions reach an owner who never signs
+in, and how What changed records the actual actor and result.
 
 ## 1. The moment
 
@@ -96,8 +112,9 @@ these the firm has connected today is not checked.
   a reply in the firm's voice. The firm's review replies are set to "post
   after 12 hours unless I stop it". No email goes out for this. The reply
   posts Monday night and shows in **What changed**: "Acme Marketing replied to
-  Dana's review", with "Runs on Strelva". If automatic platform behavior did
-  the work, the receipt instead names Strelva.
+  Dana's review", with "Runs on Strelva". Automatic execution does not change
+  the agency actor. Strelva names only
+  actual platform actions, such as platform checks or billing.
 - **Monday, 14:10.** The owner emails Acme Marketing that Friday hours change to 9–3.
   An agency team member enters it in the business record as an owner-stated fact.
   Acme Marketing updates attymooney.com and the Google Business hours. No question is
@@ -109,9 +126,10 @@ these the firm has connected today is not checked.
   inquiry reply from their phone, confirms, and the reply sends. They ignore
   the booking page.
 - **Friday, 07:00.** A reminder covers the booking page only. On day 14 it
-  lapses. Nothing goes live. The operator queue shows it as the owner's call,
-  unanswered.
-- **The monthly report** lists the actor-named receipts from What changed, with links that undo
+  lapses. Nothing goes live. Acme Marketing's Queue shows **Waiting on The
+  Mooney Firm**, with the owner's decision title and exact-item link. The
+  illustrative 14-day clock remains a proposal, not an accepted service term.
+- **The monthly recap** lists the actor-named receipts from What changed, with links that undo
   what can still be undone.
 
 The owner never signed in. Every decision that was theirs reached them, and
@@ -233,7 +251,7 @@ nothing that wasn't theirs did.
    trusted, and the address is still trusted
    (`owner_decision_link_bindings`, checked in `claim_owner_decision`). With
    no trusted address nothing is sent; the item is recorded as not sent
-   (`no_trusted_owner_recipient`) and the operator queue shows it.
+   (`no_trusted_owner_recipient`) and the agency Queue shows it.
    - **Urgent kinds** go at once, one email per item. Urgent means an end customer
      is waiting: an inquiry reply, a review reply in `approve` mode.
    - **Everything else** goes in one morning email per business that has
@@ -254,22 +272,22 @@ nothing that wasn't theirs did.
     magic-link sign-in. There is no one-tap link for them (section 4). The
     magic-link email is still the way in, so the owner still needs no
     password.
-11. **Reminders and expiry.** An `owner_decides` item is reminded on day 3
-    and day 7 and lapses on day 14. These numbers match the operator spec's
-    proposed chase clocks and today's 14-day link life.
+11. **Reminders and expiry.** The proposed configuration reminds an
+    `owner_decides` item on days 3 and 7 and lapses it on day 14, matching
+    the retained link life. These are not accepted service clocks.
     - A lapsed item does nothing. Its Not yet path runs, it closes as
-      "Expired, nothing changed", and the operator queue keeps it as the
-      owner's call (P4 in [operator.md](./operator.md)) until an operator
-      closes or re-asks it.
+      "Expired, nothing changed", and the agency Queue keeps it as the
+      **Waiting on [business]** item, with the owner's title and exact-item link,
+      until an authorized agency team member closes or re-asks it.
     - Silence never approves anything. The one exception is a kind already
       set to `handle_after_notice`. It acts at its window, which is not
       expiry.
     - Inquiry replies keep their own 24-hour budget
       (`src/products/inquiries/message-review-policy.ts`).
-12. **Operators can escalate.** A `strelva_reviews` item the operator won't
-    decide becomes an `owner_decides` item, with the operator's note. This is
-    today's `escalateEventToOwner`, generalized. An operator can never decide
-    an `owner_decides` item.
+12. **The serving agency can escalate.** A `strelva_reviews` item an
+    authorized agency reviewer will not decide becomes an `owner_decides`
+    item, with that reviewer's note. This generalizes `escalateEventToOwner`
+    through ordinary agency scope. The agency never decides an owner item.
 
     An active platform operator or member of the business's agency
     cannot use a direct admin seat to decide an owner item, even if the item
@@ -294,7 +312,7 @@ nothing that wasn't theirs did.
     - Undo states: `undo` (one tap), `undo_needs_review` (undo makes a
       new change that routes through the policy), or `not_undoable` with a
       reason ("Google has the reply; delete it on Google").
-    - Home shows the last 7 days. The monthly report, or the weekly one if
+    - Home shows the last 7 days. The monthly recap, or the weekly one if
       that cadence is chosen (`src/lib/report-cadence.ts`), carries the same
       list with signed undo links.
 15. **Undo for recorded changes.** Undoing a handled change restores the
@@ -340,7 +358,7 @@ the least strict route allowed. Only Jacob can change a floor, in code.
 | `health.fix` | Restart, re-verify, retry a failed check | handle | handle |
 | `health.owner_action` | Reconnect Google, fix DNS at the registrar | owner action (not a decision) | — |
 | `verify.failed` | Write accepted, read-back failed | strelva_reviews | strelva_reviews |
-| `suggestion` | An idea or opportunity | never in Needs you; it is a Possibility | — |
+| `suggestion` | An idea or opportunity | never in Needs you; remains a suggestion (a Proposal only in research) until a working alternative exists | — |
 
 Not decided here and needing Jacob's call: the review-reply split by star
 rating, and `copy.routine` defaulting to `strelva_reviews` instead of today's
@@ -351,17 +369,18 @@ per-tenant setting (section 9).
 **Item states:** `open` → (`approved` | `declined` | `expired` | `withdrawn`
 | `superseded`) → after resolve, `done`, `done_unverified` or `failed`.
 
-- `withdrawn`: Strelva or an operator pulled it.
+- `withdrawn`: the authorized actor pulled it; History names that actor.
 - `superseded`: a newer proposal replaced it, and any link for it refuses.
 - `failed` leaves the source item pending, as `resolveEventAction` already
   does. The owner sees "{actor display name} couldn't finish this. We're on it." The item
-  moves to the operator queue.
+  moves to the serving agency's Queue. A platform incident uses logged
+  platform support scope separately.
 - Accepted-but-unverified is never retried (AGENTS.md "Outside writes").
 
 **Delivery states per item:** `not_sent`, `sent` (provider id from
 `sendEmailWithReceipt`), `suppressed` (email gate off or per-client override
 off), `bounced`, `reminded_1`, `reminded_2`. If delivery was suppressed, the
-operator queue must show that the owner was never told. An unseen ask is not
+agency Queue must show that the owner was never told. An unseen ask is not
 an unanswered one.
 
 **Who can do what**
@@ -385,8 +404,9 @@ an unanswered one.
 - payer-transition proposals
 - invitations
 
-Converted workspaces make the operator `admin`, not `owner` (Reborn §3), so
-these stay with the client.
+The historical conversion made an operator `admin`, not `owner` (Reborn §3).
+That privileged client-service path is superseded; ordinary agency grants
+never transfer these owner decisions.
 
 **What never happens**
 
@@ -544,7 +564,7 @@ yes to email.
    `resolveEventAction` with the owner as actor. `/dashboard/review` keeps
    working unchanged for anyone still there.
 3. **Policy live, email off.** Items get created and routed. Delivery is
-   recorded as `suppressed` while client email is gated. The operator queue
+   recorded as `suppressed` while client email is gated. The agency Queue
    shows "owner not told". This is the safe default and can ship before email.
 4. **Email on, per client.** Use the per-client override
    (`reb:client-email:{tenant}` = `on`) on the Strelva-owned test business,
@@ -560,13 +580,13 @@ yes to email.
 
 | Failure | What the person sees | Recovery |
 | --- | --- | --- |
-| Email gate off or override off | Owner: nothing. Operator: "Owner not told" on the item | Operator decides whether to call; item still expires on day 14 |
-| Email bounces | Operator: "Email bounced" | The owner sets a new address (signed in), or approves one an operator proposes from the last trusted address |
-| No trusted owner address | Operator: "Not sent: no trusted owner address" | An address an operator adds waits; the owner signs in to set it |
+| Email gate off or override off | Owner: nothing. Agency Queue: "Owner not told" | Authorized agency team member follows the agreed contact policy; expiry follows the configured clock |
+| Email bounces | Agency Queue: "Email bounced" | The owner sets a new address (signed in), or approves an agency-proposed address through the existing trust rules |
+| No trusted owner address | Agency Queue: "Not sent: no trusted owner address" | An agency-proposed address waits; the owner signs in to set it |
 | Link expired or item changed | "This changed since we emailed you" / "This link expired", with Open | Owner opens the latest in the workspace or the next morning email |
 | Owner no longer owner | "This link isn't for this account" | Nothing acts |
-| Resolve fails at the provider | "{actor display name} couldn't finish this. We're on it." | Item stays pending (source rule); operator queue P1/P2 |
-| Provider accepted, read-back failed | Receipt says "Done, not yet confirmed" | `verify.failed` to operator; never retried |
+| Resolve fails at the provider | "{actor display name} couldn't finish this. We're on it." | Item stays pending (source rule); agency Queue for service failures; platform queue only for logged platform incidents |
+| Provider accepted, read-back failed | Receipt says "Done, not yet confirmed" | `verify.failed` to the recorded actor's scoped queue; never retried |
 | Scanner prefetches link | Nothing | GET never mutates |
 | Make real partly lands | Item-by-item result | Landed parts get receipts; the rest stays open |
 
@@ -613,8 +633,8 @@ yes to email.
   - receives one urgent and one morning email
   - approves one item and lets one lapse
   - receives the reminder
-  - sees the lapse on the operator side
-  - undoes one handled change from the report email
+  - sees the lapse in the agency Queue, with the exact decision link
+  - undoes one handled change from the recap email
 
   Run it locally first, then in production after Jacob's yes on email.
 - **Home on desktop and mobile:** empty, one item, many items, error and

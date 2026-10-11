@@ -2,20 +2,21 @@
 
 Created: 2026-10-06
 Status: the product model for the 1.0.0 build, area by area. Direction selected
-by Jacob (Oct 2 places, Oct 4 Systems model, Oct 6 one build to 1.0.0). Nothing
-here is shipped. Each area links the spec that makes it buildable.
+by Jacob (Oct 2 places, Oct 4 Systems model, Oct 6 one build to 1.0.0,
+Oct 9–11 actor and coherence decisions). This is a model, not release proof.
+Each area links the spec that makes it buildable.
 
 **A business opens one place and finds its real things working: its website,
-its inquiries, its bookings, its tools. Its agency or the platform runs the
-agreed work, and the owner sees the few decisions that are theirs.** The owner never has to open it for any
-of that to stay true.
+its inquiries, its bookings, its tools. Its agency runs agreed client work;
+the platform handles platform checks and support. The owner sees the few
+decisions that are theirs.** The owner never has to open it for that to stay true.
 
 This page is the map. [ADR 0011](../../../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)
 is the decision, [systems-transition.md](./systems-transition.md) maps today's
 code onto it, and [strelva-1.0.0.md](./strelva-1.0.0.md) is the feature list.
 [GLOSSARY.md](../../GLOSSARY.md) owns words. This page maps the product model;
-ADR 0012 and the October 9 approved decisions amend its older role and actor
-claims. The other specs get corrected against those decisions.
+ADRs 0012–0014 amend its older role, actor and workspace claims. The specs
+follow those decisions; older implementation checkpoints retain their dates.
 
 ## The model in one picture
 
@@ -47,9 +48,37 @@ and the same credit, under the same rules as every agency.
 **What changed** is the decided place name (October 9).
 Keep the label behind one constant. System, Connection, Possibility, Make real,
 Version, History, Health, Requests, Running, Needs you and Ask Strelva also name
-concepts whose exact on-screen labels remain open for Jacob (UI plan D2).
+concepts; labels marked open in the glossary remain Jacob's call. Possibility
+and Queue stay, and Internal tool is the decided kind (October 11, D1–D4).
 Agency screens say **clients**; owner screens say **your business** or its name;
 the public are **their customers** or **end customers**.
+
+## One model at three zooms
+
+Agency **All clients** → agency inside one client → owner **Your business**.
+The agency opens the owner's Home, Systems, Requests, Running, What changed
+and decision status within its granted scope, plus Version/source and preparation
+controls. Same System names, Health and Request stages at every zoom. Owner-only
+approval, exit, payer decisions and sensitive data stay owner-only.
+
+Agency **Queue** reads its client-service items through ordinary agency scope.
+Owner decisions show read-only **Waiting on [business]**, with the owner's same
+title and a link to that exact Needs you item. The agency Queue neither consumes
+the platform-operator queue nor adds a platform-work bucket.
+
+**Library** is the agency's reusable sources and client Versions; qualified
+sources appear in business-facing **Ready-made systems**, alongside separately
+identified starters and services. Packaging shares definitions,
+never client records, accounts, credentials or grants. **Internal tool** is the
+kind, **Internal tools** the collection; open each System by its own name.
+**Saved check** contributes evidence to Health. Owners ask for the Running
+result and review its limits; agencies configure supported checks and cadence.
+Unsupported outcomes remain Requests.
+
+Unknown attribution reads **Actor not recorded**; never infer it from the viewer.
+Owners see their agency's brand in shell, email, entry and signed pages; end
+customers see the business's name. Failed brand lookup shows a neutral state
+and holds agency-authored sends. These requirements do not establish live proof.
 
 ## The people
 
@@ -100,8 +129,8 @@ Not Systems at 1.0.0 ([systems-catalog](./specs/systems-catalog.md)):
 | Blog and collections | Part of the website System (they appear through `/api/v1/collections`) |
 | Store (gldf, rhm run checkout in their own repos) | A Connection to the client's own checkout |
 | Wellness schedule and roster | Part of the bookings System |
-| Analytics, ongoing checks, domain monitor | Health; Search Console is a Connection |
-| Weekly and monthly reports | A Running item ("You get a report every Monday") |
+| Analytics, Saved checks, domain monitor | Health; Search Console is a Connection |
+| Weekly and monthly recaps | A Running item ("You get a recap every Monday") |
 | Documents | Supporting files. Today they break for good at edit 201 |
 | Rewards, members, Strelva's order view, onboarding, custom-app builds | Frozen on `/dashboard` or cut, by written decision |
 
@@ -151,7 +180,9 @@ and more; origins `saved_work` or a tenant `stable_id`) behind
 These stay as machinery underneath. The business never navigates them:
 offerings, installations, the product catalog, "Apps" and "Work" as nouns,
 "Capability", "Version" meaning time, and the words AI, agent, automation,
-workflow and task. **Provider** means an outside system (Google, Resend,
+workflow and task. **Agency handoff** names a change of serving agency.
+**Billing group** is an operator billing grouping, never the identity of a Client or personal Account.
+**Provider** means an outside system (Google, Resend,
 Stripe or a calendar); a person or agency serving a business is the **Agency**.
 Old links (`view=apps`, `view=work`, `view=products`,
 `view=customers`, `/dashboard`) keep resolving.
@@ -232,8 +263,9 @@ turned up problems no single plan had. Each is from code reading unless marked.
 7. **Tenant rename may drop Redis data.** `src/lib/tenant-rename.ts` moves
    keys with `get`/`set`, which likely fails on the sorted sets, hashes and
    lists that hold leads, orders and rewards, and drops TTLs. Not yet run.
-8. **One clock for chasing.** Needs you and the operator queue both chase
-   owner decisions at days 3 and 7 and lapse at 14. Decide once.
+8. **One clock for chasing.** Needs you and the agency Queue must use the
+   same configured owner-decision ages. The older 3/7/14-day proposal is not
+   an accepted service promise; platform operators do not chase client service.
 9. **Google comes first.** Basic API access is granted by application with a
    reported backlog; until approved, quota is zero. Whether Strelva's project
    has it, whether the OAuth consent screen is in production (if not, refresh

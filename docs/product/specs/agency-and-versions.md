@@ -5,8 +5,39 @@
 > admin-versus-partner matrix, super-admin Team, operator-prepared client Possibilities and
 > shared operator Queue below describe older implementation (§3.2/4/6, §4, §6.2, §9.1/4).
 > They need engineering follow-up through the ordinary agency path. In the Strelva-agency
-> example its display name is "Strelva" and agency copy carries "Runs on Strelva"; another
+> example its display name is "Strelva Agency" and agency copy carries "Runs on Strelva"; another
 > agency's display name replaces it. Receipts record whoever acted.
+
+## Accepted coherence contract — October 11
+
+[ADR 0014](../../../../docs/adr/0014-one-model-at-three-zooms.md) selects one
+model at three zooms: agency **All clients** → agency inside one client →
+owner **Your business**. Inside a client, the agency sees Home, Systems,
+Requests, Running, What changed and decision status through its granted scope,
+plus Version/source and preparation controls. Approval, exit, payer decisions
+and sensitive data remain owner-only. Same nouns, Health and Request stages
+at every zoom; preparation controls never widen authority.
+
+**Queue** is the agency's cross-client client-service list, independent of
+platform-operator access. Owner decisions show read-only **Waiting on [business]**,
+the owner's same title and a link to the exact Needs you item. No operator
+bucket or operator queue supplies client-service authority. An incomplete
+client/source read stays explicit; it cannot prove nothing is waiting.
+
+**Library** is the agency's sources and client Versions. **Ready-made systems**
+includes qualified reusable definitions from Library alongside clearly
+identified starters and services; packaging never
+copies client records, accounts, secrets or grants. **Internal tool** is the
+kind and **Internal tools** the collection, with named Systems opened directly.
+Agency handoff names the business and both agencies and preserves History.
+
+Receipts name the recorded agency with **Runs on Strelva**, including
+**Strelva Agency**. Actual platform actions alone name **Strelva**. Unknown
+actors are **Actor not recorded**, never inferred from the viewer. Owners see
+their agency's brand throughout shell, email, entry and signed pages; end
+customers see the business's name. Failed brand lookup shows a neutral state
+and holds agency-authored sends. This contract is accepted; the dated local
+implementation evidence below does not prove these coherence fixes.
 
 Status: draft spec, 2026-10-06. Not approved. **Built and proven locally
 on branch `build/versions-agency` (Oct 6), applied nowhere:** the Versions
@@ -41,14 +72,14 @@ They are retained as history, not the current implementation inventory.
 | Launch requirement | Local implementation and proof |
 | --- | --- |
 | 1–3: all clients in one scoped read, cursor above 100, named partial failure | `agency_client_overview`/`agency_client_overview_v2`, strict server response parsing, Clients view; `agency-versions-server`, `agency-home-ui`, `w6-agency-operator-overview` suites. The 50-client UI case renders all rows from one request; it is not a production latency claim. |
-| 4: one Queue with owner asks, improvements and health | Agency view consumes the released operator Queue while retaining scoped Version and owner-decision rows. Incomplete sources are named; missing/stale health is Not verified. `w6-agency-operator-overview` covers inaccessible businesses, delegated scope, operator refusal and source failure. |
+| 4: one Queue with owner asks, improvements and health | The October 7 implementation consumed the released operator Queue; that source choice is superseded. The accepted Queue reads ordinary agency scope, with exact-item Waiting on [business] owner-decision links. Incomplete sources are named; missing/stale health is Not verified. `w6-agency-operator-overview` covers inaccessible businesses, delegated scope, operator refusal and source failure. |
 | 5–6: Library and Team | Source revisions, per-Version conflicts/missing accounts/declines and team reach are read and rendered. Library now links directly to the client's Version System. |
 | 7–8: Build and Package | Existing funded work-plan execution creates an owned Draft System. Package extracts the reusable app definition or Version draft, rejects private records/accounts/secrets, and records a command receipt for lost-reply retries. `w6-agency-authoring` tests accepted-but-unconfirmed publication and altered retries. |
 | 9: bulk review | Selected ready Versions get separate business preparations/receipts; conflicted/missing-account Versions are skipped. The release and Needs you gates are checked per business; adopting never moves Live. `w6-version-decisions` and `agency-home-ui` cover this boundary. |
-| 10–13: create, override, bind, release | A native internal-app source creates an empty, separately owned executable application and canonical System in one command with its source share and lineage. Local overrides remain drafts; an approved, exactly prepared Version row updates, rehearses and publishes that destination runtime in the same transaction as its immutable release and spine pointer. Records remain owned by the destination. Unsupported automated runtime kinds fail explicitly; custom-repo website Versions require operator-prepared native Possibilities. `w6-version-native-create`, `w6-version-native-runtime`, `tests/w6-version-native-applications.sql` and rollback proof exercise these boundaries. |
+| 10–13: create, override, bind, release | A native internal-app source creates an empty, separately owned executable application and canonical System in one command with its source share and lineage. Local overrides remain drafts; an approved, exactly prepared Version row updates, rehearses and publishes that destination runtime in the same transaction as its immutable release and spine pointer. Records remain owned by the destination. Unsupported automated runtime kinds fail explicitly; custom-repo website Versions historically used operator-prepared native Possibilities; the accepted contract requires preparation through ordinary agency scope. `w6-version-native-create`, `w6-version-native-runtime`, `tests/w6-version-native-applications.sql` and rollback proof exercise these boundaries. |
 | 14–17: compare, resolve, decline, separate adoption from Live | Source improvements project into the normal Possibilities vocabulary with current/candidate definitions and path conflicts. Adoption prepares the existing Version-release Needs you item; Make real decides that exact pinned item, with no duplicate approval path. Later revision comparison, decline reasons, CAS writes and lost preparation retries remain. `w6-version-possibilities`, its rendered UI tests, and `w6-version-decisions` prove these boundaries. Restore from History changes only the working draft and requires its own release decision. |
 | 18: source author sees no implicit client data | Version service and Postgres reads require the client's grant. Only its business owner can grant or revoke lineage/data access; migration `20261010163200` also blocks direct service-role saves and disables direct access to the private save implementation. The shared store contract tests owner allowance, admin denial, unchanged admin draft access, revoked grants and binding secrecy. |
-| 19: Twin Trees first real set | Mapping and isolated two-location tests exist. Production setup remains blocked on the owner's one-business/two-business answer; custom-repo improvements remain operator-prepared work. No real Version set is claimed. |
+| 19: Twin Trees first real set | Mapping and isolated two-location tests exist. Production setup remains blocked on the owner's one-business/two-business answer; the accepted contract requires ordinary agency preparation for custom-repo improvements; older operator preparation is superseded. No real Version set is claimed. |
 | 20: System Versions panel | Source, sibling context and waiting improvements render with actual reusable-shape changed paths and before/after values for each permitted sibling. The scoped read masks sensitive/secret/record/account/grant/maintenance data and names unavailable comparisons. Removed paths, empty comparisons and legacy unverified reads are explicit. Migration `63400`, `w6-version-sibling-changes.sql`, scoped projection/UI tests, and 7/7 Playwright cases at 1280/390px passed locally; rollback/reapply of the read wrapper passed. Restore from History still changes only the draft. |
 
 Round 5 initial focused proof: six test files, **39 passed / 11 skipped**.
@@ -90,28 +121,29 @@ agency mail implementation.
 
 ## 1. The moment
 
-It's Monday. Jacob opens Strelva as Strelva, the agency that runs every
-client.
+It's Monday. Jacob opens Strelva as **Strelva Agency**, serving its contracted
+clients through ordinary agency scope.
 
 **Clients** lists all of them on one page: gldf, The Mooney Firm, Twin
 Trees, McClear's, Rohlax, Leslie Bookkeeping and the rest. Each row shows the
 business by name, its Systems by their own names ("attymooney.com · Live",
 "Inquiries · Live · 2 new"), anything waiting on the owner and for how long,
-and the last thing Strelva did. Nothing is paged in eights.
+and the last thing Strelva Agency did. Nothing is paged in eights.
 
 Twin Trees has one website, run in two places. Its row shows the Camillus
 site and the Fayetteville site as two Versions of one website, each with its
-own domain, hours and booking calendar. Last week Strelva changed the
+own domain, hours and booking calendar. Last week Strelva Agency changed the
 Camillus site's hours section. The Fayetteville System page now shows, under
 Versions: "Camillus got a new hours section. Bring it here?" Both sites are
-custom repos today, so Strelva prepares that change for Fayetteville by
+custom repos today, so Strelva Agency prepares that change for Fayetteville by
 hand. It arrives as a Possibility, not as an automatic copy.
 
-Twin Trees' owner never signs in. The owner gets one email: "Strelva has an update
-for your Fayetteville site. Look at it, or approve it." The owner approves. Strelva
-publishes, reads it back, and the receipt lands under **What changed**.
+Twin Trees' owner never signs in. The owner gets one email: "Strelva Agency has
+an update for your Fayetteville site. Look at it, or approve it." The owner
+approves. Strelva Agency publishes, reads it back, and the receipt names **Strelva Agency** with
+**Runs on Strelva** under **What changed**.
 
-Separately, Strelva improves its own inquiry intake, the source behind
+Separately, Strelva Agency improves its own inquiry intake, the source behind
 clients' contact forms. **Library** shows that intake with its client
 Versions and where each stands. Say 7 clients have it: 5 can take the
 improvement cleanly, 1 has a conflict, 1 is missing a connected calendar.
@@ -122,19 +154,19 @@ The conflicted one shows both values side by side:
 
 **Review all** prepares the 5 clean ones, one Possibility per client, one
 approval per owner, one receipt per client. The conflicted one waits for
-Strelva's call. The one missing a calendar says so and does nothing.
+Strelva Agency's call. The one missing a calendar says so and does nothing.
 
 No client's data, accounts or contacts ever move to another client.
 
 ## 2. In the model
 
 - **Version** is a System adapted for a different context: a location (Twin
-  Trees), a client of an agency (Strelva's intake for Mooney), later a
+  Trees), a client of an agency (Strelva Agency's intake for Mooney), later a
   segment or franchise (`VERSION_CONTEXT_KINDS` in
   `src/platform/system-versions/types.ts`). Each Version is its own System,
   owned by the business it runs for.
-- A **source** is the System a Version descends from. Strelva's own sources
-  live in Strelva's workspace. A same-business source lives in that business.
+- A **source** is the System a Version descends from. Strelva Agency's own sources
+  live in its agency workspace. A same-business source lives in that business.
   ADR 0010's "method" is a source viewed from the agency side.
 - An **improvement** is a new source revision offered to a Version. On the
   Version's System it arrives as a **Possibility**. Adopting it is **Make
@@ -165,21 +197,26 @@ that workspace.
    count, last receipt time. The browser makes one call, not one per client.
    With 12 active tenants this is one page. Over 100 clients it paginates on
    the server by cursor.
-2. **Each row is scoped exactly as opening that client would be.** A partner
-   agency (later) sees only Systems tied to its delegated or assigned work.
-   Strelva, as admin member of converted workspaces, sees the whole business.
-   The batched read applies `system_actor_scope` per client; it never widens.
+2. **Each row is scoped exactly as opening that client would be.** Every
+   agency, including Strelva Agency, sees only its granted client scope.
+   Inside the client, the owner's workspace has an agency preparation layer,
+   with owner-only decisions read-only. The batched read applies
+   `system_actor_scope` per client; it never widens.
 3. **A client that fails to load says so** by name ("Twin Trees could not be
    loaded. Retry.") and the others still render.
-4. **Queue** lists Strelva's own work across clients, oldest first: Requests
-   in Asked or In progress, Possibilities waiting on an owner, improvements
-   ready to offer, health failures, and owner emails that bounced or were
-   never opened. Each item opens the client's System, not a copy.
-5. **Library** lists Strelva's sources. Each shows its revisions, the
+4. **Queue** lists that agency's client-service items across clients, oldest
+   first: Requests, Possibilities waiting on an owner, improvements to offer,
+   health failures and owner-email failures. It uses ordinary agency scope,
+   not the platform operator queue. Owner decisions read **Waiting on
+   [business]**, with the owner's same title and an exact-item link into
+   Needs you; approval controls stay owner-only. Other rows open the scoped
+   source item. Missing pages/sources remain explicit.
+5. **Library** lists the agency's sources. Each shows its revisions, the
    clients with Versions of it, and per-Version status: up to date, ready,
    has conflicts, missing accounts, declined.
 6. **Team** lists the agency's members and which clients each one works.
-   At 1.0.0 that is Strelva operators (`super_admins`).
+   Membership in that agency determines reach; a `super_admins` row does
+   not supply agency authority.
 7. **Build** makes a System for a client from a sentence, through the
    existing work-plan path (`src/products/work-plans/`), into the client's
    workspace as a Draft. The owner never has to build.
@@ -242,7 +279,10 @@ These keep the inquiry pattern vocabulary underneath
 `src/products/inquiries/inquiry-pattern-updates.ts`), which already calls
 `collectChangedPaths` from `src/platform/system-versions/compare.ts`.
 
-### Who can do what on a client's System
+### Historical October 6 access matrix — superseded
+
+The accepted contract above replaces the privileged Strelva admin column. It
+does not grant agencies sensitive data or owner actions by matching navigation.
 
 | Action | Owner | Member | Strelva (historical admin access) | Agency (historical delegated access) |
 | --- | --- | --- | --- | --- |
@@ -264,9 +304,10 @@ Rules that never bend:
   the business retains its data and exit. Strelva's agency has no extra powers.
   **Changed by ADR 0013 / decision 2:** the admin-based conversion and access
   described below must be reconciled with the ordinary agency path.
-- **Being the source author grants nothing** on a Version. Strelva adopts on
-  Mooney's intake because it is Mooney's admin member, not because it wrote
-  the source. A partner agency with no assignment gets `VersionAccessError`.
+- **Being the source author grants nothing** on a Version. Strelva Agency
+  prepares Mooney's intake only through its ordinary client grant or assignment,
+  never from platform-admin membership. An agency with no assignment gets
+  `VersionAccessError`.
 - **An agency relationship record grants nothing.** "Operated by {agency display name}"
   and "Runs on Strelva" are shown, but
   access comes only from membership, delegation or assignment.
@@ -477,7 +518,7 @@ already accepted by a provider (per `AGENTS.md`).
 5. Production proof on a Strelva-owned test business with two locations:
    create Versions, publish a source improvement, adopt, release, read back,
    restore the earlier release. Receipts for each.
-6. Economics: operator minutes per client per month measured from the Queue
+6. Economics: agency delivery minutes per client per month measured from the Queue
    (draft PR #205), before and after bulk review. No claim of savings until
    measured.
 
@@ -502,12 +543,11 @@ already accepted by a provider (per `AGENTS.md`).
    descend from (what `multiSiteAccountAsVersions` does). B: Camillus is the
    source, Fayetteville its Version. **Recommend A**: neither location is
    subordinate, and adding a third location is the same move.
-4. **Agency Queue vs operator queue — changed by ADR 0013 / decision 2.**
-   Client service cannot use platform operator authority. Reconcile the
-   shared projection and actions; the older recommendation below is not
-   authority to serve clients from `/admin`. Historical recommendation: Reborn §5 wants one operator queue in
-   `/admin`. **Recommend one queue, two views**: the agency Queue reads the
-   same source, filtered to the actor's clients. Otherwise it's a seventh queue.
+4. **Agency Queue vs operator queue — decided October 11, D4.** Queue stays
+   the agency cross-client list and reads ordinary agency scope. It does not
+   consume the operator queue or require platform access. Owner decisions
+   read Waiting on [business], with the owner's title and exact-item link.
+   This supersedes the October 6 recommendation of one queue with two views.
 5. **Owner silence.** How long an improvement waits before the Queue
    escalates, and whether some improvement kinds (security fixes) can be
    covered by a standing owner policy. Needs the Needs you policy spec.

@@ -47,7 +47,7 @@ including all names, counts, dates and assumed results, is confined to the owned
 
 Portfolio/library/canon previews support `state=loading|empty|error|permission`
 and `mode=dark`. Team supports those state values plus `member`. Verification
-also supports `partial|verified`. Provider change supports
+also supports `partial|verified`. Agency handoff supports
 `awaiting_policy|notified|loading|empty|error|permission` plus owner cancellation
 with `role=owner`. Typed yes in every new composer records a preview request
 only; it never approves, publishes or sends.

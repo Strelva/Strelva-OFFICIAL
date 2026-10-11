@@ -6,6 +6,18 @@
 > implementation; engineering must reconcile client onboarding and owner invitation through
 > the ordinary agency path, without platform powers used for client service.
 
+## October 11 entry and brand contract
+
+Owner entry opens **Your business**; the agency switcher says **Clients** and
+opens the same workspace within granted scope, with an agency preparation layer.
+Approval, exit, payer decisions and sensitive data stay owner-only. Owners see
+their agency's brand through invitations, sign-in, no-access and signed pages;
+end customers see the business's name. Failed brand lookup shows a neutral state
+and holds agency-authored sends; it never silently becomes Strelva. Receipts
+name the recorded actor, including Strelva Agency for that agency's service;
+unknown attribution reads Actor not recorded. These are accepted contracts,
+not new proof of the older entry implementation below.
+
 Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; release and email flags remain off. Current proof and
 production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
@@ -53,7 +65,7 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   never supplies the business-member identity used by this service executor.
   Existing unbound sessions fail closed. The focused local proof command is
   `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-owner-decision-effects-sql.sh`.
-  Application and Version release approvals require sign-in until their native
+  Internal tool and Version release approvals require sign-in until their native
   mutations accept and atomically recheck a bound service session; ordinary
   authenticated releases remain available. Old owner-link sessions cannot invoke
   those resolvers. Email points to sign-in instead of offering an unsafe approval.
@@ -180,7 +192,7 @@ Owner entry isn't a System. It's the door to the **Business**.
     `claimPendingInviteForCurrentUser`. They don't have to find the
     invitation email first.
 11. **Email links point at the new place.** For a moved workspace, every
-    owner email that links into the app (weekly and monthly reports, review
+    owner email that links into the app (weekly and monthly recaps, review
     alerts, lead notices, billing return URLs) points at the workspace
     place. For anyone else, links stay as they are. Old links in sent emails
     keep working through requirement 4.

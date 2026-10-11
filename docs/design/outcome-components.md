@@ -19,7 +19,7 @@ answers one owner question with a verdict first and one signature visual.
 | AI mirror | What does AI say when people ask for a business like mine? | Real answer with my name highlighted and citations; queries × assistants dots | Website |
 | Reply pattern | Are leads answered fast? | Week strip; each lead a pin whose height is minutes to reply | Inquiries |
 | Rating trend | Am I above the line people filter on? | Line against a dashed 4.5 cutoff with the crossing annotated | Publishing |
-| Sunday picture text | (owner never logs in) | Story-style picture message in the text thread | Phone, weekly report |
+| Sunday picture text | (owner never logs in) | Story-style picture message in the text thread | Phone, weekly recap |
 | Price sheet | What exactly am I saying yes to? | Bottom sheet over a preview of the thing being bought | Possibility, Make real |
 | Location heatmap | Which location is slipping? | Locations × days tiles colored by reply time, verdict headline, one action | Agency home, multi-location Home |
 

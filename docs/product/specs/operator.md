@@ -22,11 +22,42 @@ promise or owner-chase send is activated. See the local evidence mapping at
 the end and [the stream handoff](../streams/w6-agency-operator.md) for full
 verification and rollout prerequisites.
 
-Strelva's main delivery cost is operator time. Today that time is spread over
-six queues in two stores and fifteen `/admin` pages, and some live sites are
-not checked at all. This spec defines the one queue a Strelva operator works
-from at 1.0.0, keyed to Business → System, and the receipts, checks and
-measures that make it trustworthy.
+The platform queue contains logged support, incidents, platform checks and
+release work. Agency delivery has its own ordinary scoped **Queue**, including
+Strelva Agency. Platform access never supplies client-service authority.
+
+## Accepted operator contract — October 11
+
+- **Platform work:** the platform queue/Operator attention names platform
+  incidents and support, never the owner's Needs you collection. Platform
+  actions name Strelva only when the platform actually acted; unknown actors
+  read Actor not recorded. Client-service work names the recorded agency with
+  Runs on Strelva, including Strelva Agency.
+- **Agency work:** drafting, quoting, service acceptance, client chasing,
+  prospects and delivery-minute capture use ordinary agency grants and Queue.
+  A platform operator cannot approve owner decisions or configure agency
+  service policy. Agency Queue does not consume the platform queue.
+- **Three zooms:** All clients → agency inside a client → Your business has
+  the same nouns and decision titles. Agency views expose preparation and
+  Version/source controls within scope. Owner decisions are read-only
+  Waiting on [business], linked to the exact Needs you item. Owner-only
+  approval, exit, payer decisions and sensitive data stay owner-only.
+- **Identity:** a Client is a business, not a tenant/site. Retained site-level
+  support records are Sites until grouped under their business. Billing groups
+  name billing arrangements; Account remains personal sign-in/settings.
+  End-customer messages are Client inquiries; sales records are Agency
+  prospects, owned by the named agency, never an operator sales inbox.
+- **Navigation:** one destination names registry supplies rail, phone,
+  palette, heading and loading/error states. Checks, Operational health,
+  Site audits, Billing groups and Queue use the same names at each entrance.
+- **Brand:** owners see their agency's brand; end customers see the business's
+  name. Failed lookup is neutral and holds agency-authored sends. Audience
+  branding never changes the recorded actor of a platform billing/support action.
+
+[ADR 0014](../../../../docs/adr/0014-one-model-at-three-zooms.md) and the
+[glossary](../../../GLOSSARY.md) own these decisions. The dated rollout and
+source inventory below describe the earlier mixed implementation. They are
+retained evidence, not proof of the October 11 operator-lane separation.
 
 Sources read: `docs/architecture/operator-command-center.md`,
 `docs/product/strelva-reborn.md` §5, `docs/product/strelva-1.0.0.md` §5,
@@ -36,64 +67,42 @@ Sources read: `docs/architecture/operator-command-center.md`,
 
 ## 1. The moment
 
-Tuesday, 8:40 a.m. Jacob opens `admin.strelva.com`. One list.
+Jacob opens the platform console. McClear's website has a failed Postgres lead
+copy: a logged platform storage incident, with its exact System and evidence.
+He inspects the failure and uses the governed repair path only within that
+support scope. The receipt names the recorded platform actor and distinguishes
+accepted repair from successful read-back.
 
-At the top: **McClear's · website · a lead's Postgres copy failed 3 hours
-ago.** McClear's sends its contact form through `/api/v1/leads/mclears`
-(`release-manifest.json`). The lead is safe in Redis for 90 days, but not yet
-kept. The row says so, with the retry count, and offers **Retry now**. He
-clicks it. The row closes with a receipt: "Kept in Postgres 08:41, read back."
-
-Second: **gldf · website · change request, triage due 10:00 today.** The
-owner asked for a new wholesale page yesterday. Due time comes from the
-existing next-business-day rule (`getTriageDueAt`, `src/lib/custom-repos.ts`).
-He assigns it to himself, quotes it, and the owner gets the quote by email
-because gldf's owner has not signed in this month.
-
-Third: **The Mooney Firm · attymooney.com · 2 review replies drafted by
-Strelva, waiting on you.** He opens the diff, approves both. Each reply goes
-to Google, is read back, and leaves a receipt. The receipt says plainly:
-"Google review replies can't be undone from Strelva. You can edit or delete
-the reply in Google."
-
-Below the fold, grouped by business: Rohlax (a domain expires in 21 days,
-owner's call, emailed Monday, no answer), Twin Trees (site checks green, one
-draft maintenance digest), Leslie (nothing waiting).
-
-When he closes an item, a one-line prompt asks "Minutes on this?" prefilled
-from the time the item was open in front of him. He accepts 6. At the end of
-the month the console shows McClear's at 41 human minutes, gldf at 190, and
-the median business at 38.
-
-What he gets: one list that is complete, ordered by harm, with every outside
-write either undoable or honestly labeled as not undoable, and a measured cost
-per business.
+A wholesale-page request, draft review reply and unanswered owner decision
+belong to **Strelva Agency → the named client**, under ordinary agency grants.
+They are absent from the platform service queue. Across clients, owner decisions
+read **Waiting on [business]** and open that exact Needs you item. Agency delivery
+minutes and platform incident effort remain distinct measures.
 
 ## 2. In the model
 
-- The queue is **operator machinery**, not a business-screen noun. Owners never see
-  it. It sits under **Requests** (finite work: change requests, service
-  requests) and **Running** (what Strelva keeps true: site up, domain
-  verified, leads kept).
-- Every item is keyed **Business → System**. Business is the
-  workspace (`workspaces.id`). Before a tenant is converted, the business is
-  the tenant (`tenants.stable_id`) and the item says "not yet a workspace".
-  System is a row in `systems` (`supabase/migrations/20261004120000_systems.sql`)
-  or, for unconverted tenants, the managed website identified by tenant
-  `stable_id` (the rule in `systems-transition.md` row "websites").
-- A health or domain item is **health** of a System or of a **Connection**
-  (domain is an `appear` Connection with `target_type = 'domain'`). It never
-  changes lifecycle. "Live · domain unverified" is valid.
-- An item that waits on the owner is the owner's **Needs you** on their side,
-  and an "owner's call" item on the operator's side. The operator can see it
-  and chase it; the operator cannot decide it.
-- Every outside write produces a **What changed** receipt the owner can
-  see, and the same receipt is the operator's evidence.
-- Proactive "Ready to work" ideas (`src/app/admin/actions/portfolio-opportunities.ts`)
-  are **Possibilities**, not queue items. Only working alternatives a person can open, use and compare qualify;
-  suggestions remain suggestions; proposed research responses are Proposals.
+- The platform queue is operator machinery for logged platform support,
+  incidents and checks. It is not the agency's Queue or the owner's Needs you.
+- Items identify the business and System within explicit support scope.
+  Retained unconverted tenant records are Sites, not counted as Clients.
+- System Health and Connection health never change Draft/Live/Paused intent.
+  Missing or stale observations stay unknown, never green.
+- The agency sees owner decision status as Waiting on [business], with the
+  owner's same title and exact-item link. It cannot decide through that view;
+  the platform operator cannot decide or chase client-service items either.
+- What changed and History name whoever actually acted; unknown evidence reads
+  Actor not recorded. Platform and agency receipts do not infer authorship
+  from the viewer, brand or employment.
+- A suggestion stays a suggestion. A research response is a Proposal; only
+  a working alternative someone can open, use and compare is a Possibility.
 
-## 3. What it does at 1.0.0
+## 3. Historical October 6 mixed-queue contract — superseded
+
+The source kinds, actions and clocks below document the older implementation.
+They do not authorize a platform operator to review drafts, quote or accept
+service, read client inquiry contents, sell, chase owners or log agency delivery.
+The accepted contract above governs the operator lane; the historical 15-kind
+parity proof is not proof of the separated queue.
 
 1. **One list.** `/admin` shows one queue across every tenant and every
    workspace. It reads all sources in the table below. No source is left out
@@ -244,14 +253,16 @@ Item states: `open` → `taken` → `waiting_on_owner` | `waiting_on_provider` �
 A source closing its own item (a draft approved on the client dashboard)
 closes the queue item with "closed elsewhere by {actor}".
 
-Authority:
+Current authority (replaces the older super-admin service model):
 
-- **Strelva operator** (verified user with an active `super_admins` row): sees
-  every business, takes and works items, approves Strelva-drafted changes
-  where policy allows, triggers checks.
-- **Owner:** decides owner's-call items: publish, launch, payment, exit,
-  anything set to owner review. The operator escalates; never decides.
-- **Member, agency:** no `/admin`. Agency queue is out of 1.0.0 (assumption 2).
+- **Platform operator:** logged support, incidents, checks and release only.
+  An active `super_admins` row never grants client-service authority.
+- **Owner:** decides owner-only approvals, exit and payer choices through the
+  owner's exact item and existing authentication/payer rules.
+- **Agency:** prepares and serves clients through ordinary scope, including
+  Strelva Agency. The agency Queue is in 1.0.0 and independent of `/admin`.
+- **Member:** uses only granted business functions. Neither agency/member
+  navigation nor platform employment widens sensitive-data access.
 
 Never:
 
@@ -361,11 +372,10 @@ stay addressable as redirects.
 
 ## 9. Open decisions
 
-1. **Where the queue lives.** (a) `/admin` only; (b) the agency surface Queue
-   (`DESIGN.md` "Not built yet"), which Strelva uses as its own agency under
-   assumption 2; (c) one projection rendered in both. **Recommend (c)** with
-   `/admin` first. ADR 0012 includes outside agencies on equal terms; (c) is required and the
-   projection must filter by delegation.
+1. **Where the queue lives — decided October 11, D4.** The platform queue
+   is separate from the agency Queue. Agency Queue reads ordinary delegated
+   scope, without an operator bucket or operator-access dependency. This
+   supersedes the older recommendation of one projection in both places.
 2. **Clocks.** Proposed: P1 acknowledged in 2 working hours; owner chase at 3
    and 7 days. Different numbers change only config.
 3. **Minutes capture.** (a) manual only (#205 today); (b) prompt on close with
@@ -406,7 +416,7 @@ Inferences, to check:
 - Whether minutes per business are dominated by a few clients (gldf, custom
   repos). Unknown until #205 data exists for one full month.
 
-## Wave 6 local implementation and evidence
+## Historical wave 6 local implementation and evidence
 
 The table maps launch behavior to implementation and local proof. Synthetic
 fixtures establish behavior under those inputs; they do not establish a live

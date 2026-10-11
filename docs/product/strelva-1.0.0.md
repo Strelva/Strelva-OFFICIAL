@@ -15,13 +15,39 @@ Nothing here proves a 1.0.0 production release; production was not inspected.
 
 **1.0.0 is Strelva's launch: a business, or the agency running it, opens one
 workspace and finds its real systems working.** Its website, inquiries,
-bookings, publishing and internal tools read one business record, Strelva
-keeps them running, and the owner only sees the few decisions that are theirs.
+bookings, publishing and internal tools read one business record, its agency
+keeps agreed client work running, and the owner only sees the few decisions that are theirs.
 [Strelva Reborn](./strelva-reborn.md) is the build that gets there. Since
 October 6 it builds straight to `1.0.0`; only the lead fix (`0.2.1`) ships
 first. This page is the full list of what the launch contains.
 [What Strelva becomes at 1.0.0](./product-model.md) is the product model behind
 it, area by area.
+
+## October 11: one model at three zooms
+
+[ADR 0014](../../../docs/adr/0014-one-model-at-three-zooms.md) selects agency
+**All clients** → agency inside one client → owner **Your business**. Within
+its granted scope the agency sees the owner's workspace and decision status,
+plus Version/source and preparation controls. Approval, exit, payer decisions
+and sensitive data stay owner-only. Agency **Queue** uses ordinary agency scope,
+with read-only **Waiting on [business]** rows bearing the owner's same title
+and exact decision link; it does not consume the platform-operator queue.
+
+[GLOSSARY.md](../../GLOSSARY.md) owns the shared names: **Possibility** stays;
+**Proposal** stays a research response underneath. **Internal tool** is the kind,
+**Internal tools** the collection; each opens by its own name. **Library** and
+**Ready-made systems** share qualified reusable sources across the agency and
+business views; starters and services remain separately identified.
+Owners ask for the Running result and approve its limits; agencies configure
+supported Saved checks and cadence. Unsupported results remain Requests.
+
+Agency receipts name the recorded agency with **Runs on Strelva**, including
+**Strelva Agency**; real platform actions name **Strelva**. Unknown attribution
+reads **Actor not recorded**. Owners see their agency's brand throughout the
+journey and end customers see the business's name. Failed brand lookup is neutral
+and holds agency-authored sends. One names registry and `pnpm check:words` are
+required; their implementation and combined rendered proof belong to the other
+coherence lanes. The dated implementation inventory below is not that proof.
 
 ## October 7: 1.0.0 contains the whole ladder
 
@@ -115,9 +141,9 @@ business, monitoring, and at least the best competitor's bar.
 | **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Postgres copy of every lead built locally, not applied; read switch, 7-day parity and Postgres-first capture built locally behind off switches (`w2/bookings-inquiries`); spam review in the workspace, `inquiry_events`, workspace read, contact on capture and commitment replies to the owner built locally behind `STRELVA_INQUIRY_RECORDS` (`w3/inquiries-gaps`); flags off |
 | **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | One booking store, hours and services from the record, pause, owner notice, request mode and day/week views built locally behind off switches (`w2/bookings-inquiries`); reminders, request clocks, hold sweep, manage link page, calendar busy times, booking-only hours and schedule copies built locally behind off switches (`w3/bookings-inquiries-gaps`); the visitor's booking keeps working without Redis once the store serves, and says honestly when nothing was booked (`w4/journey-gaps`, local); no agent bookings or MCP |
 | **Publishing** | Review replies, Google Business Profile, blog and newsletter, all through approval and receipts | Local: Google listing and newsletter Systems behind `STRELVA_PUBLISHING_RELEASE`; governed writes, read-back receipts and undo in `src/products/google-listing`; blog remains the website path. GBP live writes still depend on API approval |
-| **Internal tools** | Agency/Strelva build from a sentence (work plan → app draft); records link to business contacts; notify on submit | Local: agency/Strelva creation checks and business contact/staff links with submit notices (`src/products/applications/internal-tool-links.ts`); drafting remains gated; adoption unverified |
+| **Internal tools** | Agency builds from a sentence (work plan → app draft); records link to business contacts; notify on submit | Local: maker creation checks and business contact/staff links with submit notices (`src/products/applications/internal-tool-links.ts`); drafting remains gated; adoption unverified |
 | **Store, rewards, newsletter, wellness** | Existing client features keep working; frozen store/rewards keep their legacy entry | Store and rewards frozen on `/dashboard`; roster/schedule have workspace booking views; newsletter is a Publishing System (see `src/platform/owner-entry/dispositions.ts`) |
-| **Analytics and reports** | Read the converted workspace; report crons keep running | Local: workspace analytics and recaps routes; Postgres-first report cadence and analytics config with Redis fallback (`d25a84ef`); live cron behavior unverified |
+| **Analytics and recaps** | Read the converted workspace; report crons keep running | Local: workspace analytics and recaps routes; Postgres-first report cadence and analytics config with Redis fallback (`d25a84ef`); live cron behavior unverified |
 | **Documents** | Shared documents with history | Local: unlimited revisions; latest 20 receipts in the payload, durable revision history (`src/products/documents/engine.ts`, `0f3ab077`); adoption unverified |
 
 ### 3. One business record
@@ -139,14 +165,14 @@ business, monitoring, and at least the best competitor's bar.
 | Human minutes per client measured | Local: per-business monthly minutes and operator close recording (`98cc53e3`, `2569ea33`); no measured delivery economics established |
 | Clients and agencies can switch with full history | Local ownership/exit service and schema 3 export (`src/platform/workspaces/business-ownership.ts`); full export and migration-free agency replacement remain incomplete |
 
-### 5. Running it for them
+### 5. Platform operation and agency delivery
 
 | Feature | Today |
 | --- | --- |
-| One operator queue across tenants and workspaces | Local: unified projection, queue sources, receipt store and domain view (`src/platform/operator-queue`, `2569ea33`); live operating coverage unverified |
+| Separate platform support queue and ordinary agency Queue | Historical local mixed projection, receipt store and domain view (`src/platform/operator-queue`, `2569ea33`). Selected platform queue handles logged support, incidents and checks; client delivery belongs to agency Queue. Combined separation proof remains with the coherence coordinator |
 | Every outside write leaves a receipt with read-back and undo | Local: outside-write receipt helper and Google listing/review read-back receipts; explicit undo rules including unavailable undo (`src/platform/operator-queue/receipts.ts`, `src/products/google-listing/receipts.ts`). Universal live coverage unverified |
 | Health and domain checks cover every site, including custom-repo clients | Local: coverage includes custom-repo revalidation and hosted-document checks, with bounded fallback domain probes (`src/platform/operator-queue/site-coverage.ts`, `d8e27590`); unknown/stale evidence remains visible |
-| Client leads visible to operators | Local, merged: Postgres lead capture/mirror and operator reads (`2e3721ec`); applied migration and live parity unverified |
+| Client inquiries visible only through granted agency scope or explicit logged platform support | Historical local operator reads, merged: Postgres lead capture/mirror and operator reads (`2e3721ec`); applied migration and live parity unverified |
 
 ### 6. Every client moved
 
@@ -226,4 +252,6 @@ something Strelva would stand behind for any new agency or business.
 
 The active completion source is `codex/full-model-integration-20261008`, composed from candidate `3ecb25f1` and explicitly reconciled cleanup, assistant, money, agency and access-review followups. Runtime, neutral directory, Units/standards, Home Finder and Sandbox additions are parallel preparations. Lane tests prove their bounded local behavior, not the final combined source or production. All eight rungs, owners who never sign in, actual provider paths, every active-tenant conversion, recovery, accepted commercial policies and public release remain required. No pilot or smaller release substitutes for this commitment.
 
-Platform support remains separate from agency serving. The released platform Queue no longer reads a privileged Strelva service-request inbox; ordinary agency workspace grants and queues own that work. Historical row contracts stay until compatibility retirement is proven.
+Platform support remains separate from agency serving. Agency Queue is not a
+consumer of the platform queue; owner decisions appear as read-only Waiting on
+[business] with the exact Needs you link. The released platform Queue no longer reads a privileged Strelva service-request inbox; ordinary agency workspace grants and queues own that work. Historical row contracts stay until compatibility retirement is proven.
