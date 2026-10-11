@@ -50,7 +50,23 @@ specimen) instead of styling around it in page CSS.
 
 - Screens never say AI, agent, automation, workflow or task. "Assistants" is
   allowed for third-party assistants (Gemini, ChatGPT) acting for people.
-- Strelva is the only name that acts. Name whoever acted.
+- Name the recorded actor: the agency display name with Runs on Strelva,
+  including Strelva Agency. Strelva alone names real platform actions. Unknown
+  actors read Actor not recorded; never infer authorship from the viewer.
+- One model at three zooms: All clients → agency inside a client → Your
+  business. Same workspace nouns within granted scope, plus agency
+  Version/source and preparation controls. Owner-only approval, exit, payer
+  decisions and sensitive data remain owner-only.
+- Agency Queue uses ordinary agency scope. Owner decisions read Waiting on
+  [business], with the owner's title and exact-item Needs you link. No operator
+  work bucket or dependency supplies agency authority.
+- Owners see their agency's brand throughout shell, email, entry and signed
+  pages; end customers see the business's name. Brand failure is neutral and
+  holds agency-authored sends.
+- Follow [GLOSSARY.md](../../GLOSSARY.md): Possibility stays; Proposal is research
+  underneath. Internal tool/Internal tools, Bookings, Saved check, Agency
+  handoff, History, Make real, recap and Ask Strelva on phone share one names
+  registry, enforced by `pnpm check:words` as required by ADR 0014.
 - A typed "yes" in Ask Strelva never approves. Every write is a Needs you
   item with its own control.
 - Who decides can only be made stricter than Strelva's default.
@@ -91,7 +107,7 @@ specimen) instead of styling around it in page CSS.
 
 | Lane | Area | Frames |
 | --- | --- | --- |
-| L1 owner | Home, Needs you, Strelva handled, Requests, Running, Files, Ask Strelva, search, switcher, help, first run | A1 V0rljZ, A2 JI19w, A3 L4g0HR, A4 aseNA, A5 W0CoHN, A7 HQ5yA, A9 M57QND, F2 Y2Tn3F, F4 NGBdN, F5 yBqc4, F6 vwiLI, F12 ABt1D, G1 Q1IkY, G2 s7xyY, G3 E9H9d1, G4 LBP2f, G5 cvfYV, G7 T8pknG, N6 YsBMM, L1 luqhL, L2 h171q, L3 M3TlL, dark U4Va5 |
+| L1 owner | Home, Needs you, What changed, Requests, Running, Files, Ask Strelva, search, switcher, help, first run | A1 V0rljZ, A2 JI19w, A3 L4g0HR, A4 aseNA, A5 W0CoHN, A7 HQ5yA, A9 M57QND, F2 Y2Tn3F, F4 NGBdN, F5 yBqc4, F6 vwiLI, F12 ABt1D, G1 Q1IkY, G2 s7xyY, G3 E9H9d1, G4 LBP2f, G5 cvfYV, G7 T8pknG, N6 YsBMM, L1 luqhL, L2 h171q, L3 M3TlL, dark U4Va5 |
 | L2 website | Website System: page, change review and publish, history, pause, failing checks, rebuild result, photos, look, articles, results, connect a site, domain | F3 eWqtI, N1 n5crO, N2 DVwBO, G6 jH56a, G8 T00vYE, B2a C6Scp, B2b OiF5E, B3 lNRUM, B4 NRUk3, B5 H0HBpJ, B6 KqcYl, B7 q6trU, B8 ydOpf, dark jnmS5 |
 | L3 systems | System page pattern, Possibilities, Make real, Versions, Connections, internal tools, store, documents | F9 fhHa1, F10 f5ywBU, B9 uKByO, B10 D3FVqz, B11 EJA7A, B12 Xysdf, D4 Z4ysc, B20 irVxG, B21 iBzca, B22 bAWa5 |
 | L4 inquiries | Inquiries and bookings, owner and visitor sides | F11 pxaTj, N5 xQ3JS, B14a ynPFX, B14b PAqss, B15 W9Eas2, B16 g9jb8, J1 FGT4x, J2 qD7w0, J3 QKcUT, P2 CxXZy, P3 zIeTC, L4 N57Sh, PH1 AHSG5, PH2 PdOfa, PH3 mQFZx, dark S7NYUi, states Ib8gr |

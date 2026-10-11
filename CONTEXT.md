@@ -131,21 +131,54 @@ owns exact42 issue acceptances and final receipts. Main-workspace
 `PRODUCT_MODEL.md` remains canonical. Reserved decisions, directory/legal facts,
 Sandbox dependency/resource consent and real provider proof remain explicit.
 
+## October 11 coherence decisions
+
+[ADR 0014](../docs/adr/0014-one-model-at-three-zooms.md) and
+[GLOSSARY.md](./GLOSSARY.md) govern the 1.0 experience: agency **All clients**,
+agency inside one client, owner **Your business**. The agency sees the owner's
+Home, Systems, Requests, Running, What changed and decision status within its
+granted scope, plus Version/source and preparation controls. Approval, exit,
+payer decisions and sensitive data remain owner-only.
+
+**Queue** stays the agency's cross-client list through ordinary agency scope;
+owner decisions show read-only **Waiting on [business]**, the same title and
+an exact-item link into the owner's **Needs you**. It does not consume a
+platform-operator queue. **Possibility** stays a working alternative; Proposal
+is a research response underneath. **Internal tool** is the kind, **Internal
+tools** the collection, and Systems open by their own names. Qualified Library sources appear in Ready-made systems as reusable definitions,
+without client data, accounts, secrets or grants. Built-in starters and managed
+services keep their distinct origin and acceptance requirements.
+
+Copy names the recorded actor: the agency display name with **Runs on Strelva**,
+including **Strelva Agency**. **Strelva** alone names real platform actions;
+unknown attribution is **Actor not recorded**, never inferred from the viewer.
+Owners see their agency's brand throughout shell, emails, entry and signed pages;
+end customers see the business's name. Brand lookup failure shows a neutral state
+and holds agency-authored sends. One names registry and `pnpm check:words` are
+required by ADR 0014; this docs reconciliation does not prove their implementation.
+
+This records accepted decisions and local doc changes, not rendered, deployed,
+operating, adoption or commercial proof. Existing evidence retains its own date
+and scope. The coherence coordinator owns combined proof and promotion; canonical
+`PRODUCT_MODEL.md` and strategic state remain with their integration owner.
+
 ## Product model
 
 Selected by Jacob on October 4, 2026
 ([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)).
 Customers see **Systems**, **Connections**, **Possibilities** and
 **Versions**. The verbs are Make, Connect, Explore, Make real and Version.
-This is direction. No System runtime, table or screen is shipped yet, and
-nothing here proves demand, delivery cost or pricing.
+This is selected direction. The original October 4 model did not prove a
+shipped runtime; the dated checkpoints above own later local and bounded
+production evidence. Nothing in these decisions proves demand, delivery cost
+or pricing.
 
 Walk it with The Mooney Firm. Its website is a **System**: it stays the same
 System through a rebuild, a new domain or a new booking section. It has
 **Connections**: it reads hours and services from the business record, appears
 on attymooney.com, and could act on the firm's Google Business profile once
 that access is granted. A **Possibility** could be a consult-booking flow
-Strelva builds beside the current contact path, which the owner can open, try
+Strelva Agency builds beside the current contact path, which the owner can open, try
 and compare. **Make real** turns it on. If the website change lands and the
 calendar grant fails, the owner sees exactly that, and the part that landed
 stays. If the firm opened a second office, a **Version** would be the same
@@ -326,7 +359,8 @@ layer governs business-screen nouns and actions; exact labels are Jacob-approved
 and open labels remain marked there. **Underneath** owns internal definitions.
 The [product ontology](./docs/architecture/product-ontology.md) owns structure
 and governance rules. Actor and audience naming follows the glossary and
-company ADR 0013; copy names whoever acted.
+company ADR 0013; ADR 0014 records the three zooms and names enforcement. Copy
+names whoever acted; brand lookup failure never assigns the work to Strelva.
 
 ## Evidence state
 

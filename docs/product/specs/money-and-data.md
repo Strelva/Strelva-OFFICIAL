@@ -7,6 +7,25 @@
 > requirements with engineering follow-up. Platform billing support remains logged platform
 > work; it does not grant client-service powers.
 
+## October 11 identity and scope contract
+
+A Client is a business, never a site count. **Billing group** names the
+operator grouping of businesses or linked sites for a billing arrangement;
+**Account** stays personal sign-in/settings. Grouping supplies no ownership,
+data access, agency commitment or new price. **Agency handoff** names the
+business and both agencies and preserves History. Provider names an outside
+system, not an agency.
+
+Payer choices, owner-only exit and sensitive data remain owner-only under the
+three-zoom model. Agency Queue shows owner decisions as read-only Waiting on
+[business] with the owner's title and exact-item link; it cannot decide them.
+Platform billing actions name Strelva only when the platform acted. Agency
+work names the recorded agency with Runs on Strelva, including Strelva Agency;
+unknown attribution is Actor not recorded. Failed brand lookup is neutral
+and holds agency-authored sends. Weekly/monthly customer outputs are recaps;
+report identifiers remain underneath. Existing money and production authority
+is unchanged; no billing grouping or price is activated by these words.
+
 Status: implementation prepared locally through wave 6 round 5 on
 `w6/agency-operator` (2026-10-10 migration series). Nothing in this work
 applies production migrations, changes Stripe, sends live email or flips a
@@ -113,7 +132,7 @@ and their points, bookings and booking hours, reviews and replies, and a list
 of the outside accounts Strelva was connected to. No passwords or tokens. The
 receipt says what was included and what wasn't, and why.
 
-**Every month, one line per business.** The Mooney Firm's monthly report says:
+**Every month, one line per business.** The Mooney Firm's monthly recap says:
 "412 visits. 9 inquiries; 8 answered within a day. 3 booked a consult, 2 of
 them from a website inquiry. 2 new Google reviews." Each number says whether
 it is counted or linked, and nothing is claimed that the data can't join.
@@ -422,7 +441,7 @@ Not undoable: a sent export link (it expires), a Stripe charge, an email.
   older than 90 days (from Postgres), bookings, rewards and a connection; the
   archive has every category and no secret (grep for token prefixes).
 - Production proof on the Strelva-owned test business: one lead, one order,
-  one booking, one reply, one review flow through to the monthly report with
+  one booking, one reply, one review flow through to the monthly recap with
   correct linked and counted figures.
 - Byte-identical storefront comparison for converted clients, as Sept 30
   (60/60).

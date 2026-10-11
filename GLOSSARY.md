@@ -3,22 +3,30 @@
 This is the single authority for words in product copy, docs and the internal
 model. The [product ontology](./docs/architecture/product-ontology.md) owns
 structure and governance rules; both CONTEXT.md files point here for language.
-These definitions apply Jacob's decisions of October 9, 2026.
+These definitions apply Jacob's decisions of October 9–11, 2026, including
+[ADR 0014](../docs/adr/0014-one-model-at-three-zooms.md).
 
 ## On screen
 
 Words a person sees. The concepts are defined here; exact product labels remain
-Jacob's call (label open). Internal distinctions stay in the Underneath layer.
+Jacob's call where marked label open. The October 11 decisions keep Possibility
+and Queue and select Internal tool. Internal distinctions stay in Underneath.
 
 The named actor is whoever did the work. An agency uses its display name with
-“Runs on Strelva” credit. Strelva is the actor only for platform action or when
-Strelva's own agency acted under its agency display name.
+“Runs on Strelva” credit. “Strelva Agency” names Strelva's own agency.
+“Strelva” alone names only real platform actions: platform billing, account
+authentication, platform checks and support. Never infer the actor from the viewer; an unknown actor is
+“Actor not recorded”.
+
+Owners see their agency's brand in the workspace shell, emails, entry and signed
+pages. End customers see the business's name. Failed brand lookup shows a neutral
+state and holds agency-authored sends; it never silently becomes Strelva.
 
 ### Systems and their state
 
 **System** _(label open)_:
 Something a business made in Strelva that works, such as a website, proposal,
-booking page, intake flow or internal app. Its identity survives changes to
+booking page, intake flow or internal tool. Its identity survives changes to
 its content, data, logic and screens. Draft, Live and Paused express intent;
 Health is separate.
 _Avoid_: product, project, installation, module, app (as the general noun)
@@ -29,9 +37,10 @@ by: business facts, another System, a person, an outside account or a domain.
 An account connection is one kind. A Connection never grants authority by itself.
 _Avoid_: integration (as the general on-screen noun), permission
 
-**Possibility** _(label open)_:
+**Possibility**:
 A working alternative to one or several Systems that a person can open, use
 and compare. A suggestion alone is not a Possibility. Make real turns it on.
+Proposal remains an Underneath research response, never an on-screen synonym.
 _Avoid_: idea, recommendation, research proposal, experiment (as synonyms)
 
 **Make real** _(label open)_:
@@ -53,6 +62,22 @@ _Avoid_: Version, release, revision (as the on-screen noun)
 How a System is doing now, separate from whether the business intends it to
 be Draft, Live or Paused.
 _Avoid_: lifecycle, Live (as proof of health), guaranteed uptime
+
+**Internal tool / Internal tools**:
+A System a business uses for its own work, including a tracker or an intake tool.
+Internal tool is the kind; Internal tools is the collection; open it by its own name.
+_Avoid_: Application, Internal application, App, Private app, Spreadsheet tracker
+(as kind or collection labels)
+
+**Bookings**:
+The System kind for receiving, confirming and managing bookings, including
+request-based booking and existing calendars or rosters.
+_Avoid_: Scheduling, Schedule, Reservations (as kind labels)
+
+**Saved check**:
+A saved comparison or inspection that can be run again with its stated sources;
+when maintained over time, its result contributes to the watched System's Health.
+_Avoid_: saved investigation, Ongoing check, Website monitoring (for all checks)
 
 ### Requests and what keeps running
 
@@ -78,10 +103,15 @@ did the work, including an agency's display name when the agency acted.
 _Avoid_: Strelva handled (former label), Strelva did it (when another actor did),
 anonymous agency work
 
+**Actor not recorded**:
+The visible attribution when the recorded evidence cannot identify who acted.
+It never assigns unknown work to Strelva or to the current viewer.
+_Avoid_: Strelva (as a fallback actor), Strelva or your team
+
 **Ask Strelva** _(label open)_:
 Where a person says what they want to happen. Their words are an ask before
 work exists; an ask alone grants no permission to run, share or publish anything.
-_Avoid_: Start, start request, prompt (as the on-screen noun)
+_Avoid_: Start, start request, prompt, Chats (as the phone place name)
 
 ### People and businesses
 
@@ -114,11 +144,49 @@ One end customer's request to a business, with its handling status and assignee.
 Customer Inquiry is the full term.
 _Avoid_: lead (the stored copy), submission, prospect, record
 
+**Agency handoff**:
+An owner-authorized change of serving agency that names the business and both
+agencies and preserves its records and History.
+_Avoid_: Provider handoff, Provider change, Complete provider change
+
+**Billing group**:
+An operator grouping of businesses or linked sites for a shared billing
+arrangement; it is neither a Client identity nor a person's Account.
+_Avoid_: Account, client (for a group of sites), ownership or access grant
+
 ### Finding your way
 
+**Three zooms**:
+One model viewed as agency “All clients”, agency inside one client, or owner
+“Your business”; the same nouns apply within the viewer's granted scope.
+Inside a client the agency sees the owner's workspace plus Version/source and
+preparation controls; owner-only approval, exit, payer decisions and sensitive
+data remain owner-only.
+_Avoid_: separate agency product, agency status as owner authority
+
+**Queue**:
+The agency's cross-client list of its client-service items, read through ordinary
+agency scope; owner decisions read “Waiting on [business]” with the owner's
+same title and a link to that exact item, without approval controls.
+_Avoid_: operator queue (as the agency's source), Strelva's work (platform bucket),
+Needs you (as the cross-client place name)
+
+**Ready-made / Ready-made systems**:
+Where a business finds reusable Systems it can ask to use, including qualified
+Library sources and clearly labeled starters. Managed services remain separately
+identified and require accepted scope; they are not reusable source Systems. Internal tools is a kind filter;
+setup does not imply agency acceptance or operating authority.
+_Avoid_: Apps from creators, Get or build, More tools and managed services, All products
+
+**Library**:
+The agency's reusable sources and their client Versions, with improvements and
+conflicts; a source offered as Ready-made is the same reusable definition viewed
+from the business side, without transferring records, accounts, secrets or grants.
+_Avoid_: separate catalog model, implicit client-data sharing
+
 **Section**:
-A workspace destination: Home, Needs you, Requests, Running or Systems, with
-Business details, People & access and Help in the business menu. Account is
+A workspace destination: Home, Needs you, Requests, Running, What changed or
+Systems, with Business details, People & access and Help in the business menu. Account is
 personal account context; Ask Strelva is the ask entrance. A System opens by
 its own name.
 _Avoid_: Work, Ongoing, Settings, Explore, Start (as current place names)
@@ -142,7 +210,7 @@ The shared facts, contacts, requests, bookings and content belonging to a busine
 _Avoid_: CRM, knowledge graph, tenant config
 
 **System kind**:
-A type of System, such as a website, schedule or document. A System has one kind
+A type of System, such as Website, Bookings or Internal tool. A System has one kind
 for its whole life.
 _Avoid_: product, executable, horizontal, native product, tool
 
@@ -326,7 +394,7 @@ _Avoid_: guaranteed success, anonymous agency work
 
 **Workspace record**:
 A typed thing a System kind keeps for one workspace, such as a website draft,
-schedule, document or onboarding case, with one record kind and successive revisions.
+booking, document or onboarding case, with one record kind and successive revisions.
 _Avoid_: saved work, product work, resource, item (as synonyms)
 
 **Record kind**:
@@ -520,10 +588,11 @@ _Avoid_: delivery receipt, provider receipt, guaranteed delivery
 
 ## Open naming questions
 
-- **On-screen labels:** Jacob approves exact labels. “What changed” is decided;
-  the rest stay open.
+- **On-screen labels:** What changed, Possibility, Queue and Internal tool are
+  decided. Other labels marked open remain Jacob's call; those open choices do
+  not reopen the October 9–11 decisions.
 - **Capability and System kind:** whether every System kind corresponds to one
   Capability or composes several remains open. They are internal words, not
   competing on-screen nouns.
-- **Application records:** the name for records inside a custom application,
+- **Internal tool records:** the name for records inside an Internal tool,
   distinct from workspace records, remains open.

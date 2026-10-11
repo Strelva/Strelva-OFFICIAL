@@ -7,6 +7,37 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## October 11 coherence amendment
+
+[GLOSSARY.md](../../GLOSSARY.md) and
+[ADR 0014](../../../docs/adr/0014-one-model-at-three-zooms.md) govern current
+copy and composition. The dated adoption rows below remain implementation
+history, including release-off and legacy labels; they do not establish the
+October 11 lane changes.
+
+One model has three zooms: All clients, agency inside one client, Your business.
+Agency navigation includes Clients, Queue, Library and Team. Inside a client
+it shows the same owner workspace within granted scope, plus Version/source
+and preparation controls. Owner-only approval, exit, payer decisions and
+sensitive data stay owner-only. Queue decisions read Waiting on [business],
+with the owner's same title and exact-item Needs you link; Queue uses ordinary
+agency scope, independent of platform operator access.
+
+What changed names receipts; the recorded agency carries Runs on Strelva,
+including Strelva Agency. Strelva alone names actual platform actions; unknown
+actors read Actor not recorded. Owner shell, email, entry and signed pages use
+the serving agency's brand; public pages use the business's name. Brand failure
+is neutral and holds agency-authored sends.
+
+Internal tool is the kind, Internal tools the collection; each System opens by
+name. Bookings, Saved check, Agency handoff, History, recap, Make real and Ask
+Strelva on phone use the shared names registry. Possibility remains a working
+alternative, never a bare suggestion or research Proposal. Library and Ready-made
+systems share qualified reusable definitions without client data or grants;
+starters and managed services remain separately identified.
+`pnpm check:words` is required by ADR 0014; this amendment makes no claim that
+it or the rendered coherence changes have passed in this worktree.
+
 ## Strelva 1.0 kit, October 9, 2026 (local)
 
 `src/components/ui/strelva/Kit.tsx` with `kit.module.css`, on the paper tokens

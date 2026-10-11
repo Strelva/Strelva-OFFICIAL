@@ -7,6 +7,18 @@
 > path. Engineering must reconcile the existing operator/member permission and owner-email
 > entry paths with that boundary; naming a different actor alone grants no access.
 
+## October 11 shared ask contract
+
+**Ask Strelva** names the entrance on desktop and phone. It uses the same nouns
+at All clients, inside one client and Your business; context and preparation
+controls follow granted scope. Agency status never supplies owner-only approval,
+exit, payer decisions or sensitive data. Owners ask for an Internal tool or a
+maintained Running result; the agency prepares supported tools, Saved checks
+and cadence. Unsupported work becomes a Request. Only a working alternative
+is a Possibility; Proposal remains a research response underneath. Responses
+and History name the recorded actor; missing evidence is Actor not recorded.
+Agency branding failure is neutral and holds agency-authored sends.
+
 Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; all release flags off. Proof and remaining stop points
 are in [the stream handoff](../streams/w6-owner-ask.md).
@@ -35,7 +47,7 @@ names Strelva. It rehearses the rule in isolation, shows the full message in
 Try, and returns to Exploring if the native configuration changes.
 
 Changes to a projected managed System without a durable baseline remain
-Requests for Strelva to prepare. So do new booking services, new-site booking
+Requests for the serving agency to prepare. So do new booking services, new-site booking
 bindings, custom flows and unsupported rebuilds. The existing booking effect
 publishes a scheduling grant; the inquiry effect requires a prepared,
 tenant-specific request/change. Ask has no tool to create that new inquiry
@@ -50,12 +62,14 @@ journeys on an isolated Auth stack, live mail, publication/read-back/undo on a
 Strelva-owned business, actual cost per turn or owner adoption. Old tenant chat
 threads are retained on the legacy operator surface and are not copied.
 The Mooney example's newly introduced booking service is therefore not fully
-implemented by Ask: an operator must prepare its service and grants first.
+implemented by Ask: an authorized agency maker must prepare its service
+and grants first.
 The existing-service booking alternative is implemented and tested locally.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
-want in plain words. Strelva answers, drafts a change, opens a Possibility, or
-files a Request. It never decides what belongs to the owner.
+want in plain words. Responses name the recorded actor; the serving agency
+can draft a change, open a working Possibility or receive a Request through
+its granted scope. Ask Strelva never decides what belongs to the owner.
 
 ## 1. The moment
 
@@ -152,13 +166,15 @@ Behaviors, each testable.
 11. **Receipts.** Every Ask turn that changed a record lists, item by item,
     what was drafted, queued, opened or filed, with ids. Nothing is described
     as done until it is.
-12. **Words.** Screens and replies say "Strelva". They never say AI, agent,
-    automation, workflow or task. Today's failure line "trouble reaching the
+12. **Words.** The entrance says **Ask Strelva**; responses and receipts
+    name the recorded actor, including Strelva Agency for its client work. They
+    never say AI, agent, automation, workflow or task. Today's failure line "trouble reaching the
     AI" in `src/app/api/agent/route.ts` and activity text like "AI saved a
     reply" change.
 13. **One model-call helper** carries every model call, including Ask Strelva's,
     and logs tokens and cost per call (section 5).
-14. **Asked on behalf.** An operator can ask in a client workspace and mark the
+14. **Asked on behalf.** An authorized agency team member can ask in a
+    client workspace through its ordinary grant and mark the
     turn "asked by the owner by email" or "by phone". The Request or draft
     records that origin. The owner's decision still goes to the owner.
 
@@ -210,7 +226,12 @@ Before each tool runs, `authorizeAskTool(toolId, context)` reads again:
 Today `/api/agent` checks `requireTenantPermission(tenant, "content:write")`
 once, then runs up to 8 model steps (`stepCountIs(8)`) without checking again.
 
-### Authority
+### Historical implementation authority — superseded
+
+The table records the older implementation. The October 11 contract replaces
+its platform-operator service path with ordinary agency scope; non-makers ask
+for an Internal tool rather than gaining creation authority. Platform support
+requires its own logged scope. Owner decisions stay owner-only.
 
 | Level | Who | What it allows |
 | --- | --- | --- |
@@ -477,7 +498,7 @@ newsletters have no undo; Ask Strelva says so before they go to approval.
   fixtures.
 - **Production proof** on a Strelva-owned test business: ask → draft →
   Needs you → email → Approve → published → read-back → receipt → undo, and
-  one Request filed and seen in the operator queue. Needs Jacob's yes.
+  one Request filed and seen in the serving agency's Queue. Needs Jacob's yes.
 
 ## 9. Decisions and launch defaults
 

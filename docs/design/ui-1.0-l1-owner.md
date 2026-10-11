@@ -3,9 +3,10 @@
 Objective: integrate the 23 owner canon frames on `ui/1.0-l1-owner`, preserving
 current data, authority, flags and contracts. No deployment or merge is authorized.
 
-The owner presentation now uses the paper kit. Home shows Needs you, Systems
-ordered by health group and name, Strelva handled, In progress, then Files and
-results. Ask uses the floating composer. Request detail uses retained dates for
+The October 9 owner presentation uses the paper kit. Home shows Needs you,
+Systems ordered by health group and name, the receipt feed, In progress, then
+Files and results. **What changed** is the current receipt-place contract;
+this October 11 text correction is not a new rendered proof. Ask uses the floating composer. Request detail uses retained dates for
 its stage rail. Decisions keep their exact revision and authority checks and use
 Hold controls. Search, business switching, Help, first run and phone navigation
 use the existing routes and memberships.
@@ -161,8 +162,10 @@ though that Git directory was listed as a writable root. Escalation is disabled
 in this session. Do not change Git metadata or reset this worktree to get around
 that restriction.
 
-The complete [patch](/tmp/strelva-L1-owner.patch) includes tracked edits and new
-files. The existing worktree already contains it; do not apply it there again.
+The original handoff named `/tmp/strelva-L1-owner.patch` for tracked edits and
+new files. That temporary artifact is unavailable as of October 11; use the
+original lane worktree and manifest below rather than a broken download link.
+Do not apply the patch to that worktree again.
 Once Git directory access is available, stage exactly the file manifest below,
 run `git diff --cached --check`, then commit with:
 `Recompose owner workspace with the Strelva paper kit`. No push, merge or deploy.

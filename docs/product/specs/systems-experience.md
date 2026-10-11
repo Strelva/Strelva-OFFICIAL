@@ -6,6 +6,26 @@
 > (October 9), behind one constant. Past restorable states are History; Versions are
 > adaptations to another context, never past states.
 
+## October 11 three-zoom and naming contract
+
+All clients → agency inside one client → Your business is one model. Within
+granted scope, an agency sees the owner's Home, Systems, Requests, Running,
+What changed and decision status, plus Version/source and preparation controls.
+Approval, exit, payer decisions and sensitive data stay owner-only. Queue
+owner decisions read Waiting on [business], with the owner's same title and
+an exact-item link into Needs you; the System page alone is not that link.
+
+**Internal tool** is the kind and **Internal tools** the collection, with each
+System opened by name. **Bookings**, **Saved check**, **Make real** and
+**History** are the shared words; Version means another context. Library and
+Ready-made systems share qualified reusable definitions, without client data
+or grants; starters and managed services remain separately identified.
+Possibility stays a working alternative, never a bare suggestion or research
+Proposal. Recorded actors and agency/business brands follow the
+[glossary](../../../GLOSSARY.md); unknown actors are Actor not recorded and
+brand failure is neutral, holding agency-authored sends. These requirements
+amend the dated local implementation inventory, not its proof scope.
+
 Status: draft spec, 2026-10-06. Not approved. Wave 2 (branch
 `w2/systems-live`, local only, nothing applied or turned on anywhere) built:
 Possibilities in Postgres with the stale rule in the same transaction, the
@@ -70,14 +90,15 @@ section 5.
 **The Mooney Firm gets consult booking** (illustrative; the firm has not asked
 for this). It is the walk-through in `CONTEXT.md` "Product model", done end to end.
 
-Strelva builds a consult-booking page beside attymooney.com's contact form. It
+Strelva Agency builds a consult-booking page beside attymooney.com's contact form. It
 runs on its own test data. Nothing live changes. The firm's owner never signs
-in. The morning email says: "Strelva built consult booking for attymooney.com.
-Try it. Make it live?" It has three links: **Try it** (a signed preview),
-**Make it live** and **Not yet**.
+in. The agency-branded morning email says: "Strelva Agency built consult
+booking for attymooney.com. Try it. Make real?" with **Runs on Strelva**. It
+has three links: **Try it** (a signed preview), **Make real** and **Not yet**.
 
 The owner taps Try it, books a fake consult, and sees "Test booking, nobody was
-told." Then the owner taps Make it live and confirms. Strelva runs Make real:
+told." Then the owner taps Make real and confirms. Strelva Agency runs the approved
+plan through its ordinary client scope:
 
 1. Consult booking becomes a Live System.
 2. The booking page appears on attymooney.com.
@@ -86,13 +107,16 @@ told." Then the owner taps Make it live and confirms. Strelva runs Make real:
 The first two land. The third waits, because Google hasn't approved Strelva's
 API access yet. The owner gets one email: "Consult booking is live on
 attymooney.com. Not on Google yet: Google hasn't approved Strelva's access.
-Strelva will add it when it does. Nothing else changed." The parts that landed
+The Google step remains blocked until access is approved and its grant is
+checked. Nothing else changed." The parts that landed
 stay. Under **What changed** there are two receipts, each with **Undo**.
 
-Jacob opens Home as an operator. Needs you is empty, so it isn't shown. The
+Jacob opens the client's Home as Strelva Agency through its ordinary grant.
+No owner decision remains; any waiting owner item would be read-only
+**Waiting on The Mooney Firm**, with its exact-item link. The
 cards read "attymooney.com · Live · Working", "Consult booking · Live ·
 Working" and "The Mooney Firm on Google · Live · Waiting on Google". **In
-progress** has one line: "Making consult booking live: 3 of 4 done".
+progress** has one line: "Make real: consult booking · 3 of 4 done".
 
 ## 2. In the model
 
@@ -193,8 +217,9 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
     is the only repository, and a rebuild Possibility is rebuilt from saved
     work on every `GET /api/workspace` (`prepareRebuildPossibilities` in
     `src/experience/systems/server.ts`).
-16. **Who opens one.** Strelva (an operator, Ask Strelva's `open_possibility`
-    or the rebuild pipeline). An agency can open one on work it was assigned.
+16. **Who opens one.** An authorized agency maker, including Strelva Agency,
+    through ordinary client scope and the existing `open_possibility` or
+    rebuild paths. Platform operator status supplies no client-maker authority.
     Owners and members ask Strelva to open one. Owners don't build at 1.0.0
     (systems-catalog default).
 17. **Owner-visible states**:
@@ -283,11 +308,11 @@ owner reads:
 
 | Stored | Owner line | Meaning |
 | --- | --- | --- |
-| `completed` with read-back confirmed | Done | Provider accepted it and Strelva saw it |
+| `completed` with read-back confirmed | Done | Provider accepted it and the recorded actor verified it |
 | `completed` with read-back failed | Done, not yet confirmed | Accepted. Never retried (AGENTS.md outside writes); routes as `verify.failed` |
 | `blocked` | Waiting: reason, and who unblocks it | Not attempted. Safe to resume |
 | `failed` | Didn't happen: reason | Refused with no effect. Safe to retry, 3 attempts max |
-| `unknown` | Not sure yet. Strelva is checking | Never replayed. Reconciled only with provider lookup or operator evidence |
+| `unknown` | Not sure yet. {recorded actor} is checking | Never replayed. Reconciled only with provider lookup or authorized actor evidence |
 | `restored` / `compensated` | Undone | Internal pointer restored, or provider object cancelled |
 | accepted and `irreversible` | Can't be undone, with why | Listed in `cannotUndo` |
 | `pending` | Not started | — |
@@ -297,9 +322,11 @@ owner reads:
 1. What landed stays. There is no automatic rollback.
 2. Strelva never says "done" while any step is `unknown`. Rollback can't
    finish while one is unknown (`describeActivation` already says this).
-3. A partly live activation goes to the operator queue at once
-   ([operator](./operator.md)). The operator either fixes the cause and
-   resumes, reconciles an unknown step with evidence, or rolls back.
+3. A partly live client-service activation goes to the serving agency's Queue
+   at once. The authorized agency fixes and resumes, reconciles an unknown
+   step with evidence, or rolls back under existing policy. Platform incidents
+   use separate logged support ([operator](./operator.md)); platform status
+   grants no client-service access.
 4. Resume needs no new owner approval while the candidate revision and plan
    fingerprint are unchanged. Any candidate change ends the activation.
 5. Rolling back restores the state the owner last approved, so it is handled
@@ -313,7 +340,13 @@ owner reads:
 7. After `made_real`, the whole activation can't be rolled back (`runner.ts`
    refuses this). Undo is per System, from History.
 
-**Authority:**
+**Historical implementation authority — superseded:**
+
+This table records the older privileged service path. The accepted contract
+uses ordinary agency grants for preparation, rehearsal and recovery, including
+Strelva Agency; platform operators have only logged platform support scope.
+Owner-only approvals remain owner-only and require their exact Needs you item.
+The table is not evidence that the new separation has been implemented.
 
 | Action | Owner | Member | Agency (assigned) | Strelva operator |
 | --- | --- | --- | --- | --- |
@@ -433,7 +466,7 @@ owner reads:
   | Tenant content section | `applySectionUpdate`, gated by `decideAiContentGovernance` | Read the section back | Restore the previous content state from History |
   | Inquiry form | `executeInquiryPublication`, `inquiry_publication_claims` | Claim `accepted` vs `verification_failed` | Publish the previous config. Received inquiries are kept |
   | Booking page | `publish_public_website_booking_grant` | Read the grant back | `revoke_public_website_booking_grant`. Existing bookings are kept |
-  | Internal app | `publishApplication` | Current release | `rollbackApplication` (`rollback_application_release`) |
+  | Internal tool | `publishApplication` | Current release | `rollbackApplication` (`rollback_application_release`) |
   | Google listing | A change handed to the listing System's publishing path (approval, receipt, read-back are its own) | The publishing receipt | As the publishing spec says. Posts and replies have no delete today: `not_undoable` |
 
   `DeclaredEffect` gets a `channel` field that picks the adapter. It is part
@@ -502,15 +535,15 @@ That needs client email on for them (needs-you, steps 3 and 4).
 
 | Failure | What the person sees | Recovery |
 | --- | --- | --- |
-| Systems read fails | "Your systems could not be loaded just now. Nothing about them has changed." | Reload. The operator sees the error |
+| Systems read fails | "Your systems could not be loaded just now. Nothing about them has changed." | Reload. The serving agency sees the scoped error; platform support requires logged scope |
 | A projected and a stored System disagree | One card. The stored row wins (`mergeBusinessSystems`) | Reconciliation check before turn-on |
-| A pinned System changes while Ready | "attymooney.com changed since this was built." The email link refuses | Strelva refreshes the candidate and asks again |
-| Owner taps Make it live on an old link | "This changed since we emailed you" | Latest item in the next email |
-| An effect is refused | "Didn't happen: reason." Live unchanged if before the switch | Operator fixes and resumes |
-| A provider timeout after the send | "Not sure yet. Strelva is checking" | `find` by idempotency key, or operator evidence. Never replayed |
-| Accepted, read-back fails | "Done, not yet confirmed" | `verify.failed` to the operator. Not retried |
+| A pinned System changes while Ready | "attymooney.com changed since this was built." The email link refuses | The authorized agency refreshes the candidate and asks again |
+| Owner taps Make real on an old link | "This changed since we emailed you" | Latest item in the next email |
+| An effect is refused | "Didn't happen: reason." Live unchanged if before the switch | The authorized agency fixes and resumes through its grant |
+| A provider timeout after the send | "Not sure yet. {recorded actor} is checking" | `find` by idempotency key, or authorized actor evidence. Never replayed |
+| Accepted, read-back fails | "Done, not yet confirmed" | `verify.failed` to the serving agency's Queue; platform incidents use separate support scope. Not retried |
 | Google not approved or disconnected | "Waiting: Google hasn't approved Strelva's access" | Resumes when the publishing path can write |
-| Operating check fails | "Live, but a check failed: …" Not marked Made real | Operator fixes or rolls back |
+| Operating check fails | "Live, but a check failed: …" Not marked Made real | The authorized agency fixes or rolls back under policy |
 | Process restarts mid-step | Nothing new | Resume reconciles `running` steps before anything else (`resume` in `runner.ts`) |
 | Owner wants it gone after Made real | History: Restore per System | Native undo per channel (table in section 5) |
 
@@ -581,7 +614,8 @@ them authorizes a production step.
 3. **Automatic rollback on partial failure.**
    - Options: (a) never; (b) after N days.
    - Recommend (a). A half-rolled-back state is worse than a named partial
-     one. The operator decides.
+     one. The authorized agency follows the owner's existing policy; platform
+     support scope supplies no agency recovery authority.
 4. **Undo after Made real.**
    - Options: (a) per System from History; (b) one-tap undo of the whole
      activation.
@@ -594,7 +628,7 @@ them authorizes a production step.
      revision pointer.
 6. **Idle Possibilities.**
    - Recommend Strelva withdraws one after 90 days without activity, with a
-     receipt. Alternative: keep them forever and let the operator queue list
+     receipt. Alternative: keep them forever and let the agency Queue list
      them.
 7. **Rebuilds of custom-repo sites.** Publishing a rebuild serves it at
    `<tenant>.strelva.com`. The client's domain still points at its own repo
@@ -659,7 +693,7 @@ them authorizes a production step.
 
 **Not measured:**
 
-- Whether owners understand "Try it / Make it live" without explanation.
+- Whether owners understand "Try it / Make real" without explanation.
 - Operator minutes per Make real.
 - How often a Make real ends partly live.
 
