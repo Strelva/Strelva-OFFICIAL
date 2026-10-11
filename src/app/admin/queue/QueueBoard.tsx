@@ -139,7 +139,7 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
       </div>}>
       {open && (
         <div className="mt-3 space-y-3">
-          <p className="text-[13px] text-gray-muted">{PRIORITY_LABELS[item.priority]}{leadCount && <> · {leadCount.lastSevenDays === null ? "Lead count unavailable" : `${leadCount.lastSevenDays} leads in 7 days`}</>}</p>
+          <p className="text-[13px] text-gray-muted">{PRIORITY_LABELS[item.priority]}{leadCount && <> · {leadCount.lastSevenDays === null ? "Inquiry count unavailable" : `${leadCount.lastSevenDays} inquiries in 7 days`}</>}</p>
           <StTextButton disabled={pending} onClick={openClose}>Close</StTextButton>
           {actionsEnabled && <QueueSourceActions item={item} onResult={onResult} />}
           {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}

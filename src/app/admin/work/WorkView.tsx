@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { StEmpty, StHead, StNotice, StPage, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import { OperationalInbox } from "@/experience/operations/OperationalInbox";
 import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
@@ -16,7 +17,7 @@ function SurfaceLinks({ links }: { links: SurfaceLink[] }) {
 
 export function InternalWorkView({ effort, workspaceOpen, learningOpen, operationsHref, learningHref, preview = false }: { effort: BusinessEffortLoad; workspaceOpen: boolean; learningOpen: boolean; operationsHref: string; learningHref: string; preview?: boolean }) {
   return <StPage>
-    <StHead title="Internal work" meta="Open the existing surface that owns the work. This console remains restricted to super admins." />
+    <StHead title={OPERATOR_DESTINATIONS.work.label} meta="Open the existing surface that owns the work. This console remains restricted to super admins." />
     <StSection title="Staff delivery entry">
       <StNotice>Strelva staff use the exact assignment link for one owner-approved job. Assignment scope, expiry, acceptance, and permission are checked again before work runs.</StNotice>
     </StSection>
@@ -25,18 +26,18 @@ export function InternalWorkView({ effort, workspaceOpen, learningOpen, operatio
     <StSection title="Execution exceptions and assignments" meta="Accepted or unknown effects are never replayed.">
       {preview ? <StEmpty>Recorded exceptions and assignments appear here after an authorized read.</StEmpty> : <OperationalInbox mode="internal" />}
     </StSection>
-    <StSection title="Managed-site delivery">
+    <StSection title="Strelva Agency work">
       <SurfaceLinks links={[
-        { href: "/admin/websites", label: "Rebuild a website", detail: "Read an existing site, prepare a private preview and send its decisions to the owner." },
-        { href: "/admin/actions", label: "Managed-site work", detail: "Review ready opportunities and pending governed actions for existing managed clients." },
-        { href: "/admin/drafts", label: "Drafts", detail: "Inspect drafts that have not been published." },
-        { href: "/admin/digests", label: "Maintenance", detail: "Review pending maintenance digests." },
+        { href: "/admin/websites", label: OPERATOR_DESTINATIONS.websites.label, detail: "Read an existing site, prepare a private preview and send its decisions to the owner." },
+        { href: "/admin/actions", label: OPERATOR_DESTINATIONS.actions.label, detail: "Open Strelva Agency’s Queue through the ordinary agency seat." },
+        { href: "/admin/drafts", label: OPERATOR_DESTINATIONS.drafts.label, detail: "Inspect drafts that have not been published." },
+        { href: "/admin/digests", label: OPERATOR_DESTINATIONS.maintenance.label, detail: "Review pending maintenance digests." },
       ]} />
     </StSection>
     <StSection title="Support"><SurfaceLinks links={[
-      { href: "/admin/clients", label: "Clients", detail: "Open the current client record, site health, access, and delivery controls." },
-      { href: "/admin/accounts", label: "Accounts", detail: "Inspect client and payer groupings across managed sites." },
-      { href: "/admin/leads", label: "Leads", detail: "Work received requests without treating them as accepted delivery." },
+      { href: "/admin/clients", label: OPERATOR_DESTINATIONS.sites.label, detail: "Open site support records, site health and access controls." },
+      { href: "/admin/accounts", label: OPERATOR_DESTINATIONS.billingGroups.label, detail: "Inspect payer groupings across sites; these do not define client businesses." },
+      { href: "/admin/leads", label: OPERATOR_DESTINATIONS.prospects.label, detail: "Strelva Agency’s prospective clients; requests are not accepted delivery." },
     ]} /></StSection>
     <StSection title="Offering development">
       {learningOpen ? <StRows><StRow href={learningHref} title="Open internal product learning" detail="Use saved sources, evidence, decisions, builds, and outcomes in the existing research surface." /></StRows>
@@ -47,9 +48,9 @@ export function InternalWorkView({ effort, workspaceOpen, learningOpen, operatio
         : <StEmpty>Work budgets are unavailable while the workspace release is off. Existing billing and managed-client agreements are unchanged.</StEmpty>}
     </StSection>
     <StSection title="Restricted system administration"><SurfaceLinks links={[
-      { href: "/admin/ops", label: "Operations", detail: "Inspect operational failures and supported recovery controls." },
-      { href: "/admin/uptime", label: "Uptime", detail: "Inspect current monitored host results." },
-      { href: "/admin/audit", label: "Audit", detail: "Inspect current site-audit records." },
+      { href: "/admin/ops", label: OPERATOR_DESTINATIONS.health.label, detail: "Inspect operational failures and supported recovery controls." },
+      { href: "/admin/uptime", label: OPERATOR_DESTINATIONS.checks.label, detail: "Inspect current monitored host results." },
+      { href: "/admin/audit", label: OPERATOR_DESTINATIONS.audits.label, detail: "Inspect current site-audit records." },
     ]} /></StSection>
     <StTextButton href="/admin/queue">Back to queue</StTextButton>
   </StPage>;

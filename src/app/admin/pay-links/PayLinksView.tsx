@@ -1,4 +1,5 @@
 "use client";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StEmpty, StField, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
@@ -201,19 +202,20 @@ export function PayLinksView({ request = fetch, initialLinks, initialPayments = 
   }
 
   return <StPage>
-    <StHead title="Pay links" meta="One-off charges for builds, setup fees and deposits. Monthly plans are started from each client’s page." />
-    <StSection title="New payment link">
+    <StHead title={OPERATOR_DESTINATIONS.payLinks.label} meta="Acting agency: Strelva Agency · Runs on Strelva. One-off service charges, setup fees and deposits." />
+    <StNotice>Legacy Strelva Agency service billing. These payment-link controls still require operator access; ordinary agency payment-link creation is not available here.</StNotice>
+    <StSection title="New Strelva Agency payment link">
       <StSurface label="New payment link form">
         <div className="flex flex-col gap-6">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Slug" value={form.slug} onChange={v => setForm({ ...form, slug: v })} placeholder="[payment link name]" />
             <Field label="Client name" value={form.clientName} onChange={v => setForm({ ...form, clientName: v })} placeholder="[business name]" />
-            <StField label="Link to client (optional)" hint="Pick the client to tie this link to their page. Otherwise, leave as No account yet.">
+            <StField label="Link to site (optional)" hint="Pick the site to tie this link to its support record. Otherwise, leave it unlinked.">
               <select value={form.tenantId} onChange={e => {
                 const id = e.target.value;
                 const picked = clients.find(c => c.id === id);
                 setForm(f => ({ ...f, tenantId: id, clientName: f.clientName.trim() ? f.clientName : (picked?.siteName ?? f.clientName) }));
-              }}><option value="">No account yet</option>{clients.map(c => <option key={c.id} value={c.id}>{c.siteName || c.id}</option>)}</select>
+              }}><option value="">No site linked</option>{clients.map(c => <option key={c.id} value={c.id}>{c.siteName || c.id}</option>)}</select>
             </StField>
             <StField label="Amount type"><select value={form.mode} onChange={e => setForm({ ...form, mode: e.target.value as AmountMode })}><option value="fixed">Fixed amount</option><option value="range">Let them choose (range)</option></select></StField>
             {form.mode === "range" ? <>
@@ -225,7 +227,7 @@ export function PayLinksView({ request = fetch, initialLinks, initialPayments = 
             <Field label="Note on payment page (optional)" value={form.customCopy} onChange={v => setForm({ ...form, customCopy: v })} description="Shown under the payment description." />
           </div>
           {error && <StNotice tone="critical">{error}</StNotice>}
-          <div><StPill onClick={() => void submit()} disabled={submitting} busy={submitting}>{submitting ? "Creating…" : "Create payment link"}</StPill></div>
+          <div><StPill onClick={() => void submit()} disabled={submitting} busy={submitting}>{submitting ? "Creating…" : "Create Strelva Agency payment link"}</StPill></div>
         </div>
       </StSurface>
     </StSection>
@@ -233,7 +235,7 @@ export function PayLinksView({ request = fetch, initialLinks, initialPayments = 
       {(rollup.collected > 0 || rollup.outstanding > 0) && <p className="text-sm text-gray-muted"><StMono tone="live">{dollars(rollup.collected)} collected</StMono> · <StMono>{dollars(rollup.outstanding)} outstanding</StMono> (fixed links only)</p>}
       {loading ? <StSkeleton label="Loading payment links" /> : links.length === 0 ? <StEmpty>No payment links yet.</StEmpty> : <StRows label="Payment links">{links.map(l => {
         const paid = paidPayments[l.slug];
-        return <StRow key={l.slug} title={l.clientName} detail={<><StMono>/pay/{l.slug}{typeof l.amountCents === "number" ? ` · ${dollars(l.amountCents)}` : typeof l.minCents === "number" && typeof l.maxCents === "number" ? ` · ${dollars(l.minCents)}–${dollars(l.maxCents)}` : ""}</StMono><br />{l.tenantId ? <StTextButton href={`/admin/clients/${l.tenantId}`}>{l.tenantId}</StTextButton> : "No client account"}{paid && <><br /><StState kind="live">Paid {dollars(paid.amountCents)}</StState>{paid.customerEmail && ` · ${paid.customerEmail}`}{paid.paidAt && <StMono> · {shortDate(paid.paidAt)}</StMono>}</> }</>}
+        return <StRow key={l.slug} title={l.clientName} detail={<><StMono>/pay/{l.slug}{typeof l.amountCents === "number" ? ` · ${dollars(l.amountCents)}` : typeof l.minCents === "number" && typeof l.maxCents === "number" ? ` · ${dollars(l.minCents)}–${dollars(l.maxCents)}` : ""}</StMono><br />Strelva Agency · Creator: {l.createdBy || "Actor not recorded"}<br />{l.tenantId ? <StTextButton href={`/admin/clients/${l.tenantId}`}>{l.tenantId}</StTextButton> : "No site linked"}{paid && <><br /><StState kind="live">Paid {dollars(paid.amountCents)}</StState>{paid.customerEmail && ` · ${paid.customerEmail}`}{paid.paidAt && <StMono> · {shortDate(paid.paidAt)}</StMono>}</> }</>}
           end={<div className="flex flex-wrap items-center gap-4"><StTextButton onClick={() => copyLink(l.slug)}>{copied === l.slug ? "Copied" : "Copy URL"}</StTextButton>{confirmingRevoke === l.slug ? <><StTextButton tone="danger" onClick={() => void revoke(l.slug)}>Confirm revoke</StTextButton><StTextButton onClick={() => setConfirmingRevoke(null)}>Cancel</StTextButton></> : <StTextButton tone="danger" onClick={() => setConfirmingRevoke(l.slug)}>Revoke</StTextButton>}</div>} />;
       })}</StRows>}
     </StSection>

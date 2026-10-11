@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import Link from "next/link";
 
 /** Admin-context 404. An invalid /admin/* path (e.g. a stale client id) must land
@@ -23,13 +24,13 @@ export default function AdminNotFound() {
           That page isn&apos;t here.
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-[14px] leading-relaxed text-gray-muted">
-          The client or page may have been removed, or the link is out of date.
+          The site or page may have been removed, or the link is out of date.
         </p>
         <Link
           href="/admin/clients"
           className="mt-8 inline-flex items-center justify-center rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85"
         >
-          Back to Clients
+          Back to {OPERATOR_DESTINATIONS.sites.label}
         </Link>
       </div>
     </div>

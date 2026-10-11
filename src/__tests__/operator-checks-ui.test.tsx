@@ -44,7 +44,7 @@ describe("on-behalf fixture authority", () => {
     const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("No network allowed"));
     try {
       act(() => root.render(createElement(OperatorPreview, { surface: "ask" })));
-      expect(container.textContent).toContain("Asked by Strelva operations, for Sheri");
+      expect(container.textContent).toContain("Asked by Strelva Agency · Runs on Strelva");
       const input = container.querySelector('input[aria-label="Ask Strelva"]') as HTMLInputElement;
       await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
       await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));

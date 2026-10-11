@@ -1,4 +1,5 @@
 "use client";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -95,14 +96,14 @@ export function AccountsBoard({
     <div className="space-y-6">
       {/* Summary */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Vital label="Accounts" value={rows.length} verdict={`${multiSiteCount} multi-site`} />
+        <Vital label={OPERATOR_DESTINATIONS.billingGroups.label} value={rows.length} verdict={`${multiSiteCount} multi-site`} />
         <Vital label="Bundled MRR" value={money(totalMrrCents)} verdict="active subscriptions" verdictTone="good" />
-        <Vital label="Unassigned sites" value={unassignedSites.length} verdict="not in any account" verdictTone={unassignedSites.length ? "warn" : "neutral"} />
+        <Vital label="Unassigned sites" value={unassignedSites.length} verdict="not in any billing group" verdictTone={unassignedSites.length ? "warn" : "neutral"} />
       </div>
 
       {/* Create */}
       <Panel
-        title="New account"
+        title="New billing group"
         trailing={
           <button
             onClick={() => setShowCreate((s) => !s)}
@@ -118,7 +119,7 @@ export function AccountsBoard({
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Account name (e.g. Andy Anderson)"
+                placeholder="Billing group name (e.g. Andy Anderson)"
                 className="rounded-lg border border-glass-border bg-surface-raised px-3 py-2 text-[13px] text-warm-white placeholder:text-gray-faint focus:border-accent focus:outline-none"
               />
               <input
@@ -139,13 +140,13 @@ export function AccountsBoard({
               disabled={!name.trim() || busy === "__create__"}
               className="rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105 disabled:opacity-50"
             >
-              {busy === "__create__" ? "Creating…" : "Create account"}
+              {busy === "__create__" ? "Creating…" : "Create billing group"}
             </button>
           </div>
         )}
         {!showCreate && (
           <p className="px-[18px] pb-[18px] text-[12.5px] text-gray-muted">
-            Group a multi-site owner (like Andy: CoCard + Vermont Unlimited) under one account, then assign their sites below.
+            Group a multi-site owner (like Andy: CoCard + Vermont Unlimited) under one billing group, then assign their sites below.
           </p>
         )}
       </Panel>
@@ -154,8 +155,8 @@ export function AccountsBoard({
       {rows.length === 0 ? (
         <AdminEmpty
           icon={<span className="text-lg">◇</span>}
-          title="No accounts yet"
-          description="Create an account to group a client's sites under one bundled subscription."
+          title="No billing groups yet"
+          description="Create a billing group to combine sites under one bundled subscription."
         />
       ) : (
         <div className="space-y-4">
@@ -177,7 +178,7 @@ export function AccountsBoard({
                       <span className="font-display text-[18px] font-medium text-warm-white">{money(mrrCents)}<span className="text-[12px] text-gray-faint">/mo</span></span>
                       <button
                         onClick={() => {
-                          if (confirm(`Delete account "${account.name}"? Its sites become standalone again.`)) {
+                          if (confirm(`Delete billing group "${account.name}"? Its sites become standalone again.`)) {
                             run(account.id, () => api(`/api/admin/accounts/${account.id}`, "DELETE"));
                           }
                         }}

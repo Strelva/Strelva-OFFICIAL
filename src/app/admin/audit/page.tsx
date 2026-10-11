@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getAllAuditEvents } from "@/lib/storage";
 import { getScanSummaries, type ScanSummary } from "@/lib/scan-store";
@@ -52,7 +53,7 @@ export default async function AuditPage() {
   }));
 
   return <StPage width="wide">
-    <StHead title="Site audits" meta="Check each live site’s health, search readiness and what to fix first." />
+    <StHead title={OPERATOR_DESTINATIONS.audits.label} meta="Check each live site’s health, search readiness and what to fix first." />
     <SiteAuditsBoard initialRows={rows} />
     <StSection title="Operator activity" meta="Newest first"><AuditList events={view} /></StSection>
   </StPage>;

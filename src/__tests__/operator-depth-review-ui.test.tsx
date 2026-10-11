@@ -72,7 +72,7 @@ describe("operator depth review", () => {
   });
   it("filters audit activity and restores it with Clear", async () => {
     act(() => root.render(createElement(AuditList, { events: [{ id: "log-1", time: "2026-10-09T12:00:00Z", action: "content.update", targetType: "website", targetId: "page-1", actorLabel: "Named operator", tenant: "sample" }] })));
-    const select = container.querySelector('select[aria-label="Filter by client"]') as HTMLSelectElement;
+    const select = container.querySelector('select[aria-label="Filter by site"]') as HTMLSelectElement;
     const option = document.createElement("option"); option.value = "missing"; select.appendChild(option);
     await act(async () => { select.value = "missing"; select.dispatchEvent(new Event("change", { bubbles: true })); });
     expect(container.textContent).toContain("No actions match these filters");

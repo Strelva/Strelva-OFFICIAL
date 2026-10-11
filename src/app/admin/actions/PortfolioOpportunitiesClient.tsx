@@ -106,7 +106,7 @@ export function PortfolioOpportunitiesClient({
   if (snapshot.totalOpportunities === 0 && !readsIncomplete) return null;
 
   return <StSection title="Ready to draft" meta={<StMono>{snapshot.totalOpportunities}</StMono>}>
-    <StCopy muted>Strelva prepares these changes for each client. Review and approve before anything goes live.</StCopy>
+    <StCopy muted>Strelva Agency prepares these changes for each client. Review and approve before anything goes live.</StCopy>
     {actionError && <StNotice tone="critical">{actionError}</StNotice>}
     {readsIncomplete && <StNotice tone="need" action={<StTextButton href="/admin/actions">Retry reads</StTextButton>}><strong>This opportunity scan is incomplete.</strong> {incompleteReadMessage(snapshot)}</StNotice>}
     {snapshot.totalOpportunities === 0 ? <StEmpty action={<StTextButton href="/admin/actions">Retry reads</StTextButton>}>No verified opportunities to display yet. The reads that completed returned no opportunities. Retry before treating the portfolio as clear.</StEmpty> : snapshot.groups.map(group => {
@@ -115,7 +115,7 @@ export function PortfolioOpportunitiesClient({
       return <StSection key={group.kind} title={group.title} meta={<StMono>{group.clients.length}</StMono>} action={<StPill variant="soft" onClick={() => draftGroup(group)} disabled={processing !== null} busy={busy} title={`Draft ${KIND_INFO[group.kind].drafts} for ${group.clients.length} clients — ${KIND_INFO[group.kind].lands}`}>{group.actionLabel}</StPill>}>
         <StCopy muted>{group.summary} Drafts {KIND_INFO[group.kind].drafts}, {KIND_INFO[group.kind].lands}.</StCopy>
         <StRows label={group.title}>{group.clients.map(client => <StRow key={client.tenantId} title={client.siteName} detail={client.detail} href={`/admin/clients/${client.tenantId}`} />)}</StRows>
-        {result && <div role="status"><StCopy>{result.drafted > 0 ? `Strelva drafted for ${result.drafted} of ${result.drafted + result.skipped + result.failed} clients, waiting for approval. ${result.skipped > 0 ? `${result.skipped} had nothing to draft or already had one.` : ""}` : "Nothing new to draft. These clients had nothing to draft or already have a pending draft."}</StCopy>{result.failed > 0 && <StState kind="need">{result.failed} clients couldn’t be drafted. Try again.</StState>}</div>}
+        {result && <div role="status"><StCopy>{result.drafted > 0 ? `Strelva Agency drafted for ${result.drafted} of ${result.drafted + result.skipped + result.failed} clients, waiting for approval. ${result.skipped > 0 ? `${result.skipped} had nothing to draft or already had one.` : ""}` : "Nothing new to draft. These clients had nothing to draft or already have a pending draft."}</StCopy>{result.failed > 0 && <StState kind="need">{result.failed} clients couldn’t be drafted. Try again.</StState>}</div>}
       </StSection>;
     })}
   </StSection>;

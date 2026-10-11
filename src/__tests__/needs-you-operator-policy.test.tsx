@@ -172,7 +172,7 @@ describe("policy screen", () => {
     expect(html.match(/<select[^>]*>/g)?.every(select => select.includes('disabled=""'))).toBe(true);
   });
   it("shows the off, denied and ready states and is in the rail", async () => {
-    expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "off" }, hrefFor: () => "#" }))).toContain("Needs you is off");
+    expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "off" }, hrefFor: () => "#" }))).toContain("Decision settings are off");
     expect(renderToStaticMarkup(createElement(PolicyScreen, { load: { state: "denied" }, hrefFor: () => "#" }))).toContain("Operators only");
     const ready = await loadBusinessPolicy(WS);
     const html = renderToStaticMarkup(createElement(PolicyScreen, { load: ready, hrefFor: id => `/admin/needs-you?workspaceId=${id}` }));

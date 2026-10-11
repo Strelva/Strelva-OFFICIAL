@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -45,10 +46,10 @@ export default async function AdminAccountsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
-          Accounts
+          {OPERATOR_DESTINATIONS.billingGroups.label}
         </h1>
         <p className="text-sm text-gray-muted mt-1">
-          One client, many sites. Group a multi-site owner under one account + bundled subscription.
+          Group sites for a bundled subscription. Billing groups do not define a client business or grant business access.
         </p>
       </div>
 

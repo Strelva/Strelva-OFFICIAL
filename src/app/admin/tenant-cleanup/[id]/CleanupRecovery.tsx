@@ -1,4 +1,5 @@
 "use client";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -51,8 +52,8 @@ export function CleanupRecovery({ tenantId }: { tenantId: string }) {
 
   return <div className="mx-auto max-w-2xl space-y-6">
     <header className="space-y-2">
-      <Link href="/admin/clients" className="text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Back to clients</Link>
-      <h1 className="font-display text-3xl text-warm-white">Tenant cleanup</h1>
+      <Link href="/admin/clients" className="text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Back to {OPERATOR_DESTINATIONS.sites.label}</Link>
+      <h1 className="font-display text-3xl text-warm-white">{OPERATOR_DESTINATIONS.cleanup.label}</h1>
       <p className="break-all text-base text-gray-muted">{tenantId}</p>
     </header>
     <section aria-label="Cleanup receipt" aria-busy={phase === "loading" || retrying} className="space-y-6 rounded-3xl border border-gray-border bg-surface-base p-6">
