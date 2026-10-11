@@ -50,9 +50,9 @@ export function AdminMobileNav({
     if (!el) return;
     const focusable = Array.from(
       el.querySelectorAll<HTMLElement>(
-        'a[href], button, input, [tabindex]:not([tabindex="-1"])'
+        'a[href], button, input, summary, [tabindex]:not([tabindex="-1"])'
       )
-    ).filter((n) => !n.hasAttribute("disabled"));
+    ).filter((n) => !n.hasAttribute("disabled") && (!n.closest("details:not([open])") || n.tagName === "SUMMARY"));
     if (focusable.length === 0) return;
     const first = focusable[0]!;
     const last = focusable[focusable.length - 1]!;
@@ -94,7 +94,7 @@ export function AdminMobileNav({
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="absolute left-0 top-0 flex h-full w-[82%] max-w-[300px] flex-col border-r border-glass-border bg-surface-base px-3 py-[18px]"
+            className="absolute left-0 top-0 flex h-full w-[82%] max-w-[300px] flex-col overflow-y-auto border-r border-glass-border bg-surface-base px-3 py-[18px]"
             onKeyDown={trapFocus}
           >
             <div className="mb-5 flex items-center justify-between">

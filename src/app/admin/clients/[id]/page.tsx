@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -211,7 +212,7 @@ export default async function ClientDetailPage({
   const inspectHref = `/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`;
   return (
     <StPage>
-      <StHead crumb={{ label: "Clients", href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active client" : "Archived client"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={dashboardUrl}>Open workspace</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton></>} />
+      <StHead crumb={{ label: OPERATOR_DESTINATIONS.sites.label, href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active site" : "Archived site"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={dashboardUrl}>Open workspace</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton></>} />
       <div className={styles.columns}>
         <ReleaseFlagsPanel tenantId={tenant.id} globalOwnerEmailPaused={emailSendingPaused()} />
         <aside className={styles.aside}>
@@ -222,7 +223,7 @@ export default async function ClientDetailPage({
           {verdict.detail && <p>{verdict.detail}</p>}
         </aside>
       </div>
-      <details className={styles.fold}><summary>Client records and existing site controls</summary><div className="space-y-5">
+      <details className={styles.fold}><summary>Site records and existing site controls</summary><div className="space-y-5">
       {/* Next action */}
       <div className="flex items-center gap-3 py-4">
 
@@ -254,11 +255,11 @@ export default async function ClientDetailPage({
       {/* ── Who reached out ── */}
       <Section label="Who reached out">
         <Panel
-          title="Leads from their website"
-          trailing={<PanelLink href={`/admin/client-leads?tenant=${encodeURIComponent(tenant.id)}`}>All leads →</PanelLink>}
+          title="Inquiries from their website"
+          trailing={<PanelLink href={`/admin/client-leads?tenant=${encodeURIComponent(tenant.id)}`}>All inquiries →</PanelLink>}
         >
           {!clientLeads || (clientLeads.postgres !== "ok" && clientLeads.redis !== "ok") ? (
-            <p className="px-[18px] pb-4 text-[12.5px] text-gray-muted">Leads couldn&apos;t be read right now.</p>
+            <p className="px-[18px] pb-4 text-[12.5px] text-gray-muted">Inquiries couldn&apos;t be read right now.</p>
           ) : clientLeads.leads.length === 0 ? (
             <p className="px-[18px] pb-4 text-[12.5px] text-gray-muted">No one has sent a form through this site yet.</p>
           ) : (

@@ -1,4 +1,5 @@
 "use client";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 
 import { useState } from "react";
 import type { TenantDomainHealth, DomainState } from "@/lib/domain-monitor";
@@ -32,7 +33,7 @@ export function UptimeBoard({ initialResults, initialScannedAt, request = fetch,
   }
   const failing = results.filter(result => DOWN_STATES.has(result.worst)).length;
   const unknown = results.filter(result => result.worst === "unknown").length;
-  return <StPage><StHead title="Checks" meta={<>{results.length} sites · {failing} failing · {unknown} not checked · checked {new Date(scannedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>} actions={<StPill variant="soft" busy={busy} onClick={() => void rescan()}>{busy ? "Checking…" : "Run again"}</StPill>} />
+  return <StPage><StHead title={OPERATOR_DESTINATIONS.checks.label} meta={<>{results.length} sites · {failing} failing · {unknown} not checked · checked {new Date(scannedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</>} actions={<StPill variant="soft" busy={busy} onClick={() => void rescan()}>{busy ? "Checking…" : "Run again"}</StPill>} />
     {error && <StNotice tone="critical">{error} Previous checks are still shown.</StNotice>}
     {results.length === 0 ? <StEmpty>No active client sites to check.</StEmpty> : <StGrid label="Checks across every client site, failing first" columns={["Site", "Up", "Certificate", "Form", "Domain"]}>
       {sortSiteChecks(results).flatMap(result => (result.checks.length ? result.checks : [null]).map((check, index) => <tr key={`${result.tenantId}-${check?.host ?? index}`}>

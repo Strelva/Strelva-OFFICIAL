@@ -193,7 +193,7 @@ function LeadCard({
           {DELIVERY_STATUSES.map(item => <option key={item} value={item}>{deliveryStatusLabel(item)}</option>)}
         </select>
       </StField>
-      <div className="flex justify-end"><StPill variant="soft" onClick={() => void onConvert(lead)} disabled={readOnly || pending} title="Provision the site and take the lead live">Convert</StPill></div>
+      <div className="flex justify-end"><StPill variant="soft" onClick={() => void onConvert(lead)} disabled={readOnly || pending} title="Provision the site and take the prospect live">Convert</StPill></div>
     </div>
   </StRow>;
 }

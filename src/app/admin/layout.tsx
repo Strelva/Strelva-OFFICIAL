@@ -31,6 +31,6 @@ export default async function AdminLayout({
 
   return <OperatorFrame operatorName={operatorName} moneyEnabled={moneyEnabled} clients={tenants}>
     {children}
-    <CommandPalette tenants={tenants} />
+    <CommandPalette tenants={tenants} moneyEnabled={moneyEnabled} />
   </OperatorFrame>;
 }

@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import Link from "next/link";
 import { Chip, Panel } from "@/app/admin/console";
 import type { InquiryReviewView, OperatorHeldInquiry, OperatorInquiryNotice } from "@/platform/operator-queue";
@@ -6,8 +7,8 @@ import { OperatorInquiryActions } from "./OperatorInquiryActions";
 export interface InquiryReviewLoad { state: "ready" | "off" | "unavailable" | "denied" | "loading"; held: OperatorHeldInquiry[]; notices: OperatorInquiryNotice[]; next: { at: string; id: string } | null }
 export function OperatorInquiryReview({ load, view, recordsOpen, noticesOpen }: { load: InquiryReviewLoad; view: InquiryReviewView; recordsOpen: boolean; noticesOpen: boolean }) {
   return <div className="space-y-6">
-    <div><Link href="/admin/client-leads" className="text-sm text-gray-muted underline focus-visible:text-accent">Client leads</Link>
-      <h1 className="mt-2 font-display text-[26px] font-medium text-warm-white">Inquiry review</h1>
+    <div><Link href="/admin/client-leads" className="text-sm text-gray-muted underline focus-visible:text-accent">{OPERATOR_DESTINATIONS.inquiries.label}</Link>
+      <h1 className="mt-2 font-display text-[26px] font-medium text-warm-white">{OPERATOR_DESTINATIONS.inquiryReview.label}</h1>
       <p className="mt-1 max-w-xl text-sm text-gray-muted">Review messages held as spam and notices the owner did not receive. Releasing a message sends no email.</p></div>
     <nav aria-label="Inquiry review" className="flex flex-wrap gap-3 text-sm">
       {recordsOpen && ([['held','Held messages'],['released','Released'],['spam','Confirmed spam']] as const).map(([key,title]) => <Link key={key} href={`?view=${key}`} aria-current={view === key ? "page" : undefined} className="text-warm-white underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-accent">{title}</Link>)}

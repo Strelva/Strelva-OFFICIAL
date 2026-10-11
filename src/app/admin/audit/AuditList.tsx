@@ -52,7 +52,7 @@ export function AuditList({ events }: { events: AuditEventView[] }) {
 
   return <div className="space-y-4">
     <div className="flex flex-wrap items-end gap-3">
-      <StField label="Client"><select value={tenant} onChange={event => setTenant(event.target.value)} aria-label="Filter by client"><option value="">All clients</option>{tenants.map(value => <option key={value} value={value}>{value}</option>)}</select></StField>
+      <StField label="Site"><select value={tenant} onChange={event => setTenant(event.target.value)} aria-label="Filter by site"><option value="">All sites</option>{tenants.map(value => <option key={value} value={value}>{value}</option>)}</select></StField>
       <StField label="Action"><select value={verb} onChange={event => setVerb(event.target.value)} aria-label="Filter by action"><option value="">All actions</option>{verbs.map(value => <option key={value} value={value}>{value}</option>)}</select></StField>
       <StField label="Actor"><select value={actor} onChange={event => setActor(event.target.value)} aria-label="Filter by actor"><option value="">All actors</option>{actors.map(value => <option key={value} value={value}>{value}</option>)}</select></StField>
       {hasFilter && <StTextButton onClick={() => { setTenant(""); setVerb(""); setActor(""); }}>Clear</StTextButton>}

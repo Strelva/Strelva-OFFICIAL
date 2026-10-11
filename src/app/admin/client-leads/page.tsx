@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -17,7 +18,7 @@ function StoreStatus({ data }: { data: OperatorClientLeads }) {
   const redisOnly = data.leads.filter((lead) => lead.stored === "redis_only").length;
   const kept = data.leads.length - redisOnly;
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Where these leads are stored">
+    <div className="flex flex-wrap items-center gap-1.5" aria-label="Where these inquiries are stored">
       {data.postgres === "ok" ? (
         kept > 0 && <Chip tone="good">{kept} kept in Postgres</Chip>
       ) : (
@@ -59,22 +60,22 @@ export default async function ClientLeadsPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
-            Client leads
+            {OPERATOR_DESTINATIONS.inquiries.label}
           </h1>
           <p className="mt-1 max-w-xl text-sm text-gray-muted">
-            What visitors sent through client websites{selected ? ` for ${selected.siteName}` : ""}. Strelva&apos;s own
-            prospects are in <Link href="/admin/leads" className="text-warm-white underline-offset-2 hover:underline">Leads</Link>.
+            What visitors sent through client websites{selected ? ` for ${selected.siteName}` : ""}. Strelva Agency’s
+            prospects are in <Link href="/admin/leads" className="text-warm-white underline-offset-2 hover:underline">Prospects</Link>.
           </p>
         </div>
         <form method="get" className="flex items-center gap-2">
-          <label htmlFor="client-leads-tenant" className="sr-only">Client</label>
+          <label htmlFor="client-leads-tenant" className="sr-only">Site</label>
           <select
             id="client-leads-tenant"
             name="tenant"
             defaultValue={tenant ?? ""}
             className="h-9 min-w-0 max-w-[60vw] rounded-[9px] border border-glass-border bg-surface-raised px-2.5 text-[13px] text-warm-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent sm:max-w-none"
           >
-            <option value="">All clients</option>
+            <option value="">All sites</option>
             {tenants.map((t) => (
               <option key={t.id} value={t.id}>{t.siteName}</option>
             ))}
@@ -94,13 +95,13 @@ export default async function ClientLeadsPage({
       {unreadable ? (
         <AdminEmpty
           icon={<MessageSquareText className="h-5 w-5" strokeWidth={1.6} />}
-          title="Can't read client leads right now"
+          title="Can't read client inquiries right now"
           description="Neither Postgres nor Redis answered. Nothing was lost by this page; reload in a minute."
         />
       ) : data.leads.length === 0 ? (
         <AdminEmpty
           icon={<MessageSquareText className="h-5 w-5" strokeWidth={1.6} />}
-          title={selected ? `No leads from ${selected.siteName} yet` : "No client leads yet"}
+          title={selected ? `No inquiries from ${selected.siteName} yet` : "No client inquiries yet"}
           description="When a visitor fills in a contact form on a client's website, it shows up here."
         />
       ) : (

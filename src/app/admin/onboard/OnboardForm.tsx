@@ -1,4 +1,5 @@
 "use client";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 
 import { useEffect, useState } from "react";
 import { StEmpty, StField, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSegmented, StState, StSteps, StSurface, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
@@ -230,7 +231,7 @@ export function OnboardForm({ request = fetch, preview = false, initialResult = 
   phaseGroups.sort((a, b) => a.order - b.order);
 
   return <StPage>
-    <StHead title="Onboard a client" meta="Sets up the client record, owner invite and hosting. Connect the site’s repository afterwards." />
+    <StHead title={OPERATOR_DESTINATIONS.onboard.label} meta="Sets up the client record, owner invite and hosting. Connect the site’s repository afterwards." />
     {!result ? <StSection title="Client details"><StSurface label="Client setup form"><div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Subdomain *" value={form.subdomain} onChange={v => setForm({ ...form, subdomain: v })} placeholder="[business subdomain]" />
@@ -245,14 +246,14 @@ export function OnboardForm({ request = fetch, preview = false, initialResult = 
       {form.billingType === "tier" && <StField label="Tier"><select value={form.subscriptionPlan} onChange={e => setForm({ ...form, subscriptionPlan: e.target.value as CommercialPlanKey })}>{TIERS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></StField>}
       {form.billingType === "custom" && <StTextField label="Monthly amount ($)" type="number" min="0" step="1" value={form.customMonthlyDollars} onChange={e => setForm({ ...form, customMonthlyDollars: e.target.value })} />}
       {error && <StNotice tone="critical">{error}</StNotice>}
-      {running && <StSteps label="Client setup" steps={[{ title: "Strelva is creating the client record", state: "active", detail: "Wait for the result before trying again." }]} />}
-      <div><StPill onClick={() => void run()} disabled={running} busy={running}>{running ? "Creating…" : "Create client"}</StPill></div>
+      {running && <StSteps label="Client setup" steps={[{ title: "Strelva Agency is creating the site record", state: "active", detail: "Wait for the result before trying again." }]} />}
+      <div><StPill onClick={() => void run()} disabled={running} busy={running}>{running ? "Creating…" : "Create Strelva Agency site record"}</StPill></div>
     </div></StSurface></StSection> : <>
       {restoredFromStorage && <StNotice action={<StTextButton onClick={clearStoredResult}>Dismiss</StTextButton>}>Showing the last client created: <StMono>{result.tenantId}</StMono>. Restored from this browser.</StNotice>}
-      <StSection title={result.tenantId} action={<StPillLink href={`/admin/clients/${result.tenantId}`}>Open client</StPillLink>}>
-        <StState kind={result.steps.some(step => step.status === "failed") ? "need" : "live"}>{result.steps.some(step => step.status === "failed") ? "Created with steps to review" : "Client record created"}</StState>
+      <StSection title={result.tenantId} action={<StPillLink href={`/admin/clients/${result.tenantId}`}>Open site</StPillLink>}>
+        <StState kind={result.steps.some(step => step.status === "failed") ? "need" : "live"}>{result.steps.some(step => step.status === "failed") ? "Created with steps to review" : "Site record created"}</StState>
         <StTextButton href={result.siteUrl} target="_blank" rel="noopener noreferrer">{result.siteUrl} ↗</StTextButton>
-        <details><summary className="cursor-pointer text-sm text-gray-muted">What Strelva completed ({result.steps.filter(s => s.status === "ok").length}/{result.steps.length} steps)</summary><div className="mt-4"><StSteps label="Client setup result" steps={result.steps.map(s => ({ title: s.label, state: s.status === "ok" ? "done" : s.status === "failed" ? "failed" : "pending", detail: s.detail || (s.status === "skipped" ? "Skipped" : undefined) }))} /></div></details>
+        <details><summary className="cursor-pointer text-sm text-gray-muted">What Strelva Agency completed ({result.steps.filter(s => s.status === "ok").length}/{result.steps.length} steps)</summary><div className="mt-4"><StSteps label="Client setup result" steps={result.steps.map(s => ({ title: s.label, state: s.status === "ok" ? "done" : s.status === "failed" ? "failed" : "pending", detail: s.detail || (s.status === "skipped" ? "Skipped" : undefined) }))} /></div></details>
       </StSection>
       <StSection title="Your turn" meta="Complete these before handing over access.">
         {phaseGroups.length ? phaseGroups.map(group => <StSection key={group.label} title={group.label}><StRows>{group.items.map(item => <StRow key={item.key} title={item.title} detail={item.detail} lead={item.phase === "CRITICAL" ? <StState kind="down">Critical</StState> : undefined} />)}</StRows></StSection>) : <StEmpty>No structured next steps were returned.</StEmpty>}

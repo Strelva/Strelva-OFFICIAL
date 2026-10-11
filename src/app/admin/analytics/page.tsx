@@ -1,3 +1,4 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -46,22 +47,22 @@ export default async function AdminAnalyticsPage({
     productionDomain: t.productionDomain ?? null,
   }));
 
-  // No active clients — nothing to select, render the empty shell.
+  // No active sites — nothing to select, render the empty shell.
   if (tenants.length === 0) {
     return (
       <div className="space-y-8">
         <div>
           <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
-            Search + Analytics
+            {OPERATOR_DESTINATIONS.analytics.label}
           </h1>
           <p className="text-sm text-gray-muted mt-1">
-            Search Console + GA4 performance + beacon conversions, per client.
+            Search Console + GA4 performance + beacon conversions, per site.
           </p>
         </div>
         <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
-          <p className="text-sm font-medium text-warm-white">No active clients yet</p>
+          <p className="text-sm font-medium text-warm-white">No active sites yet</p>
           <p className="mt-1 text-xs text-gray-muted">
-            Clients appear here once tenants exist.
+            Site support records appear here once sites exist.
           </p>
         </div>
       </div>
@@ -167,7 +168,7 @@ export default async function AdminAnalyticsPage({
     <div className="space-y-8">
       <div>
         <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
-          Search + Analytics
+          {OPERATOR_DESTINATIONS.analytics.label}
         </h1>
         <p className="text-sm text-gray-muted mt-1">
           Portfolio roll-up + deep dive for{" "}
@@ -178,7 +179,7 @@ export default async function AdminAnalyticsPage({
       {/* Portfolio roll-up — primary view */}
       <PortfolioAnalytics rows={portfolioRows} />
 
-      {/* Per-client deep dive */}
+      {/* Per-site deep dive */}
       <AnalyticsView
         tenants={tenants.map((t) => ({ id: t.id, siteName: t.siteName }))}
         selected={selected}

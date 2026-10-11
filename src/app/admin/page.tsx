@@ -1,7 +1,9 @@
+import { readClientBusinessCount } from "./client-businesses";
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
-import QueuePage from "./queue/page";
+import { redirect } from "next/navigation";
 import { Plus, CheckCircle2, Flag, UserPlus } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
@@ -28,26 +30,7 @@ import { DataAvailabilityNotice } from "./DataAvailabilityNotice";
 
 export const dynamic = "force-dynamic";
 
-/** Tenants that signed up in the last 7 days, newest first. Kept at module
- *  scope so the `Date.now()` read stays out of the component render. */
-function recentSignups(tenants: TenantConfig[]) {
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  return tenants
-    .filter((t) => {
-      const created = new Date(t.createdAt).getTime();
-      return !Number.isNaN(created) && created >= cutoff;
-    })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
-    .map((t) => ({
-      tenantId: t.id,
-      siteName: t.siteName || t.id,
-      ownerName: t.ownerName,
-      createdAt: t.createdAt,
-    }));
-}
-
-// Count "needs you" leads: received, still unworked, and not months-old junk
+// Count prospects needing operator attention: received, still unworked, and not months-old junk
 // (a missing/invalid submit date counts as recent so a real lead is never
 // hidden). Lives outside the page component so the impure Date.now() isn't
 // called during render (React purity rule / compiler).
@@ -65,9 +48,9 @@ function countUnworkedLeads(
 }
 
 export default async function AdminPage() {
-  if (operatorQueueReleaseEnabled()) return QueuePage();
+  if (operatorQueueReleaseEnabled()) redirect(OPERATOR_DESTINATIONS.queue.href);
   await authorizeAdminOperatorRead("admin.clients.read");
-  const ALL_TENANTS = await getAllTenants();
+  const [ALL_TENANTS, clientBusinessCount] = await Promise.all([getAllTenants(), readClientBusinessCount()]);
   const TENANTS = ALL_TENANTS.filter(isActiveTenant);
   const archivedTenantCount = ALL_TENANTS.length - TENANTS.length;
 
@@ -128,7 +111,7 @@ export default async function AdminPage() {
   const launchBlockedCount = tenantData.filter((d) => d.launchReadiness.status === "blocked").length;
   const launchWatchCount = tenantData.length - launchReadyCount - launchBlockedCount;
 
-  // Portfolio attention flags — folded into the single "Needs you" feed rather
+  // Portfolio attention flags — folded into the single "Operator attention" feed rather
   // than a second adjacent list. Deep-link to the merged client detail URL.
   const portfolioState = await getPortfolioSummaryState();
   const portfolio = portfolioState.snapshot;
@@ -192,7 +175,6 @@ export default async function AdminPage() {
     subscriptionStatus: s.subscriptionStatus,
   }));
 
-  const todaySignups = recentSignups(TENANTS);
 
   // Aggregated pending approvals across every client — the count links into the
   // portfolio "clear everything" screen. Degrades to zero on any read failure.
@@ -222,7 +204,7 @@ export default async function AdminPage() {
       quietDays: atRiskById.get(t.id)?.daysSinceActivity ?? null,
     }));
 
-  // Portfolio flags render INSIDE the "Needs you" panel, so they must count
+  // Portfolio flags render INSIDE the "Operator attention" panel, so they must count
   // toward its "N open" header + the NEEDS YOU vital — otherwise the panel says
   // "0 open" directly above five launch-blocked rows.
   const needsYouCount = todayLeads.unworked + todayApprovals.total + todayAtRisk.length + flags.length;
@@ -240,19 +222,19 @@ export default async function AdminPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
-            Overview
+            {OPERATOR_DESTINATIONS.overview.label}
           </h1>
           <p className="mt-1.5 text-[13px] text-gray-muted">
-            <b className="font-semibold text-warm-white">{TENANTS.length}</b> active client{TENANTS.length !== 1 ? "s" : ""}
+            <b className="font-semibold text-warm-white">{TENANTS.length}</b> active site{TENANTS.length !== 1 ? "s" : ""}
             {needsYouCount > 0 && (
               <> <span className="text-gray-faint">·</span> <span className="font-semibold text-critical">{needsYouCount} need attention</span></>
             )}
-            {todayLeads.unworked === 0 && (<> <span className="text-gray-faint">·</span> leads all clear</>)}
+            {todayLeads.unworked === 0 && (<> <span className="text-gray-faint">·</span> Strelva Agency prospects all clear</>)}
             {archivedTenantCount ? (<> <span className="text-gray-faint">·</span> {archivedTenantCount} archived</>) : null}
           </p>
         </div>
         <Link href="/admin/onboard" className="inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105">
-          <Plus className="h-3.5 w-3.5" strokeWidth={2.4} /> New client
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.4} /> Add a Strelva Agency client
         </Link>
       </div>
 
@@ -262,10 +244,9 @@ export default async function AdminPage() {
       <div className="mb-5 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
         <Vital label="Monthly revenue" value={`$${mrr.toLocaleString()}`}
           verdict={<>{activeSubscriptions} paid{grandfatheredCount ? ` · ${grandfatheredCount} grandfathered` : ""}</>} />
-        <Vital label="Active clients" value={activeTenants}
-          delta={todaySignups.length ? `+${todaySignups.length} wk` : undefined} deltaTone="good"
-          verdict={todaySignups[0] ? <>{todaySignups[0].siteName} joined recently</> : "steady"} verdictTone={todaySignups[0] ? "good" : undefined} />
-        <Vital label="Needs you" value={needsYouCount}
+        <Vital label="Client businesses" value={clientBusinessCount ?? "—"}
+          verdict={clientBusinessCount === null ? "Business count unavailable" : `Workspace business records · ${activeTenants} active sites`} verdictTone={clientBusinessCount === null ? "warn" : undefined} />
+        <Vital label="Operator attention" value={needsYouCount}
           delta={needsYouCount ? "act" : undefined} deltaTone="crit"
           verdict={<>{todayApprovals.total} approvals · {todayAtRisk.length} at-risk{flags.length ? ` · ${flags.length} flags` : ""}</>} verdictTone={needsYouCount ? "crit" : undefined} />
         <Vital label="Launch-ready" value={`${launchReadyCount}/${TENANTS.length}`}
@@ -275,18 +256,18 @@ export default async function AdminPage() {
 
       {/* Main grid */}
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Panel title="Needs you" trailing={<PanelCount>{needsYouCount} open</PanelCount>} bodyClassName="px-2 pb-2">
+        <Panel title="Operator attention" trailing={<PanelCount>{needsYouCount} open</PanelCount>} bodyClassName="px-2 pb-2">
           {todayAtRisk.length > 0 && (
             <>
               <GroupLabel tone="crit" label="At risk" note={`${todayAtRisk.length} quiet · no AI use in 7 days`} />
               {todayAtRisk.map((c) => (
-                <Link key={c.tenantId} href={`/admin/clients/${c.tenantId}`} className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                <Link key={c.tenantId} href="/admin/queue" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
                   <ClientLogo name={c.siteName} size={30} />
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] font-semibold tracking-[-0.01em] text-warm-white">{c.siteName}</div>
                     <div className="mt-0.5 truncate text-[11.5px] text-gray-muted">Quiet {c.daysSinceActivity}d · {c.reasons[0]}</div>
                   </div>
-                  <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Reach out</span>
+                  <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Open Queue</span>
                 </Link>
               ))}
             </>
@@ -294,14 +275,14 @@ export default async function AdminPage() {
           {todayApprovals.total > 0 && (
             <>
               <div className="mx-3 my-1.5 h-px bg-glass-border" />
-              <GroupLabel tone="warn" label="Waiting for you" note={`${todayApprovals.total} to review`} />
-              <Link href="/admin/actions" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+              <GroupLabel tone="warn" label="Waiting on client businesses" note={`${todayApprovals.total} to review`} />
+              <Link href="/admin/queue" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
                 <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><CheckCircle2 className="h-4 w-4 text-warning" strokeWidth={1.7} /></span>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-warm-white">{todayApprovals.total} change{todayApprovals.total !== 1 ? "s" : ""} ready to approve</div>
+                  <div className="text-[13px] font-semibold text-warm-white">{todayApprovals.total} change{todayApprovals.total !== 1 ? "s" : ""} waiting on client businesses</div>
                   <div className="mt-0.5 text-[11.5px] text-gray-muted">{todayApprovals.drafts} draft{todayApprovals.drafts !== 1 ? "s" : ""}{todayApprovals.digests ? ` · ${todayApprovals.digests} maintenance` : ""}</div>
                 </div>
-                <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Review</span>
+                <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Open Queue</span>
               </Link>
             </>
           )}
@@ -310,7 +291,7 @@ export default async function AdminPage() {
               <div className="mx-3 my-1.5 h-px bg-glass-border" />
               <GroupLabel tone="warn" label="Portfolio flags" note={`${flags.length} to clear`} />
               {flags.map((f, i) => (
-                <Link key={i} href={f.href} className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+                <Link key={i} href="/admin/queue" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
                   <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><Flag className="h-3.5 w-3.5 text-warning" strokeWidth={1.7} /></span>
                   <div className="min-w-0 flex-1 text-[12.5px] text-warm-white">{f.message}</div>
                   <span className="shrink-0 rounded-[7px] border border-gray-border px-3 py-1.5 text-[11.5px] font-medium text-gray-muted opacity-0 transition group-hover:opacity-100 group-hover:text-warm-white">View</span>
@@ -319,15 +300,15 @@ export default async function AdminPage() {
             </>
           )}
           <div className="mx-3 my-1.5 h-px bg-glass-border" />
-          <GroupLabel tone={todayLeads.unworked ? "warn" : "good"} label="Leads" note={todayLeads.unworked ? `${todayLeads.unworked} unworked` : undefined} />
+          <GroupLabel tone={todayLeads.unworked ? "warn" : "good"} label="Strelva Agency prospects" note={todayLeads.unworked ? `${todayLeads.unworked} unworked` : undefined} />
           {todayLeads.unworked === 0 ? (
             <div className="flex items-center gap-2.5 px-3 py-2.5 text-[12.5px] text-gray-muted">
-              <CheckCircle2 className="h-4 w-4 text-positive" strokeWidth={2} /> All clear — every lead worked or dismissed.
+              <CheckCircle2 className="h-4 w-4 text-positive" strokeWidth={2} /> All clear — every prospect worked or dismissed.
             </div>
           ) : (
-            <Link href="/admin/leads" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
+            <Link href="/admin/queue" className="group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
               <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-[8px] border border-glass-border bg-surface-raised"><UserPlus className="h-4 w-4 text-gray-muted" strokeWidth={1.7} /></span>
-              <div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-warm-white">{todayLeads.unworked} lead{todayLeads.unworked !== 1 ? "s" : ""} to work</div><div className="mt-0.5 text-[11.5px] text-gray-muted">{todayLeads.recent[0]?.businessName}{todayLeads.recent.length > 1 ? ` + ${todayLeads.recent.length - 1} more` : ""}</div></div>
+              <div className="min-w-0 flex-1"><div className="text-[13px] font-semibold text-warm-white">{todayLeads.unworked} prospect{todayLeads.unworked !== 1 ? "s" : ""} to work</div><div className="mt-0.5 text-[11.5px] text-gray-muted">{todayLeads.recent[0]?.businessName}{todayLeads.recent.length > 1 ? ` + ${todayLeads.recent.length - 1} more` : ""}</div></div>
               <span className="shrink-0 rounded-[7px] bg-accent px-3 py-1.5 text-[11.5px] font-semibold text-on-accent opacity-80 transition group-hover:opacity-100">Open</span>
             </Link>
           )}
@@ -348,7 +329,7 @@ export default async function AdminPage() {
             </div>
             <div className="h-px bg-glass-border" />
             <div>
-              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Client health</p>
+              <p className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-faint">Site health</p>
               <Meter segments={[
                 { value: TENANTS.length - todayAtRisk.length, tone: "good", label: "healthy" },
                 { value: todayAtRisk.length, tone: "crit", label: "at risk" },
@@ -360,7 +341,7 @@ export default async function AdminPage() {
             </div>
           </Panel>
 
-          <Panel title="Your book" trailing={<PanelLink href="/admin/clients">All clients →</PanelLink>} bodyClassName="px-2 pb-2.5">
+          <Panel title="Sites" trailing={<PanelLink href="/admin/clients">All sites →</PanelLink>} bodyClassName="px-2 pb-2.5">
             {book.map((c) => (
               <Link key={c.id} href={`/admin/clients/${c.id}`} className="flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-colors hover:bg-glass-active">
                 <ClientLogo name={c.name} logoUrl={c.favicon} size={32} />
@@ -371,7 +352,7 @@ export default async function AdminPage() {
                 {c.launchScore != null && <div className="w-[52px] shrink-0"><LaunchBar pct={c.launchScore} /></div>}
               </Link>
             ))}
-            {book.length === 0 && <div className="px-3 py-4 text-[12.5px] text-gray-faint">No active clients yet.</div>}
+            {book.length === 0 && <div className="px-3 py-4 text-[12.5px] text-gray-faint">No active sites yet.</div>}
           </Panel>
           {/* "Recent signups" was a third copy of the same clients already in
               "Your book" (and named on the Active-clients vital) — removed so no
@@ -380,9 +361,9 @@ export default async function AdminPage() {
       </div>
 
       {/* Mission Control sits BELOW the queue and is collapsed by default, so the
-          operator's real work ("Needs you") leads the page instead of an empty
+          operator's attention queue leads the page instead of an empty
           prompt box. */}
-      <details className="group mt-6 rounded-2xl border border-glass-border bg-glass">
+      <details id="mission-control" className="group mt-6 rounded-2xl border border-glass-border bg-glass">
         <summary className="flex cursor-pointer list-none items-center justify-between px-[18px] py-3.5 text-[13px] text-warm-white [&::-webkit-details-marker]:hidden">
           <span className="font-semibold">Mission Control</span>
           <span className="text-[12px] text-gray-muted group-open:hidden">Ask about the portfolio →</span>
