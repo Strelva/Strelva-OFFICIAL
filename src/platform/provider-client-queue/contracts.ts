@@ -8,3 +8,5 @@ export const providerQueueItemSchema = z.object({
 export const providerQueuePageSchema = z.object({ agencyWorkspaceId: z.string().uuid(), items: z.array(providerQueueItemSchema).max(100), nextCursor: providerQueueCursorSchema.nullable() }).strict();
 export type ProviderQueuePage = z.infer<typeof providerQueuePageSchema>;
 export type ProviderQueueCursor = z.infer<typeof providerQueueCursorSchema>;
+
+export type ProviderQueueItem = z.infer<typeof providerQueueItemSchema>;

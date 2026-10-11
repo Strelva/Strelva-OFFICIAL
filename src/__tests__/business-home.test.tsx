@@ -67,6 +67,18 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
+  it("keeps the same agency brand and client Systems on shared Home and decision status", () => {
+    const shared = { ...snapshot([]), workspaces: [{ id: "business-1", name: "Harbor Dental", kind: "customer" as const, access: "provider_seat" as const, role: "admin" as const }, { id: "agency-1", name: "North Studio", kind: "agency" as const, role: "owner" as const }], releases: { systems: true, needsYou: true }, ownerBrand: { agencyId: "agency-1", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" as const } };
+    for (const view of ["home", "needs-you"] as const) {
+      const html = renderToStaticMarkup(createElement(BusinessHome, { snapshot: shared, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false, systemsReleased: true, view, onOpen: noop, onStart: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" }));
+      expect(html).toContain("North Studio"); expect(html).toContain("Runs on Strelva");
+      expect(html).toContain("All clients"); expect(html).toContain("Waiting on Harbor Dental");
+      expect(html).toContain("Checking shared decision status");
+      expect(html).not.toContain("Decisions only you can make");
+      expect(html).not.toContain("Hold to approve");
+    }
+  });
+
   it("shows the outcome loop only when a preview provides it", () => {
     expect(renderHome()).not.toContain('data-outcome="loop"');
     const props = { snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
@@ -180,7 +192,7 @@ describe("business home", () => {
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
-    expect(html).toContain("Strelva handled");
+    expect(html).toContain("What changed");
     expect(html).toContain("In progress");
     expect(html).toContain("All requests");
     expect(html).toContain("Files and results");

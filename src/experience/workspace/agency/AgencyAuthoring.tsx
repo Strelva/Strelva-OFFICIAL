@@ -19,13 +19,13 @@ export function AgencyAuthoring({ request, snapshot, clients, kind, onOpenClient
   onOpenClientWork: (workspaceId: string, workId: string) => void;
 }) {
   const [clientId, setClientId] = useState("");
-  const choices = clients.filter(client => client.status === "ready" && client.reach === "member" && (client.role === "owner" || client.role === "admin"));
+  const choices = clients.filter(client => client.status === "ready" && client.canBuild === true);
   const agencyId = snapshot.workspaceId;
   const url = `/api/workspace/agency-authoring?agencyWorkspaceId=${encodeURIComponent(agencyId)}`;
   if (kind === "package") return <AgencyPackage key={agencyId} request={request} workspaceId={agencyId} url={url} />;
   return <StSection title="Make a System for a client">
     <StLabel>Choose the business and describe the result. Strelva builds a draft there; the owner decides when it goes live.</StLabel>
-    {choices.length ? <StSurface label="Client to build for"><SelectInput label="Client" value={clientId} onChange={event => setClientId(event.target.value)} options={[{ value: "", label: "Choose a client" }, ...choices.map(client => ({ value: client.workspaceId, label: client.name }))]} /></StSurface> : <StEmpty>No client is available to build for. New Systems require admin access in that client’s business.</StEmpty>}
+    {choices.length ? <StSurface label="Client to build for"><SelectInput label="Client" value={clientId} onChange={event => setClientId(event.target.value)} options={[{ value: "", label: "Choose a client" }, ...choices.map(client => ({ value: client.workspaceId, label: client.name }))]} /></StSurface> : <StEmpty>No client is available to build for. Building here requires agency owner or admin access and current authoring access to the client. Read-only assignments can be reviewed from Clients.</StEmpty>}
     {clientId && choices.some(client => client.workspaceId === clientId) ? <WorkPlanExperience key={clientId} workspaceId={clientId}
       initialRequest="Make an internal tool for this business. " sources={[]} prepareUrl={`${url}&action=prepare`} outputUrl={`${url}&action=execute`}
       onOpenWork={workId => onOpenClientWork(clientId, workId)} /> : null}

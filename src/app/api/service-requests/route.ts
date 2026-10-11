@@ -1,3 +1,4 @@
+import { servingAgencyNames } from "@/platform/service-requests/agency-names";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -61,7 +62,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     const requestId = params.get("requestId");
     if (requestId) return json({ request: await service().read(current, requestId) });
     const businessId = params.get("businessId");
-    if (businessId) return json({ requests: await service().list(current, { businessId }) });
+    if (businessId) {
+      const requests = await service().list(current, { businessId });
+      return json({ requests, servingAgencies: await servingAgencyNames(current, requests) });
+    }
     const providerWorkspaceId = params.get("providerWorkspaceId");
     if (providerWorkspaceId) return json({ requests: await service().list(current, { providerWorkspaceId }) });
     if (params.get("providerKind") === "strelva") return json({ requests: await service().list(current, { providerKind: "strelva" }) });

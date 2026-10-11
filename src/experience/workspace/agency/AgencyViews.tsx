@@ -1,4 +1,5 @@
 "use client";
+import { HEALTH_LABEL } from "@/experience/systems/model";
 
 import { useState } from "react";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
@@ -19,10 +20,10 @@ export function AgencyClientsError({ onRetry }: { onRetry: () => void }) {
 }
 
 function health(client: AgencyClientRow) {
-  if (client.systems.some(system => system.health?.status === "blocked")) return <StState kind="down">Not working</StState>;
-  if (client.systems.some(system => system.health?.status === "degraded")) return <StState kind="need">Needs attention</StState>;
-  if (client.systems.length && client.systems.every(system => system.health?.status === "healthy")) return <StState kind="live">Latest checks passed</StState>;
-  return <StState kind="draft">Not verified</StState>;
+  if (client.systems.some(system => system.health?.status === "blocked")) return <StState kind="down">{HEALTH_LABEL.blocked}</StState>;
+  if (client.systems.some(system => system.health?.status === "degraded")) return <StState kind="need">{HEALTH_LABEL.degraded}</StState>;
+  if (client.systems.length && client.systems.every(system => system.health?.status === "healthy")) return <StState kind="live">All latest checks passed</StState>;
+  return <StState kind="draft">{HEALTH_LABEL.unknown}</StState>;
 }
 
 /** One record per business. Last good reads belong only to this mounted agency view. */
@@ -63,15 +64,15 @@ function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {
 }
 
 /** Queue: oldest first within each kind, with the client's own entrance. */
-export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork }: { items: readonly AgencyQueueItem[]; now: number; onWorkspace: (workspaceId: string) => void; onOpenClientWork: (workspaceId: string, workId: string) => void }) {
-  if (!items.length) return <StEmpty>Nothing is waiting across clients.</StEmpty>;
-  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Strelva’s work", kinds: ["operator"] }];
+export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork, complete = true }: { complete?: boolean; items: readonly AgencyQueueItem[]; now: number; onWorkspace: (workspaceId: string) => void; onOpenClientWork: (workspaceId: string, workId: string) => void }) {
+  if (!items.length) return <StEmpty>{complete ? "Nothing is waiting across clients." : "Nothing is waiting in the loaded clients. The Queue is incomplete."}</StEmpty>;
+  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
   return <div className="space-y-8">{groups.map(group => {
     const rows = agencyQueueOrder(items.filter(item => group.kinds.includes(item.kind)));
     if (!rows.length) return null;
     return <StSection key={group.title} title={group.title} meta={<StMono>{rows.length}</StMono>}><StRows label={`${group.title}, oldest first`}>{rows.map(item => {
       const wait = waitLabel(item.since, now);
-      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.label ?? queueKindLabel(item.kind)}`} onClick={() => item.href ? window.location.assign(item.href) : item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<><StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
+      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.kind === "needs_you" || item.kind === "owner_email" ? `Waiting on ${item.clientName}` : item.label ?? queueKindLabel(item.kind)}`} href={item.href} onClick={item.href ? undefined : () => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<><StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
     })}</StRows></StSection>;
   })}</div>;
 }

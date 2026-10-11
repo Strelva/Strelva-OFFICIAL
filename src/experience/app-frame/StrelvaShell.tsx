@@ -52,7 +52,8 @@ interface Props {
    * STRELVA_NEEDS_YOU_RELEASE. Present: the sidebar shows the Needs you place,
    * with the waiting count when the caller knows it (null while unknown).
    */
-  needsYou?: { count: number | null };
+  needsYou?: { count: number | null; label?: string };
+  allClients?: { href: string; onOpen?: () => void };
   /**
    * October 6, 2026: the workspace is linen content beside an ink rail
    * (the default). The tenant dashboard keeps its dark foundation.
@@ -61,7 +62,7 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, theme = "linen" }: Props) {
+export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
   const brandScope = workspaceId ? `workspaceId=${encodeURIComponent(workspaceId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
   const [loadedBrand, setLoadedBrand] = useState<{ scope: string; brand: OwnerBrand } | null>(null);
   useEffect(() => {
@@ -103,7 +104,7 @@ export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, children,
   return <div data-dashboard data-workspace-theme={theme === "linen" ? "linen" : undefined} className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
     <AppFrame className={styles.shell} navigationLabel="Strelva workspace navigation" navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar agencyNavigation={agencyNavigation} ownerBrand={presentationBrand} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
+      navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={agencyNavigation} ownerBrand={presentationBrand} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
       notice={notice} rightRail={rightRail} rightRailId="managed-discussion" rightRailTitle="Ask Strelva" rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>

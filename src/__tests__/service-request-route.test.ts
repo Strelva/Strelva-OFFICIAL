@@ -49,7 +49,7 @@ describe("service request route", () => {
     const response = await GET(new Request(`https://app.strelva.com/api/service-requests?businessId=${businessId}`));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(await response.json()).toEqual({ requests: [requestRecord] });
+    expect(await response.json()).toEqual({ requests: [requestRecord], servingAgencies: [{ requestId, displayName: null }] });
     expect(mocks.list).toHaveBeenCalledWith({ userId: user.id, verifiedEmail: "owner@example.test" }, { businessId });
   });
 

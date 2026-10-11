@@ -88,7 +88,7 @@ describe("agency home on the batched read", () => {
         title: "Owner email bounced: new booking flow", systemId: uuid("51000000", 1), workId: null, since: "2026-10-07T12:00:00.000Z" }],
     })) });
     const { node } = await render(request);
-    expect(node.textContent).toContain("Client website · Live · Blocked");
+    expect(node.textContent).toContain("Client website · Live · Not working");
     await act(async () => button(node, "Queue").click());
     expect(node.textContent).toContain("Owner email bounced: new booking flow");
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");

@@ -3,7 +3,8 @@
 import { StPage, StHead, StSection, StRows, StRow, StState, StEmpty, StNotice, StSkeleton, StComposerDock, StMono } from "@/components/ui/strelva/Kit";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { OwnerPhoneNavigation } from "./OwnerPhoneNavigation";
-import { WorkspaceBusinessSwitcher } from "./WorkspaceBusinessSwitcher";
+import { workspaceReadEligibility } from "./workspace-read-eligibility";
+import { WorkspaceBusinessSwitcher, clientAgencyWorkspace } from "./WorkspaceBusinessSwitcher";
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowUpRight, FileSearch, Globe2, MessageSquareText, Search } from "lucide-react";
@@ -150,7 +151,9 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   // STRELVA_NEEDS_YOU_RELEASE, as the server reported it. Off, or outside a
   // business the owner can decide for, `view=needs-you` opens Home.
   const needsYouBusiness = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
-  const needsYouPlace = snapshot.releases?.needsYou === true && needsYouBusiness?.kind === "customer" && needsYouBusiness.access !== "delegated_read";
+  const readEligibility = workspaceReadEligibility(needsYouBusiness, snapshot.releases?.needsYou === true);
+  const needsYouPlace = readEligibility.decisions;
+  const clientAgency = clientAgencyWorkspace(snapshot);
   const section: StrelvaSection = (requestedSection === "system" && !systemsReleased) || (requestedSection === "ask" && !askReleased) || (requestedSection === "needs-you" && !needsYouPlace) ? "home" : requestedSection;
   const [askSeed, setAskSeed] = useState<{ text: string; session: number }>({ text: "", session: 0 });
   const sectionTitle = (value: StrelvaSection) => placeTitle(value, systemsReleased);
@@ -506,7 +509,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   const pinnedSites = systemsReleased
     ? pinnedSystems(systems, systemLink, openSystem, home && section === "system" ? systemId : null)
     : [...pinnedWebsites(assignedSites), ...pinnedApps(snapshot.work, workHref, openWork)];
-  const deliveryScope = current?.kind === "customer" && !readOnly && ["owner", "admin"].includes(current.role || "") ? snapshot.workspaceId : undefined;
+  const deliveryScope = readEligibility.deliveries ? snapshot.workspaceId : undefined;
   const agencyNames = new Map(snapshot.workspaces.filter(item => item.kind === "agency").map(item => [item.id, item.name]));
   const searchItems = [
     ...(systemsReleased ? files : snapshot.work).map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
@@ -514,13 +517,13 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
       ? systems.map(system => ({ id: `site-${system.id}`, title: system.name, detail: `${SYSTEM_KIND_LABEL[system.kind]} · ${LIFECYCLE_LABEL[system.lifecycle]} · ${HEALTH_LABEL[system.health.state]}`, href: systemLink(system.id), onOpen: () => openSystem(system.id) }))
       : assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
   ];
-  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell agencyNavigation={agencyNavigationEnabled ? { active: agencyView === "library" || agencyView === "package" ? "library" : agencyView === "queue" ? "queue" : "clients", onNavigate: chooseAgencyView } : undefined} ownerBrand={snapshot.ownerBrand} appBase={appBase} signOut={signOut}
-    workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased} needsYou={needsYouPlace ? { count: null } : undefined}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell allClients={clientAgency ? { href: `${appBase || ""}/workspace?workspaceId=${clientAgency.id}&agencyView=clients` } : undefined} agencyNavigation={agencyNavigationEnabled ? { active: agencyView === "library" || agencyView === "package" ? "library" : agencyView === "queue" ? "queue" : agencyView === "team" ? "team" : "clients", onNavigate: chooseAgencyView } : undefined} ownerBrand={snapshot.ownerBrand} appBase={appBase} signOut={signOut}
+    workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased} needsYou={needsYouPlace ? { count: null, label: readEligibility.agency ? `Waiting on ${current?.name || "the business"}` : undefined } : undefined}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={home && section === "system" ? systems.find(item => item.id === systemId)?.name || "System" : !home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Internal tool" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}
     accountName={person} accountDetail={snapshot.actor.email}
     onNavigate={navigate} onAccess={openAccess} onSearch={openSearch} onStart={askReleased ? () => openAsk(null) : openStart} startDisabled={askReleased ? false : workspaceMutationReadOnly} navigation={undefined}
-    businessContext={systemsReleased ? <WorkspaceBusinessSwitcher snapshot={snapshot} busy={busy} onWorkspace={id => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(id); }} onNavigate={navigate} /> : <label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
+    businessContext={systemsReleased ? <WorkspaceBusinessSwitcher snapshot={snapshot} systems={systems} currentSystemId={section === "system" ? systemId : null} onSystem={openSystem} busy={busy} onWorkspace={id => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(id); }} onNavigate={navigate} /> : <label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
     actions={!home ? inquiry ? <button type="button" onClick={() => navigate("apps")}>{appsLabel}</button> : tracker !== undefined || plan !== undefined || document !== undefined ? selectedWork ? <button type="button" onClick={onAgency}>Sharing & access</button> : <button type="button" onClick={() => navigate("apps")}>{appsLabel}</button> : <button type="button" aria-label={agency ? "Back to Home" : "Sharing & access"} onClick={agency ? () => navigate("home") : onAgency}><span className="sm:hidden" aria-hidden="true">{agency ? "Back" : "Access"}</span><span className="hidden sm:inline" aria-hidden="true">{agency ? "Back to Home" : "Sharing & access"}</span></button> : undefined}
     notice={notice} contentId="workspace-main"
   >
@@ -543,7 +546,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
           <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
         </>}
-      </div> : section === "requests" ? <WorkspaceRequests businessName={current?.name || "this business"} deliveryScope={deliveryScope} work={snapshot.work} agencyNames={agencyNames} readOnly={workspaceMutationReadOnly} busy={busy} onOpenWork={openWork} onAsk={() => openStart()} />
+      </div> : section === "requests" ? <WorkspaceRequests businessName={current?.name || "this business"} deliveryScope={deliveryScope} work={snapshot.work} agencyNames={agencyNames} agencySeat={readEligibility.agency} readOnly={workspaceMutationReadOnly} busy={busy} onOpenWork={openWork} onAsk={() => openStart()} />
       : section === "work" || section === "apps" ? <StPage>
         <StHead title={systemsReleased ? section === "work" ? "Files and results" : "Systems" : appsLabel} meta={readOnly ? "Shared with you" : "Everything this business runs, and what it has made."} />
         {appsTabs("yours")}

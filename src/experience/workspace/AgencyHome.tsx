@@ -25,7 +25,7 @@ import { AgencyTeamView } from "./agency/AgencyTeamView";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
-import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import type { AgencyLastGoodRead } from "./agency/AgencyViews";
 
 type ClientsState =
@@ -253,7 +253,7 @@ export function AgencyHome({
 
   const queueList = clients.status === "loading" ? <p role="status" className="border-y border-gray-border py-5 text-[13px] text-gray-muted">Checking work across clients…</p>
     : clients.status === "error" ? <AgencyClientsError onRetry={retry} />
-    : <AgencyQueueList items={combined!.queue} now={now} onWorkspace={onWorkspace} onOpenClientWork={onOpenClientWork} />;
+    : <AgencyQueueList complete={!combined!.nextCursor && combined!.clients.length >= combined!.total && !combined!.queueGaps.length} items={combined!.queue} now={now} onWorkspace={onWorkspace} onOpenClientWork={onOpenClientWork} />;
 
   const serviceRequests = <section aria-labelledby={`${id}-service-requests`}>
     <h2 id={`${id}-service-requests`} className={sectionTitle}>Service requests</h2>
@@ -293,7 +293,7 @@ export function AgencyHome({
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Ready-made systems are set up and managed from the client business that owns them. This agency workspace does not hold a private catalog yet." : "Business offerings are installed and managed from the client business that owns them. This agency workspace does not currently hold a private offering catalog."}</p>
+    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your sources. Qualified revisions you share appear in your clients’ Ready-made systems." : "Business offerings are installed and managed from the client business that owns them. This agency workspace does not currently hold a private offering catalog."}</p>
   </section>;
 
   const creditSection = credits.length ? <section className="mt-12" aria-labelledby={`${id}-credits`}>
@@ -341,6 +341,8 @@ export function AgencyHome({
           {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
         </div>
         {queueList}
+      {combined ? <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>Loaded {combined.clients.length} of {combined.total} clients</StMono>{combined.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients for Queue</StPill> : null}</div> : null}
+      {clients.status === "ready" && clients.moreError ? <StNotice tone="critical">More clients could not be loaded. The Queue is incomplete.</StNotice> : null}
         <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       </section>
       <section className="mt-12" aria-labelledby={`${id}-clients`}>
@@ -365,7 +367,7 @@ export function AgencyHome({
   };
 
   return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
-    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Package a revision"} meta={<>{agencyName}{combined ? <> · <StMono>{combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
+    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Package a revision"} meta={<>{agencyName}{combined ? <> · <StMono>Loaded {combined.clients.length} of {combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
       {snapshot.releases?.agencyProspecting ? <StTextButton href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`}>Prospects</StTextButton> : null}
@@ -394,6 +396,8 @@ export function AgencyHome({
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-4 text-sm text-gray-muted">Oldest first within each kind. Open the client’s own System or work.</p>
       {queueList}
+      {combined ? <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>Loaded {combined.clients.length} of {combined.total} clients</StMono>{combined.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients for Queue</StPill> : null}</div> : null}
+      {clients.status === "ready" && clients.moreError ? <StNotice tone="critical">More clients could not be loaded. The Queue is incomplete.</StNotice> : null}
         <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       {combined?.queueGaps.length ? <div role="alert" className="mt-4 text-sm text-critical"><p>This Queue is incomplete. Some sources could not be read.</p><ul className="mt-2 list-disc pl-5">{combined.queueGaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div> : null}
       <div className="mt-12 space-y-10">
@@ -414,7 +418,7 @@ export function AgencyHome({
       {accessNote}
     </TabsPanel>
 
-    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} /></TabsPanel> : null}
+    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} />{view === "build" && combined?.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients to build for</StPill> : null}</TabsPanel> : null}
     {privateWork}
     {creditSection}
   </StPage><StComposerDock><StComposerBar scope={agencyName} placeholder="Bring a client need, Strelva builds it with you" value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></StComposerDock></div>;

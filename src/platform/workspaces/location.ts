@@ -6,7 +6,7 @@ const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const RECORD_ID = /^[a-z0-9_.:-]{1,200}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VIEWS = new Set(["needs-you", "system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
+const VIEWS = new Set(["home", "needs-you", "system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 /** Complete navigation hints. No data, request contents, or authority belong here. */
@@ -17,6 +17,8 @@ export interface WorkspaceLocation {
   view?: string;
   work?: string;
   system?: string;
+  decision?: string;
+  deliveryCheck?: string;
   search?: string;
   standingId?: string;
   assignmentId?: string;
@@ -29,7 +31,7 @@ export interface WorkspaceLocation {
   template?: string;
   save?: string;
 }
-const LOCATION_KEYS = ["workspaceId", "view", "work", "system", "search", "standingId", "assignmentId", "tenantId", "inquiryView", "inquiryRequest", "inquiryRecord", "row", "offering", "template", "save", "trackerWork"] as const;
+const LOCATION_KEYS = ["workspaceId", "decision", "deliveryCheck", "view", "work", "system", "search", "standingId", "assignmentId", "tenantId", "inquiryView", "inquiryRequest", "inquiryRecord", "row", "offering", "template", "save", "trackerWork"] as const;
 
 /** Read old links leniently, but never carry a detail into an incompatible place. */
 export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocation {
@@ -37,9 +39,10 @@ export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocatio
   for (const key of LOCATION_KEYS) {
     const value = params.get(key);
     if (!value || params.getAll(key).length !== 1 || key === "trackerWork") continue;
-    const valid = key === "workspaceId" || key === "system" || key === "standingId" || key === "assignmentId" ? UUID.test(value)
+    const valid = key === "workspaceId" || key === "decision" || key === "system" || key === "standingId" || key === "assignmentId" ? UUID.test(value)
       : key === "view" ? VIEWS.has(value)
       : key === "inquiryView" ? INQUIRY_VIEWS.has(value)
+      : key === "deliveryCheck" ? /^(listing|outside|website):[0-9a-f-]{36}$/.test(value)
       : key === "row" ? RECORD_ID.test(value)
       : key === "search" ? value === "1"
       : key === "save" ? /^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(value)
@@ -51,6 +54,8 @@ export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocatio
   if ((location.standingId || location.assignmentId) && !location.view) location.view = "operations";
   if (location.view !== "operations" && location.view !== "ongoing") { delete location.standingId; delete location.assignmentId; }
   if (["system", "ask", "start", "products", "requests", "settings", "help", "needs-you"].includes(location.view || "") || location.standingId || location.assignmentId) { delete location.work; delete location.unavailableWork; }
+  if (location.view !== "needs-you" || !location.workspaceId) delete location.decision;
+  if ((location.view && location.view !== "home") || !location.workspaceId) delete location.deliveryCheck;
   if (location.view !== "system" && location.view !== "ask") delete location.system;
   if (location.view === "system" && (!location.system || !location.workspaceId)) { delete location.view; delete location.system; }
   if (location.view !== "work" && location.view !== "apps") delete location.search;
@@ -180,6 +185,8 @@ export function workspaceReturnTarget(value: string | null): string | null {
       : key === "inquiryView" ? !INQUIRY_VIEWS.has(item)
       : key === "inquiryRequest" || key === "inquiryRecord" ? !ID.test(item)
       : key === "offering" || key === "template" ? !ID.test(item) || params.get("view") !== "products"
+      : key === "decision" ? !UUID.test(item) || params.get("view") !== "needs-you" || !params.has("workspaceId")
+      : key === "deliveryCheck" ? !/^(listing|outside|website):[0-9a-f-]{36}$/.test(item) || ![null, "home"].includes(params.get("view")) || !params.has("workspaceId")
       : key === "standingId" || key === "assignmentId" ? !UUID.test(item) || !["operations", "ongoing"].includes(params.get("view") || "")
       : key === "system" ? !UUID.test(item) || !["system", "ask"].includes(params.get("view") || "")
       : key === "search" ? item !== "1" || !["work", "apps"].includes(params.get("view") || "")
@@ -235,4 +242,9 @@ export function replaceWorkspaceLocation(workspaceId: string, workId?: string) {
   location.workspaceId = workspaceId;
   if (!workId) delete location.work;
   navigateWorkspace(location, "replace");
+}
+
+/** The same opaque owner decision at both workspace zooms. */
+export function clientDecisionHref(workspaceId: string, decisionId: string) {
+  return `/workspace?${new URLSearchParams({ view: "needs-you", workspaceId, decision: decisionId })}`;
 }

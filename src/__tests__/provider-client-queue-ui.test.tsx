@@ -15,7 +15,7 @@ async function render(request:typeof fetch,onWorkspace=vi.fn(),workspaceId=AGENC
 describe("provider client delivery queue",()=>{
  it("shows both lists, opens the authorized client, and paginates without duplicate rows",async()=>{
   const cursor={at:item.openedAt,key:item.key};const request=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page([item,{...item,key:"decision:25700000-0000-4000-8000-000000000032",kind:"owner_not_told",status:"bounced",title:"Review hours"}],cursor))).mockResolvedValueOnce(Response.json(page([item])));
-  const open=await render(request);expect(node.textContent).toContain("Read-back queue");expect(node.textContent).toContain("Owner not told");expect(node.textContent).toContain("Delivery bounced");await click("Open client");expect(open).toHaveBeenCalledWith(CLIENT);
+  const open=await render(request);expect(node.textContent).toContain("Read-back queue");expect(node.textContent).toContain("Owner not told");expect(node.textContent).toContain("Delivery bounced");expect([...node.querySelectorAll("a")].map(link=>link.getAttribute("href"))).toEqual([`/workspace?workspaceId=${CLIENT}&view=home&deliveryCheck=${encodeURIComponent(item.key)}`,`/workspace?workspaceId=${CLIENT}&view=needs-you&decision=25700000-0000-4000-8000-000000000032`]);expect(open).not.toHaveBeenCalled();
   await click("Show more delivery checks");expect(request.mock.calls[1]![0]).toContain("cursor=");expect(node.querySelectorAll("li")).toHaveLength(2);
  });
  it("preserves loaded rows when a later page fails, and can retry",async()=>{

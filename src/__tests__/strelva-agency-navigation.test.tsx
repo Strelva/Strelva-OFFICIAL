@@ -15,7 +15,7 @@ it("uses the agency's three places and caller-owned navigation without changing 
   await act(async () => root.render(createElement(StrelvaSidebar, { accountName: "You", signOut: null, agencyNavigation: { active: "queue", onNavigate, hrefs: { clients: "/preview/strelva/agency-portfolio", queue: "/preview/strelva/agency-portfolio?surface=queue", library: "/preview/strelva/agency-library" } } })));
   const main = node.querySelector('nav[aria-label="Main"]')!;
   const links = [...main.querySelectorAll<HTMLAnchorElement>("a")];
-  expect(links.map(link => link.textContent)).toEqual(["Clients", "Queue", "Library"]);
+  expect(links.map(link => link.textContent)).toEqual(["Clients", "Queue", "Library", "Team"]);
   expect(links[1]?.getAttribute("aria-current")).toBe("page");
   expect(links[2]?.getAttribute("href")).toBe("/preview/strelva/agency-library");
   await act(async () => { links[2]?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });

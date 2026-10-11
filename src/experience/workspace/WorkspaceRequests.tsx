@@ -3,7 +3,9 @@
 import { ArrowUpRight } from "lucide-react";
 import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { WorkspaceWork } from "./contracts";
-import { REQUEST_STAGE_LABELS, type BusinessDeliveryItem, type BusinessRequestStage } from "./business-delivery-summary";
+import { REQUEST_STAGE_LABELS, requestStageLabel, type BusinessDeliveryItem, type BusinessRequestStage } from "./business-delivery-summary";
+import { useAgencyClientHome } from "./useAgencyClientHome";
+import { agencyClientDeliveries } from "./agency-client-home";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
 
 /** One row on the Requests page: a request to Strelva or an agency, or a finite job saved in the workspace. */
@@ -15,6 +17,7 @@ export interface BusinessRequestRow {
   href?: string;
   workId?: string;
   sortAt: string;
+  agencyName?: string;
 }
 
 const GROUPS: readonly { stage: BusinessRequestStage; heading: string }[] = [
@@ -38,8 +41,8 @@ function shortDate(value: string): string {
 }
 
 /** Who is doing a request, by name. */
-export function deliveryProviderName(item: BusinessDeliveryItem, agencyNames: ReadonlyMap<string, string>): string {
-  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva" : "";
+export function deliveryProviderName(item: BusinessDeliveryItem, _agencyNames: ReadonlyMap<string, string>): string {
+  return item.provider?.kind === "agency" ? item.servingAgencyName?.trim() || "Agency identity unavailable" : item.provider?.kind === "strelva" ? "Strelva Agency" : "Actor not recorded";
 }
 
 export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string): BusinessRequestRow[] {
@@ -52,6 +55,7 @@ export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[],
       : [item.detail, item.dueAt && item.stage !== "closed" ? `due ${shortDate(item.dueAt)}` : null, providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · "),
     href: item.href,
     sortAt: item.updatedAt || "",
+    agencyName: deliveryProviderName(item, new Map()),
   }));
   const fromJobs = work.filter(item => item.productId === "operations" && item.resourceKind === "responsibility").map(item => {
     const stage = finiteJobStage(item.operation?.status);
@@ -74,27 +78,33 @@ interface Props {
   work: readonly WorkspaceWork[];
   agencyNames: ReadonlyMap<string, string>;
   readOnly: boolean;
+  agencySeat?: boolean;
   busy: boolean;
   onOpenWork: (id: string) => void;
   onAsk: () => void;
 }
 
 /** Things someone asked for that have an end: asked, agreed, in progress, ready for review, done. */
-export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, readOnly, busy, onOpenWork, onAsk }: Props) {
-  const deliveries = useBusinessDeliveries(deliveryScope);
+export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, agencySeat = false, readOnly, busy, onOpenWork, onAsk }: Props) {
+  const ownerDeliveries = useBusinessDeliveries(agencySeat ? undefined : deliveryScope);
+  const shared = useAgencyClientHome(agencySeat ? deliveryScope : undefined);
+  const deliveries = agencySeat ? { state: shared.state.status === "ready" ? { status: "ready" as const, items: agencyClientDeliveries(shared.state.data) } : shared.state.status === "error" ? { status: "error" as const, message: "Shared Requests could not be checked." } : shared.state, refresh: shared.refresh } : ownerDeliveries;
   const items = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const providerName = (item: BusinessDeliveryItem) => deliveryProviderName(item, agencyNames);
   const rows = businessRequestRows(items, work, providerName);
   const closed = rows.filter(row => row.stage === "closed");
   const loading = busy || deliveries.state.status === "loading";
 
+  function stageLabel(stage: BusinessRequestStage, agencyName?: string) {
+    return requestStageLabel(stage, { agencySeat, businessName, agencyName });
+  }
   function row(entry: BusinessRequestRow) {
     return <StRow key={entry.id}
       title={entry.title}
       detail={entry.detail}
       href={entry.href}
       onClick={!entry.href && entry.workId ? () => onOpenWork(entry.workId!) : undefined}
-      end={<><StState kind={entry.stage === "needs_you" || entry.stage === "ready_for_review" ? "need" : entry.stage === "done" ? "live" : "draft"}>{REQUEST_STAGE_LABELS[entry.stage]}</StState><ArrowUpRight size={16} aria-hidden="true" /></>}
+      end={<><StState kind={entry.stage === "needs_you" || entry.stage === "ready_for_review" ? "need" : entry.stage === "done" ? "live" : "draft"}>{stageLabel(entry.stage, entry.agencyName)}</StState><ArrowUpRight size={16} aria-hidden="true" /></>}
     />;
   }
 
@@ -103,7 +113,7 @@ export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNam
       meta={<>Things you asked for that have an end. A request becomes agreed work once its scope and deadline are accepted.{readOnly ? " Shared with you." : null}</>}
       actions={!readOnly ? <StPill onClick={onAsk}>Ask Strelva for something</StPill> : undefined}
     />
-    {deliveries.state.status === "disabled" ? <StNotice>Requests made to Strelva or an agency are visible to the owners and admins of {businessName}.</StNotice> : null}
+    {deliveries.state.status === "disabled" ? <StNotice>Requests outside your current shared scope cannot be checked for {businessName}.</StNotice> : null}
     {deliveries.state.status === "error" ? <StNotice tone="critical"><span role="alert">{deliveries.state.message}</span> <StTextButton onClick={deliveries.refresh}>Check again</StTextButton></StNotice> : null}
     {loading ? <div role="status" aria-label="Checking your requests"><StSkeleton /><StSkeleton width="76%" /><StSkeleton width="88%" /></div> : rows.length === 0 && deliveries.state.status !== "error" ? <StEmpty>
       <p>{readOnly || deliveries.state.status === "disabled" ? "No requests you can see." : "Nothing asked yet."}</p>
@@ -112,8 +122,8 @@ export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNam
       {GROUPS.map(group => {
         const entries = rows.filter(entry => entry.stage === group.stage);
         if (!entries.length) return null;
-        return <StSection key={group.stage} title={group.heading} id={`requests-${group.stage}`} meta={<StMono>{entries.length}</StMono>}>
-          <StRows label={group.heading}>{entries.map(row)}</StRows>
+        return <StSection key={group.stage} title={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)} id={`requests-${group.stage}`} meta={<StMono>{entries.length}</StMono>}>
+          <StRows label={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)}>{entries.map(row)}</StRows>
         </StSection>;
       })}
       {closed.length ? <details><summary className="cursor-pointer py-3 text-sm text-gray-muted">Closed (<StMono>{closed.length}</StMono>)</summary><StRows label="Closed requests">{closed.map(row)}</StRows></details> : null}
