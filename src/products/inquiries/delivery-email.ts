@@ -34,10 +34,12 @@ export function createEmailInquiryTransport(options: { allowExternalSends?: bool
         }
         const sent = await sendEmailWithReceipt({
           audience: message.audience,
-          ...(inquiryRecordsEnabled() && message.audience === "customer" ? { fromAddress: `hello@${CLIENT_MAIL_DOMAIN}` } : {}),
+          authorship: message.audience === "customer" ? "business" : "agency",
+          ...(message.audience === "customer" ? { fromName: message.fromName, businessName: message.options.businessName } : {}),
+          ...(message.audience === "customer" ? { fromAddress: `hello@${CLIENT_MAIL_DOMAIN}` } : {}),
           tenantId: message.audience === "client" ? message.tenantId : undefined,
           to: message.to,
-          ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName || "Strelva" } : {}),
+          ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName } : {}),
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),
           subject: message.subject,
           options: message.options,

@@ -1,9 +1,11 @@
+import { getTenantConfig } from "@/lib/tenants";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash } from "node:crypto";
 import { getSubscribers, getContent } from "./storage";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
 import { CLIENT_MAIL_DOMAIN, sendBatchWithReceipt } from "@/platform/infra/email/send";
+import { escapeEmailHtml } from "@/platform/infra/email/escape";
 import { buildUnsubscribeUrl } from "./newsletter-unsubscribe";
 
 export interface SendNewsletterInput {
@@ -65,7 +67,8 @@ export async function sendNewsletter(
   }
 
   const settings = await getContent("settings", tenant);
-  const fromName = sanitizeEmailSubjectText(settings.siteName || "Newsletter");
+  const tenantConfig = await getTenantConfig(tenant);
+  const fromName = sanitizeEmailSubjectText(tenantConfig?.siteName || settings.siteName || "Newsletter");
   const fromAddress = `newsletter@${CLIENT_MAIL_DOMAIN}`;
   const safeHtml = sanitizeEmailHtml(body);
   const safeText = htmlToPlainText(body);
@@ -104,8 +107,8 @@ export async function sendNewsletter(
           return {
             to: subscriber.email,
             subject: safeSubject,
-            html: safeHtml,
-            text: `${safeText}\n\nUnsubscribe: ${unsubscribe}`,
+            html: `<header><p>${escapeEmailHtml(fromName)}</p></header>${safeHtml}<footer><p>Runs on Strelva.</p><a href="${escapeEmailHtml(unsubscribe)}">Unsubscribe from ${escapeEmailHtml(fromName)} newsletter</a></footer>`,
+            text: `${fromName}\n\n${safeText}\n\nRuns on Strelva.\nUnsubscribe: ${unsubscribe}`,
             headers: {
               "List-Unsubscribe": `<${unsubscribe}>`,
               "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

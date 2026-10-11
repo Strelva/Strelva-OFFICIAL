@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 /**
  * The two new senders added in the Track A hardening sprint:

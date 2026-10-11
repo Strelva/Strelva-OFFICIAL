@@ -23,7 +23,8 @@ const message = {
   to: "ada@example.test",
   replyTo: "inquiry+abc@reply.strelva.test",
   subject: "We received your message for Acme",
-  options: { heading: "We received your message", paragraphs: ["Thanks"] },
+  fromName: "Acme",
+  options: { businessName: "Acme", heading: "We received your message", paragraphs: ["Thanks"] },
   tags: { strelva_tenant_id: "acme", strelva_inquiry_id: "lead-1", strelva_action: "reply" },
   idempotencyKey: "inquiry:lead-1:reply",
 };

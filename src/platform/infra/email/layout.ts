@@ -102,6 +102,8 @@ export interface EmailOptions {
   /** Legacy name-only attribution. Prefer brand for workspace identity. */
   preparedBy?: string;
   brand?: OwnerBrand;
+  /** End customers see the business that is contacting them. */
+  businessName?: string;
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
   /** The one h1. */
@@ -131,10 +133,11 @@ export interface EmailOptions {
 
 /** The real Strelva logo (cairn + Fraunces wordmark) as a hosted image.
  *  `footer` = the smaller footer variant. */
-function logo(footer = false, preparedBy?: string, brand?: OwnerBrand): string {
-  if (brand?.agencyId) {
+function logo(footer = false, preparedBy?: string, brand?: OwnerBrand, businessName?: string): string {
+  if (businessName) return footer ? `<span style="font-size:12px;color:${TOKENS.muted};">${BRAND_CREDIT}</span>` : `<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(businessName)}</span>`;
+  if (brand && brand.name !== "Strelva") {
     if (footer) return `<span style="font-size:12px;color:${TOKENS.muted};">${BRAND_CREDIT}</span>`;
-    const image = brand.logoUrl ? `<img src="${escapeEmailHtml(brand.logoUrl)}" alt="" width="132" style="display:block;max-width:132px;max-height:64px;object-fit:contain;margin-bottom:12px;">` : "";
+    const image = brand.logoUrl ? `<img src="${escapeEmailHtml(brand.logoUrl)}" alt="${escapeEmailHtml(brand.name)}" width="132" style="display:block;max-width:132px;max-height:64px;object-fit:contain;margin-bottom:12px;">` : "";
     return `${image}<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(brand.name)}</span>`;
   }
   if (preparedBy) return `<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(preparedBy)} <span style="font-size:12px;font-weight:400;">on Strelva</span></span>`;
@@ -237,12 +240,12 @@ function footerHtml(opts: EmailOptions): string {
   const metaRow = meta.length
     ? `<div style="margin-top:10px;font-size:12px;line-height:1.5;color:${TOKENS.faint};">${meta.join(" &nbsp;·&nbsp; ")}</div>`
     : "";
-  return `<div style="padding:24px 0 8px;">${logo(true, opts.preparedBy, opts.brand)}${metaRow}</div>`;
+  return `<div style="padding:24px 0 8px;">${logo(true, opts.preparedBy, opts.brand, opts.businessName)}${metaRow}</div>`;
 }
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
-  if (opts.paper) return renderPaperEmailHtml(opts.paper);
+  if (opts.paper) return renderPaperEmailHtml({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailHtml(opts.preheader)}</div>`
@@ -267,7 +270,7 @@ ${preheader}
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${TOKENS.page};padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" cellpadding="0" cellspacing="0" width="${TOKENS.width}" style="max-width:${TOKENS.width}px;width:100%;background:${TOKENS.card};border:1px solid ${TOKENS.hairline};border-radius:14px;font-family:${TOKENS.font};">
-      <tr><td style="padding:28px 32px 0;">${logo(false, opts.preparedBy, opts.brand)}</td></tr>
+      <tr><td style="padding:28px 32px 0;">${logo(false, opts.preparedBy, opts.brand, opts.businessName)}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
         ${paragraphs}${highlight}${bullets}${decisions}${rows}${button}${secondaryButton}
@@ -281,7 +284,7 @@ ${preheader}
 
 /** Plain-text counterpart — same content, no markup. */
 export function renderEmailText(opts: EmailOptions): string {
-  if (opts.paper) return renderPaperEmailText(opts.paper);
+  if (opts.paper) return renderPaperEmailText({ ...opts.paper, ...(opts.brand ? { brand: opts.brand } : {}), ...(opts.businessName ? { businessName: opts.businessName } : {}) });
   const parts: string[] = [opts.heading, ""];
   for (const p of opts.paragraphs ?? []) parts.push(p, "");
   if (opts.highlight) {
@@ -304,7 +307,7 @@ export function renderEmailText(opts: EmailOptions): string {
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);
-  parts.push(opts.brand?.agencyId ? `${opts.brand.name} · ${BRAND_CREDIT}` : opts.preparedBy ? `${opts.preparedBy} on Strelva` : "Strelva");
+  parts.push(opts.businessName ? `${opts.businessName} · ${BRAND_CREDIT}` : opts.brand && opts.brand.name !== "Strelva" ? `${opts.brand.name} · ${BRAND_CREDIT}` : opts.preparedBy ? `${opts.preparedBy} on Strelva` : "Strelva");
   if (opts.manageUrl) parts.push(`Manage: ${opts.manageUrl}`);
   if (opts.unsubscribeUrl) parts.push(`Unsubscribe: ${opts.unsubscribeUrl}`);
   return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();

@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 // CRM comms auto-log: when a client email ACTUALLY sends, it accrues into the
 // tenant's CRM activity timeline. Invariants:
@@ -53,7 +58,7 @@ describe("delivery-email CRM comms auto-log", () => {
     expect(addActivityMock).toHaveBeenCalledWith("rohlax", {
       kind: "email",
       summary: "Sent: welcome email",
-      author: "Strelva",
+      author: "Actor not recorded",
     });
   });
 
@@ -73,7 +78,7 @@ describe("delivery-email CRM comms auto-log", () => {
     expect(addActivityMock).not.toHaveBeenCalled();
   });
 
-  it("does NOT log when no tenantId is provided (opt-in)", async () => {
+  it("holds mail without a verified tenant or agency, and does not log it", async () => {
     process.env.EMAIL_SENDING_ENABLED = "true";
     const { sendSiteLiveEmail } = await import("@/lib/delivery-email");
 
@@ -84,8 +89,8 @@ describe("delivery-email CRM comms auto-log", () => {
       dashboardUrl: "https://admin.rohlax.com/dashboard",
     });
 
-    expect(ok).toBe(true);
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(ok).toBe(false);
+    expect(sendMock).not.toHaveBeenCalled();
     expect(addActivityMock).not.toHaveBeenCalled();
   });
 

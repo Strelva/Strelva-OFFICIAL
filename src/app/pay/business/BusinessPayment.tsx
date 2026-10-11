@@ -54,8 +54,9 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
     }
   }
 
-  const title = request?.kind === "deposit" ? "Your booking deposit" : "Your quote";
-  return <PaymentLayout><PaymentSplit description={<>
+  const businessName = request?.businessName;
+  const title = businessName ? request?.kind === "deposit" ? `Your booking deposit with ${businessName}` : `Your quote from ${businessName}` : "Payment request";
+  return <PaymentLayout brand={businessName}><PaymentSplit description={<>
     <StHead title={title} meta="Review the agreed details before paying." />
     {loading ? <div className={styles.state} role="status" aria-label="Loading payment details"><StSkeleton width="75%" /><StSkeleton width="50%" /><span>Loading payment details…</span></div> : null}
     {request ? <>
@@ -68,8 +69,9 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
       <h2 className={styles.formTitle}>{request.kind === "deposit" ? "Your deposit" : "Your payment"}</h2>
       <span className={styles.amountValue}>{formatMoney(request.amountCents, request.currency)}</span>
       {request.status === "paid" ? <StState kind="live">Payment received.</StState> : request.status === "expired" ? <StState kind="down">This payment link has expired.</StState> : request.status === "cancelled" ? <StState kind="draft">This request was cancelled.</StState> : <p className={styles.caption}>Valid until <StMono as="time" dateTime={request.expiresAt}>{new Date(request.expiresAt).toLocaleString()}</StMono>.</p>}
-      {request.status === "unpaid" ? <StPill size="lg" block busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</StPill> : null}
-      <p className={`${styles.caption} ${styles.security}`}><Lock size={12} aria-hidden="true" />Payment goes to the business through Stripe. The business handles refunds and cancellation terms.</p>
+      {!businessName ? <StNotice>The business identity is unavailable. Ask for a new payment link before paying.</StNotice> : null}
+      {request.status === "unpaid" && businessName ? <StPill size="lg" block busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</StPill> : null}
+      <p className={`${styles.caption} ${styles.security}`}><Lock size={12} aria-hidden="true" />Payment goes to {businessName || "the business named on this request"} through Stripe. The business handles refunds and cancellation terms.</p>
     </div></StSurface> : !loading && !error ? <StEmpty>Payment details are unavailable. Ask the business for a current payment link.</StEmpty> : null}
   </PaymentSplit></PaymentLayout>;
 }

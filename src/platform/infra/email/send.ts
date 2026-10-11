@@ -21,6 +21,10 @@ type RenderedEmail =
 
 export type SendEmailInput = RenderedEmail & {
   audience: EmailAudience;
+  /** The author of the action, independently of who receives the message. */
+  authorship?: "platform" | "agency" | "business";
+  /** Trusted business presentation for end-customer mail. */
+  businessName?: string;
   /** The tenant this send belongs to, when known. ONLY the "client" audience is
    * tenant-aware: a per-tenant override can ARM client email for one verified
    * client while the global switch stays paused, or force it off for one client.
@@ -122,23 +126,36 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
 
-  const { Resend } = await import("resend");
-  const resend = new Resend(apiKey);
   const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
   const suppliedBrand = input.options?.brand ?? input.brand;
-  const brand = input.audience === "client"
-    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : suppliedBrand
-    : suppliedBrand;
-  // A cached brand remains a scope signal even when the fresh lookup fails.
-  const agencyId = brand?.agencyId ?? suppliedBrand?.agencyId;
-  const identity = brand?.agencyId ? await resolveAgencyEmailIdentity(brand.agencyId) : null;
-  const options = input.options && brand ? { ...input.options, brand, heading: brand.agencyId ? input.options.heading.replace(/Strelva/g, () => brand.name) : input.options.heading } : input.options;
+  const authorship = input.authorship ?? (input.audience === "client" || suppliedBrand?.agencyId ? "agency" : input.audience === "customer" ? "business" : "platform");
+  const brand = authorship === "agency"
+    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : suppliedBrand?.agencyId ? await resolveOwnerBrand(suppliedBrand.agencyId) : suppliedBrand
+    : authorship === "platform" ? STRELVA_BRAND : undefined;
+  const agencyId = brand?.agencyId;
+  const identity = agencyId ? await resolveAgencyEmailIdentity(agencyId) : null;
+  if (authorship === "agency" && (!agencyId || !identity)) {
+    console.warn("[email] agency-authored send held: agency_identity_unavailable");
+    return { status: "suppressed", reason: "agency_identity_unavailable" };
+  }
+  const businessName = authorship === "business"
+    ? input.businessName?.trim() || input.options?.businessName?.trim() || input.fromName?.trim()
+    : undefined;
+  if (authorship === "business" && !businessName) {
+    console.warn("[email] business-authored send held: business_identity_unavailable");
+    return { status: "suppressed", reason: "business_identity_unavailable" };
+  }
+  const resolvedBrand = identity && brand ? { ...brand, name: identity.name, replyTo: identity.replyTo } : brand;
+  const options = input.options ? {
+    ...input.options, brand: resolvedBrand, businessName,
+    ...(input.options.paper ? { paper: { ...input.options.paper, brand: resolvedBrand, businessName } } : {}),
+  } : undefined;
   const html = options ? renderEmailHtml(options) : input.html!;
   const text = options ? renderEmailText(options) : input.text!;
-  const fromName = identity ? `${identity.name} via Strelva` : agencyId ? STRELVA_BRAND.name : input.fromName || STRELVA_BRAND.name;
+  const fromName = identity ? identity.name : authorship === "business" ? businessName! : input.fromName || STRELVA_BRAND.name;
   const fromAddress = agencyId
     ? input.fromAddress && /@(updates|mail)\.strelva\.com$/.test(input.fromAddress) ? input.fromAddress : "hello@updates.strelva.com"
-    : input.fromAddress || `hello@${fromDomain}`;
+    : input.fromAddress || (authorship === "business" ? "hello@mail.strelva.com" : `hello@${fromDomain}`);
   const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
 
@@ -167,6 +184,8 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
     return { status: "suppressed", reason: "provider_not_cleared" };
   }
+  const { Resend } = await import("resend");
+  const resend = new Resend(apiKey);
   const result = input.idempotencyKey
     ? await resend.emails.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.emails.send(payload);

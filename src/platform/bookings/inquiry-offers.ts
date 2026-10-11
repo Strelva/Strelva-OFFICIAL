@@ -25,6 +25,7 @@ const rawOfferSchema = z.object({
   booking_id: z.string().uuid().nullable(), customer: z.object({ name: z.string(), email: z.string().email() }),
 });
 export interface InquiryBookingOffer {
+  businessName?: string;
   id: string; serviceId: string; serviceName: string; timeZone: string;
   slots: Array<{ start: string; end: string }>; expiresAt: string; url: string; token: string; booked: boolean;
 }
@@ -85,7 +86,13 @@ export async function readInquiryBookingOfferForReceipt(tenantId: string, inquir
 export async function readInquiryBookingOffer(token: string): Promise<InquiryBookingOffer | null> {
   await requireInquiryBookingOffers();
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
-  return project(await nativeRpc("read_inquiry_booking_offer", { p_hash: tokenHash(token) }));
+  const raw = await nativeRpc("read_inquiry_booking_offer", { p_hash: tokenHash(token) });
+  const offer = project(raw);
+  if (!offer) return null;
+  const row = rawOfferSchema.parse(raw);
+  const business = await nativeRpc("read_booking_business_details", { p_tenant_id: row.tenantId }) as { name?: string } | null;
+  if (!business?.name?.trim()) throw new PublicBookingError("unavailable", "The business identity could not be verified.");
+  return { ...offer, businessName: business.name };
 }
 export async function chooseInquiryBookingOffer(token: string, start: string): Promise<StoreBooking> {
   const offer = await readInquiryBookingOffer(token);

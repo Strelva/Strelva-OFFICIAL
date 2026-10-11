@@ -6,6 +6,11 @@ import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { agencyNameSchema, brandInputSchema, STRELVA_BRAND, type AgencyBrandInput, type OwnerBrand } from "@/platform/infra/agency-brand";
 
+/** A failed or absent relationship never makes the platform the agency. */
+export const AGENCY_IDENTITY_UNAVAILABLE: OwnerBrand = {
+  ...STRELVA_BRAND, name: "Agency identity unavailable", accentColor: "#565d64",
+};
+
 export class AgencyBrandReplyToError extends Error {}
 
 export function validateBrand(raw: unknown): AgencyBrandInput {
@@ -32,34 +37,51 @@ export async function brandRpc(name: string, args: Record<string, unknown>): Pro
 }
 export function logoDigest(logo: NonNullable<AgencyBrandInput["logo"]>) { return createHash("sha256").update(Buffer.from(logo.data, "base64")).digest("hex"); }
 export function presentBrand(raw: unknown): OwnerBrand {
-  if (!raw || typeof raw !== "object") return STRELVA_BRAND;
+  if (!raw || typeof raw !== "object") return AGENCY_IDENTITY_UNAVAILABLE;
   const row = raw as { agencyId: string; name: string; brand: unknown; replyTo?: string | null };
+  if (!row.agencyId || typeof row.name !== "string" || !row.name.trim()) return AGENCY_IDENTITY_UNAVAILABLE;
   const parsed = row.brand ? validateBrand(row.brand) : null;
-  return { agencyId: row.agencyId, name: parsed?.displayName ?? row.name,
+  const candidate = parsed?.displayName ?? row.name;
+  const normalized = agencyNameSchema.safeParse(candidate);
+  if (!["Strelva", "Strelva Agency"].includes(candidate) && !normalized.success) return AGENCY_IDENTITY_UNAVAILABLE;
+  const name = normalized.success ? normalized.data : candidate;
+  return { agencyId: row.agencyId, name,
     logoUrl: parsed?.logo ? `${CONTROL_PLANE_URL}/api/agency-brand/logo/${row.agencyId}/${logoDigest(parsed.logo)}` : null,
     accentColor: parsed?.accentColor ?? STRELVA_BRAND.accentColor, replyTo: row.replyTo ?? null, credit: "runs_on_strelva" };
 }
+/** Reserved house-agency names require the server's designation, never a name match alone. */
+async function resolvePresentedBrand(raw: unknown): Promise<OwnerBrand> {
+  const brand = presentBrand(raw);
+  if (!["Strelva", "Strelva Agency"].includes(brand.name)) return brand;
+  const db = getSupabase();
+  if (!db || !brand.agencyId) return AGENCY_IDENTITY_UNAVAILABLE;
+  const { data, error } = await db.from("strelva_agency_workspace").select("workspace_id").eq("workspace_id", brand.agencyId).maybeSingle();
+  if (error || !data) return AGENCY_IDENTITY_UNAVAILABLE;
+  return { ...brand, name: "Strelva Agency" };
+}
 /** Service read of public presentation only. Callers authorize workspace data separately. */
 export async function resolveOwnerBrand(workspaceId: string): Promise<OwnerBrand> {
-  try { return presentBrand(await brandRpc("resolve_owner_brand", { p_workspace_id: workspaceId })); }
-  catch { console.warn("[agency-brand] owner lookup failed; using Strelva."); return STRELVA_BRAND; }
+  try { return await resolvePresentedBrand(await brandRpc("resolve_owner_brand", { p_workspace_id: workspaceId })); }
+  catch { console.warn("[agency-brand] owner lookup failed; agency identity unavailable."); return AGENCY_IDENTITY_UNAVAILABLE; }
 }
 export async function resolveTenantBrand(tenantId: string): Promise<OwnerBrand> {
   try {
-    if (!getSupabase()) return STRELVA_BRAND;
+    if (!getSupabase()) return AGENCY_IDENTITY_UNAVAILABLE;
     const workspaceId = await releaseWorkspaceForTenant(tenantId);
-    return workspaceId ? await resolveOwnerBrand(workspaceId) : STRELVA_BRAND;
-  } catch { console.warn("[agency-brand] tenant lookup failed; using Strelva."); return STRELVA_BRAND; }
+    return workspaceId ? await resolveOwnerBrand(workspaceId) : AGENCY_IDENTITY_UNAVAILABLE;
+  } catch { console.warn("[agency-brand] tenant lookup failed; agency identity unavailable."); return AGENCY_IDENTITY_UNAVAILABLE; }
 }
 /** Never trust the brand cached in a page/report: re-read effect and member identity at send. */
 export async function resolveAgencyEmailIdentity(agencyId: string): Promise<{ name: string; replyTo: string | null } | null> {
   try {
     const raw = await brandRpc("resolve_owner_brand", { p_workspace_id: agencyId }) as { agencyId: string; emailAllowed: boolean } | null;
     if (!raw || raw.agencyId !== agencyId || raw.emailAllowed !== true) return null;
-    const brand = presentBrand(raw);
+    const brand = await resolvePresentedBrand(raw);
+    if (!brand.agencyId) return null;
+    if (brand.name === "Strelva Agency") return { name: brand.name, replyTo: brand.replyTo };
     const name = agencyNameSchema.safeParse(brand.name);
     return name.success ? { name: name.data, replyTo: brand.replyTo } : null;
-  } catch { console.warn("[agency-brand] email identity lookup failed; using Strelva."); return null; }
+  } catch { console.warn("[agency-brand] email identity lookup failed; send held."); return null; }
 }
 export async function manageAgencyBrand(actor: WorkspaceActor, workspaceId: string, brand?: AgencyBrandInput) {
   const data = await brandRpc("manage_agency_brand", { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_workspace_id: workspaceId, p_brand: brand ? validateBrand(brand) : null });

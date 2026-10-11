@@ -55,7 +55,7 @@ export function OwnerClaimPresentation({ preview, accepted, loading, submitting,
   preview: OwnerClaimPreview | null; accepted: OwnerClaimAccepted | null; loading: boolean; submitting: boolean; error: string; target: string; onAccept: () => void;
 }) {
   const expires = preview ? new Date(preview.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" }) : "";
-  return <StEntry>
+  return <StEntry brand={preview?.agencyName || "Agency identity unavailable"}>
     {loading ? <StSkeleton label="Checking your link" /> : accepted ? <>
       <StHead title={`${accepted.workspaceName} is yours`} />
       <StState kind="live">You’re the owner</StState>
@@ -72,6 +72,7 @@ export function OwnerClaimPresentation({ preview, accepted, loading, submitting,
         <StTextButton href={`/sign-up?next=${encodeURIComponent(target)}`}>Create an account</StTextButton>
       </> : <StNotice>{preview.status === "revoked" ? `${preview.agencyName} replaced this link with a newer one. Use the latest link they sent.` : preview.status === "expired" ? `This link expired. Ask ${preview.agencyName} for a new one.` : "This business has already been claimed with this link."}</StNotice>}
     </> : <StHead title="This link doesn’t work" />}
+    {preview ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
     {error ? <StNotice tone="critical">{error}</StNotice> : null}
   </StEntry>;
 }

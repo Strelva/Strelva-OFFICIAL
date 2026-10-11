@@ -135,20 +135,20 @@ export function ownerInvitationAcceptUrl(token: string): string {
   return new URL(`/workspace/invitations/accept/${token}`, CONTROL_PLANE_URL).toString();
 }
 
-/** The invitation email. Strelva is the only name that acts; no tooling words. */
+/** Prepared invitation content. Verified sender identity is resolved by the shared transport. */
 export function ownerInvitationEmail(input: { workspaceName: string; siteNames: string[]; acceptUrl: string; expiresAt: string; recipientName?: string | null }): EmailOptions {
   const sites = input.siteNames.length ? input.siteNames.join(", ") : input.workspaceName;
   const expires = new Date(input.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", timeZone: "UTC" });
   return {
-    preheader: `Strelva set up ${input.workspaceName} for you. Accept to become its owner.`,
+    preheader: `Your workspace for ${input.workspaceName} is ready. Accept to become its owner.`,
     heading: `${input.workspaceName} is ready for you`,
     paragraphs: [
-      `${input.recipientName ? `Hi ${input.recipientName}, ` : ""}Strelva keeps running ${sites} for you, and now there is one place where you can see it: your website, the people who reach out, and anything that needs your decision.`,
+      `${input.recipientName ? `Hi ${input.recipientName}, ` : ""}Your workspace brings ${sites} into one place: your website, the people who reach out, and anything that needs your decision.`,
       "Accept this invitation to become the owner. Owners decide, publish, pay and can take everything with them at any time. You never have to sign in for your site to keep working.",
       `This invitation works until ${expires}. If you weren't expecting it, you can ignore it.`,
     ],
     button: { label: "Accept and open", url: input.acceptUrl },
-    footerNote: `Sent by Strelva for ${input.workspaceName}`,
+    footerNote: `Invitation to ${input.workspaceName}`,
   };
 }
 

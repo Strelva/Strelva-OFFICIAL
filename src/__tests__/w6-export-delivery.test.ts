@@ -4,13 +4,13 @@ const doubles = vi.hoisted(() => ({ send: vi.fn(), override: vi.fn(), alert: vi.
 vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: doubles.send }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: doubles.override }));
 vi.mock("@/platform/infra/monitoring", () => ({ alert: doubles.alert }));
-import { deliverWorkspaceExportLink } from "@/platform/workspace-exports/v3-delivery";
-import type { V3Manifest } from "@/platform/workspace-exports/v3";
+import { deliverWorkspaceExportLink, exportEmailLabel } from "@/platform/workspace-exports/v3-delivery";
+import { V3_INLINE_MAXIMUM_BYTES, type V3Manifest } from "@/platform/workspace-exports/v3";
 
 const input = {
   buildId: "build-1", token: "never-log-this-token", deliverTo: "record-owner@example.test", workspaceId: "workspace-1",
   tenantIds: ["site-a", "site-b"], baseUrl: "https://strelva.example.test",
-  manifest: { included: [], unavailable: [] } as unknown as V3Manifest,
+  manifest: { scope: "business_portability_export", requesterRole: "owner", included: [], omitted: [], unavailable: [], inlineMaximumBytes: V3_INLINE_MAXIMUM_BYTES } satisfies V3Manifest,
 };
 
 beforeEach(() => {
@@ -24,6 +24,19 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("export link rollout and client gates", () => {
+  it("uses business labels for internal archive categories and omissions", async () => {
+    expect(exportEmailLabel("provider_metadata")).toBe("Connections");
+    expect(exportEmailLabel("system_history")).toBe("History");
+    expect(exportEmailLabel("workspace_snapshot_schema_2")).toBe("Saved work and business details");
+    await deliverWorkspaceExportLink({ ...input, businessName: "Lakeview Yoga", manifest: { ...input.manifest,
+      included: [{ category: "inquiry_delivery", count: 3 }],
+      omitted: [{ category: "inquiry_delivery_routing", reason: "Reverse indices and message digests" }],
+    } });
+    expect(doubles.send).toHaveBeenCalledWith(expect.objectContaining({ subject: "Your export of Lakeview Yoga is ready", options: expect.objectContaining({
+      bullets: [{ title: "Inquiry replies and delivery evidence", text: "3" }],
+      rows: [{ label: "Not included: Private delivery controls", value: "Private delivery links are excluded. Replies and delivery evidence are included where available." }],
+    }) }));
+  });
   it.each(["STRELVA_EXPORT_LINK_EMAIL", "EMAIL_SENDING_ENABLED", "CUSTOMER_EMAIL_ENABLED"])("%s off suppresses even an armed tenant", async flag => {
     vi.stubEnv(flag, "");
     doubles.override.mockResolvedValue("on");

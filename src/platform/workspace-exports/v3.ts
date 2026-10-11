@@ -198,7 +198,7 @@ export async function startWorkspaceExportV3(
     includeOperatorSnapshot?: boolean;
     schedule: (task: () => Promise<void>) => void;
     /** Sends the download link to the recipient the database chose. */
-    deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest }) => Promise<void>;
+    deliver: (input: { businessName?: string; buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest }) => Promise<void>;
     onFailure?: (input: { buildId: string; reason: string }) => Promise<void> | void;
   },
 ): Promise<V3ExportOutcome> {
@@ -227,7 +227,9 @@ export async function startWorkspaceExportV3(
       return typeof tenantId === "string" ? [tenantId] : [];
     });
     try {
-      await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: collected.manifest });
+      const recordRow = collected.data.business_record?.[0] as { record?: { facts?: { display_name?: { value?: string }; legal_name?: { value?: string } } } } | undefined;
+      const businessName = recordRow?.record?.facts?.display_name?.value || recordRow?.record?.facts?.legal_name?.value;
+      await deps.deliver({ businessName, buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: collected.manifest });
     } catch {
       // The archive remains ready. A failed email is distinct from a failed
       // build and must never expose the token through provider error text.

@@ -1,3 +1,5 @@
+import { invitationEntryIdentity } from "@/platform/agency-brand/entry";
+import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { StEntry, StHead, StSurface, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
@@ -45,6 +47,7 @@ async function getInviteContext(searchParams: AuthSearchParams) {
   return {
     email,
     siteName: tenantConfig.siteName || invite.tenant,
+    brand: await resolveTenantBrand(invite.tenant),
   };
 }
 
@@ -58,7 +61,7 @@ async function getTenantAuthContext() {
   if (!tenant) return null;
 
   const tenantConfig = await getTenantConfig(tenant);
-  if (tenantConfig && tenantConfig.active === false) return null;
+  if (!tenantConfig || tenantConfig.active === false) return null;
 
   // A missing or unavailable site theme is normal at entry. Never borrow the
   // generic template brand just because this business has no saved theme.
@@ -66,6 +69,7 @@ async function getTenantAuthContext() {
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
+    brand: await resolveTenantBrand(tenant),
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
     host: requestHeaders.get("host") || undefined,
@@ -86,18 +90,20 @@ export default async function SignUpPage({
   const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
   const invite = await getInviteContext(params);
 
-  if (invite) return <StEntry helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /></StEntry>;
+  if (invite) return <StEntry brand={invite.brand} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   const tenantAuth = await getTenantAuthContext();
-  if (tenantAuth) return <StEntry brand={tenantAuth.siteName} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /></StEntry>;
+  if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   if (workspaceOpen) {
     const asAgency = agencySignupReleaseEnabled() && searchValue(params.as) === "agency";
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || "/workspace";
-    return <StEntry helpHref="/workspace?view=help">
-      <SupabaseSignIn key={next} next={next} heading={<><StHead title="Create your account" />{agencySignupReleaseEnabled() ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
+    const identity = await invitationEntryIdentity(invitationTarget);
+    return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
+      <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencySignupReleaseEnabled() ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
+      {identity ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="Dashboard access is invite-only" meta="Already have access? Sign in with the email connected to your site. No site yet? Request your build." /><StPillLink href="/access-request">Request your build</StPillLink><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
+  return <StEntry helpHref="/workspace?view=help"><StHead title="Workspace access is invite-only" meta="Already have access? Sign in with the email connected to your business. No site yet? Request your build." /><StPillLink href="/access-request">Request your build</StPillLink><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
 }
 
 function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {

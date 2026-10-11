@@ -1,3 +1,4 @@
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import type { SendEmailInput } from "@/platform/infra/email/send";
@@ -45,15 +46,15 @@ describe("agency brand in actual report cron output", () => {
       expect(await response.json()).toMatchObject({ sent: kind === "weekly" ? [tenant.id] : 1, errors: [] });
       expect(mock.brand).toHaveBeenCalledWith(tenant.id);
       const payload = mock.send.mock.calls[0]![0] as SendEmailInput;
-      expect(payload).toMatchObject({ fromName: tenant.siteName, brand: agency, fromAddress: "report@updates.strelva.com" });
-      expect(payload.html).toContain("North &amp; Web &lt;&quot;Owner&quot;&gt;");
-      expect(payload.html).toContain(agency.logoUrl!); expect(payload.html).toContain("color:#000000");
-      for (const artifact of [payload.html!, payload.text!]) {
+      expect(payload).toMatchObject({ options: { brand: agency }, fromAddress: "report@updates.strelva.com" });
+      expect(renderEmailHtml(payload.options!)).toContain("North &amp; Web &lt;&quot;Owner&quot;&gt;");
+      expect(renderEmailHtml(payload.options!)).toContain(agency.logoUrl!); expect(renderEmailHtml(payload.options!)).toContain("color:#000000");
+      for (const artifact of [renderEmailHtml(payload.options!)!, renderEmailText(payload.options!)!]) {
         expect(artifact).toContain("Runs on Strelva.");
         expect(artifact).toContain("https://app.strelva.com/client/agency-client/dashboard/reports");
         expect(artifact).not.toContain("https://admin.fixture.example");
       }
-      expect({ html: payload.html, text: payload.text }).toMatchSnapshot();
+      expect({ html: renderEmailHtml(payload.options!), text: renderEmailText(payload.options!) }).toMatchSnapshot();
     });
     it(`${kind} leaves commas and quotes intact for the shared RFC 5322 formatter`, async () => {
       const commaBrand = { ...agency, name: 'North, "Web"' };
@@ -63,19 +64,19 @@ describe("agency brand in actual report cron output", () => {
       mock.send.mockImplementation(async (input: SendEmailInput) => (await sendEmailWithReceipt(input)).status === "accepted");
       await route(new Request(`https://app.strelva.com/api/cron/${kind}-report`));
       const payload = mock.send.mock.calls[0]![0] as SendEmailInput;
-      expect(payload.brand).toEqual(commaBrand);
+      expect(payload.options?.brand).toEqual(commaBrand);
       expect(payload.replyTo).toBeUndefined();
       expect(mock.provider.mock.calls.at(-1)![0]).toMatchObject({
-        from: '\"North, \\"Web\\" via Strelva\" <report@updates.strelva.com>', replyTo: agency.replyTo,
+        from: '\"North, \\"Web\\"\" <report@updates.strelva.com>', replyTo: agency.replyTo,
       });
     });
     it(`${kind} retains self-serve Strelva identity and the existing report URL`, async () => {
       mock.brand.mockResolvedValue(STRELVA_BRAND);
       await route(new Request(`https://app.strelva.com/api/cron/${kind}-report`));
       const payload = mock.send.mock.calls[0]![0] as SendEmailInput;
-      expect(payload.fromName).toBe(tenant.siteName); expect(payload.replyTo).toBeUndefined();
-      expect(payload.html).toContain('alt="Strelva"'); expect(payload.text).not.toContain(agency.name);
-      expect(payload.html).toContain("https://admin.fixture.example/dashboard/reports");
+      expect(payload.fromName).toBeUndefined(); expect(payload.replyTo).toBeUndefined();
+      expect(renderEmailHtml(payload.options!)).toContain('alt="Strelva"'); expect(renderEmailText(payload.options!)).not.toContain(agency.name);
+      expect(renderEmailHtml(payload.options!)).toContain("https://admin.fixture.example/dashboard/reports");
     });
   }
 });

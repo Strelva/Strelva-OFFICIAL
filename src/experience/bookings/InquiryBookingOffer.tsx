@@ -5,7 +5,7 @@ import styles from "./visitor.module.css";
 /** Plain customer form: keyboard usable, never preselects a commitment. */
 export function InquiryBookingOffer({ offer, actionUrl, error, unavailable }: { offer: Offer | null; actionUrl: string; error?: boolean; unavailable?: boolean }) {
   const format = offer ? new Intl.DateTimeFormat("en-US", { timeZone: offer.timeZone, weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
-  return <VisitorBookingShell><div className={`${styles.surface} ${offer?.booked ? styles.receipt : ""}`}>
+  return <VisitorBookingShell siteName={offer?.businessName}><div className={`${styles.surface} ${offer?.booked ? styles.receipt : ""}`}>
     {offer?.booked ? <div className={styles.clock}><Clock3 size={22} aria-hidden="true" /></div> : null}
     <h1 className={styles.title}>{!offer ? unavailable ? "These times couldn’t load" : "This suggestion has expired" : offer.booked ? "Requested, not booked yet" : "Choose a time to request"}</h1>
     <p className={styles.intro} role={unavailable ? "alert" : undefined}>{!offer ? unavailable ? "Nothing has changed. Reload in a minute, or reply to the business for help." : "Reply to the business to ask for new times." : offer.booked ? "The business will confirm your requested time. It is not confirmed yet." : "Pick a time below. The business will confirm your request."}</p>
