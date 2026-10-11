@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 
+import type { OwnerDecision } from "@/platform/needs-you/contracts";
 import { readBusinessSystems } from "@/experience/systems/from-workspace";
 import { makeRealSummary, systemHref, type SystemView } from "@/experience/systems/model";
 import { SystemPage, websiteSandbox } from "@/experience/systems/SystemPage";
@@ -240,7 +241,7 @@ describe("Make real and the System page", () => {
 
   it("draws no empty panel, and with nothing beside the thing shows one line under it", () => {
     const html = render();
-    for (const empty of [">Connections<", ">Versions<", ">History<", ">Making it live<", "Nothing else is connected to it yet", "It runs in one context today"]) expect(html).not.toContain(empty);
+    for (const empty of [">Connections<", ">Versions<", ">History<", ">Making real…<", "Nothing else is connected to it yet", "It runs in one context today"]) expect(html).not.toContain(empty);
     expect(html).not.toContain("Ask what else attymooney.com could become.");
     // A website always has its own panels (domains, requests, history), so the bare case is another kind.
     const bare = render({ system: { ...site, kind: "app", possibilities: [] } });
@@ -281,13 +282,13 @@ describe("Make real and the System page", () => {
       ] }],
       history: [{ id: "h1", sentence: "Started running it", at: "2026-10-01T12:00:00Z" }],
     } });
-    expect(html).toContain("Making it live");
+    expect(html).toContain("Making real…");
     expect(html).toContain("Partly live");
     expect(html).toContain("Waiting: Google hasn&#x27;t approved Strelva&#x27;s access yet.");
     expect(html).toContain("History");
     expect(html).toContain("Started running it");
     expect(html).not.toMatch(/>Version[^s]/);
-    const order = ["Making it live", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
+    const order = ["Making real…", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
@@ -357,5 +358,50 @@ describe("System places and hostnames", () => {
     expect(publicHostname("localhost")).toBeUndefined();
     expect(publicHostname("evil.com\" onload=")).toBeUndefined();
     expect(publicHostname(42)).toBeUndefined();
+  });
+});
+
+
+describe("scoped System decisions", () => {
+  const system: SystemView = {
+    id: INTAKE_SYSTEM, kind: "app", name: "Mediation intake", detail: "", lifecycle: "draft",
+    health: { state: "unknown", summary: "Not checked." },
+    surface: { kind: "work", workId: "intake", productId: "unknown" },
+    connections: [], versions: [], possibilities: [],
+  };
+  const render = (needsYou: Parameters<typeof SystemPage>[0]["needsYou"]) => renderToStaticMarkup(createElement(SystemPage, {
+    system, systems: [system], workspaceId: BUSINESS, sources: [], needsYou, readOnly: true,
+    systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined,
+  }));
+  it("links only this System's decisions with their original identity and no approval controls", () => {
+    const decision: OwnerDecision = {
+      id: "60000000-0000-4000-8000-000000000001", workspaceId: BUSINESS, systemId: INTAKE_SYSTEM,
+      kind: "system.go_live", route: "owner_decides", title: "Publish Mediation intake", detail: "Review the prepared form.",
+      approveEffect: "Publish", notYetEffect: "Keep draft", sourceLifecycle: "draft", sourceId: "intake", revisionHash: "a".repeat(64),
+      urgent: false, signInRequired: true, adminMayDecide: false, openHref: null, state: "open", outcome: null,
+      outcomeReason: null, receiptRef: null, decidedByKind: null, decidedAt: null, deliveryState: "not_sent", operatorNote: null,
+      openedAt: "2026-10-11T00:00:00Z", expiresAt: "2026-10-25T00:00:00Z", reminded1At: null, reminded2At: null, deliveries: [],
+    };
+    const state = { status: "ready" as const, role: "owner" as const, items: [decision,
+      { ...decision, id: "other-system", systemId: SITE, title: "Other System decision" },
+      { ...decision, id: "other-business", workspaceId: "another-business", title: "Other business decision" }],
+      complete: false, handled: [], handledAvailable: true };
+    const html = render(state);
+    expect(html).toContain("Publish Mediation intake");
+    expect(html).toContain(`view=needs-you&amp;item=${decision.id}`);
+    expect(html).not.toContain("Other System decision");
+    expect(html).not.toContain("Other business decision");
+    expect(html).toContain("Some decisions could not be checked.");
+    expect(html).not.toContain("No decisions are waiting");
+    expect(html).not.toMatch(/<button[^>]*>Approve/);
+    const empty = render({ ...state, items: [], complete: true });
+    expect(empty).toContain("No decisions are waiting for this System.");
+  });
+  it("keeps loading and failed reads visible instead of claiming no decisions", () => {
+    expect(render({ status: "loading" })).toContain("Checking decisions for this System");
+    const failed = render({ status: "error", message: "Decision read unavailable." });
+    expect(failed).toContain("Decision read unavailable.");
+    expect(failed).not.toContain("No decisions are waiting");
+    expect(render({ status: "disabled" })).not.toContain("Needs you for this System");
   });
 });

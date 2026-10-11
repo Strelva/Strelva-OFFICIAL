@@ -129,12 +129,12 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       canRevoke: false,
     }] : [],
     products: [
-      { id: "applications", name: "Applications", description: "Private apps with working forms and records.", availability: "available" },
+      { id: "applications", name: "Internal tools", description: "Private internal tools with working forms and records.", availability: "available" },
       { id: "onboarding", name: "Onboarding", description: "Collect requirements and private documents.", availability: "available" },
       { id: "ai_visibility", name: "AI Visibility", description: "See what AI can understand about a business.", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", description: "Your website and the work that keeps it useful.", availability: "managed" },
       { id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" },
-      { id: "tracker", name: "Spreadsheet tracker", description: "Turn a CSV into working data with a saved history.", availability: "available" },
+      { id: "tracker", name: "Internal tool from a spreadsheet", description: "Turn a CSV into working data with a saved history.", availability: "available" },
       { id: "documents", name: "Documents", description: "Write procedures, proposals, and notes with a saved history.", availability: "available" },
       { id: "homefinder", name: "Home Finder", description: "Home search for a brokerage’s own site.", availability: "not_enabled", previewHref: "http://127.0.0.1:3213/embed/agency-preview" },
     ],
@@ -198,7 +198,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     id: "77777777-7777-4777-8777-777777777777", businessId: CUSTOMER, definitionId: "private_staff_requests", definitionVersion: "1.0.0",
     status: "draft", revision: 1, configuration: {}, nativeResources: [{ kind: "application", id: "88888888-8888-4888-8888-888888888888" }],
     responsibility: { kind: "provider_requested", providerKind: "strelva", providerName: "Strelva" }, acceptedScope: ["submit_requests", "review_requests"],
-    surfaces: [{ id: "business_workspace", label: "Business workspace", description: "Manage the application.", href: `/preview/strelva/workspace?scenario=business&workspaceId=${CUSTOMER}&view=applications&work=88888888-8888-4888-8888-888888888888&previewSetup=staff-request` }],
+    surfaces: [{ id: "business_workspace", label: "Business workspace", description: "Manage the internal tool.", href: `/preview/strelva/workspace?scenario=business&workspaceId=${CUSTOMER}&view=internal tools&work=88888888-8888-4888-8888-888888888888&previewSetup=staff-request` }],
     installedBy: "local-preview", installedAt: "2026-09-15T12:00:00.000Z", updatedBy: "local-preview", updatedAt: "2026-09-15T12:00:00.000Z",
   };
   const accessGrants: Array<{ id: string; recipientEmail: string; views: Array<"form" | "list" | "detail" | "document">; recordRead: "none" | "own" | "all"; recordSubmit: boolean; purpose: string; expiresAt: string; status: "active" | "revoked" }> = [];
@@ -346,7 +346,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       }
     }
     if (scenario === "business" && url.pathname === "/api/bounded-work" && url.searchParams.get("productId") === "applications" && (init?.method || "GET") === "GET") {
-      if (!installedApplication || url.searchParams.get("workId") !== STAFF_REQUEST_APP) return response({ error: "This application is unavailable in the local preview." }, 404);
+      if (!installedApplication || url.searchParams.get("workId") !== STAFF_REQUEST_APP) return response({ error: "This internal tool is unavailable in the local preview." }, 404);
       return response({ id: STAFF_REQUEST_APP, payload: staffRequestApplication });
     }
     if (scenario === "business" && url.pathname === "/api/bounded-work" && init?.method === "POST" && typeof init.body === "string") {
@@ -354,9 +354,9 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       if (body.productId === "applications" && body.action === "create") {
         if (body.workspaceId !== CUSTOMER) return response({ error: "The fixture only creates in its customer business." }, 403);
         const parsed = applicationSpecSchema.safeParse({ ...body.input, maintenanceOwner: PREVIEW_ACTOR });
-        if (!parsed.success) return response({ error: "Check the proposed app fields." }, 422);
+        if (!parsed.success) return response({ error: "Check the proposed internal tool fields." }, 422);
         // Synthetic in-memory fixture only. Real persistence is tested separately.
-        if (installedApplication) return response({ error: "This fixture already has an app. Reload the isolated preview to start over." }, 409);
+        if (installedApplication) return response({ error: "This fixture already has an internal tool. Reload the isolated preview to start over." }, 409);
         const spec = parsed.data;
         staffRequestApplication = { ...initialStaffRequestApplication(), title: spec.title, spec, versions: [{ version: 1, spec }], candidate: { designRevision: 0, specVersion: 1, spec, rehearsal: null } };
         installedApplication = true;
@@ -364,7 +364,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
         saved.set(CUSTOMER, [work, ...(saved.get(CUSTOMER) || [])]);
         return response(work, 201);
       }
-      if (body.productId !== "applications" || body.action !== "command" || body.workId !== STAFF_REQUEST_APP || !body.command) return response({ error: "This application command is unavailable in the local preview." }, 422);
+      if (body.productId !== "applications" || body.action !== "command" || body.workId !== STAFF_REQUEST_APP || !body.command) return response({ error: "This internal tool command is unavailable in the local preview." }, 422);
       const command = body.command;
       const now = "2026-09-15T12:05:00.000Z";
       const history = (kind: string) => [...staffRequestApplication.history, { revision: staffRequestApplication.revision + 1, kind, actorId: PREVIEW_ACTOR, at: now }];
@@ -385,16 +385,16 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
         staffRequestApplication = { ...staffRequestApplication, revision: staffRequestApplication.revision + 1, title: spec.title, history: history("revise_candidate"), spec, specVersion: candidate.specVersion, status: "draft", rehearsal: null, candidate, versions: [...staffRequestApplication.versions, { version: candidate.specVersion, spec }] };
       } else if (command.kind === "rollback_release" && typeof command.version === "number") {
         const release = staffRequestApplication.releases.find((item) => item.version === command.version);
-        if (!release) return response({ error: "That released application version is unavailable." }, 409);
+        if (!release) return response({ error: "That released internal tool version is unavailable." }, 409);
         const candidate = { designRevision: staffRequestApplication.candidate.designRevision + 1, specVersion: staffRequestApplication.candidate.specVersion + 1, spec: release.spec, rehearsal: null };
         staffRequestApplication = { ...staffRequestApplication, revision: staffRequestApplication.revision + 1, title: release.spec.title, history: history("rollback_release"), status: "installed", release, candidate, spec: release.spec, specVersion: candidate.specVersion, rehearsal: null, versions: [...staffRequestApplication.versions, { version: candidate.specVersion, spec: release.spec }] };
-      } else return response({ error: "This application command is unavailable in the local preview." }, 422);
+      } else return response({ error: "This internal tool command is unavailable in the local preview." }, 422);
       return response({ id: STAFF_REQUEST_APP, payload: staffRequestApplication });
     }
     if (scenario === "business" && url.pathname === `/api/apps/${STAFF_REQUEST_APP}/access`) {
       if ((init?.method || "GET") === "GET") return response({ grants: accessGrants });
       if (init?.method === "POST" && typeof init.body === "string") {
-        if (!staffRequestApplication.release) return response({ error: "Publish the application before issuing access." }, 409);
+        if (!staffRequestApplication.release) return response({ error: "Publish the internal tool before issuing access." }, 409);
         const input = JSON.parse(init.body) as Omit<(typeof accessGrants)[number], "id" | "status">;
         const existing = accessGrants.find((grant) => grant.recipientEmail === input.recipientEmail && grant.status === "active");
         const grant = existing || { ...input, id: `preview-grant-${accessGrants.length + 1}`, status: "active" as const };

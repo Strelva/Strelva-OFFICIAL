@@ -45,10 +45,10 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
 
   const active = now !== null && grant?.status === "active" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
   return <StandaloneApplicationShell><StPage>
-    {busy ? <><StHead title="Opening application draft…" /><StSkeleton label="Checking the current draft permission" /></> : null}
+    {busy ? <><StHead title="Opening internal tool draft…" /><StSkeleton label="Checking the current draft permission" /></> : null}
     {error ? <><div role="alert"><StNotice tone="critical">{error}</StNotice></div><div><StPill variant="soft" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</StPill></div></> : null}
-    {!busy && !error && !active ? <StNotice tone="need">The client has not granted draft editing for this application, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</StNotice> : null}
+    {!busy && !error && !active ? <StNotice tone="need">The client has not granted draft editing for this internal tool, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</StNotice> : null}
     {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
-    {!busy && !error && active ? <StEmpty>The client reviews and publishes changes. This access is limited to the application named by the accepted delivery and assignment.</StEmpty> : null}
+    {!busy && !error && active ? <StEmpty>The client reviews and publishes changes. This access is limited to the internal tool named by the accepted delivery and assignment.</StEmpty> : null}
   </StPage></StandaloneApplicationShell>;
 }

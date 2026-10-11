@@ -10,7 +10,7 @@
  * "products" stay addressable as the full list so existing links keep working.
  * October 4: the website and apps are Systems. Each opens its System page
  * (`view=system&system=<id>`); the full list keeps its old `apps` address.
- * The on-screen word lives in `SYSTEMS_LABEL` so the brand call stays one edit.
+ * The on-screen word lives in `PLACE_LABELS.systems` so the brand call stays one edit.
  * October 5: Customers left the navigation. The page only listed where people
  * reach the business, not customers.
  * October 6: the Customers page is retired in both states (systems-catalog
@@ -24,7 +24,7 @@
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
  */
-import { SYSTEMS_LABEL } from "@/experience/systems/model";
+import { PLACE_LABELS, COLLECTION_LABELS } from "@/platform/presentation/place-labels";
 
 export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
@@ -33,19 +33,19 @@ const DIRECT_VIEWS: ReadonlySet<string> = new Set(["needs-you", "requests", "app
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
-  home: "Home",
-  "needs-you": "Needs you",
-  requests: "Requests",
-  ongoing: "Running",
-  apps: SYSTEMS_LABEL,
-  work: SYSTEMS_LABEL,
-  products: SYSTEMS_LABEL,
-  settings: "Business details",
-  access: "People & access",
-  help: "Help",
-  account: "Account",
-  system: "System",
-  ask: "Ask Strelva",
+  home: PLACE_LABELS.home,
+  "needs-you": PLACE_LABELS.needsYou,
+  requests: PLACE_LABELS.requests,
+  ongoing: PLACE_LABELS.running,
+  apps: PLACE_LABELS.systems,
+  work: PLACE_LABELS.systems,
+  products: PLACE_LABELS.systems,
+  settings: PLACE_LABELS.businessDetails,
+  access: PLACE_LABELS.access,
+  help: PLACE_LABELS.help,
+  account: PLACE_LABELS.account,
+  system: PLACE_LABELS.system,
+  ask: PLACE_LABELS.ask,
 };
 
 /** The sidebar place that owns a section. Every view of the app list counts as Apps. */
@@ -71,7 +71,7 @@ export function sectionFromView(view: string | null | undefined): StrelvaSection
 
 /** The header title for a section. The app list is "Apps" until Systems are released. */
 export function sectionTitle(section: StrelvaSection, systemsReleased = false): string {
-  return !systemsReleased && APP_VIEWS.has(section) ? "Apps" : TITLES[section];
+  return !systemsReleased && APP_VIEWS.has(section) ? COLLECTION_LABELS.applications : TITLES[section];
 }
 
 export function workspaceSectionHref(section: StrelvaSection, base = "", workspaceId?: string): string {

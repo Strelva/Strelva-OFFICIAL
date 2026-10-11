@@ -173,11 +173,11 @@ export function OfferingInstallationView({
 
     {installation.status === "draft" ? <section className={styles.section} aria-labelledby={`offering-activation-${installation.id}`}>
       <h3 id={`offering-activation-${installation.id}`}>Finish setup</h3>
-      <p>Open the business workspace, rehearse the application, and publish it through the existing application review. Then activate it so staff can use its released form.</p>
+      <p>Open the business workspace, rehearse the internal tool, and publish it through the existing internal tool review. Then activate it so staff can use its released form.</p>
       {canManage ? <>
         <label className={styles.activationConfirm}>
           <input type="checkbox" checked={publicationConfirmed} onChange={(event) => setPublicationConfirmed(event.target.checked)} />
-          <span>I published the connected application through its review.</span>
+          <span>I published the connected internal tool through its review.</span>
         </label>
         <button className={styles.primary} type="button" disabled={saving || !publicationConfirmed} onClick={() => void activate()}>{saving ? "Checking release…" : "Activate release"}</button>
       </> : <p className={styles.note}>Only a business owner or admin can activate it after publication.</p>}
@@ -185,7 +185,7 @@ export function OfferingInstallationView({
 
     {definition?.configurationFields.length ? <form className={styles.section} onSubmit={saveConfiguration}>
       <ConfigurationFields fields={definition.configurationFields} values={configuration} disabled={!canManage || saving} onChange={(id, value) => setDraft((current) => ({ values: { ...(current.dirty ? current.values : configuration), [id]: value }, dirty: true }))} />
-      <p className={styles.note}>These fields describe this setup. They do not change the connected application or its published behavior.</p>
+      <p className={styles.note}>These fields describe this setup. They do not change the connected internal tool or its published behavior.</p>
       {canManage ? <button className={styles.primary} type="submit" disabled={saving || conflictNeedsRefresh}>{saving ? "Saving…" : "Save changes"}</button> : <p className={styles.note}>You can view this configuration, but only a business owner or admin can change it.</p>}
     </form> : null}
 
@@ -377,9 +377,9 @@ export function OfferingInstallView({
 
     <fieldset className={styles.fields} disabled={!collection.permissions.canManage || saving || attempted}>
       <legend>Connect existing work</legend>
-      {canPrepareDefault ? <label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "default"} onChange={() => setResourceMode("default")} /><span>Create the standard staff request application</span></label> : null}
-      {resources.length ? <><label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "existing"} onChange={() => setResourceMode("existing")} /><span>Use an existing {definition.requiredResources[0]?.kind === "managed_website" ? "website assignment" : "application"}</span></label>{resourceMode === "existing" ? <label><span>{definition.requiredResources[0]?.kind === "managed_website" ? "Website" : "Application"}</span><select required value={resourceId} onChange={(event) => setResourceId(event.target.value)}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label> : null}</> : !canPrepareDefault ? <p className={styles.blocked}>{definition.requiredResources[0]?.kind === "managed_website" ? "Assign an account-authorized website to this business before setting this up." : "Create and release the required application before setting this up."}</p> : null}
-      {resourceMode === "default" ? <p className={styles.note}>This creates a private application draft with a request form and review list. Staff cannot use it until you rehearse and publish the application.</p> : null}
+      {canPrepareDefault ? <label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "default"} onChange={() => setResourceMode("default")} /><span>Create the standard staff request internal tool</span></label> : null}
+      {resources.length ? <><label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "existing"} onChange={() => setResourceMode("existing")} /><span>Use an existing {definition.requiredResources[0]?.kind === "managed_website" ? "website assignment" : "internal tool"}</span></label>{resourceMode === "existing" ? <label><span>{definition.requiredResources[0]?.kind === "managed_website" ? "Website" : "Internal tool"}</span><select required value={resourceId} onChange={(event) => setResourceId(event.target.value)}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label> : null}</> : !canPrepareDefault ? <p className={styles.blocked}>{definition.requiredResources[0]?.kind === "managed_website" ? "Assign an account-authorized website to this business before setting this up." : "Create and release the required internal tool before setting this up."}</p> : null}
+      {resourceMode === "default" ? <p className={styles.note}>This creates a private internal tool draft with a request form and review list. Staff cannot use it until you rehearse and publish the internal tool.</p> : null}
     </fieldset>
 
     <ConfigurationFields fields={definition.configurationFields} values={configuration} disabled={!collection.permissions.canManage || saving || attempted} onChange={(id, value) => setConfiguration((current) => ({ ...current, [id]: value }))} />

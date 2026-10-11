@@ -13,7 +13,6 @@ export function SystemsCanonShell({ children, businessName = "The Mooney Firm", 
     { id: "intake", title: "Mediation intake", href: "/preview/strelva/tool", kind: "app" as const },
     { id: "sessions", title: "Mediation sessions", href: "/preview/strelva/sessions", kind: "bookings" as const },
     { id: "tracker", title: "Matter tracker", href: "/preview/strelva/import", kind: "tracker" as const },
-    { id: "documents", title: "Documents", href: "/preview/strelva/documents", kind: "document" as const },
   ].map(item => ({ ...item, current: item.title === systemName }));
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
     <StrelvaShell title="" systemsReleased pinned={suppliedPins ?? pins} businessContext={businessName} accountName={accountName} appBase="/preview/strelva"

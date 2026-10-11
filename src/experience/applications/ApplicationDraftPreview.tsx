@@ -8,7 +8,7 @@ import type { ApplicationDraftSpec } from "./app-templates";
 
 export function applicationPreviewSnapshot(spec: ApplicationDraftSpec, records: ApplicationUseSnapshot["records"] = []): ApplicationUseSnapshot {
   return {
-    workId: "local-preview", title: spec.title || "Untitled app", releaseVersion: 0,
+    workId: "local-preview", title: spec.title || "Untitled internal tool", releaseVersion: 0,
     views: spec.components.map(component => ({ kind: component.kind, fields: component.fields.flatMap(id => { const field = spec.fields.find(item => item.id === id); return field ? [field] : []; }) })),
     records,
     // Local renderer data, never used in a network request.
@@ -26,7 +26,7 @@ function PreviewSession({ spec }: { spec: ApplicationDraftSpec }) {
   const [records, setRecords] = useState<ApplicationUseSnapshot["records"]>([]);
   const [draft, setDraft] = useState<ApplicationUseDraft>({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` });
   const [message, setMessage] = useState("");
-  return <StSection title="Try your app" action={<StTextButton onClick={() => { setRecords([]); setMessage(""); setDraft({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` }); }}>Reset preview</StTextButton>}>
+  return <StSection title="Try your internal tool" action={<StTextButton onClick={() => { setRecords([]); setMessage(""); setDraft({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` }); }}>Reset preview</StTextButton>}>
     <StCopy muted>Preview only. Test records are not saved or shared.</StCopy>
     <ApplicationUseRenderer presentation="preview" snapshot={applicationPreviewSnapshot(spec, records)} draft={draft} onDraftChange={setDraft} busy={records.length >= 20} submitMessage={message} onSubmit={value => {
       if (records.length >= 20) return;

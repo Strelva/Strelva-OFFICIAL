@@ -69,25 +69,25 @@ export function WorkPlanOutputPreview({ executionUrl = "/api/work-plans/execute"
   }
 
   if (!draft || !allowed) return <p className="text-sm text-gray-muted">This part needs further preparation before it can run.</p>;
-  const resultName = draft.kind === "document" ? "document" : draft.kind === "application" ? "app" : "tracker";
+  const resultName = draft.kind === "application" ? application?.title || "internal tool" : title || (draft.kind === "document" ? "document" : "internal tool");
   if (execution) return <section className="mt-3 space-y-3 text-sm" aria-label="Creation receipt">
-    <p role="status">{draft.kind === "document" ? "Private document" : draft.kind === "application" ? "Application" : "Internal tool"} created in this workspace.</p>
+    <p role="status">{draft.kind === "document" ? "Private document" : "Internal tool"} created in this workspace.</p>
     <p className="text-gray-muted">Created {new Date(execution.receipt.completedAt).toLocaleString()}.{draft.kind === "application" ? " Open it to review and publish when ready." : " No message was sent or website published."}</p>
     {onOpenWork ? <Button type="button" onClick={() => onOpenWork(execution.nativeWorkId, execution.nativeProductId)}>Open {resultName}</Button> : <a className="inline-flex min-h-11 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(execution.nativeWorkId)}`}>Open {resultName}</a>}
   </section>;
   const blocked = Boolean(disabled || busy || needsDetails);
   return <section className="mt-4 space-y-4" aria-busy={busy} aria-label="Review native output">
-    <h4 className="text-sm font-medium">{draft.kind === "application" ? "Review the application" : "Review and edit the draft"}</h4>
-    {draft.kind !== "application" ? <TextInput label={draft.kind === "document" ? "Document title" : "Tracker title"} value={title} maxLength={160} required disabled={blocked || attemptLocked} onChange={event => setTitle(event.target.value)} /> : null}
-    {draft.kind === "document" ? <TextArea label="Document draft" rows={10} value={text} maxLength={12000} disabled={blocked || attemptLocked} onChange={event => setText(event.target.value)} /> : draft.kind === "application" && application ? <div className="grid min-w-0 gap-6 xl:grid-cols-2" aria-label="Proposed app">
+    <h4 className="text-sm font-medium">{draft.kind === "application" ? "Review the internal tool" : "Review and edit the draft"}</h4>
+    {draft.kind !== "application" ? <TextInput label={draft.kind === "document" ? "Document title" : "System name"} value={title} maxLength={160} required disabled={blocked || attemptLocked} onChange={event => setTitle(event.target.value)} /> : null}
+    {draft.kind === "document" ? <TextArea label="Document draft" rows={10} value={text} maxLength={12000} disabled={blocked || attemptLocked} onChange={event => setText(event.target.value)} /> : draft.kind === "application" && application ? <div className="grid min-w-0 gap-6 xl:grid-cols-2" aria-label="Proposed internal tool">
       <ApplicationDraftEditor value={application} onChange={setApplication} disabled={blocked || attemptLocked} />
       {applicationError ? <p role="status" className="text-sm text-gray-muted">Complete the fields to preview: {applicationError}</p> : <ApplicationDraftPreview spec={application} />}
     </div> : <>
       <SelectInput label="Starting fields" value={templateId} disabled={blocked || attemptLocked} onChange={event => setTemplateId(event.target.value as typeof templateId)} options={TRACKER_TEMPLATES.map(template => ({ value: template.id, label: template.name }))} />
       <p className="text-sm text-gray-muted">{TRACKER_TEMPLATES.find(template => template.id === templateId)?.fields.join(", ")}. Starts empty, with no invented records.</p>
     </>}
-    {error ? <div className="space-y-2 text-sm"><p role="alert" className="text-critical">{error}</p><p className="text-gray-muted">Retry checks the same output with the same inputs. Reload the saved plan before changing this proposal.</p><a className="inline-flex min-h-11 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(planWorkId)}`}>Reload the saved plan and its receipts</a></div> : null}
+    {error ? <div className="space-y-2 text-sm"><p role="alert" className="text-critical">{error}</p><p className="text-gray-muted">Retry checks the same output with the same inputs. Reload the saved plan before changing its inputs.</p><a className="inline-flex min-h-11 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(planWorkId)}`}>Reload the saved plan and its receipts</a></div> : null}
     {needsDetails ? <p className="text-sm text-gray-muted">Add the missing details and prepare a revised plan first.</p> : null}
-    <Button type="button" onClick={() => void create()} loading={busy} disabled={blocked || (application ? Boolean(applicationError) : !title.trim())}>{draft.kind === "document" ? "Create private document" : draft.kind === "application" ? "Create application" : "Create this tracker"}</Button>
+    <Button type="button" onClick={() => void create()} loading={busy} disabled={blocked || (application ? Boolean(applicationError) : !title.trim())}>{draft.kind === "document" ? "Create private document" : "Create internal tool"}</Button>
   </section>;
 }

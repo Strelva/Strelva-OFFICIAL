@@ -103,15 +103,15 @@ export interface WorkspaceStartInput {
 
 export function workspaceStartContinueLabel(plan: WorkspaceStartPlan): string {
   if (plan.route === "inquiries") return plan.needsSelection === "business" ? "Choose a business" : "Open inquiry work";
-  if (plan.route === "tracker") return "Open your tracker";
+  if (plan.route === "tracker") return "Open your internal tool";
   if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
   if (plan.route === "websites") return "Create your website";
   if (plan.route === "document") return "Open your document";
   if (plan.route === "onboarding") return "Organize onboarding";
-  if (plan.route === "applications") return "Prepare application";
-  if (plan.route === "scheduling") return "Open scheduling";
-  if (plan.route === "investigations") return "Open ongoing checks";
-  if (plan.route === "operations") return "Open ongoing work";
+  if (plan.route === "applications") return "Prepare internal tool";
+  if (plan.route === "scheduling") return "Open Bookings";
+  if (plan.route === "investigations") return "Open saved checks";
+  if (plan.route === "operations") return "Open request";
   return "Continue to business assessment";
 }
 
@@ -131,10 +131,10 @@ const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["ass
 const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome; nextAction: string }> = {
   onboarding: { title: "Onboarding requirements", summary: "Keep requirements, private documents and their review status together.", outcome: "Capability", nextAction: "Open onboarding, define the requirements, and review supplied documents before accepting them." },
   websites: { title: "Your website", summary: "Turn your business description into a saved website draft that you can preview and change.", outcome: "Capability", nextAction: "Create a draft, review it, then choose when to prepare it for launch." },
-  applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the application." },
-  scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open scheduling and review the permitted times before reserving one." },
-  investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open ongoing checks and choose the two saved sources to compare." },
-  operations: { title: "Delegated work", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility", nextAction: "Open ongoing work and review the responsibility before it starts." },
+  applications: { title: "A private internal tool", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the internal tool." },
+  scheduling: { title: "Bookings", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open Bookings and review the permitted times before reserving one." },
+  investigations: { title: "Saved check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open saved checks and choose the two saved sources to compare." },
+  operations: { title: "Request", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility", nextAction: "Open the request and review its scope before it starts." },
   assessment: {
     title: "A business assessment",
     summary: "This looks like a read-only business assessment that you can save and return to.",
@@ -142,10 +142,10 @@ const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; 
     nextAction: "Start the assessment and review its evidence before saving it.",
   },
   tracker: {
-    title: "A working tracker",
-    summary: "This looks like a CSV-to-tracker setup with the field mapping visible before anything is saved.",
+    title: "An internal tool from a spreadsheet",
+    summary: "This looks like a spreadsheet import with the field mapping visible before anything is saved.",
     outcome: "Capability",
-    nextAction: "Open the tracker flow and review the field mapping before saving it.",
+    nextAction: "Import the spreadsheet and review the field mapping before saving it.",
   },
   inquiries: {
     title: "An inquiry workflow",
@@ -262,7 +262,7 @@ function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string):
     return [
       { id: "source-file", label: "Source CSV", detail: "Keep the original file and row references available during import.", outcome: "Capability" },
       { id: "field-mapping", label: "Proposed field mapping", detail: "Review names, types, duplicate headers, and import warnings before saving.", outcome: "Capability" },
-      { id: "saved-tracker", label: "Saved tracker", detail: "Create a filterable tracker with its import history in this workspace.", outcome: "Capability" },
+      { id: "saved-tracker", label: "Saved internal tool", detail: "Create a filterable internal tool with its import history in this workspace.", outcome: "Capability" },
     ];
   }
 
@@ -312,7 +312,7 @@ function emptyPlan(): WorkspaceStartPlan {
     request: "",
     context: undefined,
     title: "Start with the result you want.",
-    summary: "Describe an assessment, tracker, inquiry workflow, website delivery, document, onboarding requirements, application, schedule, ongoing check, or delegated work.",
+    summary: "Describe an assessment, internal tool, inquiries, website, document, onboarding requirements, Bookings, saved check, or request.",
     parts: [],
     matchedRoutes: [],
     selectedPartIds: [],

@@ -26,14 +26,14 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
       const response = await request(`/api/custom-applications/${encodeURIComponent(workId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
-        setError(message(body, response.status === 401 ? "Sign in with a confirmed email to use this custom application." : "This custom application is unavailable."));
+        setError(message(body, response.status === 401 ? "Sign in with a confirmed email to use this internal tool." : "This internal tool is unavailable."));
         setState(response.status === 401 || response.status === 403 ? "denied" : "error");
         return;
       }
       setSnapshot(body as Snapshot);
       setState("ready");
     } catch {
-      setError("This custom application could not be opened right now.");
+      setError("This internal tool could not be opened right now.");
       setState("error");
     }
   }, [request, workId]);
@@ -43,10 +43,10 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
-  if (state === "loading") return <StandaloneApplicationShell><StPage><StHead title="Opening application…" /><StSkeleton label="Opening application" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
+  if (state === "loading") return <StandaloneApplicationShell><StPage><StHead title="Opening internal tool…" /><StSkeleton label="Opening internal tool" /><StSkeleton width="60%" /></StPage></StandaloneApplicationShell>;
   if (state !== "ready" || !snapshot) {
     return <StandaloneApplicationShell><StPage>
-      <StHead title={state === "denied" ? "This application link is unavailable" : "Strelva could not open this application"} />
+      <StHead title={state === "denied" ? "This internal tool link is unavailable" : "Strelva could not open this internal tool"} />
       <div role="alert"><StNotice tone={state === "denied" ? "need" : "critical"}>{error}</StNotice></div>
       {state === "error" ? <div><StPill variant="soft" onClick={() => { setState("loading"); setError(""); void load(); }}>Try again</StPill></div> : null}
     </StPage></StandaloneApplicationShell>;
@@ -55,10 +55,10 @@ export function CustomApplicationUseExperience({ workId }: { workId: string }) {
   return <>
     <meta httpEquiv="Content-Security-Policy" content={CUSTOM_APPLICATION_PARENT_CSP} />
     <StandaloneApplicationShell><StPage>
-      <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · custom application</>} />
+      <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>} />
       <StSurface pad={false}>
         <iframe
-          title={`${snapshot.title} released application`}
+          title={`${snapshot.title} released internal tool`}
           srcDoc={customApplicationSandboxHtml(snapshot.html)}
           sandbox="allow-scripts allow-forms"
           className={styles.applicationFrame}

@@ -1,4 +1,5 @@
 "use client";
+import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 
 import { StPage, StHead, StSection, StRows, StRow, StSurface, StNotice, StEmpty, StSplit, StLabel, StTextButton } from "@/components/ui/strelva/Kit";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
@@ -88,8 +89,8 @@ export function WorkspaceBusinessSettings({
       <StSection title="Personal account"><StRows><StRow title="Your email, sign-in and access belong to you" detail="Your identity stays the same across businesses." href={accountHref} end="Open personal account" /></StRows></StSection>
     </>}>
       <StSurface label="Business information"><StLabel>Business information</StLabel><h2 className="mt-4 text-xl font-medium">{workspace?.name || "Current business"}</h2><p className="mt-3 text-sm">{readOnly ? "Read-only access" : workspace?.role === "owner" ? "You are the owner" : workspace?.role === "admin" ? "Administrator" : "Business member"}</p><StNotice>Business details hold shared facts such as hours and services. Each System declares which facts it reads; connected sites and independently edited content need their own update.</StNotice><StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId: workspace?.id ?? "" })}`}>Open the business record</StTextButton></StSurface>
-      <StSection title="People and access"><StRows><StRow title="Who can see and change this business" detail={readOnly ? "The business owner controls changes to people and access." : "Membership and permissions belong to this business."} href={href("access")} end="Open" /></StRows></StSection>
-      <StSection title="Work"><StEmpty>Applications, documents, trackers, requests, and other saved work stay with this business. A managed website is not required.</StEmpty></StSection>
+      <StSection title={PLACE_LABELS.access}><StRows><StRow title="Who can see and change this business" detail={readOnly ? "The business owner controls changes to People & access." : "Membership and permissions belong to this business."} href={href("access")} end="Open" /></StRows></StSection>
+      <StSection title="Systems and files"><StEmpty>Internal tools, documents, onboarding cases, requests, and other saved results stay with this business. A managed website is not required.</StEmpty></StSection>
       <StSection title="Plan and ownership"><StRows><StRow title="Plan and billing" href={`/workspace/billing?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title="Export all workspace data" href={`/workspace/export?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title="Leaving Strelva" href={`/workspace/exit?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Review" /></StRows></StSection>
     </StSplit>}
     {assistantConnectionsReleased && business && workspace ? <StSection title="Connected assistants"><StRows><StRow title="Read business facts and prepare website changes" detail="The business owner controls access." href={`/connect?workspaceId=${encodeURIComponent(workspace.id)}`} end="Manage assistant connections" /></StRows></StSection> : null}

@@ -12,10 +12,10 @@ export const OWNER_CONVERSATIONS: Record<OwnerConversationFrame, { title: string
   Y2Tn3F: { title: "Fees on the fees page", scope: "Fictional Firm", ask: "Show half-day and full-day fees on the fees page.", reply: "Done in this preview. Fees now show on the fees page." },
   Q1IkY: { title: "Session date scope", scope: "Mediation sessions", ask: "Let attorneys request a session date from the site.", reply: "Done in this preview. Attorneys can ask for a session date. Nothing gets booked until you confirm it." },
   s7xyY: { title: "Route inquiries", scope: "Inquiries", ask: "Send inquiries from the site to our owner, and follow up with the person.", reply: "On it. I'll show you before anything goes live." },
-  T8pknG: { title: "HR intake", scope: "Mediation intake", ask: "Add an intake for HR teams who want workplace mediation.", reply: "Here's a proposal. I started from Mediation intake and asked what an HR lead would know up front." },
+  T8pknG: { title: "HR intake", scope: "Mediation intake", ask: "Add an intake for HR teams who want workplace mediation.", reply: "Here's a Possibility. I started from Mediation intake and asked what an HR lead would know up front." },
   ABt1D: { title: "Facts on the rebuilt site", scope: "fictionalfirm.example", ask: "Show me the facts that need my confirmation.", reply: "The rebuilt site keeps its facts with their source quotes. Forty fixture claims need your confirmation. Here's the first." },
   HQ5yA: { title: "Holiday email to past clients", scope: "Fictional Firm", ask: "Email all my past clients a holiday discount on mediation.", reply: "I can't do that from here. These fixture inquiry addresses have no marketing consent. Start a newsletter people sign up for, or make this a Request with an agreed scope and date." },
-  YsBMM: { title: "Help", scope: "Help", ask: "How do I let my assistant see requests but not change anything?", reply: "Add them in People & access as a viewer. They'll see Systems and requests, and won't be able to change or approve anything." },
+  YsBMM: { title: "Help", scope: "Help", ask: "How do I let my assistant see requests but not change anything?", reply: "People & access offers Member, Admin and Owner. None is a read-only business role. Review those permissions before inviting your assistant; this workspace cannot grant the view-only access you asked for." },
 };
 
 function fixtureResult(): AskTurnResult {

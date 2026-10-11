@@ -36,9 +36,9 @@ describe("workspace places", () => {
     expect(sectionTitle("home")).toBe("Home");
     expect(sectionTitle("requests")).toBe("Requests");
     expect(sectionTitle("ongoing")).toBe("Running");
-    // The app list is "Apps" until STRELVA_SYSTEMS_RELEASE is on.
-    expect(sectionTitle("work")).toBe("Apps");
-    expect(sectionTitle("products")).toBe("Apps");
+    // The legacy app address uses the same Internal tools kind name.
+    expect(sectionTitle("work")).toBe("Internal tools");
+    expect(sectionTitle("products")).toBe("Internal tools");
     expect(sectionTitle("apps", true)).toBe("Systems");
     expect(sectionTitle("work", true)).toBe("Systems");
     expect(sectionTitle("products", true)).toBe("Systems");

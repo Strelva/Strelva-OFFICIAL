@@ -12,8 +12,8 @@ export function ApplicationDraftEditor({ value, onChange, disabled = false }: { 
   function update(id: string, field: Field) {
     onChange({ ...value, fields: value.fields.map(item => item.id === id ? field : item) });
   }
-  return <section aria-label="Customize app" className="min-w-0 space-y-6">
-    <TextInput label="App name" value={value.title} maxLength={160} required disabled={disabled} onChange={event => onChange({ ...value, title: event.target.value })} />
+  return <section aria-label="Customize internal tool" className="min-w-0 space-y-6">
+    <TextInput label="System name" value={value.title} maxLength={160} required disabled={disabled} onChange={event => onChange({ ...value, title: event.target.value })} />
     <div className="flex items-center justify-between gap-4"><h3 className="text-base font-medium">Fields</h3><span className="text-xs tabular-nums text-gray-muted">{value.fields.length} / 30</span></div>
     <div className="space-y-4">{value.fields.map((field, index) => <fieldset key={field.id} disabled={disabled} className="min-w-0 rounded-2xl border border-gray-border p-4">
       <legend className="px-2 text-xs text-gray-muted">Field {index + 1}</legend>

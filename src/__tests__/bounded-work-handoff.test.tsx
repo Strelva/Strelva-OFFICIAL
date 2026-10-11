@@ -31,7 +31,7 @@ it("does not expose app lifecycle controls until the workspace accepts the saved
     workspaceId: "workspace-a", productId: "applications", canEdit: true, workId, sources: [], onSaved,
   }));
   await act(async () => root!.render(render()));
-  const form = node.querySelector<HTMLFormElement>('form[aria-label="Application setup"]')!;
+  const form = node.querySelector<HTMLFormElement>('form[aria-label="Internal tool setup"]')!;
   const title = form.querySelector<HTMLInputElement>("input")!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(title, "Team requests");
@@ -72,7 +72,7 @@ it.each([
   const reviewTab = [...node.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(button => button.textContent === tab);
   expect(reviewTab).toBeDefined();
   await act(async () => reviewTab!.click());
-  expect(node.textContent?.includes("Edit proposed app")).toBe(checks);
+  expect(node.textContent?.includes("Edit proposed internal tool")).toBe(checks);
   expect([...node.querySelectorAll("button")].some(button => button.textContent === "Check proposed change")).toBe(checks);
   const publishButton = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Publish");
   expect(Boolean(publishButton)).toBe(publish);
@@ -84,6 +84,6 @@ it.each([
 it("does not offer application creation to a manager without maker authority", async () => {
   const node = document.createElement("div"); document.body.append(node); root = createRoot(node);
   await act(async () => root!.render(createElement(BoundedWorkExperience, { workspaceId: "workspace-a", productId: "applications", initialRequest: "A team tool", canManage: true, canEdit: false, sources: [], onSaved: () => undefined })));
-  expect(node.querySelector('form[aria-label="Application setup"]')).toBeNull();
+  expect(node.querySelector('form[aria-label="Internal tool setup"]')).toBeNull();
   expect(node.textContent).toContain("Ask your agency to create or copy an internal tool.");
 });

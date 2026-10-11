@@ -1,5 +1,6 @@
 "use client";
 
+import { STATE_LABELS } from "@/platform/presentation/place-labels";
 import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -103,7 +104,7 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
       <StPill type="submit" disabled={disabled || !dirty || !title.trim()}>{busy ? "Saving…" : "Save document"}</StPill>
     </form></StSurface> : null}
     {saved ? <div className={styles.historyLayout}>
-      <StSection title="Versions">
+      <StSection title={STATE_LABELS.history}>
         <DocumentHistory key={`${saved.workId}:${saved.document.revision}`} saved={saved} transport={transport} receiptLabel={receiptLabel} receiptActor={receiptActor} />
         {saved.document.history.at(-1)?.kind === "edit" && !readOnly ? <StTextButton disabled={disabled || dirty} onClick={() => void save(true)}>Undo last edit</StTextButton> : null}
         {dirty && saved.document.history.length ? <p className="text-sm text-gray-muted">Save or discard your unsaved text before using Undo.</p> : null}

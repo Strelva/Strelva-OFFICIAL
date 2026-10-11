@@ -62,7 +62,7 @@ function IssueEvidence({ issue, context }: { issue: ContentWorkspaceData["conten
         <Metric label="Suppressed before sending" value={issue.delivery?.suppressed ?? issue.suppressed_count} />
         <Metric label="Unconfirmed batches" value={issue.delivery?.unconfirmedBatches ?? issue.failure_count} />
       </StRows>
-      <p className={styles.copy}>Strelva can&apos;t see who read it. Mail apps hide that. Accepted is not delivered; suppressed is not bounced or unsubscribed.</p>
+      <p className={styles.copy}>Strelva can&apos;t see who read it. Mail internal tools hide that. Accepted is not delivered; suppressed is not bounced or unsubscribed.</p>
       {issue.delivery?.receipts.map(receipt => <p key={receipt.id} className={styles.copy}>{receipt.detail} Accepted: <StMono>{receipt.accepted}</StMono>. Suppressed: <StMono>{receipt.suppressed}</StMono>.</p>)}
       <details className={styles.disclosure}><summary>Approved issue · {new Date(issue.approved_at).toLocaleDateString("en-US", { timeZone: "UTC" })}</summary><p className={styles.copy}>{issue.body}</p></details>
     </StSection>;

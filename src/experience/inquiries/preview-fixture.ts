@@ -176,7 +176,7 @@ export function createPreviewInquiryAdapter(
         case "resume": {
           const work = engine.getWork(action.requestId);
           const policy = engine.snapshot().responsibilities.find((item) => item.capabilityId === work.capabilityId);
-          if (!policy) throw new Error("This capability has no standing responsibility.");
+          if (!policy) throw new Error("This form has no standing responsibility.");
           if (action.kind === "pause") engine.pauseResponsibility(policy.id, action.actorId);
           else engine.resumeResponsibility(policy.id, action.actorId);
           return { snapshot: getSnapshot(), work: engine.getWork(action.requestId) };
@@ -232,11 +232,11 @@ export function createPreviewInquiryAdapter(
         }
         case "propose-pattern-update": {
           const installation = getPatternInstallation(engine, action.installationId);
-          if (installation.capabilityId !== action.capabilityId) throw new Error("That pattern installation does not belong to this capability.");
+          if (installation.capabilityId !== action.capabilityId) throw new Error("That pattern installation does not belong to this form.");
           const source = engine.snapshot().capabilities.find((capability) => capability.id === installation.sourceCapabilityId)?.live;
           if (!source) throw new Error("The source pattern is unavailable in this preview.");
           const patternUpdate = proposePatternUpdate(engine, { capabilityId: action.capabilityId, sourceDefinition: source });
-          return { snapshot: getSnapshot(), patternUpdate, message: patternUpdate.status === "up_to_date" ? `This installation already uses source version ${patternUpdate.sourceVersion}.` : "Review the source update and choose what to keep." };
+          return { snapshot: getSnapshot(), patternUpdate, message: patternUpdate.status === "up_to_date" ? `This installation already uses source revision ${patternUpdate.sourceVersion}.` : "Review the source update and choose what to keep." };
         }
         case "stage-pattern-update": {
           const installation = getPatternInstallation(engine, action.installationId);

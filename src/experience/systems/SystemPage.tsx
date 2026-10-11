@@ -1,6 +1,7 @@
 "use client";
 import { actorPresentation } from "@/platform/presentation/actor";
-import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+import { STRELVA_HANDLED_LABEL, PLACE_LABELS, STATE_LABELS } from "@/platform/presentation/place-labels";
+import type { NeedsYouState } from "@/experience/workspace/useNeedsYou";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
@@ -62,6 +63,8 @@ export interface SystemPageProps {
   makeRealReason?: string;
   loading?: boolean;
   sources: readonly WorkspaceWork[];
+  /** Reuse the workspace's decision read, without creating another approval. */
+  needsYou?: NeedsYouState;
   localPreview?: boolean;
   workspaceStopped?: boolean;
   calendarRecoveryAllowed?: boolean;
@@ -114,6 +117,7 @@ export function SystemPage(props: SystemPageProps) {
       {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
       {system.operatedBy ? <p className={paper.meta}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={paper.meta}>Agency identity could not be loaded</p> : null}
       {system.lifecycle === "paused" ? <p className={paper.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
+      <SystemNeedsYou system={system} state={props.needsYou} workspaceId={props.workspaceId} appBase={props.appBase} />
       <section className={paper.object} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}><SystemSurface {...props} system={system} /></section>
       {showAside ? <div className={paper.context} aria-label={`About ${system.name}`}>
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
@@ -203,7 +207,7 @@ export function hasContext(system: SystemView): boolean {
 
 function ActivationsPanel({ system }: { system: SystemView }) {
   const activations = system.activations ?? [];
-  return <Panel id={`${system.id}-making-live`} title="Making it live" count={activations.length} intro="What landed stays. Strelva tells you when it settles.">
+  return <Panel id={`${system.id}-making-live`} title={STATE_LABELS.makingReal} count={activations.length} intro="What landed stays. Strelva tells you when it settles.">
     <StRows>{activations.map(activation => <StRow key={activation.id} title={activation.title}><MakeRealProgress activation={activation} /></StRow>)}</StRows>
   </Panel>;
 }
@@ -214,7 +218,7 @@ function HistoryPanel({ system }: { system: SystemView }) {
     const date = new Date(at);
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
-  return <Panel id={`${system.id}-history`} title="History" count={0} intro="The last changes, newest first.">
+  return <Panel id={`${system.id}-history`} title={STATE_LABELS.history} count={0} intro="The last changes, newest first.">
     <StRows>{rows.map(row => <StRow key={row.id} title={row.sentence} detail={actorPresentation(row.actor).credit} end={<StMono as="time" dateTime={row.at}>{when(row.at)}</StMono>} />)}</StRows>
   </Panel>;
 }
@@ -388,7 +392,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
         <span className={styles.possibilityActions}>
           {onCompare && possibility.previewSrc ? <StPill variant="soft" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</StPill> : null}
           {possibility.openHref ? <StPillLink variant="soft" href={`${appBase}${possibility.openHref}`}>{possibility.tryHref ? "Try it as a visitor" : "Open"}</StPillLink> : null}
-          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making real…" : "Make real"}</StPill>
+          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? STATE_LABELS.makingReal : STATE_LABELS.makeReal}</StPill>
         </span>
         {comparingId === possibility.id && possibility.previewSrc && system.surface.kind !== "website" ? <PossibilityComparison title={possibility.title}
           live={<StEmpty>The current System is open above. A visitor preview has not been recorded.</StEmpty>}
@@ -430,4 +434,17 @@ function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemVie
       </details> : <small>No local definition changes.</small> : <small>Definition changes: Not verified.</small> : null}
     </StRow>)}</StRows> : <p className="mt-3">It runs in one context today.</p>}
   </Panel>;
+}
+
+/** Same decision identity/title as the owner deck; all actions stay in that deck. */
+function SystemNeedsYou({ system, state, workspaceId, appBase = "" }: { system: SystemView; state?: NeedsYouState; workspaceId: string; appBase?: string }) {
+  if (!state || state.status === "disabled") return null;
+  const title = `${PLACE_LABELS.needsYou} for this System`;
+  if (state.status === "loading") return <StSection title={title}><StSkeleton label="Checking decisions for this System" /></StSection>;
+  if (state.status === "error") return <StSection title={title}><StNotice tone="critical">{state.message}</StNotice></StSection>;
+  const items = state.items.filter(item => item.workspaceId === workspaceId && item.systemId === system.id);
+  return <StSection title={title}>
+    {!state.complete ? <StNotice>Some decisions could not be checked.</StNotice> : null}
+    {items.length ? <StRows label={title}>{items.map(item => <StRow key={item.id} title={item.title} detail={item.detail} href={`${appBase}/workspace?${new URLSearchParams({ workspaceId, view: "needs-you", item: item.id })}`} end="Review in Needs you" />)}</StRows> : state.complete ? <StEmpty>No decisions are waiting for this System.</StEmpty> : null}
+  </StSection>;
 }

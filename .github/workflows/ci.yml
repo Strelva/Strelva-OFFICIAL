@@ -52,6 +52,9 @@ jobs:
       - name: Motion ladder
         run: pnpm check:motion
 
+      - name: Screen words
+        run: pnpm check:words
+
       - name: Ontology invariants
         run: pnpm check:ontology
 

@@ -28,6 +28,7 @@
     "check:ontology": "tsx scripts/check-ontology.ts",
     "check:boundaries": "tsx scripts/check-product-boundaries.ts",
     "check:motion": "node scripts/check-motion.mjs",
+    "check:words": "node --test scripts/check-words.test.mjs && node scripts/check-words.mjs",
     "db:types": "tsx scripts/generate-database-types.ts",
     "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",

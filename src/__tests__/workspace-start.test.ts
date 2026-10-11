@@ -17,10 +17,10 @@ function context(overrides: Partial<WorkspaceStartContext> = {}): WorkspaceStart
       { id: "tracker", name: "Spreadsheet tracker", availability: "available" },
       { id: "inquiries", name: "Inquiry work", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", availability: "managed" },
-      { id: "applications", name: "Internal applications", availability: "available" },
+      { id: "applications", name: "Internal tools", availability: "available" },
       { id: "scheduling", name: "Scheduling", availability: "available" },
       { id: "investigations", name: "Ongoing checks", availability: "available" },
-      { id: "operations", name: "Delegated work", availability: "available" },
+      { id: "operations", name: "Request", availability: "available" },
     ],
     inquiryBusinesses: [{ id: "harbor", title: "Harbor Dental" }],
     managedSites: [{ id: "harbor-site", title: "Harbor Dental", href: "/preview/strelva/website" }],
@@ -77,10 +77,10 @@ describe("workspace start planner", () => {
 
   it("names the native destination in each horizontal continuation", () => {
     for (const [request, label] of [
-      ["Build a staff request app", "Prepare application"],
-      ["Help my staff request time off", "Open scheduling"],
-      ["Reconcile two spreadsheets", "Open ongoing checks"],
-      ["Delegate these approved steps", "Open ongoing work"],
+      ["Build a staff request app", "Prepare internal tool"],
+      ["Help my staff request time off", "Open Bookings"],
+      ["Reconcile two spreadsheets", "Open saved checks"],
+      ["Delegate these approved steps", "Open request"],
     ] as const) {
       const plan = planWorkspaceStart(request, context());
       expect(workspaceStartContinueLabel(plan)).toBe(label);
@@ -89,10 +89,10 @@ describe("workspace start planner", () => {
 
   it("names saved horizontal work by the surface that can reopen it", () => {
     expect(workspaceWorkLabel({ productId: "onboarding", resourceKind: "case" })).toBe("Onboarding");
-    expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Application");
-    expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Schedule");
-    expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Ongoing check");
-    expect(workspaceWorkLabel({ productId: "operations", resourceKind: "responsibility" })).toBe("Delegated work");
+    expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Internal tool");
+    expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Bookings");
+    expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Saved check");
+    expect(workspaceWorkLabel({ productId: "operations", resourceKind: "responsibility" })).toBe("Request");
     expect(workspaceWorkLabel({ productId: "future", resourceKind: "result" })).toBe("Saved work · view unavailable");
   });
 
