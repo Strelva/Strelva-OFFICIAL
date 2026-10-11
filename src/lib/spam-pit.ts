@@ -10,6 +10,7 @@
  * Same shape as the leads store: one KV record per item with a TTL, plus a
  * score-ordered index trimmed to the newest SPAM_KEEP.
  */
+import { durableRecordAuthority, writeDurableRecord } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import { workspacePorts, type ClientRecordsPort, type ClientRecordStoreName, type ClientRecordCopy } from "./workspace-ports";
 import { holdSpamForReview } from "./inquiry-records";
@@ -79,10 +80,11 @@ function newSpamId(): string {
   return `spam_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Store one caught submission. Returns null when Redis is not configured. */
+/** Store a caught submission in its selected authoritative store. */
 export async function recordSpam(tenant: string, input: RecordSpamInput): Promise<SpamRecord | null> {
   const redis = getRedis();
-  if (!redis) return null;
+  const durable = await durableRecordAuthority("spam_held");
+  if (!durable && !redis) return null;
   const fields = normalizeFields(input.fields);
   const record: SpamRecord = {
     id: newSpamId(),
@@ -96,11 +98,20 @@ export async function recordSpam(tenant: string, input: RecordSpamInput): Promis
     userAgent: clip(input.userAgent, 300),
     createdAt: new Date().toISOString(),
   };
-  await redis.set(itemKey(tenant, record.id), JSON.stringify(record), { ex: SPAM_TTL_SECONDS });
-  await redis.zadd(indexKey(tenant), { score: Date.now(), member: record.id });
-  await redis.zremrangebyrank(indexKey(tenant), 0, -(SPAM_KEEP + 1));
-  // Postgres copy so a false positive outlives the 30-day TTL. Never throws.
-  await mirrorClientRecord("spam_held", tenant, { recordId: record.id, payload: JSON.parse(JSON.stringify(record)), capturedAt: record.createdAt });
+  if (durable) {
+    const status = await writeDurableRecord("spam_held", tenant, record.id, record, record.createdAt, "keep_first");
+    if (status === "kept") throw new Error("Spam capture was superseded by an existing record.");
+  }
+  if (redis) {
+    const cache = async () => {
+      await redis.set(itemKey(tenant, record.id), JSON.stringify(record), { ex: SPAM_TTL_SECONDS });
+      await redis.zadd(indexKey(tenant), { score: Date.now(), member: record.id });
+      await redis.zremrangebyrank(indexKey(tenant), 0, -(SPAM_KEEP + 1));
+    };
+    if (durable) await cache().catch(() => {});
+    else await cache();
+  }
+  if (!durable) await mirrorClientRecord("spam_held", tenant, { recordId: record.id, payload: JSON.parse(JSON.stringify(record)), capturedAt: record.createdAt });
   // Held for review in tenant_leads (inquiry 1.0 delta, C8), so the owner can
   // release a false positive from the Inquiries page. Off unless
   // STRELVA_INQUIRY_RECORDS=1; never throws.

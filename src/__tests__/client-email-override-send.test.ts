@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 // sendEmail's "client" audience must respect a per-tenant override while
 // operator/prospect stay unaffected: override "on" sends even when the global
@@ -75,13 +80,14 @@ describe("sendEmail client-audience tenant override", () => {
     expect(send).toHaveBeenCalledTimes(1);
   });
 
-  it("without a tenantId, client email follows the global switch (override never consulted)", async () => {
+  it("without a tenantId or verified agency, client mail stays held (override never consulted)", async () => {
     // global paused
     expect(await clientTo(undefined)).toBe(false);
     expect(mockGetClientEmailOverride).not.toHaveBeenCalled();
 
     vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
-    expect(await clientTo(undefined)).toBe(true);
+    expect(await clientTo(undefined)).toBe(false);
+    expect(send).not.toHaveBeenCalled();
     expect(mockGetClientEmailOverride).not.toHaveBeenCalled();
   });
 

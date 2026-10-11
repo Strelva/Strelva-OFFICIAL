@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 /**
  * Domain monitor — the safety net for the failure mode that took Orange Crate
  * offline on Aug 20: the client's registrar payment failed, the domain lapsed,
@@ -103,7 +104,7 @@ export function monitorableHosts(
 
   const add = (raw: string | undefined) => {
     const d = normalizeCustomDomain(raw);
-    if (d && !d.endsWith(".strelva.com") && !d.endsWith(".vercel.app")) {
+    if (d && !isPlatformDomain(d) && !d.endsWith(".vercel.app")) {
       custom.add(stripWww(d));
     }
   };

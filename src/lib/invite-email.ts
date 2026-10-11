@@ -25,7 +25,7 @@ export function escapeHtml(value: string): string {
   });
 }
 
-function inviteEmailOptions(params: {
+export function inviteEmailOptions(params: {
   email?: string;
   siteName: string;
   signUpUrl: string;
@@ -36,18 +36,18 @@ function inviteEmailOptions(params: {
   const invitedEmail = params.email ? sanitizeEmailSubjectText(params.email) : null;
 
   const paragraphs = [
-    `You now have access to manage ${siteName}. See what's happening with your site, make updates, and get weekly reports.`,
+    `You now have access to manage ${siteName}. See what's happening with your site, make updates, and get weekly recaps.`,
   ];
   if (invitedEmail) {
     paragraphs.push(
-      `Use ${invitedEmail} when signing up so your dashboard access connects automatically.`,
+      `Use ${invitedEmail} when signing up so your workspace access connects automatically.`,
     );
   }
   paragraphs.push("This link will work for the next 30 days.");
 
   return {
-    preheader: "Your dashboard is ready.",
-    heading: "Your dashboard is ready",
+    preheader: "Your workspace is ready.",
+    heading: "Your workspace is ready",
     paragraphs,
     button: { label: "Set up your login", url: params.signUpUrl },
   };

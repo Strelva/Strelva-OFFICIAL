@@ -50,7 +50,7 @@ export interface SiteSnapshot {
   actor?: Pick<ActorContext, "userId" | "email" | "type" | "isSuperAdmin">;
 }
 
-export type SiteSnapshotSummary = Omit<SiteSnapshot, "data" | "actor">;
+export type SiteSnapshotSummary = Omit<SiteSnapshot, "data" | "actor"> & { actorUserId?: string };
 
 export interface CreateSiteSnapshotOptions {
   reason: SiteSnapshotReason;
@@ -87,7 +87,7 @@ function parseSnapshot(raw: unknown): SiteSnapshot | null {
 
 function snapshotSummary(snapshot: SiteSnapshot): SiteSnapshotSummary {
   const { data: _data, actor: _actor, ...summary } = snapshot;
-  return summary;
+  return { ...summary, ...(snapshot.actor?.userId ? { actorUserId: snapshot.actor.userId } : {}) };
 }
 
 // --- Postgres repo helpers (self-contained; never throw) -------------------
@@ -149,14 +149,15 @@ function mapPgSnapshotRow(row: Row<"site_snapshots">): SiteSnapshot {
   };
 }
 
-/** Map a `site_snapshots` Row to a summary (no data/actor). */
+/** Summary retains only the recorded principal ID, never content or email. */
 function mapPgSnapshotSummaryRow(
   row: Pick<
     Row<"site_snapshots">,
-    "id" | "tenant_id" | "label" | "reason" | "author" | "created_at" | "sections" | "status" | "restored_at"
+    "id" | "tenant_id" | "label" | "reason" | "author" | "created_at" | "sections" | "status" | "restored_at" | "actor_user_id"
   >,
 ): SiteSnapshotSummary {
   return {
+    actorUserId: row.actor_user_id ?? undefined,
     id: row.id,
     tenantId: row.tenant_id,
     label: row.label,
@@ -183,7 +184,7 @@ async function pgListSnapshotSummaries(
   return safe<SiteSnapshotSummary[]>(async (db) => {
     const { data, error } = await db
       .from("site_snapshots")
-      .select("id, tenant_id, label, reason, author, created_at, sections, status, restored_at")
+      .select("id, tenant_id, label, reason, author, created_at, sections, status, restored_at, actor_user_id")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(limit);

@@ -30,7 +30,7 @@ export default async function ContributionPage({ params }: { params: Promise<{ w
       if (typeof payload?.text === "string") text = payload.text;
     } catch (error) { if (!(error instanceof WorkspaceAccessError)) throw error; }
     return <StrelvaShell title={title} accountName={user.email}>
-      <div className="mx-auto max-w-3xl p-4 sm:p-6"><p className="text-sm text-gray-muted">Scoped contribution · Current work version {access.workRevision}</p><h1 className="mt-3 font-display text-2xl">{title}</h1>{text !== undefined ? <section aria-label="Current document" className="mt-6 border-y border-gray-border py-5"><h2 className="mb-3 text-sm font-medium">Current document</h2><p className="whitespace-pre-wrap break-words text-sm">{text || "This document is empty."}</p></section> : <p className="mt-4 text-sm text-gray-muted">Your assignment and proposal history are below. Only this work has been shared with you.</p>}</div>
+      <div className="mx-auto max-w-3xl p-4 sm:p-6"><p className="text-sm text-gray-muted">Scoped contribution · Current work History entry {access.workRevision}</p><h1 className="mt-3 font-display text-2xl">{title}</h1>{text !== undefined ? <section aria-label="Current document" className="mt-6 border-y border-gray-border py-5"><h2 className="mb-3 text-sm font-medium">Current document</h2><p className="whitespace-pre-wrap break-words text-sm">{text || "This document is empty."}</p></section> : <p className="mt-4 text-sm text-gray-muted">Your assignment and proposal history are below. Only this work has been shared with you.</p>}</div>
       <WorkAuthorityPanel workId={workId} canManage={access.canManage} sources={[]} initiallyOpen />
     </StrelvaShell>;
   } catch (error) {

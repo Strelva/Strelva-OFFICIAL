@@ -67,7 +67,7 @@ describe("signed Try it links", () => {
       changes: [{ candidate: { summary: "the site with a booking page", content: { form: "consults" } } }], introduces: [{ name: "Consult booking" }], effects: [{ channel: "booking_page" }],
     } : null);
     await expect(possibilityTryState(token, { enabled: async () => true, read })).resolves.toEqual({ kind: "ready", view: {
-      title: "Consult booking", intent: "Add consult booking beside the contact form.", changes: ["The site with a booking page"], introduces: ["Consult booking"], takesSubmissions: true,
+      title: "Consult booking", businessName: undefined, proposingActor: null, agencyBrand: null, intent: "Add consult booking beside the contact form.", changes: ["The site with a booking page"], introduces: ["Consult booking"], takesSubmissions: true,
     } });
     const old = signPossibilityPreviewToken({ ...claims, candidateRevision: 2 });
     await expect(possibilityTryState(old, { enabled: async () => true, read })).resolves.toEqual({ kind: "changed" });

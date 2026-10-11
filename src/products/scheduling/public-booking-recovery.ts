@@ -1,3 +1,5 @@
+import { publicBookingAdmission } from "@/platform/bookings/public-admission";
+import type { PublicBookingAdmission } from "@/platform/bookings/public-request";
 import { z } from "zod";
 import { resolvePublishedPublicBooking } from "./public-booking-server";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
@@ -23,6 +25,7 @@ type RecoveryResolver = typeof resolvePublishedPublicBooking;
 type RecoveryTokenStore = Pick<PublicBookingTokenStore, "findByToken" | "save">;
 
 export interface PublicBookingRecoveryDependencies {
+  admission?: Pick<PublicBookingAdmission, "verified">;
   tokens?: RecoveryTokenStore;
   resolve?: RecoveryResolver;
   calendar?: RecoveryCalendar;
@@ -135,6 +138,10 @@ export async function recoverPublicWebsiteBooking(
   const calendar = dependencies.calendar ?? calendarSchedulingService;
   const ref = await findToken(tokens, { tenantId: input.tenantId, managementToken: tokenResult.data });
   if (!ref || ref.tenantId !== input.tenantId || ref.reservationId !== input.reservationId || ref.managementToken !== tokenResult.data) throw notFound();
+
+  // A status refresh cannot recover provider work before the email-only gate,
+  // or resurrect an expired/cancelled unconfirmed hold.
+  if (!await (dependencies.admission ?? publicBookingAdmission).verified(ref)) return receipt(ref);
 
   let binding: PublicBookingBinding | null;
   try {

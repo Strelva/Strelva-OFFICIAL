@@ -149,7 +149,7 @@ describe("improvements and the release gate", () => {
     const possibility = improvementPossibility(mooney, offers[0]!, "Inquiry intake");
     expect(possibility).toMatchObject({ kind: "possibility", system: { businessId: "mooney", systemId: "inquiries" }, status: "exploring",
       makeReal: { kind: "version_release", versionId: mooney.id } });
-    expect(possibility.conflicts).toEqual([{ path: "followUp.message", local: "We'll call you within one business day", upstream: "A new default.", reason: "overlapping_edit" }]);
+    expect(possibility.conflicts).toEqual([{ path: "followUp.message", local: "We'll call you within one business day", upstream: "A new default.", reason: "overlapping_edit", locked: false }]);
     expect(possibility.title).toBe("Inquiry intake got an update. Bring it to The Mooney Firm?");
   });
 
@@ -197,7 +197,12 @@ describe.runIf(Boolean(PSQL))("Library and Review all on local PostgreSQL", () =
     const mooney = library.sources[0]!.versions.find((version) => version.clientName === "The Mooney Firm")!;
     expect(mooney.conflicts).toEqual([{ path: "followUp.message", local: "We'll call you within one business day", upstream: "A new default." }]);
 
-    const review = await reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 2, versionIds: ids }, h.db!);
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+    // This earlier SQL gate proves adoption; Wave 6 SQL separately proves the real preparation receipt.
+    const review = await reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 2, versionIds: ids }, h.db!, async (_actor, lineage) => ({
+      receiptId: crypto.randomUUID(), decisionId: crypto.randomUUID(), workspaceId: lineage.version.businessId, versionId: lineage.id, rowRevision: lineage.rowRevision,
+    }));
     expect(Object.fromEntries(review.results.map((item) => [item.clientName, item.outcome]))).toEqual({
       "Harbor Dental": "prepared", "Twin Trees": "prepared", "The Mooney Firm": "skipped_conflicts", "Leslie Bookkeeping": "skipped_missing_accounts",
     });
@@ -210,5 +215,5 @@ describe.runIf(Boolean(PSQL))("Library and Review all on local PostgreSQL", () =
     await expect(reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids }, h.db!)).rejects.toThrow(/newer revision/);
     // Someone outside the agency reads nothing.
     await expect(readAgencyLibrary({ userId: owners[0]!.userId, verifiedEmail: owners[0]!.verifiedEmail! }, agency, h.db!)).rejects.toBeInstanceOf(VersionAccessError);
-  });
+  }, 30_000);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SiteLeadForm } from "@/products/websites/SiteLeadForm";
 import { StrelvaConnectedInquiryForm } from "../../custom-repo-starter/StrelvaInquiryForm";
@@ -14,6 +15,15 @@ const inquiry = { schemaVersion: 1, capabilityId: "main", version: 2, name: "Inq
 const schedule = { schemaVersion: 1, capabilityId: "calendar", version: 2, name: "Consultation", provider: "outlook", timeZone: "America/New_York", slots: [] };
 
 describe("hosted native website forms", () => {
+  it("keeps server-rendered inquiry controls inactive until their submit handler is ready", () => {
+    container.innerHTML = renderToString(createElement(SiteLeadForm, { tenant: "first-business" }));
+    const form = container.querySelector("form")!;
+    expect(form.method).toBe("post");
+    expect(form.querySelector("fieldset")?.disabled).toBe(true);
+    expect(form.querySelector("button")?.matches(":disabled")).toBe(true);
+    expect(form.querySelector('[name="name"]')?.matches(":disabled")).toBe(true);
+    expect(form.querySelector('[role="status"]')?.textContent).toBe("Loading inquiry form…");
+  });
   it("keeps visitor input on a failed native lead write, and sends only to the bound tenant", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "Inquiry capture unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetcher);

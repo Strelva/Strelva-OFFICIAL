@@ -23,7 +23,7 @@ function day(iso: string): string {
   return Number.isNaN(date.getTime()) ? iso : DAY.format(date);
 }
 
-/** One list of client leads. Used by /admin/client-leads and a client's page. */
+/** One list of client inquiries. Used by /admin/client-leads and a client's page. */
 export function ClientLeadList({ leads, showClient = true }: { leads: OperatorClientLead[]; showClient?: boolean }) {
   return (
     <ul className="divide-y divide-glass-border overflow-hidden rounded-2xl border border-glass-border bg-glass">

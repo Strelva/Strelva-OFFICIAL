@@ -144,7 +144,7 @@ pnpm typecheck
 pnpm test                    # Vitest
 pnpm lint
 pnpm build
-pnpm check                   # lint + typecheck + test + build
+pnpm check                   # hosted-domain config + lint + typecheck + test + build
 pnpm check:ci                # what CI runs
 pnpm smoke                   # public Playwright smoke
 pnpm smoke:surfaces          # owner + operator surfaces with local fixtures
@@ -160,11 +160,46 @@ cluster and never touch production:
 ```bash
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:agency-workflow
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH \
+  STRELVA_MCP_HTTP_SQL_PROOF=1 bash scripts/check-agent-channel-sql.sh
 ```
 
+For agency workflow or provider/owner permission changes, run
+`check:agency-workflow` for the full ordered SQL job, then the authenticated
+browser proof. Read the [October 7 handoff](./docs/operations/agency-workflow-2026-10-07.md)
+for disposable Auth setup, simulated delivery/verification limits, and retained
+failure evidence. The bounded signed-in-owner three-flag browser runner is
+`bash scripts/check-agency-workflow-browser.sh`; it creates and cleans up only
+its own local Auth stack and app, with providers disabled and a fictional
+source-site transport. A passing local run is never proof of hosted delivery.
+
+The optional MCP proof above composes actual local HTTP with disposable
+Postgres; it rejects repository env files and proves no native assistant or
+Supabase browser sign-in. The [owner-assistant record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns setup, scopes and remaining HTTPS/client qualification.
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.
+
+The private money/apps integration adds native contracts to both SQL runners via
+`scripts/sql/money-apps-contracts.sh`; keep its ordered payer/Connect/native
+fixtures and public-key/read-only checks. See
+[the prepared handoff](./docs/operations/money-apps-prepared-2026-10-07.md) for
+current gates. The optional Sandbox adapter does not authorize installing its SDK,
+changing resource limits, enabling custom apps or using a paid provider.
+
+The isolated creator maintenance identity check is
+`bash scripts/check-creator-maintenance-identity.sh`; it covers original future
+royalty eligibility, populated guarded inverse/reapply and controlled current
+verification/membership races. See
+[its private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md).
+Completed-month evidence additionally uses
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-recurring-responsibilities.sh`.
+Keep its actual populated rollback refusal, historical identity/coverage checks,
+READ ONLY reader and controlled current-actor races. The
+[private monthly contract](docs/operations/responsibility-month-evidence-2026-10-08.md)
+distinguishes observed history from unavailable period-end state and billing.
 
 ## Done means proven
 
@@ -185,7 +220,7 @@ Postgres, or bypass mode changes what a green run means.
 | Product model: Systems, Connections, Possibilities, Versions | [CONTEXT.md](./CONTEXT.md#product-model); the full ledger is `PRODUCT_MODEL.md` (untracked, main checkout only) |
 | Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
 | Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
-| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md), under [product-ontology](./docs/architecture/product-ontology.md) |
+| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md) is the word authority; [product-ontology](./docs/architecture/product-ontology.md) owns structure and governance rules |
 | Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |
 | CI and test modes | [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) |
 | Client dashboard | [docs/architecture/client-dashboard-ia.md](./docs/architecture/client-dashboard-ia.md) |

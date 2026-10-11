@@ -149,7 +149,7 @@ export default async function LinksPage() {
           {links.map((link, i) => {
             const content = (
               <div
-                className={`flex items-center gap-3 w-full px-5 py-4 rounded-xl text-left transition-all duration-200 ${
+                className={`flex items-center gap-3 w-full px-5 py-4 rounded-xl text-left transition ${
                   link.featured
                     ? "hover:scale-[1.02] hover:shadow-lg"
                     : "hover:scale-[1.01] hover:shadow-md"

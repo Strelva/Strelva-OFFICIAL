@@ -1,22 +1,15 @@
-import { FileCheck } from "lucide-react";
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { listDrafts, getDraftContent, getContent } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
-import { generatePreviewDiffs, type PreviewDiff } from "@/lib/agent-risk";
-import { DraftActions } from "./DraftActions";
-import { AdminEmpty } from "@/app/admin/console";
+import { generatePreviewDiffs } from "@/lib/agent-risk";
+import { DraftsView } from "./DraftsView";
+import type { DraftItem } from "./DraftsView";
 
 export const dynamic = "force-dynamic";
 
-interface DraftItem {
-  tenantId: string;
-  tenantName: string;
-  section: string;
-  data: Record<string, unknown>;
-  diffs: PreviewDiff[];
-}
-
 export default async function AdminDraftsPage() {
+  await authorizeAdminOperatorRead("admin.drafts.read");
   const TENANTS = (await getAllTenants()).filter(isActiveTenant);
   const allDrafts: DraftItem[] = [];
 
@@ -51,57 +44,5 @@ export default async function AdminDraftsPage() {
     })
   );
 
-  return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Pending drafts</h1>
-        <p className="text-sm text-gray-muted mt-1">
-          Review AI-generated content changes before they go live
-        </p>
-      </div>
-
-      {allDrafts.length === 0 ? (
-        <AdminEmpty
-          tone="good"
-          icon={<FileCheck className="h-5 w-5" strokeWidth={1.6} />}
-          title="No pending drafts"
-          description="Nothing is waiting across any client. Drafts appear here when the AI agent proposes content changes."
-        />
-      ) : (
-        <div className="space-y-4">
-          {allDrafts.map((draft) => (
-            <div
-              key={`${draft.tenantId}-${draft.section}`}
-              className="rounded-2xl border border-glass-border bg-glass p-6"
-            >
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-warm-white">
-                    {draft.tenantName}
-                  </span>
-                  <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-gray-bg text-warm-white">
-                    {draft.section}
-                  </span>
-                  {typeof draft.data._updatedAt === "string" && (
-                    <span className="text-[11px] text-gray-faint ml-auto">
-                      {new Date(draft.data._updatedAt as string).toLocaleString()}
-                    </span>
-                  )}
-                </div>
-                <DraftActions
-                  tenant={draft.tenantId}
-                  section={draft.section}
-                  preview={{
-                    type: "content_update",
-                    metadata: { ...draft.data, diffs: draft.diffs },
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return <DraftsView drafts={allDrafts} />;
 }

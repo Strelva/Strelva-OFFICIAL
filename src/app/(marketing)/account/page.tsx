@@ -19,7 +19,7 @@ export default async function AccountPage({
   searchParams,
 }: {
   searchParams?: Promise<{ managed?: string | string[]; next?: string | string[] }>;
-} = {}) {
+}) {
   const params = await searchParams;
   const managedRequested = params?.managed === "1";
   const workspaceTarget = workspaceReleaseEnabled() && typeof params?.next === "string"

@@ -15,6 +15,7 @@
  *
  * Off unless STRELVA_BOOKING_CALENDAR_BUSY=1, and only on store-served reads.
  */
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { getRedis } from "@/platform/infra/redis";
 import { zonedLocalToUtc } from "./availability";
 import { bookingCalendarBusyEnabled } from "./flags";
@@ -50,7 +51,7 @@ function nextDate(date: string): string {
 }
 
 function cacheKey(context: BookingContext, date: string): string {
-  return `reb:booking:busy:${context.tenantStableId}:${date}`;
+  return `reb:booking:busy:${context.calendarKey ?? context.tenantStableId ?? context.workspaceId}:${date}`;
 }
 
 function isBusyList(value: unknown): value is BusyInterval[] {
@@ -82,6 +83,7 @@ export async function readCalendarBusy(context: BookingContext, date: string, ti
   const cached = await ports.cache?.get(key).catch(() => null);
   if (isBusyList(cached)) return { connected: true, checked: true, busy: cached };
   try {
+    if (await isRateLimitedAsync(`booking-busy-provider:${context.workspaceId}`, 120)) return { connected: true, checked: false, reason: "calendar_rate_limited" };
     const busy = await ports.busy(context.workspaceId, connection.provider, {
       start: zonedLocalToUtc(date, "00:00", timeZone),
       end: zonedLocalToUtc(nextDate(date), "00:00", timeZone),
@@ -127,7 +129,7 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
       const db = getSupabase() as unknown as { from(table: string): Query } | null;
       if (!db) return null;
       const { data, error } = await db.from("workspace_calendar_connections").select("provider,status").eq("workspace_id", workspaceId)
-        .in("status", ["connected", "authorized", "error"]).order("provider").limit(1);
+        .in("status", ["connected", "authorized", "error", "revoked"]).order("provider").limit(1);
       if (error) throw new Error("calendar_connection_unreadable");
       const row = (Array.isArray(data) ? data[0] : null) as ConnectionRow | null;
       if (!row || (row.provider !== "google" && row.provider !== "outlook")) return null;

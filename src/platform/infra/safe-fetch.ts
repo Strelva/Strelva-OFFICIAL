@@ -16,7 +16,7 @@ function isProd(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
-function isPrivateOrReservedHost(host: string): boolean {
+export function isPrivateOrReservedHost(host: string): boolean {
   // URL.hostname keeps the brackets on an IPv6 literal ("[::1]"), which made
   // every IPv6 check below silently never match. Strip them first.
   let h = host.toLowerCase();
@@ -29,9 +29,13 @@ function isPrivateOrReservedHost(host: string): boolean {
   // merely starts with "fc"/"fd" (e.g. fd-cdn.example.com) isn't over-blocked.
   if (h.includes(":")) {
     if (h === "::1" || h === "::") return true; // loopback / unspecified
-    if (h.startsWith("fe80:")) return true; // link-local
+    const firstSegment = h.split(":")[0];
+    const firstWord = firstSegment ? Number.parseInt(firstSegment, 16) : 0;
+    if (firstWord >= 0xfe80 && firstWord <= 0xfebf) return true; // fe80::/10 link-local
     // unique-local fc00::/7 — an IPv6 literal beginning fc or fd.
     if (h.startsWith("fc") || h.startsWith("fd")) return true;
+    if (h.startsWith("ff")) return true; // multicast is not a public destination
+    if (h === "2001:db8" || h.startsWith("2001:db8:")) return true; // documentation range
     // IPv4-mapped IPv6: ::ffff:127.0.0.1 or its normalized hex ::ffff:7f00:1.
     const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
     if (mappedDotted) return isPrivateOrReservedHost(mappedDotted[1]!);

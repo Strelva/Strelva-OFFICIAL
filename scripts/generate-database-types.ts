@@ -26,6 +26,20 @@ import { userInfo } from "node:os";
 
 const DEFAULT_OUT = "src/platform/infra/db/database.types.ts";
 
+// pg_proc has no argument-nullability metadata. This existing RPC explicitly
+// accepts NULL to clear a signing key (20261012120000_track_signing_key_rotation).
+const nullableRpcArguments: Readonly<Record<string, readonly string[]>> = {
+  rotate_tenant_track_signing_key: ["p_public_key"],
+  // Takeover intentionally supplies no creator agreement/reference.
+  record_creator_maintenance_from_workspace: ["p_agreement", "p_rate"],
+  // Public Checkout has no agency actor; pay-link admission requires all three.
+  assert_business_checkout_admission: ["p_actor_id", "p_verified_email", "p_accepted_email"],
+  // Private trusted-service dispatch has no interactive actor/kind; absent
+  // binding snapshots also deliberately call the private digest with NULL.
+  legacy_google_commit: ["p_user_id", "p_verified_email", "p_kind"],
+  legacy_google_location_digest: ["p_binding_id"],
+};
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i === -1 ? undefined : process.argv[i + 1];
@@ -211,7 +225,7 @@ export function render(catalog: Catalog): string {
     const inArgs = allTypes.map((type, i) => ({ type, name: names[i] ?? "", mode: modes[i] ?? "i" }))
       .filter((a) => a.mode === "i" || a.mode === "b" || a.mode === "v");
     const optionalFrom = inArgs.length - fn.ndefaults;
-    const args = inArgs.map((a, i) => [`${a.name || '""'}${i >= optionalFrom ? "?" : ""}`, ts(a.type)] as [string, string])
+    const args = inArgs.map((a, i) => [`${a.name || '""'}${i >= optionalFrom ? "?" : ""}`, nullableRpcArguments[fn.name]?.includes(a.name) ? `${ts(a.type)} | null` : ts(a.type)] as [string, string])
       .sort(([a], [b]) => a.localeCompare(b));
     const tableOut = allTypes.map((type, i) => ({ type, name: names[i] ?? "", mode: modes[i] ?? "i" })).filter((a) => a.mode === "t");
     let returns: string;

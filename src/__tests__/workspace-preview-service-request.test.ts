@@ -16,7 +16,7 @@ describe("workspace preview service request adapter", () => {
       body: body({
         action: "save", businessId, status: "requested", request: "Prepare a private request flow.",
         outcome: "Prepare a private request flow.", context: { source: "workspace_help" }, scope: ["help_request"],
-        provider: { kind: "strelva" }, idempotencyKey: "preview:request:one",
+        provider: { kind: "agency", agencyWorkspaceId: "22222222-2222-4222-8222-222222222222" }, idempotencyKey: "preview:request:one",
       }),
     });
     expect(save.status).toBe(200);
@@ -31,7 +31,7 @@ describe("workspace preview service request adapter", () => {
     expect(reopened.status).toBe(200);
     expect((await reopened.json() as { request: { id: string } }).request.id).toBe(saved.id);
 
-    const inbox = await request("/api/service-requests?providerKind=strelva");
+    const inbox = await request("/api/service-requests?providerWorkspaceId=22222222-2222-4222-8222-222222222222");
     expect(inbox.status).toBe(200);
     expect((await inbox.json() as { requests: Array<{ id: string }> }).requests.map((item) => item.id)).toEqual([saved.id]);
 
@@ -41,7 +41,7 @@ describe("workspace preview service request adapter", () => {
       body: body({
         action: "save", businessId, status: "requested", request: "Prepare a private request flow.",
         outcome: "Prepare a private request flow.", context: { source: "workspace_help" }, scope: ["help_request"],
-        provider: { kind: "strelva" }, idempotencyKey: "preview:request:one",
+        provider: { kind: "agency", agencyWorkspaceId: "22222222-2222-4222-8222-222222222222" }, idempotencyKey: "preview:request:one",
       }),
     });
     expect(retry.status).toBe(200);

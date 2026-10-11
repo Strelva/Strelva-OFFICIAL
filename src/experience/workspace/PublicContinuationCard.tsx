@@ -6,7 +6,9 @@ import type { PublicContinuation } from "@/lib/public-continuation";
 import { Button } from "@/components/ui/Button";
 import { SelectInput } from "@/components/ui/TextInput";
 import type { WebsiteBrief } from "@/products/websites/contracts";
-import { serverWebsiteTransport, type WebsiteExperienceTransport } from "@/experience/websites/contracts";
+import type { WebsiteExperienceTransport } from "@/experience/websites/contracts";
+import { serverRebuildTransport } from "@/experience/websites/rebuild-transport";
+import { nativePublicWebsiteInput } from "./native-public-website";
 
 type Destination = { id: string; name: string; kind: "personal" | "agency" | "customer" };
 
@@ -27,7 +29,7 @@ type PublicContinuationCardProps = {
   onWebsiteSaved?: (location: string) => void;
 };
 
-export function PublicContinuationCard({ brief, destinations, actorEmail, websiteTransport = serverWebsiteTransport, onWebsiteSaved }: PublicContinuationCardProps) {
+export function PublicContinuationCard({ brief, destinations, actorEmail, websiteTransport, onWebsiteSaved }: PublicContinuationCardProps) {
   const router = useRouter();
   const [workspaceId, setWorkspaceId] = useState(destinations[0]?.id || "");
   const [busy, setBusy] = useState(false);
@@ -49,11 +51,16 @@ export function PublicContinuationCard({ brief, destinations, actorEmail, websit
     if (!workspaceId || busy || websiteBusy) return;
     setWebsiteBusy(true); setError("");
     try {
-      const saved = await websiteTransport.create({
-        workspaceId,
-        requestId: websiteRequestId.current,
-        brief: websiteBriefFromPublicContinuation(brief),
-      });
+      const saved = websiteTransport
+        ? await websiteTransport.create({
+          workspaceId,
+          requestId: websiteRequestId.current,
+          brief: websiteBriefFromPublicContinuation(brief),
+        })
+        : await serverRebuildTransport.start(nativePublicWebsiteInput(brief, workspaceId, websiteRequestId.current));
+      if (saved.workspaceId !== workspaceId || !saved.workId) {
+        throw new Error("The website draft could not be confirmed. Your brief is unchanged. Reload before continuing.");
+      }
       const location = `/workspace?workspaceId=${encodeURIComponent(saved.workspaceId)}&view=websites&work=${encodeURIComponent(saved.workId)}`;
       if (onWebsiteSaved) onWebsiteSaved(location);
       else router.push(location);

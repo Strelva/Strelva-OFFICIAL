@@ -1,3 +1,5 @@
+import { brandColors } from "@/platform/infra/agency-brand";
+import { attributedAudit } from "./attribution";
 /**
  * Sendable one-pager renderer for the site-health audit.
  *
@@ -64,7 +66,12 @@ function findCheck(
 /**
  * Render an `AuditResult` into a self-contained, sendable one-page HTML report.
  */
-export function renderAuditReport(result: AuditResult): string {
+export function renderAuditReport(raw: AuditResult): string {
+  const result = attributedAudit(raw, raw.agency);
+  const agency = result.agency;
+  const agencyColors = brandColors(result.agency?.brand.accentColor ?? "#447a4f");
+  const agencyLogo = result.agency?.brand.logoUrl ? `<img src="${escapeHtml(result.agency.brand.logoUrl)}" alt="" width="132" style="max-height:64px;object-fit:contain;">` : "";
+  const agencyName = agency ? escapeHtml(agency.name) : null;
   const accent = GRADE_HEX[result.grade] ?? "#9a6a00";
   const url = displayUrl(escapeHtml(result.url));
   const verdict = escapeHtml(GRADE_VERDICT[result.grade] ?? GRADE_VERDICT.C);
@@ -294,7 +301,8 @@ export function renderAuditReport(result: AuditResult): string {
 <body>
   <main class="page">
     <div class="topbar">
-      <p class="eyebrow">Strelva · Site Health Report</p>
+      <div>${agencyLogo}</div>
+      <p class="eyebrow" style="color:${agencyColors.onWhite};">${agencyName ? `${agencyName} on Strelva` : "Strelva"} · Site Health Report</p>
       <span class="scanned">Scanned ${scannedDate}</span>
     </div>
     <h1>Site Health Report</h1>
@@ -324,13 +332,13 @@ ${categoryRows}
     </ul>
 
     <div class="cta">
-      <p class="cta-title">We can do all of this for you.</p>
-      <p class="cta-sub">Strelva builds and manages your site end to end — every issue in this report fixed, and kept that way. AI-powered updates, health monitoring, and a plain-English weekly report. You own your domain and content from day one.</p>
-      <a class="cta-link" href="https://strelva.com/access-request?ref=audit-report">Let Strelva handle it</a>
+      <p class="cta-title">${agencyName ? `Ask ${agencyName} about these fixes.` : "We can do all of this for you."}</p>
+      <p class="cta-sub">${agency ? "Share this report with your web provider to discuss the fixes and agree the work." : "Strelva builds and manages your site end to end — every issue in this report fixed, and kept that way. AI-powered updates, health monitoring, and a plain-English weekly report. You own your domain and content from day one."}</p>
+      <a class="cta-link" href="${agency ? escapeHtml(agency.contactUrl) : "https://strelva.com/access-request?ref=audit-report"}">${agencyName ? `Contact ${agencyName}` : "Let Strelva handle it"}</a>
     </div>
 
     <footer>
-      Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>
+      ${agencyName ? `Prepared by ${agencyName} on Strelva.` : 'Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>'}
     </footer>
   </main>
 </body>

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import { NextRequest } from "next/server";
 import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
 

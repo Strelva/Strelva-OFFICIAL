@@ -69,7 +69,7 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
       setRestoringId(null);
       setConfirmingId(null);
       if (!response.ok || !body?.restored) {
-        setError(body?.error || "Could not restore this version.");
+        setError(body?.error || "Could not restore this saved state.");
         return;
       }
       const restored = body.restored as SiteSnapshotSummary;
@@ -92,10 +92,10 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
             Safety net
           </p>
           <h2 className="mt-2 text-[18px] font-semibold text-warm-black">
-            Revert to a last good version
+            Restore from History
           </h2>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-gray-muted">
-            Every saved version captures your whole site. Roll back to any of them and your live
+            Every History entry captures your whole site. Roll back to any of them and your live
             site returns to exactly how it looked then.
           </p>
         </div>
@@ -109,19 +109,19 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
         className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg bg-warm-white px-4 text-[13px] font-medium text-on-warm-white transition-colors hover:bg-warm-white/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         <Save className="h-4 w-4" strokeWidth={1.5} />
-        Save a version now
+        Save to History
       </button>
 
       {snapshots.length === 0 ? (
         <div className="mt-4">
           <p className="rounded-lg border border-gray-border/70 bg-surface-raised px-3 py-3 text-[13px] leading-relaxed text-gray-muted">
-            Strelva backs up your whole site every day automatically, so you always have a good version
+            Strelva backs up your whole site every day automatically, so you always have a saved state
             to return to. Save one now if you want an extra restore point you name yourself.
           </p>
           {/* Ghosted example of a saved version, so the empty state previews what
               this list will look like (clearly a placeholder — muted, "Example"). */}
           <p className="mb-2 mt-5 text-[11px] font-medium uppercase tracking-[0.12em] text-gray-faint">
-            Your saved versions will look like this
+            Your History will look like this
           </p>
           <div className="rounded-xl border border-dashed border-glass-border bg-surface-base/20 px-3 py-3" aria-hidden>
             <div className="flex items-center justify-between gap-3">
@@ -166,7 +166,7 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
                       className="inline-flex min-h-[36px] shrink-0 items-center justify-center gap-2 rounded-lg border border-glass-border px-3 text-[12px] font-medium text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-black disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      Restore this version
+                      Restore this saved state
                     </button>
                   ) : null}
                 </div>
@@ -174,7 +174,7 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
                 {confirming ? (
                   <div className="mt-3 rounded-lg border border-accent/25 bg-accent-dim/40 px-3 py-3">
                     <p className="text-[12px] leading-relaxed text-warm-black">
-                      This replaces your live site with this version. Your current site is backed up
+                      This replaces your live site with this saved state. Your current site is backed up
                       first, so you can undo it.
                     </p>
                     <div className="mt-2.5 flex gap-2">
@@ -185,7 +185,7 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
                         className="inline-flex min-h-[36px] items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <RotateCcw className="h-3.5 w-3.5" strokeWidth={1.5} />
-                        {restoring ? "Restoring…" : "Restore this version"}
+                        {restoring ? "Restoring…" : "Restore this saved state"}
                       </button>
                       <button
                         type="button"

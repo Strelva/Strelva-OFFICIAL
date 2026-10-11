@@ -41,7 +41,7 @@ describe("sendNewsletter", () => {
     expect(result).toMatchObject({ success: true, subscriberCount: 2, receipt: { accepted: 2, failedBatches: 0, from: "newsletter@mail.strelva.com" } });
     const [payload, options] = batchSend.mock.calls[0]!;
     expect(payload.map((m: { to: string }) => m.to)).toEqual(["reader0@example.test", "reader1@example.test"]);
-    expect(payload[0].from).toBe("Good Life Daily Foods <newsletter@mail.strelva.com>");
+    expect(payload[0].from).toBe('"Good Life Daily Foods" <newsletter@mail.strelva.com>');
     expect(payload[0].headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
     const url = /^<(https:\/\/app\.strelva\.example\/api\/newsletter\/unsubscribe\?token=[^>]+)>$/.exec(payload[0].headers["List-Unsubscribe"])![1]!;
     expect(verifyUnsubscribeToken(decodeURIComponent(new URL(url).searchParams.get("token")!))).toEqual({ tenantId: "gldf", email: "reader0@example.test" });

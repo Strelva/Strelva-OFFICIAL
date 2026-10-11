@@ -1,29 +1,75 @@
 # Ask Strelva in the workspace
 
-Status: draft spec, 2026-10-06, not approved. **Built and proven locally
-Oct 6 on branch `build/ask-strelva`, not deployed, flag off:** the one
-model-call helper (`src/platform/infra/model-calls.ts`, dated price table,
-cost log migration `20261007140000_model_call_log.sql`, lint rule) with all
-12 call sites on it; the chat route's inline tools moved into
-`src/lib/agent-shared.ts` (`buildTenantChatTools`); `POST /api/workspace/ask`
-behind `STRELVA_ASK_RELEASE` (plus the workspace and Systems releases) with
-per-call authority, resolution, the 18 tools, refusals, the managed default
-and a stub Needs you adapter. **Built and proven locally Oct 6 on
-`w2/owner-surfaces-b`, not migrated or deployed, flag off:** the chat UI
-in the workspace (`view=ask`, on Home, on each System page and beside the
-site editor; streaming, receipts for each of the four results, error,
-read-only and unsaved states) and workspace conversation history in
-Postgres (`20261008110000_ask_conversations.sql`, `GET /api/workspace/ask`);
-`/dashboard/chat` is `ready` while `STRELVA_ASK_RELEASE` is on. Not built:
-Postgres Possibilities (opened ones are in-memory), the real Needs you
-policy wiring, inquiry reply drafts, a business-record draft store (fact
-changes are filed as Requests), and copying old tenant chat threads (the
-workspace starts fresh; `/dashboard/chat` keeps them). See "Build notes" at
-the end.
+> **Changed by ADR 0013 / decisions 1–2 and 8.** Text typed before work exists is an ask;
+> asked-for finite work is a Request, and a Request sent to an agency is not accepted until
+> scope and deadline are agreed. Answers and receipts name whoever acted; agency names carry
+> "Runs on Strelva". Client work entered on behalf of an owner must use the ordinary agency
+> path. Engineering must reconcile the existing operator/member permission and owner-email
+> entry paths with that boundary; naming a different actor alone grants no access.
+
+## October 11 shared ask contract
+
+**Ask Strelva** names the entrance on desktop and phone. It uses the same nouns
+at All clients, inside one client and Your business; context and preparation
+controls follow granted scope. Agency status never supplies owner-only approval,
+exit, payer decisions or sensitive data. Owners ask for an Internal tool or a
+maintained Running result; the agency prepares supported tools, Saved checks
+and cadence. Unsupported work becomes a Request. Only a working alternative
+is a Possibility; Proposal remains a research response underneath. Responses
+and History name the recorded actor; missing evidence is Actor not recorded.
+Agency branding failure is neutral and holds agency-authored sends.
+
+Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
+migrated or deployed; all release flags off. Proof and remaining stop points
+are in [the stream handoff](../streams/w6-owner-ask.md).
+
+The workspace route, original 18-tool catalog, per-call authority, managed Requests,
+streamed receipts and saved conversations are built. Ask now hands drafts to
+the real Needs you policy and durable source adapters. Business facts use a
+typed, revision-pinned draft store; inquiry replies preserve the exact authored
+copy through the existing message approval, send receipt and read-back path.
+Ask never approves or performs an outside write. A failed decision sync reports
+the saved draft honestly and leaves it pending. Operators can record an owner
+ask by email or phone; the owner still decides.
+
+Possibilities use the existing Postgres repository and native website builder.
+Ask can prepare a real informational page set, with copy awaiting owner review,
+or add a booking page to an unchanged published native website using that
+site's existing inquiry and booking grants. Try renders the actual pinned
+document; booking tests use configured times and local callbacks, discard
+visitor inputs and create no reservation. Reviewed candidates become Ready,
+and Make real preserves the native work identity. Revoked connections or
+changed revisions refuse publication.
+
+With the Inquiries release on, Ask can also compare one follow-up rule on an
+existing live Inquiries System: timing, attempts and complete wording that
+names Strelva. It rehearses the rule in isolation, shows the full message in
+Try, and returns to Exploring if the native configuration changes.
+
+Changes to a projected managed System without a durable baseline remain
+Requests for the serving agency to prepare. So do new booking services, new-site booking
+bindings, custom flows and unsupported rebuilds. The existing booking effect
+publishes a scheduling grant; the inquiry effect requires a prepared,
+tenant-specific request/change. Ask has no tool to create that new inquiry
+binding or infer a service's duration and schedule. It preserves the person's
+words in an Asked Request and does not invent the missing authority. Managed
+work remains a Request by default, as required by behavior 7.
+Model calls retain tokens and measured/estimated/unknown cost. An optional
+per-business daily log warning adds no billing, plan allowance or email send.
+
+Not proven: real model/provider quality and latency, authenticated admin-host
+journeys on an isolated Auth stack, live mail, publication/read-back/undo on a
+Strelva-owned business, actual cost per turn or owner adoption. Old tenant chat
+threads are retained on the legacy operator surface and are not copied.
+The Mooney example's newly introduced booking service is therefore not fully
+implemented by Ask: an authorized agency maker must prepare its service
+and grants first.
+The existing-service booking alternative is implemented and tested locally.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
-want in plain words. Strelva answers, drafts a change, opens a Possibility, or
-files a Request. It never decides what belongs to the owner.
+want in plain words. Responses name the recorded actor; the serving agency
+can draft a change, open a working Possibility or receive a Request through
+its granted scope. Ask Strelva never decides what belongs to the owner.
 
 ## 1. The moment
 
@@ -33,12 +79,13 @@ The Mooney Firm adds estate-planning consults. Two ways this arrives:
   in the workspace. They type: "We now do estate planning consults. Add it and
   let people book one."
 - **The owner never signs in** (the common case: 1 sign-in in 30 days). They
-  email Strelva. Today that reply lands at `REPLY_TO_EMAIL` or
-  `hello@strelva.com` (`src/lib/email/send.ts`). A Strelva operator opens the
+   email their agency. For Strelva's own agency, that reply lands at `REPLY_TO_EMAIL` or
+  `hello@strelva.com` (`src/lib/email/send.ts`). A team member of the business's agency opens the
   Mooney workspace and types the same sentence into Ask Strelva, marked as
   asked by the owner by email.
 
-Either way, Strelva:
+In this example, Acme Marketing serves the firm through the ordinary agency
+path. Ask Strelva returns:
 
 1. Answers what it read: the firm's services today, from the business record.
 2. Drafts one change: "Estate planning consult" added to the firm's services.
@@ -50,8 +97,9 @@ Either way, Strelva:
    is not live.
 
 The owner gets one email with the change and a one-tap Approve / Not yet. They
-tap Approve. Strelva publishes, reads it back, and the receipt appears in
-**Strelva handled**: "Strelva added Estate planning consult to attymooney.com."
+tap Approve. Acme Marketing publishes, reads it back, and the receipt appears in
+**What changed**: "Acme Marketing added Estate planning consult to attymooney.com", with
+"Runs on Strelva" credit. Automatic platform work instead names Strelva.
 The booking Possibility waits until someone opens it and chooses **Make real**.
 
 ## 2. In the model
@@ -118,13 +166,15 @@ Behaviors, each testable.
 11. **Receipts.** Every Ask turn that changed a record lists, item by item,
     what was drafted, queued, opened or filed, with ids. Nothing is described
     as done until it is.
-12. **Words.** Screens and replies say "Strelva". They never say AI, agent,
-    automation, workflow or task. Today's failure line "trouble reaching the
+12. **Words.** The entrance says **Ask Strelva**; responses and receipts
+    name the recorded actor, including Strelva Agency for its client work. They
+    never say AI, agent, automation, workflow or task. Today's failure line "trouble reaching the
     AI" in `src/app/api/agent/route.ts` and activity text like "AI saved a
     reply" change.
 13. **One model-call helper** carries every model call, including Ask Strelva's,
     and logs tokens and cost per call (section 5).
-14. **Asked on behalf.** An operator can ask in a client workspace and mark the
+14. **Asked on behalf.** An authorized agency team member can ask in a
+    client workspace through its ordinary grant and mark the
     turn "asked by the owner by email" or "by phone". The Request or draft
     records that origin. The owner's decision still goes to the owner.
 
@@ -176,7 +226,12 @@ Before each tool runs, `authorizeAskTool(toolId, context)` reads again:
 Today `/api/agent` checks `requireTenantPermission(tenant, "content:write")`
 once, then runs up to 8 model steps (`stepCountIs(8)`) without checking again.
 
-### Authority
+### Historical implementation authority — superseded
+
+The table records the older implementation. The October 11 contract replaces
+its platform-operator service path with ordinary agency scope; non-makers ask
+for an Internal tool rather than gaining creation authority. Platform support
+requires its own logged scope. Owner decisions stay owner-only.
 
 | Level | Who | What it allows |
 | --- | --- | --- |
@@ -195,10 +250,10 @@ Ask Strelva hands each draft to the Needs you policy with the System, the
 change type and today's governance reason code (`AiGovernanceReasonCode` in
 `src/lib/ai-governance.ts`). The policy answers one of:
 
-- **Strelva does it** and reports it in Strelva handled (today: governance
+- **The authorized actor does it**, is named, and reports it in What changed (today: governance
   `publish`, `maybeAutoApprove` for low-risk sections, content autonomy
   `auto`, review-reply `auto` mode).
-- **Strelva reviews it** first (today: `reviewAudience: "operator"` in
+- **The serving agency reviews it** first (today: `reviewAudience: "operator"` in
   `src/lib/needs-you.ts`).
 - **The owner decides**: it appears in Needs you and goes out by email with the
   signed one-tap link (`src/lib/approve-link.ts`, `/api/approve`).
@@ -225,7 +280,7 @@ Make real).
 - Credentials: it never asks for, stores or repeats a password or key.
 
 Each refusal names where the thing is done instead ("Domains are in Business
-details" or "I filed it for Strelva").
+details" or "I sent the Request to {agency display name}").
 
 ### Never happens
 
@@ -258,7 +313,7 @@ details" or "I filed it for Strelva").
 
 - `src/platform/workspaces/permissions.ts`, `workspace_require` SQL helper.
 - `src/platform/systems/from-existing.ts`, `systems` tables.
-- `src/platform/service-requests` (provider `strelva`) for Requests.
+- `src/platform/service-requests` (legacy `provider_kind` value `strelva`) for Requests sent to Strelva's agency.
 - `src/platform/possibilities` and `src/platform/make-real` for Possibilities.
 - `src/platform/work-economics/provider-evidence.ts` for trusted provider
   receipts where a billing gateway gives exact cost.
@@ -284,7 +339,8 @@ details" or "I filed it for Strelva").
 
 Current tools: 6 from `agent-shared.ts` plus 24 inline in the route (30 on the
 chat surface), and 2 background-only in `agent-executor.ts`. At 1.0.0 they
-become 18. The tenant route keeps the old names until `/dashboard/chat`
+originally became 18. The prepared October 9 native app extension adds
+`draft_system_change`, bringing the source inventory to 19. The tenant route keeps the old names until `/dashboard/chat`
 retires, built from the same implementations.
 
 | Current tool | Fate | 1.0.0 tool | System it acts on | Authority |
@@ -300,7 +356,7 @@ retires, built from the same implementations.
 | `get_metrics` | Merged | `read_performance` | Website | Read |
 | `explain_traffic` | Merged | `read_performance` | Website | Read |
 | `show_report` | Merged | `read_performance` (card) | Website | Read |
-| `get_activity` | Merged | `read_history` | Any System (History, Strelva handled) | Read |
+| `get_activity` | Merged | `read_history` | Any System (History, What changed) | Read |
 | `show_connections` | Kept, renamed | `read_connections` | The System's Connections | Read |
 | `get_reviews` | Kept, renamed | `read_reviews` | Google Business Connection, reviews | Read |
 | — | New | `read_requests` | Requests for this workspace | Read |
@@ -318,6 +374,7 @@ retires, built from the same implementations.
 | `update_business_hours` (shared) | Changed | `draft_business_fact_change` | Business record; website and Google follow by Connection | Draft → owner (hours are high-risk facts) |
 | `reply_to_review` | Kept, renamed | `draft_review_reply` | Google Business (*acts*); other platforms saved only | Draft → approval, or policy for `auto` mode |
 | — | New | `draft_inquiry_reply` | Inquiries | Draft → inquiry review policy |
+| — | Prepared native extension | `draft_system_change` | Existing native internal app or Version: one title or field label | Draft → native rehearsal/Version preparation → exact Needs you decision |
 | `request_custom_change` | Merged | `create_request` | Any System, or a new one | Draft (files a Request at Asked) |
 | `create_suggestion` | Replaced | `open_possibility` | The System it changes | Draft |
 | `get_suggestions` | Merged | `read_system` (open Possibilities) | Any System | Read |
@@ -441,34 +498,38 @@ newsletters have no undo; Ask Strelva says so before they go to approval.
   fixtures.
 - **Production proof** on a Strelva-owned test business: ask → draft →
   Needs you → email → Approve → published → read-back → receipt → undo, and
-  one Request filed and seen in the operator queue. Needs Jacob's yes.
+  one Request filed and seen in the serving agency's Queue. Needs Jacob's yes.
 
-## 9. Open decisions
+## 9. Decisions and launch defaults
 
-1. **Approve in the conversation?** Options: (a) never, link to the Needs you
-   item; (b) allow for the owner on low-risk copy. Recommend (a). (b) adds a
-   confirm step that injected text could imitate.
-2. **Does Ask Strelva count against the plan?** Options: (a) log cost only;
-   (b) draw from workspace allowances (`src/platform/work-economics`).
-   Recommend (a) for 1.0.0, with an operator alert above a per-business
-   threshold, until real cost per turn is measured. Price is open, so (b)
-   would set a number nobody has chosen.
-3. **Owners who never sign in.** Options: (a) operator asks on their behalf
-   from email or phone (works today, costs operator minutes); (b) inbound
-   email parsed into Requests (new; no inbound route exists); (c) SMS (no
-   sending code exists; only stale `sms:pending:*` cleanup in
-   `src/lib/ops.ts`). Recommend (a) at 1.0.0, with operator minutes per
-   business measured. Choose (b) if those minutes don't fit the price.
-4. **One active custom request at a time.** Today `request_custom_change`
-   blocks a second one (care-plan rule). Options: keep, or queue them visibly.
-   Recommend keep for managed clients, and show the waiting one's place.
-5. **Retire social drafts.** Recommend retire; no provider publishes them.
-6. **Website entry for a new business** (brief decision 3). Paste-URL rebuild
-   makes `open_possibility` offer a rebuild beside the site. Connected sites
-   make it offer section-level Possibilities only. The spec works either way.
-7. **Partner agencies** (brief decision 2). If they come in, an agency's
-   people get Draft through `workspace_delegations` and never Owner decision.
-   The authority table gains one row; nothing else changes.
+These close the code defaults, with production, pricing and spend still
+reserved for Jacob.
+
+1. **Never approve in conversation.** The model-free refusal and tool catalog
+   enforce this. Exact decisions happen in Needs you or a signed email link.
+2. **Log cost only.** No allowance or price is chosen. The optional
+   `STRELVA_ASK_COST_ALERT_USD` threshold warns in operator logs once when a
+   business's known daily cost crosses it; unknown costs are counted separately.
+   Unset threshold or Ask off makes the warning path do nothing.
+3. **Operator asks on behalf** from email or phone at launch. Origin is recorded
+   in the draft or Request, and only operators can set it. Owners without an
+   account can decide routine items by signed email link. Access, money and exit
+   require sign-in. Inbound email and SMS remain outside launch.
+4. **Requests are visible at Asked.** They enter the existing service-request
+   queue, with no acceptance or deadline promise. The old tenant care-plan
+   custom-change tool retains its one-active-request rule; this stream does not
+   silently apply that commercial limit to business Requests.
+5. **Social drafts are retired from Ask.** There is no publishing provider or
+   tool for them in the workspace catalog.
+6. **Managed build asks default to Requests.** Ask opens isolated new-System
+   Possibilities with the durable repository. The builder prepares a website
+   alternative and pins its baseline; Ask cannot directly rebuild a projected
+   website with no durable revision. New-business website entry remains owned
+   by the website stream and its approved scope.
+7. **Partner delegation confers no owner decision authority.** Ask requires
+   direct business membership. Agency staff who already hold admin/member
+   membership can draft; delegation-only Ask is unavailable. Adding broader
+   delegation is a separate authority change.
 
 ## 10. Unknowns
 
@@ -477,8 +538,8 @@ Facts:
 - `/api/agent` is gated on tenant `content:write` (editor) and production has
   0 tenant memberships, so today its users are Strelva operators. Use per
   client is unknown. `recordAgentToolCall` keeps a Redis counter; read it.
-- The chat route records no tokens or cost. Cost per Ask turn is unknown.
-- Possibilities have only an in-memory repository.
+- The model-call helper records tokens and cost; actual production cost per Ask turn is still unknown.
+- Ask uses the Postgres Possibility repository; provider rehearsal and adoption remain unproven.
 - Two link tables exist; `from-existing.ts` names `tenant_workspace_links`
   canonical. No production client is linked yet.
 
@@ -490,42 +551,58 @@ Inferences, to check:
   The Reborn snapshot SQL can count connections read-only.
 - Whether owners will use Ask Strelva at all. Measure signed-in asks per
   converted owner for 30 days after entry ships.
-- Whether 18 tools stay accurate in one prompt with System context. Run the
+- Whether the ordinary inventory, including the prepared native extension, stays accurate in one prompt with System context. Run the
   existing agent tests plus a fixed set of Mooney and gldf asks against both
   catalogs and compare.
 
-## Build notes (Oct 6, local)
+## Build notes (October 7, local)
 
-What the build found that differs from the text above:
+- Ask requires workspace release, Ask release and Systems for the exact
+  workspace. Per-workspace release rows exist. Flag off returns before auth,
+  body reads, model calls, writes or decision sync.
+- Refusals and the managed default run before the model. All draft calls
+  recheck direct membership, workspace exit, tenant link and applicable grants.
+- Tenant tools remain forced to review. Needs you applies the policy and
+  routes owner decisions to Home; potential routine handling is held for
+  Strelva review rather than making chat a publisher.
+- Business fact drafts reject model-authored verification, preserve the record
+  revision and resolve atomically through the normal record writer. The signed
+  no-account path rechecks its exact decision and current recipient before
+  using the unchanged admin executor. Stale revisions change nothing.
+- Inquiry reply drafts reuse the governed message policy, recipient/draft
+  fingerprint, transport gates, irreversible-send receipt and read-back rules.
+  A provider-accepted send is never retried just because read-back failed.
+- Website fact/copy confirmation and preview approval are separate from launch.
+  Account-free launch requires its signed decision, exact approved document
+  hash/revision, existing executor and publication receipt. Access/money/exit
+  cannot use that capability.
+- Legacy tenant activity text stays unchanged where existing filters depend
+  on it. Workspace Ask labels and receipts use Strelva language.
 
-- **Two probes, not one.** `src/products/ai-visibility/score.ts` measures what
-  Gemini says ("Gemini named ..."), so it pins its model as a
-  `visibility_probe` like `ai-answers.ts`. Every other caller now gets the
-  configured model plus the fallback, where before six had no fallback.
-- **Flag.** Ask Strelva has its own flag, `STRELVA_ASK_RELEASE`, and also needs
-  `STRELVA_WORKSPACE_RELEASE` and `STRELVA_SYSTEMS_RELEASE`. Per-workspace flags
-  (Reborn §6) don't exist yet.
-- **Refusals and the managed default run before the model.** A model-free
-  classifier (`src/platform/ask/classify.ts`) answers refusals, "approve it",
-  and "build a new website / redo the site / add a booking page" (a Request in
-  a linked business, an offer to make it otherwise). Everything else goes to
-  the model.
-- **Drafts never auto-publish yet.** Until the Needs you policy is wired in,
-  the workspace route builds the tenant tools with `forceReview`, and the stub
-  adapter routes every draft to the owner through today's pending events
-  (`/dashboard/review`, `/api/approve`).
-- **Business record changes** are filed as a Request with the exact change,
-  because the record has no draft store. Nothing is described as done.
-- **Possibilities** can only introduce a new System from Ask (a change to an
-  existing System needs a pinned baseline revision managed sites don't have).
-  Keys are kebab-case.
-- **Activity text** like "AI saved a reply" is unchanged: the activity feed
-  filters on that text, so renaming it needs its own change. The chat failure
-  line now says "Strelva can't answer right now. Nothing was changed."
+## Native app and Version source extension, October 9, prepared
 
-Proof (local): `src/__tests__/model-calls.test.ts`,
-`model-call-sites.test.ts`, `ask-strelva.test.ts` (authority matrix of 18
-tools × 4 roles × 4 link states, re-check, resolution, managed default,
-refusals, injection, catalog parity), `ask-strelva-route.test.ts`, the
-existing agent tests, and `tests/model-call-log-schema.sql` in
-`check:workspace-sql`.
+`read_system` with `view: native_application` resolves the selected canonical
+stored System through the current merged graph, then verifies its native work,
+workspace and optional Version runtime. It exposes definition, exact design and
+lineage revisions, and recent release metadata. It omits record values,
+maintenance identity and credentials; older native release archives remain owned
+by the app lifecycle.
+
+`draft_system_change` requires that turn's successful exact native read and a
+fresh authority check. Its closed input permits one title or existing field-label
+change, preserving IDs, types, components, records, accounts and maintenance.
+A native app uses its existing maker gate and revise/rehearse services; a Version
+uses its current management authority and override/prepared-release services.
+Arrays are one Version value, so a label change submits the unchanged field array
+with only that label changed. Source standards, compare conflicts and stale
+revisions remain the existing service's decision. The actual current Needs you
+item determines the route; chat never publishes or approves.
+
+A partial or uncertain preparation requires a current native read before another
+draft. A missing decision receipt cannot be called ready. An unsupported runtime
+or absent native maker capability becomes a Request in the person's original
+words at Asked. Full new-app creation, arbitrary code, record/type changes,
+provider writes and broader adaptation are not supplied by this bounded tool.
+The [source proof and native qualification plan](../../operations/ask-native-app-version-2026-10-09.md)
+records focused tests and remaining actual SQL/Auth/model/browser proof. This
+extension does not close P07 or full release.

@@ -1,7 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { businessJsonLd, defaultAllowedOrigins, publicFactsFromRecord, verificationProofs } from "@/products/connected-sites/contracts";
 import { connectSite, connectedSiteSystemId, normalizeSiteUrl, readPublicContext, recordBeacon, submitPublicInquiry, verifySite } from "@/products/connected-sites/server";
-import { ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
+import { createConnectedSitesStore, ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
 import { connectedInquiryEmail, notifyConnectedSiteInquiry } from "@/products/connected-sites/server";
 import { systemsFromExisting } from "@/platform/systems/from-existing";
 import { systemOriginId } from "@/platform/systems/invariants";
@@ -22,6 +22,7 @@ function store(overrides: Partial<ConnectedSitesStore> = {}): ConnectedSitesStor
     context: vi.fn(async () => ({ revision: 4, facts: { display_name: "Fictional Bakery", phone: "716-555-0100", hours: { timezone: "America/New_York", weekly: [{ day: 1, opens: "08:00", closes: "16:00" }] }, links: [{ kind: "booking", url: "https://book.example/bakery" }, { kind: "instagram", url: "https://instagram.com/bakery" }], address: { line1: "1 Main St", city: "Buffalo", region: "NY", postalCode: "14201" } }, services: [{ name: "Custom cakes", description: null, priceText: "From $40" }], site: { captureForms: true, injectSchema: true } })),
     recordEvents: vi.fn(async (_key, _origin, events) => events.length),
     recordInquiry: vi.fn(async () => ({ status: "recorded" as const, id: "77000000-0000-4000-8000-0000000000aa", workspaceId: BUSINESS })),
+    recordSchemaConflict: vi.fn(async () => { throw new Error("unused"); }),
     recordSpam: vi.fn(async () => ({ status: "recorded" as const })), purge: vi.fn(async () => ({ events: 0, spam: 0 })),
     ...overrides,
   };
@@ -100,6 +101,15 @@ describe("connected sites on the server", () => {
     await expect(submitPublicInquiry(KEY, site, null, { id: "inq12345681", capture: "strelva-form", fields: { name: "Only a name" } }, { store: s })).rejects.toBeInstanceOf(ConnectedSiteInputError);
     await expect(submitPublicInquiry(KEY, { ...site, captureForms: false }, null, { id: "inq12345682", capture: "site-form", fields: { email: "pat@example.test" } }, { store: s })).rejects.toBeInstanceOf(ConnectedSiteInputError);
   });
+  it("carries confirmed policies through the SQL adapter to connect.js without private provenance", async () => {
+    const policy = { value: { required: false }, source: "operator", verified: true, updatedAt: "2026-10-07T00:00:00Z", updatedBy: BUSINESS };
+    const rpc = vi.fn(async () => ({ data: { revision: 5, facts: { display_name: "Fictional Bakery" }, services: [], policyFacts: { deposit: policy }, site: { captureForms: true, injectSchema: true } }, error: null }));
+    const context = (await readPublicContext(KEY, site, createConnectedSitesStore({ rpc })))!;
+    expect(context.facts.policies?.deposit?.value).toEqual({ required: false });
+    expect(JSON.stringify(context.jsonLd)).toContain("No deposit required.");
+    expect(JSON.stringify(context)).not.toContain("updatedBy");
+    expect(JSON.stringify(context)).not.toContain(BUSINESS);
+  });
   it("reads the public context from the business record", async () => {
     const context = (await readPublicContext(KEY, site, store()))!;
     expect(context.facts).toMatchObject({ name: "Fictional Bakery", booking_url: "https://book.example/bakery", services: [{ name: "Custom cakes", priceText: "From $40" }] });
@@ -110,10 +120,15 @@ describe("connected sites on the server", () => {
 
 describe("owner notice for a connected-site inquiry", () => {
   const inquiry = { id: "77000000-0000-4000-8000-0000000000aa", name: "Pat Visitor", email: "pat@example.test", message: "A cake?" };
+  beforeEach(() => {
+    vi.stubEnv("STRELVA_CONNECTED_SITE_EMAIL_ENABLED", "1");
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+  });
+  afterEach(() => vi.unstubAllEnvs());
   it("goes to the one owner recipient through the one email path", async () => {
     const send = vi.fn(async () => true);
-    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record" as const, source: "owner" as const, verified: true, tenantId: null }), send })).toBe("sent");
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", to: "owner@bakery.example", idempotencyKey: `connected-inquiry:${inquiry.id}` }));
+    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, clientOverride: async () => "inherit", recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record" as const, source: "owner" as const, verified: true, tenantId: "bakery" }), send })).toBe("sent");
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", tenantId: "bakery", to: "owner@bakery.example", idempotencyKey: `connected-inquiry:${inquiry.id}` }));
     expect(connectedInquiryEmail(site, inquiry).subject).toBe("New inquiry from fictional-bakery.example");
   });
   it("sends nothing while client email is paused or no owner is known", async () => {

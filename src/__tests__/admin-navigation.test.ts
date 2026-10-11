@@ -1,22 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { NAV } from "@/app/admin/AdminRail";
+import { operatorDestinations, operatorDestination } from "@/experience/operator/destinations";
 import { workspaceHref } from "@/app/admin/work/workspace-href";
 
 describe("internal Strelva navigation", () => {
-  it("keeps delivery, support, and system administration visibly separate", () => {
-    expect(NAV.map((group) => group.label ?? "Primary")).toEqual([
-      "Primary",
-      "Delivery",
-      "Support",
-      "System administration",
-    ]);
-    expect(NAV.flatMap((group) => group.items).map(({ href, label }) => [href, label])).toEqual(expect.arrayContaining([
-      ["/admin/work", "Internal work"],
-      ["/admin/actions", "Managed-site work"],
-      ["/admin/clients", "Clients"],
-      ["/admin/ops", "Ops"],
-      ["/admin/audit", "Audit"],
+  it("uses the destination registry for platform support and agency work", () => {
+    const destinations = operatorDestinations({ moneyEnabled: true });
+    expect(destinations.map(({ href, label }) => [href, label])).toEqual(expect.arrayContaining([
+      ["/admin/queue", "Queue"], ["/admin/work", "Internal work"],
+      ["/admin/actions", "Strelva Agency work"], ["/admin/clients", "Sites"],
+      ["/admin/ops", "Operational health"], ["/admin/audit", "Site audits"],
+      ["/admin/uptime", "Checks"], ["/admin/accounts", "Billing groups"],
+      ["/admin/client-leads/inquiries", "Inquiry review"],
     ]));
+    expect(destinations.find(item => item.href === "/admin/actions")?.group).toBe("Strelva Agency");
+    expect(operatorDestination("/admin/client-leads/inquiries")?.label).toBe("Inquiry review");
+    expect(operatorDestination("/admin/tenants/mooney")?.label).toBe("Sites");
+    expect(operatorDestination("/admin/not-a-destination")).toBeUndefined();
   });
 
   it("leaves the bare admin host before opening scoped workspace work", () => {

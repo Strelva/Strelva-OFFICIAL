@@ -2,10 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 export const owner: WorkspaceActor = { userId: "owner", verifiedEmail: "owner@example.com" };
-export function memoryBoundedStore(): BoundedStore {
+export function memoryBoundedStore(workspaceId = "workspace-a"): BoundedStore {
   const rows = new Map<string, SavedWork>();
-  const member = async (actor: WorkspaceActor, workspaceId: string) => {
-    if (actor.userId !== owner.userId || workspaceId !== "workspace-a") throw new WorkspaceAccessError();
+  const member = async (actor: WorkspaceActor, requestedWorkspaceId: string) => {
+    if (actor.userId !== owner.userId || requestedWorkspaceId !== workspaceId) throw new WorkspaceAccessError();
   };
   return {
     member,

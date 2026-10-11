@@ -5,3 +5,5 @@ export { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from ".
 export { replayTenantParity, seedPolicyFromTenant } from "./parity";
 export type { ParityReport, ParityRow, ParityVerdict, TenantPolicySettings } from "./parity";
 export { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
+export { reconcileInquiryDecisionNotice } from "./inquiry-notices";
+export { commitmentSignals } from "./inquiry-policy";

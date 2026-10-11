@@ -9,9 +9,14 @@ import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from ".
 import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import { withNeedsYouPreview } from "./needs-you-fixture";
 import { previewWebsiteDetail, previewWebsiteDetailMode, type PreviewWebsiteDetailMode } from "./website-detail-fixture";
+import type { PreviewRouteContext } from "./route-context";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
+import { versionPreviewState, withVersionPreview } from "./version-fixture";
 import { withAskPreview, type AskPreviewMode } from "./ask-fixture";
+import { HomeOutcomesProvider, type HomeOutcomes } from "../outcomes/HomeOutcomes";
+import { BAKERY_LOOP } from "./outcomes-fixture";
 import styles from "./preview.module.css";
 
 const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -33,7 +38,18 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, we
       if (websiteDetail === "loading") return new Promise<Response>(() => undefined);
       if (websiteDetail === "error") return previewJson({ error: "This website's details could not be loaded." }, 503);
       if (websiteDetail === "permission") return previewJson({ error: "This business is unavailable to your account." }, 403);
-      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail) });
+      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail, undefined, url.searchParams.get("workspaceId") ?? undefined) });
+    }
+    if (url.pathname === "/api/workspace/systems/website/restore" && method === "POST") {
+      if (!systems.released) return previewJson({ error: "Website restore is not enabled." }, 503);
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<string, unknown>;
+      if (typeof body.workspaceId !== "string" || !systems.owners.includes(body.workspaceId)) return previewJson({ error: "Only the owner or a Strelva operator can prepare a restore." }, 403);
+      const detail = previewWebsiteDetail(String(body.systemId ?? ""), websiteDetail, undefined, body.workspaceId);
+      const row = detail.history.find(item => item.restore && Object.entries(item.restore).every(([key, value]) => body[key] === value));
+      if (!row) return previewJson({ error: "That saved website change is unavailable." }, 409);
+      return previewJson(body.kind === "snapshot"
+        ? { status: "requested", requestId: "00000000-0000-4000-8000-00000000c4a2", message: "Strelva has your Request to restore this exact saved copy. A preview still needs to be prepared and approved. Your live website is unchanged." }
+        : { status: "queued", message: "The earlier website change is prepared for review. Your live website is unchanged." });
     }
     if (url.pathname === "/api/workspace/site-changes" && method === "POST") {
       // Ask for a change on a managed site: a Request at Asked. Words containing "refuse" show the refusal.
@@ -65,13 +81,20 @@ function previewHref(scenario: string, systems: string | null): string {
   return `/preview/strelva?${params}`;
 }
 
-export function WorkspacePreview({ scenario, systems, needsYou = false, ask = null }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean; ask?: AskPreviewMode | null }) {
+/** Fixture-only outcome data for Home (`outcomes=on`). */
+const PREVIEW_OUTCOMES: HomeOutcomes = { loop: BAKERY_LOOP };
+
+export function WorkspacePreview({ scenario, systems, needsYou = false, ask = null, outcomes = false }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean; ask?: AskPreviewMode | null; outcomes?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
   const [seededRequests] = useState(() => searchParams.get("previewSetup") === "requests");
   // Keep an explicit `systems=on|off` choice when switching examples.
   const releaseParam = searchParams.get("systems");
+  const previewRouteContext: PreviewRouteContext = {
+    scenario,
+    ...(releaseParam === "on" || releaseParam === "off" ? { systems: releaseParam } : {}),
+  };
   const previewRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -86,23 +109,26 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
   }, []);
   const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
   const [websiteDetail] = useState(() => previewWebsiteDetailMode(searchParams.get("websiteDetail")));
-  const request = useMemo(() => withAskPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail]);
+  const versionState = versionPreviewState(searchParams.get("version"), scenario);
+  const request = useMemo(() => withAskPreview(withVersionPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), systems, versionState), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail, versionState]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("previewSetup");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }, [installedStaffRequest]);
   const inquiry = useMemo(() => scenario.startsWith("mooney")
     ? { tenantId: MOONEY_TENANT, label: "The Mooney Firm", adapter: createPreviewInquiryAdapter("business", scenario === "mooney-shared" ? "read-only" : scenario, MOONEY_INQUIRY_PROFILE) }
     : { tenantId: "buffalo-realty", label: "Buffalo Realty", adapter: createPreviewInquiryAdapter("business", scenario) }, [scenario]);
-  return <div ref={previewRef} data-dashboard className={styles.preview}>
+  return <div ref={previewRef} data-dashboard data-workspace-theme="linen" data-workspace-mode={searchParams.get("mode") === "dark" ? "dark" : undefined} className={styles.preview}>
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">
       <div><strong>Local interface preview</strong><span>Fictional data · changes reset on reload · no live actions</span></div>
       <label>Example<select value={scenario} onChange={event => { router.push(previewHref(event.target.value, releaseParam)); }}>{PREVIEW_SCENARIOS.map(item => <option key={item} value={item}>{item === "read-only" ? "Shared, read-only" : item.replace(/^./, letter => letter.toUpperCase())}</option>)}</select></label>
       {systems ? <Link href={previewHref(scenario, systems.released ? "off" : "on")} aria-label={`Systems are ${systems.released ? "on" : "off"}. Turn them ${systems.released ? "off" : "on"}.`}>Systems: {systems.released ? "on" : "off"}</Link> : null}
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}
     </aside>
-    <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+    <HomeOutcomesProvider value={outcomes ? PREVIEW_OUTCOMES : null}>
+      <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}:${outcomes ? "outcomes" : ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} previewRouteContext={previewRouteContext} />
+    </HomeOutcomesProvider>
   </div>;
 }

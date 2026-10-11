@@ -1,0 +1,5 @@
+.push { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 32px; align-items: start; }
+.actions { display: flex; flex-direction: column; gap: 16px; }
+.summary { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.summary > :last-child { margin-left: auto; }
+@media (max-width: 767px) { .push { grid-template-columns: minmax(0, 1fr); gap: 28px; } .summary > :last-child { margin-left: 0; } }

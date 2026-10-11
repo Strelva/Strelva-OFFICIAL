@@ -1,3 +1,5 @@
+import { createElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -19,10 +21,7 @@ vi.mock("@/platform/workspaces", () => ({
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleaseEnabled }));
 vi.mock("@/platform/public-continuations/repository", () => ({ readPublicContinuationImport: mocks.readPublicContinuationImport }));
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: unknown; href: string }) => ({
-    type: "a",
-    props: { children, href },
-  }),
+  default: ({ children, href }: { children: ReactNode; href: string }) => createElement("a", { href }, children),
 }));
 vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
@@ -30,42 +29,24 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => mocks.continuationCookie ? { value: mocks.continuationCookie } : undefined }) }));
 vi.mock("@/experience/app-frame/StrelvaShell", () => ({
-  StrelvaShell: ({ children }: { children: unknown }) => ({ type: "div", props: { children } }),
+  StrelvaShell: ({ children }: { children: ReactNode }) => createElement("div", null, children),
 }));
 vi.mock("@/experience/workspace/WorkspaceSignOutButton", () => ({
-  WorkspaceSignOutButton: ({ className }: { className?: string }) => ({
-    type: "button",
-    props: { className, children: "Sign out" },
-  }),
+  WorkspaceSignOutButton: ({ className }: { className?: string }) => createElement("button", { className }, "Sign out"),
 }));
 vi.mock("@/experience/workspace/PublicContinuationCard", () => ({
-  PublicContinuationCard: ({ brief, destinations, actorEmail }: { brief: { resultTitle: string; request: string }; destinations: Array<{ name: string; kind: string }>; actorEmail: string }) => ({
-    type: "section",
-    props: { children: [brief.resultTitle, brief.request, actorEmail, ...destinations.map((destination) => `${destination.name} · ${destination.kind}`)] },
-  }),
+  PublicContinuationCard: ({ brief, destinations, actorEmail }: { brief: { resultTitle: string; request: string }; destinations: Array<{ name: string; kind: string }>; actorEmail: string }) => createElement("section", null, [brief.resultTitle, brief.request, actorEmail, ...destinations.map((destination) => `${destination.name} · ${destination.kind}`)]),
 }));
 vi.mock("@/experience/workspace/AccountPayerInbox", () => ({
-  AccountPayerInbox: () => ({ type: "div", props: { children: "Payer requests for this verified account" } }),
+  AccountPayerInbox: () => createElement("div", null, "Payer requests for this verified account"),
 }));
 
 function textFrom(node: unknown): string {
-  if (node == null || typeof node === "boolean") return "";
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(textFrom).join(" ");
-  if (typeof node === "object" && "props" in node) {
-    const element = node as { type?: unknown; props?: { children?: unknown } };
-    if (typeof element.type === "function") return textFrom(element.type(element.props || {}));
-    return textFrom(element.props?.children);
-  }
-  return "";
+  return renderToStaticMarkup(node as ReactNode).replace(/<[^>]*>/g, " ").replaceAll("&#x27;", "\'").replaceAll("&amp;", "&");
 }
 
 function linksFrom(node: unknown): string[] {
-  if (Array.isArray(node)) return node.flatMap(linksFrom);
-  if (!node || typeof node !== "object" || !("props" in node)) return [];
-  const element = node as { type?: unknown; props?: { href?: string; children?: unknown } };
-  if (typeof element.type === "function") return linksFrom(element.type(element.props || {}));
-  return [...(element.props?.href ? [element.props.href] : []), ...linksFrom(element.props?.children)];
+  return Array.from(renderToStaticMarkup(node as ReactNode).matchAll(/href="([^"]*)"/g), match => (match[1] ?? "").replaceAll("&amp;", "&"));
 }
 
 describe("authenticated workspace account context", () => {
@@ -101,19 +82,19 @@ describe("authenticated workspace account context", () => {
     mocks.getSessionUser.mockResolvedValue(null);
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    await expect(WorkspaceAccountPage()).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
+    await expect(WorkspaceAccountPage({})).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
   });
 
   it("renders verified identity and read-only workspace access without changing permissions", async () => {
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).toHaveBeenCalledWith({ userId: "user_123", verifiedEmail: "owner@example.com" });
     expect(mocks.ensurePersonalWorkspace).toHaveBeenCalledWith({ userId: "user_123", verifiedEmail: "owner@example.com" });
-    expect(text).toContain("Account");
+    expect(text).toContain("Your account");
     expect(text).toContain("Owner Example");
     expect(text).toContain("owner@example.com");
     expect(text).toContain("Confirmed");
@@ -121,7 +102,7 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("Personal workspace");
     expect(text).toContain("Member access");
     expect(text).toContain("Harbor Dental");
-    expect(text).toContain("Customer workspace");
+    expect(text).toContain("Your business");
     expect(text).toContain("Read-only access");
     expect(text).toContain("Each site keeps its own people, settings, and agreed service");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=personal");
@@ -132,7 +113,7 @@ describe("authenticated workspace account context", () => {
     mocks.listWorkspaces.mockRejectedValue(new Error("database password secret"));
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(text).toContain("Workspace access is temporarily unavailable");
@@ -164,7 +145,7 @@ describe("authenticated workspace account context", () => {
     });
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();

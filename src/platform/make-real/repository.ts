@@ -7,6 +7,10 @@ export interface ActivationRepository {
   get(businessId: string, id: string): Promise<Activation | null>;
   create(value: Activation): Promise<void>;
   save(value: Activation, expectedRevision: number): Promise<void>;
+  /** Current-owner, exact native completed-plan reverse checkpoints only. */
+  /** Retain accepted finality while restoring strictly matched native receipt metadata. */
+  saveNativeGoogleRecovery?(value:Activation,expectedRevision:number):Promise<void>;
+  saveNativeGoogleUndo?(value:Activation,expectedRevision:number):Promise<void>;
 }
 
 export function createInMemoryActivationRepository(): ActivationRepository {

@@ -25,6 +25,15 @@ describe("website document store: linked publication, routing and domain authori
       .rejects.toBeInstanceOf(WorkspaceAccessError);
     await expect(db({ data: "something-else", error: null }).store.authorizeDomain!(actor, { ...key, tenantId: "site", hostname: "www.example.test", action: "attach" })).rejects.toThrow(/could not be confirmed/);
   });
+  it("tells an agency why it can't act: not staffed, not verified, or no owner mandate (#255)", async () => {
+    const input = { ...key, tenantId: "site", hostname: "www.example.test", action: "attach" as const };
+    await expect(db({ data: null, error: { message: "acting_provider_unverified" } }).store.authorizeDomain!(actor, input))
+      .rejects.toMatchObject({ name: "WorkspaceAccessError", message: expect.stringMatching(/isn't verified/) });
+    await expect(db({ data: null, error: { message: "acting_provider_no_mandate" } }).store.authorizeDomain!(actor, input))
+      .rejects.toMatchObject({ name: "WorkspaceAccessError", message: expect.stringMatching(/permission/) });
+    await expect(db({ data: null, error: { message: "acting_provider_not_staffed" } }).store.authorizeDomain!(actor, input))
+      .rejects.toBeInstanceOf(WorkspaceAccessError);
+  });
   it("refuses an unlinked tenant as an access failure and a stale approval as a conflict", async () => {
     const receipt = { status: "published" as const, provider: "strelva-hosted", providerUrl: "https://site.strelva.com/", receiptId: "fixture-receipt", artifactHash: "a".repeat(64), candidateRevision: 1, publishedAt: "2026-10-08T00:00:00Z", evidence: "Fixture" };
     const input = { ...key, revision: 1, contentHash: "a".repeat(64), tenantId: "site", receipt };

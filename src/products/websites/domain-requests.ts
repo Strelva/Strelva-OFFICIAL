@@ -1,0 +1,135 @@
+import { websiteDomainRequestSchema } from "./recovery-contracts";
+import { createHash } from "node:crypto";
+import { z } from "zod";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { sendEmailWithReceipt, type SendEmailResult } from "@/platform/infra/email/send";
+import { changeHostedDomain, readHostedDomains, readHostedDomainRecords, validateHostedDomain } from "./rebuild-domains";
+import { checkWebsiteHealth } from "./site-health";
+import { websiteDocumentStore } from "./document-store";
+import { websiteRebuildReleasedFor, websiteRebuildReleaseEnabledForWorkspace } from "./rebuild-release";
+
+import { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, WebsiteDomainEffectUnconfirmedError, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
+export { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
+
+export interface WebsiteDomainRequestPorts {
+  store: ReturnType<typeof createWebsiteDomainRequestStore>;
+  change: typeof changeHostedDomain;
+  read: typeof readHostedDomains;
+  enabled(workspaceId: string): Promise<boolean>;
+  checkRouting?(request: WebsiteDomainRequest): Promise<boolean>;
+}
+export function createWebsiteDomainRequestService(ports: WebsiteDomainRequestPorts) {
+  async function routing(request: WebsiteDomainRequest, result: NonNullable<WebsiteDomainRequest["result"]>) {
+    if (!ports.checkRouting || result.status !== "verified" || (result.registrationAttempt && result.registrationAttempt !== "confirmed")) return result;
+    // The attachment was accepted. Read-back failure cannot erase its receipt.
+    let verified = false;
+    try { verified = await ports.checkRouting(request); } catch { /* Saved as unverified. */ }
+    return { ...result, routing: verified ? "verified" as const : "unverified" as const };
+  }
+  async function apply(request: WebsiteDomainRequest) {
+    if (!(await ports.enabled(request.workspaceId))) throw new WorkspaceConflictError("Website domain proposals are not enabled.");
+    const authorize = async () => { await ports.store.authorize(request); };
+    const current = await ports.store.authorize(request);
+    if (!current.tenantId) throw new WorkspaceAccessError();
+    let result: NonNullable<WebsiteDomainRequest["result"]>;
+    try {
+      const changed = await ports.change(current.tenantId, { domain: current.hostname, action: "attach" }, { authorizeWrite: authorize });
+      const observed = changed.domains.find(domain => domain.hostname === current.hostname);
+      if (changed.registrationAttempt === "rejected" || changed.registrationAttempt === "not_submitted") throw new WorkspaceConflictError("The domain attachment was not accepted. Strelva must check the provider refusal before preparing another proposal.");
+      if (!observed) throw new WebsiteDomainEffectUnconfirmedError(changed.registrationAttempt === "confirmed" ? "confirmed" : "unknown");
+      result = { ...observed, registrationAttempt: changed.registrationAttempt ?? (observed.status === "verified" ? "confirmed" : "unknown") };
+    } catch (error) {
+      if (!(error instanceof WebsiteDomainEffectUnconfirmedError)) throw error;
+      result = { hostname: current.hostname, status: "pending", checkedAt: new Date().toISOString(), records: current.records,
+        registrationAttempt: error.registrationAttempt, routing: "unverified", error: error.message };
+    }
+    // Accepted provider effects remain recorded even if ownership changes afterward.
+    const observed = await routing(current, result);
+    try { return await ports.store.record(current, observed); }
+    catch { throw new WebsiteDomainEffectUnconfirmedError(observed.registrationAttempt === "confirmed" ? "confirmed" : "unknown", true); }
+  }
+  async function approve(request: WebsiteDomainRequest, decisionId: string) {
+    if (!(await ports.enabled(request.workspaceId))) throw new WorkspaceConflictError("Website domain proposals are not enabled.");
+    return apply(await ports.store.approve(request, decisionId));
+  }
+  async function reconcile(request: WebsiteDomainRequest) {
+    if (!request.decisionId || !request.tenantId || !(await ports.enabled(request.workspaceId))) return request;
+    // A check cannot perform another attachment or move.
+    const domains = await ports.read(request.tenantId);
+    const result = domains.domains.find(domain => domain.hostname === request.hostname);
+    return result ? ports.store.record(request, await routing(request, result)) : request;
+  }
+  return { approve, apply, reconcile };
+}
+export const websiteDomainRequestService = createWebsiteDomainRequestService({ store: websiteDomainRequestStore, change: changeHostedDomain, read: readHostedDomains,
+  enabled: workspaceId => websiteRebuildReleaseEnabledForWorkspace(workspaceId),
+  checkRouting: async request => (await checkWebsiteHealth({ workspaceId: request.workspaceId, workId: request.workId, tenantId: request.tenantId!, revision: request.publishedRevision, contentHash: request.publishedHash, url: `https://${request.hostname}/` })).status === "healthy" });
+
+/** Read one retained command receipt without preparing DNS or applying a domain. */
+export async function readWebsiteDomainRequest(actor: WorkspaceActor, workId: string, raw: unknown) {
+  const input = z.object({ workspaceId: z.string().uuid(), requestId: z.string().uuid() }).strict().parse(raw);
+  z.string().uuid().parse(workId);
+  if (!(await websiteRebuildReleasedFor(actor, input.workspaceId))) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+  await websiteDocumentStore.manage(actor, { workspaceId: input.workspaceId, workId });
+  const saved = (await websiteDomainRequestStore.list(input.workspaceId)).find(row => row.workspaceId === input.workspaceId && row.workId === workId && row.id === input.requestId);
+  return saved ? websiteDomainRequestSchema.parse(saved) : null;
+}
+
+export async function prepareWebsiteDomainRequest(actor: WorkspaceActor, workId: string, raw: unknown) {
+  const input = z.object({ workspaceId: z.string().uuid(), requestId: z.string().uuid(), domain: z.string().trim().min(1).max(253) }).strict().parse(raw);
+  if (!(await websiteRebuildReleasedFor(actor, input.workspaceId))) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+  await websiteDocumentStore.manage(actor, { workspaceId: input.workspaceId, workId });
+  const tenant = await websiteDocumentStore.currentTenant!(actor, { workspaceId: input.workspaceId, workId });
+  if (!tenant || tenant.deliveryModel !== "platform_template") throw new WorkspaceConflictError("Client-repository domains need Jacob's approval in their own hosting project.");
+  const published = await websiteDocumentStore.published(tenant.tenantId);
+  if (!published || published.workspaceId !== input.workspaceId || published.workId !== workId) throw new WorkspaceAccessError();
+  const hostname = validateHostedDomain(input.domain);
+  const records = await readHostedDomainRecords(hostname, fetch, { allowUnattached: true });
+  if (records.map(record => `${record.type} ${record.name} → ${record.value}`).join("\n").length > 1000) throw new WorkspaceStoreError("The DNS records exceed the owner decision limit. No truncated proposal was saved.");
+  if (!records.length) throw new WorkspaceStoreError("The provider has not returned DNS records. No proposal was saved.");
+  const revisionHash = createHash("sha256").update(JSON.stringify([input.workspaceId, workId, published.revision, published.contentHash, hostname, records])).digest("hex");
+  return websiteDomainRequestStore.prepare(actor, { id: input.requestId, workspaceId: input.workspaceId, workId, tenantId: tenant.tenantId,
+    publishedRevision: published.revision, publishedHash: published.contentHash, hostname, records, revisionHash });
+}
+
+/** Called after polling: the receipt uses the same shared email transport.
+ * Suppression is persisted, never reported as delivery. Provider idempotency
+ * and the durable accepted marker protect a repeated cron from duplicate mail. */
+export async function sendWebsiteDomainReceipt(request: WebsiteDomainRequest, recipient: string) {
+  if (request.result?.status !== "verified" || request.result.routing !== "verified" || request.receiptEmail?.status === "accepted") return request;
+  const email: SendEmailResult = await websiteDomainEmailAllowed(request.tenantId)
+    ? await sendEmailWithReceipt({ audience: "client", tenantId: request.tenantId!, to: recipient, fromAddress: "health@updates.strelva.com",
+      subject: `${request.hostname} is connected`, idempotencyKey: `website-domain-receipt:${request.id}`,
+      options: { heading: "Your website domain is connected", paragraphs: [`Strelva confirmed ${request.hostname} is verified and routes to your published website.`], rows: [{ label: "Last check", value: request.result.checkedAt }], button: { label: "Open your website", url: `https://${request.hostname}` } } })
+    : { status: "suppressed", reason: "website_domain_email_disabled" };
+  return websiteDomainRequestStore.record(request, undefined, email);
+}
+
+/** Reconcile the approved requests belonging to businesses already in the
+ * website-domain cron. Reads only; an unknown provider write is never retried
+ * by this checker. Sends stay behind the separate domain-email opt-in. */
+export async function reconcileWebsiteDomainRequests(workspaceIds?: string[]) {
+  const { resolveOwnerRecipient } = await import("@/platform/business-record");
+  if (!workspaceIds) {
+    const { PostgresNeedsYouStore } = await import("@/platform/needs-you/repository");
+    const [linked, published] = await Promise.all([PostgresNeedsYouStore.linkedTenants(null), websiteDocumentStore.listPublished()]);
+    workspaceIds = [...linked.map(link => link.workspaceId), ...published.map(site => site.workspaceId)];
+  }
+  let checked = 0; let failed = 0;
+  for (const workspaceId of new Set(workspaceIds)) {
+    if (!(await websiteRebuildReleaseEnabledForWorkspace(workspaceId).catch(() => false))) continue;
+    let requests: WebsiteDomainRequest[];
+    try { requests = await websiteDomainRequestStore.list(workspaceId); } catch { failed += 1; continue; }
+    for (const request of requests.filter(row => row.decisionId && row.receiptEmail?.status !== "accepted").slice(0, 25)) {
+      try {
+        const saved = await websiteDomainRequestService.reconcile(request);
+        checked += 1;
+        if (saved.result?.status === "verified" && saved.result.routing === "verified") {
+          const recipient = await resolveOwnerRecipient(workspaceId);
+          if (recipient?.email) await sendWebsiteDomainReceipt(saved, recipient.email);
+        }
+      } catch { failed += 1; }
+    }
+  }
+  return { checked, failed };
+}

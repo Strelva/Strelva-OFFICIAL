@@ -1,3 +1,4 @@
+import { localSqlFailure } from "./sql-diagnostic";
 /**
  * Shared steps for the 1.0 signed-in journeys (tests/*-authenticated-local.spec.ts).
  *
@@ -12,13 +13,16 @@
  */
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
+import { assertKnownParityTenants, assertOwnedParityRuntime, type ParityTenant } from "./journey-parity-scope";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
-import { localEnvironment } from "./local-auth";
+import { localEnvironment, removeLocalSuperAdmin, seedLocalSuperAdmin } from "./local-auth";
 
+const localSignedSessions = new Map<string, string>();
 export type Admin = SupabaseClient;
 export interface Person { context: BrowserContext; userId: string; email: string }
 
@@ -30,6 +34,10 @@ export const JOURNEY_SERVER_FLAGS = [
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_BOOKING_STORE_WRITE",
+  // Make real approved by email link for an owner with no account (20261009140000).
+  "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+  // Every lead kept in Postgres, spam review and the workspace read (20261009113000).
+  "STRELVA_INQUIRY_RECORDS",
 ] as const;
 
 export function journeyEnvironment() {
@@ -54,6 +62,61 @@ export function adminHost(tenantId: string): string {
 }
 
 /**
+ * Serve client admin hosts the way Vercel does. On Vercel, Next trusts the Host
+ * header, so request.url names the host the browser asked for. A self-hosted
+ * `next dev` builds request.url from its own bound hostname instead
+ * (NextNodeServer.attachRequestMeta), so on admin.<tenant>.localhost every
+ * same-origin write guard (`origin === new URL(request.url).origin`) refuses
+ * and every redirect built from request.url points at the app host. This
+ * route maps both back for admin hosts only: a same-origin Origin header is
+ * presented as the bound origin, and a Location on the bound origin returns to
+ * the admin host. Cross-origin requests pass through untouched, so the guards
+ * still refuse them. Product code is unchanged.
+ *
+ * Two runner limits shape it. The runner's DNS does not resolve *.localhost
+ * (Chromium does), so requests go to the bound origin with the admin host in
+ * the Host header, as a proxy would. And Chromium follows a fulfilled
+ * redirect without routing the next hop, so a GET redirect chain that stays
+ * on the admin host is followed here and handed to the browser as one
+ * redirect to where it ends, which is what Vercel's absolute redirects give.
+ */
+export async function serveAdminHostsAsOnVercel(context: BrowserContext) {
+  // Host routing also belongs to the flags-off regression; it does not need
+  // any 1.0 release enabled.
+  const bound = new URL(localEnvironment().app).origin;
+  await context.route((url) => /^admin\.[a-z0-9-]+\.localhost$/.test(url.hostname), async (route) => {
+    const request = route.request();
+    let current = new URL(request.url());
+    const asked = current.origin;
+    const headers: Record<string, string> = { ...request.headers(), host: current.host };
+    if (headers.origin === asked) headers.origin = bound;
+    const onAdmin = (location: string) => {
+      const target = new URL(location, current);
+      return target.origin === bound || target.origin === asked ? new URL(`${asked}${target.pathname}${target.search}${target.hash}`) : target;
+    };
+    const send = (url: URL) => route.fetch({ url: `${bound}${url.pathname}${url.search}`, headers, maxRedirects: 0 });
+    let response = await send(current);
+    let followed = false;
+    for (let hop = 0; hop < 5 && request.method() === "GET" && response.status() >= 300 && response.status() < 400; hop += 1) {
+      const location = response.headers().location;
+      const next = location ? onAdmin(location) : null;
+      // Off the admin host, or a hop that sets cookies: the browser takes it from here.
+      if (!next || next.origin !== asked || response.headersArray().some((header) => header.name.toLowerCase() === "set-cookie")) break;
+      current = next;
+      followed = true;
+      response = await send(current);
+    }
+    const responseHeaders = response.headers();
+    if (responseHeaders.location) responseHeaders.location = onAdmin(responseHeaders.location).toString();
+    if (followed && !responseHeaders.location) {
+      await route.fulfill({ status: 307, headers: { location: current.toString(), "cache-control": "private, no-store" } });
+      return;
+    }
+    await route.fulfill({ response, headers: responseHeaders });
+  });
+}
+
+/**
  * A verified local identity signed in on each origin given. Session cookies
  * are host-only in Strelva, so a person signed in on the app host and on a
  * client admin host holds one cookie set per host, exactly as in production.
@@ -72,13 +135,17 @@ export async function person(browser: Browser, admin: Admin, label: string, opti
   } });
   const signedIn = await auth.auth.signInWithPassword({ email, password });
   if (signedIn.error) throw new Error(`The local Auth service rejected ${label}.`);
+  if (!signedIn.data.session) throw new Error("The local Auth service returned no signed session.");
+  localSignedSessions.set(email, signedIn.data.session.access_token);
   const hosts = [env.app, ...(options.origins ?? [])].map((origin) => new URL(origin).hostname);
   await context.addCookies(hosts.flatMap((domain) => collected.map((cookie) => ({ ...cookie, domain, secure: false, sameSite: "Lax" as const }))));
+  if (hosts.some((host) => /^admin\.[a-z0-9-]+\.localhost$/.test(host))) await serveAdminHostsAsOnVercel(context);
   return { context, userId: created.data.user.id, email };
 }
 
 export async function makeOperator(admin: Admin, operator: Person) {
-  expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+  expect((await admin.auth.admin.getUserById(operator.userId)).error).toBeNull();
+  seedLocalSuperAdmin(operator.userId, operator.email);
 }
 
 /** A fixture managed tenant, as an operator would find one before conversion. */
@@ -87,15 +154,94 @@ export async function fixtureTenant(admin: Admin, input: { siteName: string; own
   const row = await admin.from("tenants").insert({ id: tenantId, site_name: input.siteName, active: true, owner_email: input.ownerEmail, owner_name: input.ownerName ?? null })
     .select("stable_id").single();
   expect(row.error).toBeNull();
+  seedSyntheticJourneyParity();
+  await forgetTenantCache();
   return { tenantId, stableId: String(row.data!.stable_id) };
 }
 
+/**
+ * Read or write the disposable database directly, for tables the app reaches
+ * only through RPCs (no table grant to service_role): tenant_leads,
+ * inquiry_events, systems. Loopback only. `:'v1'`, `:'v2'`… are the values.
+ */
+export function localSql<T>(sql: string, ...values: string[]): T {
+  const url = process.env.STRELVA_LOCAL_DB_URL || "";
+  if (!url || new URL(url).hostname !== "127.0.0.1") throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
+  const vars = values.flatMap((value, index) => ["-v", `v${index + 1}=${value}`]);
+  let out: string;
+  try {
+    out = execFileSync("psql", [url, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", ...vars], { input: sql, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch (error) { throw localSqlFailure(error, url); }
+  try { return (out ? JSON.parse(out) : null) as T; }
+  catch { throw new Error("Local SQL fixture returned invalid JSON."); }
+}
+
+/** Simulate the historical read-cutover precondition on this disposable DB.
+ * Current readers require coverage of every current tenant. Never describe
+ * these backdated fixture rows as observed seven-day parity. */
+export function syntheticJourneyParityTenantIds(): string[] {
+  const env = localEnvironment();
+  const stackDirectory = realpathSync(process.env.STRELVA_AUTH_STACK_DIR || "");
+  assertOwnedParityRuntime({ proofMode: process.env.STRELVA_LOCAL_AUTH_PROOF, authUrl: env.url, appUrl: env.app,
+    databaseUrl: process.env.STRELVA_LOCAL_DB_URL || "", stackDirectory,
+    stackConfig: readFileSync(`${stackDirectory}/supabase/config.toml`, "utf8") });
+  const tenants = localSql<ParityTenant[]>(`select coalesce(json_agg(json_build_object('id',t.id,'stableId',t.stable_id,
+    'native',case when r.website_work_id is null or a.id is null then null else json_build_object(
+      'tenantId',r.tenant_id,'tenantStableId',r.tenant_stable_id,
+      'workspaceMatches',s.workspace_id=r.workspace_id and a.customer_workspace_id=r.workspace_id,
+      'actorMatches',r.created_by=a.added_by and agency.created_by=a.added_by,
+      'verifiedActor',u.verified_at is not null,
+      'agencyOwner',exists(select 1 from public.workspace_memberships m where m.workspace_id=a.agency_workspace_id and m.user_id=a.added_by and m.role='owner'),
+      'actorEmail',u.email,'agencyName',agency.name,'agencyKind',agency.kind,'businessName',business.name,'businessKind',business.kind,
+      'sourceKind',a.source_kind,'sourceUrl',a.source_url,
+      'prospectFixtureMatches',exists(select 1 from public.prospects p
+        join public.workspace_memberships recipient on recipient.workspace_id=a.customer_workspace_id and recipient.role='owner'
+        join public.users recipient_user on recipient_user.id=recipient.user_id and recipient_user.verified_at is not null
+        where p.id=a.prospect_id and p.agency_workspace_id=a.agency_workspace_id and p.source='audit'
+          and p.result_id='workflow-'||p.id::text and p.name='Dana Ruiz' and p.business='Elmwood Bakery'
+          and p.score=58 and p.grade='C' and p.url is null and p.email=recipient_user.email
+          and recipient_user.email ~ '^local-workflow-owner-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}@example[.]test$'),
+      'productId',s.product_id,'resourceKind',s.resource_kind) end) order by t.id),'[]'::json)
+    from public.tenants t left join public.website_hosted_tenant_reservations r on r.tenant_stable_id=t.stable_id and r.tenant_id=t.id
+    left join public.saved_product_work s on s.id=r.website_work_id
+    left join public.agency_client_additions a on a.customer_workspace_id=r.workspace_id
+    left join public.workspaces agency on agency.id=a.agency_workspace_id
+    left join public.workspaces business on business.id=a.customer_workspace_id
+    left join public.users u on u.id=a.added_by`);
+  return assertKnownParityTenants(tenants);
+}
+
+export function seedSyntheticJourneyParity() {
+  const stableIds = syntheticJourneyParityTenantIds();
+  // Insert only the exact verified fixture identities. A tenant introduced
+  // after this guard gets no synthetic coverage; the cutover then fails closed.
+  localSql(`insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
+    select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
+    from public.tenants t cross join generate_series(0, 7) d cross join (values ('bookings'), ('tenant_leads')) s(store)
+    where t.stable_id in (select value::uuid from jsonb_array_elements_text(:'v1'::jsonb))
+    on conflict do nothing;`, JSON.stringify(stableIds));
+}
+
+/**
+ * The tenant list is cached in Redis (`reb:tenants:all`); the app's own tenant
+ * writes drop that key (src/lib/tenants.ts invalidateCache). A fixture written
+ * straight to Postgres does the same, so the app sees it at once. Only the
+ * loopback Redis of pnpm check:journeys is ever touched.
+ */
+export async function forgetTenantCache() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  if (!url) return;
+  if (new URL(url).hostname !== "127.0.0.1") throw new Error("UPSTASH_REDIS_REST_URL is not the loopback journeys Redis.");
+  const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` }, body: JSON.stringify(["DEL", "reb:tenants:all"]) });
+  expect(response.status).toBe(200);
+}
+
 /** Run one operator script against the loopback database and parse its --json outcome. */
-export function operatorScript<T>(script: "convert-tenant-to-workspace" | "business-ownership", args: string[]): T {
+export function operatorScript<T>(script: "convert-tenant-to-workspace" | "business-ownership", args: string[], operatorEmail?: string): T {
   const env = localEnvironment();
   const stdout = execFileSync("pnpm", ["exec", "tsx", `scripts/${script}.ts`, ...args, "--json"], {
     encoding: "utf8",
-    env: { ...process.env, SUPABASE_URL: env.url, NEXT_PUBLIC_SUPABASE_URL: env.url, SUPABASE_SERVICE_ROLE_KEY: env.service },
+    env: { ...process.env, SUPABASE_URL: env.url, NEXT_PUBLIC_SUPABASE_URL: env.url, SUPABASE_SERVICE_ROLE_KEY: env.service, ...(operatorEmail ? { STRELVA_OPERATOR_SESSION_ACCESS_TOKEN: localSignedSessions.get(operatorEmail) } : {}) },
     timeout: 120_000,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -111,38 +257,30 @@ export interface InviteOutcome {
   invitation?: { invitation: { invitationId: string; recipientEmail: string }; acceptUrl?: string; delivery: { status: string } };
 }
 
-/** The operator's conversion of one tenant into a business. Returns the business id. */
-export function convertTenant(tenantId: string, operatorEmail: string): string {
-  const outcome = operatorScript<ConversionOutcome>("convert-tenant-to-workspace", [tenantId, "--apply", `--operator-email=${operatorEmail}`]);
+const conversionAgencies = new Map<string, string[]>();
+
+/** Ordinary agency, created through the same account API. No platform role or
+ * singleton designation grants it clients. Conversion names its staffed seat. */
+export async function ordinaryConversionAgency(staff: Person): Promise<{ agencyId: string; staffEmail: string }> {
+  const response = await staff.context.request.post("/api/workspace", { headers: { origin: localEnvironment().app }, data: { action: "create_agency", name: "Harbor Website Care" } });
+  expect(response.status(), await response.text()).toBeLessThan(300);
+  const agencyId = String((await response.json()).workspaceId);
+  expect(agencyId).toMatch(/^[0-9a-f-]{36}$/);
+  conversionAgencies.set(staff.userId, [...(conversionAgencies.get(staff.userId) ?? []), agencyId]);
+  return { agencyId, staffEmail: staff.email };
+}
+
+/** The operator names the ordinary agency and its actual staff explicitly. */
+export function convertTenant(tenantId: string, operatorEmail: string, agency: { agencyId: string; staffEmail: string }): string {
+  const outcome = operatorScript<ConversionOutcome>("convert-tenant-to-workspace", [tenantId, "--apply", `--operator-email=${operatorEmail}`, `--agency=${agency.agencyId}`, `--agency-staff=${agency.staffEmail}`, "--agency-basis=existing_contract"]);
   expect(outcome.mode).toBe("apply");
   expect(outcome.receipt?.workspaceId).toMatch(/^[0-9a-f-]{36}$/);
   return outcome.receipt!.workspaceId;
 }
 
-/**
- * Strelva's agency workspace is a permanent singleton (strelva_agency_workspace
- * refuses update and delete), so a rerun on the same disposable database
- * replays the existing designation instead of naming a second one.
- */
-export async function designateAgency(admin: Admin, operator: Person): Promise<{ agencyId: string; marked: number; replayed: boolean }> {
-  const existing = await admin.rpc("read_platform_workspace", { p_role: "strelva_agency" });
-  expect(existing.error).toBeNull();
-  let agencyId = typeof existing.data === "string" ? existing.data : null;
-  if (!agencyId) {
-    agencyId = randomUUID();
-    expect((await admin.from("workspaces").insert({ id: agencyId, kind: "agency", name: "Strelva", created_by: operator.userId })).error).toBeNull();
-  }
-  // The designation requires the operator to be owner or admin of the agency workspace.
-  const membership = await admin.from("workspace_memberships").upsert({ workspace_id: agencyId, user_id: operator.userId, role: "admin", created_by: operator.userId }, { onConflict: "workspace_id,user_id", ignoreDuplicates: true });
-  expect(membership.error).toBeNull();
-  const outcome = operatorScript<{ designation: { workspaceId: string; marked: number; replayed: boolean } }>("business-ownership", ["designate-agency", agencyId, `--operator-email=${operator.email}`, "--apply"]);
-  expect(outcome.designation.workspaceId).toBe(agencyId);
-  return { agencyId, marked: outcome.designation.marked, replayed: outcome.designation.replayed };
-}
-
 /** The operator's owner invitation. Email is not sent without Jacob's yes, so the accept link comes back. */
 export function inviteOwner(tenantId: string, operatorEmail: string, recipient?: string): { acceptPath: string; workspaceName: string; invitationId: string } {
-  const outcome = operatorScript<InviteOutcome>("business-ownership", ["invite-owner", tenantId, `--operator-email=${operatorEmail}`, "--apply", ...(recipient ? [`--recipient=${recipient}`] : [])]);
+  const outcome = operatorScript<InviteOutcome>("business-ownership", ["invite-owner", tenantId, "--apply", ...(recipient ? [`--recipient=${recipient}`] : [])], operatorEmail);
   expect(outcome.invitation?.delivery.status).not.toBe("sent");
   expect(outcome.invitation?.acceptUrl).toBeTruthy();
   // The link is minted for the operator host; the path is the same everywhere.
@@ -214,6 +352,14 @@ export async function serveBookingsFromTheStore(admin: Admin, tenantId: string, 
   if (!dbUrl || !["localhost", "127.0.0.1"].includes(new URL(dbUrl).hostname)) throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
   const content = await admin.from("content").upsert({ tenant_id: tenantId, section: "services", data: { services: [{ id: service.id, name: service.name, duration: "60" }] } }, { onConflict: "tenant_id,section" });
   expect(content.error).toBeNull();
+  // Current SQL also checks the authoritative business service at admission.
+  // This fixture supplies that record, rather than weakening the service gate
+  // or treating legacy page content as permission to book a retired service.
+  localSql(`insert into public.business_services(workspace_id, name, duration_minutes, external_ref, source, verified, created_by, updated_by)
+    select l.workspace_id, :'v2', 60, :'v3', 'owner', true, m.user_id, m.user_id
+    from public.tenant_workspace_links l join public.tenants t on t.stable_id=l.tenant_stable_id
+      join public.workspace_memberships m on m.workspace_id=l.workspace_id and m.role='owner'
+    where t.id=:'v1' and not exists(select 1 from public.business_services s where s.workspace_id=l.workspace_id and s.external_ref=:'v3');`, tenantId, service.name, service.id);
   const week = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, opens: "09:00", closes: "17:00" }));
   const settings = await admin.rpc("upsert_tenant_booking_settings", {
     p_tenant_id: tenantId, p_via: "native",
@@ -224,10 +370,7 @@ export async function serveBookingsFromTheStore(admin: Admin, tenantId: string, 
   expect(stable.error).toBeNull();
   const stableId = String(stable.data!.stable_id);
   if (!/^[0-9a-f-]{36}$/.test(stableId)) throw new Error("The fixture tenant has no stable id.");
-  execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-q", "-c",
-    `insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
-       select 'bookings', '${stableId}'::uuid, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
-       from generate_series(0, 7) d on conflict do nothing`], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+  seedSyntheticJourneyParity();
   const streak = await admin.rpc("client_record_parity_streak", { p_store: "bookings" });
   expect(streak.error).toBeNull();
   expect(Number((streak.data as { days: number }).days)).toBeGreaterThanOrEqual(7);
@@ -308,8 +451,11 @@ export async function cleanup(admin: Admin, input: { tenantIds?: string[]; works
   for (const workspaceId of input.workspaceIds ?? []) await admin.from("workspaces").delete().eq("id", workspaceId).then(() => undefined, () => undefined);
   for (const tenantId of input.tenantIds ?? []) await admin.from("tenants").delete().eq("id", tenantId).then(() => undefined, () => undefined);
   for (const one of input.people ?? []) {
+    for (const agencyId of conversionAgencies.get(one.userId) ?? []) await admin.from("workspaces").delete().eq("id", agencyId);
+    conversionAgencies.delete(one.userId);
+    localSignedSessions.delete(one.email);
     await one.context.close().catch(() => undefined);
-    await admin.from("super_admins").delete().eq("user_id", one.userId).then(() => undefined, () => undefined);
+    try { removeLocalSuperAdmin(one.userId); } catch { /* left for the disposable stack */ }
     await admin.auth.admin.deleteUser(one.userId).catch(() => undefined);
   }
 }
@@ -334,8 +480,9 @@ export async function convertedBusinessWithOwner(browser: Browser, admin: Admin,
   const ownerEmail = `local-${label}-owner-${randomUUID().slice(0, 8)}@example.test`;
   const tenant = await fixtureTenant(admin, { siteName: `Harbor ${label}`, ownerEmail, ownerName: "Mara Quinn" });
   const owner = await person(browser, admin, `${label}-owner`, { email: ownerEmail, origins: options.ownerOrigins?.(tenant.tenantId) ?? [] });
-  const businessId = convertTenant(tenant.tenantId, operator.email);
+  const agency = await ordinaryConversionAgency(operator);
+  const businessId = convertTenant(tenant.tenantId, operator.email, agency);
   const invitation = inviteOwner(tenant.tenantId, operator.email);
   await acceptAsOwner(owner, invitation.acceptPath, invitation.workspaceName);
-  return { operator, owner, tenantId: tenant.tenantId, businessId, workspaceName: invitation.workspaceName };
+  return { operator, owner, agencyId: agency.agencyId, tenantId: tenant.tenantId, businessId, workspaceName: invitation.workspaceName };
 }

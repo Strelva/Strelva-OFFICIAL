@@ -1,0 +1,34 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-creator-maintenance-auth-proof-20261009
+
+ ❯ src/__tests__/source-package-recovery-ui.test.tsx (5 tests | 1 failed | 4 skipped) 23ms
+     × holds a lost listing response; current read confirms the state without resending 22ms
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 4 skipped (5)
+   Start at  11:17:32
+   Duration  592ms (transform 81ms, setup 30ms, import 133ms, tests 23ms, environment 346ms)
+
+(node:19454) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/source-package-recovery-ui.test.tsx > source package immutable uncertain command recovery > holds a lost listing response; current read confirms the state without resending
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/__tests__/source-package-recovery-ui.test.tsx:25:52
+     23|     const request = vi.fn<typeof fetch>(async (_url, init) => { if (in…
+     24|     const { node } = await mount(request); await listing(node, "listed…
+     25|     expect(node.querySelector("select")!.disabled).toBe(true);
+       |                                                    ^
+     26|     expect(node.textContent).toContain("Previous request held");
+     27|     await refresh(node);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

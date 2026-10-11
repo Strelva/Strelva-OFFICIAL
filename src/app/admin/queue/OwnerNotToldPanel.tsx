@@ -12,12 +12,14 @@ function when(value: string | null | undefined): string {
 
 /** Why the owner never heard, in the operator's words. */
 export function notToldReason(row: NotToldRow): string {
-  if (!row.recipientKnown) return "No owner email on file: add owner_recipient to the business record";
+  // Only an owner-confirmed or imported address receives owner links (#524);
+  // an address an operator or agency adds waits for the owner.
+  if (!row.recipientKnown) return "Not sent: no trusted owner address. One you add waits for the owner to confirm it";
   const last = row.lastDelivery;
   if (!last) return "Not emailed yet";
   if (last.status === "bounced") return `Email bounced${last.reason ? ` (${last.reason})` : ""}`;
   if (last.status === "suppressed") {
-    if (last.reason === "no_owner_recipient") return "No owner email on file";
+    if (last.reason === "no_trusted_owner_recipient" || last.reason === "no_owner_recipient") return "Not sent: no trusted owner address";
     return `Email held back${last.reason ? ` (${last.reason.replace(/_/g, " ")})` : ""}: client email is off or not set up`;
   }
   if (last.status === "failed") return `Email failed to send${last.reason ? ` (${last.reason})` : ""}`;

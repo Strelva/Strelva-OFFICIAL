@@ -7,7 +7,7 @@ import { agencyDocumentFixture } from "@/experience/agency-website/agency-docume
 import { renderSiteDocumentHtml, siteDocumentHash } from "@/products/websites/index";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Website rebuild interface fixture", robots: { index: false, follow: false } };
-export default async function RebuildPreview({ searchParams }: { searchParams: Promise<{ scenario?: string }> }) {
+export default async function RebuildPreview({ searchParams }: { searchParams: Promise<{ scenario?: string; mode?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const params = await searchParams;
   if (params.scenario?.startsWith("agency-")) {
@@ -18,5 +18,5 @@ export default async function RebuildPreview({ searchParams }: { searchParams: P
     initial.previewPages = Object.fromEntries(candidate.document.pages.map(page => [page.path,renderSiteDocumentHtml(candidate.document,page.path,{preview:true})]));
     return <div data-dashboard className="min-h-screen bg-surface-base"><AgencyDocumentFixture scenario={params.scenario} initial={initial} /></div>;
   }
-  return <div data-dashboard className="min-h-screen bg-surface-base"><RebuildFixture scenario={params.scenario ?? "review"} /></div>;
+  return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={params.mode === "dark" ? "dark" : "light"} className="min-h-screen bg-surface-base"><RebuildFixture scenario={params.scenario ?? "review"} /></div>;
 }

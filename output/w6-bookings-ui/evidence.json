@@ -1,0 +1,2694 @@
+{
+  "reviewedAt": "2026-10-07",
+  "scope": "local preview fixtures",
+  "baseUrl": "http://localhost:3026",
+  "worktree": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings",
+  "browser": "T3 collaborative browser, CSS viewport resize; desktop user agent",
+  "rows": [
+    {
+      "surface": "manage",
+      "state": "ready",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "held",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nWaiting for your confirmation\nConfirm this request\n\nAn assistant requested this time. It is held for 15 minutes. Confirm only if you asked for it; otherwise let the hold expire.\n\nConfirm my request",
+        "actions": [
+          {
+            "text": "Confirm my request",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=held",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "pending",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nWaiting for the business to confirm\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=pending",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "paused",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nThe business isn't taking new times right now. You can still cancel, or reply to your booking email.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=paused",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "empty",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nNo other times are open in the next two weeks. Reply to your booking email to ask about another time.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=empty",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Your booking couldn't load\n\nNothing has changed, and your booking is kept. Reload this page in a minute, or reply to your booking email to reach the business.",
+        "actions": [],
+        "alerts": [
+          {
+            "role": "alert",
+            "text": "Nothing has changed, and your booking is kept. Reload this page in a minute, or reply to your booking email to reach the business."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=error",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "unavailable",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nOpen times couldn't be read right now. Your booking is unchanged. Reload to try again.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=unavailable",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "not_found",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "This link doesn't open a booking\n\nIt may have been copied incompletely. Use the link in your most recent booking email, or reply to that email to reach the business.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=not_found",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "cancelled",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking is cancelled\n\nCancelled. The time is open for someone else.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nCancelled",
+        "actions": [],
+        "alerts": [
+          {
+            "role": "status",
+            "text": "Cancelled. The time is open for someone else."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=cancelled",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "rescheduled",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\n\nYour new time is booked. A confirmation is on its way when email is on for this business.\n\nWhat\nConsultation\nWhen\nFriday, November 6, 9:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": [
+          {
+            "role": "status",
+            "text": "Your new time is booked. A confirmation is on its way when email is on for this business."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=rescheduled",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "taken",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nYour booking\n\nThat time can't be booked now. Pick another time, or reply to your booking email.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "text": "That time can't be booked now. Pick another time, or reply to your booking email."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=taken",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "ended",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "THE MOONEY FIRM\n\nThis booking link has expired\n\nThe appointment has ended or the confirmation window has closed. To book again, visit the business's website.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=ended",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "ready",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "held",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nWaiting for your confirmation\nConfirm this request\n\nAn assistant requested this time. It is held for 15 minutes. Confirm only if you asked for it; otherwise let the hold expire.\n\nConfirm my request",
+        "actions": [
+          {
+            "text": "Confirm my request",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=held",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/manage-held-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "pending",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nWaiting for the business to confirm\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=pending",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "paused",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nThe business isn't taking new times right now. You can still cancel, or reply to your booking email.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=paused",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nNo other times are open in the next two weeks. Reply to your booking email to ask about another time.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=empty",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Your booking couldn't load\n\nNothing has changed, and your booking is kept. Reload this page in a minute, or reply to your booking email to reach the business.",
+        "actions": [],
+        "alerts": [
+          {
+            "role": "alert",
+            "text": "Nothing has changed, and your booking is kept. Reload this page in a minute, or reply to your booking email to reach the business."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=error",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "unavailable",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\n\nOpen times couldn't be read right now. Your booking is unchanged. Reload to try again.\n\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=unavailable",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "not_found",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "This link doesn't open a booking\n\nIt may have been copied incompletely. Use the link in your most recent booking email, or reply to that email to reach the business.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=not_found",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "cancelled",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking is cancelled\n\nCancelled. The time is open for someone else.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nCancelled",
+        "actions": [],
+        "alerts": [
+          {
+            "role": "status",
+            "text": "Cancelled. The time is open for someone else."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=cancelled",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "rescheduled",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\n\nYour new time is booked. A confirmation is on its way when email is on for this business.\n\nWhat\nConsultation\nWhen\nFriday, November 6, 9:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": [
+          {
+            "role": "status",
+            "text": "Your new time is booked. A confirmation is on its way when email is on for this business."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=rescheduled",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "taken",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nYour booking\n\nThat time can't be booked now. Pick another time, or reply to your booking email.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking",
+        "actions": [
+          {
+            "text": "Move my booking",
+            "height": 44
+          },
+          {
+            "text": "Cancel my booking",
+            "height": 44
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "text": "That time can't be booked now. Pick another time, or reply to your booking email."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=taken",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "ended",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "THE MOONEY FIRM\n\nThis booking link has expired\n\nThe appointment has ended or the confirmation window has closed. To book again, visit the business's website.\n\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=ended",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "booked",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Your request is received\n\nThe business will confirm your requested time. It is not confirmed yet.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=booked",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "expired",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "This suggestion has expired\n\nReply to the business to ask for new times.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=expired",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "loading",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "BOOKINGS\n\nLoading bookings\u2026",
+        "actions": [],
+        "alerts": [
+          {
+            "role": null,
+            "busy": "true",
+            "text": "BOOKINGS\n\nLoading bookings\u2026"
+          },
+          {
+            "role": "status",
+            "busy": null,
+            "text": "Loading bookings\u2026"
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=loading",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "permission",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nThis week\n\nEvery booking this week, from your website and the tools it connects to.\n\nThese bookings belong to another business\n\nYour account isn't a member of this business. Ask its owner to invite you, or open your own workspace.\n\nOpen your workspace",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Open your workspace",
+            "height": 20,
+            "width": 142.765625
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "busy": null,
+            "text": "These bookings belong to another business\n\nYour account isn't a member of this business. Ask its owner to invite you, or open your own workspace.\n\nOpen your workspace"
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=permission",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nThis week\n\nEvery booking this week, from your website and the tools it connects to.\n\nBookings couldn't load\n\nNothing is lost, and visitors can still book. Reload the page to try again.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "busy": null,
+            "text": "Bookings couldn't load\n\nNothing is lost, and visitors can still book. Reload the page to try again."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=error",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "empty",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\nNo bookings.\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\nNo bookings.\n\nSat, Nov 7\n\nNo bookings.\n\nSun, Nov 8\n\nNo bookings.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=empty",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "unlinked",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nNo booking site is connected to this business yet\n\nBookings show here once Strelva runs a site that takes them for this business.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=unlinked",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "unavailable",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\n\nBookings for Twin Trees Wellness couldn't be read right now. Nothing is lost, and visitors can still book. Reload to try again.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": [
+          {
+            "role": "status",
+            "busy": null,
+            "text": "Bookings for Twin Trees Wellness couldn't be read right now. Nothing is lost, and visitors can still book. Reload to try again."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=unavailable",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "two-sites",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nTwin Trees Spa\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\nNo bookings.\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\nSat, Nov 7\n\nNo bookings.\n\nSun, Nov 8\n\nNo bookings.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=two-sites",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChange",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Change",
+            "height": 32,
+            "width": 74.4765625
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-open",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nSame as your opening hours.\n\nChange",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Change",
+            "height": 32,
+            "width": 74.4765625
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours-open",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-norecord",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours: add the business's opening hours first. Booking hours can only be narrower than them.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours-norecord",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "booked",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Your request is received\n\nThe business will confirm your requested time. It is not confirmed yet.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=booked",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "expired",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "This suggestion has expired\n\nReply to the business to ask for new times.",
+        "actions": [],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=expired",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "ready",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "loading",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "BOOKINGS\n\nLoading bookings\u2026",
+        "actions": [],
+        "alerts": [
+          {
+            "role": null,
+            "busy": "true",
+            "text": "BOOKINGS\n\nLoading bookings\u2026"
+          },
+          {
+            "role": "status",
+            "busy": null,
+            "text": "Loading bookings\u2026"
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=loading",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-loading-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "permission",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nThis week\n\nEvery booking this week, from your website and the tools it connects to.\n\nThese bookings belong to another business\n\nYour account isn't a member of this business. Ask its owner to invite you, or open your own workspace.\n\nOpen your workspace",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Open your workspace",
+            "height": 20,
+            "width": 142.765625
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "busy": null,
+            "text": "These bookings belong to another business\n\nYour account isn't a member of this business. Ask its owner to invite you, or open your own workspace.\n\nOpen your workspace"
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=permission",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-permission-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nThis week\n\nEvery booking this week, from your website and the tools it connects to.\n\nBookings couldn't load\n\nNothing is lost, and visitors can still book. Reload the page to try again.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          }
+        ],
+        "alerts": [
+          {
+            "role": "alert",
+            "busy": null,
+            "text": "Bookings couldn't load\n\nNothing is lost, and visitors can still book. Reload the page to try again."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=error",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\nNo bookings.\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\nNo bookings.\n\nSat, Nov 7\n\nNo bookings.\n\nSun, Nov 8\n\nNo bookings.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=empty",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "unlinked",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nNo booking site is connected to this business yet\n\nBookings show here once Strelva runs a site that takes them for this business.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=unlinked",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "unavailable",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\n\nBookings for Twin Trees Wellness couldn't be read right now. Nothing is lost, and visitors can still book. Reload to try again.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          }
+        ],
+        "alerts": [
+          {
+            "role": "status",
+            "busy": null,
+            "text": "Bookings for Twin Trees Wellness couldn't be read right now. Nothing is lost, and visitors can still book. Reload to try again."
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=unavailable",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "two-sites",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nTwin Trees Spa\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\nNo bookings.\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\nSat, Nov 7\n\nNo bookings.\n\nSun, Nov 8\n\nNo bookings.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=two-sites",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChange",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Change",
+            "height": 32,
+            "width": 74.4765625
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-open",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nSame as your opening hours.\n\nChange",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Change",
+            "height": 32,
+            "width": 74.4765625
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours-open",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-norecord",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours: add the business's opening hours first. Booking hours can only be narrower than them.",
+        "actions": [
+          {
+            "tag": "A",
+            "text": "Back to Home",
+            "height": 18,
+            "width": 90.78125
+          },
+          {
+            "tag": "A",
+            "text": "Day",
+            "height": 32,
+            "width": 49.2109375
+          },
+          {
+            "tag": "A",
+            "text": "Week",
+            "height": 32,
+            "width": 61.3125
+          },
+          {
+            "tag": "A",
+            "text": "Previous week",
+            "height": 32,
+            "width": 109.21875
+          },
+          {
+            "tag": "A",
+            "text": "Today",
+            "height": 32,
+            "width": 53.578125
+          },
+          {
+            "tag": "A",
+            "text": "Next week",
+            "height": 32,
+            "width": 84.6484375
+          },
+          {
+            "tag": "A",
+            "text": "jo@example.test",
+            "height": 18,
+            "width": 106.5
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0100",
+            "height": 18,
+            "width": 92.125
+          },
+          {
+            "tag": "A",
+            "text": "dana@example.test",
+            "height": 18,
+            "width": 126.5390625
+          },
+          {
+            "tag": "A",
+            "text": "sam@example.test",
+            "height": 18,
+            "width": 122.25
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0142",
+            "height": 18,
+            "width": 90.5546875
+          },
+          {
+            "tag": "A",
+            "text": "ana@example.test",
+            "height": 18,
+            "width": 118.34375
+          },
+          {
+            "tag": "A",
+            "text": "716-555-0177",
+            "height": 18,
+            "width": 88.234375
+          },
+          {
+            "tag": "A",
+            "text": "mia@example.test",
+            "height": 18,
+            "width": 118.1640625
+          },
+          {
+            "tag": "BUTTON",
+            "text": "Cancel",
+            "height": 32,
+            "width": 69.578125
+          }
+        ],
+        "alerts": []
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours-norecord",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "ready",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-manage",
+      "state": "ready",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "THE MOONEY FIRM\n\nYour booking\nWhat\nConsultation\nWhen\nThursday, November 5, 10:00 AM\nEastern Time\nStatus\nConfirmed\nChange the time\nPick a new time\n\nThursday, November 5\n\n9:00 AM\n11:00 AM\n11:30 AM\n2:00 PM\n\nFriday, November 6\n\n9:00 AM\n9:30 AM\n\nMonday, November 9\n\n1:00 PM\n3:30 PM\nMove my booking\nCancel\n\nThe business is told and the time opens up for someone else. This can't be undone from here.\n\nCancel my booking"
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChange"
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-bottom",
+      "width": 1280,
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-bottom",
+      "width": 390,
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "manage",
+      "state": "keyboard-focus",
+      "width": 320,
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-manage",
+        "captured": true,
+        "retained": false
+      },
+      "metrics": {
+        "tabFocusedFirstRadio": true,
+        "firstSelected": false,
+        "arrowRightFocusedNext": true,
+        "nextSelected": true,
+        "outline": "rgb(127, 174, 127) solid 2px"
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "keyboard-focus",
+      "width": 320,
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry",
+        "captured": true,
+        "retained": false
+      },
+      "metrics": {
+        "tabFocusedFirstRadio": true,
+        "firstSelected": false,
+        "arrowDownFocusedNext": true,
+        "nextSelected": true,
+        "outline": "rgb(127, 174, 127) solid 2px"
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "ready",
+      "width": 1280,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 40
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "taken",
+      "width": 1280,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nThis time could not be requested. It may have just been taken. Reply to the business for new times.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 40
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=taken",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "day",
+      "width": 1280,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\n3 appointments \u00b7 1 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\nUndo check-in\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCheck in\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177",
+        "buttons": [
+          {
+            "text": "Undo check-in",
+            "height": 32
+          },
+          {
+            "text": "Check in",
+            "height": 32
+          },
+          {
+            "text": "Cancel",
+            "height": 32
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=day&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-editor",
+      "width": 1280,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChoose when people can book. These can only be narrower than your opening hours; to change opening hours, ask Strelva.\n\nMondayClosed\nTuesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nTuesday bookings from\nto\nTuesday bookings until\nWednesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nWednesday bookings from\nto\nWednesday bookings until\nThursdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nThursday bookings from\nto\nThursday bookings until\nFridayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nFriday bookings from\nto\nFriday bookings until\nSaturdayOpen 9:00 AM\u20135:00 PM\nTakes bookings\nSaturday bookings from\nto\nSaturday bookings until\nSundayClosed\nSave booking hours\nUse opening hours\nCancel",
+        "buttons": [
+          {
+            "text": "Cancel",
+            "height": 32
+          },
+          {
+            "text": "Cancel",
+            "height": 32
+          },
+          {
+            "text": "Save booking hours",
+            "height": 32
+          },
+          {
+            "text": "Use opening hours",
+            "height": 32
+          },
+          {
+            "text": "Cancel",
+            "height": 32
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "ready",
+      "width": 390,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=ready",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/booking-inquiry-ready-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "taken",
+      "width": 390,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nThis time could not be requested. It may have just been taken. Reply to the business for new times.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=taken",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "day",
+      "width": 390,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\n3 appointments \u00b7 1 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\nUndo check-in\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCheck in\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177",
+        "buttons": [
+          {
+            "text": "Undo check-in",
+            "height": 44
+          },
+          {
+            "text": "Check in",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=day&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-editor",
+      "width": 390,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChoose when people can book. These can only be narrower than your opening hours; to change opening hours, ask Strelva.\n\nMondayClosed\nTuesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nTuesday bookings from\nto\nTuesday bookings until\nWednesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nWednesday bookings from\nto\nWednesday bookings until\nThursdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nThursday bookings from\nto\nThursday bookings until\nFridayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nFriday bookings from\nto\nFriday bookings until\nSaturdayOpen 9:00 AM\u20135:00 PM\nTakes bookings\nSaturday bookings from\nto\nSaturday bookings until\nSundayClosed\nSave booking hours\nUse opening hours\nCancel",
+        "buttons": [
+          {
+            "text": "Cancel",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          },
+          {
+            "text": "Save booking hours",
+            "height": 44
+          },
+          {
+            "text": "Use opening hours",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-hours-editor-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "ready",
+      "width": 320,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=ready",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "booking-inquiry",
+      "state": "taken",
+      "width": 320,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Choose a time to request\n\nPick a time below. The business will confirm your request.\n\nThis time could not be requested. It may have just been taken. Reply to the business for new times.\n\nConsultation\n\nTimes in America/New_York\n\nThursday, Nov 5, 10:00 AM\nFriday, Nov 6, 10:00 AM\nMonday, Nov 9, 10:00 AM\nRequest this time",
+        "buttons": [
+          {
+            "text": "Request this time",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/booking-inquiry?state=taken",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "day",
+      "width": 320,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\n3 appointments \u00b7 1 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\nUndo check-in\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCheck in\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177",
+        "buttons": [
+          {
+            "text": "Undo check-in",
+            "height": 44
+          },
+          {
+            "text": "Check in",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=day&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "hours-editor",
+      "width": 320,
+      "revision": "after narrow control sizing",
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, from your website and the tools it connects to.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nTwin Trees Wellness\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM \u2013 1:00 PM\n\nJo Banks\n\nMassage, 60 min \u00b7 Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 Checked in\n\n716-555-0100 \u00b7 dana@example.test\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM \u2013 12:30 PM\n\nMia Chen\n\nMassage, 90 min \u00b7 Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.\n\nBooking hours\n\nTue 10:00 AM\u20132:00 PM \u00b7 Wed 10:00 AM\u20136:00 PM \u00b7 Thu 10:00 AM\u20136:00 PM \u00b7 Fri 10:00 AM\u20136:00 PM \u00b7 Sat 10:00 AM\u20134:00 PM\n\nChoose when people can book. These can only be narrower than your opening hours; to change opening hours, ask Strelva.\n\nMondayClosed\nTuesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nTuesday bookings from\nto\nTuesday bookings until\nWednesdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nWednesday bookings from\nto\nWednesday bookings until\nThursdayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nThursday bookings from\nto\nThursday bookings until\nFridayOpen 9:00 AM\u20137:00 PM\nTakes bookings\nFriday bookings from\nto\nFriday bookings until\nSaturdayOpen 9:00 AM\u20135:00 PM\nTakes bookings\nSaturday bookings from\nto\nSaturday bookings until\nSundayClosed\nSave booking hours\nUse opening hours\nCancel",
+        "buttons": [
+          {
+            "text": "Cancel",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          },
+          {
+            "text": "Save booking hours",
+            "height": 44
+          },
+          {
+            "text": "Use opening hours",
+            "height": 44
+          },
+          {
+            "text": "Cancel",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=hours",
+        "captured": true,
+        "retained": false
+      }
+    }
+  ]
+}

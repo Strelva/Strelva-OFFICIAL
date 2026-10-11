@@ -28,3 +28,11 @@ export function getConfiguredHomeFinderAdapter(): HomeFinderServerAdapter | null
     return null;
   }
 }
+
+// Native server composition remains separate from browser-safe contracts.
+export {
+  HOME_FINDER_CATALOG_APP, checkHomeFinder, configureHomeFinder, installHomeFinder,
+  publishHomeFinder, readHomeFinderBindings, readHomeFinderReceipt,
+  readHomeFinderSystemObservations, revokeHomeFinder, searchHomeFinder, submitHomeFinder,
+} from "./runtime-server";
+export { createHomeFinderEntry, homeFinderFrameAncestors, requireHomeFinderEntry } from "./entry";

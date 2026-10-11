@@ -294,16 +294,22 @@ async function loadFromDevFile(): Promise<TenantConfig[]> {
   }
 }
 
-function invalidateCache() {
+export async function invalidateTenantConfigCache(): Promise<boolean> {
   _memCache = null;
   _memCacheTime = 0;
 
-  const redis = getRedis();
-  if (redis) {
-    redis.del(REDIS_KEY).catch(() => {
-      // Redis delete failed — TTL will expire it
-    });
+  try {
+    const redis = getRedis();
+    if (redis) await redis.del(REDIS_KEY);
+    return true;
+  } catch {
+    // The database is still authoritative; callers can record cache cleanup as partial.
+    return false;
   }
+}
+
+function invalidateCache() {
+  void invalidateTenantConfigCache();
 }
 
 

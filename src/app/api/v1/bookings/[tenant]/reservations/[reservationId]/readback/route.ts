@@ -1,3 +1,4 @@
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { recoverPublicWebsiteBooking } from "@/products/scheduling/server";
 import { bookingError, bookingJson, bookingOptions, bodyObject, stringValue } from "../../../../_shared";
@@ -13,6 +14,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   const managementToken = body ? stringValue(body.managementToken, 2_048) : undefined;
   if (!managementToken || !reservationId) return bookingJson({ error: "The booking recovery request is incomplete." }, 400);
   try {
+    if (await isRateLimitedAsync(rateLimitKey(request, "booking-readback"), 20)) return bookingJson({ error: "Too many requests." }, 429);
     return bookingJson(await recoverPublicWebsiteBooking({ tenantId: tenant, reservationId, managementToken }));
   } catch (error) {
     return bookingError(error);

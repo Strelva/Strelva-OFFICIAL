@@ -24,6 +24,23 @@ export const fixtureSiteDocument: SiteDocument = {
 };
 export const mooneyFixtureDocument = siteDocumentSchema.parse(mooneySource);
 export function fixtureRebuild(scenario = "review"): RebuildView {
+  if (["contacts", "contacts-error", "contacts-read-only"].includes(scenario)) {
+    const record = fixtureRebuild("review");
+    record.status = "approved";
+    record.approved = true;
+    record.stages = record.stages.map(stage => ({ ...stage, message: "Completed in this fictional contact-control fixture" }));
+    if (record.candidate) record.candidate.facts = {
+      phone: { text: "(716) 555-0100", kind: "contact", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+      email: { text: "orders@example.test", kind: "contact", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+      ordinary: { text: "Fictional contact-control review; no publication or message is sent.", kind: "claim", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+    };
+    return record;
+  }
+  if (scenario === "skipped-pages") return { ...fixtureRebuild("review"), skippedPaths: [
+    { url: "https://synthetic-business.example.test/private", reason: "robots" },
+    { url: "https://synthetic-business.example.test/app", reason: "javascript_only" },
+    { url: "https://synthetic-business.example.test/missing", reason: "unreachable" },
+  ] };
   if (["published", "domain-pending", "domain-verified", "domain-error"].includes(scenario)) {
     const record = fixtureRebuild("review");
     record.title = "[Synthetic business]";
@@ -50,10 +67,10 @@ export function fixtureRebuild(scenario = "review"): RebuildView {
     stages: [{ stage: "Read website", status: "completed", message: `${mooneyEvidence.pages} public pages read on October 1` }, { stage: "Extract facts", status: "completed", message: `${Object.keys(mooneyFixtureDocument.facts).length} facts retain source quotes` }, { stage: "Compose pages", status: "completed", message: "Private catalog preview from public source content" }, { stage: "Check facts", status: "completed", message: `${mooneyEvidence.needsReview} decisions flagged; source support does not independently verify claims` }],
     candidate: { revision: 1, contentHash: mooneyEvidence.documentHash, previewHref: "/preview/strelva/rebuild/site?example=mooney", pageCount: mooneyFixtureDocument.pages.length, hasForms: false, facts: structuredClone(mooneyFixtureDocument.facts), unmappedPages: [] },
   };
-  return { workId: "44444444-4444-4444-8444-444444444444", workspaceId: "11111111-1111-4111-8111-111111111111", revision: 1, title: "The Mooney Firm", status: scenario === "building" ? "building" : scenario === "failed" ? "failed" : "review", stages: [
+  return { workId: "44444444-4444-4444-8444-444444444444", workspaceId: "11111111-1111-4111-8111-111111111111", tenantId: null, revision: 1, title: "The Mooney Firm", status: scenario === "building" ? "building" : scenario === "failed" ? "failed" : "review", stages: [
     { stage: "Read website", status: "completed", message: "Source pages saved in this interface fixture" },
     { stage: "Extract facts", status: "completed", message: "Business details keep their source quotes" },
     { stage: "Compose pages", status: scenario === "building" ? "running" : "completed", message: scenario === "building" ? "Composing the saved content" : "Private preview prepared" },
     { stage: "Check facts", status: scenario === "failed" ? "failed" : scenario === "building" ? "pending" : "completed", message: scenario === "failed" ? "Verification unavailable; earlier stages retained" : "Two fixture decisions require owner review" },
-  ], candidate: scenario === "building" ? null : { revision: 1, contentHash: "a".repeat(64), previewHref: "/preview/strelva/rebuild/site", pageCount: 1, hasForms: false, facts: structuredClone(fixtureSiteDocument.facts), unmappedPages: [] }, capabilitySelection: null, audit: null, documentRevisions: [], history: [], approved: false, publishedUrl: null, readBack: null, domain: null, error: scenario === "failed" ? "Fact verification failed. Retry resumes from the saved composition." : null };
+  ], skippedPaths: [], candidate: scenario === "building" ? null : { revision: 1, contentHash: "a".repeat(64), previewHref: "/preview/strelva/rebuild/site", pageCount: 1, hasForms: false, facts: structuredClone(fixtureSiteDocument.facts), unmappedPages: [] }, capabilitySelection: null, audit: null, documentRevisions: [], history: [], approved: false, publishedUrl: null, readBack: null, domain: null, error: scenario === "failed" ? "Fact verification failed. Retry resumes from the saved composition." : null };
 }

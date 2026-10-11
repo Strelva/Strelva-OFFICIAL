@@ -1,17 +1,79 @@
 # Money and the client's data
 
-Status: draft spec, 2026-10-06; built and proven **locally only** on branch
-`build/money-data` (2026-10-06). Nothing applied to production, Stripe or
-Supabase. Every new behavior is behind a flag that is off by default.
+> **Changed by ADR 0013 / decision 2.** The business or its agency is the payer, chosen
+> per business. Current managed clients remain business-paid, with unchanged billing
+> and grandfathered terms (October 9 Addendum 2). Owner-only payment email (§3.7), payer identity and permissions (§4–5), and
+> operator conversion/export/exit as client service (§2, §3.19, §4) are superseded
+> requirements with engineering follow-up. Platform billing support remains logged platform
+> work; it does not grant client-service powers.
 
-| Part | Built | Proven (local) | Not built |
-| --- | --- | --- | --- |
-| Rename fix (6.6) | `tenant-rename.ts` moves zsets, hashes, sets and lists atomically in Lua, keeps TTLs, keeps going after one bad key; spam pit and client-email keys added | real disposable `redis-server` test; fails on the old code | |
-| Deprovision (6.6) | Sweeps every client store the rename registry moves, event blobs, account grouping; keeps the operator CRM | real `redis-server` test | |
-| (a) Billing | `20261007180000_business_billing.sql`: billing state on `accounts` keyed by `workspace_id`, written by a trigger at conversion, undone at unlink, payer = owner recipient; webhook mirror and checkout `workspaceId` behind `STRELVA_BUSINESS_BILLING`; `scripts/stripe-workspace-metadata.ts` (dry run, no Stripe call) | SQL cluster test for every tenant shape, Twin Trees, rename, unlink, access; unit tests; `/api/v1`, hosted pages, lead capture and the public booking POST pinned ungated | Portfolio MRR reading the billing home (5); failed-payment Needs you item (7, webhook already emails); the flat plan (9) |
-| (b) Redis → Postgres | `20261007181000_tenant_client_records.sql` + `src/platform/client-records`: dual-write (`STRELVA_CLIENT_RECORDS_DUAL_WRITE`), dry-run backfill and parity script, read flag per store (`STRELVA_CLIENT_RECORDS_READ`) after 7 days; applied to spam held, inquiry timelines and first replies, booking config, account grouping (analytics config and report markers use the Systems catalog's typed tables instead; see below) | SQL cluster test; real `redis-server` tests for dual-write failure, repair, backfill, parity mismatch, read flip and fallback | Orders and rewards (read-only key count only); events, threads, connections, owner settings |
-| (c) Export | `20261007182000_workspace_export_v3.sql` + `src/platform/workspace-exports/v3.ts`, `POST /api/workspace-export/v3` behind `STRELVA_EXPORT_SCHEMA_3`: paged categories, background builds in parts, credential-shape check, expiring token link to the owner recipient | SQL cluster test (pages, isolation, partial builds refused, token, expiry); unit tests | Exit steps per linked site (20); assets manifest; orders and rewards |
-| (d) Outcome loop | `20261007183000_business_outcomes.sql` + `src/platform/business-outcomes`; optional `page`, `referrer`, `utm_*` on `/api/v1/leads` and the starter form | SQL cluster test with every join; formatter tests | Wiring into the monthly report email; Calendly bookings |
+## October 11 identity and scope contract
+
+A Client is a business, never a site count. **Billing group** names the
+operator grouping of businesses or linked sites for a billing arrangement;
+**Account** stays personal sign-in/settings. Grouping supplies no ownership,
+data access, agency commitment or new price. **Agency handoff** names the
+business and both agencies and preserves History. Provider names an outside
+system, not an agency.
+
+Payer choices, owner-only exit and sensitive data remain owner-only under the
+three-zoom model. Agency Queue shows owner decisions as read-only Waiting on
+[business] with the owner's title and exact-item link; it cannot decide them.
+Platform billing actions name Strelva only when the platform acted. Agency
+work names the recorded agency with Runs on Strelva, including Strelva Agency;
+unknown attribution is Actor not recorded. Failed brand lookup is neutral
+and holds agency-authored sends. Weekly/monthly customer outputs are recaps;
+report identifiers remain underneath. Existing money and production authority
+is unchanged; no billing grouping or price is activated by these words.
+
+Status: implementation prepared locally through wave 6 round 5 on
+`w6/agency-operator` (2026-10-10 migration series). Nothing in this work
+applies production migrations, changes Stripe, sends live email or flips a
+production flag. Code and local tests establish implementation; production
+conversion, agency delivery and seven days of parity remain rollout proof.
+
+| Launch requirement | Implemented path | Local evidence / remaining proof |
+| --- | --- | --- |
+| Billing 1–4: one state per business, conversion sources, bundled sites, additive Stripe metadata | `business-billing`, existing business billing migration, conversion trigger, checkout/webhook mirror, dry-run metadata script | `business-billing.test.ts` and SQL billing fixtures; Stripe test-mode metadata and actual converted clients still require approved rollout |
+| Billing 5–8: amount/MRR from billing home, public service survives payment failure, owner decision, explicit allowances | `read_business_portfolio_billing`, `readBusinessPortfolioBilling`, billing Needs you source, existing owner email and explicit allowance configuration | Portfolio SQL fixture, business billing/public-route tests and operator tests; live owner delivery remains unproven |
+| Billing 9: flat plan exists without a price | `WORKSPACE_SUBSCRIPTION_PLAN` defines `workspace`, subscription, no amount/Stripe price, `purchasable: false`; excluded from legacy checkout keys | `w6-business-outcome-reports.test.ts`; Jacob's price decision is open, no offer activated |
+| Redis 10–12: every store, safe dual writes, repair and dry-run backfill | `client-records` complete store registry plus typed analytics/report, lead, booking and inquiry homes; encrypted provider records use shared secrets path | Client move/removal/parity tests; real disposable Redis rename and repair race tests prove retained snapshots survive source expiry and failed writes never replay rewards balances |
+| Redis 13–15: per-store seven-day parity/read switch, rename and deprovision | Parity ledger and sweep, Postgres readers, stable tenant identity, explicit tombstones, atomic pending-repair rekey and compare-and-delete acknowledgement | Local parity, rename, deletion and SQL stale-write fixtures; seven consecutive production days and each store's read flip are outstanding |
+| Export 16–17: record, every System/history, native and tenant data, assets, honest manifest | Schema 3 additive categories, credential scrub, asset manifest, native records, orders/rewards, provider metadata allowlist | Export contracts/V3/native-facet and SQL portability fixtures; unavailable provider-only or already-expired history stays explicit |
+| Export 18–19: large archives, operator start, owner-only expiring link and receipt | Background parts, archive download, shared owner resolver, cron recovery with durable predispatch reservation; accepted/unknown delivery cannot auto-send again after receipt failure or worker crash | `w6-export-recovery.test.ts`, SQL recovery fixture, export UI tests; live owner delivery not exercised. Expiring download tokens do not expire the retained export receipts/exit evidence |
+| Exit 20: each site's export, custom repo/files, billing and domain handoff | `complete_workspace_exit_with_handoff`, per-site/System plan and retained obligations; exit never deletes records | SQL portability and workspace-exit tests; `/preview/strelva/portability` uses the real export/exit components with local request doubles for ready/loading/error/permission states |
+| Outcomes 21–23: per-business counts, attribution and first reply | PostgreSQL outcome RPC; additive lead API/starter attribution; provider-accepted first reply mirror | Outcome SQL/domain, inquiry reply and API contract tests; unavailable counts retain null rather than becoming zero |
+| Outcomes 24–25: bookings joined where evidence exists, one monthly business line | Original public/legacy counts plus unique one-store bookings including Calendly imports; explicit inquiry/contact/email/normalized phone joins to earlier business leads; existing native and legacy report transports append the line | Native/legacy caller tests, domain formatter and SQL import/join fixture. Shared private business/month reservation excludes accepted, dispatching and unknown deliveries from retry; grouping outage while armed suppresses delivery |
+
+The report integration requires both `STRELVA_WORKSPACE_RELEASE=1` and the
+new `STRELVA_BUSINESS_OUTCOME_REPORTS=1`; the latter is off by default. It
+respects the existing global/business email gates and every linked site's
+email override. Flags off retain the existing report path. An armed grouping
+or receipt outage never falls back around the durable delivery reservation.
+Rollback retains private monthly delivery receipts, and reapply refuses
+accepted, unknown and dispatching months (`w6-business-portability-rollback.sql`).
+
+Business-record launch mapping (`strelva-1.0.0.md` §3): facts, services,
+people and contacts have one revisioned home, website/booking/inquiry readers,
+and history/undo tested by the business-record contracts, reader and surface
+suites. Export carries that record plus linked Systems and their history.
+The stream owner audits and owns the shared owner-recipient rule; this money
+slice consumes it rather than defining a second recipient policy.
+
+Clients-moved launch mapping (`strelva-1.0.0.md` §6): conversion, bundled
+billing, `/api/v1` compatibility and the complete Redis exit are prepared in
+code and local fixtures. No live client is asserted converted by these tests.
+Nine-repo compatibility and the full verification belong in the stream's final
+handoff. The seven-day parity window, production backfills, approved conversion
+and real client/storefront smoke proof cannot be replaced by local greens.
+
+Production stop points: apply the prepared migrations only after approval;
+verify the existing encryption key and backfill inputs without exposing
+credentials; dry-run each store, then prove seven days of parity before reads
+move; verify Stripe metadata in test mode before any live metadata action;
+prove owner delivery and handoff on the Strelva-owned test business and actual
+converted clients. Keep grandfathered terms and the Twin Trees bundle intact.
+The flat plan stays unsellable until Jacob sets its price.
 
 Corrections found while building: the Postgres home for these stores is one
 table, `tenant_client_records`, not per-store tables (section 5); typed tables
@@ -62,7 +124,7 @@ sites stay up and every lead is kept while it's sorted out.
 
 **gldf leaves with everything.** Great Lakes Dried Fruits is grandfathered,
 runs a store with rewards, takes leads, and holds a Google connection. A year
-from now the owner emails "we're moving to another provider, send me our
+from now the owner emails "we're moving to another agency, send me our
 stuff." The operator starts the export. The owner gets a link by email to one
 download: the business record, the website content and assets, every lead
 ever received (not just the last 90 days), every order, every rewards member
@@ -70,7 +132,7 @@ and their points, bookings and booking hours, reviews and replies, and a list
 of the outside accounts Strelva was connected to. No passwords or tokens. The
 receipt says what was included and what wasn't, and why.
 
-**Every month, one line per business.** The Mooney Firm's monthly report says:
+**Every month, one line per business.** The Mooney Firm's monthly recap says:
 "412 visits. 9 inquiries; 8 answered within a day. 3 booked a consult, 2 of
 them from a website inquiry. 2 new Google reviews." Each number says whether
 it is counted or linked, and nothing is claimed that the data can't join.
@@ -79,7 +141,9 @@ it is counted or linked, and nothing is claimed that the data can't join.
 
 - **Business** owns the money relationship and the data. Billing hangs off the
   business workspace, not a site or a System. One business can pay for many
-  Systems and Versions (Twin Trees). The payer is the **owner** role.
+  Systems and Versions (Twin Trees). The **payer is chosen per business**:
+  the business pays directly, or its agency pays and resells at its own price.
+  Payer and owner are separate; payment grants no operating authority.
 - **Systems** produce records (leads, orders, bookings, members). Those
   records belong to the business and are stored in Postgres keyed so they
   survive renames, rebuilds and conversion. A System pausing never deletes
@@ -91,9 +155,11 @@ it is counted or linked, and nothing is claimed that the data can't join.
 - **Running** carries the data promises: "Every inquiry is kept", "Every
   inquiry is answered within a day". The outcome loop is how Running proves
   them.
-- **Needs you** carries only money decisions that are the owner's: a failed
-  payment, a payer change, an exit. Strelva handled carries receipts:
-  "Strelva sent your export", "Strelva recorded your payment".
+- **Needs you** carries decisions for the authorized person: money goes to
+  the selected payer; owner approval of a payer change and exit remains
+  explicit. What changed carries actor-named receipts:
+  "Acme Marketing sent your export" with "Runs on Strelva", or
+  "Strelva recorded your payment" when the platform acted.
 - **Strelva operator** does conversions, billing setup and exports for owners
   who never sign in. The operator is `admin` on the workspace, never `owner`.
 
@@ -182,7 +248,8 @@ it is counted or linked, and nothing is claimed that the data can't join.
     `/api/v1/leads/[tenant]` (additive). The starter form in
     `custom-repo-starter/` sends them first; client repos adopt them only on
     their next change.
-23. Every inquiry records the time of its first reply, by owner or Strelva,
+23. Every inquiry records the time and actor of its first reply, by owner, agency
+    or platform,
     in Postgres.
 24. Bookings link to a lead where one exists: native bookings already do
     (`public_website_bookings.inquiry_id`); legacy `bookings` and Calendly
@@ -203,10 +270,16 @@ not the same as comped: `subscription.ts` treats a grandfathered tenant as
 
 **Who can do what**
 
+**Changed by ADR 0013 / decision 2:** money actions and payment notices must
+follow the chosen business or agency payer. The owner-only payment matrix and
+recipient binding below are historical implementation; engineering must
+reconcile payer permissions, transitions and delivery. Export/exit requests
+made as client service must use the ordinary agency path, not platform powers.
+
 | Action | Owner | Member | Strelva operator |
 | --- | --- | --- | --- |
 | See billing state and amount | Yes | No | Yes |
-| Pay, update card (Stripe portal) | Yes, by emailed link or signed in | No | No |
+| Pay, update card (Stripe portal) | When business is payer, by emailed link or signed in | No | No |
 | Set or change billing state | No | No | Yes, with receipt; money changes need Jacob's yes |
 | Propose payer change | Yes (`workspace_payer_transitions`) | No | No |
 | Request export | Yes, in app or by email | No | Starts it for the owner |
@@ -243,8 +316,9 @@ not the same as comped: `subscription.ts` treats a grandfathered tenant as
 `job_economics.payer_id` reference `users(id)`. An owner who never signed in
 has no user row, so a converted client can't hold an allowance or a job until
 someone signs in. Billing state therefore must not depend on a payer user. It
-names the payer by the business record's owner recipient; the user link is
-added if and when they sign in.
+must identify the selected business or agency payer without requiring an
+owner user row. The earlier owner-recipient binding is superseded by decision 2;
+the organization-payer mapping remains an engineering follow-up.
 
 **Recommended billing home.** Activate the dormant `accounts` tables and add
 `accounts.workspace_id` (unique), `billing_type`, `billing_sources jsonb` and a
@@ -367,7 +441,7 @@ Not undoable: a sent export link (it expires), a Stripe charge, an email.
   older than 90 days (from Postgres), bookings, rewards and a connection; the
   archive has every category and no secret (grep for token prefixes).
 - Production proof on the Strelva-owned test business: one lead, one order,
-  one booking, one reply, one review flow through to the monthly report with
+  one booking, one reply, one review flow through to the monthly recap with
   correct linked and counted figures.
 - Byte-identical storefront comparison for converted clients, as Sept 30
   (60/60).

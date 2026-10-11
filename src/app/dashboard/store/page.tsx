@@ -1,3 +1,5 @@
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { notFound } from "next/navigation";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getTenantConfig } from "@/lib/tenants";
@@ -17,6 +19,8 @@ import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanne
 // a Store tab that 404s on click. A super-admin inspecting a non-store tenant
 // still gets the read-only preview instead of a 404.
 export default async function StorePage() {
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/store");
+
   const { tenant } = await requireDashboardView();
 
   const [config, summary, orders, products] = await Promise.all([

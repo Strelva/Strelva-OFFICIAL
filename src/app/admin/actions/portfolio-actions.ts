@@ -8,14 +8,14 @@
  * (`resolveEventAction`) — never a shortcut that bypasses approval — so an
  * external write that fails leaves its item pending and is reported honestly.
  *
- * Pure of auth/HTTP: the page reads `getPortfolioActions`, the server action
- * gates super-admin then calls `bulkResolvePortfolioActions`. A transient read
+ * The page reads `getPortfolioActions`; the server action resolves the
+ * verified operator, then calls `bulkResolvePortfolioActions` as that operator. A transient read
  * failure keeps the overview usable, but is carried as an explicit incomplete
  * source so an empty result can never masquerade as a verified clear queue.
  */
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getEvents } from "@/lib/events";
-import { resolveEventAction } from "@/lib/event-actions";
+import { decideTenantEventAsOperator, type VerifiedOperator } from "@/lib/operator-decisions";
 import type { UnifiedEvent } from "@/lib/types";
 
 export interface PortfolioActionItem {
@@ -215,14 +215,32 @@ export interface PortfolioResolveResult {
  * write that fails comes back `changed:false` with the underlying reason and the
  * item stays pending, never silently marked done. Sequential so concurrent
  * external writes don't stampede an integration; the batch is a handful of items.
+ *
+ * Every item runs as the verified operator, never as the owner, through the
+ * shared operator decision (`decideTenantEventAsOperator`): it re-checks that
+ * the operator is still active, refuses a draft routed to the owner or one
+ * this queue can't approve, and writes an audit row before and after.
  */
 export async function bulkResolvePortfolioActions(
   items: PortfolioResolveInput[],
+  operator: VerifiedOperator,
 ): Promise<PortfolioResolveResult[]> {
   const results: PortfolioResolveResult[] = [];
+  let revoked = false;
   for (const item of items) {
+    if (revoked) {
+      results.push({ tenantId: item.tenantId, eventId: item.eventId, changed: false, reason: "operator_access_changed" });
+      continue;
+    }
     try {
-      const res = await resolveEventAction(item.tenantId, item.eventId, "approved");
+      const res = await decideTenantEventAsOperator(operator, {
+        tenantId: item.tenantId,
+        eventId: item.eventId,
+        action: "approved",
+        auditAction: "portfolio.draft.approve",
+        accept: isPortfolioApprovable,
+      });
+      if (res.reason === "operator_access_changed") revoked = true;
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,
@@ -230,7 +248,8 @@ export async function bulkResolvePortfolioActions(
         reason: res.reason,
       });
     } catch (err) {
-      // A single item throwing must not abort the rest of the batch.
+      // A single item throwing must not abort the rest of the batch. The
+      // decision already wrote its result row.
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,

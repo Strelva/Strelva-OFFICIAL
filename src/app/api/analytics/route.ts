@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getDailyMetrics, getClickCounts } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
@@ -8,6 +9,7 @@ export async function GET(request: Request) {
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const url = new URL(request.url);
     const days = Math.min(Number(url.searchParams.get("days")) || 30, 90);

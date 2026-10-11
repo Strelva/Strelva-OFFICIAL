@@ -1,3 +1,6 @@
+import { formatEmailFrom } from "@/platform/infra/email/from";
+import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { resolveAgencyEmailIdentity, resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import {
   customerEmailPaused,
   emailSendingPaused,
@@ -5,6 +8,7 @@ import {
   prospectEmailsEnabled,
 } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { agencyEmailSendAllowed, senderDomain, type EmailAgency } from "@/platform/infra/email/provider-gate";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
 
 /** The four people Strelva can address. These are relationship roles, not
@@ -17,13 +21,26 @@ type RenderedEmail =
 
 export type SendEmailInput = RenderedEmail & {
   audience: EmailAudience;
+  /** The author of the action, independently of who receives the message. */
+  authorship?: "platform" | "agency" | "business";
+  /** Trusted business presentation for end-customer mail. */
+  businessName?: string;
   /** The tenant this send belongs to, when known. ONLY the "client" audience is
    * tenant-aware: a per-tenant override can ARM client email for one verified
    * client while the global switch stays paused, or force it off for one client.
    * Absent (or any other audience) ⇒ behavior is unchanged (follow the global
    * switch). */
   tenantId?: string;
+  /** Set when an agency sends this for a business (an owner invitation, a
+   * client's mail). The send then also needs that agency's seat, its email
+   * verification and the business's mandate for the sending domain
+   * (provider-gate.ts). Absent ⇒ behavior is unchanged. */
+  provider?: EmailAgency;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName?: string;
+  /** Presentation already rendered into raw reports; envelope is revalidated here. */
+  brand?: OwnerBrand;
   /** Full from address override, e.g. "report@updates.strelva.com". Defaults to
    * hello@{RESEND_DOMAIN}. For senders that need a distinct local-part or a
    * per-tenant sending domain (weekly/monthly reports). Must be a verified
@@ -40,6 +57,7 @@ export type SendEmailInput = RenderedEmail & {
   tags?: Record<string, string>;
   /** Provider idempotency key for sends that must be safe across retries. */
   idempotencyKey?: string;
+  attachments?: Array<{ filename: string; content: string }>;
 };
 
 export type SendEmailResult =
@@ -60,7 +78,17 @@ export type EmailReceivedReadbackResult =
     }
   | { status: "unavailable"; reason: string };
 
-async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
+function fromAddressFor(input: Pick<SendEmailInput, "fromAddress">): string {
+  return input.fromAddress || `hello@${process.env.RESEND_DOMAIN || "updates.strelva.com"}`;
+}
+
+async function audienceEnabled(input: SendEmailInput, strictClientGate = false): Promise<boolean> {
+  if (!(await audiencePolicyEnabled(input, strictClientGate))) return false;
+  // The audience allows it; an agency's send also needs its own effect gate.
+  return !input.provider || agencyEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input)));
+}
+
+async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: boolean): Promise<boolean> {
   const { audience } = input;
   if (audience === "operator") return operatorEmailsEnabled();
   if (audience === "prospect") return prospectEmailsEnabled();
@@ -70,7 +98,7 @@ async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
   // verified client ("on") or block one client ("off") independent of the
   // global switch. No tenantId / "inherit" ⇒ follow the global switch (unchanged).
   if (input.tenantId) {
-    const override = await getClientEmailOverride(input.tenantId);
+    const override = await (strictClientGate ? getClientEmailOverride(input.tenantId, { failClosed: true }) : getClientEmailOverride(input.tenantId));
     if (override === "on") return true;
     if (override === "off") return false;
   }
@@ -90,7 +118,7 @@ async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
  * API for existing senders.
  */
 export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendEmailResult> {
-  if (!(await audienceEnabled(input))) {
+  if (!(await audiencePolicyEnabled(input, false))) {
     console.warn(`[email] ${input.audience} email disabled — skipped send`);
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }
@@ -98,22 +126,52 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
 
-  const { Resend } = await import("resend");
-  const resend = new Resend(apiKey);
   const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
-  const html = input.options ? renderEmailHtml(input.options) : input.html;
-  const text = input.options ? renderEmailText(input.options) : input.text;
-  const fromName = input.fromName || "Strelva";
-  const fromAddress = input.fromAddress || `hello@${fromDomain}`;
-  const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const suppliedBrand = input.options?.brand ?? input.brand;
+  const authorship = input.authorship ?? (input.audience === "client" || suppliedBrand?.agencyId ? "agency" : input.audience === "customer" ? "business" : "platform");
+  const brand = authorship === "agency"
+    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : suppliedBrand?.agencyId ? await resolveOwnerBrand(suppliedBrand.agencyId) : suppliedBrand
+    : authorship === "platform" ? STRELVA_BRAND : undefined;
+  const agencyId = brand?.agencyId;
+  const identity = agencyId ? await resolveAgencyEmailIdentity(agencyId) : null;
+  if (authorship === "agency" && (!agencyId || !identity)) {
+    console.warn("[email] agency-authored send held: agency_identity_unavailable");
+    return { status: "suppressed", reason: "agency_identity_unavailable" };
+  }
+  const businessName = authorship === "business"
+    ? input.businessName?.trim() || input.options?.businessName?.trim() || input.fromName?.trim()
+    : undefined;
+  if (authorship === "business" && !businessName) {
+    console.warn("[email] business-authored send held: business_identity_unavailable");
+    return { status: "suppressed", reason: "business_identity_unavailable" };
+  }
+  const resolvedBrand = identity && brand ? { ...brand, name: identity.name, replyTo: identity.replyTo } : brand;
+  const options = input.options ? {
+    ...input.options, brand: resolvedBrand, businessName,
+    ...(input.options.paper ? { paper: { ...input.options.paper, brand: resolvedBrand, businessName } } : {}),
+  } : undefined;
+  const html = options ? renderEmailHtml(options) : input.html!;
+  const text = options ? renderEmailText(options) : input.text!;
+  const fromName = identity ? identity.name : authorship === "business" ? businessName! : input.fromName || STRELVA_BRAND.name;
+  const fromAddress = agencyId
+    ? input.fromAddress && /@(updates|mail)\.strelva\.com$/.test(input.fromAddress) ? input.fromAddress : "hello@updates.strelva.com"
+    : input.fromAddress || (authorship === "business" ? "hello@mail.strelva.com" : `hello@${fromDomain}`);
+  const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
+
+  // Authorize the actual sending domain after resolving agency branding.
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  }
 
   const payload = {
-    from: `${fromName} <${fromAddress}>`,
+    from: formatEmailFrom(fromName, fromAddress),
     replyTo,
     to: input.to,
     subject: input.subject,
     html,
     text,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     ...(input.tags
       ? {
           tags: Object.entries(input.tags)
@@ -123,6 +181,11 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
         }
       : {}),
   };
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "provider_not_cleared" };
+  }
+  const { Resend } = await import("resend");
+  const resend = new Resend(apiKey);
   const result = input.idempotencyKey
     ? await resend.emails.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.emails.send(payload);
@@ -145,8 +208,14 @@ export interface BatchMessage {
 }
 
 export interface SendBatchInput {
+  /** Client-branded newsletters also obey the tenant-aware client pause. */
+  requireClientGate?: boolean;
   audience: EmailAudience;
   tenantId?: string;
+  /** As SendEmailInput.provider; checked against fromAddress's domain. */
+  provider?: EmailAgency;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName: string;
   /** Must be on updates.strelva.com or mail.strelva.com. */
   fromAddress: string;
@@ -163,6 +232,16 @@ export type SendBatchResult =
 
 const ALLOWED_FROM_DOMAINS = ["updates.strelva.com", CLIENT_MAIL_DOMAIN];
 
+/** Check before rendering unsubscribe links; the transport checks again at send. */
+export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate"> & Partial<Pick<SendBatchInput, "provider" | "fromAddress">>): Promise<string | null> {
+  const rendered = { subject: "", to: [], html: "", text: "" };
+  if (input.requireClientGate && !(await audienceEnabled({ ...rendered, audience: "client", tenantId: input.tenantId }, true))) return "not sent: gated";
+  if (!(await audienceEnabled({ ...rendered, audience: input.audience, tenantId: input.tenantId }))) return "not sent: gated";
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input))))) return "not sent: provider not cleared";
+  if (!process.env.RESEND_API_KEY) return "not sent: unconfigured";
+  return null;
+}
+
 /**
  * A batch through the same transport boundary and audience gate as
  * sendEmailWithReceipt. Used for newsletters (audience `customer`). Throws on
@@ -173,18 +252,15 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
   if (input.messages.length > 100) throw new Error("A batch holds at most 100 messages.");
   const domain = input.fromAddress.split("@")[1]?.toLowerCase();
   if (!domain || !ALLOWED_FROM_DOMAINS.includes(domain)) throw new Error(`Refusing to send from ${domain ?? "an invalid address"}.`);
-  if (!(await audienceEnabled({ audience: input.audience, tenantId: input.tenantId, subject: "", to: [], html: "", text: "" }))) {
-    console.warn(`[email] ${input.audience} email disabled — skipped batch`);
-    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
-  }
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  const suppression = await batchEmailSuppression(input);
+  if (suppression) return { status: "suppressed", reason: suppression };
+  const apiKey = process.env.RESEND_API_KEY!;
 
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
   const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const payload = input.messages.map((message) => ({
-    from: `${input.fromName} <${input.fromAddress}>`,
+    from: formatEmailFrom(input.fromName, input.fromAddress),
     replyTo,
     to: message.to,
     subject: message.subject,
@@ -192,11 +268,15 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
     text: message.text,
     ...(message.headers ? { headers: message.headers } : {}),
   }));
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, domain))) {
+    return { status: "suppressed", reason: "not sent: provider not cleared" };
+  }
   const result = input.idempotencyKey
     ? await resend.batch.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.batch.send(payload);
   if (result.error) throw new Error(result.error.message || "Resend rejected the batch.");
   const ids = (result.data?.data ?? []).map((item) => item.id).filter((id): id is string => typeof id === "string");
+  if (ids.length !== input.messages.length) throw new Error("Batch acceptance is unconfirmed; reconcile before retrying.");
   return { status: "accepted", count: input.messages.length, providerMessageIds: ids, acceptedAt: new Date().toISOString() };
 }
 

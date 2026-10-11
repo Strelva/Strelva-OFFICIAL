@@ -51,6 +51,16 @@ describe("the Google listing System", () => {
     expect(out.listings[0]).toMatchObject({ health: "ok" });
   });
 
+  it("keeps health, receipts and listing controls after a location becomes a stored Version System", () => {
+    const projected = addPublishingSystems(base, snapshot(), { now: NOW });
+    const adopted = projected.listing.systems.find(item => item.system.kind === "listing")!;
+    const storedBase = { ...base, systems: [...base.systems, { ...adopted, provenance: "stored" as const }] };
+    const out = addPublishingSystems(storedBase, snapshot(), { now: NOW });
+    expect(out.listing.systems.filter(item => item.system.id === adopted.system.id)).toHaveLength(1);
+    expect(out.listings[0]).toMatchObject({ systemId: adopted.system.id, health: "ok" });
+    expect(out.observations).toHaveLength(1);
+  });
+
   it("is additive: every existing System keeps its id and place", () => {
     const out = addPublishingSystems(base, snapshot(), { now: NOW });
     expect(out.listing.systems.slice(0, base.systems.length)).toEqual(base.systems);

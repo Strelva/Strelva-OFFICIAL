@@ -317,7 +317,7 @@ async function DashboardHome() {
             value={retentionSignals.aiChangesThisWeek}
             detail={
               retentionSignals.aiChangesThisWeek > 0
-                ? "Strelva handled these for you this week"
+                ? "What changed this week"
                 : "No updates needed this week"
             }
             icon={<Sparkles className="h-4 w-4" strokeWidth={1.5} />}

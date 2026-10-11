@@ -93,9 +93,9 @@ function item(input: { kind: ChangeKind; title: string; sourceId: string; revisi
   return {
     kind: input.kind,
     route: "owner_decides",
-    title: (first ? `Put ${input.title} live` : `Release the new version of ${input.title}`).slice(0, 200).trim(),
-    detail: first ? "It passed its checks. Nobody can use it until you approve." : "It passed its checks. The live version stays until you approve.",
-    approveEffect: first ? "It goes live for the people you give access to." : "The new version replaces the live one.",
+    title: (first ? `Put ${input.title} live` : `Approve the new release of ${input.title}`).slice(0, 200).trim(),
+    detail: first ? "It passed its checks. Nobody can use it until you approve." : "It passed its checks. The live release stays until you approve.",
+    approveEffect: first ? "It goes live for the people you give access to." : "The new release replaces the live one.",
     notYetEffect: "Nothing changes; it waits for you.",
     sourceLifecycle: "application_release",
     sourceId: input.sourceId,
@@ -137,6 +137,8 @@ export function applicationReleaseAdapter(ports: ApplicationReleasePorts): Sourc
   return {
     lifecycle: "application_release",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: false,
+    ownerLinkApprovalRequiresSignIn: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       const items: ProposedItem[] = [];
@@ -158,6 +160,9 @@ export function applicationReleaseAdapter(ports: ApplicationReleasePorts): Sourc
     async resolve(ctx, item, decision, by) {
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
       if (decision === "not_yet") return { outcome: "done", reason: "Not yet" };
+      // Existing service sessions also refuse: the ordinary member mutation
+      // cannot atomically recheck the owner-link agency assignment/effect.
+      if (by.kind === "owner_link") return { outcome: "failed", reason: "sign_in_required" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       try {

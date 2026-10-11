@@ -2,20 +2,24 @@
 /**
  * Convert one managed tenant into a customer business workspace.
  *
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug>                                   # dry run (default)
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --operator-email=<super admin>    # dry run + link state
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --apply --operator-email=<email>  # local database only
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --agency=<uuid> --agency-staff=<email[,email...]> --agency-basis=<existing_contract|owner_choice>  # dry run
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --agency=<uuid> --agency-staff=<email[,email...]> --agency-basis=<...> --apply --operator-email=<email>  # local only
  *
  * A dry run reads the tenant, content, booking config, leads, bookings and
- * account through the existing src/lib readers and prints the exact plan. It
+ * account from explicit legacy sources and prints the exact plan. Content uses its
+ * existing configured source; booking rows use the legacy DB/dev store; settings
+ * and account grouping are captured directly from legacy Redis. This does not
+ * select a runtime read authority or qualify any cutover. It
  * writes nothing: no Postgres, no Redis (the tenant row is read directly so the
- * tenant-list cache is not refreshed), no email.
+ * tenant-list cache is not refreshed), no invitation or email.
  *
  * --apply writes through one atomic RPC (convert_tenant_to_business). It
  * refuses unless SUPABASE_URL is a loopback host, or --i-have-jacobs-yes is
  * passed: a production conversion is Jacob's call. It never changes the tenant
- * row, `reb:` keys, /api/v1, memberships, Stripe, and never invites anyone.
- * Reruns are no-ops; a failed run left nothing behind and can simply rerun.
+ * row, `reb:` keys, /api/v1 or Stripe. It creates provider-seat access for the
+ * explicitly named agency staff and no personal admin membership. Owner
+ * invitation behavior stays unchanged; this command sends no invitation or
+ * email. Reruns are no-ops; a failed run left nothing behind and can rerun.
  *
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --separate-business --operator-email=<email>  # dry run
  *
@@ -40,10 +44,10 @@ import "../src/register-workspace-ports"; // workspace ports src/lib declares (S
 import { getSupabase, type Row } from "../src/platform/infra/db/client";
 import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
 import { getStoredContent } from "../src/lib/storage/content-store";
-import { getBookingConfig, getBookings, getDateOverrides } from "../src/platform/bookings/legacy-store";
+import { legacyGetBookings as getBookings } from "../src/platform/bookings/legacy-store";
 import { DEFAULT_BOOKING_CONFIG } from "../src/lib/booking";
 import { getRedisLeads as getLeads } from "../src/lib/leads";
-import { getAccountForTenant } from "../src/lib/accounts";
+import { captureLegacyRedisConversionSettings } from "./tenant-conversion-legacy-source";
 import { billingMonthlyCents, resolveBillingType } from "../src/lib/billing-type";
 import { isGrandfathered } from "../src/lib/subscription";
 import { PROTECTED_TENANTS } from "../src/lib/deprovision";
@@ -61,17 +65,16 @@ async function readTenant(slug: string) {
 async function read(slug: string): Promise<ConversionSources> {
   const tenant = await readTenant(slug);
   if (!tenant) return { tenant, contact: null, settings: null, footer: null, services: null, bookingConfig: null, leads: [], bookings: [], billing: null, account: null };
-  const [contact, settings, footer, services, config, overrides, leads, bookings, account] = await Promise.all([
+  const [contact, settings, footer, services, legacy, leads, bookings] = await Promise.all([
     getStoredContent("contact", slug),
     getStoredContent("settings", slug),
     getStoredContent("footer", slug),
     getStoredContent("services", slug),
-    getBookingConfig(slug),
-    getDateOverrides(slug),
+    captureLegacyRedisConversionSettings(slug),
     getLeads(slug, 500),
     getBookings(slug),
-    getAccountForTenant(slug),
   ]);
+  const {config,overrides,account}=legacy;
   return {
     tenant,
     contact,

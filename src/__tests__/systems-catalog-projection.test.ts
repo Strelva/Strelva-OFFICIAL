@@ -50,6 +50,14 @@ function snapshot(overrides: Partial<ExistingSystemsSnapshot> = {}): ExistingSys
 const facts = (entries: Array<[string, TenantSiteFacts]>) => new Map(entries);
 
 describe("systems catalog: merges", () => {
+  it("keeps the tracker, check and document in the original file list while Systems is off", async () => {
+    const listing = systemsFromExisting(snapshot({ managedWebsites: [] }));
+    const projection = await projectWorkspaceSystems({ listing, siteDomains: new Map(), candidates: [], observations: [], actorId: BUSINESS, now: NOW });
+    const files = [[TRACKER, "tracker", "tracker"], [CHECK, "investigations", "investigation"], [DOCUMENT, "documents", "document"]].map(([id, productId, resourceKind]) =>
+      ({ id, workspaceId: BUSINESS, productId, resourceKind, title: "Saved work", createdAt: AT, input: {}, payload: null }) as unknown as WorkspaceWork);
+    const view = readBusinessSystems({ snapshot: { workspaceId: BUSINESS, workspaces: [], work: files, delegations: [], systems: projection, releases: { systems: false } }, sites: [] });
+    expect(view).toEqual({ systems: [], files, unavailable: false });
+  });
   it("lists a tracker as an internal tool and leaves documents out of Systems", () => {
     const { systems } = systemsFromExisting(snapshot());
     const tracker = systems.find(({ references }) => references.savedWorkId === TRACKER)!;
@@ -220,6 +228,16 @@ describe("systems catalog: agency drafts are website Possibilities", () => {
     expect(candidate.origin).toBe("agency_draft");
     expect(candidate.summary).toContain("your agency prepared under its website draft grant");
     expect(candidate.tenantId).toBe("mooney-firm");
+  });
+
+  it("labels the latest agent draft without changing prior agency history", () => {
+    const work = rebuild(["rebuild_published", "agency_document_draft", "agent_document_proposal"]);
+    const candidate = websiteRebuildCandidate(work)!;
+    expect(candidate.origin).toBe("agent_draft");
+    expect(candidate.summary).toContain("your connected agent");
+    expect(work.payload.history[1]!.kind).toBe("agency_document_draft");
+    expect(websiteRebuildCandidate(rebuild(["agent_document_proposal", "publish_reconciled"]))!.origin).toBe("rebuild");
+    expect(websiteRebuildCandidate(rebuild(["agent_document_proposal", "agency_document_draft"]))!.origin).toBe("agency_draft");
   });
 
   it("keeps a plain rebuild, or a draft already published, a rebuild", () => {

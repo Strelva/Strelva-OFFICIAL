@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPublicWebsiteBookingService, PublicBookingError } from "@/products/scheduling/server";
+import { bookingConflictAlternatives, type BookingAlternatives } from "@/platform/bookings/conflicts";
 
 export const BOOKING_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +26,12 @@ export function bookingService() {
 export function bookingError(error: unknown): NextResponse {
   if (error instanceof PublicBookingError) return bookingJson({ error: error.message, code: error.code }, error.status);
   return bookingJson({ error: "Booking availability is temporarily unavailable." }, 503);
+}
+
+export async function bookingConflictError(error: unknown, read: () => Promise<{ timeZone: string; slots: BookingAlternatives["nextSlots"] }>): Promise<NextResponse> {
+  const alternatives = await bookingConflictAlternatives(error, read);
+  if (error instanceof PublicBookingError) return bookingJson({ error: error.message, code: error.code, ...alternatives }, error.status);
+  return bookingError(error);
 }
 
 export function stringValue(value: unknown, max: number): string | undefined {

@@ -3,6 +3,7 @@
 import type {
   InquiryTimelineEventType,
   ResponsibilityEvaluation,
+  ResponsibilityMessageDisclosure,
   ReceiptActor,
 } from "./contracts";
 import type { EmailOptions } from "@/platform/infra/email/layout";
@@ -35,6 +36,8 @@ export type InquiryDeliveryStatus =
 export interface InquiryDeliverySubmission {
   id: string;
   tenantId: string;
+  /** Trusted engine workspace identity, never sourced from visitor fields. */
+  businessId?: string;
   name: string;
   email: string;
   message?: string | null;
@@ -49,6 +52,7 @@ export interface InquiryDeliverySubmission {
   capabilityVersion?: number | null;
   /** Optional host revision used to bind approvals and follow-up rechecks. */
   inquiryVersion?: string | number | null;
+  bookingOffer?: import("./booking-handoff").InquiryBookingOffer;
   receivedAt: string;
 }
 
@@ -110,8 +114,10 @@ export interface InquiryDeliveryMessage {
   audience: EmailAudience;
   to: string;
   replyTo?: string;
+  fromName?: string;
   subject: string;
   options: EmailOptions;
+  disclosure?: ResponsibilityMessageDisclosure;
   /** Non-sensitive provider metadata used to correlate signed delivery events. */
   tags?: Record<string, string>;
   /** Stable in Strelva, even when the provider does not expose an idempotency API. */
@@ -249,6 +255,8 @@ export interface InquiryDeliveryStore {
     /** Digest of the exact message this attempt will hand to the provider. */
     messageDigest?: string;
   }): Promise<InquiryDeliveryClaim>;
+  /** Confirm the exact accepted attempt's durable projections before readback. */
+  repairAcceptedProjections?(input: { tenantId: string; inquiryId: string; action: InquiryDeliveryAction; attemptId: string; acceptedAt: string; providerMessageId?: string; replyTo?: string }): Promise<InquiryDeliveryCheckpoint>;
   markAccepted(input: {
     tenantId: string;
     inquiryId: string;
@@ -322,6 +330,7 @@ export interface InquiryFollowUpRecheck {
 }
 
 export interface InquiryDeliveryDependencies {
+  messageRoute?: import("./inquiry-policy-at-use").InquiryMessageRouteReader;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
   now?: () => Date;

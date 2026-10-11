@@ -147,8 +147,12 @@ export function resolveService(
   return { bookable: true, durationMinutes: Number.isFinite(parsed) && parsed > 0 ? parsed : settings.defaultLengthMinutes, name: siteService.name, businessServiceId: null };
 }
 
-/** Store rows that hold time on a calendar: held, requested, confirmed, plus imported bookings. */
+/** Store rows that hold time on a calendar: held, requested, confirmed, plus
+ * imported bookings. An anonymous hold (website, inquiry or agent) stops
+ * holding time 15 minutes after it was made, before any sweep releases it. */
 export function blocksTime(booking: StoreBooking): boolean {
+  if (booking.status === "held" && (booking.origin === "site" || booking.origin === "inquiry" || booking.origin === "agent")
+    && Date.parse(booking.createdAt) <= Date.now() - 15 * 60000) return false;
   return SLOT_HOLDING_STATUSES.has(booking.status) || (booking.origin === "import" && booking.status === "confirmed");
 }
 
@@ -175,9 +179,14 @@ export function storeSlotsForDate(context: BookingContext, date: string, duratio
       maxAdvanceBooking: settings.maxAdvanceDays,
       requirePayment: false,
     };
-    for (const slot of generateSlots(config, date, durationMinutes, asLegacy, [])) slots.add(slot);
+    for (const slot of generateSlots(config, date, durationMinutes, context.servicePolicies ? [] : asLegacy, [])) slots.add(slot);
   }
-  return [...slots].sort();
+  return [...slots].sort().filter(time => {
+    if (!context.servicePolicies) return true;
+    const start=Date.parse(zonedLocalToUtc(date,time,timeZoneOf(context)));
+    const end=start+(durationMinutes+settings.bufferMinutes)*60000;
+    return !blocking.some(booking=>start < Date.parse(booking.end)+booking.bufferMinutes*60000 && end > Date.parse(booking.start));
+  });
 }
 
 /** The legacy BookingConfig a store-served dashboard shows: first open range per weekday. */

@@ -11,6 +11,8 @@ export interface ClientRecordRedis {
   get<T = unknown>(key: string): Promise<T | null>;
   mget<T = unknown[]>(...keys: string[]): Promise<T>;
   zrange<T = unknown[]>(key: string, start: number, stop: number, opts?: { withScores?: boolean; rev?: boolean }): Promise<T>;
+  hgetall<T = Record<string, unknown>>(key: string): Promise<T | null>;
+  lrange<T = unknown[]>(key: string, start: number, stop: number): Promise<T>;
   scan(cursor: string | number, opts: { match: string; count: number }): Promise<[string | number, string[]]>;
 }
 
@@ -59,6 +61,18 @@ export function firstReplyRecord(inquiryId: string, acceptedAt: string, action: 
   return { recordId: inquiryId, payload: { firstReplyAt: acceptedAt, by, action }, capturedAt: acceptedAt };
 }
 
+export const INQUIRY_DELIVERY_KINDS = ["checkpoint", "provider_target", "reply_target", "reply_state", "provider_event"] as const;
+export type InquiryDeliveryRecordKind = typeof INQUIRY_DELIVERY_KINDS[number];
+export function inquiryDeliveryRecordId(kind: InquiryDeliveryRecordKind, key: string): string {
+  return `${kind}:${createHash("sha256").update(`${kind}\0${key}`).digest("hex")}`;
+}
+/** Stable-id context supplies the tenant; payloads never pin a mutable slug. */
+export function inquiryDeliveryRecord(kind: InquiryDeliveryRecordKind, key: string, value: unknown, capturedAt = new Date().toISOString()): ClientRecord {
+  const normalized = value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, unknown> } : value;
+  if (normalized && typeof normalized === "object") delete (normalized as Record<string, unknown>).tenantId;
+  return { recordId: inquiryDeliveryRecordId(kind, key), payload: { kind, key, value: normalized }, capturedAt };
+}
+
 export interface ClientRecordStoreDefinition {
   store: ClientRecordStore;
   mode: ClientRecordMode;
@@ -70,6 +84,52 @@ export interface ClientRecordStoreDefinition {
 const nowIso = (now?: Date) => (now ?? new Date()).toISOString();
 
 export const CLIENT_RECORD_STORE_DEFINITIONS: Record<ClientRecordStore, ClientRecordStoreDefinition> = {
+  orders: indexedBlobs("orders", (t) => `orders:${t}`, (t, id) => `order:${t}:${id}`),
+  threads: indexedBlobs("threads", (t) => `threads:${t}:index`, (t, id) => `threads:${t}:${id}`, true),
+  provider_connections: {
+    store: "provider_connections", mode: "replace", removalIsIntentional: true,
+    async readRedis(redis, tenant, now) {
+      const prefix = `connections:${tenant}:`;
+      const rows: ClientRecord[] = [];
+      for (const key of await scanAll(redis, `${prefix}*`)) {
+        const value = parse(await redis.get(key));
+        if (value && typeof value === "object") rows.push({ recordId: key.slice(prefix.length), payload: asPayload(value), capturedAt: nowIso(now) });
+      }
+      return rows;
+    },
+  },
+  provider_metadata: keyedValues("provider_metadata", { google: (t) => `google-meta:${t}`, calendly: (t) => `calendly-meta:${t}` }),
+  tenant_settings: keyedValues("tenant_settings", {
+    reply_voice: (t) => `reb:reply-voice:${t}`, content_autonomy: (t) => `reb:content-autonomy:${t}`,
+    goal: (t) => `goal:${t}`, client_email: (t) => `reb:client-email:${t}`,
+  }),
+  reward_members: {
+    store: "reward_members", mode: "replace", removalIsIntentional: false,
+    async readRedis(redis, tenant, now) {
+      const prefix = `reb:rewards:${tenant}:member:`;
+      const rows: ClientRecord[] = [];
+      for (const key of await scanAll(redis, `${prefix}*`)) {
+        const value = await redis.hgetall<Record<string, unknown>>(key);
+        if (value?.email) rows.push({ recordId: key.slice(prefix.length), payload: Object.fromEntries(Object.entries(value).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)])), capturedAt: typeof value.createdAt === "string" ? value.createdAt : nowIso(now) });
+      }
+      return rows;
+    },
+  },
+  reward_transactions: {
+    store: "reward_transactions", mode: "replace", removalIsIntentional: false,
+    async readRedis(redis, tenant, now) {
+      const prefix = `reb:rewards:${tenant}:txns:`;
+      const rows: ClientRecord[] = [];
+      for (const key of await scanAll(redis, `${prefix}*`)) {
+        const email = key.slice(prefix.length);
+        for (const raw of await redis.lrange<unknown[]>(key, 0, -1)) {
+          const value = parse(raw) as Record<string, unknown> | null;
+          if (typeof value?.id === "string") rows.push({ recordId: value.id, payload: { ...value, email }, capturedAt: typeof value.timestamp === "string" ? value.timestamp : nowIso(now) });
+        }
+      }
+      return rows;
+    },
+  },
   spam_held: {
     store: "spam_held",
     mode: "replace",
@@ -130,6 +190,25 @@ export const CLIENT_RECORD_STORE_DEFINITIONS: Record<ClientRecordStore, ClientRe
       return [...earliest.values()];
     },
   },
+  inquiry_delivery: {
+    store: "inquiry_delivery", mode: "replace", removalIsIntentional: false,
+    async readRedis(redis, tenant, now) {
+      const definitions: [InquiryDeliveryRecordKind, string][] = [
+        ["checkpoint", `reb:inquiry-delivery:${keyPart(tenant)}:`],
+        ["provider_target", `reb:inquiry-delivery-provider:${keyPart(tenant)}:`],
+        ["reply_target", `reb:inquiry-reply:${keyPart(tenant)}:`],
+        ["reply_state", `reb:inquiry-reply-state:${keyPart(tenant)}:`],
+        ["provider_event", `reb:inquiry-delivery-event:${keyPart(tenant)}:`],
+      ];
+      const records: ClientRecord[] = [];
+      for (const [kind, prefix] of definitions) for (const key of await scanAll(redis, `${prefix}*`)) {
+        const value = parse(await redis.get(key));
+        if (value === null || value === undefined || (kind === "provider_event" && value !== "completed")) continue;
+        records.push(inquiryDeliveryRecord(kind, key.slice(prefix.length), value, nowIso(now)));
+      }
+      return records;
+    },
+  },
   booking_config: {
     store: "booking_config",
     mode: "replace",
@@ -156,3 +235,29 @@ export const CLIENT_RECORD_STORE_DEFINITIONS: Record<ClientRecordStore, ClientRe
     },
   },
 };
+
+function indexedBlobs(store: ClientRecordStore, index: (tenant: string) => string, key: (tenant: string, id: string) => string, removalIsIntentional = false): ClientRecordStoreDefinition {
+  return { store, mode: "replace", removalIsIntentional, async readRedis(redis, tenant, now) {
+    const ids = ((await redis.zrange<unknown[]>(index(tenant), 0, -1)) ?? []).map(String);
+    const rows: ClientRecord[] = [];
+    for (let i = 0; i < ids.length; i += 200) {
+      const values = await redis.mget<unknown[]>(...ids.slice(i, i + 200).map((id) => key(tenant, id)));
+      values.forEach((raw, j) => {
+        const value = parse(raw) as Record<string, unknown> | null;
+        if (!value || typeof value !== "object") return;
+        rows.push({ recordId: ids[i + j]!, payload: value, capturedAt: String(value.updatedAt ?? value.createdAt ?? nowIso(now)) });
+      });
+    }
+    return rows;
+  } };
+}
+function keyedValues(store: ClientRecordStore, keys: Record<string, (tenant: string) => string>): ClientRecordStoreDefinition {
+  return { store, mode: "replace", removalIsIntentional: true, async readRedis(redis, tenant, now) {
+    const rows: ClientRecord[] = [];
+    for (const [recordId, key] of Object.entries(keys)) {
+      const value = await redis.get(key(tenant));
+      if (value !== null && value !== undefined) rows.push({ recordId, payload: { value: parse(value) }, capturedAt: nowIso(now) });
+    }
+    return rows;
+  } };
+}

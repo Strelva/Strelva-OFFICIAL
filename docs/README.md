@@ -7,6 +7,7 @@ Updated: 2026-10-04
 | [capabilities/](./capabilities/README.md) | Every customer capability: what it does, status, code, specs, tests | [capabilities/README](./capabilities/README.md) |
 | [architecture/](./architecture/README.md) | Data, auth, tenancy, contracts, platform layers | [persistence-boundaries](./architecture/persistence-boundaries.md) |
 | [operations/](#operations) | Runbooks: release, rollback, secrets, domains, onboarding, testing | [production-readiness](./operations/production-readiness.md) |
+| [agency/](./agency/README.md) | Internal 1.0 help drafts, week-one playbook and source verification; unbuilt steps marked | [agency/README](./agency/README.md) |
 | [product/](#product) | Direction, briefs, evidence, roadmap | [product-reality](./product/product-reality.md) |
 | [design/](./design/) | Tokens, components, color, motion, brand | [component-system](./design/component-system.md) |
 | [research/](./research/), [strategy/](./strategy/00-INDEX.md) | Research memos and strategy explorations. Inputs, not decisions | — |

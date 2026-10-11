@@ -22,6 +22,10 @@ describe("workspace places", () => {
     expect(isRetiredView("customers")).toBe(true);
     for (const view of [null, undefined, "", "home", "requests", "apps"]) expect(isRetiredView(view)).toBe(false);
     expect(sectionFromView("apps")).toBe("apps");
+    // October 6: Needs you is its own place (the layout opens Home while its release is off).
+    expect(sectionFromView("needs-you")).toBe("needs-you");
+    expect(sectionTitle("needs-you")).toBe("Needs you");
+    expect(workspaceSectionHref("needs-you", "", "b1")).toBe("/workspace?view=needs-you&workspaceId=b1");
   });
 
   it("falls back to Home for missing, unknown or unsafe views", () => {
@@ -32,9 +36,9 @@ describe("workspace places", () => {
     expect(sectionTitle("home")).toBe("Home");
     expect(sectionTitle("requests")).toBe("Requests");
     expect(sectionTitle("ongoing")).toBe("Running");
-    // The app list is "Apps" until STRELVA_SYSTEMS_RELEASE is on.
-    expect(sectionTitle("work")).toBe("Apps");
-    expect(sectionTitle("products")).toBe("Apps");
+    // The legacy app address uses the same Internal tools kind name.
+    expect(sectionTitle("work")).toBe("Internal tools");
+    expect(sectionTitle("products")).toBe("Internal tools");
     expect(sectionTitle("apps", true)).toBe("Systems");
     expect(sectionTitle("work", true)).toBe("Systems");
     expect(sectionTitle("products", true)).toBe("Systems");

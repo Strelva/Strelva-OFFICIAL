@@ -1,0 +1,124 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { reconcileWorkspaceInquiryProviderEvent, replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput, type WorkspaceReplyDependencies } from "@/products/inquiries/workspace-replies";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { readBusinessInquiryOutcomes, readBusinessOutcomeMonth } from "@/platform/business-outcomes";
+const actor = { userId: "d0000000-0000-4000-8000-0000000000e2", verifiedEmail: "owner@example.test" };
+const input = { workspaceId: "d0000000-0000-4000-8000-0000000000a1", rowId: "d0000000-0000-4000-8000-0000000000b1", requestId: "d0000000-0000-4000-8000-0000000000f1", subject: "Re: Party", body: "Thank you Dana. We can host 30 guests for $40 each." };
+const claim = { acquired: true, id: "d0000000-0000-4000-8000-0000000000c1", status: "sending", recipient: "dana@example.test", subject: input.subject, body: input.body,
+  tenantId: "mclears", replyTo: "owner@example.test", businessName: "McClear's", providerMessageId: null, acceptedAt: null };
+function deps(patch: Partial<WorkspaceReplyDependencies> = {}): WorkspaceReplyDependencies {
+  return { enabled: () => true, gates: vi.fn(async () => true), rpc: vi.fn(async (name) => name.startsWith("claim") ? claim : { status: "accepted" as const }),
+    send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "mail-1", acceptedAt: "2026-10-06T12:00:00Z" })),
+    readback: vi.fn(async () => ({ status: "available" as const, providerMessageId: "mail-1", to: ["dana@example.test"], subject: input.subject, lastEvent: "delivered" })), ...patch };
+}
+afterEach(() => vi.unstubAllEnvs());
+describe("owner workspace replies", () => {
+  it("requires explicit flags; flags off do no storage or transport work", async () => {
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    expect(workspaceInquiryRepliesEnabled({})).toBe(false);
+    expect(workspaceInquiryRepliesEnabled({ STRELVA_INQUIRY_RECORDS: "1" })).toBe(false);
+    expect(workspaceInquiryRepliesEnabled({ STRELVA_INQUIRY_RECORDS: "1", STRELVA_INQUIRY_REPLIES: "1" })).toBe(true);
+    const d = deps({ enabled: () => false }); expect((await replyFromWorkspace(actor,input,d)).status).toBe("suppressed"); expect(d.rpc).not.toHaveBeenCalled(); expect(d.send).not.toHaveBeenCalled();
+  });
+  it("saves owner scope and exact message before transport; provider acceptance survives failed readback", async () => {
+    const d = deps({ readback: vi.fn(async () => ({ status: "unavailable" as const, reason: "offline" })) });
+    expect(await replyFromWorkspace(actor,input,d)).toMatchObject({ status: "accepted" as const, retryable: false, providerMessageId: "mail-1" });
+    expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply_v2",expect.objectContaining({ p_user_id: actor.userId,p_verified_email: actor.verifiedEmail,p_lead_row_id:input.rowId,p_body:input.body,p_is_commitment:true }),expect.any(Function));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "customer",fromAddress:"hello@mail.strelva.com",replyTo:"owner@example.test",idempotencyKey:expect.stringContaining(claim.id) }));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId } }));
+    expect(d.rpc).toHaveBeenNthCalledWith(2,"finish_workspace_inquiry_reply",expect.objectContaining({ p_status:"accepted" as const,p_provider_message_id:"mail-1" }));
+  });
+  it("never sends a duplicate, in-progress, bounced or unknown purpose", async () => {
+    for(const status of ["sending","accepted","bounced","unknown"]){ const d=deps({ rpc:vi.fn(async()=>({...claim,acquired:false,status})) }); expect((await replyFromWorkspace(actor,input,d)).status).toBe(status); expect(d.send).not.toHaveBeenCalled(); }
+  });
+  it("suppresses at the email gates after authorized claim; no provider read", async () => {
+    const d=deps({gates:vi.fn(async()=>false)}); expect((await replyFromWorkspace(actor,input,d)).status).toBe("suppressed");expect(d.send).not.toHaveBeenCalled();expect(d.readback).not.toHaveBeenCalled();
+  });
+  it("provider timeout closes unknown acceptance; retry uses same claim without another send", async () => {
+    const rpc=vi.fn().mockResolvedValueOnce(claim).mockResolvedValueOnce({status:"unknown"}).mockResolvedValueOnce({...claim,acquired:false,status:"unknown"});
+    const d=deps({rpc,send:vi.fn(async()=>{throw new Error("timeout");})}); expect((await replyFromWorkspace(actor,input,d)).status).toBe("unknown");await replyFromWorkspace(actor,input,d);expect(d.send).toHaveBeenCalledTimes(1);
+  });
+  it("accepted provider write is never retried when its database receipt fails", async () => {
+    const d=deps({rpc:vi.fn().mockResolvedValueOnce(claim).mockRejectedValueOnce(new Error("DB down"))});expect((await replyFromWorkspace(actor,input,d)).status).toBe("accepted");expect(d.readback).not.toHaveBeenCalled();expect(d.send).toHaveBeenCalledTimes(1);
+  });
+  it("rejects non-owner/wrong-business and changed message before transport", async () => {
+    const d=deps({rpc:vi.fn(async()=>{throw new WorkspaceAccessError();})});await expect(replyFromWorkspace(actor,input,d)).rejects.toBeInstanceOf(WorkspaceAccessError);expect(d.send).not.toHaveBeenCalled();
+    const changed=deps({rpc:vi.fn(async()=>{throw new Error("inquiry_reply_changed");})});await expect(replyFromWorkspace(actor,input,changed)).rejects.toThrow("changed");expect(changed.send).not.toHaveBeenCalled();
+  });
+  it("truthful readback projects bounce, defer, failure and delivery; mismatch stays accepted", async () => {
+    for(const [lastEvent,status] of [["bounced","bounced"],["delivery_delayed","deferred"],["failed","failed"],["opened","delivered"]] as const){
+      const d=deps({readback:vi.fn(async()=>({status:"available" as const,providerMessageId:"mail-1",to:["dana@example.test"],subject:input.subject,lastEvent}))});expect((await replyFromWorkspace(actor,input,d)).status).toBe(status);
+    }
+    const d=deps({readback:vi.fn(async()=>({status:"available" as const,providerMessageId:"mail-1",to:["wrong@example.test"],subject:input.subject,lastEvent:"delivered"}))});expect((await replyFromWorkspace(actor,input,d)).status).toBe("accepted");
+  });
+  it("refuses subject injection, arbitrary destinations and malformed request ids", () => {
+    expect(workspaceReplyInput.safeParse({...input,subject:"Hello\nBCC: victim@example.test"}).success).toBe(false);
+    expect(workspaceReplyInput.safeParse({...input,to:"victim@example.test"}).success).toBe(false);
+    expect(workspaceReplyInput.safeParse({...input,requestId:"same"}).success).toBe(false);
+  });
+});
+describe("assigned member reply classification", () => {
+  it("server classifies exact text, records the member actor and uses truthful approval copy", async () => {
+    const plain={...input,body:"Thanks Dana. Could you tell us more?"};
+    const d=deps({rpc:vi.fn(async name=>name.startsWith("claim")?{...claim,body:plain.body,isOwner:false}:{status:"accepted"})});
+    await replyFromWorkspace({userId:actor.userId,verifiedEmail:"member@example.test"},plain,d);
+    expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply_v2",expect.objectContaining({p_is_commitment:false,p_verified_email:"member@example.test",p_body:plain.body}),expect.any(Function));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({options:expect.objectContaining({footerNote:expect.stringContaining("assigned team member")})}));
+    for(const body of ["The price is $40.","We reserved Friday.","We promise to deliver."]){
+      const blocked=deps({rpc:vi.fn(async (_name,args)=>{expect(args?.p_is_commitment).toBe(true);throw new Error("inquiry_reply_commitment_owner_only");})});
+      await expect(replyFromWorkspace(actor,{...input,body},blocked)).rejects.toThrow("owner’s approval"); expect(blocked.send).not.toHaveBeenCalled();
+    }
+  });
+});
+describe("workspace reply provider reconciliation", () => {
+  const event = { type: "email.delivered", created_at: "2026-10-06T12:01:00Z", data: {
+    email_id: "mail-1", created_at: "2026-10-06T12:00:00Z", to: ["dana@example.test"], subject: input.subject,
+    tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId },
+  } };
+  it("flags off and unrelated events do no storage, readback or send", async () => {
+    const d = deps({ enabled: () => false });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toMatchObject({ status: "ignored" });
+    expect(d.rpc).not.toHaveBeenCalled();
+    const active = deps();
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: { ...event, data: { ...event.data, tags: {} } }, eventId: "evt1" }, active)).toMatchObject({ status: "ignored" });
+    expect(active.rpc).not.toHaveBeenCalled();
+  });
+  it("correlates authenticated evidence with scope, destination, subject and event time; never sends", async () => {
+    const d = deps({ rpc: vi.fn(async () => ({ status: "recorded" })) });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toEqual({ status: "recorded" });
+    expect(d.rpc).toHaveBeenCalledWith("record_workspace_inquiry_provider_event", {
+      p_message_id: claim.id, p_workspace_id: input.workspaceId, p_provider_message_id: "mail-1", p_event_id: "evt1",
+      p_status: "delivered", p_event_at: event.created_at, p_accepted_at: event.data.created_at,
+      p_recipients: ["dana@example.test"], p_subject: input.subject,
+    });
+    expect(d.send).not.toHaveBeenCalled(); expect(d.readback).not.toHaveBeenCalled();
+  });
+  it("passes duplicate and mismatch, and keeps persistence failure retryable as webhook evidence", async () => {
+    for (const status of ["duplicate", "unmatched"] as const) {
+      const d = deps({ rpc: vi.fn(async () => ({ status })) });
+      expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toEqual({ status });
+    }
+    const d = deps({ rpc: vi.fn(async () => { throw new Error("DB offline"); }) });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toMatchObject({ status: "unavailable" as const });
+    expect(d.send).not.toHaveBeenCalled();
+  });
+  it("supports provider tag arrays and email.sent acceptance time; rejects incomplete evidence", async () => {
+    const d = deps({ rpc: vi.fn(async () => ({ status: "recorded" })) });
+    const sent = { ...event, type: "email.sent", data: { ...event.data, created_at: undefined,
+      tags: Object.entries(event.data.tags).map(([name, value]) => ({ name, value })) } };
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: sent, eventId: "sent1" }, d)).toMatchObject({ status: "recorded" });
+    expect(d.rpc).toHaveBeenCalledWith("record_workspace_inquiry_provider_event", expect.objectContaining({ p_status: "accepted" as const, p_accepted_at: sent.created_at }));
+    d.rpc = vi.fn();
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: { ...event, data: { ...event.data, to: [] } }, eventId: "bad" }, d)).toMatchObject({ status: "unmatched" });
+    expect(d.rpc).not.toHaveBeenCalled();
+  });
+});
+describe("inquiry outcome proof",()=>{
+  it("weekly proof requires its off-by-default flag and passes authenticated business scope",async()=>{
+    const rpc=vi.fn(async()=>({data:{workspaceId:input.workspaceId,from:"2026-10-01",to:"2026-10-08",inquiries:3,answered:2,withinDay:2,unanswered:1,averageReplySeconds:7200,medianReplySeconds:7200},error:null}));await expect(readBusinessInquiryOutcomes(actor,input.workspaceId,"2026-10-01","2026-10-08",rpc)).rejects.toThrow("unavailable");expect(rpc).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_OUTCOMES","1");expect(await readBusinessInquiryOutcomes(actor,input.workspaceId,"2026-10-01","2026-10-08",rpc)).toMatchObject({answered:2});expect(rpc).toHaveBeenCalledWith("business_inquiry_outcomes",expect.objectContaining({p_user_id:actor.userId,p_workspace_id:input.workspaceId}));
+  });
+  it("monthly report uses its existing RPC with flag off and exact inquiries RPC with flag on",async()=>{
+    const rpc=vi.fn(async()=>({data:{},error:null})); await readBusinessOutcomeMonth(actor,input.workspaceId,"2026-10",rpc);expect(rpc).toHaveBeenLastCalledWith("business_outcome_month",expect.any(Object));vi.stubEnv("STRELVA_INQUIRY_OUTCOMES","1");await readBusinessOutcomeMonth(actor,input.workspaceId,"2026-10",rpc);expect(rpc).toHaveBeenLastCalledWith("business_outcome_month_inquiries",expect.any(Object));
+  });
+});

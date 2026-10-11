@@ -4,3 +4,5 @@ export { executeWorkPlanOutput } from "./execution";
 export { readWorkPlan } from "./repository";
 export { createWorkPlan, presentWorkPlan } from "./service";
 export type { WorkPlan, WorkPlanNativeOperation, WorkPlanRecord } from "./contracts";
+
+export { workPlanFundingWorkspace } from "./funding";

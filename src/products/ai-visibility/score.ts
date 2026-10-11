@@ -16,7 +16,7 @@
  */
 
 import * as cheerio from "cheerio";
-import { validateUrlSafety } from "@/lib/audit/checks";
+import { validateUrlSafety, withPublicUrlValidationTimeout } from "@/platform/infra/public-url-safety";
 import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
 import type { AiVisibilityResult, CitationProbe, Grade, MeasurementStatus, ScoreInput, Signal } from "./contracts";
 
@@ -270,7 +270,7 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
     // SSRF protection: validate the URL resolves to a public IP before any fetch,
     // matching the same guard used by runAudit in src/lib/audit/checks.ts.
     try {
-      await validateUrlSafety(url);
+      await withPublicUrlValidationTimeout(() => validateUrlSafety(url!));
     } catch {
       // Treat SSRF-blocked URLs as unfetchable — degrade to no signals.
       url = undefined;

@@ -1,0 +1,12 @@
+.form { display: flex; flex-direction: column; gap: 12px; }
+.form label { color: var(--st-text); font-size: 14px; line-height: 22px; font-weight: 500; }
+.form label span { color: var(--st-text-3); font-weight: 400; }
+.form textarea, .form select { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); font: inherit; font-size: 16px; line-height: 24px; }
+.form textarea { resize: vertical; }
+.form textarea:focus-visible, .form select:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.form p, .copy { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding-block: 8px; }
+.businessSetup { display: flex; flex-direction: column; gap: 24px; }
+.businessSetup summary { color: var(--st-text-2); font-size: 14px; cursor: pointer; }
+.deliveryLink { width: 100%; max-width: 1016px; padding: 24px 48px 0; margin-inline: auto; }
+@media (max-width: 767px) { .actions { align-items: stretch; flex-direction: column; gap: 12px; } .deliveryLink { padding: 20px 20px 0; } }

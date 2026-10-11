@@ -25,7 +25,11 @@ $$;
 create or replace function pg_temp.sb_import(p_tenant text, p_extra jsonb) returns jsonb language sql as $$
   select jsonb_build_object('tenantId', t.id, 'tenantStableId', t.stable_id, 'workspaceName', t.site_name,
       'billing', '{"billingType":"custom","subscriptionStatus":"active","subscriptionPlan":null,"monthlyCents":15000,"hasStripeSubscription":true,"grandfathered":false}'::jsonb,
-      'account', pg_temp.sb_account(), 'patch', '{}'::jsonb, 'contacts', '[]'::jsonb) || p_extra
+      'account', pg_temp.sb_account(), 'patch', '{}'::jsonb, 'contacts', '[]'::jsonb)
+      || case when to_regprocedure('public.repath_converted_tenant_provider(text,text,uuid,jsonb,text,boolean)') is null then '{}'::jsonb
+        else jsonb_build_object('agencyWorkspaceId', '5b000000-0000-4000-8000-000000000010',
+          'agencyStaffEmails', jsonb_build_array('sb-agency-staff@example.test'), 'agencySelectionBasis', 'existing_contract') end
+      || p_extra
   from public.tenants t where t.id = p_tenant
 $$;
 create or replace function pg_temp.sb_convert(p_tenant text, p_extra jsonb, p_command uuid default gen_random_uuid()) returns jsonb language sql as $$
@@ -38,8 +42,13 @@ $$;
 
 insert into public.users(id, email, verified_at) values
   ('5b000000-0000-4000-8000-000000000001', 'sb-operator@strelva.example.test', now()),
-  ('5b000000-0000-4000-8000-000000000002', 'sb-camillus-owner@example.test', now());
+  ('5b000000-0000-4000-8000-000000000002', 'sb-camillus-owner@example.test', now()),
+  ('5b000000-0000-4000-8000-000000000003', 'sb-agency-staff@example.test', now());
 insert into public.super_admins(user_id, email) values ('5b000000-0000-4000-8000-000000000001', 'sb-operator@strelva.example.test');
+insert into public.workspaces(id, kind, name, created_by)
+  values ('5b000000-0000-4000-8000-000000000010', 'agency', 'Fictional separate-business test agency', '5b000000-0000-4000-8000-000000000001');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+  values ('5b000000-0000-4000-8000-000000000010', '5b000000-0000-4000-8000-000000000003', 'member', '5b000000-0000-4000-8000-000000000001');
 insert into public.tenants(id, stable_id, site_name, active, owner_email) values
   ('sb-twin-a', '5b000000-0000-4000-8000-0000000000a1', 'Twin Trees Camillus', true, 'twin-owner@example.test'),
   ('sb-twin-b', '5b000000-0000-4000-8000-0000000000a2', 'Twin Trees Fayetteville', true, 'twin-owner@example.test'),

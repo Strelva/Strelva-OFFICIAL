@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUSINESS_START_PRODUCTS, businessStartHref, businessStartRequest, businessStartView, isBusinessStartProduct } from "@/platform/workspaces/business-start";
+import { BUSINESS_START_PRODUCTS, businessStartHref, businessStartAsk, businessStartView, isBusinessStartProduct } from "@/platform/workspaces/business-start";
 import { workspaceReturnTarget, accountReturnTarget } from "@/platform/workspaces/location";
 
 describe("public business starts", () => {
@@ -11,13 +11,13 @@ describe("public business starts", () => {
   });
 
   it("makes website delivery a reviewable service request, not a generation assignment", () => {
-    expect(businessStartRequest("website")).toBe("Have Strelva build a website for my business.");
+    expect(businessStartAsk("website")).toBe("Have Strelva build a website for my business.");
     expect(businessStartView("website")).toBe("help");
-    expect(businessStartRequest("website")).not.toContain("24");
+    expect(businessStartAsk("website")).not.toContain("24");
   });
 
   it.each(["applications", "onboarding", "tracker", "document"] as const)("does not create an agency request for %s", product => {
-    expect(businessStartRequest(product)).toBe("");
+    expect(businessStartAsk(product)).toBe("");
     expect(businessStartView(product)).toBe(product);
   });
 

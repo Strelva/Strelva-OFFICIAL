@@ -28,7 +28,7 @@ export interface ClientRow {
 
 type StatusTone = "good" | "warn" | "crit" | "neutral";
 
-/** One clear verdict per client, absorbing active / at-risk / billing / readiness. */
+/** One clear verdict per site, absorbing active / at-risk / billing / readiness. */
 function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
   if (!c.active) return { label: "Archived", tone: "neutral" };
   if (c.atRiskReason) return { label: "At risk", tone: "crit", detail: c.atRiskReason };
@@ -91,7 +91,7 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search clients…"
+            placeholder="Search sites…"
             className="w-full bg-transparent py-2.5 text-[12.5px] text-warm-white placeholder:text-gray-faint focus:outline-none"
           />
         </div>
@@ -104,13 +104,13 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
       {/* List */}
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
-          <p className="text-[14px] font-medium text-warm-white">No clients match</p>
-          <p className="mt-1 text-[12px] text-gray-muted">{query || filter !== "all" ? "Clear the filters to see everyone." : "Clients appear here once tenants exist."}</p>
+          <p className="text-[14px] font-medium text-warm-white">No sites match</p>
+          <p className="mt-1 text-[12px] text-gray-muted">{query || filter !== "all" ? "Clear the filters to see everyone." : "Site support records appear here once sites exist."}</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-glass-border bg-glass">
           <div className="hidden grid-cols-[1fr_52px_180px_120px] items-center gap-5 px-4 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-gray-faint md:grid">
-            <span>Client</span>
+            <span>Site</span>
             <span className="text-center">Health</span>
             <span>Billing</span>
             <span className="text-right">Status</span>

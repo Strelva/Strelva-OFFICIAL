@@ -1,3 +1,4 @@
+import { HEALTH_LABEL, LIFECYCLE_LABEL } from "@/experience/systems/model";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
 import {
   daysWaiting,
@@ -51,6 +52,7 @@ export interface AgencyClientsView {
   team: AgencyTeamMember[];
   total: number;
   nextCursor: string | null;
+  queueGaps: string[];
 }
 
 /**
@@ -79,6 +81,7 @@ export function combineAgencyPages(pages: readonly AgencyLoadedPage[]): AgencyCl
     team: [...team.values()],
     total: last?.total ?? 0,
     nextCursor: last?.nextCursor ?? null,
+    queueGaps: [...new Set(pages.flatMap(({ page }) => page.queueGaps ?? []))],
   };
 }
 
@@ -86,12 +89,12 @@ export function combineAgencyPages(pages: readonly AgencyLoadedPage[]): AgencyCl
 /*  Words                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const LIFECYCLE_LABEL: Record<AgencyClientSystem["lifecycle"], string> = { draft: "Draft", live: "Live", paused: "Paused" };
 
 /** "attymooney.com · Live", or "Twin Trees site · Live · Camillus Version". */
 export function clientSystemLabel(system: AgencyClientSystem): string {
   const parts = [system.name, LIFECYCLE_LABEL[system.lifecycle]];
   if (system.versionContext) parts.push(`${system.versionContext} Version`);
+  if (system.health) parts.push(HEALTH_LABEL[system.health.status]);
   return parts.join(" · ");
 }
 
@@ -132,6 +135,9 @@ const QUEUE_KIND_LABEL: Record<AgencyQueueItem["kind"], string> = {
   request: "Request",
   needs_you: "Waiting on the owner",
   improvement: "Improvement ready",
+  health: "System health",
+  owner_email: "Owner email",
+  operator: "Platform support",
 };
 
 export function queueKindLabel(kind: AgencyQueueItem["kind"]): string {

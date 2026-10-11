@@ -21,7 +21,7 @@ function failure(error: unknown) {
   if (error instanceof CustomApplicationConflictError) return json({ error: error.message, code: "custom_application_conflict" }, 409);
   if (error instanceof CustomApplicationBuildError) return json({ error: error.message, code: "custom_application_unavailable" }, 503);
   if (error instanceof z.ZodError) return json({ error: "Check the recipient and expiry." }, 400);
-  return json({ error: "Custom application access could not be confirmed." }, 503);
+  return json({ error: "Internal tool access could not be confirmed." }, 503);
 }
 
 async function context(params: Promise<{ workId: string }>) {
@@ -29,10 +29,10 @@ async function context(params: Promise<{ workId: string }>) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ workId: string }> }) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   try {
     const actor = await workspaceHttpActor();
-    if (!actor) return json({ error: "Sign in with a confirmed email to manage custom application access." }, 401);
+    if (!actor) return json({ error: "Sign in with a confirmed email to manage internal tool access." }, 401);
     const id = await context(params);
     return json({ grants: await createCustomApplicationService().listGrants(actor, id), href: `/custom-applications/${id}` });
   } catch (error) {
@@ -41,12 +41,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wor
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ workId: string }> }) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   const denied = workspaceWriteGuard(request);
   if (denied) return denied;
   try {
     const actor = await workspaceHttpActor();
-    if (!actor) return json({ error: "Sign in with a confirmed email to manage custom application access." }, 401);
+    if (!actor) return json({ error: "Sign in with a confirmed email to manage internal tool access." }, 401);
     const input = customApplicationGrantInputSchema.parse(await readWorkspaceBody(request, 32_000));
     return json(await createCustomApplicationService().grant(actor, await context(params), input), 201);
   } catch (error) {
@@ -55,12 +55,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ wor
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ workId: string }> }) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   const denied = workspaceWriteGuard(new Request(request, { method: "POST", headers: request.headers }));
   if (denied) return denied;
   try {
     const actor = await workspaceHttpActor();
-    if (!actor) return json({ error: "Sign in with a confirmed email to manage custom application access." }, 401);
+    if (!actor) return json({ error: "Sign in with a confirmed email to manage internal tool access." }, 401);
     const grantId = z.string().uuid().parse(new URL(request.url).searchParams.get("grantId"));
     await createCustomApplicationService().revoke(actor, await context(params), grantId);
     return json({ ok: true });

@@ -12,8 +12,11 @@
 import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
+import { nativeRpc } from "./native";
+import { recordPublicSlot } from "./public-record";
+import { PublicBookingError } from "./errors";
 import { blocksTime } from "./availability";
-import { bookingReadSource, bookingStoreWriteEnabled } from "./flags";
+import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "./flags";
 import { readTenantBookings, recordBooking, type StoreBookingStatus } from "./store";
 import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "./tenant";
 
@@ -33,6 +36,14 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
   return {
     async claim(input) {
       try {
+        if (input.binding.recordBooking) {
+          const existing = (await readTenantBookings(input.binding.tenantId)).find(b => b.publicReservationId === input.reservationId);
+          if (existing) {
+            if (existing.requestFingerprint !== input.requestFingerprint) throw new PublicBookingError("conflict", "This request was already used for different booking details.");
+            return "claimed";
+          }
+        }
+        const record = input.binding.recordBooking ? await recordPublicSlot(input.binding, input.start, input.end, input.reservationId) : null;
         const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,
           status: "requested",
@@ -42,10 +53,11 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           end: input.end,
           bufferMinutes: 0,
           timeZone: input.binding.timeZone,
-          customer: { name: input.visitor.name, email: input.visitor.email },
-          ...(input.visitor.message ? { intakeAnswers: { message: input.visitor.message } } : {}),
+          customer: { name: input.visitor.name, email: input.visitor.email, ...(input.visitor.phone?.trim() ? { phone: input.visitor.phone.trim() } : {}) },
+          ...(input.visitor.intakeAnswers || input.visitor.message ? { intakeAnswers: { ...input.visitor.intakeAnswers, ...(input.visitor.message ? { message: input.visitor.message } : {}) } } : {}),
           inquiryId: input.inquiryId,
           requestFingerprint: input.requestFingerprint,
+          ...(record ? { ...record, status: "held", reason: "Public booking receipt pending" } : {}),
         }, "native");
         if (result.status !== "conflict") return "claimed";
         if ((await bookingReadSource()) === "postgres") return "conflict";
@@ -53,13 +65,31 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
         await alertOnce("booking_store_conflict", "high", { tenant: input.binding.tenantId }, 3600).catch(() => undefined);
         return "skipped";
       } catch (error) {
+        if (input.binding.recordBooking) {
+          if (error instanceof PublicBookingError) throw error;
+          if (error instanceof Error && error.message.includes("booking_request_conflict")) throw new PublicBookingError("conflict", "This request was already used for different booking details.");
+          throw new PublicBookingError("unavailable", "Nothing was booked. Booking storage is unavailable.");
+        }
         await queue(input.binding.tenantId, input.reservationId, error instanceof Error ? error.message : String(error));
         return "skipped";
       }
     },
+    async release(binding, reservationId) {
+      if (!binding.recordBooking) return;
+      await nativeRpc("release_public_record_booking_claim", { p_tenant_id: binding.tenantId, p_reservation_id: reservationId });
+    },
     async settle(input) {
+      if (input.binding.recordBooking) {
+        const booking = (await readTenantBookings(input.binding.tenantId)).find(b => b.publicReservationId === input.reservationId);
+        if (booking?.serviceRef) {
+          const { deliverBookingUpdates, notifyBookingRequestNow } = await import("./updates");
+          await notifyBookingRequestNow(booking);
+          if (bookingMessagesEnabled()) await deliverBookingUpdates(booking.id).catch(() => undefined);
+          return;
+        }
+      }
       try {
-        await recordBooking(input.binding.tenantId, {
+        const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,
           status: STATUS[input.status],
           origin: "site",
@@ -71,6 +101,10 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           customer: input.visitor ? { name: input.visitor.name, email: input.visitor.email } : { name: "Customer" },
           ...(input.status === "cancelled" ? { cancelledAt: new Date().toISOString() } : {}),
         }, "native");
+        if (bookingMessagesEnabled() && result.status !== "conflict") {
+          const { deliverBookingUpdates } = await import("./updates");
+          await deliverBookingUpdates(result.booking.id).catch(() => undefined);
+        }
       } catch (error) {
         await queue(input.binding.tenantId, input.reservationId, error instanceof Error ? error.message : String(error));
       }

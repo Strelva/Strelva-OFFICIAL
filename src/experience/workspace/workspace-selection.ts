@@ -1,3 +1,4 @@
+import { readWorkspaceLocation } from "@/platform/workspaces/location";
 import type { WorkspaceSnapshot } from "./contracts";
 import { workspaceExitIsStopped } from "./workspace-exit-ui";
 
@@ -23,14 +24,15 @@ export function selectWorkspaceLocation(
   data: Pick<WorkspaceSnapshot, "work" | "products" | "managedWork" | "workspaceExitState" | "workspaceExitReadStatus">,
   inquiry?: { tenantId: string },
 ) {
-  const requestedWork = params.get("work");
-  const requestedView = params.get("view");
-  const requestedStanding = params.get("standingId");
-  const requestedAssignment = params.get("assignmentId");
+  const location = readWorkspaceLocation(params);
+  const requestedWork = location.work;
+  const requestedView = location.view;
+  const requestedStanding = location.standingId;
+  const requestedAssignment = location.assignmentId;
   const accessRoute = requestedView === "access";
   const inquiryAvailable = Boolean(inquiry) || data.products.some((product) => product.id === "inquiries" && product.availability === "available");
   const inquiryRoute = requestedView === "inquiries" && inquiryAvailable;
-  const inquiryId = params.get("tenantId") || inquiry?.tenantId || data.managedWork?.[0]?.id || null;
+  const inquiryId = location.tenantId || inquiry?.tenantId || data.managedWork?.[0]?.id || null;
   const match = data.work.find(item => item.id === requestedWork);
   const trackerAvailable = data.products.some((product) => product.id === "tracker" && product.availability === "available");
   const trackerRoute = requestedView === "tracker" && (trackerAvailable || match?.productId === "tracker");
@@ -43,13 +45,13 @@ export function selectWorkspaceLocation(
   const horizontalView = requestedStanding || requestedAssignment || requestedView === "ongoing" ? "operations" : isHorizontalView(requestedView) ? requestedView : isHorizontalView(match?.productId) ? match.productId : null;
   const validView: WorkspaceView = accessRoute ? "agency" : horizontalView || (inquiryRoute ? "inquiries" : trackerRoute || savedTrackerRoute ? "tracker" : documentRoute || savedDocumentRoute ? "document" : planRoute || savedPlanRoute ? "plan" : "work");
   return {
-    missingWork: Boolean(requestedWork && !match && !requestedStanding),
-    selectedWorkId: match?.id ?? (requestedWork || horizontalView ? null : data.work[0]?.id) ?? null,
+    missingWork: Boolean(location.unavailableWork || (requestedWork && !match && !requestedStanding)),
+    selectedWorkId: match?.id ?? (requestedWork || location.unavailableWork || horizontalView ? null : data.work[0]?.id) ?? null,
     selectedStandingId: requestedStanding && horizontalView === "operations" ? requestedStanding : null,
     selectedAssignmentId: requestedAssignment && horizontalView === "operations" ? requestedAssignment : null,
     inquiryTenantId: inquiryRoute ? inquiryId : null,
-    showAssessment: !requestedWork && !accessRoute && data.work.length === 0 && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView && !workspaceExitIsStopped(data.workspaceExitState, data.workspaceExitReadStatus),
-    home: !requestedWork && !accessRoute && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView,
+    showAssessment: !requestedWork && !location.unavailableWork && !accessRoute && data.work.length === 0 && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView && !workspaceExitIsStopped(data.workspaceExitState, data.workspaceExitReadStatus),
+    home: !requestedWork && !location.unavailableWork && !accessRoute && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView,
     view: validView,
   };
 }

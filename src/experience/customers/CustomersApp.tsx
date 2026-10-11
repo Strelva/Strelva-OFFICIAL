@@ -63,7 +63,7 @@ const AVAILABILITY_LABELS: Record<CustomerResourceView["availability"], string> 
 };
 
 const SCENARIO_LABELS: Record<CustomerPreviewScenario, string> = {
-  assigned: "Assigned customers",
+  assigned: "Assigned clients",
   direct: "Direct brokerage",
   revoked: "Revoked resource",
   empty: "No assignments",
@@ -184,10 +184,10 @@ function deliveryStateLabel(state: HomeFinderDeliveryPage["items"][number]["stat
 function requestHref(customer: CustomerSummary, organizationName: string, resourceLabel: string): string {
   const body = [
     `Organization scope: ${organizationName}`,
-    `Customer: ${customer.displayName}`,
+    `Client: ${customer.displayName}`,
     `Resource: ${resourceLabel}`,
     "",
-    "I would like to discuss Home Finder access for this customer.",
+    "I would like to discuss Home Finder access for this client.",
   ].join("\n");
   return `mailto:hello@strelva.com?subject=${encodeURIComponent("Home Finder access")}&body=${encodeURIComponent(body)}`;
 }
@@ -457,12 +457,12 @@ export function CustomersApp({
     const body = visibleDetail && selectedHomeFinder
       ? [
           `Organization scope: ${organizationName}`,
-          `Customer: ${visibleDetail.customer.displayName}`,
+          `Client: ${visibleDetail.customer.displayName}`,
           `Resource: ${selectedHomeFinder.label || "Home Finder"}`,
           "",
-          "I would like to discuss Home Finder access for this customer.",
+          "I would like to discuss Home Finder access for this client.",
         ].join("\n")
-      : "I would like to discuss scoped customer access.";
+      : "I would like to discuss scoped client access.";
     try {
       await navigator.clipboard.writeText(body);
       setCopyMessage("Copied. Nothing was sent or granted.");
@@ -495,8 +495,8 @@ export function CustomersApp({
   return (
     <div className={styles.preview} data-dashboard>
       {preview && (
-        <aside className={styles.previewControls} aria-label="Local Customers preview controls">
-          <div><strong>Customers preview</strong><span>Fictional relationships · changes reset on reload · no live actions</span></div>
+        <aside className={styles.previewControls} aria-label="Local Clients preview controls">
+          <div><strong>Clients preview</strong><span>Fictional relationships · changes reset on reload · no live actions</span></div>
           <label htmlFor="customers-preview-scenario">Example<select id="customers-preview-scenario" value={scenario} onChange={(event) => router.push(`${basePath}?scenario=${encodeURIComponent(event.target.value)}`)}>{CUSTOMER_PREVIEW_SCENARIOS.map((item) => <option key={item} value={item}>{SCENARIO_LABELS[item]}</option>)}</select></label>
         </aside>
       )}
@@ -509,33 +509,33 @@ export function CustomersApp({
         active={undefined}
         context={<label className={styles.scopeControl}><span>Scope</span><select aria-label="Organization scope" value={scope} onChange={(event) => selectScope(event.target.value)}>{SCOPE_OPTIONS.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>}
         navigation={<section aria-label="Organization"><h2>Organization</h2><Link href={`${basePath}?scenario=${encodeURIComponent(scenario)}`} aria-current="page"><Building2 size={16} aria-hidden="true" /><span>Customers</span></Link></section>}
-        notice={<div className={styles.notice} role="note"><strong>Fictional access preview</strong><span>Customer mappings are synthetic. Availability is not an authorization or service promise.</span></div>}
+        notice={<div className={styles.notice} role="note"><strong>Fictional access preview</strong><span>Client mappings are synthetic. Availability is not an authorization or service promise.</span></div>}
         contentId="customers-main"
       >
         <div ref={scrollRef} className={styles.scroll} aria-busy={false}>
           <div className={styles.page}>
             <header className={styles.pageHeader}>
-              <p className={styles.eyebrow}>{scenario === "direct" ? "Resources · Direct brokerage" : `Customers · ${organizationName}`}</p>
-              <h1>{scenario === "direct" ? "Your resources" : "Customers you can access"}</h1>
-              <p>{scenario === "direct" ? "Open your website or Home Finder." : "Choose a customer to see the resources this organization can read."}</p>
+              <p className={styles.eyebrow}>{scenario === "direct" ? "Resources · Direct brokerage" : `Clients · ${organizationName}`}</p>
+              <h1>{scenario === "direct" ? "Your resources" : "Clients you can access"}</h1>
+              <p>{scenario === "direct" ? "Open your website or Home Finder." : "Choose a client to see the resources this organization can read."}</p>
             </header>
 
             <div className={styles.customerWorkspace}>
               <section className={styles.collectionPanel} aria-labelledby="customer-list-title">
                 <div className={styles.collectionHeader}>
-                  <div><h2 id="customer-list-title">{scenario === "direct" ? "Your resources" : "Customers you can access"}</h2><p>{collectionUnavailable ? "Count unavailable" : `${collection.customers.length} customer${collection.customers.length === 1 ? "" : "s"}`}</p></div>
+                  <div><h2 id="customer-list-title">{scenario === "direct" ? "Your resources" : "Clients you can access"}</h2><p>{collectionUnavailable ? "Count unavailable" : `${collection.customers.length} client${collection.customers.length === 1 ? "" : "s"}`}</p></div>
                   <span className={styles.scopeBadge}>{organizationName}</span>
                 </div>
                 <div className={styles.searchRow}>
                   <label className={styles.searchField}>
                     <Search size={17} aria-hidden="true" />
-                    <span className="sr-only">Search customers</span>
-                    <input ref={searchInputRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or domain" aria-label="Search customers" />
+                    <span className="sr-only">Search clients</span>
+                    <input ref={searchInputRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name or domain" aria-label="Search clients" />
                   </label>
                   {normalizedQuery && <button type="button" className={styles.clearSearch} onClick={clearSearch}>Clear</button>}
                 </div>
                 {collectionUnavailable ? (
-                  <div className={styles.collectionState} role="status"><TriangleAlert size={20} aria-hidden="true" /><h3>Customers are unavailable</h3><p>The organization could not be read. Nothing has been confirmed.</p><button type="button" className={styles.textAction} onClick={() => router.refresh()}>Try again <ArrowRight size={15} aria-hidden="true" /></button></div>
+                  <div className={styles.collectionState} role="status"><TriangleAlert size={20} aria-hidden="true" /><h3>Clients are unavailable</h3><p>The organization could not be read. Nothing has been confirmed.</p><button type="button" className={styles.textAction} onClick={() => router.refresh()}>Try again <ArrowRight size={15} aria-hidden="true" /></button></div>
                 ) : visibleCustomers.length > 0 ? (
                   <div className={styles.customerList}>
                     {visibleCustomers.map((customer) => {
@@ -548,7 +548,7 @@ export function CustomersApp({
                     })}
                   </div>
                 ) : (
-                  <div className={styles.collectionState} role="status"><Search size={20} aria-hidden="true" /><h3>{normalizedQuery ? `No customers match “${normalizedQuery}”` : "No customers assigned"}</h3><p>{normalizedQuery ? "Try a different name or domain within this organization." : "An explicit relationship and read assignment must exist before a customer appears here."}</p>{normalizedQuery ? <button type="button" className={styles.textAction} onClick={clearSearch}>Clear search <ArrowRight size={15} aria-hidden="true" /></button> : <a className={styles.textAction} href="mailto:hello@strelva.com?subject=Customer%20access">Ask about customer access <ArrowRight size={15} aria-hidden="true" /></a>}</div>
+                  <div className={styles.collectionState} role="status"><Search size={20} aria-hidden="true" /><h3>{normalizedQuery ? `No clients match “${normalizedQuery}”` : "No clients assigned"}</h3><p>{normalizedQuery ? "Try a different name or domain within this organization." : "An explicit relationship and read assignment must exist before a client appears here."}</p>{normalizedQuery ? <button type="button" className={styles.textAction} onClick={clearSearch}>Clear search <ArrowRight size={15} aria-hidden="true" /></button> : <a className={styles.textAction} href="mailto:hello@strelva.com?subject=Customer%20access">Ask about client access <ArrowRight size={15} aria-hidden="true" /></a>}</div>
                 )}
               </section>
 
@@ -557,7 +557,7 @@ export function CustomersApp({
                   <>
                     <Link className={styles.backLink} href={`${basePath}?scenario=${encodeURIComponent(scenario)}`}><ArrowLeft size={15} aria-hidden="true" /> Customers</Link>
                     <header className={styles.detailHeader}>
-                      <p className={styles.eyebrow}>Customer · {organizationName}</p>
+                      <p className={styles.eyebrow}>{scenario === "direct" ? "Your business" : "Client"} · {organizationName}</p>
                       <h2 id="customer-detail-title" ref={detailHeadingRef} tabIndex={-1}>{visibleDetail.customer.displayName}</h2>
                       <p>{visibleDetail.customer.kind === "organization" ? "Organization" : "Person"}{visibleDetail.customer.domain ? ` · ${visibleDetail.customer.domain}` : ""}</p>
                       <div className={styles.detailMeta}><span className={styles.statusBadge} data-state="available">Read-only access</span><span>{provenanceLabel(visibleDetail.customer.provenance.source)} · observed {formatDate(visibleDetail.customer.observedAt)}</span></div>
@@ -565,19 +565,19 @@ export function CustomersApp({
 
                     <section className={styles.resourcesSection} aria-labelledby="authorized-resources-title">
                       <div className={styles.sectionHeading}><div><h3 id="authorized-resources-title">Resources</h3><p>Only resources this organization can read appear here.</p></div><span className={styles.quietLabel}>{visibleDetail.resources.length} resource{visibleDetail.resources.length === 1 ? "" : "s"}</span></div>
-                      {visibleDetail.resources.length > 0 ? <ul className={styles.resourceList}>{visibleDetail.resources.map((resource) => { const Icon = RESOURCE_ICONS[resource.kind]; const selected = resource.id === selectedResourceId; return <li key={resource.id} className={styles.resourceRow} data-selected={selected || undefined}><span className={styles.resourceIcon}><Icon size={18} aria-hidden="true" /></span><span className={styles.resourceCopy}><strong>{resource.label || RESOURCE_LABELS[resource.kind]}</strong><small>{RESOURCE_LABELS[resource.kind]} · {resourceAvailabilityCopy(resource.availability)}</small></span><span className={styles.resourceRight}><span className={styles.statusBadge} data-state={resource.availability}>{AVAILABILITY_LABELS[resource.availability]}</span><ResourceAction resource={resource} onOpenHomeFinder={openHomeFinder} /></span></li>; })}</ul> : <div className={styles.inlineEmpty}><h4>No resources</h4><p>This customer has no resources available to this organization.</p></div>}
+                      {visibleDetail.resources.length > 0 ? <ul className={styles.resourceList}>{visibleDetail.resources.map((resource) => { const Icon = RESOURCE_ICONS[resource.kind]; const selected = resource.id === selectedResourceId; return <li key={resource.id} className={styles.resourceRow} data-selected={selected || undefined}><span className={styles.resourceIcon}><Icon size={18} aria-hidden="true" /></span><span className={styles.resourceCopy}><strong>{resource.label || RESOURCE_LABELS[resource.kind]}</strong><small>{RESOURCE_LABELS[resource.kind]} · {resourceAvailabilityCopy(resource.availability)}</small></span><span className={styles.resourceRight}><span className={styles.statusBadge} data-state={resource.availability}>{AVAILABILITY_LABELS[resource.availability]}</span><ResourceAction resource={resource} onOpenHomeFinder={openHomeFinder} /></span></li>; })}</ul> : <div className={styles.inlineEmpty}><h4>No resources</h4><p>This client has no resources available to this organization.</p></div>}
                     </section>
 
                     {selectedHomeFinder && <HomeFinderPanel resource={selectedHomeFinder} data={selectedHomeFinderData} request={request} copyMessage={copyMessage} onCopy={() => void copyAccessRequest()} />}
                   </>
                 ) : requestedCustomerId && !requestedCustomerKnown ? (
-                  <EmptyDetail title="Customer unavailable" description="This customer is unavailable to your account. Return to the Customers list without revealing another customer." icon={<ShieldAlert size={22} aria-hidden="true" />} action={<Link className={styles.primaryAction} href={`${basePath}?scenario=${encodeURIComponent(scenario)}`}>Back to Customers <ArrowRight size={16} aria-hidden="true" /></Link>} />
+                  <EmptyDetail title="Client unavailable" description="This client is unavailable to your account. Return to the Customers list without revealing another client." icon={<ShieldAlert size={22} aria-hidden="true" />} action={<Link className={styles.primaryAction} href={`${basePath}?scenario=${encodeURIComponent(scenario)}`}>Back to Customers <ArrowRight size={16} aria-hidden="true" /></Link>} />
                 ) : collectionUnavailable ? (
-                  <EmptyDetail title="Customer details are unavailable" description="The organization source could not be read, so no customer or resource has been confirmed." icon={<TriangleAlert size={22} aria-hidden="true" />} />
+                  <EmptyDetail title="Client details are unavailable" description="The organization source could not be read, so no client or resource has been confirmed." icon={<TriangleAlert size={22} aria-hidden="true" />} />
                 ) : normalizedQuery && visibleCustomers.length === 0 ? (
-                  <EmptyDetail title="No customer selected" description="Clear the search or choose a customer from the Customers list." icon={<Search size={22} aria-hidden="true" />} action={<button type="button" className={styles.secondaryAction} onClick={clearSearch}>Clear search</button>} />
+                  <EmptyDetail title="No client selected" description="Clear the search or choose a client from the Customers list." icon={<Search size={22} aria-hidden="true" />} action={<button type="button" className={styles.secondaryAction} onClick={clearSearch}>Clear search</button>} />
                 ) : visibleCustomers.length > 0 ? (
-                  <EmptyDetail title="Select a customer" description="Choose a customer to see the resources this organization can read." icon={<Building2 size={22} aria-hidden="true" />} />
+                  <EmptyDetail title="Select a client" description="Choose a client to see the resources this organization can read." icon={<Building2 size={22} aria-hidden="true" />} />
                 ) : null}
               </section>
             </div>

@@ -46,6 +46,7 @@ export function customerReminderEmail(input: {
   return {
     subject: soon ? `Today at ${time}: ${service}${with_}` : `Reminder: ${service}${with_}, ${day} at ${time}`,
     options: {
+      businessName: business,
       preheader: `${service}${with_}, ${day} at ${time}.`,
       heading: soon ? "See you soon" : "See you tomorrow",
       paragraphs: [
@@ -79,7 +80,7 @@ export function ownerRequestReminderEmail(input: {
       heading: "A booking request is still waiting",
       paragraphs: [
         `${who} asked for ${cleanSubjectText(input.booking.serviceName)} on ${day} at ${time}. Nobody has confirmed it yet.`,
-        "Approve it or say not yet from the email we sent when it came in, or open Bookings. If nobody answers within 3 days of the request, Strelva tells the customer the time wasn't confirmed and offers other times. A booking is never confirmed by silence.",
+        "Approve it or say not yet from the email we sent when it came in, or open Bookings. If nobody answers within 3 days of the request, the customer receives a notice saying the time wasn't confirmed, with an option to choose other times. A booking is never confirmed by silence.",
       ],
       button: { label: "Open Bookings", url: input.openUrl },
       footerNote: input.businessName ? `For ${cleanSubjectText(input.businessName)}` : undefined,
@@ -100,11 +101,12 @@ export function requestLapsedEmail(input: {
     `Hi ${first(input.booking.customer.name)}, your request for ${day} at ${time}${with_} wasn't confirmed, so that time is not booked.`,
     input.alternatives.length
       ? "These times are open right now:"
-      : "Pick another time on the website, or reply to this email to reach the business.",
+      : input.bookAgainUrl ? "Pick another time on the website, or reply to this email to reach the business." : "Reply to this email to ask the business for another time.",
   ];
   return {
     subject: `Your request for ${day} at ${time} wasn't confirmed`,
     options: {
+      businessName: business,
       preheader: `${day} at ${time} is not booked. Pick another time.`,
       heading: "Your time wasn't confirmed",
       paragraphs,

@@ -13,7 +13,7 @@ const request: Record<string, unknown> = {
   outcome: "A private request form and review path.",
   context: { workspaceName: "Harbor Dental" },
   scope: ["help_request"],
-  provider: { kind: "strelva" },
+  provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" },
   providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null },
   installationId: null,
   deliveryId: null,
@@ -48,13 +48,13 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-describe("service request provider inbox", () => {
+describe("service request agency inbox", () => {
   it("loads pending requests and records an explicit acceptance", async () => {
-    await act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: fetch }, createElement(ServiceRequestInbox))));
-    expect(pending[0]!.url).toBe("/api/service-requests?providerKind=strelva");
+    await act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: fetch }, createElement(ServiceRequestInbox, { providerWorkspaceId: "20000000-0000-4000-8000-000000000001", surface: "workspace" }))));
+    expect(pending[0]!.url).toBe("/api/service-requests?providerWorkspaceId=20000000-0000-4000-8000-000000000001");
     await act(async () => pending[0]!.resolve(response({ requests: [request] })));
     expect(container.textContent).toContain("Prepare a private request flow.");
-    expect(container.textContent).toContain("Provider acceptance pending");
+    expect(container.textContent).toContain("Agency acceptance pending");
 
     const accept = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent === "Accept for review")!;
     await act(async () => accept.click());
@@ -93,4 +93,11 @@ describe("service request provider inbox", () => {
     expect(container.textContent).not.toContain("Agency A");
     expect(container.textContent).toContain("No pre-installation service requests are waiting");
   });
+});
+
+it("retires the operator-provider surface without querying or offering acceptance", async () => {
+  await act(async () => root.render(createElement(ServiceRequestInbox)));
+  expect(pending).toHaveLength(0);
+  expect(container.textContent).toContain("chosen agency workspace");
+  expect(container.querySelector("button")).toBeNull();
 });

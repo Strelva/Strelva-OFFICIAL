@@ -26,7 +26,7 @@ export default function MarketingLayout({
           <nav className="flex items-center gap-4">
             <Link
               href="/access-request"
-              className="inline-flex h-8 items-center justify-center rounded-full bg-m-button px-4 text-[13px] font-medium text-m-button-text transition-transform duration-300 hover:-translate-y-0.5"
+              className="inline-flex h-8 items-center justify-center rounded-full bg-m-button px-4 text-[13px] font-medium text-m-button-text transition-transform hover:-translate-y-0.5"
             >
               Request your build
             </Link>

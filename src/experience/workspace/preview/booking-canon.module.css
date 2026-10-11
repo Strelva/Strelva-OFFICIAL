@@ -1,0 +1,36 @@
+/* Calendar geometry belongs to the booking object; controls and surfaces use the kit. */
+.decision { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr); gap: 36px; }
+.calendar { display: grid; grid-template-columns: 24px repeat(3, minmax(0, 1fr)); gap: 12px; }
+.hours { padding-top: 38px; display: grid; grid-template-rows: repeat(10, 44px); color: var(--st-text-3); }
+.day h2 { font-size: 12px; font-weight: 600; height: 32px; }
+.dayTrack { height: 440px; background: repeating-linear-gradient(to bottom, var(--st-line) 0, var(--st-line) 1px, transparent 1px, transparent 44px); padding: 1px 7px; }
+.event { margin-top: 44px; min-height: 132px; border: 1px solid var(--st-line); border-radius: 8px; background: var(--st-inset); padding: 10px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--st-text-2); }
+.event strong { font-weight: 500; }
+.event[data-kind="request"] { margin-top: 0; height: 440px; background: var(--st-need-tint); border-color: var(--st-need); color: var(--st-need); }
+.request { min-width: 0; font-size: 14px; line-height: 1.55; }
+.requestText { border-top: 1px solid var(--st-line); border-bottom: 1px solid var(--st-line); padding: 16px; }
+.label { font-size: 13px; color: var(--st-text-2); margin-bottom: 8px; }
+.availability { padding: 16px 0; border-bottom: 1px solid var(--st-line); font-size: 13px; }
+.actions { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+.alternatives { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+.phoneCalendar { display: none; }
+@media (max-width: 700px) {
+  .decision { display: flex; flex-direction: column; gap: 16px; }
+  .calendar, .availability, .desktopDates, .label { display: none; }
+  .phoneCalendar { display: block; }
+  .requestText { border: 0; padding: 0; color: var(--st-text-2); }
+  .requestText > p:last-child { display: none; }
+  .actions { padding-top: 32px; }
+  .alternatives { font-size: 13px; }
+}
+.preview { color: var(--st-text); background: var(--st-canvas); font-family: var(--font-workspace, system-ui), sans-serif; }
+.composerPosition { position: fixed; bottom: 30px; left: 264px; right: 0; z-index: 20; pointer-events: none; }
+.composerPosition > * { pointer-events: auto; }
+.mobileTabs { display: none; }
+@media (max-width: 1023px) { .composerPosition { left: 0; } }
+@media (max-width: 700px) {
+  .composerPosition { bottom: 80px; }
+  .mobileTabs { display: flex; justify-content: space-around; position: fixed; bottom: 0; left: 0; right: 0; background: var(--st-surface); padding: 12px 8px; border-top: 1px solid var(--st-line); z-index: 30; font-size: 12px; }
+  .mobileTabs a { color: var(--st-text-3); text-decoration: none; padding: 8px; }
+  .mobileTabs a[aria-current] { color: var(--st-text); font-weight: 600; }
+}

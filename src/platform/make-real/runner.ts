@@ -1,16 +1,17 @@
+import { googleMakeRealRequestSchema, googleProviderReferenceSchema, assertExtendedProviderReference } from "./google-provider-reference";
 import { randomUUID } from "node:crypto";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { EFFECT_SCOPE, type DeclaredEffect, type Possibility, type SystemTarget } from "@/platform/possibilities/contracts";
-import { attachActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
+import { attachActivation, detachUndoneNativeGoogleActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
 import type { PossibilityRepository } from "@/platform/possibilities/repository";
 import { activationSchema, type Activation, type ActivationStep } from "./contracts";
-import { approvalProblem, planApprovalProblem, type ApprovalRecordsPort } from "./approvals";
+import { approvalProblem, planFingerprint, planApprovalProblem, type ApprovalRecordsPort } from "./approvals";
 import { gatePublish } from "./governance";
 import { initialChecks, planActivation } from "./plan";
-import { BaselineMovedError, selectAdapter, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
+import { BaselineMovedError, selectAdapter, type NativeGoogleCompletedUndo, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
 import type { ActivationRepository } from "./repository";
 
-/** A worker that started a step this recently may still be running it. */
+/** A worker that claimed this step or compensation recently may still be active. */
 export const RUNNING_STEP_GRACE_MS = 120_000;
 const MAX_ATTEMPTS = 3;
 
@@ -65,9 +66,37 @@ function introducedKey(target: string): string | null {
   return target.startsWith("introduced:") ? target.slice("introduced:".length) : null;
 }
 
+/** Activation rows predate the typed compensation outcome and only kept this
+ * detail in `reason`. Read those rows without making prose the current state. */
+function legacyCompensationFailed(step: ActivationStep): boolean {
+  return step.compensation === undefined && step.reason?.startsWith("Compensation failed:") === true;
+}
+
+function compensationFailed(step: ActivationStep): boolean {
+  return step.compensation?.status === "failed" || legacyCompensationFailed(step);
+}
+
+function compensationUnknown(step: ActivationStep): boolean {
+  return step.compensation?.status === "unknown";
+}
+
+function compensationRunning(step: ActivationStep): boolean {
+  return step.compensation?.status === "running";
+}
+
 export function createMakeReal(deps: MakeRealDeps) {
   const now = deps.clock ?? (() => new Date().toISOString());
   const newId = deps.ids ?? randomUUID;
+  const activeCompensationClaims = new Set<string>();
+
+  function compensationClaimKey(businessId: string, activationId: string, stepId: string, claimId: string): string {
+    return `${businessId}\u0000${activationId}\u0000${stepId}\u0000${claimId}`;
+  }
+
+  function compensationClaimActive(a: Activation, step: ActivationStep): boolean {
+    const claimId = step.compensation?.claimId;
+    return Boolean(claimId && activeCompensationClaims.has(compensationClaimKey(a.businessId, a.id, step.id, claimId)));
+  }
 
   async function load(businessId: string, id: string): Promise<Activation> {
     const a = await deps.activations.get(businessId, id);
@@ -155,6 +184,16 @@ export function createMakeReal(deps: MakeRealDeps) {
         }
         if (result.status === "rejected") return { status: "failed", effect: "none", reason: result.reason };
         const approval = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
+        try { assertExtendedProviderReference(result.providerRef, a.businessId, effect); }
+        catch {
+          // Explicit acceptance remains final even when its metadata is unusable.
+          // Do not persist malformed/provider content or declare it absent/replayable.
+          return { status: "unknown", effect: "accepted", reason: "The provider accepted this effect, but its reference could not be validated. Recover the exact receipt before continuing.",
+            receipt: { adapterMode: adapter.mode, acceptedAt: at, ...(grantId ? {grantId} : {}), ...(approval ? {approvalId: approval.approvalId} : {}) },
+            readBack: {status:"failed",detail:"Accepted provider reference could not be validated; no readback was attempted.",at},
+            apply: cur => { const x=cur.approvals.find(v=>v.effectId===effect.id&&!v.consumedAt);if(x)x.consumedAt=at; },
+          };
+        }
         let readBack: ActivationStep["readBack"];
         try {
           const rb = await adapter.readBack({ businessId: a.businessId, providerRef: result.providerRef });
@@ -378,6 +417,26 @@ export function createMakeReal(deps: MakeRealDeps) {
     runNext,
     run,
 
+    /** Repair only the final local publication record; never dispatch another effect. */
+    async completeNativeGoogle(actor:WorkspaceActor,businessId:string,id:string,frame:NativeGoogleCompletedUndo):Promise<Activation> {
+      const a=await load(businessId,id);
+      const permission=await deps.authority.check(actor,{businessId,scope:"system.activate"});
+      if(!permission.allowed)throw new WorkspaceAccessError(permission.reason);
+      const p=await loadPossibility(businessId,a.possibilityId),effect=p.effects[0],step=a.steps.find(s=>s.kind==="effect"&&s.target===frame.effectId);
+      if(a.status!=="made_real" || a.rollbackStartedAt || a.steps.some(s=>s.status!=="completed") || a.checks.some(c=>c.status!=="passed") || !["ready","made_real"].includes(p.status) || p.activationId!==a.id || !effect || p.effects.length!==1 || effect.kind!=="publish" || effect.channel!=="google_listing" || !effect.request.nativeGrant || effect.id!==frame.effectId || a.candidateRevision!==frame.candidateRevision || p.candidateRevision!==frame.candidateRevision || planFingerprint(p)!==frame.planFingerprint || step?.effect!=="accepted" || step.receipt?.providerRef!==frame.providerRef)conflict("Native Google completion requires the exact fully completed approved plan.");
+      try {
+        const ref=googleProviderReferenceSchema.parse(JSON.parse(frame.providerRef));
+        if(JSON.stringify(ref)!==frame.providerRef || !ref.receiptId || ref.businessId!==businessId || JSON.stringify(ref.request)!==JSON.stringify(googleMakeRealRequestSchema.parse(effect.request)))conflict("Exact native Google receipt required.");
+      } catch { conflict("Exact native Google receipt required."); }
+      const current=await deps.authority.check(actor,{businessId,scope:"system.activate"});
+      if(!current.allowed)throw new WorkspaceAccessError(current.reason);
+      if(p.status==="ready" && deps.possibilities.finalizeNativeGoogleCompletion) {
+        await deps.possibilities.finalizeNativeGoogleCompletion(markMadeReal(p,a.id,actor.userId,now()),p.revision,a.id);
+        return a;
+      }
+      return settle(actor,a);
+    },
+
     /** Continue only unfinished work. Accepted effects are never replayed; an
      * interrupted effect is resolved by provider lookup on its idempotency key. */
     async resume(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
@@ -394,6 +453,16 @@ export function createMakeReal(deps: MakeRealDeps) {
           const found = await adapter.find({ businessId, idempotencyKey: step.idempotencyKey, effect });
           step.leaseId = undefined;
           if (found?.found) {
+            try { assertExtendedProviderReference(found.providerRef, businessId, effect); }
+            catch {
+              step.status="unknown";step.effect="accepted";step.finishedAt=now();
+              const approval=a.approvals.find(x=>x.effectId===effect.id&&!x.consumedAt);
+              if(approval)approval.consumedAt=now();
+              step.receipt={adapterMode:adapter.mode,acceptedAt:now(),reconciledBy:"provider_lookup",...(approval?{approvalId:approval.approvalId}:{})};
+              step.reason="The provider found the accepted effect, but its reference could not be validated. Recover the exact receipt; do not repeat the write.";
+              step.readBack={status:"failed",detail:"Accepted provider reference could not be validated; no readback was attempted.",at:now()};
+              notes.push(`${step.id}: accepted reference needs recovery, not repeated`);continue;
+            }
             const rb = await adapter.readBack({ businessId, providerRef: found.providerRef }).catch((e: unknown) => ({ ok: false, detail: e instanceof Error ? e.message : "Read-back failed." }));
             step.status = "completed"; step.effect = "accepted"; step.finishedAt = now();
             step.receipt = { providerRef: found.providerRef, adapterMode: adapter.mode, acceptedAt: now(), reconciledBy: "provider_lookup" };
@@ -447,18 +516,70 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     /** Operator evidence for an unknown outcome. An accepted write can never
      * be declared safe to replay. */
-    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }): Promise<Activation> {
+    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string; target?: "effect" | "compensation" }): Promise<Activation> {
       const a = await load(businessId, id);
       const step = a.steps.find((s) => s.id === input.stepId);
       // Declaring what happened outside is an authority act, rechecked now.
       const decision = await deps.authority.check(actor, { businessId, scope: step?.scope ?? "system.activate" });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
-      if (!step || step.status !== "unknown" || !input.evidence.trim()) conflict("Reconciliation needs an unknown step and evidence of its outcome.");
+      if (!step || !input.evidence.trim()) conflict("Reconciliation needs an unknown step and evidence of its outcome.");
+      const target = input.target ?? (compensationUnknown(step) ? "compensation" : "effect");
+      if (target === "compensation") {
+        if (step.kind !== "effect" || step.effect !== "accepted") {
+          conflict("Reconciliation needs an accepted effect with an unknown compensation outcome.");
+        }
+        if (compensationRunning(step)) {
+          conflict("A compensation request is still active or claimed. Wait before reconciling its outcome.");
+        }
+        if (!compensationUnknown(step)) {
+          conflict("Reconciliation needs an accepted effect with an unknown compensation outcome.");
+        }
+        if (compensationClaimActive(a, step)) {
+          conflict("A compensation request is still settling. Wait before reconciling its outcome.");
+        }
+        const evidence = input.evidence.slice(0, 2000);
+        if (input.resolution === "completed") {
+          const declared = (await loadPossibility(businessId, a.possibilityId)).effects.find(effect => effect.id === step.target);
+          if (declared?.channel === "google_listing" && declared.request.nativeGrant) {
+            const adapter = adapterFor(declared);
+            if (!step.receipt?.providerRef || !adapter.verifyCompensation) conflict("Native Google compensation needs exact inverse readback.");
+            assertExtendedProviderReference(step.receipt.providerRef, businessId, declared);
+            const inverse = await adapter.verifyCompensation({ businessId, providerRef: step.receipt.providerRef });
+            if (!inverse.ok) conflict("Native Google compensation readback is unconfirmed. Nothing was repeated.");
+          }
+          step.status = "compensated";
+          step.compensation = { status: "compensated", detail: evidence, at: now() };
+          step.reason = undefined;
+        } else {
+          const detail = `Evidence confirms compensation did not apply: ${evidence}`.slice(0, 2000);
+          step.compensation = { status: "failed", detail, at: now() };
+          step.reason = `Compensation failed: ${detail}`.slice(0, 2000);
+        }
+        a.status = deriveStatus(a);
+        const next = record(a, "reconcile", actor.userId, now(), `${step.id} compensation: ${input.resolution}`);
+        await deps.activations.save(next, a.revision);
+        return next;
+      }
+      if (step.status !== "unknown") conflict("Reconciliation needs an unknown step and evidence of its outcome.");
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
+      let nativeAcceptedRecovery=false;
       if (input.resolution === "completed") {
-        step.status = "completed"; step.effect = "accepted";
         const declared = step.kind === "effect" ? (await loadPossibility(businessId, a.possibilityId)).effects.find((e) => e.id === step.target) : undefined;
-        step.receipt = { adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(input.providerRef ? { providerRef: input.providerRef } : {}) };
+        nativeAcceptedRecovery=declared?.channel==="google_listing" && Boolean(declared.request.nativeGrant) && step.effect==="accepted" && !step.receipt?.providerRef;
+        let providerRef = input.providerRef;
+        if (declared?.channel === "google_listing") {
+          const adapter = adapterFor(declared);
+          const found = await adapter.find({ businessId, effect: declared, idempotencyKey: step.idempotencyKey });
+          if (!found?.found || (providerRef !== undefined && providerRef !== found.providerRef)) conflict("Google recovery requires the exact provider-found receipt reference.");
+          providerRef = found.providerRef;
+          assertExtendedProviderReference(providerRef, businessId, declared);
+          const readBack = await adapter.readBack({ businessId, providerRef });
+          if (!readBack.ok) conflict("Google recovery requires confirmed provider read-back.");
+          step.readBack = { status: "confirmed", detail: readBack.detail.slice(0, 1000), at: now() };
+        }
+        if (providerRef !== undefined) assertExtendedProviderReference(providerRef, businessId, declared);
+        step.status = "completed"; step.effect = "accepted";
+        step.receipt = { ...(step.receipt ?? {}), adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: step.receipt?.acceptedAt ?? now(), reconciledBy: nativeAcceptedRecovery?"provider_lookup":"operator_evidence", ...(providerRef ? { providerRef } : {}) };
       } else {
         step.status = "failed"; step.effect = "none";
       }
@@ -467,7 +588,8 @@ export function createMakeReal(deps: MakeRealDeps) {
       a.status = "in_progress";
       a.status = deriveStatus(a);
       const next = record(a, "reconcile", actor.userId, now(), `${step.id}: ${input.resolution}${input.note ? ` (${input.note})` : ""}`);
-      await deps.activations.save(next, a.revision);
+      if(nativeAcceptedRecovery && deps.activations.saveNativeGoogleRecovery)await deps.activations.saveNativeGoogleRecovery(next,a.revision);
+      else await deps.activations.save(next,a.revision);
       return settle(actor, next);
     },
 
@@ -478,19 +600,49 @@ export function createMakeReal(deps: MakeRealDeps) {
      * `rolled_back` until it is reconciled with evidence; calling rollback
      * again then finishes it. Each undone step is checkpointed on its own so
      * an interrupted rollback resumes instead of repeating live writes. */
-    async rollback(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
+    async rollback(actor: WorkspaceActor, businessId: string, id: string, note?: string, nativeUndo?:NativeGoogleCompletedUndo): Promise<Activation> {
       let a = await load(businessId, id);
-      if (a.status === "made_real") conflict("This is already real. Change it with a new possibility instead of rolling back.");
-      if (a.status === "rolled_back") return a;
+      if (a.status === "made_real" && !nativeUndo) conflict("This is already real. Change it with a new possibility instead of rolling back.");
+      if (a.status === "rolled_back" && !nativeUndo) return a;
       if (a.steps.some((s) => s.status === "running")) conflict("A step is still running. Resume to reconcile it before rolling back.");
       const decision = await deps.authority.check(actor, { businessId, scope: "system.activate" });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
       const p = await loadPossibility(businessId, a.possibilityId);
+      if(nativeUndo || p.status==="made_real") {
+        const effect=p.effects[0],step=a.steps.find(s=>s.kind==="effect"&&s.target===nativeUndo?.effectId);
+        if(!nativeUndo || !effect || p.effects.length!==1 || effect.kind!=="publish" || effect.channel!=="google_listing" || !effect.request.nativeGrant || effect.id!==nativeUndo.effectId || a.candidateRevision!==nativeUndo.candidateRevision || p.candidateRevision!==nativeUndo.candidateRevision || planFingerprint(p)!==nativeUndo.planFingerprint || !step || step.effect!=="accepted" || step.reversibility!=="compensable" || step.receipt?.providerRef!==nativeUndo.providerRef)conflict("Completed native Google undo requires the exact approved whole plan and accepted compensable receipt.");
+        try {
+          const ref=googleProviderReferenceSchema.parse(JSON.parse(nativeUndo.providerRef));
+          if(JSON.stringify(ref)!==nativeUndo.providerRef || !ref.receiptId || ref.businessId!==businessId || JSON.stringify(ref.request)!==JSON.stringify(googleMakeRealRequestSchema.parse(effect.request)))conflict("Native Google undo requires the exact canonical retained provider receipt.");
+        } catch { conflict("Native Google undo requires the exact canonical retained provider receipt."); }
+        if(p.status==="made_real" && !a.rollbackStartedAt) {
+          for(const pin of a.pinned)if(!pin.stagedRevisionId || (await deps.live.current({businessId,systemId:pin.systemId}))?.revisionId!==pin.stagedRevisionId)conflict("A live System moved after this native Google plan. Review a new inverse plan.");
+          for(const intro of a.introduced)if(!intro.systemId || !intro.revisionId || (await deps.live.current({businessId,systemId:intro.systemId}))?.revisionId!==intro.revisionId)conflict("An introduced System moved after this native Google plan. Review a new inverse plan.");
+        }
+      }
+
+      const saveReverse=async(value:Activation,expectedRevision:number) => {
+        if(nativeUndo && p.status==="made_real" && deps.activations.saveNativeGoogleUndo)await deps.activations.saveNativeGoogleUndo(value,expectedRevision);
+        else await deps.activations.save(value,expectedRevision);
+      };
+      const finishNativeWithdrawal=async(done:Activation) => {
+        const detached=detachUndoneNativeGoogleActivation(p,a.id,actor.userId,now(),{
+          undoneStepIds:done.steps.filter(s=>s.status==="restored"||s.status==="compensated").map(s=>s.id),
+          consumedApprovalIds:done.approvals.filter(x=>x.consumedAt).map(x=>x.approvalId),
+        });
+        if(deps.possibilities.finalizeNativeGoogleUndo)await deps.possibilities.finalizeNativeGoogleUndo(detached,p.revision,a.id);
+        else await deps.possibilities.save(detached,p.revision);
+      };
+      if(a.status==="rolled_back") {
+        if(p.status==="made_real")await finishNativeWithdrawal(a);
+        else if(p.status!=="withdrawn" || p.activationId)conflict("Native Google undo has an inconsistent terminal plan.");
+        return a;
+      }
 
       const checkpoint = async (kind: string, detail?: string) => {
         a.status = deriveStatus(a);
         const next = record(a, kind, actor.userId, now(), detail);
-        await deps.activations.save(next, a.revision);
+        await saveReverse(next,a.revision);
         a = next;
       };
       if (!a.rollbackStartedAt) {
@@ -499,9 +651,15 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
 
       for (const stepId of [...a.steps].reverse().map((s) => s.id)) {
-        const step = a.steps.find((s) => s.id === stepId)!;
+        let step = a.steps.find((s) => s.id === stepId)!;
         if (step.status !== "completed") continue;
-        const before = `${step.status}|${step.reason ?? ""}`;
+        const before = `${step.status}|${step.reason ?? ""}|${JSON.stringify(step.compensation ?? null)}`;
+        let attemptedCompensation = false;
+        let activeClaimKey: string | undefined;
+        if (step.kind === "connect" || step.kind === "activate") {
+          const permission = await deps.authority.check(actor, { businessId, scope: "system.activate" });
+          if (!permission.allowed) throw new WorkspaceAccessError(permission.reason);
+        }
         if (step.kind === "connect") {
           const row = a.connections.find((c) => c.id === step.target);
           if (row?.connectionId) await deps.live.disconnect(businessId, row.connectionId);
@@ -520,29 +678,99 @@ export function createMakeReal(deps: MakeRealDeps) {
             step.status = "restored"; step.reason = `Live reference restored to ${pin.baselineRevisionId}.`;
           }
         } else if (step.kind === "effect" && step.effect === "accepted") {
+          if (compensationRunning(step)) {
+            const claim = step.compensation!;
+            const claimAge = Date.parse(now()) - Date.parse(claim.at);
+            if (compensationClaimActive(a, step) || claimAge < RUNNING_STEP_GRACE_MS) break;
+            const detail = "A compensation claim expired without a recorded provider outcome.";
+            step.compensation = { status: "unknown", detail, at: now(), claimId: claim.claimId };
+            step.reason = `Compensation outcome is unknown: ${detail}`;
+          }
           const effect = p.effects.find((e) => e.id === step.target)!;
-          const adapter = adapterFor(effect);
-          if (step.reversibility === "compensable" && adapter.compensate && step.receipt?.providerRef) {
-            const r = await adapter.compensate({ businessId, providerRef: step.receipt.providerRef, idempotencyKey: `${step.idempotencyKey}:compensate` });
-            if (r.ok) { step.status = "compensated"; step.reason = r.detail; } else { step.reason = `Compensation failed: ${r.detail}`; }
+          const adapter = selectAdapter(deps.adapters, effect);
+          const providerRef = step.receipt?.providerRef;
+          if (compensationUnknown(step)) {
+            // Reconciliation must establish the provider outcome before retry.
+          } else if (step.reversibility === "compensable" && adapter?.compensate && providerRef) {
+            const permission = await deps.authority.check(actor, { businessId, scope: step.scope ?? EFFECT_SCOPE[effect.kind] });
+            if (!permission.allowed) {
+              step.compensation = { status: "unavailable", detail: `Undo authority is not current: ${permission.reason}`.slice(0, 2000), at: now() };
+              step.reason = step.compensation.detail;
+              await checkpoint("rollback_step", `${step.id}: undo authority unavailable`);
+              continue;
+            }
+            const claimId = newId();
+            step.compensation = { status: "running", detail: "A compensation request is in progress.", at: now(), claimId };
+            step.reason = undefined;
+            activeClaimKey = compensationClaimKey(businessId, a.id, step.id, claimId);
+            activeCompensationClaims.add(activeClaimKey);
+            try {
+              await checkpoint("rollback_compensation_claim", `${step.id}: compensation claimed`);
+            } catch (error) {
+              activeCompensationClaims.delete(activeClaimKey);
+              throw error;
+            }
+            // checkpoint() advances the activation copy, so reacquire the step
+            // that carries the persisted claim before recording the result.
+            step = a.steps.find((s) => s.id === stepId)!;
+            attemptedCompensation = true;
+            try {
+              const r = await adapter.compensate({ businessId, providerRef, idempotencyKey: `${step.idempotencyKey}:compensate` });
+              if (r.ok) {
+                step.status = "compensated";
+                step.compensation = { status: "compensated", detail: r.detail.slice(0, 2000), at: now(), claimId };
+                step.reason = r.detail.slice(0, 2000);
+              } else {
+                step.compensation = { status: "failed", detail: r.detail.slice(0, 2000), at: now(), claimId };
+                step.reason = `Compensation failed: ${step.compensation.detail}`.slice(0, 2000);
+              }
+            } catch (error) {
+              const detail = error instanceof Error ? error.message : "The provider did not confirm whether compensation succeeded.";
+              step.compensation = { status: "unknown", detail: detail.slice(0, 2000), at: now(), claimId };
+              step.reason = `Compensation outcome is unknown: ${step.compensation.detail}`.slice(0, 2000);
+            }
+
           } else {
+            const detail = step.reversibility !== "compensable" ? "This accepted effect is irreversible."
+              : !adapter ? `The ${effect.kind} adapter is unavailable.`
+                : !adapter.compensate ? `The ${effect.kind} adapter has no compensation operation.`
+                  : "The accepted effect has no provider reference for compensation.";
+            step.compensation = { status: "unavailable", detail, at: now() };
             step.reason = "Already happened and cannot be undone.";
           }
         } else if (step.kind === "stage" || step.kind === "introduce") {
           step.status = "restored"; step.reason = "Prepared revision kept as history; never live.";
         }
-        if (`${step.status}|${step.reason ?? ""}` !== before) await checkpoint("rollback_step", `${step.id}: ${step.status}`);
+        if (`${step.status}|${step.reason ?? ""}|${JSON.stringify(step.compensation ?? null)}` !== before || attemptedCompensation) {
+          try {
+            await checkpoint("rollback_step", `${step.id}: ${step.status}`);
+          } finally {
+            if (activeClaimKey) activeCompensationClaims.delete(activeClaimKey);
+          }
+        } else if (activeClaimKey) {
+          activeCompensationClaims.delete(activeClaimKey);
+        }
       }
 
-      const unknown = a.steps.filter((s) => s.status === "unknown");
+      const unknown = a.steps.filter((s) => s.status === "unknown" || compensationUnknown(s));
       if (unknown.length) {
         // Nothing may claim this is over while an outside outcome is unknown.
-        await checkpoint("rollback_waiting", `Needs reconciliation: ${unknown.map((s) => s.id).join(", ")}`);
+        return a;
+      }
+      if (a.steps.some(compensationRunning)) return a;
+      const failedCompensations = a.steps.filter((s) => s.kind === "effect" && s.effect === "accepted"
+        && s.status === "completed" && (compensationFailed(s)
+          || (s.reversibility === "compensable" && s.compensation?.status === "unavailable")));
+      if (failedCompensations.length) {
+        // Keep the activation attached and open. A failed compensation may be
+        // retried after the provider issue is fixed; calling it rolled back
+        // would strand an accepted effect that is still live.
         return a;
       }
       a.status = "rolled_back";
       const done = record(a, "rollback", actor.userId, now());
-      await deps.activations.save(done, a.revision);
+      await saveReverse(done,a.revision);
+      if(p.status==="made_real") { await finishNativeWithdrawal(done); return done; }
       const detached = detachActivation(p, a.id, actor.userId, now(), {
         undoneStepIds: done.steps.filter((s) => s.status === "restored" || s.status === "compensated").map((s) => s.id),
         consumedApprovalIds: done.approvals.filter((x) => x.consumedAt).map((x) => x.approvalId),

@@ -210,9 +210,9 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
       <SidebarButton icon={Plus} label="New" active={view === "new"} onClick={() => { navigate("new"); onClose(); }} />
       <SidebarButton icon={Search} label="Search" active={view === "search"} onClick={() => { navigate("search"); onClose(); }} />
       <Link className={`${styles.sidebarButton} ${view === "attention" ? styles.sidebarButtonActive : ""}`} href={agency ? "/business" : "/business"} onClick={onClose} aria-current={view === "attention" ? "page" : undefined}><LayoutList size={17} strokeWidth={1.6} aria-hidden="true" /><span>{agency ? "Clients" : "Businesses"}</span></Link>
-      <SidebarButton icon={Clock3} label="Recent work" active={view === "work" || view === "receipt" || view === "record"} onClick={() => { navigate("work"); onClose(); }} />
+      <SidebarButton icon={Clock3} label="Recent changes" active={view === "work" || view === "receipt" || view === "record"} onClick={() => { navigate("work"); onClose(); }} />
     </nav>
-    {recent.length > 0 ? <div className={styles.recentRail} aria-label="Recent inquiry work"><span className={styles.eyebrow}>RECENT</span>{recent.map((work) => <button key={work.id} type="button" onClick={() => { navigate("work", { requestId: work.id }); onClose(); }}><span>{work.intent}</span><small>{work.state.replaceAll("_", " ")}</small></button>)}</div> : null}
+    {recent.length > 0 ? <div className={styles.recentRail} aria-label="Recent inquiry changes"><span className={styles.eyebrow}>RECENT</span>{recent.map((work) => <button key={work.id} type="button" onClick={() => { navigate("work", { requestId: work.id }); onClose(); }}><span>{work.intent}</span><small>{work.state.replaceAll("_", " ")}</small></button>)}</div> : null}
     <div className={styles.sidebarFooter}><SidebarButton icon={UserRound} label="Account" active={view === "account"} onClick={() => { navigate("account"); onClose(); }} /></div>
   </aside>;
 }

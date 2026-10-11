@@ -196,6 +196,35 @@ beforeEach(() => {
 });
 
 describe("an owner who never signs in", () => {
+  it("reports an unreadable converted-business list instead of claiming no work", async () => {
+    const { mem, src, svc } = setup(async () => session({ workspaceId: WS }));
+    mem.store.linkedTenants = async () => { throw new Error("linked business read unavailable"); };
+    expect((await svc.chase()).failed).toBe(1);
+    expect(src.reads).toEqual([]);
+    expect(mem.items.size).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("reports incomplete Make real discovery instead of a successful empty chase", async () => {
+    for (const admitted of [false, true]) {
+      const mem = memoryStore(clock, async () => admitted ? session({ workspaceId: WS }) : null);
+      const readyPlans = vi.fn(async () => { throw new Error("projection unavailable"); });
+      const start = vi.fn();
+      const adapter = makeRealAdapter({ enabled: async () => true, readyPlans, policies: async () => [], start });
+      const svc = createNeedsYouService({ store: mem.store, adapters: [adapter], appOrigin: "https://app.example.test", now: () => clock.now, sendEmail });
+      const result = await svc.chase();
+      expect(result.failed).toBe(1);
+      expect(result.discovery?.workspaces).toContainEqual({
+        workspaceId: WS, serviceSession: admitted ? "admitted" : "unavailable",
+        sources: [{ lifecycle: "make_real", complete: false, proposed: 0 }],
+      });
+      expect(mem.items.size).toBe(0);
+      expect(start).not.toHaveBeenCalled();
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(readyPlans).toHaveBeenCalledTimes(admitted ? 1 : 0);
+    }
+  });
+
   it("gets one morning email with an item from every workspace source, opened by Strelva (system)", async () => {
     const { mem, src, svc } = setup(async (workspaceId) => session({ workspaceId }));
     const summary = await svc.chase();
@@ -212,11 +241,17 @@ describe("an owner who never signs in", () => {
     const decisions = sent[0]!.options!.decisions!;
     expect(decisions).toHaveLength(WORKSPACE_SOURCES.length);
     for (const item of opened) expect(decisions.map(d => d.title)).toContain(item.title);
-    // Money and access need a sign-in; everything else carries one-tap links.
+    // Money, access and release lifecycles without atomic link gates need sign-in.
     const signIn = opened.filter(item => item.signInRequired);
     expect(signIn.map(item => item.sourceLifecycle).sort()).toEqual(["agency_grant", "work_money"]);
     for (const item of signIn) expect(decisions.find(d => d.title === item.title)).toMatchObject({ note: "This one needs you signed in. Open it to decide." });
-    expect(decisions.filter(d => d.approve).length).toBe(WORKSPACE_SOURCES.length - signIn.length);
+    expect(decisions.filter(d => d.approve).length).toBe(WORKSPACE_SOURCES.length - signIn.length - 2);
+    for (const lifecycle of ["application_release", "version_release"]) {
+      const item = [...mem.items.values()].find(row => row.sourceLifecycle === lifecycle);
+      expect(item).toBeDefined();
+      expect(decisions.find(d => d.title === item!.title)).toMatchObject({ note: "This one needs you signed in. Open it to decide." });
+      expect(decisions.find(d => d.title === item!.title)?.approve).toBeUndefined();
+    }
     // Read and open only: no resolver ran.
     for (const resolver of Object.values(src.resolvers)) expect(resolver).not.toHaveBeenCalled();
   });

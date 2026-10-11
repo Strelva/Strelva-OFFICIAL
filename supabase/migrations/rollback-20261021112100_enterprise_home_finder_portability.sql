@@ -1,0 +1,12 @@
+begin;
+set local lock_timeout='5s';
+drop function public.read_workspace_exit_handoff_plan(uuid,uuid,text);
+alter function public.read_workspace_exit_handoff_plan_before_home_finder(uuid,uuid,text) rename to read_workspace_exit_handoff_plan;
+grant execute on function public.read_workspace_exit_handoff_plan(uuid,uuid,text) to service_role;
+drop function public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer);
+alter function public.export_workspace_v3_category_before_enterprise(uuid,uuid,text,text,integer,integer) rename to export_workspace_v3_category;
+grant execute on function public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer) to service_role;
+drop function public.workspace_export_v3_categories();
+alter function public.workspace_export_v3_categories_before_enterprise() rename to workspace_export_v3_categories;
+notify pgrst,'reload schema';
+commit;

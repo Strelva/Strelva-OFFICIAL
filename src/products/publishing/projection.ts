@@ -5,6 +5,7 @@ import { defaultPropagation, systemOriginId } from "@/platform/systems/invariant
 import type { ConnectionKind, ConnectionState, ConnectionTarget, System, SystemConnection, SystemOrigin } from "@/platform/systems/contracts";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { Observation } from "@/platform/system-health/contracts";
+import { listingControlSchema } from "@/products/google-listing/contracts";
 import { listingHealth, listingObservation } from "@/products/google-listing/health";
 import type { ListingHealth, ListingReceipt } from "@/products/google-listing/contracts";
 
@@ -34,12 +35,14 @@ export const publishingSnapshotSchema = z.object({
   scope: z.enum(["business", "assigned"]),
   bindings: z.array(accountBindingSchema),
   receipts: z.array(receiptSummarySchema),
+  controls: z.array(listingControlSchema).optional(),
 });
 export type PublishingSnapshot = z.infer<typeof publishingSnapshotSchema>;
 
 export interface SiteAudience {
   tenantId: string;
-  activeSubscribers: number;
+  activeSubscribers: number | null;
+  approvedIssues?: number;
 }
 
 export interface SiteCollections {
@@ -142,18 +145,17 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
     if (website && (binding.scopes === null || binding.scopes.includes(GSC_READ_SCOPE) || binding.scopes.includes(GA4_READ_SCOPE))) {
       connections.push({ provenance: "existing", connection: connection(website.system, "read", target, bindingState(binding.status), "Search Console and Analytics from Google") });
     }
-    const location = binding.locations.find((item) => item.isPrimary) ?? binding.locations[0];
-    if (!location) continue;
+    for (const location of binding.locations) {
     const listingSystem = system(businessId, { kind: "google_location", ref: `${binding.id}:${location.locationId}` }, {
       name: location.title ?? (website ? `${website.system.name} on Google` : "Google listing"),
-      kind: "listing", lifecycle: "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
+      kind: "listing", lifecycle: snapshot.controls?.find((control) => control.locationId === location.locationId)?.paused ? "paused" : "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
     });
-    if (seen.has(listingSystem.id)) continue;
+    const alreadyStored = seen.has(listingSystem.id);
     seen.add(listingSystem.id);
     const receipts = snapshot.receipts.filter((receipt) => receipt.bindingId === binding.id && receipt.locationId === location.locationId);
-    const healthInput = { binding, receipts: receipts as unknown as ListingReceipt[], now };
+    const healthInput = { binding, receipts: receipts as unknown as ListingReceipt[], now, accessPending: snapshot.controls?.find((control) => control.locationId === location.locationId)?.accessPending };
     const verdict = listingHealth(healthInput);
-    systems.push({
+    if (!alreadyStored) systems.push({
       system: listingSystem, provenance: "existing",
       basis: "Connected to Google. Replies, hours and posts go through approval.",
       references: { savedWorkId: null, tenantStableId: binding.originTenantStableId, tenantId: binding.originTenantId },
@@ -170,6 +172,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
         createdAt: receipt.createdAt, targetRef: receipt.targetRef, error: receipt.error,
       })),
     });
+    }
   }
 
   for (const [stableId, website] of websitesByTenant) {
@@ -180,7 +183,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
 
   for (const audience of extras.newsletters ?? []) {
     const website = websitesByTenantId.get(audience.tenantId);
-    if (!website || audience.activeSubscribers <= 0 || !website.references.tenantStableId) continue;
+    if (!website || ((audience.activeSubscribers ?? 0) <= 0 && !audience.approvedIssues) || !website.references.tenantStableId) continue;
     const newsletter = system(businessId, { kind: "tenant_newsletter", ref: website.references.tenantStableId }, {
       name: `${website.system.name} newsletter`, kind: "newsletter", lifecycle: "live",
       createdAt: website.system.createdAt, updatedAt: website.system.updatedAt,
@@ -189,7 +192,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
     seen.add(newsletter.id);
     systems.push({
       system: newsletter, provenance: "existing",
-      basis: `${audience.activeSubscribers} active subscriber${audience.activeSubscribers === 1 ? "" : "s"}. Each issue is approved before it sends.`,
+      basis: `${audience.activeSubscribers === null ? "Subscriber count is unavailable" : `${audience.activeSubscribers} active subscriber${audience.activeSubscribers === 1 ? "" : "s"}`}. Sending is paused; approved issues and receipts stay here.`,
       references: { savedWorkId: null, tenantStableId: website.references.tenantStableId, tenantId: audience.tenantId },
     });
     connections.push({ provenance: "existing", connection: connection(newsletter, "appear", { type: "audience", audience: "subscribers" }, "connected", "Sent to active subscribers") });

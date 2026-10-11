@@ -42,7 +42,7 @@ test("real local Auth can create, review, accept, reopen, and isolate onboarding
     await expect(page.getByText(/Automatic extraction unavailable for this file/)).toBeVisible();
     await page.getByLabel("Tax ID").fill("12-3456789");
     await page.getByRole("button", { name: "Save review", exact: true }).click();
-    await page.getByRole("button", { name: "Accept this version", exact: true }).click();
+    await page.getByRole("button", { name: "Accept this document", exact: true }).click();
     await expect(page.getByText("Complete", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Reopen private file", exact: true }).click();

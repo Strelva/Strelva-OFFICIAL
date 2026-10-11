@@ -29,14 +29,20 @@ const MAX_FAILURES = 100;
 const FAILURE_TTL_DAYS = 7;
 const LAST_REVALIDATION_PREFIX = "reb:revalidation:last-success:";
 
-export async function getRecentFailures(): Promise<RevalidationFailure[]> {
+export async function getRecentFailures(options: { requireStore?: boolean } = {}): Promise<RevalidationFailure[]> {
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) { if (options.requireStore) throw new Error("Revalidation failures unavailable"); return []; }
 
   try {
     const raw = await redis.zrange(FAILURES_KEY, 0, MAX_FAILURES - 1, { rev: true });
-    return raw.map((item) => (typeof item === "string" ? JSON.parse(item) : item) as RevalidationFailure);
-  } catch {
+    return raw.map((item) => {
+      const value = (typeof item === "string" ? JSON.parse(item) : item) as RevalidationFailure;
+      if (options.requireStore && (!value || typeof value.tenantId !== "string" || typeof value.error !== "string"
+        || !Number.isFinite(Date.parse(value.timestamp)))) throw new Error("Revalidation failure record unavailable");
+      return value;
+    });
+  } catch (error) {
+    if (options.requireStore) throw error;
     return [];
   }
 }

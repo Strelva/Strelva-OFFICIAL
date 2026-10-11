@@ -27,7 +27,7 @@ export type PolicyActionResult = { ok: true; message: string; view: PolicyView }
 const input = z.object({ workspaceId: z.string().uuid(), change: strelvaChangeSchema }).strict();
 
 export async function setStrelvaPolicyAction(raw: unknown): Promise<PolicyActionResult> {
-  if (!needsYouReleaseEnabled()) return { ok: false, message: "Needs you is off. Nothing changed." };
+  if (!needsYouReleaseEnabled()) return { ok: false, message: "Decision settings are off. Nothing changed." };
   if (!(await isSuperAdmin())) return { ok: false, message: "Only a Strelva operator can change this." };
   const actor = await workspaceHttpActor();
   if (!actor) return { ok: false, message: "Only a Strelva operator can change this." };

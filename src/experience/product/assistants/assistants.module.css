@@ -1,0 +1,23 @@
+.publicRoot { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), sans-serif; }
+.publicHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 40px; }
+.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--st-text); font-size: 16px; text-decoration: none; }
+.profileColumns { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: start; gap: 48px; }
+.ownerColumns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; gap: 32px; }
+.stack { display: flex; min-width: 0; flex-direction: column; gap: 20px; }
+.evidenceLine { display: flex; align-items: center; gap: 8px; color: var(--st-text-2); font-size: 13px; line-height: 20px; margin: 0; overflow-wrap: anywhere; }
+.evidenceLine svg { flex-shrink: 0; color: var(--st-live); }
+.muted, .about, .fixture { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 22px; }
+.endpoint { margin: 0; overflow-wrap: anywhere; }
+.about { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; }
+.fixture { font-size: 12px; }
+.permissionMark { display: inline-flex; width: 32px; height: 18px; margin-top: 3px; flex-shrink: 0; align-items: center; border-radius: 999px; background: var(--st-accent); padding: 2px; }
+.permissionMark[data-enabled="false"] { background: var(--st-line); }
+.permissionMark::after { width: 14px; height: 14px; border-radius: 999px; background: var(--st-surface); content: ""; margin-left: auto; }
+.permissionMark[data-enabled="false"]::after { margin-left: 0; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.receipt { display: flex; gap: 12px; align-items: baseline; color: var(--st-text); font-size: 13px; line-height: 22px; }
+.receiptText { flex: 1; }
+@media (max-width: 767px) { .profileColumns, .ownerColumns { grid-template-columns: minmax(0, 1fr); gap: 32px; } .publicHeader { padding: 16px 20px; } }
+
+.factLabel { width: 120px; flex-shrink: 0; color: var(--st-text-2); font-size: 13px; line-height: 22px; }
+@media (max-width: 767px) { .factLabel { width: 80px; } }

@@ -220,6 +220,13 @@ export function detachActivation(raw: Possibility, activationId: string, actorId
   return record(p, "make_real_rolled_back", actorId, at, activationId);
 }
 
+/** A fully compensated native Google plan closes as withdrawn, retaining its accepted/undone history. */
+export function detachUndoneNativeGoogleActivation(raw:Possibility,activationId:string,actorId:string,at:string,settled:{undoneStepIds:string[];consumedApprovalIds:string[]}):Possibility {
+  const effect=raw.effects[0];
+  if(raw.status!=="made_real" || !effect || raw.effects.length!==1 || effect.channel!=="google_listing" || !effect.request.nativeGrant || !settled.undoneStepIds.includes(`effect:${effect.id}`))conflict("Only the fully undone native Google activation can withdraw its completed plan.");
+  return detachActivation({...raw,status:"withdrawn"},activationId,actorId,at,settled);
+}
+
 export function markMadeReal(raw: Possibility, activationId: string, actorId: string, at: string): Possibility {
   const p = copy(raw);
   if (p.activationId !== activationId || p.status !== "ready") conflict("Only the activation that is making this possibility real can close it.");

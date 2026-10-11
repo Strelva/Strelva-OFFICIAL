@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowRight, ArrowUpRight, ListChecks, MessageSquareText } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { WorkspaceWork } from "./contracts";
-import { REQUEST_STAGE_LABELS, type BusinessDeliveryItem, type BusinessRequestStage } from "./business-delivery-summary";
+import { REQUEST_STAGE_LABELS, requestStageLabel, type BusinessDeliveryItem, type BusinessRequestStage } from "./business-delivery-summary";
+import { useAgencyClientHome } from "./useAgencyClientHome";
+import { agencyClientDeliveries } from "./agency-client-home";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
-import styles from "./workspace-surface.module.css";
 
 /** One row on the Requests page: a request to Strelva or an agency, or a finite job saved in the workspace. */
 export interface BusinessRequestRow {
@@ -15,6 +17,7 @@ export interface BusinessRequestRow {
   href?: string;
   workId?: string;
   sortAt: string;
+  agencyName?: string;
 }
 
 const GROUPS: readonly { stage: BusinessRequestStage; heading: string }[] = [
@@ -38,8 +41,8 @@ function shortDate(value: string): string {
 }
 
 /** Who is doing a request, by name. */
-export function deliveryProviderName(item: BusinessDeliveryItem, agencyNames: ReadonlyMap<string, string>): string {
-  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva" : "";
+export function deliveryProviderName(item: BusinessDeliveryItem, _agencyNames: ReadonlyMap<string, string>): string {
+  return item.provider?.kind === "agency" ? item.servingAgencyName?.trim() || "Agency identity unavailable" : item.provider?.kind === "strelva" ? "Strelva Agency" : "Actor not recorded";
 }
 
 export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string): BusinessRequestRow[] {
@@ -47,11 +50,12 @@ export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[],
     id: `delivery-${item.id}`,
     title: item.title,
     stage: item.stage,
-    detail: item.stage === "asked" ? `Asked · waiting for ${providerName(item) || "the provider"} to agree scope and deadline`
+    detail: item.stage === "asked" ? `Asked · waiting for ${providerName(item) || "your agency"} to agree scope and deadline`
       : item.stage === "done" ? ["Done", providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · ")
       : [item.detail, item.dueAt && item.stage !== "closed" ? `due ${shortDate(item.dueAt)}` : null, providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · "),
     href: item.href,
     sortAt: item.updatedAt || "",
+    agencyName: deliveryProviderName(item, new Map()),
   }));
   const fromJobs = work.filter(item => item.productId === "operations" && item.resourceKind === "responsibility").map(item => {
     const stage = finiteJobStage(item.operation?.status);
@@ -74,50 +78,55 @@ interface Props {
   work: readonly WorkspaceWork[];
   agencyNames: ReadonlyMap<string, string>;
   readOnly: boolean;
+  agencySeat?: boolean;
   busy: boolean;
   onOpenWork: (id: string) => void;
   onAsk: () => void;
 }
 
 /** Things someone asked for that have an end: asked, agreed, in progress, ready for review, done. */
-export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, readOnly, busy, onOpenWork, onAsk }: Props) {
-  const deliveries = useBusinessDeliveries(deliveryScope);
+export function WorkspaceRequests({ businessName, deliveryScope, work, agencyNames, agencySeat = false, readOnly, busy, onOpenWork, onAsk }: Props) {
+  const ownerDeliveries = useBusinessDeliveries(agencySeat ? undefined : deliveryScope);
+  const shared = useAgencyClientHome(agencySeat ? deliveryScope : undefined);
+  const deliveries = agencySeat ? { state: shared.state.status === "ready" ? { status: "ready" as const, items: agencyClientDeliveries(shared.state.data) } : shared.state.status === "error" ? { status: "error" as const, message: "Shared Requests could not be checked." } : shared.state, refresh: shared.refresh } : ownerDeliveries;
   const items = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const providerName = (item: BusinessDeliveryItem) => deliveryProviderName(item, agencyNames);
   const rows = businessRequestRows(items, work, providerName);
   const closed = rows.filter(row => row.stage === "closed");
   const loading = busy || deliveries.state.status === "loading";
 
+  function stageLabel(stage: BusinessRequestStage, agencyName?: string) {
+    return requestStageLabel(stage, { agencySeat, businessName, agencyName });
+  }
   function row(entry: BusinessRequestRow) {
-    const body = <><ListChecks size={20} strokeWidth={1.5} aria-hidden="true" /><span><strong>{entry.title}</strong><small>{entry.detail}</small></span><ArrowUpRight size={17} aria-hidden="true" /></>;
-    return <li key={entry.id}>{entry.href ? <a className={styles.workRow} href={entry.href}>{body}</a> : <button type="button" className={styles.workRow} aria-label={`Open ${entry.title}`} onClick={() => entry.workId && onOpenWork(entry.workId)}>{body}</button>}</li>;
+    return <StRow key={entry.id}
+      title={entry.title}
+      detail={entry.detail}
+      href={entry.href}
+      onClick={!entry.href && entry.workId ? () => onOpenWork(entry.workId!) : undefined}
+      end={<><StState kind={entry.stage === "needs_you" || entry.stage === "ready_for_review" ? "need" : entry.stage === "done" ? "live" : "draft"}>{stageLabel(entry.stage, entry.agencyName)}</StState><ArrowUpRight size={16} aria-hidden="true" /></>}
+    />;
   }
 
-  return <div className={styles.page} aria-labelledby="requests-title">
-    <header className={styles.pageHeader}>
-      <p className={styles.eyebrow}>{readOnly ? "Shared with you" : businessName}</p>
-      <h1 id="requests-title">Requests</h1>
-      <p>Things you asked for that have an end. A request becomes agreed work once its scope and deadline are accepted.</p>
-    </header>
-    {!readOnly ? <button type="button" className={styles.secondaryAction} onClick={onAsk}><MessageSquareText size={17} aria-hidden="true" />Ask Strelva for something</button> : null}
-    {deliveries.state.status === "disabled" ? <p className={styles.emptyNote}>Requests made to Strelva or an agency are visible to the owners and admins of {businessName}.</p> : null}
-    {deliveries.state.status === "error" ? <p role="status" className={styles.emptyNote}>{deliveries.state.message} <button type="button" className={styles.textAction} onClick={deliveries.refresh}>Check again<ArrowRight size={15} aria-hidden="true" /></button></p> : null}
-    {loading ? <p role="status" className={styles.emptyNote}>Checking your requests…</p> : rows.length === 0 ? <div className={styles.empty}>
-      {readOnly || deliveries.state.status === "disabled" ? <h2>No requests you can see.</h2> : <>
-        <h2>Nothing asked yet.</h2>
-        <p>Ask Strelva for something with an end: a new page, an intake form, a launch. It shows up here with its stage and due date.</p>
-      </>}
-    </div> : <>
+  return <StPage>
+    <StHead title="Requests" titleId="requests-title"
+      meta={<>Things you asked for that have an end. A request becomes agreed work once its scope and deadline are accepted.{readOnly ? " Shared with you." : null}</>}
+      actions={!readOnly ? <StPill onClick={onAsk}>Ask Strelva for something</StPill> : undefined}
+    />
+    {deliveries.state.status === "disabled" ? <StNotice>Requests outside your current shared scope cannot be checked for {businessName}.</StNotice> : null}
+    {deliveries.state.status === "error" ? <StNotice tone="critical"><span role="alert">{deliveries.state.message}</span> <StTextButton onClick={deliveries.refresh}>Check again</StTextButton></StNotice> : null}
+    {loading ? <div role="status" aria-label="Checking your requests"><StSkeleton /><StSkeleton width="76%" /><StSkeleton width="88%" /></div> : rows.length === 0 && deliveries.state.status !== "error" ? <StEmpty>
+      <p>{readOnly || deliveries.state.status === "disabled" ? "No requests you can see." : "Nothing asked yet."}</p>
+      {readOnly || deliveries.state.status === "disabled" ? null : <p>Ask Strelva for something with an end: a new page, an intake form, a launch. It shows up here with its stage and due date.</p>}
+    </StEmpty> : <>
       {GROUPS.map(group => {
         const entries = rows.filter(entry => entry.stage === group.stage);
         if (!entries.length) return null;
-        const id = `requests-${group.stage}`;
-        return <section key={group.stage} aria-labelledby={id} className="mt-10">
-          <div className={styles.sectionHeading}><h2 id={id}>{group.heading}</h2><span className="text-sm text-gray-muted">{entries.length}</span></div>
-          <ul className={styles.workList} role="list">{entries.map(row)}</ul>
-        </section>;
+        return <StSection key={group.stage} title={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)} id={`requests-${group.stage}`} meta={<StMono>{entries.length}</StMono>}>
+          <StRows label={group.stage === "asked" ? REQUEST_STAGE_LABELS.asked : stageLabel(group.stage)}>{entries.map(row)}</StRows>
+        </StSection>;
       })}
-      {closed.length ? <details className="mt-10"><summary className="cursor-pointer py-3 text-sm text-gray-muted">Closed ({closed.length})</summary><ul className={styles.workList} role="list">{closed.map(row)}</ul></details> : null}
+      {closed.length ? <details><summary className="cursor-pointer py-3 text-sm text-gray-muted">Closed (<StMono>{closed.length}</StMono>)</summary><StRows label="Closed requests">{closed.map(row)}</StRows></details> : null}
     </>}
-  </div>;
+  </StPage>;
 }

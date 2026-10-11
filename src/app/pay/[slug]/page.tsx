@@ -92,7 +92,7 @@ export default async function PayLinkPage({ params, searchParams }: PageProps) {
               className="reb-rise inline-flex items-center rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium tracking-wide text-white"
               style={{ animationDelay: "60ms" }}
             >
-              Built by Jacob · Strelva
+              Built by Jacob · Strelva Agency · Runs on Strelva
             </span>
             <h1
               className="reb-rise mx-auto mt-5 max-w-[460px] text-[34px] font-semibold leading-[1.06] tracking-[-0.025em] text-[#1d1d1f] sm:text-[42px]"

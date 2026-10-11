@@ -5,17 +5,32 @@ import {
   isLocalDatabaseUrl, parseConversionArgs, runTenantConversion, runTenantRollback,
   type ConversionDeps, type ConversionSources, type RollbackDeps,
 } from "../../scripts/tenant-conversion";
-import { planTenantUnlink, type TenantUnlinkPreview, type TenantUnlinkReceipt } from "@/platform/business-record";
+import { planTenantUnlink, type ConversionReceipt, type TenantUnlinkPreview, type TenantUnlinkReceipt } from "@/platform/business-record";
 import type { TenantConfig } from "@/lib/types";
 
 const fixture = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-source.json"), "utf8"));
-const receipt = {
+const agencyRouteArgs = [
+  "--agency=77777777-7777-4777-8777-777777777777",
+  "--agency-staff=staff@agency.example.test",
+  "--agency-basis=existing_contract",
+];
+const conversionArgs = (...args: string[]) => ["gldf", ...agencyRouteArgs, ...args];
+const receipt: ConversionReceipt = {
   kind: "tenant_conversion", version: 1, tenantId: "gldf", tenantStableId: fixture.tenant.stableId, tenantActive: true,
   workspaceId: "44444444-4444-4444-8444-444444444444", workspaceName: "Great Lakes Dried Fruit", joinedExistingWorkspace: false,
-  operatorId: "55555555-5555-4555-8555-555555555555", operatorRole: "admin", billing: null, account: null, sequence: 1, revision: 1, changeCount: 14,
+  operatorId: "55555555-5555-4555-8555-555555555555", operatorRole: "none", operatorMembershipCreated: false,
+  providerRoute: {
+    agencyWorkspaceId: "77777777-7777-4777-8777-777777777777", selectionBasis: "existing_contract", source: "tenant_conversion",
+    providerId: "88888888-8888-4888-8888-888888888888", providerCreatedByConversion: true,
+    seatId: "99999999-9999-4999-8999-999999999999", seatGrantedByKind: "conversion",
+    staff: [{ staffId: "66666666-6666-4666-8666-666666666666", userId: "55555555-5555-4555-8555-555555555556", email: "staff@agency.example.test", createdByConversion: true }],
+    providerToEndId: null, providerToEndWorkspaceId: null,
+    routedAt: "2026-10-02T12:00:00Z",
+  },
+  billing: null, account: null, sequence: 1, revision: 1, changeCount: 14,
   counts: { facts: 9, services: 2, people: 1, contacts: 3, contactsCreated: 3, contactsMerged: 2, contactsUnchanged: 0 },
   convertedAt: "2026-10-02T12:00:00Z", replayed: false, alreadyConverted: false,
-} as const;
+};
 
 function sources(overrides: Partial<ConversionSources> = {}): ConversionSources {
   return {
@@ -37,7 +52,7 @@ function deps(overrides: Partial<ConversionDeps> = {}) {
 describe("tenant conversion script", () => {
   it("defaults to a dry run that prints the plan and writes nothing", async () => {
     const { deps: d, convert, lines } = deps();
-    const options = parseConversionArgs(["gldf"]);
+    const options = parseConversionArgs(conversionArgs());
     const outcome = await runTenantConversion({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d);
     expect(options.apply).toBe(false);
     expect(outcome.mode).toBe("dry-run");
@@ -45,25 +60,39 @@ describe("tenant conversion script", () => {
     expect(convert).not.toHaveBeenCalled();
     expect(lines.join("\n")).toContain("phone: \"716-555-0199\"");
     expect(lines.join("\n")).toContain("GRANDFATHERED");
+    expect(lines.join("\n")).toContain("agency=77777777-7777-4777-8777-777777777777 source=tenant_conversion basis=existing_contract");
+    expect(lines.join("\n")).toContain("operator client membership: none");
     expect(lines.at(-1)).toBe("Dry run: nothing was written.");
   });
 
   it("refuses --apply against a non-local database without Jacob's yes", async () => {
     const { deps: d, convert } = deps();
-    const options = parseConversionArgs(["gldf", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const options = parseConversionArgs(conversionArgs("--apply", "--operator-email=operator@strelva.example.test"));
     await expect(runTenantConversion({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d)).rejects.toThrow(/Jacob's yes/);
     await expect(runTenantConversion({ ...options, databaseUrl: undefined }, d)).rejects.toThrow(/Jacob's yes/);
-    await expect(runTenantConversion({ ...parseConversionArgs(["gldf", "--apply"]), databaseUrl: "http://127.0.0.1:54321" }, d)).rejects.toThrow(/operator-email/);
+    await expect(runTenantConversion({ ...parseConversionArgs(conversionArgs("--apply")), databaseUrl: "http://127.0.0.1:54321" }, d)).rejects.toThrow(/operator-email/);
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it("requires an explicit agency, named staff and selection basis", async () => {
+    const { deps: d, convert } = deps();
+    expect(() => parseConversionArgs(["gldf"])).toThrow(/no default agency/);
+    await expect(runTenantConversion({ ...parseConversionArgs(conversionArgs()), agencyWorkspaceId: undefined }, d)).rejects.toThrow(/agency workspace UUID/);
     expect(convert).not.toHaveBeenCalled();
   });
 
   it("applies once against a loopback database with the exact planned command", async () => {
     const { deps: d, convert } = deps();
-    const options = parseConversionArgs(["gldf", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const options = parseConversionArgs(conversionArgs("--apply", "--operator-email=operator@strelva.example.test"));
     const outcome = await runTenantConversion({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
     expect(convert).toHaveBeenCalledTimes(1);
     const committed = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-import.json"), "utf8"));
-    expect(convert.mock.calls[0]).toEqual(["operator@strelva.example.test", committed.payload, { commandId: committed.commandId, digest: committed.digest }]);
+    expect(convert.mock.calls[0]).toEqual(["operator@strelva.example.test", {
+      ...committed.payload,
+      agencyWorkspaceId: "77777777-7777-4777-8777-777777777777",
+      agencyStaffEmails: ["staff@agency.example.test"],
+      agencySelectionBasis: "existing_contract",
+    }, { commandId: outcome.plan.commandId, digest: outcome.plan.digest }]);
     expect(outcome.receipt?.workspaceId).toBe(receipt.workspaceId);
   });
 
@@ -76,7 +105,7 @@ describe("tenant conversion script", () => {
       read: async () => sources({ account: { id: "acct-1", name: "Twin Trees", tenantIds: ["gldf", "sister-site"], multiSite: true } }),
       readLink,
     });
-    const outcome = await runTenantConversion({ ...parseConversionArgs(["gldf", "--operator-email=operator@strelva.example.test"]), databaseUrl: "http://localhost:54321" }, d);
+    const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--operator-email=operator@strelva.example.test")), databaseUrl: "http://localhost:54321" }, d);
     expect(outcome.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
     expect(outcome.plan.payload.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
     expect(lines.join("\n")).toContain("MULTI-SITE");
@@ -93,16 +122,16 @@ describe("tenant conversion script", () => {
     }));
 
     it("parses the flag, defaults it off, and refuses it on a rollback", () => {
-      expect(parseConversionArgs(["gldf"]).separateBusiness).toBe(false);
-      expect(parseConversionArgs(["gldf", "--separate-business"]).separateBusiness).toBe(true);
-      expect(parseConversionArgs(["gldf", "--separate-business", "--apply", "--operator-email=o@strelva.example.test"]).apply).toBe(true);
+      expect(parseConversionArgs(conversionArgs()).separateBusiness).toBe(false);
+      expect(parseConversionArgs(conversionArgs("--separate-business")).separateBusiness).toBe(true);
+      expect(parseConversionArgs(conversionArgs("--separate-business", "--apply", "--operator-email=o@strelva.example.test")).apply).toBe(true);
       expect(() => parseConversionArgs(["gldf", "--separate-business", "--rollback"])).toThrow(/not a rollback/);
       expect(() => parseConversionArgs(["gldf", "--separate-businesses"])).toThrow(/Unknown flag/);
     });
 
     it("dry run: does not join the sibling's business and says why", async () => {
       const { deps: d, convert, lines } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
-      const outcome = await runTenantConversion({ ...parseConversionArgs(["gldf", "--separate-business", "--operator-email=operator@strelva.example.test"]), databaseUrl: "http://localhost:54321" }, d);
+      const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--separate-business", "--operator-email=operator@strelva.example.test")), databaseUrl: "http://localhost:54321" }, d);
       expect(outcome.targetWorkspaceId).toBeNull();
       expect(outcome.plan.payload.targetWorkspaceId).toBeUndefined();
       expect(outcome.plan.payload.separateBusiness).toBe(true);
@@ -118,7 +147,7 @@ describe("tenant conversion script", () => {
     it("apply passes the flag through in the exact planned payload", async () => {
       const { deps: d, convert } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
       const outcome = await runTenantConversion({
-        ...parseConversionArgs(["gldf", "--separate-business", "--apply", "--operator-email=operator@strelva.example.test"]), databaseUrl: "http://127.0.0.1:54321",
+        ...parseConversionArgs(conversionArgs("--separate-business", "--apply", "--operator-email=operator@strelva.example.test")), databaseUrl: "http://127.0.0.1:54321",
       }, d);
       expect(convert).toHaveBeenCalledTimes(1);
       const [, payload, plan] = convert.mock.calls[0] as unknown as [string, { separateBusiness?: boolean; targetWorkspaceId?: string }, { commandId: string; digest: string }];
@@ -128,7 +157,7 @@ describe("tenant conversion script", () => {
     });
 
     it("gives a separate business a different command than the default join", async () => {
-      const run = async (argv: string[]) => runTenantConversion({ ...parseConversionArgs(argv), databaseUrl: "http://localhost:54321" },
+      const run = async (argv: string[]) => runTenantConversion({ ...parseConversionArgs([...argv, ...agencyRouteArgs]), databaseUrl: "http://localhost:54321" },
         deps({ read: async () => sources({ account: twin }), readLink: readLink() }).deps);
       const joined = await run(["gldf", "--operator-email=operator@strelva.example.test"]);
       const separate = await run(["gldf", "--separate-business", "--operator-email=operator@strelva.example.test"]);
@@ -138,10 +167,10 @@ describe("tenant conversion script", () => {
 
     it("is ignored on a single-site tenant, leaving the default payload byte-identical", async () => {
       const { deps: d, lines } = deps();
-      const outcome = await runTenantConversion({ ...parseConversionArgs(["gldf", "--separate-business"]), databaseUrl: "http://localhost:54321" }, d);
+      const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--separate-business")), databaseUrl: "http://localhost:54321" }, d);
       const committed = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-import.json"), "utf8"));
-      expect(outcome.plan.payload).toEqual(committed.payload);
-      expect(outcome.plan.digest).toBe(committed.digest);
+      expect(outcome.plan.payload).toEqual({ ...committed.payload, agencyWorkspaceId: "77777777-7777-4777-8777-777777777777",
+        agencyStaffEmails: ["staff@agency.example.test"], agencySelectionBasis: "existing_contract" });
       expect(lines.join("\n")).toContain("--separate-business: ignored");
     });
   });
@@ -192,7 +221,7 @@ describe("tenant conversion rollback", () => {
   it("parses --rollback and defaults it to a dry run", () => {
     const options = parseConversionArgs(["gldf", "--rollback", "--operator-email=operator@strelva.example.test"]);
     expect(options).toMatchObject({ slug: "gldf", rollback: true, apply: false });
-    expect(parseConversionArgs(["gldf"]).rollback).toBe(false);
+    expect(parseConversionArgs(conversionArgs()).rollback).toBe(false);
   });
 
   it("previews without writing and prints what it would remove, keep and detach", async () => {

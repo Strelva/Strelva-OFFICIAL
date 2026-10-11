@@ -117,6 +117,16 @@ export interface WorkspacePresentationOptions {
 }
 
 export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresentationOptions = {}): WorkspaceWork {
+  if (work.productId === "websites" && work.resourceKind === "website") {
+    // Routing metadata only: the product reader authorizes and validates the
+    // complete document. Do not expose its content, inputs or agency grants.
+    const value = work.payload && typeof work.payload === "object" && !Array.isArray(work.payload) ? work.payload as Record<string, unknown> : null;
+    const version = value?.version;
+    const website: WorkspaceWork["website"] | null = version === 1 || version === 2 ? { version } : null;
+    return { id: work.id, workspaceId: work.workspaceId, title: work.title?.trim() || "Website", productId: work.productId, resourceKind: work.resourceKind, payload: null, input: {}, createdAt: work.createdAt,
+      ...(work.sourceWorkId ? { sourceWorkId: work.sourceWorkId } : {}),
+      ...(website ? { website } : { unavailableReason: "This website's document version is unavailable or unsupported. Its saved content has not changed." }) };
+  }
   const horizontalKinds: Record<string, string> = { "custom-applications": "custom-application", onboarding: "case", applications: "application", scheduling: "schedule", investigations: "investigation", operations: "responsibility", "product-learning": "learning" };
   if (horizontalKinds[work.productId] === work.resourceKind) {
     const value = work.payload && typeof work.payload === "object" && !Array.isArray(work.payload) ? work.payload as Record<string, unknown> : null;

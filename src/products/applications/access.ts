@@ -13,6 +13,10 @@ import {
 } from "./contracts";
 import { isApplicationDateOnly } from "./date-only";
 
+import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
+import { assertLinkFieldsReleased, linkFields, notifyAssignedPerson } from "./internal-tool-links";
+import { applicationSpecSchema } from "./contracts";
+
 /**
  * Application use is a resource grant. It is deliberately separate from the
  * workspace membership and from the application design/release commands.
@@ -143,6 +147,7 @@ export interface ApplicationUseContext {
   releasedSpec: unknown;
   records: unknown[];
   grant: ApplicationUseGrant;
+  linkLabels?: Array<{ recordId: string; fieldId: string; linkId: string; label: string }>;
 }
 
 export interface ApplicationUseSnapshot {
@@ -153,7 +158,7 @@ export interface ApplicationUseSnapshot {
     kind: ApplicationViewKind;
     fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "date" | "select" | "contact" | "assigned_person"; required: boolean; options?: string[] }>;
   }>;
-  records: Array<{ id: string; values: Record<string, string | number | boolean>; revision?: number }>;
+  records: Array<{ id: string; values: Record<string, string | number | boolean>; revision?: number; linkLabels?: Record<string, string> }>;
   access: {
     views: ApplicationViewKind[];
     recordRead: ApplicationRecordReadScope;
@@ -230,6 +235,15 @@ function rpcFailure(
   if (/workspace_exit_resource_stopped/.test(detail)) {
     throw new ApplicationUseConflictError(WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE);
   }
+  if (/application_record_person_unknown/.test(detail)) {
+    throw new ApplicationUseInputError("That email isn't on this business's staff.");
+  }
+  if (/application_record_link_denied/.test(detail)) {
+    throw new ApplicationUseInputError("Contacts and staff come from this business only.");
+  }
+  if (/workspace_exit_future_work_blocked/.test(detail)) {
+    throw new ApplicationUseConflictError("This business has stopped new work.");
+  }
   if (/application_use_invalid|application_record_invalid|application_schema_invalid/.test(detail)) {
     throw new ApplicationUseInputError(invalidMessage);
   }
@@ -274,6 +288,25 @@ function parseContext(value: unknown, workId: string): ApplicationUseContext {
     throw new ApplicationUseUnavailableError("The released application is unavailable.");
   }
   return { workId: parsedWorkId, workspaceId, title, releaseVersion, releasedSpec, records, grant: parseGrant(row.grant ?? row, parsedWorkId, workspaceId) };
+}
+
+// Labels come from the same grant projection as the records, never from a
+// workspace contact/staff listing. IDs remain authoritative for corrections.
+async function withLinkLabels(actor: WorkspaceActor, context: ApplicationUseContext): Promise<ApplicationUseContext> {
+  if (!systemsReleaseMayBeOn() || context.records.length === 0) return context;
+  const spec = applicationSpecSchema.safeParse(context.releasedSpec);
+  if (!spec.success || linkFields(spec.data).length === 0 || !await systemsReleasedFor(actor, context.workspaceId)) return context;
+  const { data, error } = await db().rpc("read_internal_tool_use_link_labels", {
+    ...identity(actor), p_work_id: context.workId, p_grant_id: context.grant.id, p_release_version: context.releaseVersion,
+  });
+  rpcFailure(error);
+  const parsed = z.object({
+    workId: z.literal(context.workId), workspaceId: z.literal(context.workspaceId),
+    grantId: z.literal(context.grant.id), releaseVersion: z.literal(context.releaseVersion),
+    labels: z.array(z.object({ recordId: z.string(), fieldId: z.string(), linkId: z.string().uuid(), label: z.string().trim().min(1).max(500) }).strict()),
+  }).strict().safeParse(data);
+  if (!parsed.success) throw new ApplicationUseUnavailableError("The linked record details are unavailable.");
+  return { ...context, linkLabels: parsed.data.labels };
 }
 
 function dateIsActive(value: string, now: Date): boolean {
@@ -373,7 +406,13 @@ function project(context: ApplicationUseContext, actor: WorkspaceActor, now: Dat
     if (grant.recordRead === "own" && record.createdBy !== actor.userId) return [];
     const safeValues = Object.fromEntries(Object.entries(record.values).filter(([key]) => visibleFields.has(key)));
     const editable = grant.recordEdit === "all" || (grant.recordEdit === "own" && record.createdBy === actor.userId);
-    return [{ id: record.id, values: safeValues, ...(editable && record.revision ? { revision: record.revision } : {}) }];
+    const labels = Object.fromEntries((context.linkLabels ?? []).filter(label => {
+      const type = fields.get(label.fieldId)?.type;
+      return label.recordId === record.id && visibleFields.has(label.fieldId)
+        && (type === "contact" || type === "assigned_person") && safeValues[label.fieldId] === label.linkId;
+    }).map(label => [label.fieldId, label.label]));
+    return [{ id: record.id, values: safeValues, ...(editable && record.revision ? { revision: record.revision } : {}),
+      ...(Object.keys(labels).length ? { linkLabels: labels } : {}) }];
   });
   return {
     workId: context.workId,
@@ -420,7 +459,7 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
       p_work_id: z.string().uuid().parse(workId),
     });
     rpcFailure(error);
-    return parseContext(data, workId);
+    return withLinkLabels(actor, parseContext(data, workId));
   },
   async list(actor, workId) {
     const { data, error } = await db().rpc("list_application_use_grants", {
@@ -454,7 +493,13 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
     rpcFailure(error);
   },
   async submit(actor, workId, input, access) {
-    const { data, error } = await db().rpc("submit_application_use_record_v2", {
+    const client = db();
+    const spec = applicationSpecSchema.safeParse(systemsReleaseMayBeOn()
+      ? (await postgresApplicationUsePersistence.inspect(actor, workId)).releasedSpec : null);
+    const linked = spec.success && linkFields(spec.data).length > 0;
+    const released = linked ? await systemsReleasedFor(actor, access.workspaceId) : false;
+    if (linked) assertLinkFieldsReleased(spec.data, released);
+    const { data, error } = await client.rpc(linked ? "submit_internal_tool_use_record" : "submit_application_use_record_v2", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_grant_id: z.string().uuid().parse(access.id),
@@ -463,10 +508,19 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
       p_idempotency_key: input.idempotencyKey,
     });
     rpcFailure(error, "Check the record fields and try again.");
-    return parseContext(data, workId);
+    const saved = parseContext(data, workId);
+    if (spec.success) await notifyAssignedPerson(client, actor, {
+      workspaceId: access.workspaceId, workId, toolTitle: spec.data.title, spec: spec.data, record: input.record,
+    });
+    return withLinkLabels(actor, saved);
   },
   async edit(actor, workId, input, access) {
-    const { data, error } = await db().rpc("edit_application_use_record", {
+    const client = db();
+    const spec = applicationSpecSchema.safeParse(systemsReleaseMayBeOn()
+      ? (await postgresApplicationUsePersistence.inspect(actor, workId)).releasedSpec : null);
+    const linked = spec.success && linkFields(spec.data).length > 0;
+    if (linked) assertLinkFieldsReleased(spec.data, await systemsReleasedFor(actor, access.workspaceId));
+    const { data, error } = await client.rpc(linked ? "edit_internal_tool_use_record" : "edit_application_use_record", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_grant_id: z.string().uuid().parse(access.id),
@@ -476,7 +530,7 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
       p_idempotency_key: input.idempotencyKey,
     });
     rpcFailure(error, "Check the record fields and try again.");
-    return parseContext(data, workId);
+    return withLinkLabels(actor, parseContext(data, workId));
   },
 };
 

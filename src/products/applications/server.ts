@@ -7,7 +7,7 @@ import {
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
-import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, resolveRecordLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
+import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, submitRecordWithLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
@@ -22,6 +22,8 @@ import {
   stateMap,
   withMemoryLane,
 } from "./repository";
+
+export { toolNoticesMayBeOn, retryToolNotices } from "./notice-delivery";
 
 export {
   applicationCandidateSchema,
@@ -217,7 +219,6 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationPublishInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "publish_application_candidate", {
@@ -241,7 +242,6 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRollbackInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rollback_application_release", {
@@ -277,9 +277,9 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       if (linked) assertLinkFieldsReleased(release.spec, await linkFieldsReleasedFor(release.spec, actor, loaded.work.workspaceId));
       const target = { workspaceId: loaded.work.workspaceId, workId: id };
       const { record, conflicts } = linked
-        ? await resolveRecordLinks(db, actor, target, release.spec, input.record, input.links)
+        ? await submitRecordWithLinks(db, actor, target, release.spec, input)
         : { record: input.record, conflicts: [] as string[] };
-      await durableRpc(db, "submit_application_record", {
+      if (!linked) await durableRpc(db, "submit_application_record", {
         p_work_id: id,
         p_workspace_id: loaded.work.workspaceId,
         p_expected_release_version: input.expectedReleaseVersion,
@@ -290,7 +290,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
         p_verified_email: actor.verifiedEmail,
       }, "The application record could not be saved.");
       let notice: AssignedPersonNoticeStatus = "none";
-      if (linked) notice = (await notifyAssignedPerson(db, actor, { ...target, toolTitle: release.spec.title, spec: release.spec, record })).status;
+      notice = (await notifyAssignedPerson(db, actor, { ...target, toolTitle: release.spec.title, spec: release.spec, record })).status;
       const runtimeResult = await readRuntime(actor, id);
       return linked ? Object.assign(runtimeResult, { linkResult: { notice, contactConflicts: conflicts } }) : runtimeResult;
     }
@@ -337,7 +337,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     // before translation so stale dashboard links retain their conflict UX.
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
-      if (command.kind !== "submit") await requireSystemChanger(store, actor, loaded.work.workspaceId);
+      if (!["submit", "install", "rehearse"].includes(command.kind)) await requireSystemChanger(store, actor, loaded.work.workspaceId);
       if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
       assertLegacyApplicationRevision(loaded.state, command);
       if (command.kind === "revise") return revise(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision, spec: command.spec });
@@ -502,3 +502,6 @@ export async function rehearseApplicationCandidateForAssignment(
   }, "The application candidate could not be rehearsed.");
   return readWorkspaceApplication(actor, workId);
 }
+
+/** Pure isolated adapter used by creator source qualification. */
+export { rehearseApplicationPackage } from "./package-rehearsal";

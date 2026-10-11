@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { runAuditSnapshot, validateUrlSafety } from "@/lib/audit/checks";
+import { runAuditSnapshot } from "@/lib/audit/checks";
+import {
+  PUBLIC_URL_VALIDATION_TIMEOUT_MS,
+  validateUrlSafety,
+  withPublicUrlValidationTimeout,
+} from "@/platform/infra/public-url-safety";
 import type { CategoryResult } from "@/lib/audit/types";
 
 const websiteSourceInputSchema = z.object({
@@ -30,7 +35,6 @@ export interface PublicWebsiteSourceRead {
 interface PublicWebsiteSourceDependencies {
   auditSnapshot?: (url: string) => Promise<{ categories: CategoryResult[]; visibleText: string; fetchedUrl?: string; httpStatus?: number; fetchOk?: boolean }>;
   audit?: (url: string) => Promise<CategoryResult[]>;
-  validateUrl?: (url: string) => Promise<unknown>;
   now?: () => Date;
 }
 
@@ -73,7 +77,6 @@ export function createPublicWebsiteSourceAdapter(dependencies: PublicWebsiteSour
       const result = await runAuditSnapshot(url);
       return { categories: result.categories, visibleText: result.visibleText, fetchedUrl: result.fetchedUrl, httpStatus: result.httpStatus, fetchOk: result.fetchOk };
     });
-  const validateUrl = dependencies.validateUrl ?? validateUrlSafety;
   const now = dependencies.now ?? (() => new Date());
 
   return {
@@ -83,7 +86,10 @@ export function createPublicWebsiteSourceAdapter(dependencies: PublicWebsiteSour
       try {
         // Keep the canonical SSRF guard at this boundary even when the audit
         // runner is injected for a local test.
-        await validateUrl(input.url);
+        await withPublicUrlValidationTimeout(
+          () => validateUrlSafety(input.url),
+          PUBLIC_URL_VALIDATION_TIMEOUT_MS,
+        );
         const result = await auditSnapshot(input.url);
         if (result.httpStatus === 401 || result.httpStatus === 403 || result.httpStatus === 429 || result.fetchOk === false) {
           const error = new Error(`Public page returned HTTP ${result.httpStatus ?? "unavailable"}`);

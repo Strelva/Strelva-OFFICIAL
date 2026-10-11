@@ -11,7 +11,7 @@ describe("workspace help entry", () => {
     expect(html).toContain("What do you need?");
     expect(html).toContain('id="capability-request"');
     expect(html).toContain("Sharing &amp; agency access");
-    expect(html).toContain("Open email");
+    expect(html).toContain("Email platform support");
     expect(html).not.toContain("<details");
   });
 

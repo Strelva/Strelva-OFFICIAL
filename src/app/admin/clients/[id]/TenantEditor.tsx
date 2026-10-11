@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useId } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
 import { Field } from "@/app/admin/ui";
@@ -77,6 +78,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
   const [deprovisionSlug, setDeprovisionSlug] = useState("");
   const [deprovisioning, setDeprovisioning] = useState(false);
   const [deprovisionError, setDeprovisionError] = useState<string | null>(null);
+  const [deprovisionCleanupId, setDeprovisionCleanupId] = useState<string | null>(null);
 
   const membersUrl = `/api/admin/tenants/${tenant.id}/members`;
 
@@ -272,10 +274,15 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       const res = await fetch(`/api/admin/tenants/${tenant.id}/deprovision`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmSlug: tenant.id }),
+        body: JSON.stringify({ confirmSlug: tenant.id,
+          ...(deprovisionCleanupId ? { action: "retry-cleanup", cleanupReceiptId: deprovisionCleanupId } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      if (data.ok !== true) {
+        setDeprovisionCleanupId(typeof data.cleanup?.id === "string" ? data.cleanup.id : null);
+        throw new Error("The database removal committed. Cleanup is still pending and this slug cannot be reused. Retry cleanup when the remaining stores are available.");
+      }
       router.push("/admin/clients");
     } catch (err) {
       setDeprovisionError(err instanceof Error ? err.message : "Deprovision failed");
@@ -655,6 +662,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             placeholder={tenant.id}
             className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm font-mono text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-critical0/50"
           />
+          {deprovisionCleanupId && <Link href={`/admin/tenant-cleanup/${tenant.id}`} className="block text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Open cleanup recovery</Link>}
           {deprovisionError && (
             <p className="text-xs text-critical leading-snug">{deprovisionError}</p>
           )}
@@ -664,7 +672,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             disabled={deprovisionSlug !== tenant.id || deprovisioning}
             className="rounded-md border border-critical0/40 bg-critical0/10 px-4 py-2 text-sm font-medium text-critical hover:bg-critical0/20 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {deprovisioning ? "Deprovisioning…" : "Permanently delete this tenant"}
+            {deprovisioning ? "Deprovisioning…" : deprovisionCleanupId ? "Retry pending cleanup" : "Permanently delete this tenant"}
           </button>
         </div>
       </div>
@@ -760,4 +768,3 @@ function FeaturesPanel({
     </div>
   );
 }
-

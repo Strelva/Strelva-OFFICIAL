@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "@/lib/tenants";
@@ -20,6 +21,7 @@ export async function GET() {
 
   let configs: TenantConfig[];
   if (dev || (await isSuperAdmin())) {
+    if (!dev) await authorizeAdminOperatorRead("admin.clients.read");
     configs = (await getAllTenants()).filter(isActiveTenant);
   } else {
     const ids = await getCurrentUserTenants();

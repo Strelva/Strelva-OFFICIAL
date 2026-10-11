@@ -10,6 +10,8 @@
  * Reads by workspace through a service-role function that returns only that
  * business's requests, so the hourly chase can propose items without a member.
  */
+import { bookingAgentVisibilityEnabled } from "./flags";
+import { bookingAgentLabel } from "./agent-source";
 import { createHash } from "node:crypto";
 import type { ProposedItem } from "@/platform/needs-you/contracts";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
@@ -43,7 +45,7 @@ export function bookingRequestGoneReason(booking: (StoreBooking & { lastChange: 
 }
 
 export function bookingRequestRevision(booking: StoreBooking): string {
-  return createHash("sha256").update(JSON.stringify([booking.id, booking.status, booking.start, booking.end, booking.serviceName])).digest("hex");
+  return createHash("sha256").update(JSON.stringify([booking.id, booking.status, booking.start, booking.end, booking.serviceName, ...(bookingAgentVisibilityEnabled() ? [bookingAgentLabel(booking)] : [])])).digest("hex");
 }
 
 function when(booking: StoreBooking): string {
@@ -58,14 +60,15 @@ function when(booking: StoreBooking): string {
 export function bookingRequestItem(booking: StoreBooking, workspaceId: string): ProposedItem | null {
   if (booking.status !== "requested" || booking.workspaceId !== workspaceId) return null;
   const who = booking.customer.name.replace(/\s+/g, " ").trim() || "A customer";
+  const source = bookingAgentVisibilityEnabled() ? bookingAgentLabel(booking) : null;
   return {
     kind: "customer.commitment",
     route: "owner_decides",
     systemId: booking.systemId,
-    title: `Booking request: ${who}, ${when(booking)}`.slice(0, 200),
+    title: `Booking request: ${source ? `${source} · ` : ""}${who}, ${when(booking)}`.slice(0, 200),
     detail: [booking.serviceName, booking.customer.email, booking.intakeAnswers.notes ?? booking.intakeAnswers.message].filter(Boolean).join(" · ").slice(0, 600) || null,
-    approveEffect: "The booking is confirmed for this time.",
-    notYetEffect: "The time is released and the booking is not confirmed.",
+    approveEffect: `The booking is confirmed for this time.${source ? ` ${source}.` : ""}`,
+    notYetEffect: `The time is released and the booking is not confirmed.${source ? ` ${source}.` : ""}`,
     sourceLifecycle: BOOKING_REQUEST_LIFECYCLE,
     sourceId: booking.id,
     revisionHash: bookingRequestRevision(booking),

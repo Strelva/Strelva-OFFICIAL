@@ -1,0 +1,22 @@
+[
+  {
+    "name": "canonical-system-original-red",
+    "source": "src/platform/ask/turn.ts",
+    "baseline": "39e27a71e7a6ab505adaa3b9620000a04d96d955",
+    "originalSha256": "2d851bcb653af577dd4a86350fc7ec996aca49d83247924117bedb76e6e1487f",
+    "candidateSha256": "525778bf6988f952c6eb570f1b451c8d24ba949a0f065d3cbed04628c992c0c0",
+    "exitCode": 1,
+    "restorationVerified": true,
+    "log": "docs/operations/ask-native-source-proof-2026-10-09/canonical-system-original-red.log"
+  },
+  {
+    "name": "listing-response-original-red",
+    "source": "src/experience/workspace/agency/SourcePackageControls.tsx",
+    "baseline": "39e27a71e7a6ab505adaa3b9620000a04d96d955",
+    "originalSha256": "8fa6263ba16687491fdad8e6a83138a0657b07f4d7d8467db6fe176580f5b112",
+    "candidateSha256": "bdaa1c23c53f77b4e4a5819ff25c6afeae0943f3fe9f6c8057761bf27cdc2c3c",
+    "exitCode": 1,
+    "restorationVerified": true,
+    "log": "docs/operations/ask-native-source-proof-2026-10-09/listing-response-original-red.log"
+  }
+]

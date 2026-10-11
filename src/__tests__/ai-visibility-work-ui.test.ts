@@ -47,7 +47,7 @@ describe("AI Visibility workspace UI entry", () => {
         onCreated: () => undefined,
       }),
     );
-    expect(html).toContain("See what AI can understand about this business.");
+    expect(html).toContain("Ask Gemini about your business");
     expect(html).toContain("Run assessment");
     expect(html).toContain("Saved only after completion");
   });

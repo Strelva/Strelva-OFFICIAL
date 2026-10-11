@@ -12,8 +12,8 @@ import {
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Site delivery status | Strelva",
-  description: "Track the status of a Strelva site request.",
+  title: "Site delivery status | Strelva Agency",
+  description: "Track the status of a Strelva Agency site request. Runs on Strelva.",
 };
 
 export default async function DeliveryStatusPage({
@@ -41,7 +41,7 @@ export default async function DeliveryStatusPage({
           className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
         >
           <ArrowLeft className="size-4" />
-          Strelva
+          Strelva Agency · Runs on Strelva
         </Link>
 
         <section className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">

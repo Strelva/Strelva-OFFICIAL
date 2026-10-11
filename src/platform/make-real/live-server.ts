@@ -4,6 +4,8 @@
  * and the per-workspace flags. Server only. Every outside write here is a
  * call into the path that already owns it (live-adapters.ts has the table).
  */
+import { createGoogleListingAdapter } from "./google-adapter";
+import type { GoogleMakeRealPorts } from "./google-adapter";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
@@ -24,7 +26,6 @@ import {
   createInquiryFormAdapter,
   createInternalAppAdapter,
   createTenantContentAdapter,
-  createWaitingAdapter,
   type LiveChannelContext,
 } from "./live-adapters";
 import { createLiveMakeRealService, liveReadyPlan, startLiveApproved, type DueActivation } from "./live";
@@ -36,36 +37,43 @@ import { createSystemStoreLiveSystems } from "./systems-adapter";
 
 /** Systems must be on for the workspace, and the channel's own key. */
 export async function makeRealChannelEnabled(workspaceId: string, channel: MakeRealChannel): Promise<boolean> {
-  if (channel === "google_listing") return false;
   if (!(await workspaceReleaseFlagEnabled("systems", workspaceId))) return false;
   return workspaceReleaseFlagEnabled(`make_real_live:${channel}`, workspaceId);
 }
 
 /** Whether any live channel is on for this workspace: the route stays isolated otherwise. */
 export async function anyMakeRealChannelEnabled(workspaceId: string): Promise<boolean> {
-  for (const channel of ["hosted_website", "tenant_content", "inquiry_form", "booking_page", "internal_app"] as const) {
+  for (const channel of ["hosted_website", "tenant_content", "inquiry_form", "booking_page", "internal_app", "google_listing"] as const) {
     if (await makeRealChannelEnabled(workspaceId, channel)) return true;
   }
   return false;
 }
 
-export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) {
+export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts, service?: import("./live").LiveMakeRealServiceContext) {
   const ctx: LiveChannelContext = { actor, enabled: (channel) => makeRealChannelEnabled(workspaceId, channel) };
   return [
     createHostedWebsiteAdapter({
       read: async (a, workId) => (await import("@/products/websites/rebuild-service")).readWebsiteRebuild(a, workId),
       approve: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).approveWebsiteRebuild(a, workId, selection),
       launch: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).launchWebsiteRebuild(a, workId, selection),
+      publishLinked: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).publishWebsiteRebuildOntoLinkedSite(a, workId, selection),
     }, ctx),
     createTenantContentAdapter({
       tenantConfig: async (tenantId) => (await getTenantConfig(tenantId)) ?? null,
       apply: (input) => applySectionUpdate({ ...input, section: input.section as ContentSection, tenantConfig: input.tenantConfig as Parameters<typeof applySectionUpdate>[0]["tenantConfig"] }),
       versions: async (section, tenantId) => (await getVersions(section as ContentSection, tenantId)).map((v) => ({ id: v.id, data: v.data, ...(v.requestId ? { requestId: v.requestId } : {}) })),
       content: (section, tenantId) => getContent(section as ContentSection, tenantId),
+      publicReadBack: async (tenantId, section, expected) => {
+        const tenant = await getTenantConfig(tenantId);
+        if (!tenant) return { ok: false, detail: "The published site's address is unavailable." };
+        return (await import("@/products/websites/rebuild-service")).readPublishedWebsiteContent({ tenant, section, expected });
+      },
       restore: (section, versionId, tenantId) => restoreVersion(section as ContentSection, versionId, tenantId, "ai"),
     }, ctx),
     createInquiryFormAdapter({
+      prepareFollowUp: async (a, selection) => (await import("@/products/inquiries/server")).approveAskInquiryFollowUpPublication(a, selection),
       queue: async (input) => (await import("@/products/inquiries/server")).queueInquiryPublication(input),
+      find: async (input) => (await import("@/products/inquiries/server")).findInquiryPublication(input),
       execute: async (input) => (await import("@/products/inquiries/publication")).executeInquiryPublication(input),
       claim: async (tenantId, claimId) => (await import("@/products/inquiries/repository")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
     }, ctx),
@@ -79,18 +87,21 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       publish: async (a, workId, raw) => (await import("@/products/applications/server")).publishApplication(a, workId, raw),
       rollback: async (a, workId, raw) => (await import("@/products/applications/server")).rollbackApplication(a, workId, raw),
     }, ctx),
-    createWaitingAdapter("google_listing", "Google hasn't approved Strelva's access yet. Strelva adds it when Google does."),
+    createGoogleListingAdapter(service && google.forService ? google.forService(service) : google, ctx),
   ];
 }
 
-export const liveMakeReal = createLiveMakeRealService({
-  possibilities: (actor) => createSupabasePossibilityRepository(actor),
-  activations: (actor) => createSupabaseActivationRepository(actor),
-  live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
-  adapters: liveChannelAdapters,
-  approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
-  recordService: recordServiceAction,
-});
+export function createServerLiveMakeReal(google: GoogleMakeRealPorts) {
+  return createLiveMakeRealService({
+    possibilities: (actor) => createSupabasePossibilityRepository(actor),
+    activations: (actor) => createSupabaseActivationRepository(actor),
+    live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
+    adapters: (actor, workspaceId, service) => liveChannelAdapters(actor, workspaceId, google, service),
+    approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
+    recordService: recordServiceAction,
+    nativeGoogleUndoOwner:async(actor,workspaceId)=>(await (await import("@/platform/business-record/service")).readBusinessRecord(actor,workspaceId)).access==="owner",
+  });
+}
 
 type Rpc = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
 function db(): Rpc {
@@ -193,6 +204,6 @@ export async function readLiveReadyPlans(workspaceId: string): Promise<ReadyPlan
 }
 
 /** Start an approved live plan (the item id is the plan approval). */
-export function startLiveMakeReal(input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string }) {
-  return startLiveApproved(liveMakeReal, input);
+export function startLiveMakeReal(google: GoogleMakeRealPorts, input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string; service?: ServiceSession }) {
+  return startLiveApproved(createServerLiveMakeReal(google), input);
 }

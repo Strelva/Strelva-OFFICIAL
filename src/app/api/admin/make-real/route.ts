@@ -1,3 +1,5 @@
+import { activationProviderReferenceSchema } from "@/platform/make-real/google-provider-reference";
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
@@ -12,7 +14,7 @@ const command = z.discriminatedUnion("action", [
   z.object({ action: z.literal("resume"), ...ids }).strict(),
   z.object({ action: z.literal("rollback"), ...ids, confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("reconcile"), ...ids, stepId: z.string().min(1).max(80), resolution: z.enum(["completed", "not_applied"]),
-    evidence: z.string().trim().min(10).max(2000), providerRef: z.string().max(240).optional() }).strict(),
+    evidence: z.string().trim().min(10).max(2000), providerRef: activationProviderReferenceSchema.optional() }).strict(),
 ]);
 
 /**
@@ -31,7 +33,8 @@ export async function GET(request: Request) {
   const parsed = z.object(ids).safeParse({ workspaceId: url.searchParams.get("workspaceId"), activationId: url.searchParams.get("activationId") });
   if (!parsed.success) return NextResponse.json({ error: "Check the request." }, { status: 400, headers: noStore });
   try {
-    const { activationStarter, activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    await authorizeAdminOperatorRead("admin.make-real.read");
+    const { activationStarter, activationRunner, liveMakeReal } = await import("@/experience/systems/live-server");
     // The starter reads it; once the starter has left, Strelva (system) does (a logged session).
     const actor = await activationStarter(parsed.data.workspaceId, parsed.data.activationId)
       ?? (await activationRunner(parsed.data.workspaceId, parsed.data.activationId))?.actor ?? null;
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Check the request. Reconciling needs evidence of at least 10 characters; rolling back needs confirm." }, { status: 400, headers: noStore });
   const input = parsed.data;
   try {
-    const { activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    const { activationRunner, liveMakeReal } = await import("@/experience/systems/live-server");
     const runner = await activationRunner(input.workspaceId, input.activationId);
     if (!runner) return NextResponse.json({ error: "That activation is not available." }, { status: 404, headers: noStore });
     const { actor, service } = runner;
@@ -60,9 +63,9 @@ export async function POST(request: Request) {
       const { recordServiceAction } = await import("@/platform/needs-you/service-actor");
       await recordServiceAction(service, input.action, `activation:${input.activationId}`, note);
     }
-    const activation = input.action === "resume" ? await liveMakeReal.resume(actor, input.workspaceId, input.activationId, note)
-      : input.action === "rollback" ? await liveMakeReal.rollback(actor, input.workspaceId, input.activationId, note)
-        : await liveMakeReal.reconcile(actor, input.workspaceId, input.activationId, { stepId: input.stepId, resolution: input.resolution, evidence: input.evidence, ...(input.providerRef ? { providerRef: input.providerRef } : {}), note });
+    const activation = input.action === "resume" ? await liveMakeReal.resume(actor, input.workspaceId, input.activationId, note, service ?? undefined)
+      : input.action === "rollback" ? await liveMakeReal.rollback(actor, input.workspaceId, input.activationId, note, service ?? undefined)
+        : await liveMakeReal.reconcile(actor, input.workspaceId, input.activationId, { stepId: input.stepId, resolution: input.resolution, evidence: input.evidence, ...(input.providerRef ? { providerRef: input.providerRef } : {}), note }, service ?? undefined);
     return NextResponse.json({ activation, view: describeActivation(activation) }, { headers: noStore });
   } catch (error) {
     return failure(error);

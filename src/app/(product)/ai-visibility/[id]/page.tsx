@@ -9,12 +9,12 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { id } = await params;
   const stored = await getAiVisibilityResult(id);
-  if (!stored) return { title: "AI Visibility scorecard not found | Strelva" };
+  if (!stored) return { title: "Business check not found | Strelva" };
   const measured = stored.result.readinessMeasured ?? stored.result.measurementStatus !== "unavailable";
   const partial = stored.result.measurementStatus === "partial";
   const title = measured
-    ? `${stored.result.business}: ${stored.result.grade} AI Visibility grade`
-    : `${stored.result.business}: AI Visibility scorecard`;
+    ? `${stored.result.business}: ${stored.result.grade} business check grade`
+    : `${stored.result.business}: business check`;
   const description = measured
     ? `${partial ? "Partial measurement." : `${stored.result.score}/100.`} ${stored.result.verdict}`
     : `Measurement unavailable. ${stored.result.measurementNote || stored.result.verdict}`;
@@ -28,5 +28,5 @@ export default async function SharedAiVisibilityPage(
   const stored = await getAiVisibilityResult(id);
   if (!stored) notFound();
   await recordAiVisibilityResultView(id).catch(() => {});
-  return <AiVisibilityPage initialResult={stored.result} scanId={id} workspaceEnabled={workspaceReleaseEnabled()} />;
+  return <AiVisibilityPage initialResult={stored.result} agency={stored.result.agency} scanId={id} workspaceEnabled={workspaceReleaseEnabled()} />;
 }

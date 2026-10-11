@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { scanPortfolioDomains } from "@/lib/domain-monitor";
 import { UptimeBoard } from "./UptimeBoard";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
  * time, before the cron has run or when Redis is unavailable (dev).
  */
 export default async function UptimePage() {
+  await authorizeAdminOperatorRead("admin.uptime.read");
   const stored = await getDomainHealth();
   const results = stored?.results ?? (await scanPortfolioDomains());
   const scannedAt = stored?.scannedAt ?? new Date().toISOString();

@@ -32,6 +32,7 @@ import { manifestAllowsAction } from "./site-capabilities";
 import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { revalidateClientSite } from "./revalidate-client";
 import { diffFields } from "./utils";
+import { workspacePorts } from "./workspace-ports";
 
 type Governance = Awaited<ReturnType<typeof maybeAutoApprove>>;
 type FieldChange = ReturnType<typeof diffFields>[number];
@@ -58,6 +59,8 @@ export interface ApplySectionUpdateInput {
    * landed. Make real passes its step's idempotency key.
    */
   requestId?: string;
+  /** The person preparing this review, separate from its later approver. */
+  preparer?: { userId: string; email: string; kind: "owner" | "operator" };
 }
 
 export type ApplySectionUpdateResult =
@@ -193,9 +196,14 @@ export async function applySectionUpdate(
     }
     const { revalidatePath } = await import("next/cache");
     revalidatePath("/");
-    revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
+    const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
       console.error("[agent] Failed to revalidate client site:", err);
     });
+    try {
+      await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
+        tenantId, section, expected: parsed.data, actorId: "ai", publicationRef: input.requestId, revalidation,
+      });
+    } catch { /* Public observation cannot turn the accepted write into failure. */ }
   } else {
     const event = await queueAiContentReview({
       tenantId,
@@ -205,6 +213,7 @@ export async function applySectionUpdate(
       diffs,
       risk,
       governance,
+      ...(input.preparer ? { preparer: input.preparer } : {}),
     });
     eventId = event.id;
     await setDraftContent(section, parsed.data as Parameters<typeof setContent>[1], tenantId);
@@ -222,7 +231,7 @@ export async function applySectionUpdate(
         time: new Date().toISOString(),
         type: "ai",
         section,
-        actor: "ai",
+        actor: input.preparer ? input.preparer.kind === "operator" ? "admin" : "user" : "ai",
         changes,
         eventStatus: autoPublish ? "auto_approved" : "pending",
         governanceReason: governance.reason,

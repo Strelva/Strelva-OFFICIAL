@@ -34,19 +34,19 @@ export function hoursToGoogle(hours: FactValues["hours"]): Required<GoogleHours>
 }
 
 export interface RecordInfo {
-  phone?: FactValues["phone"];
-  description?: FactValues["description"];
-  links?: FactValues["links"];
+  phone?: FactValues["phone"] | null;
+  description?: FactValues["description"] | null;
+  links?: FactValues["links"] | null;
 }
 
 /** Phone, website and description, with the update mask Google needs. */
 export function infoToGoogle(record: RecordInfo): { body: GoogleInfo; updateMask: string[] } {
   const body: GoogleInfo = {};
   const updateMask: string[] = [];
-  if (record.phone) { body.phoneNumbers = { primaryPhone: record.phone }; updateMask.push("phoneNumbers"); }
+  if (record.phone !== undefined) { body.phoneNumbers = record.phone ? { primaryPhone: record.phone } : {}; updateMask.push("phoneNumbers"); }
   const website = record.links?.find((link) => link.kind === "website")?.url;
-  if (website) { body.websiteUri = website; updateMask.push("websiteUri"); }
-  if (record.description) { body.profile = { description: record.description }; updateMask.push("profile"); }
+  if (record.links !== undefined) { body.websiteUri = website ?? ""; updateMask.push("websiteUri"); }
+  if (record.description !== undefined) { body.profile = { description: record.description ?? "" }; updateMask.push("profile"); }
   return { body, updateMask };
 }
 

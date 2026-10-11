@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue, ThreeWayChange, ThreeWayConflict } from "./compare";
 import type { SystemRef, SystemRevisionRef } from "./refs";
+import type { PackageDeclaration, RevisionQualification } from "./declaration";
 
 /** Where a Version works differently. Not a point in time. */
 export const VERSION_CONTEXT_KINDS = ["location", "customer_segment", "agency_client", "franchise"] as const;
@@ -12,15 +13,21 @@ export interface VersionContext {
 }
 
 // On the server the actor comes from `read_version_actor` (direct workspace
-// memberships, src/platform/system-versions/supabase-store.ts). Postgres
-// rechecks every call, including agency scope, which this shape does not
-// carry: a partner agency with no membership is refused here first.
+// memberships plus provider seats, src/platform/system-versions/supabase-store.ts).
+// A provider seat is the agency's standing access to a client business
+// (20261009151000_provider_seats.sql) and counts like a direct membership
+// with the seat's role. Postgres rechecks every call, including agency
+// scope, which this shape does not carry: a partner agency with neither a
+// membership nor a seat is refused here first.
 export type VersionRole = "owner" | "admin" | "member";
+export type VersionMembershipVia = "membership" | "provider_seat";
 export interface VersionActor {
   userId: string;
   /** Required by the Postgres store, which rechecks the actor in the database. */
   verifiedEmail?: string;
-  memberships: ReadonlyArray<{ businessId: string; role: VersionRole }>;
+  memberships: ReadonlyArray<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }>;
+  /** Current delegated work only. Never converted into an owner/admin role. */
+  delegatedSystems?: ReadonlyArray<{ businessId: string; systemId: string; canWrite: boolean }>;
 }
 
 /** The authoring side of lineage. Only its business can publish revisions. */
@@ -29,6 +36,9 @@ export interface SourceSystemRecord {
   /** Businesses that may base Versions on this source and see its improvements. */
   sharedWith: string[];
   createdAt: string;
+  creatorWorkspaceId?: string;
+  listingState?: "private" | "clients" | "listed";
+  availableTo?: string[];
 }
 
 /**
@@ -42,8 +52,13 @@ export interface SourceRevision {
   summary: string;
   definition: JsonObject;
   requires: { bindingKinds: string[] };
+  /** Immutable source policy. Local accounts/data never become standards. */
+  lockedPaths?: string[];
   publishedBy: string;
   publishedAt: string;
+  creatorWorkspaceId?: string;
+  declaration?: PackageDeclaration;
+  qualification?: RevisionQualification | null;
 }
 
 /** A path the descendant changed relative to its baseline. Business-owned. */
@@ -73,6 +88,7 @@ export interface VersionRelease {
   definition: JsonObject;
   /** The source revision this release was based on, for traceability only. */
   baselineRevision: number;
+  baselineSourceRevisionId?: string;
   overridePaths: string[];
   releasedBy: string;
   releasedAt: string;
@@ -96,6 +112,11 @@ export interface VersionLineage {
   /** The descendant's own business-owned System identity. */
   version: SystemRef;
   source: SystemRef;
+  creatorWorkspaceId?: string;
+  /** Immutable initial installation revision, including after updates. */
+  sourceRevisionId?: string;
+  sourceComponentKey?: string;
+  bundleId?: string;
   context: VersionContext;
   baseline: { revision: number; definition: JsonObject };
   overrides: VersionOverride[];
@@ -121,6 +142,7 @@ export interface ImprovementComparison {
   sourceRevision: number;
   summary: string;
   status: ImprovementStatus;
+  lockedPaths?: string[];
   changes: ThreeWayChange[];
   conflicts: ThreeWayConflict[];
   /** Required binding kinds this Version has not bound locally. */

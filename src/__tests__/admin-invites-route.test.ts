@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 const mockAssignUserToTenant = vi.hoisted(() => vi.fn());
 const mockCreateInvite = vi.hoisted(() => vi.fn());
@@ -104,7 +109,7 @@ describe("admin invites route", () => {
       "production",
     );
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"North Studio" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),
@@ -115,7 +120,7 @@ describe("admin invites route", () => {
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       html: expect.stringContaining("owner@example.com"),
       text: expect.stringContaining(
-        "Use owner@example.com when signing up so your dashboard access connects automatically.",
+        "Use owner@example.com when signing up so your workspace access connects automatically.",
       ),
     }));
     expect(mockGetActorContext).toHaveBeenCalledWith("gldf");

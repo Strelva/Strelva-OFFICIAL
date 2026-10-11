@@ -1,0 +1,76 @@
+Intermediate extraction check: a renamed test call lost its normalizer argument. Corrected before final passing checks.
+
+(node:78399) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+
+(node:78418) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78417) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78407) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78414) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78412) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78413) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78536) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78877) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79956) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:79954) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/__tests__/rebuild-transport-uncertainty.test.ts (23 tests | 2 failed) 120ms
+   × matches server deterministic URL normalization and rejection under test rules 5ms
+   × matches server deterministic URL normalization and rejection under production rules 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/rebuild-transport-uncertainty.test.ts > matches server deterministic URL normalization and rejection under test rules
+ FAIL  src/__tests__/rebuild-transport-uncertainty.test.ts > matches server deterministic URL normalization and rejection under production rules
+AssertionError: https://: expected { Object (error) } to deeply equal { Object (error) }
+
+- Expected
++ Received
+
+  {
+-   "error": "Enter a valid public website address.",
++   "error": "normalize is not a function",
+  }
+
+ ❯ src/__tests__/rebuild-transport-uncertainty.test.ts:16:31
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+ Test Files  1 failed | 30 passed (31)
+      Tests  2 failed | 375 passed (377)
+   Start at  17:04:23
+   Duration  7.25s (transform 30.31s, setup 1.47s, import 60.30s, tests 9.35s, environment 12.90s)
+
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+src/__tests__/rebuild-transport-uncertainty.test.ts(16,12): error TS2554: Expected 2 arguments, but got 1.
+ ELIFECYCLE  Command failed with exit code 2.
+
+> strelva@0.2.0 lint /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> eslint .
+
+[BABEL] Note: The code generator has deoptimised the styling of /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009/src/platform/infra/db/database.types.ts as it exceeds the max of 500KB.
+
+/Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009/src/__tests__/rebuild-transport-uncertainty.test.ts
+  4:10  error  'normalizeWebsiteRebuildUrl' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+✖ 1 problem (1 error, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.

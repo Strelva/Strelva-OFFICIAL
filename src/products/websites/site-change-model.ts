@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { recordedActorSchema } from "@/platform/presentation/actor";
 
 /**
  * The browser-safe half of website repo-change Requests (site-changes.ts):
@@ -16,6 +17,7 @@ export const siteChangeReceiptSchema = z.object({
   readBack: z.enum(["confirmed", "not_confirmed", "not_checked"]).nullable(),
   note: z.string().nullable(),
   recordedAt: z.string(),
+  actor: recordedActorSchema.nullable().optional().catch(null),
 });
 export type SiteChangeReceipt = z.infer<typeof siteChangeReceiptSchema>;
 
@@ -44,10 +46,10 @@ export function siteChangeStage(request: SiteChangeRequest): SiteChangeStage {
 }
 
 export const SITE_CHANGE_STAGE_LABEL: Record<SiteChangeStage, string> = {
-  asked: "Asked · Strelva agrees scope and timing with you next",
-  in_progress: "In progress · Strelva is building it on a copy of the site",
+  asked: "Asked · Scope and timing need agreement with the selected agency",
+  in_progress: "In progress · Your agency is building it on a copy of the site",
   ready_for_review: "Ready for your review · open the preview, then approve or decline",
-  approved: "Approved · Strelva deploys it next",
+  approved: "Approved · Deployment requires current provider authority",
   declined: "Declined · nothing on the site changed",
   done: "Done · live and checked on the site",
   done_unconfirmed: "Deployed · not yet confirmed on the live site",
@@ -70,7 +72,7 @@ export type RecordSiteChange = z.infer<typeof recordSiteChangeSchema>;
 
 /** The service-request command that files "Ask for a change" on a website System. */
 export function siteChangeRequestCommand(input: {
-  workspaceId: string; systemId: string; tenantStableId: string; editing: "native" | "request"; words: string; page?: string; idempotencyKey: string;
+  provider: { kind: "agency"; agencyWorkspaceId: string }; workspaceId: string; systemId: string; tenantStableId: string; editing: "native" | "request"; words: string; page?: string; idempotencyKey: string;
 }) {
   const words = input.words.trim().slice(0, 3_000);
   return {
@@ -87,7 +89,7 @@ export function siteChangeRequestCommand(input: {
       ...(input.page ? { page: input.page.slice(0, 200) } : {}),
     },
     scope: [SITE_CHANGE_SCOPE],
-    provider: { kind: "strelva" as const },
+    provider: input.provider,
     idempotencyKey: input.idempotencyKey,
   };
 }

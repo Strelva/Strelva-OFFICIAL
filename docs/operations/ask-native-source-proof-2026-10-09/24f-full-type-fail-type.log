@@ -1,0 +1,10 @@
+src/__tests__/ask-native-tools.test.ts(15,18): error TS2322: Type 'Mock<() => Promise<{ role: string; exited: boolean; site: null; googleWriteGranted: boolean; inquiriesEnabled: boolean; }>>' is not assignable to type '() => Promise<AskAuthoritySnapshot>'.
+  Type 'Promise<{ role: string; exited: boolean; site: null; googleWriteGranted: boolean; inquiriesEnabled: boolean; }>' is not assignable to type 'Promise<AskAuthoritySnapshot>'.
+    Type '{ role: string; exited: boolean; site: null; googleWriteGranted: boolean; inquiriesEnabled: boolean; }' is not assignable to type 'AskAuthoritySnapshot'.
+      Types of property 'role' are incompatible.
+        Type 'string' is not assignable to type 'WorkspaceRole | null'.
+src/__tests__/ask-native-tools.test.ts(16,63): error TS2322: Type 'Mock<() => Promise<{ id: string; status: string; }>>' is not assignable to type '(actor: WorkspaceActor, input: AskRequestInput) => Promise<AskFiledRequest>'.
+  Type 'Promise<{ id: string; status: string; }>' is not assignable to type 'Promise<AskFiledRequest>'.
+    Type '{ id: string; status: string; }' is not assignable to type 'AskFiledRequest'.
+      Types of property 'status' are incompatible.
+        Type 'string' is not assignable to type '"requested"'.

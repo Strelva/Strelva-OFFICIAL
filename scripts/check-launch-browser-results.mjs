@@ -2,17 +2,41 @@ import { readFileSync } from "node:fs";
 const report = process.argv[2];
 const profile = process.argv[3] || "core";
 if (!report) throw new Error("Supply the retained Playwright JSON report.");
-if (profile !== "core" && profile !== "marketing") throw new Error("Unknown launch verification profile.");
-const result = JSON.parse(readFileSync(report, "utf8"));
-const stats = result.stats;
-const required = new Map(profile === "marketing" ? [
-  ["marketing-launch-authenticated-local.spec.ts", 6],
-] : [
+const core = [
   ["launch-business-authenticated-local.spec.ts", 2],
   ["application-use-authenticated-local.spec.ts", 2],
   ["onboarding-authenticated-local.spec.ts", 1],
   ["service-request-authenticated-local.spec.ts", 1],
-]);
+];
+// pnpm check:journeys: the 1.0 journeys with flags on, then today's journeys and the dark 1.0 surfaces with flags off.
+const profiles = {
+  core,
+  "neutral-on": [["agency-neutral-authenticated-local.spec.ts", 1]],
+  "neutral-off": [["agency-neutral-authenticated-local.spec.ts", 1]],
+  marketing: [["marketing-launch-authenticated-local.spec.ts", 6]],
+  "journeys-on": [
+    ["owner-journey-1-0-authenticated-local.spec.ts", 2],
+    ["operator-queue-authenticated-local.spec.ts", 2],
+    ["make-real-authenticated-local.spec.ts", 1],
+    ["booking-approval-authenticated-local.spec.ts", 3],
+    ["email-only-owner-authenticated-local.spec.ts", 2],
+    ["versions-authenticated-local.spec.ts", 1],
+    ["inquiries-1-0-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
+  ],
+  "journeys-off": [
+    ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
+    ["launch-business-authenticated-local.spec.ts", 2],
+    ["application-use-authenticated-local.spec.ts", 3],
+    ["onboarding-authenticated-local.spec.ts", 1],
+    ["service-request-authenticated-local.spec.ts", 1],
+  ],
+};
+if (!profiles[profile]) throw new Error("Unknown launch verification profile.");
+const result = JSON.parse(readFileSync(report, "utf8"));
+const stats = result.stats;
+const required = new Map(profiles[profile]);
 const executed = new Map();
 function visit(suite) {
   for (const spec of suite.specs || []) {

@@ -16,6 +16,7 @@ import type {
   InquiryRecord,
   ResponsibilityAction,
   ResponsibilityEvaluation,
+  ResponsibilityMessageDisclosure,
 } from "./contracts";
 import type {
   CompareAndSwapResult,
@@ -24,7 +25,8 @@ import type {
 } from "./repository";
 import { getInquiryRepository } from "./repository";
 import { enqueueInquiryCaptureRepair, type InquiryCaptureRepairStore } from "./reconciliation";
-import { currentResponsibility, inquiryCurrentness } from "./currentness";
+import { currentResponsibility, inquiryIntakeCurrentness } from "./currentness";
+import { inquiryDefinitionAtUse } from "./business-context";
 
 export interface RecordInquiryEvidenceInput {
   tenantId: string;
@@ -52,13 +54,14 @@ export function evaluateInquiryResponsibility(
   action: ResponsibilityAction,
   messageBody: string,
   at: string,
+  messageDisclosure?: ResponsibilityMessageDisclosure,
 ): ResponsibilityEvaluation | null {
   try {
     const state = stateForReceive(snapshot);
     const policy = currentResponsibility(state.responsibilities, capabilityId);
     if (!policy) return null;
     const engine = new InquiryEngine({ businessId: snapshot.businessId, state, now: () => at });
-    return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody });
+    return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody, messageDisclosure });
   } catch {
     return null;
   }
@@ -97,7 +100,7 @@ function existingEvidence(snapshot: InquiryWorkspaceSnapshot, inquiryId: string)
  * authoritative for customer data. Rebuild non-PII timeline stubs only so the
  * engine can validate causal references while appending a new record receipt.
  */
-export function stateForReceive(snapshot: InquiryWorkspaceSnapshot): InquiryEngineState {
+export function stateForReceive(snapshot: {businessId:string;state:InquiryEngineState} & Partial<Omit<InquiryWorkspaceSnapshot,"businessId"|"state">>): InquiryEngineState {
   const state = clone(snapshot.state) as InquiryEngineState;
   const known = new Set(state.inquiries.map((item) => item.id));
   const byInquiry = new Map<string, typeof state.timeline>();
@@ -254,7 +257,7 @@ async function recordInquiryEvidenceInternal(
     const already = existingEvidence(snapshot, input.inquiryId);
     if (already) return already;
 
-    const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+    const currentness = inquiryIntakeCurrentness(snapshot.state, snapshot.businessId, {
       capabilityId: input.capabilityId,
       capabilityVersion: input.expectedCapabilityVersion,
     });
@@ -273,6 +276,7 @@ async function recordInquiryEvidenceInternal(
       usesHistoricalDefinition = true;
     }
     if (!receiveDefinition) return { status: "unavailable", reason: "inquiry_historical_capability_unavailable" };
+    if (!usesHistoricalDefinition) receiveDefinition = await inquiryDefinitionAtUse(input.tenantId, receiveDefinition);
     const errors = validateInquiryFields(receiveDefinition, input.fields);
     if (errors.length > 0) return { status: "rejected", reason: errors[0] || "invalid_inquiry_fields" };
 
@@ -290,6 +294,8 @@ async function recordInquiryEvidenceInternal(
     // current capability configuration before the CAS. No live configuration
     // is republished or rewritten by this path.
     const currentCapabilities = clone(state.capabilities);
+    const actingCapability = state.capabilities.find(item => item.id === input.capabilityId);
+    if (actingCapability) actingCapability.live = clone(receiveDefinition);
     if (usesHistoricalDefinition) {
       const historicalCapability = state.capabilities.find((item) => item.id === input.capabilityId);
       if (!historicalCapability) return { status: "unavailable", reason: "inquiry_historical_capability_unavailable" };
@@ -323,7 +329,7 @@ async function recordInquiryEvidenceInternal(
     let saved: CompareAndSwapResult;
     try {
       const nextState = engine.snapshot();
-      if (usesHistoricalDefinition) nextState.capabilities = currentCapabilities;
+      nextState.capabilities = currentCapabilities;
       saved = await repository.compareAndSwap({
         tenantId: input.tenantId,
         businessId: input.businessId,

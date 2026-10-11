@@ -1,6 +1,11 @@
 "use client";
 
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
+import { StHead, StNotice, StPage, StPillLink, StSection } from "@/components/ui/strelva/Kit";
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
+import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
+import { InquiryRunning } from "./InquiryRunning";
 import type { WorkspaceWork } from "./contracts";
 
 export function WorkspaceOngoing({
@@ -12,6 +17,8 @@ export function WorkspaceOngoing({
   creatingStanding,
   readOnly,
   newWorkBlocked = false,
+  monthlyRecap = false,
+  inquiriesEnabled = false,
   initialRequest,
   onCreatingStandingChange,
   onOpenStanding,
@@ -26,6 +33,9 @@ export function WorkspaceOngoing({
   readOnly: boolean;
   /** Stop/paused work blocks new commands while leaving owner recovery available. */
   newWorkBlocked?: boolean;
+  /** Systems projection confirms this business has a managed website. */
+  monthlyRecap?: boolean;
+  inquiriesEnabled?: boolean;
   initialRequest?: string;
   onCreatingStandingChange: (creating: boolean) => void;
   onOpenStanding: (id: string) => void;
@@ -33,18 +43,21 @@ export function WorkspaceOngoing({
 }) {
   const finiteJobOpen = !selectedStandingId && !selectedAssignmentId && selectedWork?.productId === "operations" && selectedWork.resourceKind === "responsibility";
 
-  return <div className="mx-auto w-full max-w-4xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-    {finiteJobOpen ? <header>
-      <p className="text-sm font-medium text-accent-text">Request</p>
-      <h1 className="mt-3 font-display text-4xl font-normal text-warm-black">{selectedWork.title}</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">This has an end. Its steps, decisions and results are below; every request is listed in Requests.</p>
-    </header> : <header>
-      <p className="text-sm font-medium text-accent-text">Running</p>
-      <h1 className="mt-3 font-display text-4xl font-normal text-warm-black">What Strelva keeps running</h1>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Each one is named by what it keeps true. Strelva acts within the access you have given, asks when it can’t, and records every run.</p>
-    </header>}
+  return <StPage>
+    <StHead title={finiteJobOpen ? selectedWork.title : "Running"}
+      meta={finiteJobOpen
+        ? "This has an end. Its steps, decisions and results are below; every request is listed in Requests."
+        : "What stays true for your business. Each one is named by its result, with its scope and latest evidence below."}
+    />
+    {readOnly ? <StNotice>Shared with you. You can read the running work and its results.</StNotice> : null}
+    {!finiteJobOpen && monthlyRecap ? <StNotice>Monthly recap records appear in {STRELVA_HANDLED_LABEL}, including recorded sends, holds and failures.</StNotice> : null}
+    {finiteJobOpen ? null : <StSection title="What should stay true?"
+      meta="Describe the result you want kept true. Your agency agrees the scope, limits and deadline before the request becomes accepted work."
+      action={!readOnly && !newWorkBlocked ? <StPillLink href={`/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`}>Request an ongoing result</StPillLink> : undefined}
+    >{null}</StSection>}
+    {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
-    {finiteJobOpen ? null : <StandingResponsibilityPicker
+    {finiteJobOpen ? null : <details open={creatingStanding || Boolean(selectedStandingId)}><summary className="cursor-pointer">Configure a supported saved check</summary><StandingResponsibilityPicker
       workspaceId={workspaceId}
       sources={sources}
       selectedId={selectedStandingId || undefined}
@@ -53,7 +66,9 @@ export function WorkspaceOngoing({
       onCreatingChange={onCreatingStandingChange}
       onOpen={onOpenStanding}
       onCreated={onOpenStanding}
-    />}
+    /></details>}
+
+    {finiteJobOpen ? null : <StSection title="What the last seven days show"><ResponsibilityProof key={`proof:${workspaceId}`} workspaceId={workspaceId} readOnly={readOnly || newWorkBlocked} /></StSection>}
 
     {selectedAssignmentId || selectedStandingId || selectedWork?.productId === "operations" || (initialRequest && !creatingStanding) ? <ResponsibilityExperience
       key={`${workspaceId}:${selectedAssignmentId || selectedStandingId || selectedWork?.id || "new"}`}
@@ -67,5 +82,5 @@ export function WorkspaceOngoing({
       initialRequest={initialRequest}
       onSaved={onSaved}
     /> : null}
-  </div>;
+  </StPage>;
 }

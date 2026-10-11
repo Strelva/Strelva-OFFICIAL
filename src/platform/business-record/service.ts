@@ -3,14 +3,17 @@ import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import {
   businessContactSchema,
+  businessPolicyPatchSchema,
   businessRecordPatchSchema,
   businessRecordRevisionSchema,
   businessRecordSchema,
   businessRecordWriteResultSchema,
   businessRecordWriteSourceSchema,
+  confirmedBusinessFactsSchema,
   contactBatchSchema,
   conversionReceiptSchema,
   ownerRecipientSchema,
+  providerRepathResultSchema,
   tenantOwnerRecipientSchema,
   patchVerificationAllowed,
   tenantImportPayloadSchema,
@@ -21,8 +24,10 @@ import {
   type BusinessRecord,
   type BusinessRecordRevision,
   type BusinessRecordWriteResult,
+  type ConfirmedBusinessFacts,
   type ConversionReceipt,
   type OwnerRecipient,
+  type ProviderRepathResult,
   type TenantOwnerRecipient,
   type TenantImportPayload,
   type TenantLinkState,
@@ -31,6 +36,8 @@ import {
 } from "./contracts";
 import { actorArgs, BusinessRecordValidationError, callBusinessRecord } from "./repository";
 import { canonicalJson, sha256, type TenantUnlinkCommand } from "./tenant-import";
+
+import { selectBusinessPolicies, type BusinessPolicies } from "./policies";
 
 const workspaceId = z.string().uuid();
 const commandId = z.string().uuid();
@@ -53,6 +60,17 @@ export async function readBusinessRecord(actor: WorkspaceActor, workspace: strin
     businessRecordSchema, "The business record could not be loaded.");
 }
 
+/** What client sites may show: the owner's own writes and owner-decided changes only. */
+export async function readConfirmedBusinessFacts(actor: WorkspaceActor, workspace: string): Promise<ConfirmedBusinessFacts> {
+  return callBusinessRecord("read_confirmed_business_facts", { p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor) },
+    confirmedBusinessFactsSchema, "The confirmed business details could not be loaded.");
+}
+
+/** Exact same membership/agency read boundary as the business record. */
+export async function readBusinessPolicies(actor: WorkspaceActor, workspace: string): Promise<BusinessPolicies> {
+  return selectBusinessPolicies(await readBusinessRecord(actor, workspace));
+}
+
 export async function patchBusinessRecord(
   actor: WorkspaceActor, workspace: string, expectedRevision: number, rawPatch: unknown, options: WriteOptions,
 ): Promise<BusinessRecordWriteResult> {
@@ -66,6 +84,14 @@ export async function patchBusinessRecord(
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_source: source,
     p_expected_revision: revision, p_patch: patch, p_command_id: id, p_command_digest: digest,
   }, businessRecordWriteResultSchema, "The business record could not be saved.");
+}
+
+/** Same revision, idempotency, provenance and confirmation rules as all facts.
+ * Remove a policy with null; undo with undoBusinessRecordRevision. */
+export async function patchBusinessPolicies(
+  actor: WorkspaceActor, workspace: string, expectedRevision: number, rawPolicies: unknown, options: WriteOptions,
+): Promise<BusinessRecordWriteResult> {
+  return patchBusinessRecord(actor, workspace, expectedRevision, { facts: businessPolicyPatchSchema.parse(rawPolicies) }, options);
 }
 
 export async function undoBusinessRecordRevision(
@@ -104,8 +130,9 @@ export async function readBusinessRecordHistory(actor: WorkspaceActor, workspace
   }, z.array(businessRecordRevisionSchema), "The business record history could not be loaded.");
 }
 
-/** Who Strelva would notify for this business. Server-only: the caller must
- * already hold its own authority. It resolves an address and sends nothing. */
+/** The business's trusted owner address (#524): imported at conversion or set
+ * by the owner, never one an operator or agency wrote. Server-only: the caller
+ * must already hold its own authority. It resolves an address and sends nothing. */
 export async function resolveOwnerRecipient(workspace: string): Promise<OwnerRecipient | null> {
   return callBusinessRecord("resolve_business_owner_recipient", { p_workspace_id: workspaceId.parse(workspace) },
     ownerRecipientSchema.nullable(), "The owner recipient could not be resolved.");
@@ -128,6 +155,9 @@ export async function convertTenantToBusiness(
   operatorEmail: string, payload: TenantImportPayload, plan: { commandId: string; digest: string },
 ): Promise<ConversionReceipt> {
   const parsed = tenantImportPayloadSchema.parse(payload);
+  if (!parsed.agencyWorkspaceId || !parsed.agencyStaffEmails?.length || !parsed.agencySelectionBasis) {
+    throw new BusinessRecordValidationError("tenant_conversion_invalid", "Choose an agency, named agency staff, and a selection basis before converting.");
+  }
   if (sha256(canonicalJson(parsed)) !== plan.digest) {
     throw new BusinessRecordValidationError("tenant_conversion_invalid", "The plan digest does not match its payload.");
   }
@@ -138,6 +168,24 @@ export async function convertTenantToBusiness(
     p_command_id: commandId.parse(plan.commandId),
     p_command_digest: plan.digest,
   }, conversionReceiptSchema, "The tenant conversion failed.");
+}
+
+/** Preview or atomically repair access for a tenant converted before agency
+ * seats replaced the conversion-created operator admin membership. */
+export async function repathConvertedTenantProvider(
+  operatorEmail: string,
+  tenantId: string,
+  route: { agencyWorkspaceId: string; agencyStaffEmails: string[]; agencySelectionBasis: "existing_contract" | "owner_choice" },
+  apply: boolean,
+): Promise<ProviderRepathResult> {
+  return callBusinessRecord("repath_converted_tenant_provider", {
+    p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()),
+    p_tenant_id: z.string().min(1).max(120).parse(tenantId),
+    p_agency_workspace_id: workspaceId.parse(route.agencyWorkspaceId),
+    p_staff_emails: z.array(z.string().email()).min(1).max(100).parse(route.agencyStaffEmails.map((email) => email.trim().toLowerCase())),
+    p_selection_basis: z.enum(["existing_contract", "owner_choice"]).parse(route.agencySelectionBasis),
+    p_apply: z.boolean().parse(apply),
+  }, providerRepathResultSchema, "The converted tenant provider route could not be reconciled.");
 }
 
 /** Operator preview of unlinking a converted tenant. Writes nothing. */
@@ -156,4 +204,17 @@ export async function unlinkTenantFromBusiness(operatorEmail: string, command: T
     p_command_id: commandId.parse(command.commandId),
     p_command_digest: z.string().regex(/^[0-9a-f]{64}$/).parse(command.digest),
   }, tenantUnlinkReceiptSchema, "The tenant unlink failed.");
+}
+
+/** Server-only public projection for a linked tenant. No contacts or secrets. */
+export async function readTenantBusinessContext(tenantId: string) {
+  const facts = z.object({
+    display_name: z.string().optional(), legal_name: z.string().optional(), description: z.string().optional(),
+    phone: z.string().optional(), email: z.string().email().optional(),
+    address: z.object({ formatted: z.string().optional(), line1: z.string().optional(), line2: z.string().optional(), city: z.string().optional(), region: z.string().optional(), postalCode: z.string().optional(), country: z.string().optional() }).optional(),
+    hours: z.object({ timezone: z.string(), weekly: z.array(z.object({ day: z.number().int().min(0).max(6), opens: z.string(), closes: z.string() })) }).optional(),
+    links: z.array(z.object({ kind: z.string(), url: z.string().url() })).optional(),
+  });
+  const schema = z.object({ revision: z.number().int().nonnegative(), facts, services: z.array(z.object({ id: z.string().uuid(), name: z.string(), description: z.string().nullable(), priceText: z.string().nullable() })) });
+  return callBusinessRecord("read_tenant_business_context", { p_tenant_id: z.string().min(1).max(120).parse(tenantId) }, schema.nullable(), "Business facts could not be loaded.");
 }

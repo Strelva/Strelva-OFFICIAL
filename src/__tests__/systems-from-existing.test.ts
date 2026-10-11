@@ -41,6 +41,18 @@ const snapshot: ExistingSystemsSnapshot = {
 };
 
 describe("systems from existing things", () => {
+  it("connects booking only to its selected published provider and never treats consent alone as connected", () => {
+    const graph = systemsFromExisting({ ...snapshot, calendarConnections: [
+      { ...snapshot.calendarConnections[0]!, status: "authorized" },
+      { id: "5e000000-0000-4000-8000-0000000000e2", provider: "outlook", calendarName: "Other calendar", status: "connected" },
+    ] });
+    const calendars = graph.connections.filter(item => item.connection.target.type === "account_binding");
+    expect(calendars).toHaveLength(1);
+    expect(calendars[0]!.connection.state).toBe("disconnected");
+    const revoked = systemsFromExisting({ ...snapshot, bookingGrants: snapshot.bookingGrants.map(grant => ({ ...grant, status: "revoked" })) });
+    expect(revoked.connections.filter(item => item.connection.target.type === "account_binding")).toEqual([]);
+  });
+
   it("lists real Systems for a business and skips work that is not a System", () => {
     const { systems } = systemsFromExisting(snapshot);
     expect(systems.map(({ system }) => [system.name, system.kind, system.lifecycle])).toEqual([
@@ -157,6 +169,26 @@ describe("systems from existing things", () => {
     expect(website[0]).toMatchObject({ provenance: "stored", system: { name: "Juniper website" } });
     expect(listed.systems.map(({ system }) => system.name)).toContain("Catering proposal");
     expect(listed.systems).toHaveLength(6);
+  });
+
+  it("keeps connected identity from draft rebuild through hosted launch, without a duplicate website", () => {
+    const connectedId = "5e000000-0000-4000-8000-0000000000cc";
+    const connected = { id: connectedId, label: "Connected site", siteUrl: "https://connected.example.test/", siteHost: "connected.example.test", status: "active" as const, verifiedAt: AT, lastEventAt: null, createdAt: AT, updatedAt: AT };
+    for (const published of [false, true]) {
+      const listing = systemsFromExisting({
+        businessId: BUSINESS, savedWork: [work("5e000000-0000-4000-8000-0000000000a9", "websites", "website", "Connected rebuild", {
+          connectedSiteId: connectedId, ...(published ? { websitePublishedRevision: 1, hostedTenantStableId: NATIVE_TENANT, hostedTenantId: "connected", hostedTenantReserved: true } : {}),
+        })], managedWebsites: published ? [{ link: "website_binding", tenantStableId: NATIVE_TENANT, tenantId: "connected", siteName: "Connected", tenantActive: true, linkedAt: AT }] : [],
+        connectedSites: [connected], inquiryWorkspaces: [], bookingGrants: [], calendarConnections: [],
+      });
+      expect(listing.systems).toHaveLength(1);
+      expect(listing.systems[0]?.system).toMatchObject({ id: systemOriginId(BUSINESS, { kind: "connected_site", ref: connectedId }), lifecycle: "live" });
+      expect(listing.systems[0]?.references).toMatchObject({ connectedSiteId: connectedId, savedWorkId: "5e000000-0000-4000-8000-0000000000a9" });
+      expect(listing.connections).toEqual([expect.objectContaining({ connection: expect.objectContaining({
+        source: { businessId: BUSINESS, systemId: listing.systems[0]!.system.id }, kind: "read", state: "connected",
+        target: { type: "business_resource", resource: "business_record:facts" },
+      }) })]);
+    }
   });
 
   it("keeps one website System under one id as a managed site converts", async () => {

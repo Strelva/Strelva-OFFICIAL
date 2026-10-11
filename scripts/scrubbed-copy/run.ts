@@ -22,7 +22,7 @@ import {
   scrubRedisKey, scrubRedisValue, scrubRow, uncoveredColumns, valueKindFor, type RedisRecord, type RowContext,
 } from "./policy";
 import {
-  LOCAL_OPERATOR, addLocalOperator, buildExportSql, buildLoadSql, destinationColumns, exportSourceRows, foreignKeyOrphans,
+  LOCAL_OPERATOR, LOCAL_REHEARSAL_AGENCY, addLocalOperator, addLocalRehearsalAgency, buildExportSql, buildLoadSql, destinationColumns, exportSourceRows, foreignKeyOrphans,
   initCluster, psql, psqlFile, psqlTargetFromUrl, readSourceCatalog, rehearseConversion, repoMigrations, run, splitMigrations,
   startCluster, type ExportPlanItem, type LocalCluster, type PsqlTarget, type RehearsalResult,
 } from "./postgres";
@@ -480,10 +480,12 @@ export async function dryRunCopy(out: string, options: { repoRoot: string; env: 
   }
   const entries: DryRunEntry[] = [];
   try {
+    if (options.rehearse && running.target) await addLocalRehearsalAgency(running.target);
     const tsx = path.join(options.repoRoot, "node_modules/.bin/tsx");
     for (const slug of slugs) {
       log(`Planning ${slug}...`);
-      const result = await runChild(tsx, ["--tsconfig", path.join(options.repoRoot, "tsconfig.json"), path.join(options.repoRoot, "scripts/convert-tenant-to-workspace.ts"), slug, "--json"], running.env, p.dev);
+      const route = ["--agency=" + LOCAL_REHEARSAL_AGENCY.id, "--agency-staff=" + LOCAL_REHEARSAL_AGENCY.email, "--agency-basis=existing_contract"];
+      const result = await runChild(tsx, ["--tsconfig", path.join(options.repoRoot, "tsconfig.json"), path.join(options.repoRoot, "scripts/convert-tenant-to-workspace.ts"), slug, ...route, "--json"], running.env, p.dev);
       const outcome = lastJsonObject(result.stdout);
       const plan = outcome?.plan as { payload: unknown; commandId: string; digest: string; counts: Record<string, number>; skipped: Array<{ field: string }> } | undefined;
       if (result.code !== 0 || !plan) {

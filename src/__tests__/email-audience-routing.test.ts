@@ -29,6 +29,7 @@ afterEach(() => vi.unstubAllEnvs());
 async function deliver(audience: EmailAudience) {
   return sendEmail({
     audience,
+    authorship: "platform",
     to: "person@example.com",
     subject: "Subject",
     html: "<p>Hello</p>",

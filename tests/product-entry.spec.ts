@@ -17,6 +17,9 @@ test("public assessment stays in the product, preserves input on failure, and of
   await expect(page.getByLabel("Business name", { exact: true })).toHaveValue("Fictional Bakery");
   await page.getByRole("button", { name: "Run my AI audit" }).click();
   await expect(page.getByRole("heading", { name: "Fictional Bakery" })).toBeVisible();
+  await expect(page).toHaveURL(url => url.pathname === "/ai-visibility/scan_fixture");
+  await page.waitForTimeout(5_000);
+  expect(new URL(page.url()).pathname).toBe("/ai-visibility/scan_fixture");
   if (workspaceReleaseEnabled) {
     await expect(page.getByRole("link", { name: /Save a copy/ })).toHaveAttribute("href", "/workspace?save=scan_fixture");
   } else {
@@ -26,6 +29,9 @@ test("public assessment stays in the product, preserves input on failure, and of
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+  await page.getByRole("button", { name: "Audit another business", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Run my AI audit" })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/ai-visibility");
 });
 
 test("website audit supports legacy URL input and keeps result actions in the product", async ({ page }) => {
@@ -35,6 +41,8 @@ test("website audit supports legacy URL input and keeps result actions in the pr
   await page.getByRole("button", { name: "Scan My Site" }).click();
   await expect(page.getByText("Your site scored 80/100.")).toBeVisible();
   await expect(page).toHaveURL(url => url.searchParams.get("report") === `audit_${"a".repeat(32)}`);
+  await page.waitForTimeout(5_000);
+  expect(new URL(page.url()).searchParams.get("report")).toBe(`audit_${"a".repeat(32)}`);
   if (workspaceReleaseEnabled) {
     await expect(page.getByRole("link", { name: "Save to my work" })).toHaveAttribute("href", `/workspace?save=audit_${"a".repeat(32)}`);
   } else {
@@ -46,6 +54,11 @@ test("website audit supports legacy URL input and keeps result actions in the pr
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+  await page.getByRole("button", { name: "Scan another site", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Scan My Site" })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.has("report")).toBe(false);
+  await page.waitForTimeout(5_000);
+  expect(new URL(page.url()).searchParams.has("report")).toBe(false);
 });
 
 

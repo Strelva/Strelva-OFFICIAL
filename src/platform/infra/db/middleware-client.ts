@@ -1,3 +1,4 @@
+import { hostOnlyAuthCookieOptions } from "@/platform/infra/db/auth-cookie-options";
 /**
  * Middleware/proxy Supabase client (migration Phase 4). Reads the session from the
  * request cookies so the proxy can gate routes on Supabase Auth. Separate from
@@ -58,7 +59,7 @@ export function createMiddlewareSupabase(
         const pending = responseMutations.get(request) ?? [];
         pending.push((response) => {
           for (const { name, value, options } of cookiesToSet) {
-            response.cookies.set(name, value, options);
+            response.cookies.set(name, value, hostOnlyAuthCookieOptions(options));
           }
           for (const [name, value] of Object.entries(headersToSet)) {
             response.headers.set(name, value);

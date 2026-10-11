@@ -1,5 +1,20 @@
 # Websites: paste a URL, get it back rebuilt and live
 
+**Wave 6 round 5, local only:** saved crawl omissions and fact review, exact
+candidate approval, linked-tenant publication and read-back, immutable History
+restores, domain decisions with uncertain-write receipts, owner-attested cutover
+undo, and both entry paths are implemented. Model composition, Jev risk scoring
+and changed-copy verification require an explicit off-default paid-call opt-in,
+recheck authority before each call and share a durable per-work allowance.
+Hosted public fact reads have a separate opt-in and never rewrite the issued
+document. [Current proof and rollout steps](../../product/streams/w6-website.md).
+
+**§11 auto-approve is not built for document publication:** the risk and
+verification machinery is wired, but every new copy claim stays reviewed and
+SQL requires the owner's exact revision/hash approval. Existing tenant auto mode
+is not a standing document-publication grant. Defining and implementing that
+grant is a local decision/code prerequisite, not a real-provider smoke test.
+
 Status: local implementation and read-only public-source spike prepared on
 October 1, 2026. Production deployment and acceptance are pending. See the
 [implementation receipt](../../operations/testing-and-ci.md#october-1-website-rebuild-implementation-receipt)

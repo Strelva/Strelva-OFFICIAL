@@ -26,7 +26,7 @@ export interface VerifiedActor {
 
 // ── Client records (src/platform/client-records) ──────────────────────────────
 
-export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "booking_config" | "account_grouping";
+export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "inquiry_delivery" | "booking_config" | "account_grouping" | "orders" | "provider_connections" | "provider_metadata" | "reward_members" | "reward_transactions" | "threads" | "tenant_settings";
 
 export interface ClientRecordCopy {
   recordId: string;
@@ -34,12 +34,32 @@ export interface ClientRecordCopy {
   capturedAt: string;
 }
 
+export interface RewardMutationInput {
+  operation: "save" | "adjust" | "log";
+  commandId: string;
+  member?: Record<string, string>;
+  delta?: number;
+  tierThreshold?: number;
+  transaction?: { id: string; type: string; amount: number; reason: string; timestamp: string };
+  actor?: VerifiedActor;
+}
+export interface RewardMutationResult {
+  status: "saved" | "adjusted" | "logged" | "missing" | "insufficient";
+  member?: Record<string, unknown>;
+  transaction?: { id: string; type: string; amount: number; reason: string; timestamp: string };
+  available?: number;
+  requested?: number;
+}
 export interface ClientRecordsPort {
+  mutateRewardRecord(tenant: string, email: string, input: RewardMutationInput): Promise<RewardMutationResult>;
+  mutateProviderConnection(tenant:string,provider:string,expected:Record<string,unknown>,payload:Record<string,unknown>,capturedAt:string):Promise<string>;
+  clientRecordReadSource(store: ClientRecordStoreName): Promise<"redis" | "postgres">;
+  writeClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy | { recordId: string; remove: true; capturedAt?: string }, via: "dual_write", mode?: "replace" | "keep_first"): Promise<{ status: string; reason?: string }>;
   /** Dual-write one record after the Redis write. Never throws. */
   mirrorClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy, mode?: "replace" | "keep_first"): Promise<unknown>;
   /** Dual-write a removal. Never throws. */
   mirrorClientRecordRemoval(store: ClientRecordStoreName, tenant: string, recordId: string): Promise<unknown>;
-  /** Read one store through STRELVA_CLIENT_RECORDS_READ, falling back to Redis. */
+  /** Read one store through STRELVA_CLIENT_RECORDS_READ; durable outages fail explicitly. */
   readThroughFlag<T>(store: ClientRecordStoreName, tenant: string, fromRedis: () => Promise<T>, fromPostgres: (records: ClientRecordCopy[]) => T): Promise<T>;
 }
 
@@ -95,6 +115,16 @@ export type OutsideWriteAcceptance = "accepted" | "rejected" | "unknown";
 export type ReadbackCheck = { result: "matched" | "differs" | "failed"; detail: string };
 
 export interface OutsideWriteReceiptsPort {
+  beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo" | "review_reply"; request: Record<string, unknown> }): Promise<{ claimed: boolean; attemptId: string; acceptance: "pending" | OutsideWriteAcceptance; receipt?: { providerRef: string | null; readback: string } | null }>;
+  completeGoogleWrite(attemptId: string, input: Parameters<OutsideWriteReceiptsPort["recordGoogleWrite"]>[0]): Promise<{ id: string }>;
+  recordReadback(receiptId: string, readback: "matched" | "differs" | "failed" | "not_possible", detail: string): Promise<unknown>;
+  /** Legacy Google writes join the same ledger when the operator release is on. */
+  recordGoogleWrite(input: {
+    commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo" | "review_reply";
+    subject: string; request: Record<string, unknown>; beforeState?: unknown;
+    acceptance: OutsideWriteAcceptance; acceptanceDetail?: string; providerRef?: string;
+    readback?: "pending" | "matched" | "differs" | "failed" | "not_possible"; readbackDetail?: string; actor: string;
+  }): Promise<unknown>;
   /** A Google review reply, after publish and its immediate read-back. Never throws on storage failure. */
   recordReviewReply(input: {
     tenantId: string; reviewId: string; replyText: string; actor: string;
@@ -123,9 +153,23 @@ export interface TenantOwnerRecipientRow {
   workspaceId: string | null;
 }
 
+/** Public confirmed facts only; the SQL reader never returns owner contacts. */
+export interface TenantBusinessContext {
+  revision: number;
+  facts: {
+    display_name?: string; legal_name?: string; description?: string; phone?: string; email?: string;
+    address?: { formatted?: string; line1?: string; line2?: string; city?: string; region?: string; postalCode?: string; country?: string };
+    hours?: { timezone: string; weekly: Array<{ day: number; opens: string; closes: string }> };
+    links?: Array<{ kind: string; url: string }>;
+  };
+  services: Array<{ id: string; name: string; description: string | null; priceText: string | null }>;
+}
+
 export interface BusinessRecordPort {
+  ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
+  readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
 }
 
 // ── Google account bindings (src/platform/account-bindings) ────────────────────
@@ -140,6 +184,7 @@ export interface GoogleBindingLocation {
 
 export interface GoogleBindingWithSecrets {
   id: string;
+  updatedAt: string;
   workspaceId: string;
   status: BindingStatus;
   scopes: string[] | null;
@@ -149,8 +194,20 @@ export interface GoogleBindingWithSecrets {
   locations: GoogleBindingLocation[];
 }
 
+export interface LegacyGoogleOperationPin {
+  tenantId: string; tenantStableId: string; workspaceId: string | null;
+  bindingId: string | null; bindingUpdatedAt: string | null; locationDigest: string | null; startedAt: string;
+}
+export interface LegacyGoogleOperationInput {
+  grant?: { workspaceId: string; originTenantStableId: string | null; subject?: string | null; scopes?: string[] | null; refreshToken?: string | null; accessToken?: string | null; tokenExpiresAt?: string | null; status: BindingStatus; lastError?: string | null };
+  location?: { accountId: string; locationId: string; title?: string | null };
+}
 export interface GoogleBindingsPort {
+  readLegacyGoogleOperation(tenantId: string, startedAt: string): Promise<LegacyGoogleOperationPin>;
+  commitLegacyGoogleBindingOperation(pin: LegacyGoogleOperationPin, input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;
+  applyLegacyGoogleOperation(actor: { userId: string; verifiedEmail: string }, pin: LegacyGoogleOperationPin, kind: "oauth" | "location", input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;
   googleBindingsEnabled(): boolean;
+  mutateGoogleBinding(bindingId: string, expectedUpdatedAt: string, mutation: { accessToken?: string; expiresAt?: string | null; rotatedRefreshToken?: string | null; status?: BindingStatus; error?: string | null; checkedAt?: string | null }): Promise<string>;
   readBindingTarget(tenantId: string): Promise<{ workspaceId: string; tenantStableId: string } | null>;
   readGoogleBindingForTenant(tenantId: string): Promise<GoogleBindingWithSecrets | null>;
   setGoogleBindingStatus(bindingId: string, status: BindingStatus, error: string | null, checkedAt: string | null): Promise<unknown>;
@@ -170,11 +227,33 @@ export interface GoogleBindingsPort {
   AccountBindingStoreError: abstract new (...args: never[]) => Error & { code: string | null };
 }
 
+// ── Tenant provider disconnect receipts (src/platform/provider-connections) ──
+
+export interface ProviderDisconnectPort {
+  recordTenantProviderDisconnect(input: {
+    tenantId: string;
+    provider: "google" | "instagram" | "yelp" | "calendly" | "vegaro";
+    actorUserId: string | null;
+    revocationOutcome: "revoked" | "already_revoked" | "failed" | "partial_failure" | "unsupported" | "consent_remains" | "no_token" | "not_attempted";
+    revocationErrorCode: string | null;
+    localCleanupStatus: "complete" | "partial";
+    clearedStores: string[];
+  }): Promise<{
+    id: string;
+    provider: "google" | "instagram" | "yelp" | "calendly" | "vegaro";
+    revocationOutcome: "revoked" | "already_revoked" | "failed" | "partial_failure" | "unsupported" | "consent_remains" | "no_token" | "not_attempted";
+    revocationErrorCode: string | null;
+    localCleanupStatus: "complete" | "partial";
+    clearedStores: string[];
+  }>;
+}
+
 // ── Business billing (src/platform/business-billing) ───────────────────────────
 
 export interface BusinessBillingPort {
   /** `workspaceId` for checkout metadata when the tenant is a converted business (STRELVA_BUSINESS_BILLING). */
   businessBillingCheckoutMetadata(tenantId: string): Promise<Record<string, string>>;
+  readBusinessPortfolioMrr(tenantIds: string[]): Promise<Array<{ workspaceId: string; monthlyCents: number; tenantIds: string[] }> | null>;
 }
 
 // ── Inquiries (src/products/inquiries) ─────────────────────────────────────────
@@ -188,15 +267,19 @@ export interface InquiryReviewOutcome {
 }
 
 export interface InquiriesPort {
+  inquiryOutcomeProofEnabled(): boolean;
+  readTenantInquiryOutcomeProof(tenantId: string, from: string, to: string): Promise<import("./types").WeeklyInquiryOutcomeProof>;
+  notifyInquiryOwner(input: { tenantId: string; lead: import("./leads").LeadRecord }): Promise<unknown>;
   isInquiryMessageReviewEvent(event: UnifiedEvent): boolean;
-  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string; eventAction?: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
   executeInquiryMessageReview(input: { tenantId: string; eventId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome & {
     acceptedAt?: string;
     providerMessageId?: string;
     deliveryAttemptId?: string;
   }>;
   reconcileInquiryMessageReview(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome>;
-  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
+  authorizeInquiryPublicationActor(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string; action: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
+  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
 }
 
 // ── Google listing replies for a tenant (src/products/google-listing) ──────────
@@ -206,10 +289,12 @@ export type TenantReplyDepsHandle = object;
 
 export type TenantReplyAuthority =
   | { kind: "auto_reply_policy"; rating: number }
-  | { kind: "owner_approval"; actor: string; approvalRef: string };
+  | { kind: "owner_approval"; actor: string; approvalRef: string }
+  | { kind: "operator_instruction"; actor: string; instructionRef: string };
 
 export interface TenantReviewRepliesPort {
   defaultTenantReplyDeps(): Promise<TenantReplyDepsHandle>;
+  listingDraftingAllowed(tenantId: string, locationId?: string): Promise<boolean>;
   routeTenantReviewReply(tenantId: string, deps: TenantReplyDepsHandle): Promise<{ kind: "legacy"; reason: string } | { kind: "listing"; workspaceId: string }>;
   postTenantReviewReply(input: {
     tenantId: string; workspaceId: string; eventId: string; attemptId: string; reviewId: string; text: string;
@@ -238,18 +323,43 @@ export interface WebsitesPort {
   patchWebsiteRebuild(actor: VerifiedActor, workId: string, patch: Record<string, unknown> & { forceReview: true }): Promise<unknown>;
 }
 
+/** Observation only: the tenant write and revalidation have already started. */
+export interface WebsitePublicationReadbackPort {
+  observeAcceptedNativePublish(input: {
+    tenantId: string; section: string; expected: unknown; actorId: string;
+    publicationRef?: string; revalidation: Promise<unknown>;
+  }): Promise<void>;
+}
+
+export interface PublishingContentPort {
+  authorizePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  prepareTenantCollectionDraft(input: { tenantId: string; actor: VerifiedActor | null; draft: unknown }): Promise<{ eventId: string; slug: string } | null>;
+
+  executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  /** Read-only dashboard platform bypass; missing registration fails closed. */
+  operatorReadAdmission(): Promise<{ authorizeTenantOperatorRead(tenant: string): Promise<void> }>;
+  responsibilityProof(): Promise<{ responsibilityProofEmailParagraphs(tenantId: string, from: string, to: string): Promise<string[]> }>;
+  bookingProof(): Promise<{
+    readAgentBookingOutcomes(tenantId: string, from: string, to: string): Promise<{ businessName: string; discoveryCalls: number; discoveryCoverage: "partial" | "unknown"; discoverySince: string | null; holds: number; confirmations: number; completed: number } | null>;
+    agentBookingOutcomesLine(outcomes: { businessName: string; discoveryCalls: number; discoveryCoverage: "partial" | "unknown"; discoverySince: string | null; holds: number; confirmations: number; completed: number } | null): string | null;
+  }>;
   clientRecords(): Promise<ClientRecordsPort>;
   tenantPolicy(): Promise<TenantPolicyPort>;
   outsideWriteReceipts(): Promise<OutsideWriteReceiptsPort>;
   businessRecord(): Promise<BusinessRecordPort>;
   googleBindings(): Promise<GoogleBindingsPort>;
+  providerDisconnect(): Promise<ProviderDisconnectPort>;
   businessBilling(): Promise<BusinessBillingPort>;
   inquiries(): Promise<InquiriesPort>;
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;
   websites(): Promise<WebsitesPort>;
+  websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
+  publishingContent(): Promise<PublishingContentPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

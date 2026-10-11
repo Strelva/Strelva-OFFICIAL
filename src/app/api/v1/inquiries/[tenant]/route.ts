@@ -3,6 +3,7 @@ import { isTenantId } from "@/lib/scaffold-contracts";
 import { getTenantConfig } from "@/lib/tenants";
 import { getInquiryRepository, inquiryReleaseEnabledForTenant, inquiryReleaseMayBeOn, projectPublishedInquiry } from "@/products/inquiries/server";
 import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
+import { inquiryDefinitionAtUse } from "@/products/inquiries";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
     if (workspace.exitCompleted) return json({ error: "Inquiry form is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
     const snapshot = await getInquiryRepository().getSnapshot(tenant, workspace.businessId);
     const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === workspace.businessId);
-    const projection = capability ? projectPublishedInquiry(capability) : null;
+    const projection = capability ? projectPublishedInquiry({ ...capability, live: capability.live ? await inquiryDefinitionAtUse(tenant, capability.live) : null }) : null;
     return projection ? json(projection) : json({ error: "Inquiry form unavailable." }, 404);
   } catch {
     return json({ error: "Inquiry forms are temporarily unavailable." }, 503);

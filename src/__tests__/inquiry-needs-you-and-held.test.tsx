@@ -47,10 +47,10 @@ describe("the inquiry policy in Needs you", () => {
     expect(tenantEventItem(review("Thanks Dana, tell us more.", { reviewAudience: "operator" }))).toMatchObject({ kind: "customer.message", route: "strelva_reviews", urgent: false });
   });
 
-  it("no inquiry policy decision or trust moves a commitment; a message follows the policy above its floor", () => {
+  it("no inquiry trust moves a commitment; ordinary messages follow supervised and trusted routes", () => {
     expect(evaluateRoute({ kind: "customer.commitment", origin: "strelva", signals: { inquiryDecision: "allow" } }).route).toBe("owner_decides");
-    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "allow" } }).route).toBe("strelva_reviews");
-    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "approval_required" } }).route).toBe("owner_decides");
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "allow" } }).route).toBe("handle");
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "approval_required" } }).route).toBe("strelva_reviews");
   });
 });
 
@@ -115,7 +115,7 @@ describe("held spam on the workspace Inquiries page", () => {
   it("explains a refusal in the owner's words", () => {
     expect(heldErrorMessage(403, null)).toBe("Only the business owner can decide on held messages. Nothing changed.");
     expect(heldErrorMessage(404, null)).toBe("This message is no longer here.");
-    expect(heldErrorMessage(503, { error: "The decision couldn't be saved. Nothing changed." })).toBe("The decision couldn't be saved. Nothing changed.");
+    expect(heldErrorMessage(503, { error: "The decision couldn't be saved. Nothing changed." })).toBe("The decision couldn't be confirmed. Reload these inquiries to inspect its current state before deciding again.");
   });
 });
 

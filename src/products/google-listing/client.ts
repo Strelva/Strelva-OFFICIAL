@@ -36,6 +36,8 @@ export interface GooglePost {
 export interface GoogleLocationRef { accountId: string; locationId: string }
 
 export interface GoogleListingClient {
+  /** Bind a fresh authority check inside each paced mutation attempt. */
+  withWriteAuthority?(authorize: () => Promise<void>): GoogleListingClient;
   listReviews(location: GoogleLocationRef, pageToken?: string): Promise<GoogleResult<{ reviews: GoogleReview[]; nextPageToken?: string }>>;
   getReview(location: GoogleLocationRef, reviewId: string): Promise<GoogleResult<GoogleReview>>;
   updateReply(location: GoogleLocationRef, reviewId: string, comment: string): Promise<GoogleResult<{ comment?: string }>>;
@@ -51,7 +53,7 @@ export interface GoogleListingClient {
  * not enabled is "access pending", not a failure the owner must fix. */
 export function classifyGoogleFailure(status: number, body: string): GoogleFailureKind {
   const lower = body.toLowerCase();
-  if ((status === 403 || status === 429) && ["accessnotconfigured", "service_disabled", "has not been used in project", "business profile api", "quota"].some((needle) => lower.includes(needle))) {
+  if ((status === 403 || status === 429) && (["accessnotconfigured", "service_disabled", "has not been used in project", "quota limit: 0", "limit of 0", "quota of 0", "quota is 0"].some((needle) => lower.includes(needle)) || /"quota_limit_value"\s*:\s*"?0"?(?=\s*[,}])/.test(lower))) {
     return "setup_pending";
   }
   if (status === 429 || lower.includes("resource_exhausted")) return "rate_limited";
@@ -83,8 +85,8 @@ export function createHttpGoogleListingClient(accessToken: string, fetchImpl: ty
         signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) {
-        const detail = (await res.text().catch(() => "")).slice(0, 300);
-        return { ok: false, kind: classifyGoogleFailure(res.status, detail), status: res.status, detail };
+        const body = await res.text().catch(() => "");
+        return { ok: false, kind: classifyGoogleFailure(res.status, body), status: res.status, detail: body.slice(0, 300) };
       }
       if (empty) return { ok: true, data: null as T };
       return { ok: true, data: (await res.json()) as T };

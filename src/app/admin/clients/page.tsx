@@ -1,3 +1,6 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -11,6 +14,7 @@ import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
+import { readClientBusinessCount } from "../client-businesses";
 import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
@@ -22,7 +26,7 @@ function clientDomain(t: { productionDomain?: string; siteUrl?: string }): strin
   const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
   if (!raw) return null;
   const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  if (!host || isPlatformDomain(host) || host.endsWith(".vercel.app")) return null;
   return host;
 }
 
@@ -33,10 +37,11 @@ export default async function AdminClientsPage() {
   // super-admin, but mirror the guard here so this page never renders client
   // data for a non-admin even if the layout chain changes.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
-  const tenants = await getAllTenants();
+  const [tenants, clientBusinessCount] = await Promise.all([getAllTenants(), readClientBusinessCount()]);
 
-  // Per-client signals: health grade, launch status, at-risk.
+  // Per-site signals: health grade, launch status, at-risk.
   const [atRiskSignals, rows] = await Promise.all([
     getAtRiskTenants().catch((): AtRiskSignal[] => []),
     Promise.all(
@@ -117,11 +122,11 @@ export default async function AdminClientsPage() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
-            Clients
+            {OPERATOR_DESTINATIONS.sites.label}
           </h1>
           <p className="mt-1.5 text-[13px] text-gray-muted">
-            One list for every business you manage a site for <span className="text-gray-faint">·</span>{" "}
-            <b className="font-semibold text-warm-white">{activeCount} active</b>
+            Site-level support records; client businesses can have several sites <span className="text-gray-faint">·</span>{" "}
+            <b className="font-semibold text-warm-white">{activeCount} active sites</b> · {clientBusinessCount === null ? "Client business count unavailable" : `${clientBusinessCount} client businesses`}
           </p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className="text-[20px] font-semibold tabular-nums tracking-[-0.02em] text-warm-white">
@@ -138,7 +143,7 @@ export default async function AdminClientsPage() {
             href="/admin/onboard"
             className="inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105"
           >
-            New client
+            Add a Strelva Agency client
           </Link>
         </div>
       </div>

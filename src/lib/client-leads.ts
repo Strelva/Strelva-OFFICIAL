@@ -19,7 +19,7 @@ import {
   type LeadMirrorHealth,
 } from "./lead-mirror";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
-import { checkLeadParity, leadReadMode, type LeadReadMode } from "./lead-reads";
+import { checkLeadParity, leadReadMode, recordFailedLeadReadParity, type LeadReadMode } from "./lead-reads";
 import { getRedis } from "@/platform/infra/redis";
 
 const REDIS_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -243,7 +243,8 @@ export interface LeadReadParityRun {
  * The daily Redis-versus-Postgres check behind the 7-day rule (inquiry 1.0
  * delta, section 6 step 2). Runs only while the read switch is `compare` or
  * `postgres`; records one result per tenant per day. A tenant whose stores
- * can't be read records nothing that day, which breaks the streak.
+ * can't be read records a failed day when Postgres is reachable. Missing
+ * daily results also block the complete-tenant streak.
  */
 export async function runLeadReadParity(
   options: { tenants?: () => Promise<string[]>; mode?: LeadReadMode } = {},
@@ -256,10 +257,13 @@ export async function runLeadReadParity(
   for (const tenant of tenants) {
     run.checked++;
     try {
+      if (!getRedis()) throw new Error("lead_parity_redis_unconfigured");
       const report = await checkLeadParity(tenant, { redisLeads: await getLeads(tenant, 500), hash: (lead) => leadSubmissionHash(lead as LeadRecord) });
+      if (!report.recorded) throw new Error("lead_parity_record_failed");
       if (report.ok) run.inParity++;
       else run.outOfParity.push({ tenant, missing: report.missing.length, mismatched: report.mismatched.length });
     } catch (error) {
+      await recordFailedLeadReadParity(tenant);
       run.failed.push({ tenant, reason: error instanceof Error ? error.message : String(error) });
     }
   }

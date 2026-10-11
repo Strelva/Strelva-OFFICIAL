@@ -26,6 +26,7 @@ export interface ListingHealthInput {
   /** Newest first. */
   receipts: readonly Pick<ListingReceipt, "status" | "error" | "createdAt">[];
   suspended?: boolean;
+  accessPending?: boolean;
   now?: number;
 }
 
@@ -36,6 +37,7 @@ export function listingHealth(input: ListingHealthInput): { health: ListingHealt
   if (input.suspended) return pick("profile_suspended");
   // Null scopes: connected before scope tracking. Attempt, don't block.
   if (input.binding.scopes && !input.binding.scopes.includes(GBP_MANAGE_SCOPE)) return pick("scope_missing");
+  if (input.accessPending) return pick("api_access_pending");
   const latest = input.receipts[0];
   if (latest?.status === "failed" && latest.error?.startsWith(ACCESS_PENDING)) return pick("api_access_pending");
   if (input.receipts.some((receipt) => receipt.status === "held_by_google")) return pick("edits_pending");

@@ -59,14 +59,14 @@ describe("recordBusinessEffortAction", () => {
   });
 
   it("rejects invalid minutes before storage", async () => {
-    const result = await recordBusinessEffortAction({ ...input, minutes: 0 });
+    const result = await recordBusinessEffortAction({ ...input, minutes: -1 });
     expect(result).toEqual({ ok: false, message: "Check the minutes, category, date and note." });
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it("reports an unknown business from the SQL boundary", async () => {
     mockRpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "business_effort_business_not_found" } });
-    expect(await recordBusinessEffortAction(input)).toEqual({ ok: false, message: "That customer business was not found." });
+    expect(await recordBusinessEffortAction(input)).toEqual({ ok: false, message: "That client business was not found." });
     expect(mockRevalidate).not.toHaveBeenCalled();
   });
 

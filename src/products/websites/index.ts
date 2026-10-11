@@ -11,11 +11,14 @@ export * from "./document-store";
 // Keep the non-UI server APIs usable in Node scripts. React/CSS is loaded only
 // when a Next route asks to render a hosted page.
 export const getHostedSite: typeof import("./hosted-public").getHostedSite = (...args) => import("./hosted-public").then(module => module.getHostedSite(...args));
+export const getPathHostedSite: typeof import("./hosted-public").getPathHostedSite = (...args) => import("./hosted-public").then(module => module.getPathHostedSite(...args));
+export const renderPathHostedPage: typeof import("./hosted-public").renderPathHostedPage = (...args) => import("./hosted-public").then(module => module.renderPathHostedPage(...args));
 export const hostedPageMetadata: typeof import("./hosted-public").hostedPageMetadata = (...args) => import("./hosted-public").then(module => module.hostedPageMetadata(...args));
 export const renderHostedPage: typeof import("./hosted-public").renderHostedPage = (...args) => import("./hosted-public").then(module => module.renderHostedPage(...args));
 export * from "./site-seo";
 export * from "./site-routing";
 export * from "./site-health";
+export { currentHostedUrl } from "./hosted-routing";
 export * from "./domain-verification";
 export * from "./site-sharing";
 export type { WebsiteMonthlyReport } from "./site-report";
@@ -49,9 +52,28 @@ export const runWebsiteMonthlyReports: typeof import("./site-report").runWebsite
 export { generateWebsiteDraft, websiteDraftPreviewHtml } from "./generation";
 
 export * from "./rebuild-providers";
+export { askPageSetSchema, composeAskPageSet } from "./ask-page-set";
+export const prepareAskPageSet: typeof import("./ask-page-set").prepareAskPageSet = (...args) => import("./ask-page-set").then(module => module.prepareAskPageSet(...args));
+export const prepareWebsiteBookingPage: typeof import("./rebuild-service").prepareWebsiteBookingPage = (...args) => import("./rebuild-service").then(module => module.prepareWebsiteBookingPage(...args));
 export * from "./rebuild-benchmark";
 
 export const readAgencyWebsiteDocument: typeof import("./agency-document-service").readAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.readAgencyWebsiteDocument(...args));
 export const patchAgencyWebsiteDocument: typeof import("./agency-document-service").patchAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.patchAgencyWebsiteDocument(...args));
 
 export const previewAgencyWebsiteDocument: typeof import("./agency-document-service").previewAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.previewAgencyWebsiteDocument(...args));
+
+export { createSiteChangeStore } from "./site-changes";
+export { reconcileWebsiteSystemReleases } from "./system-releases";
+export const readHostedBusinessFacts: typeof import("./business-facts-server").readHostedBusinessFacts = (...args) => import("./business-facts-server").then(module => module.readHostedBusinessFacts(...args));
+export const readWebsiteDomainRequest: typeof import("./domain-requests").readWebsiteDomainRequest = (...args) => import("./domain-requests").then(module => module.readWebsiteDomainRequest(...args));
+export const prepareWebsiteDomainRequest: typeof import("./domain-requests").prepareWebsiteDomainRequest = (...args) => import("./domain-requests").then(module => module.prepareWebsiteDomainRequest(...args));
+export const reconcileWebsiteDomainRequests: typeof import("./domain-requests").reconcileWebsiteDomainRequests = (...args) => import("./domain-requests").then(module => module.reconcileWebsiteDomainRequests(...args));
+export { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
+export const prepareExistingWebsitePages: typeof import("./rebuild-service").prepareExistingWebsitePages = (...args) => import("./rebuild-service").then(module => module.prepareExistingWebsitePages(...args));
+export { prepareBundleWebsiteSection } from "./bundle";
+export { rehearseBundleWebsiteSection } from "./bundle";
+
+export {prepareBundleWebsiteUpdate} from "./bundle-lifecycle";
+
+export * from "./legacy-archive";
+export * from "./legacy-archive-store";

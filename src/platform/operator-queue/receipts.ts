@@ -49,9 +49,9 @@ function clip(value: string | null | undefined, max: number): string | null {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
-export async function recordOutsideWrite(write: OutsideWrite): Promise<ReceiptResult> {
+export function outsideWritePayload(write: OutsideWrite): Record<string, unknown> {
   const rule = undoRuleFor(write.writeKind);
-  const payload = {
+  return {
     commandKey: write.commandKey,
     tenantId: write.tenantId ?? null,
     workspaceId: write.workspaceId ?? null,
@@ -70,6 +70,10 @@ export async function recordOutsideWrite(write: OutsideWrite): Promise<ReceiptRe
     undoLabel: rule.label,
     actor: clip(write.actor, 200) ?? "strelva",
   };
+}
+
+export async function recordOutsideWrite(write: OutsideWrite): Promise<ReceiptResult> {
+  const payload = outsideWritePayload(write);
   try {
     return { recorded: true, receipt: await writer(payload) };
   } catch (error) {

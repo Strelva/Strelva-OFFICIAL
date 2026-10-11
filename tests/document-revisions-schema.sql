@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- Documents take any number of edits: 205 edits and an Undo through the real
+-- Documents take any number of edits: 1000 edits and an Undo through the real
 -- RPC, every receipt in document_revisions, a bounded payload window, and
 -- the same denials as before.
 create function pg_temp.assert_true(condition boolean, message text)
@@ -32,7 +32,7 @@ begin
   returning * into item;
   current_payload := item.payload;
 
-  for i in 1..205 loop
+  for i in 1..1000 loop
     new_text := 'v' || i;
     rcpt := jsonb_build_object('revision', i, 'actorId', actor::text, 'at', '2026-10-06T12:00:00Z', 'kind', 'edit',
       'before', jsonb_build_object('title', 'Long-lived', 'text', current_payload->>'text'),
@@ -42,43 +42,43 @@ begin
                   where p > jsonb_array_length(current_payload->'history') - 19) || jsonb_build_array(rcpt));
     select payload into current_payload from public.update_document_work(item.id,w,actor,'agency@example.com',i-1,next_payload);
   end loop;
-  if current_payload->>'text' <> 'v205' or (current_payload->>'revision')::integer <> 205 then raise exception 'edit 205 not saved'; end if;
+  if current_payload->>'text' <> 'v1000' or (current_payload->>'revision')::integer <> 1000 then raise exception 'edit 1000 not saved'; end if;
   if jsonb_array_length(current_payload->'history') <> 20 then raise exception 'payload window is not 20 receipts'; end if;
   select count(*) into stored from public.document_revisions where work_id=item.id;
-  if stored <> 205 then raise exception 'expected 205 stored receipts, found %', stored; end if;
+  if stored <> 1000 then raise exception 'expected 1000 stored receipts, found %', stored; end if;
 
-  -- Undo of the latest edit (revision 206) still works past the old cap.
-  rcpt := jsonb_build_object('revision', 206, 'actorId', actor::text, 'at', '2026-10-06T12:01:00Z', 'kind', 'undo', 'undoesRevision', 205,
-    'before', jsonb_build_object('title', 'Long-lived', 'text', 'v205'),
-    'after', jsonb_build_object('title', 'Long-lived', 'text', 'v204'));
-  next_payload := current_payload || jsonb_build_object('revision', 206, 'text', 'v204',
+  -- Undo of the latest edit (revision 1001) still works past the old cap.
+  rcpt := jsonb_build_object('revision', 1001, 'actorId', actor::text, 'at', '2026-10-06T12:01:00Z', 'kind', 'undo', 'undoesRevision', 1000,
+    'before', jsonb_build_object('title', 'Long-lived', 'text', 'v1000'),
+    'after', jsonb_build_object('title', 'Long-lived', 'text', 'v999'));
+  next_payload := current_payload || jsonb_build_object('revision', 1001, 'text', 'v999',
     'history', ((current_payload->'history') - 0) || jsonb_build_array(rcpt));
-  select payload into current_payload from public.update_document_work(item.id,w,actor,'agency@example.com',205,next_payload);
-  if current_payload->>'text' <> 'v204' then raise exception 'undo past the old cap failed'; end if;
-  if not exists(select 1 from public.document_revisions where work_id=item.id and revision=206 and receipt->>'kind'='undo') then raise exception 'undo receipt not stored'; end if;
+  select payload into current_payload from public.update_document_work(item.id,w,actor,'agency@example.com',1000,next_payload);
+  if current_payload->>'text' <> 'v999' then raise exception 'undo past the old cap failed'; end if;
+  if not exists(select 1 from public.document_revisions where work_id=item.id and revision=1001 and receipt->>'kind'='undo') then raise exception 'undo receipt not stored'; end if;
 
   -- A window that drops a recent receipt or rewrites one is refused.
   begin
-    perform public.update_document_work(item.id,w,actor,'agency@example.com',206,
-      current_payload || jsonb_build_object('revision',207,'text','x','history',jsonb_build_array(
-        jsonb_build_object('revision',207,'actorId',actor::text,'at','2026-10-06T12:02:00Z','kind','edit',
-          'before',jsonb_build_object('title','Long-lived','text','v204'),'after',jsonb_build_object('title','Long-lived','text','x')))));
+    perform public.update_document_work(item.id,w,actor,'agency@example.com',1001,
+      current_payload || jsonb_build_object('revision',1002,'text','x','history',jsonb_build_array(
+        jsonb_build_object('revision',1002,'actorId',actor::text,'at','2026-10-06T12:02:00Z','kind','edit',
+          'before',jsonb_build_object('title','Long-lived','text','v999'),'after',jsonb_build_object('title','Long-lived','text','x')))));
     raise exception 'truncated window accepted';
   exception when others then if SQLERRM<>'document_payload_invalid' then raise; end if; end;
 
   -- Stale revision, foreign actor and another workspace stay denied.
   begin
-    perform public.update_document_work(item.id,w,actor,'agency@example.com',205,next_payload);
+    perform public.update_document_work(item.id,w,actor,'agency@example.com',1000,next_payload);
     raise exception 'stale edit accepted';
   exception when others then if SQLERRM<>'document_revision_conflict' then raise; end if; end;
   begin
     insert into public.users(id,email,verified_at) values('d1900000-0000-4000-8000-000000000001','outsider-doc@example.test',now()) on conflict do nothing;
-    perform public.update_document_work(item.id,w,'d1900000-0000-4000-8000-000000000001','outsider-doc@example.test',206,next_payload);
+    perform public.update_document_work(item.id,w,'d1900000-0000-4000-8000-000000000001','outsider-doc@example.test',1001,next_payload);
     raise exception 'foreign edit accepted';
   exception when others then if SQLERRM<>'workspace_access_denied' then raise; end if; end;
   if other_workspace is not null then
     begin
-      perform public.update_document_work(item.id,other_workspace,actor,'agency@example.com',206,next_payload);
+      perform public.update_document_work(item.id,other_workspace,actor,'agency@example.com',1001,next_payload);
       raise exception 'cross-workspace edit accepted';
     exception when others then if SQLERRM<>'workspace_access_denied' then raise; end if; end;
   end if;

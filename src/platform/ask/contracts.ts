@@ -15,7 +15,7 @@ export type AskResultKind = "answer" | "draft" | "possibility" | "request" | "re
 export type AskAuthority = "read" | "draft";
 
 /**
- * The 18 tools at 1.0.0. `tenant` names the tenant chat tools each one runs
+ * The ordinary tool inventory. `tenant` names the tenant chat tools each one runs
  * (one implementation, src/lib/agent-shared.ts); `needsTenant` is true when it
  * acts on a linked managed website; `acts` marks tools that act through a
  * Connection and need its grant.
@@ -28,6 +28,7 @@ export const ASK_TOOL_CATALOG = {
   read_reviews: { authority: "read", needsTenant: true, tenant: ["get_reviews"] },
   read_requests: { authority: "read", needsTenant: false, tenant: [] },
   draft_website_change: { authority: "draft", needsTenant: true, tenant: ["patch_site", "update_section", "toggle_section_visibility", "reorder_sections"] },
+  draft_system_change: { authority: "draft", needsTenant: false, tenant: [] },
   undo_change: { authority: "draft", needsTenant: true, tenant: ["undo_last_change"] },
   add_image: { authority: "draft", needsTenant: true, tenant: ["upload_image"] },
   draft_entry: { authority: "draft", needsTenant: true, tenant: ["save_entry"] },
@@ -101,7 +102,7 @@ export type AskRefusalCode = (typeof ASK_REFUSAL_CODES)[number];
 export const ASK_REFUSALS: Record<AskRefusalCode, string> = {
   money: "I can't change billing, plans, pay links or refunds from here. Billing is in Business details, or reply to your Strelva email and we'll sort it.",
   domains: "I can't add, remove or move a domain. Domains are in Business details, and Strelva handles domain moves for you.",
-  people: "I can't invite people, change roles or remove anyone. People and access are in Business details, for an owner.",
+  people: "I can't invite people, change roles or remove anyone. People & access are in Business details, for an owner.",
   exit_or_delete: "I can't pause, export, delete or leave the business or a site from here. That's in Business details, for an owner.",
   approval_in_chat: "I can't approve anything from the conversation. Approve it in Needs you, or from the link in your email, so the approval stays tied to that exact change.",
   direct_send: "I don't send email, post to Google or publish on my own. I draft it, and it goes to Needs you for a yes.",

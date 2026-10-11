@@ -11,5 +11,5 @@ export default async function DeliveryPage({ params }: { params: Promise<{ reque
   if (!workspaceReleaseEnabled()) notFound();
   const parsed = z.string().uuid().safeParse((await params).requestId);
   if (!parsed.success) notFound();
-  return <StrelvaShell title="Delivery"><div className="mx-auto w-full max-w-3xl p-6"><DeliveryCommitmentPanel key={parsed.data} requestId={parsed.data} /></div></StrelvaShell>;
+  return <StrelvaShell title="Request"><DeliveryCommitmentPanel key={parsed.data} requestId={parsed.data} /></StrelvaShell>;
 }

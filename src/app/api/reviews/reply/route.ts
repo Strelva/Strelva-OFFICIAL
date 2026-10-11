@@ -28,6 +28,7 @@ import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { readJsonObject } from "@/lib/request-body";
 import { submitOwnerReviewReply } from "@/lib/reviews/owner-reply";
+import { sessionTenantDecider } from "@/lib/operator-decisions";
 
 export async function POST(req: Request) {
   const authed = await verifyAuth();
@@ -54,9 +55,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const result = await submitOwnerReviewReply(tenant, reviewId, reply);
+  // An operator or agency staff reply as themselves, audited (src/lib/operator-decisions.ts).
+  const decider = await sessionTenantDecider(tenant);
+  if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const result = await submitOwnerReviewReply(tenant, reviewId, reply, decider);
   if (result.status === "not_found") {
     return NextResponse.json({ error: "Review not found" }, { status: 404 });
+  }
+  if (result.status === "owner_decides") {
+    return NextResponse.json({ error: "The owner decides this reply. Nothing was posted." }, { status: 403 });
   }
   if (result.status === "publish_failed") {
     return NextResponse.json(

@@ -136,6 +136,14 @@
     for (var i = 0; i < s.length; i++) if (BIZ_LD.test(s[i].textContent || "")) return true;
     return false;
   }
+  // The browser sends only a presence hint. The server fetches the verified
+  // site's stored URL and compares its public JSON-LD to confirmed facts.
+  function ownBusinessSchema() {
+    return { present: true };
+  }
+  function reportOwnBusinessSchema() {
+    if (granted && hasOwnBusinessLd()) post("/events", { events: [], platformSchema: ownBusinessSchema() }, false);
+  }
   function injectLd(ld) {
     if (hasOwnBusinessLd()) return;
     var el = d.querySelector("script[data-strelva]");
@@ -152,7 +160,10 @@
         context = c;
         api.facts = c.facts || {};
         fill(api.facts);
-        if (c.site.injectSchema && c.jsonLd) injectLd(c.jsonLd);
+        if (c.site.injectSchema) {
+          reportOwnBusinessSchema();
+          if (c.jsonLd) injectLd(c.jsonLd);
+        }
       })
       .catch(function () { /* the site keeps working without Strelva */ });
   }
@@ -185,7 +196,7 @@
     if (!isContactForm(form)) return;
     var fields = fieldsOf(form);
     if (!fields) return;
-    post("/inquiries", { id: "i" + rand(22), sid: session(), capture: "site-form", path: location.pathname, ref: d.referrer || undefined, fields: fields }, false);
+    post("/inquiries", { id: "i" + rand(22), sid: session(), capture: "site-form", path: location.pathname, fields: fields }, false);
   }
 
   // ---- The Strelva form ---------------------------------------------------
@@ -225,18 +236,42 @@
     var status = d.createElement("p");
     status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.setAttribute("style", "margin:0");
     form.appendChild(status);
+    var times = d.createElement("section");
+    times.setAttribute("aria-label", "Appointment times");
+    form.appendChild(times);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (!granted) { status.textContent = "Allow Strelva to send this form before continuing, or call or email us."; return; }
       if (!email.value.trim() && !phone.value.trim()) { status.textContent = "Add an email or phone number so we can reply."; email.focus(); return; }
       if (!message.value.trim() && !name.value.trim()) { status.textContent = "Tell us a little about what you need."; message.focus(); return; }
-      button.disabled = true; status.textContent = "Sending…";
+      button.disabled = true; status.textContent = "Sending…"; times.textContent = "";
       var fields = {}, list = [name, email, phone, message];
       for (var i = 0; i < list.length; i++) if (list[i].value.trim()) fields[list[i].name] = list[i].value.trim().slice(0, 5000);
       w.fetch(base + "/inquiries", { method: "POST", credentials: "omit", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ id: "i" + rand(22), sid: session(), capture: "strelva-form", path: location.pathname, ref: d.referrer || undefined, _hp: hp.value, fields: fields }) })
+        body: JSON.stringify({ id: "i" + rand(22), sid: session(), capture: "strelva-form", path: location.pathname, _hp: hp.value, fields: fields }) })
         .then(function (r) {
           if (!r.ok) throw new Error(String(r.status));
+          return r.json().catch(function () { return null; });
+        })
+        .then(function (result) {
           form.reset(); status.textContent = "Thanks. Your message was sent.";
+          var offer = result && result.bookingOffer;
+          if (!offer || typeof offer.serviceName !== "string" || offer.serviceName.length > 160 || !Array.isArray(offer.slots) || !offer.slots.length || offer.slots.length > 3) return;
+          for (var n = 0; n < offer.slots.length; n++) {
+            var s = offer.slots[n];
+            if (!s || typeof s.label !== "string" || s.label.length > 200 || typeof s.chooseUrl !== "string" || !/^\/inquiry-booking\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\?slot=[0-2]$/.test(s.chooseUrl)) return;
+          }
+          var title = d.createElement("h3"), note = d.createElement("p");
+          title.textContent = "Request a time for " + offer.serviceName;
+          note.textContent = "The business must confirm your appointment.";
+          times.appendChild(title); times.appendChild(note);
+          for (var j = 0; j < offer.slots.length; j++) {
+            var row = d.createElement("p"), link = d.createElement("a");
+            link.href = origin + offer.slots[j].chooseUrl;
+            link.textContent = offer.slots[j].label;
+            link.setAttribute("style", "display:inline-flex;align-items:center;min-height:44px");
+            row.appendChild(link); times.appendChild(row);
+          }
         })
         .catch(function () { status.textContent = "That didn't send. Please try again, or call or email us."; })
         .then(function () { button.disabled = false; });

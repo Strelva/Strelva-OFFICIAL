@@ -1,12 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Strelva handled lists the owner's decided Needs you items
+// What changed lists the owner's decided Needs you items
 // (20261009130000_strelva_handled_decisions.sql): what Strelva did after an
 // approval or a Not yet, and the honest undo for that lifecycle. None is a
 // one-tap undo; each says why or what undoing takes.
 
-const events = vi.hoisted(() => ({ getEvents: vi.fn() }));
+const events = vi.hoisted(() => ({ getEvents: vi.fn(), reports: vi.fn(), notices: vi.fn() }));
 vi.mock("@/lib/events", () => ({ getEvents: events.getEvents, getEventRaw: vi.fn() }));
+vi.mock("@/platform/catalog-reports/receipts", () => ({ readCatalogReportHandled: events.reports }));
+vi.mock("@/platform/catalog-reports/tool-notices", () => ({ readToolNoticeHandled: events.notices }));
 
 import { approvedDecisionUndo, decidedTenantEventIds, handledFromStore, mergeHandled } from "@/platform/needs-you/handled";
 import { readStrelvaHandled } from "@/platform/needs-you/server";
@@ -15,10 +17,55 @@ import type { UnifiedEvent } from "@/lib/types";
 
 const AT = "2026-10-08T15:00:00.000Z";
 const SYSTEM = "11111111-1111-4111-8111-111111111111";
+beforeEach(() => { vi.resetAllMocks(); events.reports.mockResolvedValue([]); events.notices.mockResolvedValue([]); });
+
+describe("What changed read dependencies", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(done => { resolve = done; });
+    return { promise, resolve };
+  }
+  const actor = { userId: SYSTEM, verifiedEmail: "owner@example.test" };
+
+  it("authorizes first, then starts report and notice reads while tenant discovery is pending", async () => {
+    const authorized = deferred<unknown[]>(), tenants = deferred<[]>(), reports = deferred<[]>();
+    const store = { handled: vi.fn(() => authorized.promise), linkedTenants: vi.fn(() => tenants.promise) } as unknown as NeedsYouStore;
+    events.reports.mockReturnValue(reports.promise);
+    const read = readStrelvaHandled(actor, SYSTEM, store, Date.parse(AT) + 1000);
+    expect(store.linkedTenants).not.toHaveBeenCalled(); expect(events.reports).not.toHaveBeenCalled(); expect(events.notices).not.toHaveBeenCalled();
+    authorized.resolve([]);
+    try {
+      await vi.waitFor(() => { expect(store.linkedTenants).toHaveBeenCalled(); expect(events.reports).toHaveBeenCalled(); expect(events.notices).toHaveBeenCalled(); });
+      expect(events.reports).toHaveBeenCalledWith(actor, SYSTEM, "2026-10-01T15:00:01.000Z");
+      expect(events.notices).toHaveBeenCalledWith(actor, SYSTEM, "2026-10-01T15:00:01.000Z");
+    } finally { tenants.resolve([]); reports.resolve([]); await read; }
+    expect(await read).toEqual([]);
+  });
+
+  it("does no tenant or receipt reads when access is denied", async () => {
+    const store = { handled: vi.fn().mockRejectedValue(new Error("denied")), linkedTenants: vi.fn() } as unknown as NeedsYouStore;
+    await expect(readStrelvaHandled(actor, SYSTEM, store)).rejects.toThrow("denied");
+    expect(store.linkedTenants).not.toHaveBeenCalled(); expect(events.getEvents).not.toHaveBeenCalled();
+    expect(events.reports).not.toHaveBeenCalled(); expect(events.notices).not.toHaveBeenCalled();
+  });
+
+  it.each(["reports", "notices"] as const)("rejects unavailable %s rather than reporting empty history", async source => {
+    const store = { handled: vi.fn().mockResolvedValue([]), linkedTenants: vi.fn().mockResolvedValue([]) } as unknown as NeedsYouStore;
+    events[source].mockRejectedValue(new Error("required receipt unavailable"));
+    await expect(readStrelvaHandled(actor, SYSTEM, store)).rejects.toThrow("required receipt unavailable");
+  });
+
+  it.each(["links", "events"])("retains the existing optional tenant fallback on unavailable %s", async source => {
+    const store = { handled: vi.fn().mockResolvedValue([decision()]), linkedTenants: vi.fn().mockResolvedValue([{ tenantId: "fictional" }]) } as unknown as NeedsYouStore;
+    if (source === "links") vi.mocked(store.linkedTenants).mockRejectedValue(new Error("optional tenant read"));
+    else events.getEvents.mockRejectedValue(new Error("optional event read"));
+    expect(await readStrelvaHandled(actor, SYSTEM, store, Date.parse(AT) + 1000)).toEqual([handledFromStore(decision())]);
+  });
+});
 
 function decision(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    store: "owner_decisions", id: "22222222-2222-4222-8222-222222222222", at: AT, kind: "customer.commitment",
+    actor: { kind: "platform" }, store: "owner_decisions", id: "22222222-2222-4222-8222-222222222222", at: AT, kind: "customer.commitment",
     title: "Booking request: Dana Reed, Tue, Oct 15 3:00 PM", state: "approved", outcome: "done", outcomeReason: null,
     sourceLifecycle: "booking_request", sourceId: "33333333-3333-4333-8333-333333333333", decidedByKind: "owner_link",
     receiptRef: "booking:33333333-3333-4333-8333-333333333333:confirmed",
@@ -28,11 +75,11 @@ function decision(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
-describe("decided Needs you items in Strelva handled", () => {
+describe("decided Needs you items in What changed", () => {
   it("an approved booking request reads as Strelva confirming it, with why it isn't one-tap undo", () => {
     const receipt = handledFromStore(decision());
     expect(receipt).toEqual({
-      id: "decision:22222222-2222-4222-8222-222222222222", store: "owner_decisions", systemId: SYSTEM, at: AT, evidence: null,
+      id: "decision:22222222-2222-4222-8222-222222222222", store: "owner_decisions", systemId: SYSTEM, at: AT, evidence: null, actor: { kind: "platform" },
       sentence: "Strelva confirmed the booking you approved: Dana Reed, Tue, Oct 15 3:00 PM",
       changed: "The booking is confirmed for this time.",
       undo: { state: "not_undoable", reason: "A confirmed booking isn't undone in one tap. Move or cancel it in Bookings, and the customer is told." },
@@ -60,7 +107,7 @@ describe("decided Needs you items in Strelva handled", () => {
 
   it("a failed or unfinished approval never claims it happened", () => {
     const failed = handledFromStore(decision({ outcome: "failed", outcomeReason: "resolver_failed" }))!;
-    expect(failed.sentence).toBe('Strelva couldn\'t finish "Booking request: Dana Reed, Tue, Oct 15 3:00 PM" after you decided. We\'re on it.');
+    expect(failed.sentence).toBe('Strelva couldn\'t finish "Booking request: Dana Reed, Tue, Oct 15 3:00 PM" after you decided.');
     expect(failed.undo).toMatchObject({ state: "not_undoable" });
     const running = handledFromStore(decision({ outcome: null }))!;
     expect(running.sentence).toMatch(/^Strelva is finishing /);
@@ -75,7 +122,7 @@ describe("decided Needs you items in Strelva handled", () => {
 
   it("names who decided when it wasn't the owner", () => {
     expect(handledFromStore(decision({ decidedByKind: "operator", sourceLifecycle: "website_document", title: "Fix the hours copy" }))!.sentence)
-      .toBe('Strelva did "Fix the hours copy" after Strelva reviewed it.');
+      .toBe('Strelva did "Fix the hours copy" after Platform operator (support) reviewed it.');
     expect(handledFromStore(decision({ decidedByKind: "admin_session" }))!.sentence)
       .toBe("Strelva confirmed the booking (an admin decided): Dana Reed, Tue, Oct 15 3:00 PM");
   });

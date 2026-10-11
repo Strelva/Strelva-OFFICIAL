@@ -1,0 +1,41 @@
+.root { font-family: var(--font-workspace), system-ui, sans-serif; }
+.scroll { overflow-y: auto; min-height: 0; flex: 1; }
+.previewHeader { display: flex; width: 100%; align-items: center; gap: 16px; padding: 0 24px; color: var(--st-text-3); font-size: 12px; }
+.previewHeader > :last-child { margin-left: auto; }
+.menu { display: none; width: 36px; height: 36px; align-items: center; justify-content: center; border: 0; border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); }
+.reviewGrid { display: grid; grid-template-columns: minmax(0, 1.34fr) minmax(0, 1fr); align-items: start; gap: 32px; }
+.pageColumn, .decisionColumn { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
+.compare, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.compare { justify-content: space-between; gap: 8px; }
+.browserBar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--st-line); }
+.browserDots { color: var(--st-line); font-size: 11px; white-space: nowrap; }
+.address { display: flex; min-width: 0; flex: 1; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text-3); overflow-wrap: anywhere; }
+/* The object is a client-branded page, kept light even in the dark workspace. */
+.clientPage { min-height: 500px; padding: 32px 36px; background: var(--st-client-paper, #faf9f6); color: var(--st-client-ink, #302b27); }
+.clientPage h2 { margin: 0 0 20px; font-size: 32px; font-weight: 400; line-height: 40px; }
+.clientPage p { margin: 0 0 14px; font-size: 14px; line-height: 20px; }
+.clientPage dl { margin: 0; }
+.clientPage dl > div { display: flex; justify-content: space-between; gap: 16px; padding: 12px 10px; border-bottom: 1px solid var(--st-client-rule, #e7e2db); border-radius: var(--st-r-sm); font-size: 14px; line-height: 20px; }
+.clientPage dl > div[data-highlight="true"] { background: var(--st-client-highlight, #f3e7da); }
+.clientPage dt { flex: 1; min-width: 0; }
+.clientPage dd { margin: 0; text-align: right; font-weight: 600; }
+.historyLedger { display: grid; gap: 12px; margin-top: 12px; }
+.pause { max-width: 480px; }
+.body { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.kept { display: grid; gap: 8px; margin: 12px 0 0; padding-left: 20px; }
+.kept li::marker { color: var(--st-live); }
+.push { flex: 1; }
+.checkGrid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.editForm { display: grid; gap: 16px; }
+.editForm label { display: grid; gap: 8px; font-size: 14px; color: var(--st-text-2); }
+.editForm input { width: 100%; padding: 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); }
+.editForm input:focus-visible, .menu:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+@media (max-width: 1023px) { .menu { display: inline-flex; } }
+@media (max-width: 767px) {
+  .reviewGrid, .checkGrid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .clientPage { min-height: 340px; padding: 24px 20px; }
+  .clientPage dl > div { flex-wrap: wrap; gap: 4px; }
+  .clientPage dt { flex-basis: 100%; }
+  .clientPage dd { text-align: left; }
+  .previewHeader { gap: 8px; padding-inline: 20px; }
+}

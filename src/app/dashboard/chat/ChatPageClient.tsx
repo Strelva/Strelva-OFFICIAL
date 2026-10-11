@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChatPanel } from "@/components/dashboard/ChatPanel";
 import { useDashboard } from "@/components/dashboard/DashboardContext";
 import type { UnifiedEvent } from "@/lib/types";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import { consumeWebsiteRequestDraft } from "@/lib/website-request-draft";
 
 interface ChatPageClientProps {
@@ -31,7 +32,7 @@ export function ChatPageClient({ threadId, ownerName, needsYou }: ChatPageClient
       const draft = consumeWebsiteRequestDraft(token, tenantId, window.sessionStorage);
       if (draft) setChatPrompt(draft);
       url.searchParams.delete("draft");
-      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+      window.history.replaceState(workspaceHistoryState(window.history.state), "", url.pathname + url.search + url.hash);
     } catch { /* Storage restrictions leave the existing governed composer usable. */ }
   }, [tenantId, setChatPrompt]);
 

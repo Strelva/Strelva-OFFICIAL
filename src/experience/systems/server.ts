@@ -1,3 +1,7 @@
+import { bookingCalendarConnectionStates, readBookingCalendarEvidence } from "./calendar-evidence";
+import { getInquiryRepository } from "@/products/inquiries/server";
+import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/server";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 /**
  * Server projection for the Systems experience. Server only: it reads the
  * spine, existing monitors and saved rebuilds, and runs Make real on an
@@ -14,6 +18,11 @@
 import { checkHeartbeats } from "@/platform/infra/heartbeat";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
+import { readDailyTraffic } from "@/platform/infra/analytics/traffic";
+import { readSearchConnection } from "@/platform/catalog-reports/search-connection";
+import { searchConsoleObservation, trafficObservation } from "@/platform/system-health/catalog-observations";
+import { readToolNoticeReceipts, toolNoticeObservations } from "@/platform/catalog-reports/tool-notices";
+import { readToolReleases } from "@/platform/catalog-reports/tool-history";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
@@ -21,7 +30,9 @@ import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/produ
 import { connectedSitesStore } from "@/products/connected-sites/store";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
+import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
 import { savedCheckObservations } from "@/products/investigations/system-health";
+import { readHomeFinderSystemObservations } from "@/products/home-finder/server";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
 import type { System } from "@/platform/systems/contracts";
@@ -38,10 +49,10 @@ import {
 } from "@/platform/system-health";
 import { prepareIsolatedPossibility, type IsolatedSandbox, type SandboxRunOptions } from "@/platform/make-real/sandbox";
 import { planFingerprint } from "@/platform/make-real/approvals";
-import { bareHostname, websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
+import { bareHostname, websiteRebuildCandidate, readWebsiteRebuild, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
 import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
-import { publishingReleaseEnabled, readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
+import { readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
 import { receiptHeadline } from "@/products/google-listing/service";
 import {
   REBUILD_SOURCE_PREFIX,
@@ -51,6 +62,9 @@ import {
   storedPossibilityViews,
   storedTargets,
   syncRebuildPossibilities,
+  syncPublicSourceRebuildPossibilities,
+  syncAskPageSetPossibilities,
+  syncAskInquiryFollowUpPossibilities,
 } from "./stored-possibilities";
 
 export interface SystemsProjectionInput {
@@ -65,6 +79,7 @@ export interface SystemsProjectionInput {
   bookingViews?: ReadonlyMap<string, readonly BookingView[]>;
   /** How each managed site changes, by tenant id. Absent: not known, nothing is claimed. */
   siteEditing?: ReadonlyMap<string, SiteEditing>;
+  businessFactsConnected?: ReadonlySet<string>;
   /** Set while STRELVA_PUBLISHING_RELEASE is on. Null: the read failed. */
   publishing?: Omit<PublishingProjection, "listing" | "observations"> | null;
 }
@@ -142,6 +157,8 @@ export async function prepareRebuildPossibilities(input: Omit<SystemsProjectionI
     const site = targetSite(candidate, input.listing, input.siteDomains);
     if (!site) continue;
     const domain = siteDomain(site, input.siteDomains) ?? site.system.name;
+    const draft = candidate.origin !== "rebuild";
+    const author = candidate.origin === "agent_draft" ? "connected agent" : "agency";
     // The rebuilt site carries the contact form, so the inquiries it feeds change too.
     const inquiries = input.listing.connections
       .filter(({ connection }) => connection.kind === "appear" && connection.state !== "disconnected"
@@ -152,14 +169,14 @@ export async function prepareRebuildPossibilities(input: Omit<SystemsProjectionI
     const sandbox = await prepareIsolatedPossibility({
       businessId: input.listing.businessId,
       possibilityId: rebuildPossibilityId(candidate.workId),
-      title: candidate.origin === "agency_draft" ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
-      intent: candidate.origin === "agency_draft" ? `Apply the agency's proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
+      title: draft ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
+      intent: draft ? `Apply the ${author}'s proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
       systems: [
         { ref: { businessId: site.system.businessId, systemId: site.system.id }, name: site.system.name, content: { website: domain, tenantId: site.references.tenantId } },
         ...inquiries.map((item) => ({ ref: { businessId: item.system.businessId, systemId: item.system.id }, name: item.system.name, content: { form: `Contact form on ${domain}` } })),
       ],
       changes: [
-        { systemId: site.system.id, summary: candidate.origin === "agency_draft" ? `the agency's change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
+        { systemId: site.system.id, summary: draft ? `the ${author}'s change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
         ...inquiries.map((item) => ({ systemId: item.system.id, summary: "inquiries from the rebuilt contact form", content: { form: `Rebuilt contact form on ${domain}`, rebuildWorkId: candidate.workId } })),
       ],
       checks: [
@@ -188,6 +205,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
     connections: connections.map((item) => item.connection),
     observations: input.observations,
   }), input.now);
+  const calendarStates = bookingCalendarConnectionStates(input.listing, input.observations, input.now);
   const names = new Map(listings.map((item) => [item.system.id, item.system.name]));
   return {
     status: "ready",
@@ -199,12 +217,15 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       basis: item.basis,
       savedWorkId: item.references.savedWorkId,
       tenantId: item.references.tenantId,
-      health: healthSummary(health.get(item.system.id)),
+      health: { ...healthSummary(health.get(item.system.id)),
+        ...(input.observations.some(observation => observation.subjectId === item.system.id && observation.source === "traffic") ? { signals: input.observations.filter(observation => observation.subjectId === item.system.id && ["domain-monitor", "traffic", "search-console"].includes(observation.source)).map(observation => observation.message) } : {}),
+      },
       ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
       ...(item.system.kind === "website" && item.references.tenantId && input.siteEditing?.get(item.references.tenantId) ? { editing: input.siteEditing.get(item.references.tenantId)! } : {}),
+      ...(item.system.kind === "website" && item.references.tenantId && input.businessFactsConnected?.has(item.references.tenantId) ? { businessFactsConnected: true } : {}),
       ...(item.connectedSite ? { connectedSite: { ...item.connectedSite } } : {}),
     })),
-    connections: connections.map(({ connection }) => {
+    connections: [...connections.map(({ connection }) => {
       const targetSystemId = connection.target.type === "system" ? connection.target.system.systemId : null;
       return {
         id: connection.id,
@@ -212,10 +233,15 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
         kind: connection.kind,
         targetSystemId,
         targetLabel: targetSystemId ? names.get(targetSystemId) ?? "Another system" : connection.purpose ?? connection.target.type.replace("_", " "),
-        state: connection.state,
+        state: calendarStates.get(connection.id) ?? connection.state,
         purpose: connection.purpose,
       };
-    }),
+    }), ...listings.flatMap(item => {
+      const search = input.observations.find(observation => observation.subjectId === item.system.id && observation.source === "search-console");
+      const fresh = search?.observedAt && input.now - Date.parse(search.observedAt) <= search.maxAgeSeconds * 1000;
+      return search ? [{ id: `search-console:${item.system.id}`, sourceId: item.system.id, kind: "read" as const, targetSystemId: null, targetLabel: "Google Search Console", state: search.outcome === "pass" && fresh ? "connected" as const : "stale" as const,
+        purpose: `${search.message} Authority: Strelva's service account was added to the property. Source of truth: Google. Freshness: daily, 07:00 UTC.` }] : [];
+    })],
     ...(input.publishing !== undefined ? { publishing: publishingView(input.publishing) } : {}),
     possibilities: possibilities.map(({ candidate, sandbox, affects }) => ({
       id: sandbox.possibility.id,
@@ -245,14 +271,21 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
     getScanSummaries(websites.map((item) => item.references.tenantId!)).catch(() => ({} as Record<string, null>)),
   ]);
   const observations: Observation[] = [];
-  for (const site of websites) {
+  await Promise.all(websites.map(async (site) => {
     const tenantId = site.references.tenantId!;
     observations.push(...domainObservations(site.system.id, domains?.results.find((result) => result.tenantId === tenantId) ?? null, domains?.scannedAt ?? null));
     observations.push(scanObservation(site.system.id, scans[tenantId] ?? null));
     observations.push(...heartbeatObservations(site.system.id, heartbeats, ["domain-monitor", "portfolio-scan"]));
-  }
+    const [daily, search] = await Promise.all([
+      readDailyTraffic(tenantId, 30).catch(() => null),
+      readSearchConnection(tenantId, listing.businessId).catch(() => null),
+    ]);
+    observations.push(trafficObservation(site.system.id, daily), searchConsoleObservation(site.system.id, search));
+  }));
   for (const inquiry of inquiries) {
-    observations.push(inquiryFormUnchecked(inquiry.system.id));
+    const tenantId = inquiry.references.tenantId ?? listing.systems.find(site => site.system.kind === "website" && site.references.tenantStableId === inquiry.references.tenantStableId)?.references.tenantId;
+    const snapshot = tenantId ? await getInquiryRepository().getSnapshot(tenantId, inquiry.references.inquiryBusinessId ?? listing.businessId).catch(() => null) : null;
+    observations.push(inquiryPublicationObservation(inquiry.system.id, snapshot));
     observations.push(...heartbeatObservations(inquiry.system.id, heartbeats, ["inquiry-follow-ups"]));
   }
   return [...observations, ...connected];
@@ -263,6 +296,24 @@ export function connectedSiteObservation(subjectId: string, site: { siteHost: st
   if (!site.verified) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `Waiting for proof that ${site.siteHost} is this business's site.` };
   if (!site.lastEventAt) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} has not reported a visit yet. Check the Strelva script is on the page.` };
   return { subjectId, signal: "connected_site.reporting", outcome: "pass", observedAt: site.lastEventAt, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} is reporting visits.` };
+}
+
+/** Only readback for the currently live version establishes publication health. */
+export function inquiryPublicationObservation(subjectId: string, snapshot: InquiryWorkspaceSnapshot | null): Observation {
+  const capabilities = snapshot?.state.capabilities.filter(capability => capability.live !== null) ?? [];
+  if (!capabilities.length) return inquiryFormUnchecked(subjectId);
+  const verifications = capabilities.map(capability => {
+    const receipt = [...(snapshot?.state.changes ?? [])].reverse().find(change => change.capabilityId === capability.id && change.verification?.version === capability.live!.version);
+    return receipt?.verification;
+  });
+  const failed = verifications.filter(verification => verification && !verification.verified);
+  const unchecked = verifications.some(verification => !verification || !Number.isFinite(Date.parse(verification.checkedAt)));
+  const outcome = failed.length ? "fail" : unchecked ? "unknown" : "pass";
+  // The oldest readback bounds a claim about every live form: a fresh form
+  // cannot hide a stale sibling. Unknown evidence never receives a timestamp.
+  const dates = verifications.flatMap(verification => verification && Number.isFinite(Date.parse(verification.checkedAt)) ? [verification.checkedAt] : []);
+  const observedAt = outcome === "unknown" ? null : dates.sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+  return { subjectId, signal: "inquiry.publication", outcome, observedAt, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: outcome === "fail" ? "At least one current form failed publication readback." : outcome === "unknown" ? "At least one current form has not passed a dated publication readback." : "Every current form passed publication readback." };
 }
 
 /** Follow-ups running says nothing about whether the form on the site works. */
@@ -294,18 +345,25 @@ export interface LiveSystemsDeps {
  * own config. A failed read adds nothing for that site: no Store Connection
  * and no booking views are claimed without the fact.
  */
-async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<{ facts: Map<string, TenantSiteFacts>; editing: Map<string, SiteEditing> }> {
+async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<{ facts: Map<string, TenantSiteFacts>; editing: Map<string, SiteEditing>; businessFactsConnected: Set<string> }> {
   const tenantIds = [...new Set(listing.systems.flatMap((item) => item.system.kind === "website" && item.references.tenantId ? [item.references.tenantId] : []))];
   const facts = new Map<string, TenantSiteFacts>();
   const editing = new Map<string, SiteEditing>();
+  const businessFactsConnected = new Set<string>();
   await Promise.all(tenantIds.map(async (tenantId) => {
     const tenant = await getTenantConfig(tenantId).catch(() => undefined);
     if (!tenant || tenant.id !== tenantId) return;
     const domain = siteDomains.get(tenantId);
     facts.set(tenantId, { features: tenant.features ?? [], domain: domain ? bareHostname(domain) : null });
     editing.set(tenantId, siteEditingFor(tenant));
+    if (process.env.STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED === "1") {
+      try {
+        const document = await getPublishedSiteDocument(tenantId);
+        if (document?.businessRecord?.bindings.length && await readHostedBusinessFacts(tenantId)) businessFactsConnected.add(tenantId);
+      } catch { /* A failed runtime read never claims a working Connection. */ }
+    }
   }));
-  return { facts, editing };
+  return { facts, editing, businessFactsConnected };
 }
 
 /** Saved checks become health evidence of the Systems they watch. */
@@ -321,17 +379,27 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
   const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore(), connectedSites: connectedSitesReader(deps.actor, deps.businessId) });
   const tenantFacts = await readTenantSiteFacts(spine, deps.siteDomains);
   const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
-  const published = publishingReleaseEnabled() ? await withPublishing(surfaced, deps.actor, now) : null;
+  const published = await publishingEnabledForWorkspace(surfaced.businessId, deps.actor) ? await withPublishing(surfaced, deps.actor, now) : null;
   const listing = published?.listing ?? surfaced;
+  const homeFinderSystems = listing.systems.filter(item => item.system.kind === "home_finder");
+  const homeFinderObservations: Observation[] = homeFinderSystems.length
+    ? await readHomeFinderSystemObservations(deps.actor, deps.businessId).catch(() => homeFinderSystems.map(item => ({
+      subjectId: item.system.id, signal: "home-finder.readiness", source: "integration-connection",
+      outcome: "unknown", impact: "blocking", observedAt: null, maxAgeSeconds: 300,
+      message: "The licensed provider and current grant could not be checked.",
+    }))) : [];
+  const noticeRows = await readToolNoticeReceipts(deps.actor, deps.businessId, new Date(now - 7 * 86400_000).toISOString()).catch(() => null);
   return {
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? [])],
+    observations: [...homeFinderObservations, ...await readBookingCalendarEvidence(listing, deps.actor, now), ...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
+      ...toolNoticeObservations(noticeRows ?? [], listing.systems.map(item => ({ systemId: item.system.id, workId: item.references.savedWorkId })))],
     actorId: deps.actor.userId,
     now,
     bookingViews,
     siteEditing: tenantFacts.editing,
+    businessFactsConnected: tenantFacts.businessFactsConnected,
     ...(published ? { publishing: published.publishing } : {}),
   };
 }
@@ -339,7 +407,8 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
 /**
  * Stored Version lineage joined onto the projection. A hidden same-business
  * source is never listed as a System. If lineage cannot be read, the
- * Systems still show and no lineage is claimed (`versions` stays absent).
+ * null is supported for isolated projections; live lineage read errors fail
+ * the complete Systems response before any action can use inferred state.
  */
 export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSources: string[]; versions: NonNullable<WorkspaceSystems["versions"]> } | null): WorkspaceSystems {
   if (!lineage || projection.status !== "ready") return projection;
@@ -348,7 +417,7 @@ export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSour
     ...projection,
     systems: projection.systems.filter((system) => !hidden.has(system.ref.systemId)),
     connections: projection.connections.filter((connection) => !hidden.has(connection.sourceId) && !(connection.targetSystemId && hidden.has(connection.targetSystemId))),
-    possibilities: projection.possibilities.map((possibility) => ({ ...possibility, affects: possibility.affects.filter((id) => !hidden.has(id)) })),
+    possibilities: projection.possibilities.map((possibility) => ({ ...possibility, affects: possibility.affects.filter((id) => !hidden.has(id)), ...(possibility.sourceSystemIds ? { sourceSystemIds: possibility.sourceSystemIds.filter(id => !hidden.has(id)) } : {}) })),
     versions: lineage.versions,
   };
 }
@@ -358,9 +427,15 @@ export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<Works
   try {
     const input = await liveProjectionInput(deps);
     const projection = await projectWorkspaceSystems(input);
-    const stored = await withStoredPossibilities(projection, input, deps).catch(() => projection);
-    const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
-    return withVersions(stored, lineage);
+    const stored = await withStoredPossibilities(projection, input, deps);
+    const lineage = await readBusinessVersions(deps.actor, deps.businessId);
+    const releases = await readToolReleases(deps.actor, deps.businessId);
+    const releaseHistory = releases.flatMap(release => {
+      const system = input.listing.systems.find(item => item.references.savedWorkId === release.workId);
+      return system ? [{ systemId: system.system.id, id: `tool-release:${release.workId}:${release.version}`, at: release.at,
+        sentence: `Strelva ${release.provenance === "rollback" ? "restored" : "released"} ${system.system.name}, release ${release.version}.` }] : [];
+    });
+    return withVersions({ ...stored, history: [...(stored.history ?? []), ...releaseHistory] }, lineage);
   } catch {
     return { status: "unavailable", systems: [], connections: [], possibilities: [] };
   }
@@ -372,7 +447,7 @@ const HANDLED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * Possibilities in Postgres, Make real activations, History and Strelva
  * handled receipts, laid over the per-request projection. A stored
  * Possibility replaces the per-request one for the same rebuild. Any read
- * failure leaves the projection as it was and claims none of these.
+ * failure is surfaced by readWorkspaceSystems as unavailable.
  */
 export async function withStoredPossibilities(projection: WorkspaceSystems, input: SystemsProjectionInput, deps: LiveSystemsDeps): Promise<WorkspaceSystems> {
   if (projection.status !== "ready") return projection;
@@ -389,10 +464,28 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
   });
   const revisions = new Map(input.listing.systems.flatMap((item) => item.provenance === "stored" && item.system.currentRevision
     ? [[item.system.id, { revisionId: item.system.currentRevision.revisionId, number: item.system.currentRevision.number }] as const] : []));
-  const stored = await syncRebuildPossibilities({
+  const rebuilds = await syncRebuildPossibilities({
     repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
     at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
   });
+  const publicSourceTargets = input.candidates.flatMap(candidate => {
+    if (candidate.origin !== "rebuild" || candidate.tenantId || !candidate.sourceHost || targetSite(candidate, input.listing, input.siteDomains)) return [];
+    const sources = input.listing.systems.filter(item => item.system.kind === "website" && item.connectedSite
+      && bareHostname(item.connectedSite.siteUrl) === candidate.sourceHost);
+    // Ambiguous references require an explicit choice; never select one arbitrarily.
+    return sources.length === 1 ? [{ candidate, source: sources[0]! }] : [];
+  });
+  const publicSourceStored = await syncPublicSourceRebuildPossibilities({
+    repo, businessId: deps.businessId, targets: publicSourceTargets, stored: rebuilds,
+    actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
+    read: workId => readWebsiteRebuild(deps.actor, workId),
+  });
+  const websiteStored = await syncAskPageSetPossibilities({
+    repo, live, stored: publicSourceStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
+    canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
+  });
+  const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");
+  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
   const activations = createSupabaseActivationRepository(deps.actor);
   const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
     possibility,

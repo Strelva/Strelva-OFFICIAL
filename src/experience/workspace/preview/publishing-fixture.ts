@@ -53,3 +53,28 @@ export function previewPublishingExtras(scenario: PreviewScenario) {
     collections: [{ tenantId: MOONEY_TENANT, types: [{ type: "blog", published: 12, drafts: 1 }, { type: "video", published: 0, drafts: 0 }] }],
   };
 }
+
+/** L5 canon presentation fixtures. Fictional, not provider observations. */
+export const PUBLISHING_LISTING_PREVIEW = {
+  category: "Mediation service · Buffalo, NY", rating: "5.0", reviews: 18,
+  googleHours: "Sat 10–2", recordHours: "Closed Sat", fixLabel: "Prepare Saturday hours correction",
+  pendingReview: "Google is still reviewing the photo you added Oct 7. Google decides; Strelva checks for updates.",
+};
+export const PUBLISHING_REVIEW_SITE: import("@/products/google-listing/linked-reviews").SiteReviews = {
+  tenantId: "juniper", siteName: "The Mooney Firm", googleConnected: true, googlePlaceId: null, replyMode: "approve", unavailable: false,
+  reviews: [
+    { id: "fictional-patel", author: "M. Patel", source: "google", rating: 5, text: "Thank you for helping us settle this without court. Sheri kept both sides calm.", date: "2026-10-06T15:00:00Z", reply: null, repliedAt: null, draft: { reply: "Thank you. It was a privilege to help both sides reach an agreement.", autoPostAt: null } },
+    { id: "fictional-novak", externalId: "fictional-external-novak", author: "R. Novak", source: "google", rating: 5, text: "Thank you for your help.", date: "2026-09-30T15:00:00Z", reply: "Thank you for trusting us with your mediation.", repliedAt: "2026-09-30T17:00:00Z", draft: null },
+  ],
+};
+export const PUBLISHING_NEWSLETTER_CONTEXT: import("@/experience/publishing/NewsletterSurface").NewsletterContext = {
+  subscribers: 214, sender: "sheri@attymooney.com", sendAt: "Wed, Oct 14 · 9:00 AM", lastIssueLabel: "September",
+  bounced: null, unsubscribed: null,
+};
+export const PUBLISHING_RECAP: import("@/products/recaps/server").RecapView = {
+  id: "fictional-mooney-week", period: "week", start: "2026-09-28", end: "2026-10-04", summary: "Your week: 4 inquiries, 2 sessions booked",
+  visits: 212, visitsDelta: 0, customerActions: 0, highlights: [], nextAction: { title: "Ask clients for a review after each session", description: "A Possibility. Strelva can prepare one short email for the day after. You see it before anything goes out." },
+};
+export const PUBLISHING_RECAP_OUTCOME: import("@/experience/recaps/WorkspaceRecaps").OutcomeRecap = {
+  inquiries: 4, answered: 4, bookings: 2, reviews: 0, inquiryDetail: "All from the form; 1 spam held back", answeredDetail: "Fastest 6 min, slowest 3 h", bookingDetail: "Oct 21 and Oct 28", reviewDetail: "Ask the 2 booked clients after their session?",
+};

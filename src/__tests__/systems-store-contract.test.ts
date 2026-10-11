@@ -109,8 +109,50 @@ describe("SystemStore contract (memory)", () => {
     const store = makeStore();
     const { ref, system } = await liveProposal(store);
     await expect(store.updateSystem(owner, ref, system.changeNumber - 1, { name: "Stale" })).rejects.toMatchObject({ code: "system_change_conflict" });
-    const portal = await store.updateSystem(owner, ref, system.changeNumber, { kind: "portal" });
-    expect(portal).toMatchObject({ id: ref.systemId, businessId: JUNIPER, kind: "portal", lifecycle: "live" });
+    const evolved = await store.updateSystem(owner, ref, system.changeNumber, { name: "Catering portal", purpose: "Proposal and onboarding" });
+    expect(evolved).toMatchObject({ id: ref.systemId, businessId: JUNIPER, kind: "proposal", lifecycle: "live", purpose: "Proposal and onboarding" });
+  });
+
+  it("refuses kind mutation without changing the row, revisions or accepted outputs", async () => {
+    const store = makeStore();
+    const { ref, system } = await liveProposal(store);
+    const output = await store.issueOutput(owner, ref, { kind: "proposal", title: "Agreed terms", snapshotHash: "a".repeat(64) }, command());
+    await store.acceptOutput(owner, ref, output.id);
+    const before = await store.readSystem(owner, ref);
+    await expect(store.updateSystem(owner, ref, system.changeNumber, { kind: "portal" } as never)).rejects.toThrow();
+    expect(await store.readSystem(owner, ref)).toEqual(before);
+  });
+
+  it.each([{}, { kind: "proposal" }, { name: "Renamed", kind: "portal" }, { purpose: 3 }, { purpose: {} },
+    { name: null }, { name: " padded" }, { origin: null }, { lifecycle: "paused" }])(
+    "refuses malformed or unknown application patch %j without mutation", async (patch) => {
+      const store = makeStore();
+      const { ref, system } = await liveProposal(store);
+      const before = await store.readSystem(owner, ref);
+      await expect(store.updateSystem(owner, ref, system.changeNumber, patch as never)).rejects.toThrow();
+      expect(await store.readSystem(owner, ref)).toEqual(before);
+    },
+  );
+
+  it("keeps current access, exit and history protections around permitted updates", async () => {
+    let access: SystemAccess | null = "owner";
+    let stopped = false;
+    const store = createMemorySystemStore({ access: () => access, stopped: () => stopped });
+    const { ref, system } = await liveProposal(store);
+    const before = await store.readSystem(owner, ref);
+    for (const denied of ["member", null] as const) {
+      access = denied;
+      await expect(store.updateSystem(owner, ref, system.changeNumber, { name: "Taken" })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    }
+    access = "owner";
+    stopped = true;
+    await expect(store.updateSystem(owner, ref, system.changeNumber, { purpose: "New work" })).rejects.toMatchObject({ code: "system_business_stopped" });
+    expect(await store.readSystem(owner, ref)).toEqual(before);
+    stopped = false;
+    const updated = await store.updateSystem(owner, ref, system.changeNumber, { purpose: "Onboarding" });
+    const cleared = await store.updateSystem(owner, ref, updated.changeNumber, { purpose: null });
+    expect(cleared).toMatchObject({ id: system.id, kind: "proposal", purpose: null, changeNumber: system.changeNumber + 2 });
+    expect((await store.readSystem(owner, ref)).revisions).toEqual(before.revisions);
   });
 
   it("keeps issued and accepted outputs on the revision that produced them", async () => {

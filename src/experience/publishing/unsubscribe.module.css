@@ -1,0 +1,6 @@
+.page { min-height: 100dvh; background: var(--st-canvas); }
+.page > div { max-width: 520px; padding-top: 36px; padding-bottom: 24px; }
+.page > div > div { min-height: calc(100dvh - 60px); gap: 16px; }
+.copy { margin: 0; color: var(--st-text-2); font-size: 15px; line-height: 24px; }
+.footer { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding-top: 32px; }
+.note { margin: 0; color: var(--st-text-3); text-align: center; font-size: 12px; line-height: 20px; }

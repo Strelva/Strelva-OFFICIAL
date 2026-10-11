@@ -24,18 +24,20 @@ async function fullPhoneContent(page: Page) {
 
 test("Home presents The Mooney Firm's actual Systems and what needs the owner", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=mooney&systems=on");
-  await expect(page.getByRole("heading", { name: "The Mooney Firm", level: 1 })).toBeVisible();
-  await expect(page.getByText("3 live · 1 in draft")).toBeVisible();
+  // October 6: the dusk band names the business above the greeting; Systems are a live chip.
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Right now" }).getByText("4 systems live")).toBeVisible();
   const needsYou = page.getByRole("region", { name: "Needs you" });
   await expect(needsYou.getByText("Let attorneys request a session date from attymooney.com")).toBeVisible();
   await expect(needsYou.getByText("Confirm 40 flagged facts on the rebuilt site")).toBeVisible();
   const systems = page.getByRole("list", { name: "The Mooney Firm systems" });
-  await expect(systems.getByRole("link")).toHaveCount(4);
+  await expect(systems.getByRole("link")).toHaveCount(5);
   // Health comes from evidence; no evidence reads Unknown, never Working.
   await expect(systems.getByRole("link", { name: "Open attymooney.com, Website, Live, Working" })).toBeVisible();
   await expect(systems.getByRole("link", { name: "Open The Mooney Firm inquiries, Inquiries, Live, Unknown" })).toBeVisible();
   await expect(systems.getByRole("link", { name: "Open Mediation sessions, Bookings, Draft, Unknown" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Strelva navigation" }).getByRole("region", { name: "Systems" }).getByRole("link")).toHaveCount(5); // four Systems and the full list
+  await expect(systems.getByRole("link", { name: "Open Arbitration intake, Internal tool, Live, Unknown" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Strelva navigation" }).getByRole("region", { name: "Systems" }).getByRole("link")).toHaveCount(6); // five Systems and the full list
 });
 
 test("opening the website gives it the page, compares, and runs Make real on an isolated copy", async ({ page }) => {
@@ -83,7 +85,7 @@ test("bookings and internal tools open as the actual thing, with lineage beside 
 test("read-only access sees Systems but cannot change them or make anything real", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=mooney-shared&systems=on");
   await expect(page.getByText("Shared with you")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What should happen next?" })).toHaveCount(0);
+  await expect(page.getByLabel("What do you want to accomplish?", { exact: true })).toHaveCount(0);
   await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
   await expect(page.getByRole("button", { name: "Ask for a change" })).toBeDisabled();
   await expect(page.getByText("The Mooney Firm shared this with your agency to review.")).toBeVisible();
@@ -118,7 +120,9 @@ test("empty, loading and error states say what is true", async ({ page }) => {
   // Systems arrive with the workspace read; the slower decision reads say they are still checking.
   await page.goto("/preview/strelva?scenario=mooney-loading&systems=on");
   await expect(page.getByRole("region", { name: "Needs you" }).getByText("Checking your work…")).toBeVisible();
-  await expect(page.getByRole("list", { name: "The Mooney Firm systems" }).getByRole("link")).toHaveCount(4);
+  const loadingSystems = page.getByRole("list", { name: "The Mooney Firm systems" });
+  await expect(loadingSystems.getByRole("link")).toHaveCount(5);
+  await expect(loadingSystems.getByRole("link", { name: "Open Arbitration intake, Internal tool, Live, Unknown" })).toBeVisible();
   await page.goto("/preview/strelva?scenario=mooney-error&systems=on");
   await expect(page.getByText("Some websites could not be loaded.")).toBeVisible();
   await expect(page.getByText("Requests waiting on your decision could not be checked.")).toBeVisible();
@@ -146,7 +150,7 @@ test("two locations on one account are Versions of one website", async ({ page }
 test("Home and a System reflow on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/preview/strelva?scenario=mooney&systems=on");
-  await expect(page.getByRole("heading", { name: "The Mooney Firm", level: 1 })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
   await noHorizontalScroll(page);
   await fullPhoneContent(page);
   await page.getByRole("link", { name: /^Open attymooney\.com/ }).click();
@@ -164,7 +168,7 @@ test("Home and a System reflow on a phone", async ({ page }) => {
 
 test("with Systems off, Home is the pre-Systems workspace and System links open Home", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=mooney&systems=off");
-  await expect(page.getByRole("heading", { name: "What should happen next?", level: 1 })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
   await expect(page.getByRole("list", { name: "The Mooney Firm systems" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Systems" })).toHaveCount(0);
   await expect(page.getByText(/\d live/)).toHaveCount(0);
@@ -178,7 +182,7 @@ test("with Systems off, Home is the pre-Systems workspace and System links open 
 
   // A System deep link opens Home instead of a System page.
   await page.goto("/preview/strelva/workspace?scenario=mooney&systems=off&workspaceId=a0000000-0000-4000-8000-000000000001&view=system&system=00000000-0000-4000-8000-00000000dead");
-  await expect(page.getByRole("heading", { name: "What should happen next?", level: 1 })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
   await expect(page.getByRole("heading", { name: "This system isn’t available here." })).toHaveCount(0);
 
   await page.goto("/preview/strelva?scenario=agency-systems&systems=off");
@@ -190,7 +194,7 @@ test("with Systems off, Home is the pre-Systems workspace and System links open 
 test("with Systems off, Home reflows on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/preview/strelva?scenario=mooney&systems=off");
-  await expect(page.getByRole("heading", { name: "What should happen next?", level: 1 })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
   await noHorizontalScroll(page);
   await page.setViewportSize({ width: 320, height: 720 });
   await noHorizontalScroll(page);

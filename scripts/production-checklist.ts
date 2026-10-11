@@ -440,8 +440,8 @@ function checkPackageReleaseScripts(path: string) {
     const packageJson = JSON.parse(readFileSync(path, "utf8")) as {
       scripts?: Record<string, string>;
     };
-    const expectedLaunch = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
-    const expectedRelease = "pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+    const expectedLaunch = "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
+    const expectedRelease = "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke";
 
     if (packageJson.scripts?.["check:launch"] !== expectedLaunch || packageJson.scripts?.["check:release"] !== expectedRelease) {
       log({

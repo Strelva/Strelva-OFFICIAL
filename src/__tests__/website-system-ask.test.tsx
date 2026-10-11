@@ -62,16 +62,17 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(request.mock.calls.filter(([url]) => String(url).startsWith("/api/workspace/systems/website")).length).toBe(2);
   });
 
-  it("the Requests panel's own link opens the same form", async () => {
+  it("an empty Requests panel is hidden and the header opens the same form", async () => {
     const { node, onAsk } = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed);
     const links = buttons(node, "Ask for a change");
-    expect(links.length).toBe(2);
-    await act(async () => links[1]!.click());
+    expect(links.length).toBe(1);
+    expect(node.querySelector("ul[aria-label='Requests']")).toBeNull();
+    await act(async () => links[0]!.click());
     expect(node.querySelector("textarea")).not.toBeNull();
     expect(onAsk).not.toHaveBeenCalled();
   });
 
-  it("a refusal says so and keeps the words", async () => {
+  it("an unconfirmed permission-looking response preserves the words and request uncertainty", async () => {
     const request = server(() => new Response(JSON.stringify({ error: "Only an owner or admin of this business can ask for a change here." }), { status: 403 }));
     const { node } = await mount(request as unknown as typeof fetch, managed);
     await act(async () => buttons(node, "Ask for a change")[0]!.click());
@@ -80,7 +81,9 @@ describe("Ask for a change on a managed website files a Request", () => {
     await settle();
     const alert = [...node.querySelectorAll("[role=alert]")].map(item => item.textContent).join(" ");
     expect(alert).toContain("Only an owner or admin");
-    expect(alert).toContain("your words are still here");
+    expect(alert).toContain("Your words are preserved.");
+    expect(alert).toContain("The request couldn't be confirmed.");
+    expect(alert).toContain("Check this same request");
     expect(node.querySelector("textarea")!.value).toBe("Change the hero photo");
   });
 
@@ -91,5 +94,18 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(node.querySelector("textarea")).toBeNull();
     const readOnly = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed, true);
     expect(buttons(readOnly.node, "Ask for a change").every(item => item.disabled)).toBe(true);
+  });
+  it("opens Ask Strelva with the website scope and preserves the words without filing or approving a change", async () => {
+    const request = server(() => new Response("{}", { status: 500 }));
+    const { node, onAsk } = await mount(request as unknown as typeof fetch, managed);
+    const field = node.querySelector<HTMLInputElement>('input[aria-label="Ask Strelva"]')!;
+    expect(field.placeholder).toBe("Ask about attymooney.com");
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+    await act(async () => { setter.call(field, "yes"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => field.form!.requestSubmit());
+    expect(onAsk).toHaveBeenCalledExactlyOnceWith("About attymooney.com: yes");
+    expect(field.value).toBe("yes");
+    expect(request.mock.calls.some(([url]) => url === "/api/workspace/site-changes")).toBe(false);
+    expect(node.querySelector("textarea")).toBeNull();
   });
 });

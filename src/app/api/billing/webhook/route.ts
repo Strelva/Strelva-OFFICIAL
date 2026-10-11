@@ -1,3 +1,7 @@
+import { ingestRevenueEvent } from "@/platform/connect/revenue";
+import { connectEnabled, ingestConnectEvent } from "@/platform/connect";
+import { syncAgencyInvoiceFromConnectEvent } from "@/platform/agency-billing";
+import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
@@ -18,7 +22,7 @@ import { OPERATOR_URL } from "@/platform/infra/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
 import { getStripe } from "@/lib/billing";
 import { syncConfiguredSubscriptionAllowance } from "@/platform/work-economics";
-import { mirrorStripeEventToBusinessBilling, stripeBillingContext } from "@/platform/business-billing";
+import { businessBillingEnabled, mirrorStripeEventToBusinessBilling, stripeBillingContext } from "@/platform/business-billing";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -188,6 +192,19 @@ async function applyTenantSubscriptionStatus(
   event: Stripe.Event
 ) {
   if (!tenantId) {
+    // New workspaces may have no legacy tenant. Preserve tenant processing
+    // while allowing a signed, workspace-scoped status into the billing home.
+    if (businessBillingEnabled() && patch.subscriptionStatus) {
+      const context = stripeBillingContext(event.data.object);
+      if (context.workspaceId) {
+        const mirrored = await mirrorStripeEventToBusinessBilling({ ...context, tenantId: null, status: patch.subscriptionStatus });
+        if (mirrored.status === "failed") {
+          alert("billing_webhook_business_mirror_failed", "medium", { eventType: event.type, reason: mirrored.reason });
+        } else if (mirrored.status === "skipped" && mirrored.reason === "unresolved") {
+          alert("billing_webhook_workspace_unresolved", "medium", { eventType: event.type });
+        }
+      }
+    }
     // A signed subscription event with no tenantId metadata is NOT retryable —
     // the event is immutable, so throwing here would 500 and trigger a 3-day
     // Stripe retry storm that fails identically every time. Alert loudly (Slack
@@ -516,6 +533,16 @@ export async function POST(req: Request) {
   const tenantId = extractTenantId(event.data.object);
 
   try {
+    if (event.account) {
+      // Connected-account metadata never owns legacy platform tenant billing.
+      // Both projections verify their own durable account/object binding.
+      if (businessBillingEnabled()) await syncAgencyInvoiceFromConnectEvent(event);
+      await ingestRevenueEvent(event, {stripe});
+      if (connectEnabled()) await ingestConnectEvent(event, {stripe});
+      await markEventProcessed(event.id);
+      return NextResponse.json({ received: true, connected: true });
+    }
+    await ingestRevenueEvent(event, {stripe});
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -707,7 +734,8 @@ export async function POST(req: Request) {
         // streak on the PRESERVED first-failure timestamp, so Stripe's multiple failed-retry
         // webhooks send exactly one email; the marker is released on a suppressed/failed send
         // so it still reaches the owner the day client email is switched on. Fail-soft.
-        if (invoiceTenantId && existing?.ownerEmail) {
+        const payerEmail = invoiceTenantId ? await releasedOwnerNoticeEmail({ id: invoiceTenantId, ownerEmail: existing?.ownerEmail }) : null;
+        if (invoiceTenantId && payerEmail) {
           try {
             const redis = getRedis();
             const dedupeKey = `reb:past-due-email-sent:${invoiceTenantId}:${pastDueSince}`;
@@ -723,8 +751,8 @@ export async function POST(req: Request) {
               let ok = false;
               try {
                 ok = await sendPaymentPastDueEmail({
-                  email: existing.ownerEmail,
-                  businessName: existing.siteName || invoiceTenantId,
+                  email: payerEmail,
+                  businessName: existing?.siteName || invoiceTenantId,
                   dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
                   tenantId: invoiceTenantId,
                   logPrefix: "[billing webhook]",

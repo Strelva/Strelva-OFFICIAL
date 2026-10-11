@@ -68,7 +68,7 @@ describe("workspace business settings destinations", () => {
       accountHref: "/workspace/account",
     }));
     expect(markup).toContain("Business information");
-    expect(markup).toContain("People and access");
+    expect(markup).toContain("People &amp; access");
     expect(markup).toContain("Work");
     expect(markup).toContain("Usage and limits");
     expect(markup).not.toContain(">Connections<");

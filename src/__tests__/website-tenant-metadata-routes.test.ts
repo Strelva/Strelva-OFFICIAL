@@ -33,6 +33,11 @@ describe("tenant metadata routes", () => {
     expect(metadata(current)).toBe(metadata(original));
     expect(jsonLd(current)).toBe(jsonLd(original));
   });
+  it("allows the platform MCP and authorization discovery on the released app host", async () => {
+    request.hosted = false; vi.stubEnv("STRELVA_AGENT_READABLE", "1"); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    const rule = (await robots()).rules;
+    expect(rule).toMatchObject({ allow: expect.arrayContaining(["/api/mcp/public", "/.well-known/oauth-protected-resource", "/api/v1/*/openapi.json"]), disallow: ["/dashboard/", "/api/"] });
+  });
   it("blocks private v2 preview indexing and page discovery", async () => {
     request.preview = true; expect(await sitemap()).toEqual([]); expect(await robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });
   });

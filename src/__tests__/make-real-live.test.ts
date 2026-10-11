@@ -1,40 +1,12 @@
+import { AT, BIZ, HASH, OWNER, WORK, ctx, hostedEffect, hostedPorts, readyPossibility, service } from "./helpers/make-real-live-fixtures";
+import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
+import { createSupabaseActivationRepository } from "@/platform/make-real/supabase-repository";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
-import {
-  createInMemoryPossibilityRepository,
-  createPossibility,
-  markReady,
-  recordRehearsal,
-  rehearsePossibility,
-  type DeclaredEffect,
-  type Possibility,
-  type PossibilityInput,
-} from "@/platform/possibilities";
-import {
-  approvalProblem,
-  createGovernedWorkApprovalRecords,
-  createInMemoryActivationRepository,
-  createInMemoryApprovalRecords,
-  createInMemoryLiveSystems,
-  createIsolatedAdapter,
-  createNeedsYouApprovalRecords,
-  effectApprovalSubject,
-  planApprovalSubject,
-  planFingerprint,
-  selectAdapter,
-  type ActivationRepository,
-  type EffectAdapter,
-} from "@/platform/make-real";
-import {
-  createBookingPageAdapter,
-  createHostedWebsiteAdapter,
-  createInquiryFormAdapter,
-  createInternalAppAdapter,
-  createTenantContentAdapter,
-  createWaitingAdapter,
-  type LiveChannelContext,
-} from "@/platform/make-real/live-adapters";
+import { createInMemoryPossibilityRepository, type DeclaredEffect, type Possibility } from "@/platform/possibilities";
+import { approvalProblem, createGovernedWorkApprovalRecords, createInMemoryActivationRepository, createInMemoryApprovalRecords, createIsolatedAdapter, createNeedsYouApprovalRecords, effectApprovalSubject, planApprovalSubject, planFingerprint, selectAdapter, type ActivationRepository, type EffectAdapter } from "@/platform/make-real";
+import { createBookingPageAdapter, createHostedWebsiteAdapter, createInquiryFormAdapter, createInternalAppAdapter, createTenantContentAdapter, createWaitingAdapter } from "@/platform/make-real/live-adapters";
 import { createApprovalAuthority, createLiveMakeRealService, createLiveOperatingChecks, liveReadyPlan, startLiveApproved } from "@/platform/make-real/live";
 import { makeRealAdapter, makeRealSourceId } from "@/platform/needs-you/sources/make-real";
 import { customerActivationView } from "@/platform/make-real/view";
@@ -48,51 +20,7 @@ import { createNeedsYouService } from "@/platform/needs-you/service";
  * records calls; nothing reaches a provider.
  */
 
-const BIZ = "b1000000-0000-4000-8000-000000000001";
-const OWNER: WorkspaceActor = { userId: "b1000000-0000-4000-8000-0000000000a1", verifiedEmail: "owner@mooney.test" };
-const AT = "2026-10-06T12:00:00.000Z";
-const WORK = "b1000000-0000-4000-8000-0000000000c1";
-const HASH = "a".repeat(64);
-
-function ctx(on: Record<string, boolean> = {}): LiveChannelContext {
-  return { actor: OWNER, enabled: async (channel) => on[channel] ?? true };
-}
-
 // Fakes for each write path -------------------------------------------------------
-
-function hostedPorts() {
-  const state = {
-    revision: 7, status: "review_ready", approved: null as number | null, candidate: { revision: 3, contentHash: HASH } as { revision: number; contentHash: string } | null,
-    receipt: null as null | { receiptId: string; candidateRevision: number; providerUrl: string },
-    readBack: null as null | { status: string; message: string }, launches: 0, approvals: 0, failAfterWrite: false,
-  };
-  return {
-    state,
-    ports: {
-      async read() { return { rebuild: { revision: state.revision, status: state.status, approvedCandidateRevision: state.approved, candidate: state.candidate, tenantId: "mooney", launch: { receipt: state.receipt, readBack: state.readBack } } }; },
-      async approve(_a: WorkspaceActor, _w: string, selection: { expectedRevision: number; candidateRevision: number }) {
-        if (selection.expectedRevision !== state.revision) throw new WorkspaceConflictError("stale");
-        state.approvals++; state.status = "approved"; state.approved = selection.candidateRevision; state.revision++;
-      },
-      async launch(_a: WorkspaceActor, _w: string, selection: { candidateRevision: number; expectedRevision: number }) {
-        if (state.status !== "approved" || selection.expectedRevision !== state.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
-        state.launches++;
-        state.receipt = { receiptId: `hosted-${selection.candidateRevision}`, candidateRevision: selection.candidateRevision, providerUrl: "https://mooney.strelva.com/" };
-        state.readBack = { status: "verified", message: "Serves every page." };
-        state.status = "launched";
-        if (state.failAfterWrite) throw new Error("Response lost after publish.");
-        return { rebuild: { launch: { receipt: state.receipt, readBack: state.readBack } } };
-      },
-    },
-  };
-}
-
-function hostedEffect(id = "publish-site", candidateRevision = 3): DeclaredEffect {
-  return {
-    id, kind: "publish", channel: "hosted_website", system: { systemId: "b1000000-0000-4000-8000-0000000000e1" }, description: "Publish the rebuilt site",
-    request: { workId: WORK, candidateRevision, candidateContentHash: HASH }, after: [], publish: { section: "hero", data: { headline: "Mooney Firm" } },
-  };
-}
 
 describe("live channel adapters", () => {
   it("select only their own channel; isolated fakes serve effects without one", () => {
@@ -131,6 +59,25 @@ describe("live channel adapters", () => {
     await expect(adapter.perform({ businessId: BIZ, effect: { ...hostedEffect(), request: {} }, idempotencyKey: "k3" })).resolves.toMatchObject({ status: "rejected" });
   });
 
+  it("publishes rebuilds onto the named existing tenant and retains each cutover result", async () => {
+    const { ports, state } = hostedPorts();
+    const publishLinked = vi.fn(async (_actor, _workId, selection) => {
+      const launched = await ports.launch(_actor, _workId, selection);
+      return { ...launched, cutover: [{ id: "domain_moved", status: "waiting", label: "Owner DNS step pending." }] };
+    });
+    const launch = vi.spyOn(ports, "launch");
+    const adapter = createHostedWebsiteAdapter({ ...ports, publishLinked }, ctx());
+    const effect = { ...hostedEffect(), request: { ...hostedEffect().request, tenantId: "linked-client" } };
+    const result = await adapter.perform({ businessId: BIZ, effect, idempotencyKey: "linked" });
+    expect(publishLinked).toHaveBeenCalledWith(expect.anything(), WORK, expect.objectContaining({ tenantId: "linked-client", candidateRevision: 3 }));
+    expect(result).toMatchObject({ status: "accepted", result: { tenantId: "linked-client", cutover: [{ status: "waiting" }] } });
+    expect(state.approvals).toBe(1);
+    expect(launch).toHaveBeenCalledOnce(); // only the test double uses new-site launch
+    state.receipt = null;
+    await expect(createHostedWebsiteAdapter(ports, ctx()).perform({ businessId: BIZ, effect, idempotencyKey: "unconnected" })).resolves.toMatchObject({ status: "rejected" });
+    expect(launch).toHaveBeenCalledOnce();
+  });
+
   it("tenant content: governed publish with the step key on the version, read back, restore the previous version", async () => {
     const versions: Array<{ id: string; requestId?: string; data?: unknown }> = [{ id: "v_old", data: { headline: "Old" } }];
     let live: Record<string, unknown> = { headline: "Old" };
@@ -144,6 +91,7 @@ describe("live channel adapters", () => {
       }),
       versions: async () => versions,
       content: async () => live,
+      publicReadBack: vi.fn(async () => ({ ok: true, detail: "The visitor page shows New." })),
       restore,
     };
     const adapter = createTenantContentAdapter(ports, ctx());
@@ -176,6 +124,7 @@ describe("live channel adapters", () => {
       }),
       execute: vi.fn(async (input: { claimId: string }) => { for (const c of claims.values()) if (c.id === input.claimId) c.status = "accepted"; return { accepted: true, verified: true }; }),
       claim: async (_t: string, id: string) => [...claims.values()].find((c) => c.id === id) ?? null,
+      find: vi.fn(async (input: { idempotencyKey: string }) => claims.get(input.idempotencyKey) ?? null),
     };
     const adapter = createInquiryFormAdapter(ports, ctx());
     const effect: DeclaredEffect = { id: "form", kind: "publish", channel: "inquiry_form", system: { systemId: "b1000000-0000-4000-8000-0000000000e2" }, description: "Publish the consult form",
@@ -184,11 +133,20 @@ describe("live channel adapters", () => {
     // A replay with the same key finds the accepted claim and executes nothing again.
     await expect(adapter.perform({ businessId: BIZ, effect, idempotencyKey: "mr:form" })).resolves.toMatchObject({ status: "accepted", providerRef: "mooney|claim-1" });
     expect(ports.execute).toHaveBeenCalledTimes(1);
+    expect(ports.execute).toHaveBeenCalledWith({ tenantId: "mooney", eventId: "evt-claim-1", claimId: "claim-1", actorId: OWNER.userId });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "mr:form", effect })).resolves.toEqual({ found: true, providerRef: "mooney|claim-1" });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "mr:form" })).resolves.toBeNull();
     await expect(adapter.readBack({ businessId: BIZ, providerRef: "mooney|claim-1" })).resolves.toMatchObject({ ok: true });
     await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "mr:form:compensate" })).resolves.toMatchObject({ ok: true, detail: expect.stringMatching(/Inquiries already received are kept/) });
-    expect(ports.queue).toHaveBeenLastCalledWith(expect.objectContaining({ action: "undo", idempotencyKey: "mr:form:compensate" }));
+    expect(ports.queue).toHaveBeenLastCalledWith({ tenantId: "mooney", businessId: "mooney-biz", requestId: "req-1", capabilityId: "contact", changeId: "chg-1", version: 3, action: "undo", idempotencyKey: "mr:form:compensate", actorId: OWNER.userId });
+    expect(ports.execute).toHaveBeenLastCalledWith({ tenantId: "mooney", eventId: "evt-claim-2", claimId: "claim-2", actorId: OWNER.userId });
+    await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "mr:form:compensate" })).resolves.toMatchObject({ ok: true });
+    expect(ports.execute).toHaveBeenCalledTimes(2);
+    expect(claims.size).toBe(2);
+    claims.get("mr:form")!.status = "claimed";
+    ports.queue.mockClear();
+    await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "must-not-undo-unaccepted" })).resolves.toMatchObject({ ok: false });
+    expect(ports.queue).not.toHaveBeenCalled();
   });
 
   it("booking page: publishes the grant, finds it by capability, reads it back, revokes it", async () => {
@@ -246,22 +204,6 @@ describe("live channel adapters", () => {
 
 // Plan approvals ------------------------------------------------------------------
 
-async function readyPossibility(input: Partial<PossibilityInput> & { effects: DeclaredEffect[] }) {
-  const live = createInMemoryLiveSystems();
-  const site = { businessId: BIZ, systemId: "b1000000-0000-4000-8000-0000000000e1" };
-  const baseline = live.seed(site, "attymooney.com", { pages: 3 });
-  let p = createPossibility({
-    title: "consult booking", intent: "Add consult booking.",
-    changes: [{ baseline: { ...site, revisionId: baseline, number: 1 }, candidate: { summary: "booking", content: { pages: 4 } } }],
-    checks: [{ id: "site-serves", description: "attymooney.com serves every page." }],
-    ...input,
-  }, { id: randomUUID(), businessId: BIZ, actorId: OWNER.userId, at: AT });
-  const rehearsal = await rehearsePossibility(p, live.port, [createIsolatedAdapter("publish"), createIsolatedAdapter("calendar")], AT);
-  p = recordRehearsal(p, rehearsal, p.revision, OWNER.userId, AT);
-  p = await markReady(p, live.port, p.revision, OWNER.userId, AT);
-  return { p, live, site };
-}
-
 describe("plan approvals keyed by workspace", () => {
   it("one approval covers every effect of exactly this candidate; any effect change breaks it", async () => {
     const { p } = await readyPossibility({ effects: [hostedEffect(), { ...hostedEffect("google"), channel: "google_listing" }] });
@@ -305,19 +247,6 @@ describe("plan approvals keyed by workspace", () => {
 });
 
 // The live service ----------------------------------------------------------------
-
-function service(input: { p: Possibility; live: ReturnType<typeof createInMemoryLiveSystems>; adapters: EffectAdapter[]; activations?: ActivationRepository; clock?: { now: number }; recordService?: Parameters<typeof createLiveMakeRealService>[0]["recordService"] }) {
-  const possibilities = createInMemoryPossibilityRepository();
-  const activations = input.activations ?? createInMemoryActivationRepository();
-  const approvals = createInMemoryApprovalRecords();
-  const clock = input.clock ?? { now: Date.parse(AT) };
-  const svc = createLiveMakeRealService({
-    possibilities: () => possibilities, activations: () => activations, live: () => input.live.port,
-    adapters: () => input.adapters, approvals, clock: () => new Date(clock.now).toISOString(),
-    ...(input.recordService ? { recordService: input.recordService } : {}),
-  });
-  return { svc, possibilities, activations, approvals, clock };
-}
 
 describe("live Make real service", () => {
   it("the moment: what lands stays, Google waits, the result reads Partly live, and nothing rolls back", async () => {
@@ -446,7 +375,8 @@ describe("live Make real service", () => {
     const clock = { now: Date.parse(AT) };
     const log: string[] = [];
     const recordService = vi.fn(async (_session: unknown, action: string, subject: string) => { log.push(`${action} ${subject}`); });
-    const { svc, possibilities, approvals } = service({ p, live, adapters: [createHostedWebsiteAdapter(hosted.ports, ctx())], activations: crashing, clock, recordService });
+    const adapterFactory=vi.fn(()=>[createHostedWebsiteAdapter(hosted.ports, ctx())]);
+    const { svc, possibilities, approvals } = service({ p, live, adapters: [], activations: crashing, clock, recordService, adapterFactory });
     await possibilities.create(p);
     approvals.record({ id: "a1", businessId: BIZ, subject: planApprovalSubject(p), status: "approved", decidedBy: "owner_link" });
     await expect(svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "a1" })).rejects.toThrow("worker killed");
@@ -464,6 +394,7 @@ describe("live Make real service", () => {
     const resumed = await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: session }]);
     expect(resumed.results[0]).toMatchObject({ status: "made_real" });
     expect(log.at(-1)).toBe(`resume activation:${activationId}`);
+    expect(adapterFactory).toHaveBeenLastCalledWith(SYSTEM,BIZ,{session,approvalId:"a1",possibilityId:p.id,activationId});
     expect(hosted.state.launches).toBe(1);
     const done = (await memory.get(BIZ, activationId))!;
     // Approver of record: the owner who started it, with the same approval.
@@ -648,4 +579,150 @@ describe("live plans name their source rebuild", () => {
     const fromRebuild = { ...p, changes: p.changes.map((change) => ({ ...change, candidate: { ...change.candidate, content: { ...change.candidate.content, rebuildWorkId: "rebuild-w1" } } })) };
     expect(liveReadyPlan(fromRebuild, new Map()).sourceRebuild).toBe("rebuild-w1");
   });
+});
+
+describe("real runner Google canonical recovery and repository checkpoint", () => {
+ it("finds and confirms unknown Google without replay, stores canonical reference and supports compensation", async () => {
+  const request = { tenantId: `workspace-${BIZ}`, locationId: "exact", eventId: "exact", draftDigest: "a".repeat(64) };
+  const effect = { ...hostedEffect("google"), channel: "google_listing" as const, request };
+  const { p, live } = await readyPossibility({ effects: [effect] });
+  let accepted = false;
+  const receipt = { id: "b1000000-0000-4000-8000-000000000099", status: "posted", readback: "matched", undo: true };
+  const approve = vi.fn(async () => { accepted = true; throw new Error("outside accepted, response lost"); });
+  const verify = vi.fn(async () => ({ ok: true, detail: "actual adapter fixture readback" }));
+  const undo = vi.fn(async () => ({ status: "posted" }));
+  const adapter = createGoogleListingAdapter({ inspect: async () => ({ ready: !accepted, receipt: accepted ? receipt : null }), approve, verify, undo }, ctx());
+  const { svc, possibilities, approvals } = service({ p, live, adapters: [adapter] });
+  await possibilities.create(p); approvals.record({ id: "google-plan", businessId: BIZ, subject: planApprovalSubject(p), status: "approved" });
+  const unknown = await svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "google-plan" });
+  expect(unknown.steps.find(step => step.kind === "effect")!.status).toBe("unknown");
+  await expect(svc.reconcile(OWNER, BIZ, unknown.id, { stepId: "effect:google", resolution: "completed", evidence: "real receipt", providerRef: receipt.id })).rejects.toThrow("exact provider-found");
+  const recovered = await svc.reconcile(OWNER, BIZ, unknown.id, { stepId: "effect:google", resolution: "completed", evidence: "adapter finds exact receipt" });
+  const step = recovered.steps.find(value => value.kind === "effect")!;
+  expect(step.readBack?.status).toBe("confirmed"); expect(step.receipt!.providerRef!.length).toBeGreaterThan(240); expect(approve).toHaveBeenCalledTimes(1);
+  let row: unknown;
+  const repository = createSupabaseActivationRepository(OWNER, { rpc: async (_name, args) => { if (args.p_activation) row = structuredClone(args.p_activation); return { data: row, error: null }; } });
+  await repository.create(recovered);
+  const read = await repository.get(BIZ, recovered.id);
+  expect(read!.steps.find(value => value.kind === "effect")!.receipt!.providerRef).toBe(step.receipt!.providerRef);
+  await svc.rollback(OWNER, BIZ, recovered.id); expect(undo).toHaveBeenCalledTimes(1); expect(approve).toHaveBeenCalledTimes(1);
+ });
+});
+
+describe("explicit accepted write with an invalid extended reference", () => {
+ const request = { tenantId: `workspace-${BIZ}`, locationId: "exact", eventId: "exact", draftDigest: HASH,
+  nativeGrant: { bindingId: "b1000000-0000-4000-8000-0000000000b1", accountId: "accounts/exact", grantGeneration: HASH } };
+ const receiptId = "b1000000-0000-4000-8000-000000000099";
+ const canonicalReference = JSON.stringify({ businessId: BIZ, request, receiptId });
+ const invalidReferences = [
+  { name: "malformed metadata", reference: `${canonicalReference.slice(0, -1)},"unownedPayload":"acceptance-payload-canary"}` },
+  { name: "foreign workspace", reference: JSON.stringify({ businessId: "b1000000-0000-4000-8000-000000000088", request, receiptId }) },
+  { name: "different approved request", reference: JSON.stringify({ businessId: BIZ, request: { ...request, eventId: "foreign-event" }, receiptId }) },
+ ];
+
+ async function acceptedFixture(reference: string) {
+  expect(reference.length).toBeGreaterThan(240);
+  const effect = { ...hostedEffect("google"), channel: "google_listing" as const, request };
+  const { p, live } = await readyPossibility({ effects: [effect] });
+  // The boundary is the runner: the adapter explicitly confirms acceptance,
+  // but its reference cannot authorize readback or a compensating write.
+  const perform = vi.fn(async () => ({ status: "accepted" as const, providerRef: reference, result: { untrustedPayload: "adapter-result-canary" } }));
+  const find = vi.fn<EffectAdapter["find"]>(async () => null);
+  const readBack = vi.fn(async () => ({ ok: true, detail: "Should not trust this reference." }));
+  const compensate = vi.fn(async () => ({ ok: true, detail: "Should not compensate this reference." }));
+  const adapter: EffectAdapter = {
+   kind: "publish", channel: "google_listing", mode: "live", idempotentByKey: false,
+   reversibility: () => "compensable", ready: async () => ({ ok: true }),
+   rehearse: async () => ({ ok: false, detail: "Isolated rehearsal only." }),
+   perform, find, readBack, compensate,
+  };
+  const setup = service({ p, live, adapters: [adapter] });
+  await setup.possibilities.create(p);
+  setup.approvals.record({ id: "accepted-plan", businessId: BIZ, subject: planApprovalSubject(p), status: "approved" });
+  const activation = await setup.svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "accepted-plan" });
+  return { ...setup, p, live, adapter, activation, perform, find, readBack, compensate };
+ }
+
+ it.each(invalidReferences)("$name: retains accepted finality, consumes approval and discards untrusted payload", async ({ reference }) => {
+  const { activation, activations, readBack, perform } = await acceptedFixture(reference);
+  const stored = await activations.get(BIZ, activation.id);
+  expect(stored!.steps.find(step => step.id === "effect:google")).toMatchObject({ status: "unknown", effect: "accepted" });
+  expect(stored!.approvals.find(approval => approval.effectId === "google")!.consumedAt).toBeTruthy();
+  expect(JSON.stringify(stored)).not.toContain(reference);
+  expect(JSON.stringify(stored)).not.toContain("acceptance-payload-canary");
+  expect(JSON.stringify(stored)).not.toContain("adapter-result-canary");
+  expect(stored!.steps.find(step => step.id === "effect:google")!.receipt?.providerRef).toBeUndefined();
+  expect(perform).toHaveBeenCalledOnce();
+  expect(readBack).not.toHaveBeenCalled();
+ });
+
+ it.each(invalidReferences)("$name: cannot reconcile explicit acceptance as not applied", async ({ reference }) => {
+  const { svc, activation, perform } = await acceptedFixture(reference);
+  await expect(svc.reconcile(OWNER, BIZ, activation.id, {
+   stepId: "effect:google", resolution: "not_applied", evidence: "No usable receipt metadata was returned.",
+  })).rejects.toThrow(/accepted write cannot be declared safe to replay/i);
+  expect(perform).toHaveBeenCalledOnce();
+ });
+
+ it.each(invalidReferences)("$name: restart and resume never repeat the accepted write", async ({ reference }) => {
+  const { svc, activation, activations, possibilities, approvals, live, adapter, clock, perform } = await acceptedFixture(reference);
+  const resumed = await svc.resume(OWNER, BIZ, activation.id);
+  // Reconstruct the service over the retained stores to exercise a fresh worker.
+  const restarted = createLiveMakeRealService({ possibilities: () => possibilities, activations: () => activations,
+   live: () => live.port, adapters: () => [adapter], approvals, clock: () => new Date(clock.now).toISOString() });
+  const again = await restarted.resume(OWNER, BIZ, activation.id);
+  expect(resumed.status).toBe("needs_attention");
+  expect(again.steps.find(step => step.id === "effect:google")).toMatchObject({ status: "unknown", effect: "accepted" });
+  expect(perform).toHaveBeenCalledOnce();
+ });
+
+ it.each(invalidReferences)("$name: rollback retains the accepted effect and never invents undo authority", async ({ reference }) => {
+  const { svc, activation, activations, perform, compensate } = await acceptedFixture(reference);
+  await svc.rollback(OWNER, BIZ, activation.id);
+  const again = await svc.rollback(OWNER, BIZ, activation.id);
+  expect(again.status).toBe("needs_attention");
+  expect(again.steps.find(step => step.id === "effect:google")).toMatchObject({ effect: "accepted" });
+  expect((await activations.get(BIZ, activation.id))!.status).not.toBe("rolled_back");
+  expect(again.approvals.find(approval => approval.effectId === "google")!.consumedAt).toBeTruthy();
+  expect(perform).toHaveBeenCalledOnce();
+  expect(compensate).not.toHaveBeenCalled();
+ });
+
+ it.each(invalidReferences)("$name: exact provider recovery restores readback and undo without repeating acceptance", async ({ reference }) => {
+  const { svc, activation, find, readBack, perform, compensate } = await acceptedFixture(reference);
+  find.mockResolvedValue({ found: true, providerRef: canonicalReference });
+  const recovered = await svc.reconcile(OWNER, BIZ, activation.id, {
+   stepId: "effect:google", resolution: "completed", evidence: "Exact provider lookup and current readback.",
+  });
+  expect(recovered.steps.find(step => step.id === "effect:google")).toMatchObject({
+   status: "completed", effect: "accepted", receipt: { providerRef: canonicalReference }, readBack: { status: "confirmed" },
+  });
+  expect(readBack).toHaveBeenCalledWith({ businessId: BIZ, providerRef: canonicalReference });
+  expect((await svc.rollback(OWNER, BIZ, activation.id)).status).toBe("rolled_back");
+  expect(perform).toHaveBeenCalledOnce();
+  expect(compensate).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ businessId: BIZ, providerRef: canonicalReference }));
+ });
+
+ it("persists exact native accepted receipt recovery through the narrow port despite the generic accepted-receipt guard", async () => {
+  const { svc, activation, activations, find, perform, readBack } = await acceptedFixture(invalidReferences[0]!.reference);
+  const save = activations.save;
+  const recovery = vi.fn<NonNullable<ActivationRepository["saveNativeGoogleRecovery"]>>(async (value, expected) => save(value, expected));
+  activations.saveNativeGoogleRecovery = recovery;
+  const generic = vi.spyOn(activations, "save").mockImplementation(async (value, expected) => {
+   const retained = (await activations.get(BIZ, value.id))!;
+   const before = retained.steps.find(step => step.id === "effect:google")!;
+   const after = value.steps.find(step => step.id === "effect:google")!;
+   if (before.effect === "accepted" && JSON.stringify(before.receipt) !== JSON.stringify(after.receipt)) throw new Error("Generic accepted receipt is immutable.");
+   return save(value, expected);
+  });
+  find.mockResolvedValue({ found: true, providerRef: canonicalReference });
+  const recovered = await svc.reconcile(OWNER, BIZ, activation.id, { stepId: "effect:google", resolution: "completed", evidence: "Exact provider-found receipt and current readback." });
+  expect(recovery).toHaveBeenCalledOnce(); expect(generic).not.toHaveBeenCalled();
+  const [checkpoint, expected] = recovery.mock.calls[0]!;
+  expect(expected).toBe(activation.revision); expect(checkpoint.revision).toBe(expected + 1);
+  expect(checkpoint.history.at(-1)?.kind).toBe("reconcile");
+  expect(recovered.steps.find(step => step.id === "effect:google")).toMatchObject({ status: "completed", effect: "accepted", receipt: { providerRef: canonicalReference }, readBack: { status: "confirmed" } });
+  expect(recovered.approvals[0]!.consumedAt).toBe(activation.approvals[0]!.consumedAt);
+  expect(readBack).toHaveBeenCalledWith({ businessId: BIZ, providerRef: canonicalReference }); expect(perform).toHaveBeenCalledOnce();
+ });
 });

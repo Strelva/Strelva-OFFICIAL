@@ -1,0 +1,120 @@
+\set ON_ERROR_STOP on
+begin;
+create function pg_temp.assert_ok(ok boolean, detail text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'responsibility assertion: %',detail; end if; end $$;
+create function pg_temp.expect_fail(statement text, detail text) returns void language plpgsql as $$ begin begin execute statement; exception when others then if sqlerrm not like '%'||detail||'%' then raise exception 'expected %, got %',detail,sqlerrm; end if; return; end; raise exception 'expected failure: %',detail; end $$;
+select pg_temp.assert_ok(not has_table_privilege('service_role','public.responsibility_meter_periods','UPDATE') and not has_function_privilege('authenticated','public.create_keep_me_found_bundle(uuid,uuid,uuid,uuid,text,text,jsonb,integer,timestamptz)','EXECUTE'),'RPC only privileges');
+insert into public.users(id,email,verified_at) values ('99100000-0000-4000-8000-000000000001','rr-owner@example.test',now()),('99100000-0000-4000-8000-000000000002','rr-agency@example.test',now()),('99100000-0000-4000-8000-000000000003','rr-other@example.test',now());
+insert into public.workspaces(id,kind,name,created_by) values ('99100000-0000-4000-8000-000000000011','customer','Recurring client','99100000-0000-4000-8000-000000000001'),('99100000-0000-4000-8000-000000000012','agency','Recurring agency','99100000-0000-4000-8000-000000000002');
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','owner','99100000-0000-4000-8000-000000000001'),('99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000002','owner','99100000-0000-4000-8000-000000000002');
+insert into public.super_admins(user_id,email) values ('99100000-0000-4000-8000-000000000003','rr-other@example.test');
+insert into public.workspace_providers(customer_workspace_id,provider_workspace_id,source,started_by,status) values ('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000012','business_choice','99100000-0000-4000-8000-000000000001','active');
+insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by) values ('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000012','owner','99100000-0000-4000-8000-000000000001');
+insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by) values ('99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000002','99100000-0000-4000-8000-000000000002');
+select public.record_agency_verification('rr-other@example.test','99100000-0000-4000-8000-000000000012','email','verified','{"note":"local fixture"}',null);
+insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,created_by) select ('99100000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'99100000-0000-4000-8000-000000000011','investigations','investigation','Bounded source check','{}','99100000-0000-4000-8000-000000000001' from generate_series(101,105) n;
+create temp table rr_input as select jsonb_build_object('gbp_replies','99100000-0000-4000-8000-000000000101','hours_sync','99100000-0000-4000-8000-000000000102','health','99100000-0000-4000-8000-000000000103','inquiry_reply_time','99100000-0000-4000-8000-000000000104','weekly_proof','99100000-0000-4000-8000-000000000105') investigations, clock_timestamp()+interval '1 day' next_at;
+insert into public.service_requests(id,business_workspace_id,status,request_text,outcome,context,scope,provider_kind,provider_agency_workspace_id,provider_acceptance,accepted_by,accepted_at,created_by,delivery_commitment)
+select '99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000011','requested','Keep me found','Check the accepted scope',jsonb_build_object('standingInvestigations',investigations,'standingEverySeconds',604800,'standingNextAt',next_at),array['gbp_replies','hours_sync','health','inquiry_reply_time','weekly_proof'],'agency','99100000-0000-4000-8000-000000000012','accepted','99100000-0000-4000-8000-000000000002',now(),'99100000-0000-4000-8000-000000000001',jsonb_build_object('version',1,'status','running') from rr_input;
+create temp table rr_created as select public.create_keep_me_found_bundle('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000001','rr-owner@example.test','bundle:1',investigations,604800,next_at) result from rr_input;
+select pg_temp.assert_ok((select count(*)=5 from public.standing_responsibilities where workspace_id='99100000-0000-4000-8000-000000000011' and status='active'),'five exact policies activated atomically');
+select pg_temp.assert_ok(jsonb_array_length(public.read_responsibility_proof_rows('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',now()-interval '7 days',now()))=5,'scoped native policy projection');
+select pg_temp.assert_ok(jsonb_array_length(public.read_responsibility_domain_evidence('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000002','rr-agency@example.test',now()-interval '7 days',now()))=5,'assigned provider native domain evidence readers execute');
+select pg_temp.assert_ok(public.read_responsibility_bundle_state('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000002','rr-agency@example.test')->>'canSetCadence'='true','assigned provider bundle state');
+
+select pg_temp.assert_ok((public.create_keep_me_found_bundle('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000001','rr-owner@example.test','bundle:1',investigations,604800,next_at)->>'replayed')='true','idempotent replay') from rr_input;
+select pg_temp.expect_fail(format('select public.create_keep_me_found_bundle(%L,%L,%L,%L,%L,%L,%L::jsonb,60,%L::timestamptz)','99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000001','rr-owner@example.test','bundle:1',investigations,next_at),'idempotency_conflict') from rr_input;
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000003','rr-other@example.test',date_trunc('month',now())::date)$q$,'membership_denied');
+-- Retained upgrade fixtures may have earlier eligible or unavailable businesses.
+-- Exercise the actual one-business fair sweep until this fixture is captured,
+-- preserving other candidates instead of assuming this database is empty.
+do $$ declare result jsonb; step integer; maximum integer;
+begin
+ select count(*)+1 into maximum from public.workspaces;
+ for step in 1..maximum loop
+  result:=public.snapshot_due_responsibility_meters(1);
+  perform pg_temp.assert_ok((result->>'processed')::integer+(result->>'failed')::integer<=1,'one-business recurring batch remains bounded');
+  exit when exists(select 1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date);
+ end loop;
+ perform pg_temp.assert_ok(exists(select 1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date),'guarded recurring cron captures current-month immutable preview');
+end $$;
+create temp table rr_meter as select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date) snapshot;
+select pg_temp.assert_ok(jsonb_array_length(snapshot->'standingResponsibilities')=5 and snapshot->>'stage'='preview' and snapshot->>'priced'='false' and snapshot->>'stripeExportEnabled'='false' and not (snapshot ? 'hours') and not (snapshot ? 'compute'),'unpriced responsibility evidence snapshot') from rr_meter;
+select pg_temp.assert_ok((select snapshot from rr_meter)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date),'immutable replay');
+select pg_temp.expect_fail('update public.responsibility_meter_periods set snapshot=''{}''','snapshot_immutable');
+select pg_temp.expect_fail('delete from public.responsibility_meter_periods','snapshot_immutable');
+select pg_temp.expect_fail($q$select public.set_provider_responsibility_cadence('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test','weekly')$q$,'membership_denied');
+select pg_temp.assert_ok(public.set_provider_responsibility_cadence('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000002','rr-agency@example.test','weekly')->>'cadence'='weekly','ordinary assigned provider sets cadence');
+-- A revoked accepted mandate blocks admission and late claims even if a policy remains active.
+update public.service_requests set provider_acceptance='pending',accepted_by=null,accepted_at=null where id='99100000-0000-4000-8000-000000000021';
+select pg_temp.expect_fail($q$insert into public.standing_responsibility_jobs(standing_responsibility_id,workspace_id,policy_version,trigger_key,finite_work_id,status) select standing_responsibility_id,'99100000-0000-4000-8000-000000000011',1,'fixture:revoked','99100000-0000-4000-8000-000000000101','accepted' from public.responsibility_bundle_members limit 1$q$,'mandate_revoked');
+select public.snapshot_due_responsibility_meters(20);
+select pg_temp.assert_ok((select count(*)=1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date) and (select snapshot from rr_meter)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date),'captured day preview is unchanged on recurring cron replay');
+insert into public.workspaces(id,kind,name,created_by) values ('99100000-0000-4000-8000-000000000031','customer','Unqualified first','99100000-0000-4000-8000-000000000001'),('99100000-0000-4000-8000-000000000032','customer','Unqualified second','99100000-0000-4000-8000-000000000001');
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'99100000-0000-4000-8000-000000000001','owner','99100000-0000-4000-8000-000000000001' from public.workspaces where id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
+insert into public.saved_product_work(workspace_id,product_id,resource_kind,title,payload,created_by) select id,'investigations','investigation','Bounded fixture source','{}','99100000-0000-4000-8000-000000000001' from public.workspaces where id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
+insert into public.standing_responsibilities(workspace_id,owner_id,version,revision,status,payload,next_trigger_at) select w.id,s.owner_id,1,0,'proposed',jsonb_set((s.payload - 'approvedBy' - 'approvedAt')||jsonb_build_object('revision',0,'status','proposed','history','[]'::jsonb),'{scope,steps,0,workId}',to_jsonb((select id::text from public.saved_product_work where workspace_id=w.id limit 1))),s.next_trigger_at from public.workspaces w cross join lateral (select * from public.standing_responsibilities where workspace_id='99100000-0000-4000-8000-000000000011' limit 1) s where w.id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
+select public.update_standing_responsibility(id,workspace_id,owner_id,'rr-owner@example.test',0,payload||jsonb_build_object('revision',1,'status','active','approvedBy',owner_id,'approvedAt',clock_timestamp(),'history',jsonb_build_array(jsonb_build_object('revision',1,'kind','approve','actorId',owner_id,'at',clock_timestamp(),'detail','Explicit test acceptance')))) from public.standing_responsibilities where workspace_id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
+select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','unqualified background capture records isolated failure');
+select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','second bounded batch progresses despite first failure');
+select pg_temp.assert_ok((select count(*)=2 from public.responsibility_meter_capture_attempts where status='unavailable' and business_workspace_id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032')),'failed business cannot starve subsequent candidates');
+-- #299: a completed month's missing history must be represented explicitly,
+-- rather than rejected as an invalid month or rebuilt from today's policies.
+create temp table rr_missing_month as select public.snapshot_responsibility_meter(
+ '99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',
+ (date_trunc('month',clock_timestamp() at time zone 'UTC')-interval '1 month')::date) snapshot;
+select pg_temp.assert_ok(snapshot->>'stage'='monthly_snapshot' and snapshot->>'availability'='unavailable'
+ and jsonb_array_length(snapshot->'observations')=0 and snapshot->>'priced'='false'
+ and snapshot->>'stripeExportEnabled'='false','missing historical month is explicit and never billed') from rr_missing_month;
+-- Synthetic past immutable capture payloads exercise history handling. These
+-- local fixture inserts are not an application backfill or past-period claim.
+create temp table rr_history_period as select (date_trunc('month',clock_timestamp() at time zone 'UTC')-interval '2 months')::date as month;
+insert into public.responsibility_meter_periods(business_workspace_id,month,captured_at,capture_day,snapshot)
+select '99100000-0000-4000-8000-000000000011',h.month,t.at,(t.at at time zone 'UTC')::date,
+ (m.snapshot||jsonb_build_object('month',to_char(h.month,'YYYY-MM'),'capturedAt',t.at,
+   'payerParty',jsonb_build_object('kind','agency','workspaceId','99100000-0000-4000-8000-000000000099'),
+   'standingResponsibilities',jsonb_build_array(jsonb_build_object('id','fixture-standing','version',n,'acceptedAt',h.month,'providerWorkspaceId','fixture-original-provider','serviceRequestId','fixture-mandate','evidence','fixture:accepted-standing')),
+   'acceptedOfferings',jsonb_build_array(jsonb_build_object('installationId','fixture-installation','definitionVersion',n,'sourceRevisionId','fixture-source-'||n,'versionId','fixture-version-'||n,'providerWorkspaceId','fixture-original-provider','acceptedAt',h.month,'evidence','fixture:accepted-delivery')),
+   'slaEvidence',public.inquiry_outcome_cohort('99100000-0000-4000-8000-000000000011',h.month::timestamp at time zone 'UTC',t.at)))
+from rr_meter m cross join rr_history_period h cross join generate_series(1,2) n
+cross join lateral(select (h.month+n)::timestamp at time zone 'UTC' as at) t;
+create temp table rr_history_month as select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month) snapshot from rr_history_period;
+select pg_temp.assert_ok(snapshot->>'availability'='partial' and snapshot->'coverage'->>'observationCount'='2'
+ and snapshot->'coverage'->>'completePeriod'='false' and snapshot->>'responsibilityStateAtPeriodEnd'='unavailable'
+ and snapshot->'slaEvidence'->>'status'='unavailable' and snapshot->'billableQuantity'='null'::jsonb
+ and snapshot->'acceptedOfferings'->0->>'sourceRevisionId'='fixture-source-2'
+ and snapshot->'acceptedOfferings'->0->>'versionId'='fixture-version-2'
+ and snapshot->'standingResponsibilities'->0->>'providerWorkspaceId'='fixture-original-provider'
+ and snapshot->'payerParty'->>'kind'='agency' and snapshot->'payerParty'->>'workspaceId'='99100000-0000-4000-8000-000000000099'
+ and snapshot->'period'->>'endExclusive'='true' and snapshot->>'priced'='false' and snapshot->>'stripeExportEnabled'='false'
+ and not(snapshot ? 'hours') and not(snapshot ? 'compute'),'monthly inventory retains observed payer, provider, source and Version without reconstructing period-end state') from rr_history_month;
+select pg_temp.assert_ok(not exists(select 1 from rr_history_month h cross join lateral jsonb_array_elements(h.snapshot->'observations') o
+ where o->>'snapshotSha256' is distinct from encode(sha256(convert_to((o->'snapshot')::text,'UTF8')),'hex')),'all attached immutable captures have exact hashes');
+-- Today's accepted mandate was revoked above. Historical receipt does not
+-- change, authorize a new mandate or count the current state in a past period.
+select pg_temp.assert_ok((select snapshot from rr_history_month)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month),'exact monthly replay despite changed present acceptance') from rr_history_period;
+select pg_temp.expect_fail('update public.responsibility_meter_months set snapshot=''{}''','snapshot_immutable');
+select pg_temp.expect_fail('delete from public.responsibility_meter_months','snapshot_immutable');
+select pg_temp.assert_ok(not has_table_privilege('service_role','public.responsibility_meter_months','SELECT')
+ and not has_table_privilege('service_role','public.responsibility_meter_months','INSERT')
+ and not has_function_privilege('service_role','public.snapshot_responsibility_meter_preview_v1(uuid,uuid,text,date)','EXECUTE')
+ and not has_function_privilege('authenticated','public.snapshot_responsibility_meter(uuid,uuid,text,date)','EXECUTE'),'monthly history is RPC only; hidden preview helper has no actor bypass');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000003','rr-other@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'membership_denied');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000032','99100000-0000-4000-8000-000000000002','rr-agency@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'provider_unqualified');
+update public.workspace_memberships set role='member' where workspace_id='99100000-0000-4000-8000-000000000011' and user_id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'membership_denied');
+update public.workspace_memberships set role='owner' where workspace_id='99100000-0000-4000-8000-000000000011' and user_id='99100000-0000-4000-8000-000000000001';
+update public.users set verified_at=null where id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'actor_unverified');
+update public.users set verified_at=now() where id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')+interval '1 month')::date)$q$,'month_invalid');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')+interval '1 day')::date)$q$,'month_invalid');
+-- A source row stamped outside its declared month is never silently accepted.
+insert into public.responsibility_meter_periods(business_workspace_id,month,captured_at,capture_day,snapshot)
+select '99100000-0000-4000-8000-000000000011',(h.month-interval '1 month')::date,clock_timestamp(),current_date,m.snapshot from rr_history_period h cross join rr_meter m;
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '3 months')::date)$q$,'source_evidence_invalid');
+select pg_temp.assert_ok((select snapshot from rr_history_month)=public.read_responsibility_month_evidence('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month),'read exact immutable monthly receipt') from rr_history_period;
+\if :{?responsibility_meter_retain}
+commit;
+\else
+rollback;
+\endif

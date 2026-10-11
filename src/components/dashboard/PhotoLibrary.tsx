@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Camera, ImageIcon, Loader2, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import Image from "next/image";
-import { Button } from "@/components/ui/Button";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRow, StRows, StSkeleton, StState } from "@/components/ui/strelva/Kit";
+import styles from "./website-library.module.css";
 import { cn } from "@/lib/cn";
 import type { MediaAsset } from "@/lib/media";
 import { PhotoDetail } from "@/components/dashboard/PhotoDetail";
@@ -24,6 +24,8 @@ export function PhotoLibrary() {
     () => dashboard?.dashboardHref ?? ((path: string) => path),
     [dashboard?.dashboardHref],
   );
+  const readOnly = dashboard?.readOnly ?? false;
+  const [loadError, setLoadError] = useState(false);
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -47,14 +49,15 @@ export function PhotoLibrary() {
   // Fetch assets on mount
   useEffect(() => {
     fetch(apiHref("/api/media"), { credentials: "same-origin" })
-      .then((res) => (res.ok ? res.json() : { assets: [] }))
+      .then((res) => { if (!res.ok) throw new Error("Photos could not be read."); return res.json(); })
       .then((data) => setAssets(data.assets || []))
-      .catch(() => setAssets([]))
+      .catch(() => { setAssets([]); setLoadError(true); })
       .finally(() => setLoading(false));
   }, [apiHref]);
 
   // Upload handler
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
+    if (readOnly) return;
     const selectedFiles = Array.from(files);
     if (selectedFiles.length === 0) return;
 
@@ -128,7 +131,7 @@ export function PhotoLibrary() {
     }
     setUploadProgress(null);
     setUploading(false);
-  }, [apiHref]);
+  }, [apiHref, readOnly]);
 
   // Delete handler — invoked from PhotoDetail after the user confirms.
   const deleteAsset = useCallback(
@@ -187,190 +190,18 @@ export function PhotoLibrary() {
     }
   };
 
-  return (
-    <div
-      className="flex flex-1 min-h-0 h-full"
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        {/* Header */}
-        <div className="px-4 py-5 sm:px-8 sm:py-7 shrink-0 border-b border-glass-border">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-gray-muted mb-2">
-              Visual proof
-            </p>
-            <h1 className="font-display text-[28px] sm:text-[32px] font-medium text-warm-black">
-              Photo library
-            </h1>
-            <p className="text-[13px] text-gray-muted mt-2 max-w-xl">
-              Keep a bank of real photos the site and AI can use for trust, seasonal updates, service pages, and weekly content.
-            </p>
-          </div>
-            <Button
-              variant="primary"
-              size="md"
-              icon={uploading ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : <Upload className="w-4 h-4" strokeWidth={1.5} />}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              {uploading ? "Uploading..." : "Upload photos"}
-            </Button>
-          </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          {uploading && uploadProgress && (
-            <div className="mt-4 rounded-lg border border-glass-border bg-glass px-4 py-3 text-[12px]">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" strokeWidth={1.5} />
-                <p className="font-medium text-warm-white">
-                  Uploading {uploadProgress.current} of {uploadProgress.total}…
-                </p>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-bg-hover">
-                <div
-                  className="h-full rounded-full bg-accent transition-all duration-200"
-                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {!uploading && uploadSummary && (
-            <div
-              className={cn(
-                "mt-4 rounded-lg border px-4 py-3 text-[12px]",
-                uploadSummary.failed > 0
-                  ? "border-warning/20 bg-warning/10 text-warning"
-                  : "border-positive/20 bg-positive/10 text-positive",
-              )}
-            >
-              <p className="font-medium text-warm-white">
-                {uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped
-              </p>
-              <div className="mt-2 space-y-1">
-                {uploadResults.map((result, index) => (
-                  <div key={`${result.name}-${index}`} className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="truncate text-gray-muted">{result.name}</span>
-                    <span
-                      className={cn(
-                        "shrink-0 font-medium",
-                        result.status === "uploaded" ? "text-positive" : "text-warning",
-                      )}
-                    >
-                      {result.message}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Drag overlay */}
-        {dragging && (
-          <div className="fixed inset-0 z-40 flex items-center justify-center bg-sage/10 pointer-events-none">
-            <div className="border-2 border-dashed border-sage rounded-xl px-12 py-10 bg-surface-raised/80 text-center">
-              <Upload className="w-8 h-8 text-sage mx-auto mb-2" strokeWidth={1.5} />
-              <p className="text-[14px] font-medium text-sage">Drop photos here</p>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="flex-1 px-4 sm:px-8 py-5">
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="aspect-square bg-gray-bg-hover rounded-lg animate-pulse"
-                />
-              ))}
-            </div>
-          ) : assets.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center min-h-[400px]">
-              <EmptyState
-                icon={<ImageIcon className="w-5 h-5 text-gray-muted" strokeWidth={1.5} />}
-                title="No visual proof yet"
-                description="Start with real photos that prove what customers can expect: your space, team, work, offers, and recent customer-facing moments."
-                action={
-                  <Button
-                    variant="primary"
-                    size="md"
-                    icon={<Upload className="w-4 h-4" strokeWidth={1.5} />}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Add first photos
-                  </Button>
-                }
-              />
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-glass-border bg-glass p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-muted">Library</p>
-                  <p className="mt-2 text-[26px] font-semibold leading-none text-warm-black">{assets.length}</p>
-                  <p className="mt-1 text-[12px] text-gray-muted">photos ready for site updates</p>
-                </div>
-                <div className="rounded-xl border border-glass-border bg-glass p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-gray-muted">Freshness</p>
-                  <p className="mt-2 text-[26px] font-semibold leading-none text-warm-black">{recentCount}</p>
-                  <p className="mt-1 text-[12px] text-gray-muted">added in the last 30 days</p>
-                </div>
-                <div className="rounded-xl border border-accent/20 bg-accent-dim/35 p-4">
-                  <div className="flex items-center gap-2">
-                    <Camera className="h-4 w-4 text-accent" strokeWidth={1.5} />
-                    <p className="text-[13px] font-medium text-warm-black">Next useful upload</p>
-                  </div>
-                  <p className="mt-2 text-[12px] leading-relaxed text-gray-fg">
-                    Add one current photo that proves what changed this week.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3">
-                {assets.map((asset) => (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    onClick={() => setSelected(selected?.id === asset.id ? null : asset)}
-                    className={cn(
-                      "group relative aspect-square rounded-lg overflow-hidden border transition-all duration-150",
-                      selected?.id === asset.id
-                        ? "border-accent ring-2 ring-accent/20"
-                        : "border-gray-border hover:border-gray-muted hover:shadow-md",
-                    )}
-                  >
-                    <Image
-                      src={asset.url}
-                      alt={asset.filename}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
-                    />
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-warm-black/0 group-hover:bg-warm-black/10 transition-colors duration-150" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Detail panel (desktop) / bottom sheet (mobile) */}
-      <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={deleteAsset} />
-    </div>
-  );
+  return <div className={styles.library} onDragEnter={handleDragEnter} onDragLeave={handleDragLeave} onDragOver={handleDragOver} onDrop={handleDrop}>
+    <StPage><StHead title="Photos and files" meta={`${assets.length} photos · uploads are images up to 5 MB`} actions={<StPill variant="soft" busy={uploading} disabled={readOnly} onClick={() => fileInputRef.current?.click()}><Upload size={16} aria-hidden="true" />{uploading ? "Uploading…" : "Upload photos"}</StPill>} />
+      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} disabled={readOnly} />
+      {readOnly ? <StNotice>You can see these photos. Only an owner or admin can upload or remove them.</StNotice> : null}
+      {uploading && uploadProgress ? <StNotice><span role="status">Uploading <StMono>{uploadProgress.current} of {uploadProgress.total}</StMono>…</span></StNotice> : null}
+      {!uploading && uploadSummary ? <div className={styles.stack}><StState kind={uploadSummary.failed ? "need" : "live"}>{uploadSummary.uploaded} uploaded, {uploadSummary.failed} failed or skipped</StState><StRows label="Upload results">{uploadResults.map((result, index) => <StRow key={`${result.name}-${index}`} title={result.name} end={<StState kind={result.status === "uploaded" ? "live" : "need"}>{result.message}</StState>} />)}</StRows></div> : null}
+      {dragging && !readOnly ? <StNotice>Drop photos here to upload them.</StNotice> : null}
+      {loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading photos"><StSkeleton /><StSkeleton width="80%" /></section> : loadError ? <StNotice tone="critical">The photos could not be read. Reload this page to try again; the library is unchanged.</StNotice> : assets.length === 0 ? <StEmpty action={<StPill variant="soft" disabled={readOnly} onClick={() => fileInputRef.current?.click()}>Add first photos</StPill>}>No photos yet. Add photos of your space, team, and work for Strelva to use on the site.</StEmpty> : <>
+        <p className={styles.description}><StMono>{recentCount}</StMono> added within 30 days of the latest photo.</p>
+        <div className={styles.photoGrid}>{assets.map(asset => <div key={asset.id} className={styles.photoItem}><button type="button" aria-label={`Open ${asset.filename}`} aria-pressed={selected?.id === asset.id} onClick={() => setSelected(selected?.id === asset.id ? null : asset)} className={cn(styles.photo, selected?.id === asset.id && styles.selected)}><Image src={asset.url} alt={asset.filename} fill className="object-cover" sizes="(max-width: 767px) 50vw, 25vw" /></button><span>{asset.filename}</span><StMono>{asset.width} × {asset.height}</StMono></div>)}</div>
+      </>}
+    </StPage>
+    <PhotoDetail asset={selected} onClose={() => setSelected(null)} onDelete={readOnly ? undefined : deleteAsset} />
+  </div>;
 }

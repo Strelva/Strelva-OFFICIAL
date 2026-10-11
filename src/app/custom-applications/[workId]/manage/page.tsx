@@ -5,7 +5,7 @@ import { getWork } from "@/platform/workspaces";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Manage custom application", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "Manage Internal tool", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 export default async function CustomApplicationManagePage({ params }: { params: Promise<{ workId: string }> }) {
   const workId = (await params).workId;

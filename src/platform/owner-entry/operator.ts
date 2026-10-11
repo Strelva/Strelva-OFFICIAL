@@ -1,6 +1,7 @@
 import { getDashboardSurfaces, tenantHasStore, type SurfaceTenantConfig } from "@/lib/dashboard-surfaces";
 import type { Connection } from "@/lib/types";
 import { readTenantWorkspaceLink } from "@/platform/business-record/service";
+import type { WorkspaceActor } from "@/platform/workspaces/types";
 import {
   RELEASE_FLAG_ENV,
   RELEASE_FLAG_LABELS,
@@ -23,12 +24,13 @@ import {
   type ReleaseFlagChange,
 } from "@/platform/release-flags/store";
 import { pagesBlockingOwnerEntry, type DashboardPageUse } from "./dispositions";
+import type { OperatorAuditContext } from "@/platform/workspaces/operator-approvals";
 
 /**
  * Operator controls for one client's release flags (`/admin/clients/[id]`).
  * Every change names its reason and is recorded in the flag history; the
- * first `on` for a client also needs Jacob's yes (spec §4 Authority), which
- * the operator confirms and the reason records.
+ * first `on` for a client records a one-use server approval for the
+ * authenticated operator, bound to the exact flag, state and reason.
  */
 
 export interface TenantPageFacts {
@@ -100,10 +102,11 @@ export async function readTenantReleaseState(operatorEmail: string, tenantId: st
 }
 
 export type ReleaseFlagCommand =
-  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; jacobApproved?: boolean }
+  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number }
   | { kind: "tester"; email: string; present: boolean; reason: string };
 
-export async function applyTenantReleaseCommand(operatorEmail: string, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand): Promise<void> {
+export async function applyTenantReleaseCommand(actor: WorkspaceActor, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand, auditContext: OperatorAuditContext = { source: "web" }): Promise<void> {
+  const operatorEmail = actor.verifiedEmail;
   const link = await readTenantWorkspaceLink(operatorEmail, tenantId);
   if (!link.link) throw new ReleaseFlagValidationError("workspace_release_unlinked", "This client isn't converted to a business workspace yet.");
   const workspaceId = link.link.workspaceId;
@@ -111,7 +114,7 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     await setWorkspaceReleaseTester({ operatorEmail, workspaceId, testerEmail: command.email, present: command.present, reason: command.reason });
     return;
   }
-  let reason = command.reason.trim();
+  const reason = command.reason.trim();
   if (isMakeRealLiveFlag(command.flag) && (command.state === "on" || command.state === "operators")) {
     // A live channel only ever runs where Systems itself is shown (spec 6.3).
     const stored = await readWorkspaceReleaseFlags(workspaceId, { fresh: true });
@@ -121,9 +124,6 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     }
   }
   if (command.state === "on") {
-    if (command.jacobApproved !== true) {
-      throw new ReleaseFlagValidationError("workspace_release_needs_jacob", "Turning a client on needs Jacob's yes. Confirm it, then try again.");
-    }
     if (command.flag === "owner_entry") {
       const blockers = pagesBlockingOwnerEntry(dashboardUsesForTenant(facts));
       if (blockers.length > 0) {
@@ -131,7 +131,6 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
           `Owner entry can go on only when every page this client uses has moved. Still on /dashboard: ${blockers.map((entry) => `/dashboard${entry.route === "/" ? "" : entry.route}`).join(", ")}. Use operators until then.`);
       }
     }
-    reason = `Jacob's yes: ${reason}`;
   }
-  await setWorkspaceReleaseFlag({ operatorEmail, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision });
+  await setWorkspaceReleaseFlag({ actor, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision, auditContext });
 }

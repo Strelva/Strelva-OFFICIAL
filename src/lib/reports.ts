@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { generateModelText } from "@/platform/infra/model-calls";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
@@ -598,6 +599,8 @@ export async function generateWeeklyReport(
     anomalyNarrative,
   });
 
+  const responsibilityProof = await (await workspacePorts().responsibilityProof()).responsibilityProofEmailParagraphs(tenantId, weekStart.toISOString(), new Date(weekEnd.getTime() + 1).toISOString());
+
   return {
     tenant,
     pageViews,
@@ -611,7 +614,7 @@ export async function generateWeeklyReport(
     failedVerifications,
     visibilityLines,
     analyticsRows,
-    summary,
+    summary: [summary, ...responsibilityProof].join("\n\n"),
   };
 }
 

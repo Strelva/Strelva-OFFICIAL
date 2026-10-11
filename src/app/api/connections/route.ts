@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Connections API - Lists all connections for a tenant with sync status
  */
@@ -20,6 +21,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const connections = await getConnections(tenant);
 
