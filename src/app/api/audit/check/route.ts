@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
   function child(path: string) {
     const url = new URL(request.url);
     url.pathname = path;
-    return new NextRequest(url, { method: "POST", headers: request.headers, body: JSON.stringify(body) });
+    const input = path === "/api/audit/scan" ? { ...body, businessName: body.business, location: body.city } : body;
+    return new NextRequest(url, { method: "POST", headers: request.headers, body: JSON.stringify(input) });
   }
   async function section(run: () => Promise<Response>) {
     try {

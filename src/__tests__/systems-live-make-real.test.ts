@@ -18,6 +18,13 @@ function ports(over: Partial<LiveMakeRealPorts> = {}): LiveMakeRealPorts {
 }
 
 describe("which Make real path a tap takes", () => {
+  it("refuses changed execution availability before any live approval", async () => {
+    const approve = vi.fn(async () => ({ status: "done", reason: null, activationId: "act-1" }));
+    await expect(makeRealPath(OWNER, WS, P, ports({ liveEnabled: async () => true, approve }), "rehearsal")).resolves.toBeNull();
+    await expect(makeRealPath(OWNER, WS, P, ports({ liveEnabled: async () => false, approve }), "live")).resolves.toBeNull();
+    await expect(makeRealPath(OWNER, WS, "website-rebuild:w", ports({ approve }), "live")).resolves.toBeNull();
+    expect(approve).not.toHaveBeenCalled();
+  });
   it("keeps per-request rebuilds isolated, and stored ones isolated until a live channel is on", async () => {
     await expect(makeRealPath(OWNER, WS, "website-rebuild:w1", ports())).resolves.toEqual({ kind: "isolated", possibilityId: "website-rebuild:w1" });
     await expect(makeRealPath(OWNER, WS, P, ports())).resolves.toEqual({ kind: "isolated", possibilityId: "website-rebuild:w1" });

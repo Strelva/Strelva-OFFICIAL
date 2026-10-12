@@ -131,3 +131,12 @@ describe("workspace business settings destinations", () => {
     expect(retry).toContain("Retry the same assignment after checking the current state.");
   });
 });
+
+
+describe("export label matches available data", () => {
+  it.each([false, true])("schema-3 archive available: %s", exportSchema3 => {
+    const html = renderToStaticMarkup(createElement(WorkspaceBusinessSettings, { workspace: { id: "business-id", kind: "customer", access: "member", name: "Juniper" }, sites: [], siteAssignmentState: "known", accountHref: "/workspace/account", exportSchema3 }));
+    expect(html).toContain(exportSchema3 ? "Export workspace archive" : "Export available workspace snapshot");
+    expect(html).not.toContain("Export all workspace data");
+  });
+});

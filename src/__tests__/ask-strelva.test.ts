@@ -302,6 +302,29 @@ describe("startAskTurn", () => {
     expect(h.filed).toHaveLength(0);
     expect(h.modelCalls).toHaveLength(0);
   });
+  it("routes a saved booking ask to native booking preparation, independently of website release", async () => {
+    const h = harness({ managedWebsites: [] });
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    h.deps.websiteCreationReleased = async () => false;
+    const result = await run(h.deps, "Add a booking page for consultations");
+    const ask = result.result?.ask as { creationAction: { kind: string; href: string; label: string }; conversationId: string };
+    expect(ask.creationAction).toMatchObject({ kind: "booking", label: "Prepare bookings" });
+    const href = new URL(ask.creationAction.href, "https://example.test");
+    expect(href.pathname).toBe("/workspace/business/new/booking");
+    const conversation = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.find(item => item.id === href.searchParams.get("messageId"))?.content).toBe("Add a booking page for consultations");
+    expect(result.text).not.toContain("Prepare a website");
+    expect(h.modelCalls).toHaveLength(0);
+  });
+  it("withholds booking preparation when its availability cannot be confirmed", async () => {
+    const h = harness({ managedWebsites: [] });
+    h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.bookingCreationReleased = async () => { throw new Error("unavailable"); };
+    const result = await run(h.deps, "Add a booking page");
+    expect(result.result?.ask).not.toHaveProperty("creationAction");
+    expect(result.text).toContain("Booking preparation isn't open");
+  });
   it.each(["off", "unreadable", "stopped", "revoked", "member", "unsaved", "operator"])("withholds website creation on %s", async state => {
     const h = harness({ managedWebsites: [], isOperator: state === "operator", role: state === "member" ? "member" : "owner" });
     if (state !== "unsaved") h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
@@ -376,7 +399,7 @@ describe("startAskTurn", () => {
     const h = harness({ managedWebsites: [] });
     const result = await run(h.deps, "Add a booking page");
     expect(h.filed).toHaveLength(0);
-    expect(result.text).toContain("Website creation isn't open");
+    expect(result.text).toContain("booking preparation couldn't be opened");
   });
 
   it("names the business's recorded agency, never Strelva, when it files (ADR 0015)", async () => {

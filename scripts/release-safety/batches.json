@@ -2127,6 +2127,26 @@
           "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
         }
       ]
+    },
+    {
+      "id": "ux-audit-pass2-owner2-2026-10-12",
+      "status": "October 12 owner2 follow-up: held and unqualified. Checkout identity and issued payment terms are source-pinned only. Native SQL, concurrent admission, hosted Stripe/Auth, rendered acceptance and production application UNRUN/held; no packet batch or application authority granted.",
+      "items": [
+        {
+          "file": "20261024131000_ux_owner2_checkout.sql",
+          "sha256": "28b5d1c76a671a1049e16759c818b5be5962396d3ab7376bfd77ca0e9819f649",
+          "rollback": "rollback-20261024131000_ux_owner2_checkout.sql",
+          "rollbackSha256": "c87523d6dea2216c2e4f920642a51ef391e9e7cf09f46d2750e604aae2977047",
+          "rollbackStatus": "Prepared inverse only; disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024131100_ux_owner2_payment_terms.sql",
+          "sha256": "f08fe85bc548128d46652323110fb250e687b28689d6504d525fb2171012eea7",
+          "rollback": "rollback-20261024131100_ux_owner2_payment_terms.sql",
+          "rollbackSha256": "18286671bebe68b0562fc3e8c8c6d76d463eb6524ef419962cecb826aeca83cb",
+          "rollbackStatus": "Prepared inverse only; disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        }
+      ]
     }
   ]
 }

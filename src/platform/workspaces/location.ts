@@ -144,10 +144,10 @@ export function workspaceReturnTarget(value: string | null): string | null {
       || target.searchParams.getAll("date").length > 1 || (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
-  if (value?.startsWith("/workspace/business/new/website?")) {
+  if (value && /^\/workspace\/business\/new\/(website|booking)\?/.test(value)) {
     const target = new URL(value, "https://workspace.invalid");
     const params = target.searchParams;
-    if (target.hash || target.pathname !== "/workspace/business/new/website" || params.size !== 3
+    if (target.hash || !["/workspace/business/new/website", "/workspace/business/new/booking"].includes(target.pathname) || params.size !== 3
       || ["workspaceId", "conversationId", "messageId"].some(key => params.getAll(key).length !== 1 || !UUID.test(params.get(key) || ""))
       || [...params.keys()].some(key => !["workspaceId", "conversationId", "messageId"].includes(key))) return null;
     return `${target.pathname}?${params}`;

@@ -6,6 +6,15 @@ vi.mock("@/products/ai-visibility/server",()=>({getAiVisibilityResult:mocks.scan
 vi.mock("@/products/website-audit/server",()=>({getPublicWebsiteAudit:mocks.audit}));
 beforeEach(()=>{vi.clearAllMocks();mocks.scan.mockResolvedValue({id:"scan_example",result:{}});mocks.parse.mockReturnValue({business:"Juniper",url:"https://example.test",topFix:"Correct opening hours"});});
 describe("check to business continuity",()=>{
+ it("reuses the displayed priority and worst-score ranking with the retained business name",async()=>{
+  const id=`audit_${"a".repeat(32)}`;
+  mocks.audit.mockResolvedValue({businessName:"Juniper",url:"https://example.test",categories:[{name:"Contact",checks:[
+   {name:"First high",message:"Better score",status:"fail",priority:"high",score:50},
+   {name:"Ranked first",message:"Worst score",status:"fail",priority:"high",score:0},
+   {name:"Low",message:"Lower priority",status:"fail",priority:"low",score:0}
+  ]}]});
+  expect(await readSetupCheck(id)).toEqual({businessName:"Juniper",request:`Start with this website fix for Juniper: Ranked first. Worst score\nWebsite: https://example.test\nSaved check: ${id}`});
+ });
  it("uses saved evidence and first fix rather than user-written URL contents",async()=>{expect(await readSetupCheck("scan_example")).toEqual({businessName:"Juniper",request:"Start with this fix for Juniper: Correct opening hours\nWebsite: https://example.test\nSaved check: scan_example"});});
  it("refuses missing, corrupt or mismatched public results",async()=>{mocks.scan.mockResolvedValue({id:"scan_other",result:{}});expect(await readSetupCheck("scan_example")).toBeNull();expect(mocks.parse).not.toHaveBeenCalled();mocks.scan.mockResolvedValue({id:"scan_example",result:{}});mocks.parse.mockReturnValue(null);expect(await readSetupCheck("scan_example")).toBeNull();});
  it("selects the high-priority website fix and retains its report",async()=>{const id=`audit_${"a".repeat(32)}`;mocks.audit.mockResolvedValue({url:"https://example.test",categories:[{checks:[{name:"Other",message:"Minor",status:"warn",priority:"low"},{name:"Contact",message:"Missing phone",status:"fail",priority:"high"}]}]});expect((await readSetupCheck(id))?.request).toContain(`Contact. Missing phone\nWebsite: https://example.test\nSaved check: ${id}`);});

@@ -4,6 +4,7 @@
  * and the per-workspace flags. Server only. Every outside write here is a
  * call into the path that already owns it (live-adapters.ts has the table).
  */
+import { livePlanChannelsAvailable } from "@/platform/make-real/execution-availability";
 import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
 import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
 import { z } from "zod";
@@ -189,14 +190,15 @@ export async function activationRunner(workspaceId: string, activationId: string
 /**
  * Live plans for the one Make real Needs you source
  * (src/server/needs-you/systems-sources.ts): stored Ready Possibilities,
- * only where Systems and at least one live channel are on. Each carries the
+ * only where Systems and every declared effect channel are on. Each carries the
  * signed "Try it" link so an owner who never signs in can try it from the
  * email.
  */
 export async function readLiveReadyPlans(workspaceId: string): Promise<ReadyPlan[]> {
   if (!(await anyMakeRealChannelEnabled(workspaceId))) return [];
   const { possibilities, names } = await readReadyPossibilitiesWithNames(workspaceId);
-  return possibilities.map((p) => {
+  const qualified = await Promise.all(possibilities.map(async p => await livePlanChannelsAvailable(p.effects.map(effect => effect.channel), channel => makeRealChannelEnabled(workspaceId, channel)) ? p : null));
+  return qualified.filter((p): p is Possibility => p !== null).map((p) => {
     let href: string | null = null;
     try { href = possibilityPreviewPath({ workspaceId, possibilityId: p.id, candidateRevision: p.candidateRevision }); } catch { href = null; }
     return liveReadyPlan(p, names, href);

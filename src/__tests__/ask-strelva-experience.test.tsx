@@ -127,3 +127,13 @@ describe("saved website creation action", () => {
     expect(readAskResult({ kind: "answer", creationAction: invalid })?.creationAction).toBeUndefined();
   });
 });
+
+
+describe("saved booking action parser",()=>{
+ it("carries booking creation but refuses a website path disguised as booking",()=>{
+  const query=new URLSearchParams({workspaceId:"ab200000-0000-4000-8000-000000000002",conversationId:"ab200000-0000-4000-8000-000000000003",messageId:"ab200000-0000-4000-8000-000000000004"});
+  const creationAction={kind:"booking",label:"Prepare bookings",href:`/workspace/business/new/booking?${query}`};
+  expect(readAskResult({kind:"answer",items:[],creationAction})?.creationAction).toEqual(creationAction);
+  expect(readAskResult({kind:"answer",items:[],creationAction:{...creationAction,href:`/workspace/business/new/website?${query}`}})?.creationAction).toBeUndefined();
+ });
+});

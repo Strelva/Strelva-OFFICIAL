@@ -9,8 +9,8 @@ import type { SystemView } from "@/experience/systems/model";
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID();
 const system: SystemView = { id: systemId, name: "Team intake", detail: "Internal intake app", kind: "app", lifecycle: "draft", health: { state: "unknown", summary: "No checks yet." },
   surface: { kind: "work", workId: "intake", productId: "unknown" }, connections: [], versions: [], possibilities: [
-    { id: "first", title: "Shorter intake", summary: "Remove one question.", status: "ready", affects: [systemId] },
-    { id: "second", title: "Referral intake", summary: "Add a referral question.", status: "ready", affects: [systemId] },
+    { id: "first", title: "Shorter intake", summary: "Remove one question.", status: "ready", executionAvailability: "live", affects: [systemId] },
+    { id: "second", title: "Referral intake", summary: "Add a referral question.", status: "ready", executionAvailability: "live", affects: [systemId] },
   ] };
 const roots: ReturnType<typeof createRoot>[] = [];
 beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
@@ -100,5 +100,22 @@ describe("Make real acknowledgment and recovery", () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({})); const node = await render(request, true);
     expect(makeRealButtons(node).every(button => button.disabled)).toBe(true);
     expect(request).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("exact plan execution labels", () => {
+  it.each(["rehearsal", "unavailable", undefined] as const)("does not offer live execution for %s", async executionAvailability => {
+    const request = vi.fn<typeof fetch>(async () => Response.json({ result: { isolated: true, status: "in_progress", headline: "Isolated run", done: [], waiting: [], unknown: [], notStarted: [], liveUnchanged: true, notConnected: [] } }));
+    const alternative = { ...system, possibilities: [{ ...system.possibilities[0]!, executionAvailability }] };
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
+    await act(async () => root.render(page(request, false, alternative)));
+    expect(makeRealButtons(node)).toHaveLength(0);
+    const action = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => /Rehearse this change|Live unavailable/.test(button.textContent || ""))!;
+    expect(action.disabled).toBe(executionAvailability !== "rehearsal");
+    await act(async () => action.click());
+    expect(request).toHaveBeenCalledTimes(executionAvailability === "rehearsal" ? 1 : 0);
+    if (executionAvailability === "rehearsal") expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toMatchObject({ executionMode: "rehearsal" });
+    expect(node.textContent).not.toContain("Making it live");
   });
 });

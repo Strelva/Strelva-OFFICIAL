@@ -14,8 +14,9 @@ import type { AuditResult } from "@/lib/audit/types";
 import { saveAuditReport } from "@/lib/audit-report-store";
 import { recordFunnelEvent } from "@/platform/infra/funnel";
 
-async function retainedResponse(raw: AuditResult, agency?: AgencyAttribution) {
-  const result = attributedAudit(raw, agency);
+async function retainedResponse(raw: AuditResult, agency?: AgencyAttribution, businessName?: string) {
+  const { businessName: _cachedName, ...identityNeutral } = raw;
+  const result = { ...attributedAudit(identityNeutral, agency), ...(businessName ? { businessName } : {}) };
   const reportId = await saveAuditReport(result, { name: "", email: "", url: result.url });
   // Funnel (ADR 0015): a check ran, from the direct door or an agency prospecting.
   if (reportId) void recordFunnelEvent("check_run", `audit_${reportId}`, { agencyWorkspaceId: agency?.workspaceId ?? null });
@@ -101,6 +102,10 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (body.businessName !== undefined && (typeof body.businessName !== "string" || !body.businessName.trim() || body.businessName.trim().length > 120)) {
+    return NextResponse.json({ error: "Business name must be between 1 and 120 characters." }, { status: 400 });
+  }
+  const businessName = body.businessName?.trim();
 
   let normalizedUrl = url;
   if (!/^https?:\/\//i.test(normalizedUrl)) {
@@ -146,7 +151,7 @@ export async function POST(request: NextRequest) {
     try {
       const cached = await cacheRedis.get(cacheKey);
       if (cached) {
-        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult, agency);
+        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult, agency, businessName);
       }
     } catch {
       // Cache miss or error — proceed with fresh audit
@@ -178,7 +183,7 @@ export async function POST(request: NextRequest) {
       await cacheRedis.set(cacheKey, JSON.stringify(result), { ex: 3600 }).catch(() => {});
     }
 
-    return retainedResponse(result, agency);
+    return retainedResponse(result, agency, businessName);
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: "audit-scan" },

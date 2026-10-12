@@ -13,8 +13,8 @@ do $$declare owner_id uuid:=gen_random_uuid();ws uuid:=gen_random_uuid();p uuid;
  perform public.manage_connected_account(ws,owner_id,'checkout-native-owner@example.test','reserve');
  perform public.record_connected_account(ws,'acct_FinalCheckout',array['merchant'],'fictional-native','{}','{}',true);
  select c.generation into generation from public.connected_accounts c where c.workspace_id=ws;
- insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key)
- values(r,ws,'quote',gen_random_uuid(),'[{"name":"Fictional quoted work","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('1',64),owner_id,'fictional-final-quote');
+ insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key,cancellation_policy)
+ values(r,ws,'quote',gen_random_uuid(),'[{"name":"Fictional quoted work","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('1',64),owner_id,'fictional-final-quote','{"refundable":false}');
  perform public.accept_public_payment_request(repeat('1',64));
  select id into p from public.business_payments where workspace_id=ws and idempotency_key='request:'||r::text;
  perform public.claim_business_payment_channel(p,'checkout');perform public.prepare_business_checkout(p);
@@ -38,8 +38,8 @@ do $$declare owner_id uuid:=gen_random_uuid();ws uuid:=gen_random_uuid();p uuid;
  insert into public.business_bookings(id,calendar_key,workspace_id,legacy_id,status,origin,service_name_at_booking,start_at,end_at,block_end_at,time_zone,customer_name,customer_email,recorded_via,created_at)
  values(booking,ws,ws,'fictional-final-deposit','held','agent','Fictional consultation',clock_timestamp()+interval '4 days',clock_timestamp()+interval '4 days 30 minutes',clock_timestamp()+interval '4 days 30 minutes','UTC','Fictional customer','checkout-native-customer@example.test','native',clock_timestamp());
  r:=gen_random_uuid();
- insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key)
- values(r,ws,'deposit',booking,'[{"name":"Fictional deposit","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('3',64),owner_id,'fictional-final-deposit');
+ insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key,cancellation_policy)
+ values(r,ws,'deposit',booking,'[{"name":"Fictional deposit","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('3',64),owner_id,'fictional-final-deposit','{"refundable":true}');
  perform public.accept_public_payment_request(repeat('3',64));select id into p from public.business_payments where workspace_id=ws and idempotency_key='request:'||r::text;
  perform public.claim_business_payment_channel(p,'checkout');perform public.prepare_business_checkout(p);
  perform pg_temp.ca_assert(public.assert_business_checkout_admission(p,'acct_FinalCheckout',generation,null,null,null),'held accepted deposit');

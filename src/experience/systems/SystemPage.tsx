@@ -324,10 +324,10 @@ const makeRealResponseSchema = z.union([
     unknown: z.array(z.string()), notStarted: z.array(z.string()), liveUnchanged: z.boolean(), notConnected: z.array(z.string()) }) }),
 ]);
 
-async function requestMakeReal(request: typeof fetch, workspaceId: string, possibilityId: string): Promise<MakeRealOutcome> {
+async function requestMakeReal(request: typeof fetch, workspaceId: string, possibilityId: string, executionMode: "live" | "rehearsal"): Promise<MakeRealOutcome> {
   try {
     const response = await request("/api/workspace/systems/make-real", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, possibilityId }),
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, possibilityId, executionMode }),
     });
     const body: unknown = await response.json().catch(() => null);
     const parsed = makeRealResponseSchema.safeParse(body);
@@ -370,11 +370,11 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
   const [needsReload, setNeedsReload] = useState(false);
   const [versionCount, setVersionCount] = useState(0);
   async function makeReal(possibility: SystemPossibility) {
-    if (inFlight.current || needsReload || !canMakeReal || readOnly || possibility.status !== "ready" || possibility.staleReason) return;
+    if (inFlight.current || needsReload || !canMakeReal || readOnly || possibility.status !== "ready" || possibility.staleReason || !possibility.executionAvailability || possibility.executionAvailability === "unavailable") return;
     inFlight.current = true;
     setRunning(possibility.id);
     setOutcome(null);
-    const next = await requestMakeReal(request, workspaceId, possibility.id);
+    const next = await requestMakeReal(request, workspaceId, possibility.id, possibility.executionAvailability);
     setOutcome({ id: possibility.id, outcome: next });
     setNeedsReload(next.kind === "live" || next.kind === "error" || next.kind === "permission");
     inFlight.current = false;
@@ -383,7 +383,8 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
   return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length + versionCount} intro="Alternatives you can open and compare before anything changes.">
     {system.possibilities.length ? <StRows>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
-      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
+      const execution = possibility.executionAvailability ?? "unavailable";
+      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
       return <StRow key={possibility.id} title={possibility.title} detail={possibility.summary}>
         <StState kind="draft">{POSSIBILITY_STATUS_LABEL[possibility.status]}</StState>
         {possibility.staleReason ? <small role="note">{possibility.staleReason} Strelva is refreshing it.</small> : null}
@@ -392,13 +393,13 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
         <span className={styles.possibilityActions}>
           {onCompare && possibility.previewSrc ? <StPill variant="soft" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</StPill> : null}
           {possibility.openHref ? <StPillLink variant="soft" href={`${appBase}${possibility.openHref}`}>{possibility.tryHref ? "Try it as a visitor" : "Open"}</StPillLink> : null}
-          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making it live…" : "Make it live"}</StPill>
+          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? execution === "rehearsal" ? "Rehearsing…" : "Making it live…" : execution === "rehearsal" ? "Rehearse this change" : execution === "unavailable" ? "Live unavailable" : "Make it live"}</StPill>
         </span>
         {comparingId === possibility.id && possibility.previewSrc && system.surface.kind !== "website" ? <PossibilityComparison title={possibility.title}
           live={<StEmpty>The current System is open above. A visitor preview has not been recorded.</StEmpty>}
           candidate={<iframe title={`${possibility.title}, not live`} src={possibility.previewSrc} sandbox="" referrerPolicy="no-referrer" />}
           staleReason={possibility.staleReason} scope={scope.join(", ")} /> : null}
-        {readOnly || !canMakeReal ? <small>{blockedReason}</small> : null}
+        {blockedReason ? <small>{blockedReason}</small> : execution === "rehearsal" ? <small>Runs in an isolated copy. Your live Systems stay unchanged.</small> : null}
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </StRow>;
     })}</StRows> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}

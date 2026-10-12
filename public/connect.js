@@ -294,7 +294,7 @@
           }
           var title = d.createElement("h3"), note = d.createElement("p");
           title.textContent = "Request a time for " + offer.serviceName;
-          note.textContent = "The business must confirm your appointment.";
+          note.textContent = "Choose a time, then check your email to confirm. The business may then need to accept your request.";
           times.appendChild(title); times.appendChild(note);
           for (var j = 0; j < offer.slots.length; j++) {
             var row = d.createElement("p"), link = d.createElement("a");
