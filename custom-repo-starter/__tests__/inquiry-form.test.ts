@@ -26,12 +26,12 @@ describe("portable inquiry form contract", () => {
     expect(isInquiryBookingOffer({...offer,slots:[{start:"bad",end:"bad"}]})).toBe(false);
   });
 
-  it("renders the fixed fields, escaped content, labels, and Strelva disclosure", () => {
+  it("renders the fixed fields, escaped content, labels, and business-only disclosure", () => {
     const html = renderToStaticMarkup(createElement(StrelvaInquiryForm, { definition: { ...definition, form: { ...definition.form, title: "<script>unsafe</script>" } } }));
     expect(html).toContain("&lt;script&gt;unsafe&lt;/script&gt;");
     expect(html).not.toContain("<script>");
     expect(html).toContain("type=\"email\"");
-    expect(html).toContain("Strelva helps this business handle your request.");
+    expect(html).toContain("Your request goes to this business.");
     expect(html).toContain("Preview only. This form does not send a request.");
   });
 

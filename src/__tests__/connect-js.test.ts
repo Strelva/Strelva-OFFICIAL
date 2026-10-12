@@ -201,6 +201,85 @@ describe("connect.js", () => {
     expect(status.textContent).toBe("Thanks. Your message was sent.");
   });
 
+  it.each([
+    ["not-an-email", "", "email", "Enter a valid email address, or clear it and use your phone number."],
+    ["visitor@example.test", "call me", "phone", "Enter a valid phone number, or clear it and use your email address."],
+    ["bad@address", "716-555-0199", "email", "Enter a valid email address, or clear it and use your phone number."],
+    ["visitor@example..test", "", "email", "Enter a valid email address, or clear it and use your phone number."],
+    ["visitor@example/test.com", "", "email", "Enter a valid email address, or clear it and use your phone number."],
+    ["", "( ) - .", "phone", "Enter a valid phone number, or clear it and use your email address."],
+    ["", "123456", "phone", "Enter a valid phone number, or clear it and use your email address."],
+    ["", "1234567890123456", "phone", "Enter a valid phone number, or clear it and use your email address."],
+  ])("keeps input and explains invalid contact (%s, %s)", async (email, phone, invalid, correction) => {
+    const page = load('<div data-strelva-form></div>');
+    await tick();
+    const form = page.win.document.querySelector<HTMLFormElement>("[data-strelva-form] form")!;
+    form.querySelector<HTMLInputElement>('[name="email"]')!.value = email;
+    form.querySelector<HTMLInputElement>('[name="phone"]')!.value = phone;
+    form.querySelector<HTMLTextAreaElement>('[name="message"]')!.value = "Please call about Friday.";
+    form.requestSubmit();
+    await tick();
+    expect(posts(page, "/inquiries")).toHaveLength(0);
+    expect(form.querySelector('[role="status"]')!.textContent).toBe(correction);
+    const field = form.querySelector<HTMLInputElement>(`[name="${invalid}"]`)!;
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(form.querySelector('[role="status"]')!.id);
+    expect(page.win.document.activeElement).toBe(field);
+    expect(form.querySelector<HTMLInputElement>('[name="email"]')!.value).toBe(email);
+    expect(form.querySelector<HTMLInputElement>('[name="phone"]')!.value).toBe(phone);
+    expect(form.querySelector<HTMLTextAreaElement>('[name="message"]')!.value).toBe("Please call about Friday.");
+    if (invalid === "email") field.value = "visitor@example.test";
+    else field.value = "716-555-0199";
+    form.requestSubmit();
+    await tick();
+    expect(posts(page, "/inquiries")).toHaveLength(1);
+    expect(field.hasAttribute("aria-invalid")).toBe(false);
+    expect(form.querySelector('[role="status"]')!.textContent).toBe("Thanks. Your message was sent.");
+  });
+
+  it("preserves input and exposes the server's contact correction without showing other server errors", async () => {
+    const page = load('<div data-strelva-form></div>');
+    await tick();
+    const form = page.win.document.querySelector<HTMLFormElement>("[data-strelva-form] form")!;
+    const email = form.querySelector<HTMLInputElement>('[name="email"]')!;
+    email.value = "visitor@example.test";
+    form.querySelector<HTMLTextAreaElement>('[name="message"]')!.value = "Please reply.";
+    page.fetch.mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: "Enter a valid email address, or clear it and use your phone number." }) });
+    form.requestSubmit();
+    await tick();
+    expect(email.value).toBe("visitor@example.test");
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+    expect(form.querySelector('[role="status"]')!.textContent).toContain("Enter a valid email address");
+    page.fetch.mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ error: "private server detail" }) });
+    form.requestSubmit();
+    await tick();
+    expect(form.querySelector('[role="status"]')!.textContent).toBe("That didn't send. Please try again, or call or email us.");
+    expect(email.value).toBe("visitor@example.test");
+    expect(form.querySelector<HTMLTextAreaElement>('[name="message"]')!.value).toBe("Please reply.");
+  });
+
+  it("accepts phone alone and retains the input when delivery fails", async () => {
+    const page = load('<div data-strelva-form></div>');
+    await tick();
+    const form = page.win.document.querySelector<HTMLFormElement>("[data-strelva-form] form")!;
+    const phone = form.querySelector<HTMLInputElement>('[name="phone"]')!;
+    const message = form.querySelector<HTMLTextAreaElement>('[name="message"]')!;
+    phone.value = "+1 (716) 555-0199";
+    message.value = "Please call about Friday.";
+    page.fetch.mockRejectedValueOnce(new Error("offline"));
+    form.requestSubmit();
+    await tick();
+    expect(posts(page, "/inquiries")).toHaveLength(1);
+    expect(phone.value).toBe("+1 (716) 555-0199");
+    expect(message.value).toBe("Please call about Friday.");
+    expect(form.querySelector('[role="status"]')!.textContent).toContain("didn't send");
+    expect(form.querySelector("button")!.disabled).toBe(false);
+    form.requestSubmit();
+    await tick();
+    expect(posts(page, "/inquiries")[1]).toMatchObject({ fields: { phone: "+1 (716) 555-0199", message: "Please call about Friday." } });
+    expect(phone.value).toBe("");
+  });
+
   it("fills facts as text, exposes them, and injects JSON-LD only when the page has none", async () => {
     const page = load(`<a data-strelva-fact="phone"></a><p data-strelva-fact="hours"></p><b data-strelva-fact="email">keep</b>`);
     await tick();

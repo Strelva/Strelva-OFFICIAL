@@ -278,18 +278,42 @@ export function safePath(path: string | undefined): string | null {
   return trimmed.split(/[?#]/)[0]!.slice(0, 500) || "/";
 }
 
-/** The usual contact fields, whatever names a site's form uses. */
-export function contactFromFields(fields: Record<string, string>): { name: string | null; email: string | null; phone: string | null; message: string | null } {
+/** Keep raw contact fields available so malformed contact is never silently discarded on mounted forms. */
+function rawContactFromFields(fields: Record<string, string>) {
   const entries = Object.entries(fields).map(([key, value]) => [key.toLowerCase().replace(/[\s_-]+/g, ""), value.trim()] as const);
   const pick = (test: (key: string) => boolean) => entries.find(([key, value]) => value && test(key))?.[1] ?? null;
   const first = pick(key => key === "firstname" || key === "fname");
   const last = pick(key => key === "lastname" || key === "lname");
   const name = pick(key => key === "name" || key === "fullname" || key === "yourname") ?? ([first, last].filter(Boolean).join(" ") || null);
   const emailRaw = pick(key => key.includes("email"));
-  const email = emailRaw && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailRaw) ? emailRaw.slice(0, 320) : null;
   const phoneRaw = pick(key => key.includes("phone") || key === "tel" || key.includes("mobile"));
-  const phone = phoneRaw && /^\+?[0-9 ().-]{7,24}$/.test(phoneRaw) ? phoneRaw : null;
   const message = pick(key => ["message", "comments", "comment", "details", "question", "body", "howcanwehelp", "notes", "description"].includes(key));
+  return { name, emailRaw, phoneRaw, message };
+}
+
+function validEmail(value: string): boolean {
+  return value.length <= 320 && /^(?!\.)(?!.*\.\.)[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(value) && value.charAt(value.indexOf("@") - 1) !== ".";
+}
+
+function validPhone(value: string): boolean {
+  const digits = value.replace(/\D/g, "");
+  return /^\+?[0-9 ().-]{7,24}$/.test(value) && digits.length >= 7 && digits.length <= 15;
+}
+
+/** Mounted forms promise a reply; every supplied contact must be usable. Keep connect.js in sync. */
+export function mountedFormContactError(fields: Record<string, string>): string | null {
+  const { emailRaw, phoneRaw } = rawContactFromFields(fields);
+  if (emailRaw && !validEmail(emailRaw)) return "Enter a valid email address, or clear it and use your phone number.";
+  if (phoneRaw && !validPhone(phoneRaw)) return "Enter a valid phone number, or clear it and use your email address.";
+  if (!emailRaw && !phoneRaw) return "Add an email or phone number so we can reply.";
+  return null;
+}
+
+/** The usual contact fields, whatever names a site's form uses. */
+export function contactFromFields(fields: Record<string, string>): { name: string | null; email: string | null; phone: string | null; message: string | null } {
+  const { name, emailRaw, phoneRaw, message } = rawContactFromFields(fields);
+  const email = emailRaw && validEmail(emailRaw) ? emailRaw : null;
+  const phone = phoneRaw && validPhone(phoneRaw) ? phoneRaw : null;
   return { name: name?.slice(0, 200) ?? null, email, phone, message: message?.slice(0, 5000) ?? null };
 }
 

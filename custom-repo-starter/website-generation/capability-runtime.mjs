@@ -68,7 +68,19 @@ function bookingReceipt(value, expected) {
     item.capabilityId !== expected.capabilityId || item.version !== expected.version || !["outlook", "google"].includes(item.provider) ||
     !["confirmed", "pending", "cancelled"].includes(item.status) || !text(item.title) || !ISO.test(text(item.start)) || !ISO.test(text(item.end)) ||
     Date.parse(item.end) <= Date.parse(item.start) || !text(item.timeZone)) return null;
+  if (item.confirmationRequired !== undefined && typeof item.confirmationRequired !== "boolean") return null;
+  if (item.confirmationExpiresAt !== undefined && (!ISO.test(text(item.confirmationExpiresAt)) || !Number.isFinite(Date.parse(item.confirmationExpiresAt)))) return null;
+  if (item.businessName !== undefined && (!text(item.businessName).trim() || text(item.businessName).length > 160)) return null;
   return item;
+}
+
+function bookingReceiptPresentation(receipt, businessAuthority) {
+  if (receipt.status === "cancelled") return { heading: "Cancelled", detail: "This booking is cancelled." };
+  if (receipt.confirmationRequired && receipt.confirmationExpiresAt && Date.parse(receipt.confirmationExpiresAt) <= Date.now()) return { heading: "Confirmation time expired", detail: `Contact ${receipt.businessName ?? "the business"} to request a new time.` };
+  if (receipt.confirmationRequired) return { heading: "Check your email to confirm", detail: "Open the confirmation email and use its link to confirm your request. This time is not confirmed yet." };
+  if (receipt.status === "confirmed") return { heading: "Confirmed", detail: "You can change the time or cancel below." };
+  if (businessAuthority) return { heading: `Waiting on ${receipt.businessName ?? "the business"}`, detail: "Your request is waiting for the business to confirm. This time is not confirmed yet. Check request status below." };
+  return { heading: "Outcome not confirmed", detail: "We could not confirm this booking yet. Check the calendar before trying again." };
 }
 
 function visitor(value) {
@@ -227,7 +239,7 @@ function mountInquiry(root, config, api) {
     }
     const submit = element("button", "Send request", { type: "submit" });
     const result = element("p", undefined, { role: "status" });
-    form.append(element("p", "Strelva helps this business handle your request."), submit, result);
+    form.append(element("p", "Your request goes to this business."), submit, result);
     form.addEventListener("submit", event => {
       event.preventDefault(); submit.disabled = true; result.textContent = "";
       const values = Object.fromEntries(fields.map(field => [field.name, String(field.value).trim()]));
@@ -237,10 +249,10 @@ function mountInquiry(root, config, api) {
           let url; try { url = new URL(offer.url); } catch { return; }
           if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) return;
           const choices = element("div");
-          choices.append(element("p", "You can also request a time. The business will confirm it."));
+          choices.append(element("p", "You can also request a time. Check your email to confirm, then wait for the business to accept it."));
           for (const slot of offer.slots) {
             if (!record(slot) || !Number.isFinite(Date.parse(slot.start))) continue;
-            let label; try { label = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: offer.timeZone }).format(new Date(slot.start)); } catch { label = slot.start; }
+            const label = readableTime(slot.start, offer.timeZone);
             choices.append(element("p", `${text(offer.serviceName)} · ${label}`));
           }
           choices.append(element("a", "Choose a time to request", { href: url.toString() })); result.after(choices);
@@ -251,11 +263,14 @@ function mountInquiry(root, config, api) {
   }, error => status(root, error instanceof Error ? error.message : "This inquiry form is unavailable."));
 }
 
-function slotLabel(slot, timeZone) {
+function readableTime(value, timeZone) {
   try {
-    const format = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone });
-    return `${format.format(new Date(slot.start))}–${format.format(new Date(slot.end))}`;
-  } catch { return `${slot.start}–${slot.end}`; }
+    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone }).format(new Date(value));
+  } catch { return value; }
+}
+
+function slotLabel(slot, timeZone) {
+  return `${readableTime(slot.start, timeZone)}–${readableTime(slot.end, timeZone)}`;
 }
 
 function mountBooking(root, config, api) {
@@ -302,19 +317,24 @@ function mountBooking(root, config, api) {
     const result = element("p", undefined, { role: "status" }); form.append(result); wrapper.append(form);
     const receiptRoot = element("section", undefined, { "aria-label": "Booking receipt" }); wrapper.append(receiptRoot);
     let receipt = null;
+    let confirmationTimer;
     const updateReceipt = () => {
       receiptRoot.replaceChildren();
+      clearTimeout(confirmationTimer);
       if (!receipt) return;
-      receiptRoot.append(element("h3", receipt.title), element("p", slotLabel(receipt, native ? visitorTimeZone : receipt.timeZone)), element("p", receipt.status === "confirmed" ? native ? "The business confirmed this booking." : `${currentSchedule.provider === "outlook" ? "Outlook" : "Google Calendar"} confirmed this booking.` : receipt.status === "cancelled" ? "This booking is cancelled." : native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this booking yet. Check the calendar before trying again.", { role: "status" }));
+      const presentation = bookingReceiptPresentation(receipt, native);
+      receiptRoot.append(element("h3", presentation.heading), element("p", receipt.title), element("p", slotLabel(receipt, native ? visitorTimeZone : receipt.timeZone)), element("p", presentation.detail, { role: "status" }));
+      if (presentation.heading === "Check your email to confirm" && receipt.confirmationExpiresAt) confirmationTimer = setTimeout(updateReceipt, Math.max(0, Date.parse(receipt.confirmationExpiresAt) - Date.now() + 1));
+      if (presentation.heading === "Check your email to confirm") receiptRoot.append(element("p", receipt.confirmationExpiresAt ? `Confirm by ${readableTime(receipt.confirmationExpiresAt, native ? visitorTimeZone : receipt.timeZone)}.` : "Use the confirmation link before it expires."));
       if (receipt.status === "cancelled") return;
-      if (receipt.status === "pending") {
+      if (receipt.confirmationRequired || receipt.status === "pending") {
         const check = element("button", native ? "Check request status" : "Check booking status", { type: "button" });
         check.addEventListener("click", () => {
           check.disabled = true;
           void api.readbackBooking(config, receipt).then(next => {
             receipt = next;
             updateReceipt();
-            result.textContent = next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : native ? "The business has not confirmed your request yet." : "The reservation is still awaiting confirmation. Check the calendar before trying again.";
+            result.textContent = bookingReceiptPresentation(next, native).heading;
           }, error => {
             result.textContent = error instanceof Error ? error.message : "The booking status could not be checked. Please try again.";
             check.disabled = false;
@@ -325,11 +345,11 @@ function mountBooking(root, config, api) {
       }
       const change = element("button", "Change time", { type: "button" });
       change.addEventListener("click", () => { change.disabled = true; void api.changeBooking(config, receipt, currentSchedule.slots.find(slot => slot.id === slotSelect.value)).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not changed. Please try again."; showConflict(error); }).finally(() => { change.disabled = !currentSchedule.slots.length; }); });
-      const cancel = element("button", "Cancel reservation", { type: "button" });
+      const cancel = element("button", "Cancel booking", { type: "button" });
       cancel.addEventListener("click", () => { cancel.disabled = true; void api.cancelBooking(config, receipt).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not cancelled. Please try again."; }).finally(() => { cancel.disabled = false; }); });
       receiptRoot.append(change, cancel);
     };
-    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; for(const input of intakeInputs.values()) input.disabled=true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value, ...(phone?.value.trim() ? { phone: phone.value.trim() } : {}), ...(schedule.intake ? {intakeAnswers:Object.fromEntries([...intakeInputs].map(([id,input])=>[id,input.value]))} : {}) }).then(next => { receipt = next; updateReceipt(); result.textContent = next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation."; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; showConflict(error); }).finally(() => { reserve.disabled = !currentSchedule.slots.length; for(const input of intakeInputs.values()) input.disabled=false; }); });
+    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; for(const input of intakeInputs.values()) input.disabled=true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value, ...(phone?.value.trim() ? { phone: phone.value.trim() } : {}), ...(schedule.intake ? {intakeAnswers:Object.fromEntries([...intakeInputs].map(([id,input])=>[id,input.value]))} : {}) }).then(next => { receipt = next; updateReceipt(); result.textContent = bookingReceiptPresentation(next, native).heading; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; showConflict(error); }).finally(() => { reserve.disabled = !currentSchedule.slots.length; for(const input of intakeInputs.values()) input.disabled=false; }); });
     root.replaceChildren(wrapper);
   }, error => status(root, error instanceof Error ? error.message : "Booking availability is unavailable."));
 }

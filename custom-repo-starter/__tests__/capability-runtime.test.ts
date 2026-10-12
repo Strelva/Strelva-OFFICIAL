@@ -147,3 +147,16 @@ describe("generated website capability runtime", () => {
     expect(JSON.parse(String(fetcher.mock.calls[2]![1]?.body))).toEqual({ managementToken: receipt.managementToken });
   });
 });
+
+
+describe("generated receipt metadata", () => {
+  it("keeps additive email-confirmation guidance", async () => {
+    const expected = { ...receipt, confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:15:00Z", businessName: "Northstar" };
+    const api = createCapabilityApi(vi.fn().mockResolvedValue(response(expected)));
+    await expect(api.readbackBooking(config, receipt)).resolves.toEqual(expected);
+  });
+  it.each([{ confirmationRequired: "true" }, { confirmationExpiresAt: "tomorrow" }, { confirmationExpiresAt: "2026-10-99T12:15:00Z" }, { businessName: " " }])("rejects invalid receipt guidance %j", async metadata => {
+    const api = createCapabilityApi(vi.fn().mockResolvedValue(response({ ...receipt, ...metadata })));
+    await expect(api.readbackBooking(config, receipt)).rejects.toThrow("incomplete receipt");
+  });
+});

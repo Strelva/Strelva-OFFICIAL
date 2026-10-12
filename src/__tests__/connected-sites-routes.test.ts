@@ -72,6 +72,28 @@ describe("public connect routes", () => {
     expect(store.recordInquiry).toHaveBeenCalledWith(KEY, ORIGIN, expect.objectContaining({ leadId: "lead_inq12345678" }));
     expect(deps.notify).toHaveBeenCalledOnce();
   });
+  it.each([
+    [{ message: "Please reply" }, "Add an email or phone number so we can reply."],
+    [{ email: "not-an-email", message: "Please reply" }, "Enter a valid email address, or clear it and use your phone number."],
+    [{ email: "bad@address", phone: "716-555-0199", message: "Please reply" }, "Enter a valid email address, or clear it and use your phone number."],
+    [{ email: "visitor@example..test", message: "Please reply" }, "Enter a valid email address, or clear it and use your phone number."],
+    [{ email: "visitor@example/test.com", message: "Please reply" }, "Enter a valid email address, or clear it and use your phone number."],
+    [{ email: "pat@example.test", phone: "( ) - .", message: "Please reply" }, "Enter a valid phone number, or clear it and use your email address."],
+    [{ phone: "123456", message: "Please reply" }, "Enter a valid phone number, or clear it and use your email address."],
+    [{ phone: "1234567890123456", message: "Please reply" }, "Enter a valid phone number, or clear it and use your email address."],
+  ])("refuses unusable mounted form contact without recording or sending (%j)", async (fields, error) => {
+    const response = await inquiry({ id: "inq12345678", capture: "strelva-form", fields });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error });
+    expect(store.recordInquiry).not.toHaveBeenCalled();
+    expect(store.recordSpam).not.toHaveBeenCalled();
+    expect(deps.notify).not.toHaveBeenCalled();
+  });
+  it("accepts phone-only mounted inquiries and preserves passive site form capture", async () => {
+    expect((await inquiry({ id: "inq12345678", capture: "strelva-form", fields: { phone: "+1 (716) 555-0199", message: "Please call" } })).status).toBe(201);
+    expect(store.recordInquiry).toHaveBeenCalledWith(KEY, ORIGIN, expect.objectContaining({ fields: expect.objectContaining({ phone: "+1 (716) 555-0199" }) }));
+    expect((await inquiry({ id: "inq12345679", capture: "site-form", fields: { message: "Please help" } })).status).toBe(201);
+  });
   it("refuses no Origin, another Origin, an unverified site and an unknown key, storing nothing", async () => {
     expect((await inquiry(undefined, null)).status).toBe(403);
     expect((await inquiry(undefined, "https://evil.example")).status).toBe(403);

@@ -1,0 +1,13 @@
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 48px; align-items: start; }
+.description { min-width: 0; }
+.form { margin-top: 0; display: flex; flex-direction: column; gap: 16px; }
+.amounts { display: flex; flex-wrap: wrap; gap: 32px; margin-top: 24px; }
+.amount { display: flex; flex-direction: column; gap: 6px; }
+.amountValue { font-size: 24px; font-weight: 600; line-height: 1.3; }
+.fieldsPair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.terms { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.6; }
+.security { display: flex; align-items: flex-start; gap: 8px; }
+.security > svg { flex: 0 0 14px; margin-top: 3px; }
+.state { display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 767px) { .split { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+.line { display: contents; }

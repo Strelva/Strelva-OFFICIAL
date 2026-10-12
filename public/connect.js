@@ -201,6 +201,17 @@
 
   // ---- The Strelva form ---------------------------------------------------
   var INPUT_STYLE = "display:block;width:100%;box-sizing:border-box;margin-top:.3em;padding:.6em .7em;font:inherit;color:inherit;background:transparent;border:1px solid rgba(127,127,127,.55);border-radius:6px";
+  // Keep these contact rules in sync with connected-sites/contracts.ts.
+  var EMAIL_CORRECTION = "Enter a valid email address, or clear it and use your phone number.";
+  var PHONE_CORRECTION = "Enter a valid phone number, or clear it and use your email address.";
+  var CONTACT_REQUIRED = "Add an email or phone number so we can reply.";
+  function validEmail(value) {
+    return value.length <= 320 && /^(?!\.)(?!.*\.\.)[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/.test(value) && value.charAt(value.indexOf("@") - 1) !== ".";
+  }
+  function validPhone(value) {
+    var digits = value.replace(/\D/g, "");
+    return /^\+?[0-9 ().-]{7,24}$/.test(value) && digits.length >= 7 && digits.length <= 15;
+  }
   function field(form, id, label, tag, type, auto) {
     var wrap = d.createElement("div"), l = d.createElement("label"), input = d.createElement(tag);
     l.htmlFor = id; l.textContent = label;
@@ -234,22 +245,42 @@
     button.setAttribute("style", "justify-self:start;padding:.7em 1.3em;font:inherit;cursor:pointer;border-radius:6px");
     form.appendChild(button);
     var status = d.createElement("p");
+    status.id = p + "status";
     status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.setAttribute("style", "margin:0");
     form.appendChild(status);
     var times = d.createElement("section");
     times.setAttribute("aria-label", "Appointment times");
     form.appendChild(times);
+    function correction(input, text) {
+      status.textContent = text;
+      input.setAttribute("aria-invalid", "true");
+      input.setAttribute("aria-describedby", status.id);
+      input.focus();
+    }
+    function clearCorrection(input) {
+      input.removeAttribute("aria-invalid");
+      input.removeAttribute("aria-describedby");
+    }
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (button.disabled) return;
+      clearCorrection(email); clearCorrection(phone); clearCorrection(message);
       if (!granted) { status.textContent = "Allow Strelva to send this form before continuing, or call or email us."; return; }
-      if (!email.value.trim() && !phone.value.trim()) { status.textContent = "Add an email or phone number so we can reply."; email.focus(); return; }
-      if (!message.value.trim() && !name.value.trim()) { status.textContent = "Tell us a little about what you need."; message.focus(); return; }
+      var emailValue = email.value.trim(), phoneValue = phone.value.trim();
+      if (emailValue && !validEmail(emailValue)) { correction(email, EMAIL_CORRECTION); return; }
+      if (phoneValue && !validPhone(phoneValue)) { correction(phone, PHONE_CORRECTION); return; }
+      if (!emailValue && !phoneValue) { correction(email, CONTACT_REQUIRED); return; }
+      if (!message.value.trim() && !name.value.trim()) { correction(message, "Tell us a little about what you need."); return; }
       button.disabled = true; status.textContent = "Sending…"; times.textContent = "";
       var fields = {}, list = [name, email, phone, message];
       for (var i = 0; i < list.length; i++) if (list[i].value.trim()) fields[list[i].name] = list[i].value.trim().slice(0, 5000);
       w.fetch(base + "/inquiries", { method: "POST", credentials: "omit", headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ id: "i" + rand(22), sid: session(), capture: "strelva-form", path: location.pathname, _hp: hp.value, fields: fields }) })
         .then(function (r) {
+          if (r.status === 400) return r.json().catch(function () { return null; }).then(function (body) {
+            var text = body && body.error;
+            throw new Error(text === EMAIL_CORRECTION || text === PHONE_CORRECTION || text === CONTACT_REQUIRED ? text : "Failed");
+          });
           if (!r.ok) throw new Error(String(r.status));
           return r.json().catch(function () { return null; });
         })
@@ -273,7 +304,12 @@
             row.appendChild(link); times.appendChild(row);
           }
         })
-        .catch(function () { status.textContent = "That didn't send. Please try again, or call or email us."; })
+        .catch(function (error) {
+          var detail = error && error.message;
+          if (detail === EMAIL_CORRECTION || detail === CONTACT_REQUIRED) correction(email, detail);
+          else if (detail === PHONE_CORRECTION) correction(phone, detail);
+          else status.textContent = "That didn't send. Please try again, or call or email us.";
+        })
         .then(function () { button.disabled = false; });
     });
     host.appendChild(form);

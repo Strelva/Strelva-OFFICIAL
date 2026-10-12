@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicBookingError } from "@/platform/bookings/errors";
 const mocks = vi.hoisted(() => ({ limit: vi.fn(), read: vi.fn(), reserve: vi.fn(), confirm: vi.fn(), change: vi.fn(), cancel: vi.fn(), recover: vi.fn(), identity: vi.fn() }));
-vi.mock("@/platform/bookings/public-identity", () => ({ readPublicBookingIdentity: mocks.identity }));
+vi.mock("@/products/scheduling/public-visitor-receipt", () => ({ readVisitorConfirmation: mocks.identity, readVisitorPresentationTime: async () => Date.parse("2026-11-06T12:00:00Z") }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: mocks.limit, rateLimitKey: (_r: Request, prefix: string) => prefix + ":fixture-ip" }));
 vi.mock("@/products/scheduling/server", () => ({ PublicBookingError, publicBookingRangeSchema: { safeParse: (data: unknown) => ({ success: true, data }) }, publicBookingVisitorSchema: { safeParse: (data: unknown) => ({ success: true, data }) },
   recoverPublicWebsiteBooking: mocks.recover, createPublicWebsiteBookingService: () => ({ read: mocks.read, reserve: mocks.reserve, confirm: mocks.confirm, change: mocks.change, cancel: mocks.cancel }) }));

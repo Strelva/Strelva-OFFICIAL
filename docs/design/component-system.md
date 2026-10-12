@@ -2004,3 +2004,21 @@ claim and Live status. Prepared links, owner acceptance and verified publication
 remain distinct evidence. Source publication never proves the owner’s separate
 client copy is live. These changes have local source/DOM evidence; actual
 Auth, provider execution and desktop/phone rendering require separate proof.
+### October 12 · visitor booking and payment shell
+
+[VisitorBookingShell](../../src/experience/bookings/VisitorBookingShell.tsx) is
+the shared business header, type and button system for booking choices,
+confirmation, management and business payments. Its optional `wide` and
+`navigation` props retain the same header for wider calendar and payment
+layouts. Unknown business identity shows neutral copy. The existing
+`--visitor-*` variables supply business colors; primary buttons use the business
+accent or neutral ink, with paired foreground, visible focus and 44px targets.
+The business is the only visible brand.
+
+Inquiry receipts distinguish customer email confirmation, waiting on the
+business, confirmed and ended states. Saved confirmation deadlines and readable
+times include a zone. Public payments place issued refund/cancellation terms
+beside the amount and hold the pay action when required terms are absent.
+Visitor and deposit fixtures compose the same shell. Local component and
+contract tests cover those states; browser, SQL execution, provider delivery
+and production proof remain outstanding under the audit's disk stop point.

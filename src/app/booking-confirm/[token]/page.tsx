@@ -1,4 +1,5 @@
-import { readPublicBookingIdentity } from "@/platform/bookings/public-identity";
+import { readVisitorConfirmation } from "@/products/scheduling/public-visitor-receipt";
+import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 import type { Metadata } from "next";
 import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";
 import styles from "@/experience/bookings/visitor.module.css";
@@ -13,23 +14,26 @@ export default async function BookingConfirmationPage({ params, searchParams }: 
 }) {
   const { token } = await params;
   const query = await searchParams;
-  const identity = await readPublicBookingIdentity(token).catch(() => null);
+  const identity = await readVisitorConfirmation(token).catch(() => null);
   const done = identity?.state === "placed";
   const confirmed = done && identity.bookingStatus === "confirmed";
   const cancelled = done && (identity.bookingStatus === "cancelled" || identity.bookingStatus === "declined");
   const error = typeof query.error === "string" || !identity;
   return <VisitorBookingShell siteName={identity?.businessName}>
     <div className={styles.surface}>
-      <h1 className={styles.title}>{done ? cancelled ? "Your booking is no longer active" : confirmed ? "Your booking is confirmed" : "Your email is confirmed" : "Confirm your booking request"}</h1>
+      <h1 className={styles.title}>{done ? cancelled ? "Your booking is no longer active" : confirmed ? "Confirmed" : `Waiting on ${identity?.businessName || "the business"}` : identity?.state === "confirming" ? "Outcome not confirmed" : "Confirm your booking request"}</h1>
       <div className={styles.section}>
         <p role={error ? "alert" : undefined} className={styles.intro}>{error
           ? query.error === "rate" ? "Too many tries. Wait a minute and try again." : "This confirmation could not complete. The link may have expired or the time may have been taken. Contact the business before requesting again."
-          : done ? cancelled ? "This booking was cancelled or declined. Contact the business about another time." : confirmed ? "Your time is booked. Use your booking email to change or cancel it." : "Your email is confirmed. Check your booking email for the current request status."
-          : "Confirm within 15 minutes. Nothing is booked until you confirm your email. The business may still need to accept your request."}</p>
-        {identity ? <p className={styles.note}>Requested time: {new Date(identity.start).toLocaleString("en-US", { timeZone: "UTC" })} UTC</p> : null}
-        {!done && !error ? <form method="post" action={`/booking-confirm/${encodeURIComponent(token)}/action`} className="mt-6">
+          : done ? cancelled ? "This booking was cancelled or declined. Contact the business about another time." : confirmed ? "Your time is booked. Use your booking email to change or cancel it." : "Your email is confirmed. The business will reply to accept this time or suggest another. Use your booking email to check, change or cancel your request."
+          : identity?.state === "confirming" ? "Your email was received, but the booking outcome is not confirmed. Reload to read its current status, or contact the business."
+          : "Nothing is booked until you confirm your email. The business may then need to accept your request."}</p>
+        {identity ? <p className={styles.note}>Requested time: {formatVisitorTime(identity.start, identity.timeZone)}</p> : null}
+        {!done && identity?.expiresAt ? <p className={styles.note}>Confirm by {formatVisitorTime(identity.expiresAt, identity.timeZone)}.</p> : null}
+        {!done && !error && identity?.state === "held" ? <form method="post" action={`/booking-confirm/${encodeURIComponent(token)}/action`} className="mt-6">
           <button type="submit" className={styles.button}>Confirm my email and request this time</button>
         </form> : null}
+        {identity?.state === "confirming" || error ? <a className={`${styles.button} ${styles.secondary} mt-6`} href={`/booking-confirm/${encodeURIComponent(token)}`}>Read current status</a> : null}
       </div>
     </div>
   </VisitorBookingShell>;

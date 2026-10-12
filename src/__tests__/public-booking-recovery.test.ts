@@ -106,6 +106,14 @@ function dependencies(options: {
 }
 
 describe("public booking readback recovery", () => {
+  it("retains the saved email deadline during status checks without recovering a calendar", async () => {
+    const deps = dependencies();
+    const presentation = vi.fn(async () => ({ confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:55:00Z", businessName: "Northstar" }));
+    const result = await recoverPublicWebsiteBooking({ tenantId, reservationId, managementToken }, { ...deps, admission: { ...deps.admission, presentation } });
+    expect(result).toMatchObject({ status: "pending", confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:55:00Z", businessName: "Northstar" });
+    expect(deps.resolve).not.toHaveBeenCalled(); expect(deps.calendar.read).not.toHaveBeenCalled(); expect(deps.calendar.recover).not.toHaveBeenCalled();
+    expect(deps.admission.verified).not.toHaveBeenCalled();
+  });
   it.each(["pending", "cancelled"] as const)("returns an unverified %s receipt without resolving or reconciling the provider", async status => {
     const deps = dependencies({ currentRef: ref({ status }) });
     deps.admission.verified.mockResolvedValue(false);
