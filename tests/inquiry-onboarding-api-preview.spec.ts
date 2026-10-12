@@ -171,7 +171,7 @@ test("failed API scan keeps all seven editable facts and a correction survives r
   const { actions } = await mockInquiryWorkspace(page);
 
   await page.goto("/business/gldf", { waitUntil: "domcontentloaded" });
-  await expect(page.getByRole("heading", { name: "What should Strelva handle?", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inquiries", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check business details", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Start with what the website can show.", exact: true })).toBeVisible();
 

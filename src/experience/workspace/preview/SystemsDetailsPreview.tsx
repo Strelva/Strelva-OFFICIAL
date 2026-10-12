@@ -25,7 +25,6 @@ export function CalendarConnectionPreview({ state, mode }: { state: SystemDetail
 export function ReadOnlyStorePreview({ state, mode }: { state: SystemDetailFixtureState; mode: "light" | "dark" }) {
   const [retry, setRetry] = useState(false);
   return <SystemsCanonShell businessName="Lakeview Yoga" systemName="Store · Square" mode={mode} pins={[{ id: "website", title: "lakeviewyoga.com", href: "/preview/strelva/website", kind: "website" }, { id: "classes", title: "Classes", href: "/preview/strelva/sessions", kind: "bookings" }]}>
-    <StPage><StSection title="Connections"><StTextButton href="/preview/strelva/store">Square · store orders</StTextButton></StSection></StPage>
     <StoreConnection systemsHref="/preview/strelva?scenario=business&systems=on&view=apps" provider="Square" status="connected" freshness="Read 6 min ago" orders={storeOrdersFixture} state={state} onRetry={() => setRetry(true)} />
     {retry ? <StPage><StNotice>This is a simulated read failure. No Square request was made.</StNotice></StPage> : null}
   </SystemsCanonShell>;

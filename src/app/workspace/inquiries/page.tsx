@@ -4,6 +4,10 @@ import { readPlace } from "@/platform/owner-entry/place-state";
 import { readWorkspaceInquiryInbox } from "@/products/inquiries";
 import { z } from "zod";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
+import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
+import { listWorkspaces } from "@/platform/workspaces";
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { StPage } from "@/components/ui/strelva/Kit";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Inquiries", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -13,6 +17,12 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const { workspaceId, actor } = await openWorkspacePlace(params, "/workspace/inquiries");
   const cursor = z.object({ before: z.iso.datetime({ offset: true }), beforeId: z.string().uuid() }).safeParse(params);
-  const state = await readPlace("inquiries", workspaceId, () => readWorkspaceInquiryInbox(actor, workspaceId, cursor.success ? cursor.data : undefined));
-  return <WorkspaceInquiries workspaceId={workspaceId} state={state} />;
+  const [state, workspaces, systemsReleased] = await Promise.all([
+    readPlace("inquiries", workspaceId, () => readWorkspaceInquiryInbox(actor, workspaceId, cursor.success ? cursor.data : undefined)),
+    listWorkspaces(actor).catch(() => []),
+    systemsReleasedFor(actor, workspaceId).catch(() => false),
+  ]);
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}>
+    <StPage><WorkspaceInquiries workspaceId={workspaceId} state={state} embedded /></StPage>
+  </WorkspaceSurfaceShell>;
 }

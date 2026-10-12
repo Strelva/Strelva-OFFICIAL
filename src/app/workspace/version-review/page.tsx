@@ -1,3 +1,4 @@
+import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
 import { z } from "zod";
 import { notFound, redirect } from "next/navigation";
 import { StHead, StNotice, StPage, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
@@ -27,7 +28,7 @@ export default async function VersionReviewPage({ searchParams }: { searchParams
     if (!item || item.workspaceId !== workspaceId || item.systemId !== systemId || item.sourceLifecycle !== "version_release" || item.sourceId !== version.versionId) notFound();
     review = { item, label: version.label };
   } catch {
-    return <StPage><StHead title="Prepared review" /><StNotice tone="critical">This exact review could not be verified for your access. Nothing changed.</StNotice></StPage>;
+    return <WorkspaceSurfaceShell workspaceId={workspaceId}><StPage><StHead title="Prepared review" /><StNotice tone="critical" action={<StTextButton href={`/workspace?${new URLSearchParams({ workspaceId })}`}>Back to workspace</StTextButton>}>This exact review could not be verified for your access. Nothing changed.</StNotice></StPage></WorkspaceSurfaceShell>;
   }
-  return <main data-workspace-theme="linen"><StPage><StHead title={review.item.title} crumb={{ label: review.label, href: systemHref("", workspaceId, systemId) }} meta={`Review ${decisionId}`} /><StSection title="Prepared review"><p>{review.item.detail}</p><StRows><StRow title="Current decision" detail={review.item.state.replaceAll("_", " ")} /><StRow title="If approved" detail={review.item.approveEffect} /><StRow title="If held" detail={review.item.notYetEffect} /></StRows><StNotice>The business owner decides. Opening this review does not approve or publish it.</StNotice><StTextButton href={`/workspace?${new URLSearchParams({ workspaceId, view: "needs-you" })}#decision-${decisionId}`}>Open this decision in Needs you</StTextButton></StSection></StPage></main>;
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} systemsReleased><StPage><StHead title={review.item.title} crumb={{ label: review.label, href: systemHref("", workspaceId, systemId) }} meta={`Review ${decisionId}`} /><StSection title="Prepared review"><p>{review.item.detail}</p><StRows><StRow title="Current decision" detail={review.item.state.replaceAll("_", " ")} /><StRow title="If approved" detail={review.item.approveEffect} /><StRow title="If held" detail={review.item.notYetEffect} /></StRows><StNotice>The business owner decides. Opening this review does not approve or publish it.</StNotice><StTextButton href={`/workspace?${new URLSearchParams({ workspaceId, view: "needs-you" })}#decision-${decisionId}`}>Open this decision in Needs you</StTextButton></StSection></StPage></WorkspaceSurfaceShell>;
 }

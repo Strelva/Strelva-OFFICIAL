@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { InquiryExperience, InquiryWorkspaceExperience, type InquiryExperienceProps } from "./InquiryExperience";
 import type { InquirySurfaceAdapter, InquirySurfaceResult, InquirySurfaceSnapshot } from "./contracts";
 import styles from "./inquiry.module.css";
+import { StHead, StNotice, StPage, StPill, StTextButton } from "@/components/ui/strelva/Kit";
 
 export type InquiryServerExperienceProps = Omit<InquiryExperienceProps, "adapter" | "initialSnapshot" | "scenario"> & {
   tenantId: string;
@@ -118,5 +119,5 @@ function readResult(value: unknown): InquirySurfaceResult | null {
 }
 
 function ServerStatus({ error }: { error: string }) {
-  return <main className={styles.unavailablePage} role={error ? "alert" : "status"}><div className={styles.unavailablePanel}><span className={styles.eyebrow}>{error ? "INQUIRIES UNAVAILABLE" : "LOADING INQUIRIES"}</span><h1 className="font-display">{error ? "This business could not be loaded." : "Loading this Business scope…"}</h1><p>{error || "Checking the authorized inquiry state."}</p>{error ? <button type="button" className={styles.secondaryButton} onClick={() => window.location.reload()}>Try again</button> : null}</div></main>;
+  return <main className={styles.unavailablePage} data-workspace-theme="linen" role={error ? "alert" : "status"}><StPage><StHead title={error ? "This business could not be loaded." : "Loading inquiries…"} meta={error || "Checking the authorized inquiry state."} />{error ? <><StNotice tone="critical">No preview data was substituted.</StNotice><StPill variant="soft" onClick={() => window.location.reload()}>Try again</StPill><StTextButton href="/business">Choose another business</StTextButton></> : null}</StPage></main>;
 }

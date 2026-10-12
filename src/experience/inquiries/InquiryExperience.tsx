@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import {
-  AlertCircle,
-  CheckCircle2,
   Clock3,
   LayoutList,
   LockKeyhole,
@@ -21,6 +19,9 @@ import { InquiryProvider, type InquiryExperienceProps, useInquiry } from "./cont
 import type { InquiryView } from "./contracts";
 import { ViewRouter } from "./views";
 import styles from "./inquiry.module.css";
+import shellStyles from "@/experience/app-frame/strelva-shell.module.css";
+import sidebarStyles from "@/experience/app-frame/strelva-sidebar.module.css";
+import { StEmpty, StHead, StNotice, StPage, StPill, StSteps, StTextButton } from "@/components/ui/strelva/Kit";
 import { inquiryActorLabel } from "./recorded-actors";
 
 export type { InquiryExperienceProps } from "./context";
@@ -90,7 +91,7 @@ export function InquiryWorkspaceExperience({
 }
 
 function MissingAdapter() {
-  return <main className={styles.unavailablePage}><div className={styles.unavailablePanel}><span className={styles.eyebrow}>INQUIRIES UNAVAILABLE</span><h1 className="font-display">This business could not be loaded.</h1><p>Refresh to try again. No preview data was substituted for the authorized business state.</p></div></main>;
+  return <main className={styles.unavailablePage} data-workspace-theme="linen"><StPage><StHead title="This business could not be loaded." /><StNotice tone="critical">Refresh to try again. No preview data was substituted for the authorized business state.</StNotice><StTextButton href="/business">Choose another business</StTextButton></StPage></main>;
 }
 
 function titleForView(view: InquiryView, audience: "business" | "agency"): string {
@@ -113,10 +114,10 @@ function InquiryFrame() {
   const audience = snapshot.audience;
   const rightRail = selectedRecord ? <RecordTimelineRail /> : null;
   return (
-    <div className={styles.experience} data-dashboard data-audience={audience} data-rehearsal={snapshot.rehearsal || view === "rehearsal" || undefined}>
+    <div className={`${shellStyles.root} ${styles.experience}`} data-workspace-theme="linen" data-dashboard data-audience={audience} data-rehearsal={snapshot.rehearsal || view === "rehearsal" || undefined}>
       <a className={styles.skip} href="#inquiry-main">Skip to inquiries</a>
       <AppFrame
-        className={styles.frame}
+        className={`${shellStyles.shell} ${styles.frame}`}
         navigationLabel="Inquiry navigation"
         navigationStorageKey={`strelva:inquiries:${audience}:rail`}
         navigationOpen={mobileOpen}
@@ -128,7 +129,7 @@ function InquiryFrame() {
           <button ref={menuRef} className={styles.mobileMenu} type="button" onClick={() => setMobileOpen(true)} disabled={!ready} aria-label="Open inquiry navigation" aria-expanded={mobileOpen}><Menu size={18} aria-hidden="true" /></button>
           <span className={styles.headerTitle}>{titleForView(view, audience)}</span>
           <span className={styles.headerContext}><span className={styles.contextDot} aria-hidden="true" />{snapshot.business.name}</span>
-          {selectedRecord && view === "record" ? <button ref={historyTrigger} type="button" className={styles.secondaryButton} aria-expanded={historyOpen} aria-controls="inquiry-record-timeline" onClick={() => { setOpenedRecordId(selectedRecord.id); setClosedRecordId(null); }}>Record history</button> : null}
+          {selectedRecord && view === "record" ? <StPill ref={historyTrigger} type="button" variant="soft" aria-expanded={historyOpen} aria-controls="inquiry-record-timeline" onClick={() => { setOpenedRecordId(selectedRecord.id); setClosedRecordId(null); }}>Record history</StPill> : null}
           {snapshot.readOnly ? <span className={styles.readOnlyTag}><LockKeyhole size={13} aria-hidden="true" />Read only</span> : null}
         </div>}
         notice={<InquiryNotice />}
@@ -152,10 +153,10 @@ export function InquiryEmbeddedContent() {
 function InquiryEmbeddedNavigation() {
   const { view, navigate } = useInquiry();
   return <nav className={styles.embeddedNav} aria-label="Inquiries">
-    <button type="button" className={view === "new" ? styles.embeddedNavActive : undefined} onClick={() => navigate("new")}>New</button>
-    <button type="button" className={view === "search" ? styles.embeddedNavActive : undefined} onClick={() => navigate("search")}>Search</button>
-    <button type="button" className={view === "work" || view === "receipt" || view === "record" ? styles.embeddedNavActive : undefined} onClick={() => navigate("work")}>Recent changes</button>
-    <button type="button" className={view === "account" ? styles.embeddedNavActive : undefined} onClick={() => navigate("account")}>Account</button>
+    <StTextButton type="button" aria-current={view === "new" ? "page" : undefined} onClick={() => navigate("new")}>New</StTextButton>
+    <StTextButton type="button" aria-current={view === "search" ? "page" : undefined} onClick={() => navigate("search")}>Search</StTextButton>
+    <StTextButton type="button" aria-current={view === "work" || view === "receipt" || view === "record" ? "page" : undefined} onClick={() => navigate("work")}>Recent changes</StTextButton>
+    <StTextButton type="button" aria-current={view === "account" ? "page" : undefined} onClick={() => navigate("account")}>Account</StTextButton>
   </nav>;
 }
 
@@ -165,7 +166,7 @@ export function InquirySurfaceContent() {
 }
 
 function UnavailableBusiness() {
-  return <section className={styles.unavailablePanel} role="alert" aria-labelledby="inquiries-unavailable-title"><span className={styles.eyebrow}>INQUIRIES UNAVAILABLE</span><h1 id="inquiries-unavailable-title" className="font-display">This business could not be loaded.</h1><p>The authorized inquiry state is unavailable right now. No preview data was substituted.</p></section>;
+  return <StPage><StHead titleId="inquiries-unavailable-title" title="This business could not be loaded." /><StNotice tone="critical">The authorized inquiry state is unavailable right now. No preview data was substituted.</StNotice><StTextButton href="/business">Choose another business</StTextButton></StPage>;
 }
 
 export function InquiryNotice() {
@@ -183,50 +184,50 @@ export function InquiryNotice() {
 function Feedback() {
   const { message, error } = useInquiry();
   if (!message && !error) return null;
-  return <div className={`${styles.feedback} ${error ? styles.feedbackError : styles.feedbackSuccess}`} role={error ? "alert" : "status"}>
-    {error ? <AlertCircle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
-    <span>{error || message}</span>
-  </div>;
+  return <div className={styles.feedback} role={error ? undefined : "status"}><StNotice tone={error ? "critical" : undefined}>{error || message}</StNotice></div>;
 }
 
 function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose: () => void }) {
   const { snapshot, view, navigate, basePath } = useInquiry();
   const recent = snapshot.state.requests.slice(0, 3);
   const agency = snapshot.audience === "agency";
-  return <aside className={styles.sidebar} data-open={mobileOpen}>
-    <div className={styles.brandRow}>
-      <Link href={basePath} className={styles.brand} onClick={(event) => {
-        // The view lives in provider state, so a link to the page already open
-        // would change nothing. Go to the inquiry home view instead.
-        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0 && window.location.pathname === basePath) {
+  return <aside className={sidebarStyles.sidebar} data-open={mobileOpen}>
+    <div className={sidebarStyles.brandRow}>
+      <Link href={basePath} className={sidebarStyles.brand} onClick={(event) => {
+        if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) {
           event.preventDefault();
           navigate("home", { requestId: null, inquiryId: null });
         }
         onClose();
-      }} aria-label="Strelva inquiries home"><LogoMark className={styles.brandMark} /><span className="font-display">Strelva</span></Link>
-      <button className={styles.mobileClose} type="button" onClick={onClose} aria-label="Close inquiry navigation"><X size={18} /></button>
+      }} aria-label={`${snapshot.business.name} inquiries home`}><span>{snapshot.business.name}</span></Link>
+      <button className={sidebarStyles.mobileClose} type="button" onClick={onClose} aria-label="Close inquiry navigation"><X size={18} /></button>
     </div>
-    <div className={styles.scopeBlock}><span className={styles.eyebrow}>{agency ? "CLIENT" : "BUSINESS"}</span><strong>{snapshot.business.name}</strong><small>{snapshot.business.domain || "Website not recorded"}</small></div>
-    <nav className={styles.sidebarNav} aria-label="Inquiries">
-      <SidebarButton icon={Plus} label="New" active={view === "new"} onClick={() => { navigate("new"); onClose(); }} />
-      <SidebarButton icon={Search} label="Search" active={view === "search"} onClick={() => { navigate("search"); onClose(); }} />
-      <Link className={`${styles.sidebarButton} ${view === "attention" ? styles.sidebarButtonActive : ""}`} href={agency ? "/business" : "/business"} onClick={onClose} aria-current={view === "attention" ? "page" : undefined}><LayoutList size={17} strokeWidth={1.6} aria-hidden="true" /><span>{agency ? "Clients" : "Businesses"}</span></Link>
-      <SidebarButton icon={Clock3} label="Recent changes" active={view === "work" || view === "receipt" || view === "record"} onClick={() => { navigate("work"); onClose(); }} />
-    </nav>
-    {recent.length > 0 ? <div className={styles.recentRail} aria-label="Recent inquiry changes"><span className={styles.eyebrow}>RECENT</span>{recent.map((work) => <button key={work.id} type="button" onClick={() => { navigate("work", { requestId: work.id }); onClose(); }}><span>{work.intent}</span><small>{work.state.replaceAll("_", " ")}</small></button>)}</div> : null}
-    <div className={styles.sidebarFooter}><SidebarButton icon={UserRound} label="Account" active={view === "account"} onClick={() => { navigate("account"); onClose(); }} /></div>
+    <div className={sidebarStyles.body}>
+      <nav className={sidebarStyles.primary} aria-label="Inquiries">
+        <SidebarButton icon={LayoutList} label="Inquiries" active={view === "home"} onClick={() => { navigate("home", { requestId: null, inquiryId: null }); onClose(); }} />
+        <SidebarButton icon={Plus} label="New" active={view === "new"} onClick={() => { navigate("new"); onClose(); }} />
+        <SidebarButton icon={Search} label="Search" active={view === "search"} onClick={() => { navigate("search"); onClose(); }} />
+        <Link className={sidebarStyles.navItem} href="/business" onClick={onClose}><LayoutList size={17} strokeWidth={1.6} aria-hidden="true" /><span>{agency ? "Clients" : "Businesses"}</span></Link>
+        <SidebarButton icon={Clock3} label="Recent changes" active={view === "work" || view === "receipt" || view === "record"} onClick={() => { navigate("work"); onClose(); }} />
+      </nav>
+      {recent.length > 0 ? <section className={sidebarStyles.recent} aria-label="Recent inquiry changes"><h2>Recent</h2>{recent.map((work) => <button className={sidebarStyles.navItem} key={work.id} type="button" title={work.intent} onClick={() => { navigate("work", { requestId: work.id }); onClose(); }}><span>{work.intent}</span></button>)}</section> : null}
+    </div>
+    <div className={sidebarStyles.footer}>
+      <div className={styles.platformMark} aria-label="Strelva platform"><LogoMark aria-hidden="true" />Strelva</div>
+      <button type="button" className={sidebarStyles.account} aria-current={view === "account" ? "page" : undefined} onClick={() => { navigate("account"); onClose(); }}><span className={sidebarStyles.avatar} aria-hidden="true"><UserRound size={16} /></span><span><strong>{snapshot.account?.name || "Your account"}</strong><small>{snapshot.account?.email || "Account"}</small></span></button>
+    </div>
   </aside>;
 }
 
 function SidebarButton({ icon: Icon, label, active, onClick }: { icon: LucideIcon; label: string; active: boolean; onClick: () => void }) {
-  return <button type="button" className={`${styles.sidebarButton} ${active ? styles.sidebarButtonActive : ""}`} onClick={onClick} aria-current={active ? "page" : undefined}><Icon size={17} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span></button>;
+  return <button type="button" className={sidebarStyles.navItem} onClick={onClick} aria-current={active ? "page" : undefined}><Icon size={17} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span></button>;
 }
 
 function RecordTimelineRail() {
   const { selectedRecord, snapshot } = useInquiry();
   if (!selectedRecord) return null;
   const events = snapshot.state.timeline.filter((event) => event.inquiryId === selectedRecord.id).sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
-  return <section className={styles.recordRailContent}><span className={styles.eyebrow}>EVIDENCE</span><h2 className="font-display">Record timeline</h2><p>Each event is retained with the inquiry record.</p>{snapshot.deliveryEvidence?.available === false ? <p role="status">Delivery evidence is unavailable right now. Provider outcomes may be missing.</p> : null}{events.length > 0 ? <ol className={styles.railTimeline}>{events.map((event) => <li key={event.id}><span className={styles.eventDot} aria-hidden="true" /><div><strong>{event.type.replaceAll("_", " ")}</strong><small>{event.summary}</small><small>{inquiryActorLabel(event.actor)} · {formatRailDate(event.at)} · {event.outcome}</small></div></li>)}</ol> : <p>No timeline events are recorded for this inquiry.</p>}</section>;
+  return <section className={styles.recordRailContent}><h2>Record timeline</h2><p>Each event is retained with the inquiry record.</p>{snapshot.deliveryEvidence?.available === false ? <StNotice>Delivery evidence is unavailable right now. Provider outcomes may be missing.</StNotice> : null}{events.length > 0 ? <StSteps label="Inquiry record history" steps={events.map(event => ({ title: event.type.replaceAll("_", " "), state: event.outcome === "failed" || event.outcome === "blocked" ? "failed" : "done", detail: <>{event.summary}<small className={styles.timelineMeta}>{inquiryActorLabel(event.actor)} · {formatRailDate(event.at)} · {event.outcome}</small></> }))} /> : <StEmpty>No timeline events are recorded for this inquiry.</StEmpty>}</section>;
 }
 
 function formatRailDate(value: string): string {

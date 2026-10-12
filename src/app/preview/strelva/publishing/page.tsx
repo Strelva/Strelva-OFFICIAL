@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function PublishingPreviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; state?: string; mode?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { kind, state = "ready", mode } = await searchParams;
-  if (kind === "record") return <PublishingRecordPreview state={state} />;
+  if (kind === "record") return <PublishingPreviewFrame place="Business hours" mode={mode}><PublishingRecordPreview state={state} /></PublishingPreviewFrame>;
   const place = kind === "google" ? "Google listing" : kind === "unsubscribe" ? "Newsletter preferences" : kind === "newsletter" ? "Newsletter" : "Website content";
   return <PublishingPreviewFrame place={place} mode={mode} publicPage={kind === "unsubscribe"}>
     {kind === "google" ? <PublishingGooglePreview state={state} /> : kind === "unsubscribe" ? <UnsubscribePreview state={state} /> : <PublishingContentPreview kind={kind === "newsletter" ? "newsletter" : "website"} state={state} />}
