@@ -41,18 +41,18 @@ describe("make it yourself instead", () => {
   it("shows the button on a managed request, switches the proposal and sends nothing", async () => {
     const onHelp = vi.fn(); const onContinue = vi.fn();
     const node = await render(createElement(WorkspaceStart, { initialRequest: "Build a new website", context: managed, onContinue, onHelp }));
-    expect(node.textContent).toContain("Have Strelva build your website");
+    expect(node.textContent).toContain("Have an agency build your website");
     const choice = button(node, "Make it yourself instead");
     expect(choice).toBeTruthy();
     await act(async () => choice!.click());
     expect(node.textContent).toContain("Your website");
-    expect(node.textContent).not.toContain("Have Strelva build your website");
+    expect(node.textContent).not.toContain("Have an agency build your website");
     expect(button(node, "Make it yourself instead")).toBeUndefined();
     expect(onHelp).not.toHaveBeenCalled(); expect(onContinue).not.toHaveBeenCalled();
   });
   it("hides the button where self-service is not offered", async () => {
     const node = await render(createElement(WorkspaceStart, { initialRequest: "Build a new website", context: { ...managed, products: managed.products!.filter(item => item.id !== "websites") }, onContinue: vi.fn(), onHelp: vi.fn() }));
-    expect(node.textContent).toContain("Have Strelva build your website");
+    expect(node.textContent).toContain("Have an agency build your website");
     expect(button(node, "Make it yourself instead")).toBeUndefined();
   });
 });

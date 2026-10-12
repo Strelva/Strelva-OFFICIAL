@@ -8,6 +8,7 @@ import {
   AskConversationNotFoundError,
   askReleaseMayBeOn,
   createNeedsYouAskAdapter,
+  askAgencyFromOptions,
   createServiceRequestAdapter,
   createSupabaseAskHistory,
   createTenantEventNeedsYouAdapter,
@@ -21,6 +22,7 @@ import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
 import { createAskPossibilityPort } from "./possibilities-server";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
+import { readServiceRequestProviders } from "@/platform/service-requests/provider-options";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { createSupabaseSystemStore, listBusinessSystems } from "@/platform/systems";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
@@ -57,10 +59,11 @@ function askNeedsYou(actor: WorkspaceActor): { port: NeedsYouPort; path: string 
             if (!classification) return event;
             const origin = draft.askedOnBehalf ? "owner_interpreted" : draft.origin;
             const policy = evaluateRoute({ ...classification, origin, systemId: draft.systemId, policies });
-            // Ask only proposes. A policy that could handle routine work still
-            // goes to Strelva's review here; chat never becomes its own publisher.
-            const route = policy.route === "owner_decides" ? "owner_decides" : "strelva_reviews";
-            return { ...event, metadata: { ...event.metadata, reviewAudience: route === "owner_decides" ? "owner" : "operator",
+            // Ask only proposes, and the business decides (ADR 0015): every Ask
+            // draft lands in the owner's Needs you, never an operator queue. A
+            // policy that could handle routine work still waits for the owner;
+            // chat never becomes its own publisher.
+            return { ...event, metadata: { ...event.metadata, reviewAudience: "owner",
               askStrelva: { workspaceId: draft.workspaceId, systemId: draft.systemId, toolId: draft.toolId,
                 origin, askedOnBehalf: draft.askedOnBehalf, evaluatedRoute: policy.route, policyRule: policy.rule } } };
           });
@@ -94,7 +97,9 @@ export async function POST(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
     if (await isRateLimitedAsync(`ask:${actor.userId}`, 30)) return workspaceJson({ error: "Too many requests. Try again in a minute." }, 429);
     const body = await readWorkspaceBody(request, 150_000);
-    const requests = createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore));
+    // ADR 0015: a Request goes to the business's recorded agency, never a default one.
+    const requests = createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore),
+      async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId)));
     const needsYou = askNeedsYou(actor);
     const deps: AskTurnDeps = {
       isOperator: await isSuperAdmin(),

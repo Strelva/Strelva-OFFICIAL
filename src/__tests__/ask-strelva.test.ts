@@ -5,6 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("ai", () => ({ tool: (def: unknown) => def }));
 
 import {
+  type AskAgency,
+  AskAgencyRequiredError,
+  askAgencyFromOptions,
+  createServiceRequestAdapter,
   ASK_REFUSAL_CODES,
   ASK_REFUSALS,
   ASK_REPLACED_TENANT_TOOLS,
@@ -212,6 +216,7 @@ function harness(options: {
   isOperator?: boolean;
   script?: ModelScript;
   tenantTools?: Record<string, { execute: (input: unknown) => Promise<unknown> }>;
+  agency?: AskAgency;
 } = {}) {
   let membership: AskMembership | null = { role: options.role ?? "owner", access: "member", kind: "customer" };
   let websites = options.managedWebsites ?? [site(MOONEY, "mooney", "The Mooney Firm")];
@@ -228,7 +233,10 @@ function harness(options: {
     inquiriesEnabled: () => false,
     needsYou: createTenantEventNeedsYouAdapter(),
     requests: {
-      file: async (_actor, input) => { filed.push(input as unknown as Record<string, unknown>); return { id: `req-${filed.length}`, status: "requested" }; },
+      // The converted clients' recorded agency is Strelva Agency; a business
+      // without a site has none unless the test says so.
+      agency: async () => options.agency ?? (websites.length ? { kind: "one", agencyWorkspaceId: "00000000-0000-4000-8000-0000000000aa", name: "Strelva Agency" } : { kind: "none" }),
+      file: async (_actor, input) => { filed.push(input as unknown as Record<string, unknown>); return { id: `req-${filed.length}`, status: "requested", agencyName: "Strelva Agency" }; },
       list: async () => [],
     },
     possibilities: createPossibilityAdapter(repository, { durable: false, newId: () => "poss-1", now: () => at }),
@@ -314,6 +322,29 @@ describe("startAskTurn", () => {
     const result = await run(h.deps, "Add a booking page");
     expect(h.filed).toHaveLength(0);
     expect(result.text).toContain("Start");
+  });
+
+  it("names the business's recorded agency, never Strelva, when it files (ADR 0015)", async () => {
+    const h = harness({ agency: { kind: "one", agencyWorkspaceId: "00000000-0000-4000-8000-0000000000bb", name: "North Studio" } });
+    const result = await run(h.deps, "Build a new website");
+    expect(h.filed).toHaveLength(1);
+    expect(result.text).toContain("North Studio works on this business, so I filed this for North Studio");
+    expect(result.text).not.toMatch(/Strelva runs your site|for Strelva\b/);
+  });
+
+  it("files nothing when a site has no recorded agency, and points to making it or bringing in an agency", async () => {
+    const h = harness({ agency: { kind: "none" } });
+    const result = await run(h.deps, "Build a new website");
+    expect(h.filed).toHaveLength(0);
+    expect(result.text).toContain("Start");
+    expect(result.text).toContain("bring in an agency from Help");
+  });
+
+  it("asks the owner to choose when the business has several agencies and none is of record", async () => {
+    const h = harness({ agency: { kind: "several", names: ["North Studio", "Strelva Agency"] } });
+    const result = await run(h.deps, "Build a new website");
+    expect(result.text).toContain("Choose who should do this in Requests");
+    expect(h.filed).toHaveLength(0);
   });
 
   it("answers 'approve it' with the Needs you link and approves nothing", async () => {
@@ -451,4 +482,26 @@ describe("startAskTurn", () => {
       expect(result.text).toContain("site_no_longer_connected");
     });
   }
+});
+
+describe("createServiceRequestAdapter (ADR 0015)", () => {
+  const AGENCY = "00000000-0000-4000-8000-0000000000cc";
+  const input = { workspaceId: WS, systemId: null, words: "Redo the site", outcome: "Redo the website", read: [], askedOnBehalf: null, topic: "managed.redo_website", idempotencyKey: "ask:t:1" };
+  it("addresses the Request to the recorded agency as an ordinary agency provider", async () => {
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z" }));
+    const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "North Studio" }));
+    await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "North Studio" });
+    expect(execute).toHaveBeenCalledWith(actor, expect.objectContaining({ provider: { kind: "agency", agencyWorkspaceId: AGENCY } }));
+  });
+  it("refuses before saving when there is no single recorded agency", async () => {
+    const execute = vi.fn();
+    const none = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "none" }));
+    await expect(none.file(actor, input)).rejects.toBeInstanceOf(AskAgencyRequiredError);
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("picks the provider of record, else the only agency", () => {
+    expect(askAgencyFromOptions([])).toEqual({ kind: "none" });
+    expect(askAgencyFromOptions([{ agencyWorkspaceId: AGENCY, name: "A", providerOfRecord: false }, { agencyWorkspaceId: WS, name: "B", providerOfRecord: true }])).toEqual({ kind: "one", agencyWorkspaceId: WS, name: "B" });
+    expect(askAgencyFromOptions([{ agencyWorkspaceId: AGENCY, name: "A", providerOfRecord: false }, { agencyWorkspaceId: WS, name: "B", providerOfRecord: false }])).toEqual({ kind: "several", names: ["A", "B"] });
+  });
 });

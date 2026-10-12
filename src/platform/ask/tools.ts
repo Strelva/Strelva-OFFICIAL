@@ -5,7 +5,7 @@ import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types"
 import { authorizeAskTool, type AskAuthoritySnapshot } from "./authority";
 import { ASK_TOOL_CATALOG, type AskChangeKind, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskAuthorityReader, AskNeedsYouRouting, AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
-import { AskPossibilityUnsupportedError, AskPreparedPossibilityError } from "./ports";
+import { AskAgencyRequiredError, AskPossibilityUnsupportedError, AskPreparedPossibilityError } from "./ports";
 import { askNativeChangeSchema, askNativeIdentitySchema, AskNativePreparationIncompleteError, AskNativeUnsupportedError, type AskNativeSystemPort } from "./native-systems";
 import { WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 
@@ -230,7 +230,11 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
           if (cause instanceof AskNativeUnsupportedError || cause instanceof WorkspaceMakeSystemsError) {
             const filed = await ctx.requests.file(ctx.actor, { workspaceId: ctx.workspaceId, systemId: ctx.systemId,
               words: ctx.lastUserText, outcome: ctx.lastUserText, read: [], askedOnBehalf: ctx.askedOnBehalf,
-              topic: "native_app.unsupported_change", idempotencyKey: `${ctx.turnId}:native-app-request` });
+              topic: "native_app.unsupported_change", idempotencyKey: `${ctx.turnId}:native-app-request` }).catch((error: unknown) => {
+                if (error instanceof AskAgencyRequiredError) return error;
+                throw error;
+              });
+            if (filed instanceof AskAgencyRequiredError) return { success: false, error: filed.message, agentResultStatus: "failed" };
             ctx.onReceipt({ kind: "request", toolId: "draft_system_change", status: "filed", ids: [filed.id], summary: "Native app work requested at Asked." });
             return { success: true, requestId: filed.id, agentResultStatus: "queued", nextStep: "Filed at Asked. Scope and timing still need agreement; nothing went live." };
           }
@@ -346,7 +350,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     create_request: tool({
-      description: "File a Request to Strelva for work the tools can't do: a new page set, a booking page, custom features (cart, checkout, rewards, popups, chat), design changes, a new site or internal tool. It enters Requests at Asked; scope and deadline are agreed later, so never say it is accepted.",
+      description: "File a Request to the business's agency for work the tools can't do: a new page set, a booking page, custom features (cart, checkout, rewards, popups, chat), design changes, a new site or internal tool. It enters Requests at Asked; scope and deadline are agreed later, so never say it is accepted.",
       inputSchema: z.object({ outcome: z.string().min(1).max(2_000), topic: z.string().min(1).max(80), alreadyRead: z.array(z.string().max(200)).max(20).optional() }),
       execute: (input) => guarded("create_request", async () => {
         requestCount += 1;
@@ -357,10 +361,10 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
           });
           ctx.onReceipt({ kind: "request", toolId: "create_request", status: "filed", ids: [filed.id], summary: input.outcome.slice(0, 300) });
-          return { success: true, requestId: filed.id, agentResultStatus: "queued", message: "Filed for Strelva at Asked. Scope and timing get agreed next; nothing is accepted yet." };
-        } catch {
+          return { success: true, requestId: filed.id, agentResultStatus: "queued", message: `Filed for ${filed.agencyName} at Asked. Scope and timing get agreed next; nothing is accepted yet.` };
+        } catch (error) {
           ctx.onReceipt({ kind: "request", toolId: "create_request", status: "failed", ids: [], summary: "Could not file the Request." });
-          return { success: false, error: "I couldn't file that. Nothing was sent.", agentResultStatus: "failed" };
+          return { success: false, error: error instanceof AskAgencyRequiredError ? error.message : "I couldn't file that. Nothing was sent.", agentResultStatus: "failed" };
         }
       }),
     }),
@@ -415,7 +419,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
                 idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
               });
               ctx.onReceipt({ kind: "request", toolId: "open_possibility", status: "filed", ids: [filed.id], summary: input.intent.slice(0, 300) });
-              return { success: true, requestId: filed.id, agentResultStatus: "queued", message: "This needs work beyond the supported working page-set candidate. Filed your original ask for Strelva at Asked. Scope and timing still need agreement; no working flow or live change is claimed." };
+              return { success: true, requestId: filed.id, agentResultStatus: "queued", message: `This needs work beyond the supported working page-set candidate. Filed your original ask for ${filed.agencyName} at Asked. Scope and timing still need agreement; no working flow or live change is claimed.` };
             } catch { /* Report the failed filing below. */ }
           }
           const draftId = error instanceof AskPreparedPossibilityError ? error.draftId : null;
@@ -448,7 +452,7 @@ export function askToolLabel(toolId: string): string {
     draft_business_fact_change: "Writing up the change...",
     draft_review_reply: "Drafting a reply...",
     draft_inquiry_reply: "Drafting a reply...",
-    create_request: "Filing it for Strelva...",
+    create_request: "Filing the Request...",
     open_possibility: "Opening a Possibility...",
   };
   return labels[toolId] ?? "Working on it...";

@@ -10,5 +10,7 @@ export const businessEntryInputSchema = z.object({
 }).strict();
 export const businessEntryResultSchema = z.object({
   workspaceId: z.string().uuid(), requestId: z.string().uuid().nullable(), alreadyCreated: z.boolean(),
+  /** ADR 0015: the brief was kept out of Requests because the business has no single agency yet. */
+  agencyRequired: z.boolean().optional(),
 }).strict();
 export type BusinessEntryInput = z.infer<typeof businessEntryInputSchema>;

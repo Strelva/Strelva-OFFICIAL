@@ -11,7 +11,7 @@ describe("public business starts", () => {
   });
 
   it("makes website delivery a reviewable service request, not a generation assignment", () => {
-    expect(businessStartAsk("website")).toBe("Have Strelva build a website for my business.");
+    expect(businessStartAsk("website")).toBe("Have an agency build a website for my business.");
     expect(businessStartView("website")).toBe("help");
     expect(businessStartAsk("website")).not.toContain("24");
   });

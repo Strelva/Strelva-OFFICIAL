@@ -38,7 +38,7 @@ export interface WorkspaceStartProps {
 const EXAMPLES = [
   { label: "Give staff one place to make requests", request: "Give my team a better way to submit and track requests.", icon: Table2 },
   { label: "Make supplier onboarding consistent", request: "Make supplier onboarding consistent and easy to keep up to date.", icon: FileText },
-  { label: "Get a new website live", request: "Have Strelva build a website for my business.", icon: Globe2 },
+  { label: "Get a new website live", request: "Have an agency build a website for my business.", icon: Globe2 },
   { label: "Stop customer inquiries being missed", request: "Make sure customer inquiries are captured and followed up when nobody replies.", icon: MessageSquareText },
   { label: "Make this spreadsheet operational", request: "Turn my spreadsheet into something my team can use and keep up to date.", icon: Table2 },
   { label: "See what assistants understand about us", request: "Help me see what assistants can understand about my business.", icon: FileSearch },
