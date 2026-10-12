@@ -184,7 +184,7 @@ describe("Use my current website", () => {
   });
 
   it("reports an unreadable site without throwing a raw error", async () => {
-    const d = member(); vi.mocked(d.crawl).mockRejectedValue(new WebsiteCrawlError("robots", "This website asks crawlers not to read it."));
+    const d = member(); vi.mocked(d.crawl).mockRejectedValue(new WebsiteCrawlError("robots_blocked", "This website asks crawlers not to read it."));
     await expect(createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example")).rejects.toThrow("This website asks crawlers not to read it.");
   });
 

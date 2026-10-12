@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
+import { readBusinessRecord } from "@/platform/business-record/service";
+import { businessWebsite as businessWebsiteFromRecord } from "@/products/getting-started/website";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/platform/infra/db/server-client";
@@ -193,15 +196,17 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
   const canManage = workspace.role === "owner" || workspace.role === "admin";
   let body: React.ReactNode;
   try {
-    const [overview, records, visibility] = await Promise.all([
+    const [overview, records, visibility, businessWebsite] = await Promise.all([
       path === "connect" ? readConnectedSites(actor, workspaceId) : null,
       path === "rebuild" ? listWebsiteRebuilds(actor, workspaceId) : [],
       // The server-rendered details (#309, #502) are optional: if they fail, the connect flow still works.
       path === "connect" ? Promise.resolve().then(() => readBusinessVisibility(actor, workspaceId)).catch(() => null) : null,
+      // Owner door: the business's one website prefills both paths. Optional; never blocks the page.
+      businessSignupReleaseEnabled() ? readBusinessRecord(actor, workspaceId).then(businessWebsiteFromRecord).catch(() => null) : null,
     ]);
     body = <>
       <WebsiteEntry actorEmail={actor.verifiedEmail} agency={!("access" in workspace) || workspace.access === "provider_seat"} workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} canPublish={"access" in workspace && workspace.access === "member" && workspace.role === "owner"} operator={operator}
-        initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />
+        initialWorkId={workId ?? undefined} businessWebsite={businessWebsite ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />
       {visibility ? <ServerVisibility workspaceId={workspaceId} canManage={canManage} suggestedHandle={suggestBusinessHandle(workspace.name)}
         initial={{ pagesEnabled: visibility.pagesEnabled, page: visibility.page, blocks: visibility.blocks?.map(item => ({ id: item.id, label: item.label, url: item.url, checkable: item.checkable, block: { hash: item.block.hash, html: item.block.html } })) ?? null }} /> : null}
     </>;

@@ -57,6 +57,7 @@ export function GettingStarted({ business, links }: { business: GettingStartedBu
       <StRows label="Next steps">
         <StRow kind="Google" title="Connect Google" detail={links.google ? "Bring in your Google listing: hours, phone and reviews." : "Not open for your business yet."} href={links.google ?? undefined} />
         <StRow kind="Website" title="Keep your site" detail={links.connect ? "Keep the site you have. Add two lines and Strelva works beside it." : "Not open for your business yet."} href={links.connect ?? undefined} />
+        {website ? <StRow kind="Check" title="See how AI answers about you" detail="The free check, already filled in with your business and website." href={`/ai-visibility?${new URLSearchParams({ business: business.name, url: website })}`} /> : null}
         <StRow kind="Help" title="Bring in an agency" detail="Choose an agency to do the work. You stay the owner." href={links.agency} />
       </StRows>
     </StSection>

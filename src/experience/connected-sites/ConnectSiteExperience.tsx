@@ -45,15 +45,15 @@ const errorResponse = z.object({ error: z.string() });
  * the live page to confirm the site is theirs → the website opens as a
  * System. Strelva never edits the pages. Every call is rechecked on the server.
  */
-export function ConnectSiteExperience(props: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string }) {
+export function ConnectSiteExperience(props: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string; /** The business's one website (owner door). */ initialUrl?: string }) {
   return <ConnectSiteExperienceContent key={props.workspaceId} {...props} />;
 }
 
-function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, appBase = "" }: Parameters<typeof ConnectSiteExperience>[0]) {
+function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, appBase = "", initialUrl = "" }: Parameters<typeof ConnectSiteExperience>[0]) {
   const request = useWorkspaceRequest();
   const [site, setSite] = useState<ConnectableSite | null>(() => initialSites.find(item => item.status === "active") ?? null);
   const [sites, setSites] = useState(initialSites.filter(item => item.status === "active"));
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
   const [platform, setPlatform] = useState<SitePlatform>("unknown");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

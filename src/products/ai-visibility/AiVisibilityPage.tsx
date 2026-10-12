@@ -24,6 +24,9 @@ interface AiVisibilityPageProps {
   scanId?: string;
   /** The server decides whether private workspace continuation is open. */
   workspaceEnabled?: boolean;
+  /** Carried in from the business (owner door): the one website and its name. */
+  initialBusiness?: string;
+  initialUrl?: string;
 }
 
 function acquisitionSource(): string | undefined {
@@ -38,9 +41,9 @@ function acquisitionSource(): string | undefined {
   }
 }
 
-export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false, agency, embedded = false }: AiVisibilityPageProps) {
-  const [business, setBusiness] = useState("");
-  const [url, setUrl] = useState("");
+export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false, agency, embedded = false, initialBusiness = "", initialUrl = "" }: AiVisibilityPageProps) {
+  const [business, setBusiness] = useState(initialBusiness);
+  const [url, setUrl] = useState(initialUrl);
   const [category, setCategory] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState<ScanState>(initialResult ? "done" : "idle");
