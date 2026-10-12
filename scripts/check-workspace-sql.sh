@@ -1578,6 +1578,9 @@ bash "$repo_root/scripts/check-agency-prospects-sql.sh"
 # Agencies add clients (#259): seat not membership, isolation, limits, owner
 # claim link, and the rollback stop point, on the full ordered schema.
 bash "$repo_root/scripts/check-agency-add-client-sql.sh"
+# Claim review (Getting started L3): found facts with sources, pre-claim
+# Prepare that decides nothing, per-area consent at the claim, rollback stop.
+bash "$repo_root/scripts/check-claim-review-sql.sh"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
 
 # #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
