@@ -36,7 +36,17 @@ import {
   ownerClaimAcceptedSchema,
   ownerClaimPreviewSchema,
   ownerClaimSchema,
+  AGENCY_CLIENT_FOUND_LIMIT,
+  CLAIM_AREAS,
+  claimReviewAcceptedSchema,
+  claimReviewSchema,
   type AddAgencyClientInput,
+  type ClaimArea,
+  type ClaimAreaChoice,
+  type ClaimReview,
+  type ClaimReviewAcceptInput,
+  type ClaimReviewAccepted,
+  type ClientFoundFacts,
   type AddAgencyClientResult,
   type AgencyClientAddition,
   type AgencyClientListItem,
@@ -50,6 +60,7 @@ import { seedFromSite, type SiteSeed } from "./seed";
 import { runPrivateAiVisibilityAssessment, parseAiVisibilityAssessmentPayload, isAiVisibilityWorkResourceKind } from "@/products/ai-visibility/server";
 import type { SavedWork } from "@/platform/workspaces/types";
 import type { ClientAiCheck } from "./contracts";
+import { claimReviewReleaseEnabled } from "./index";
 
 export * from "./index";
 
@@ -67,6 +78,8 @@ export interface AgencyClientDeps {
   token(): string;
   now(): Date;
   assess: typeof runPrivateAiVisibilityAssessment;
+  /** STRELVA_CLAIM_REVIEW_RELEASE. Absent means off. */
+  claimReview?: () => boolean;
 }
 
 function defaultDeps(): AgencyClientDeps {
@@ -79,6 +92,7 @@ function defaultDeps(): AgencyClientDeps {
     token: () => randomBytes(32).toString("base64url"),
     now: () => new Date(),
     assess: runPrivateAiVisibilityAssessment,
+    claimReview: () => claimReviewReleaseEnabled(),
   };
 }
 
@@ -96,6 +110,9 @@ const FAILURES: Array<[string, number, string]> = [
   ["agency_client_claim_identity_required", 401, "Sign in with a confirmed email to continue."],
   ["agency_client_claim_not_found", 404, "This link is missing or no longer works."],
   ["agency_client_claim_invalid", 400, "Check the owner's email address."],
+  ["agency_client_claim_review_invalid", 400, "Choose what to do in each area, and check the details you changed."],
+  ["agency_client_claim_review_changed", 409, "Something on this page changed. Reload and review it again."],
+  ["agency_scope_taken", 409, "Another agency already has full control of one of those areas. Choose Prepare there."],
   ["agency_client_invalid", 400, "Check the business name and website."],
   ["workspace_exit_future_work_blocked", 409, "This business has left Strelva."],
 ];
@@ -180,7 +197,8 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
   const prospect = input.prospectId ? await readProspect(deps, actor, input.agencyWorkspaceId, input.prospectId) : null;
   const rawUrl = input.url ?? prospect?.url ?? null;
   const url = rawUrl ? publicUrl(rawUrl) : null;
-  const seed = url ? await deps.seed(url) : { scan: NOT_SCANNED, facts: {} };
+  const seed: SiteSeed = url ? await deps.seed(url) : { scan: NOT_SCANNED, facts: {} };
+  const review = deps.claimReview?.() === true;
   const name = (input.name ?? prospect?.business ?? seed.scan.name ?? "").trim().slice(0, 120);
   if (!name) throw new AgencyClientError("We couldn't find the business's name on its site. Enter it.", 400, "agency_client_name_required");
   // The digest covers what the agency asked for, not what the scan found, so
@@ -189,11 +207,13 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
   const client = await call(deps, "agency_add_client", {
     ...actorArgs(actor),
     p_agency_workspace_id: input.agencyWorkspaceId,
-    p_input: { name, sourceUrl: url, prospectId: input.prospectId ?? null, facts: seed.facts },
+    // Behind the claim review, found facts wait for the owner instead of entering the record.
+    p_input: { name, sourceUrl: url, prospectId: input.prospectId ?? null, facts: review ? {} : seed.facts },
     p_command_id: input.idempotencyKey,
     p_command_digest: digest,
   }, agencyClientAdditionSchema, "The client couldn't be added. Retry the same request before trying again.");
   const scan = client.replayed ? { ...seed.scan, seeded: [] } : seed.scan;
+  const found = review ? await stageFoundFacts(actor, client, seed, deps) : undefined;
   let ownerClaim: OwnerClaim | null = null;
   let ownerClaimError: string | null = null;
   if (input.ownerEmail && !client.replayed) {
@@ -207,7 +227,27 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
     }
   }
   const aiCheck = await checkClientSite(actor, client, input.idempotencyKey, deps);
-  return { client, scan, ownerClaim, ownerClaimError, website: clientWebsiteEntries(client.customerWorkspaceId), aiCheck };
+  return { client, scan, ownerClaim, ownerClaimError, website: clientWebsiteEntries(client.customerWorkspaceId), aiCheck, ...(found ? { found } : {}) };
+}
+
+const stagedSchema = z.object({ staged: z.number().int().min(0), waiting: z.number().int().min(0), preparing: z.array(z.enum(CLAIM_AREAS)) }).strict();
+
+/**
+ * Stage what the add found for the owner, and open the adding agency's
+ * pre-claim Prepare in every area. Repeating it (a replayed add) changes
+ * nothing. A failure never costs the agency its added client.
+ */
+async function stageFoundFacts(actor: WorkspaceActor, client: AgencyClientAddition, seed: SiteSeed, deps: AgencyClientDeps): Promise<ClientFoundFacts> {
+  const items = (seed.found ?? []).slice(0, AGENCY_CLIENT_FOUND_LIMIT);
+  try {
+    const staged = await call(deps, "stage_agency_client_found_facts", {
+      ...actorArgs(actor), p_agency_workspace_id: client.agencyWorkspaceId, p_customer_workspace_id: client.customerWorkspaceId, p_found: items,
+    }, stagedSchema, "What we found couldn't be saved for the owner.");
+    return { status: "staged", ...staged };
+  } catch (error) {
+    if (error instanceof AgencyClientError && error.code === "agency_client_owner_exists") return { status: "owner_claimed", staged: 0, waiting: 0, preparing: [] };
+    return { status: "unavailable", staged: 0, waiting: 0, preparing: [], message: "The client was added, but what we found on its site couldn't be saved for the owner. Add the client again with the same details to retry." };
+  }
 }
 
 /**
@@ -262,6 +302,41 @@ export async function acceptOwnerClaim(actor: WorkspaceActor, token: string, dep
 }
 
 export type { AgencyClientAddition };
+
+const AREA_WORDS: Record<ClaimArea, string> = {
+  website: "the website", inquiries: "inquiries", bookings: "bookings", google: "the Google listing", internal_tools: "internal tools",
+};
+const OWNER_KEEPS = "I keep payment, adding and ending agencies, my data and leaving Strelva.";
+
+/** The exact words the owner agrees to for one area; stored with that area's grant. */
+export function claimAreaConsentText(agencyName: string, businessName: string, area: ClaimArea, choice: Exclude<ClaimAreaChoice, "none">): string {
+  const what = AREA_WORDS[area];
+  const body = choice === "full_control"
+    ? `I let ${agencyName} run ${what} for ${businessName}: they approve and make changes live themselves. I can end their access anytime.`
+    : `I let ${agencyName} prepare ${what} for ${businessName}. Nothing goes live until I approve it.`;
+  return `${body} ${OWNER_KEEPS}`.slice(0, 2000);
+}
+
+/** The claim review, for the signed-in recipient: what was found, what was prepared, and the areas to decide. */
+export async function readClaimReview(actor: WorkspaceActor, token: string, deps: Pick<AgencyClientDeps, "rpc"> = defaultDeps()): Promise<ClaimReview> {
+  return call(deps as AgencyClientDeps, "read_agency_client_claim_review", {
+    p_token_hash: tokenHash(token), p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
+  }, claimReviewSchema, "This link couldn't be checked. Try again.");
+}
+
+/** The owner takes the business, decides each found fact and each area, in one step. */
+export async function acceptClaimReview(actor: WorkspaceActor, token: string, input: ClaimReviewAcceptInput, deps: Pick<AgencyClientDeps, "rpc"> = defaultDeps()): Promise<ClaimReviewAccepted> {
+  const review = await readClaimReview(actor, token, deps);
+  const consents: Partial<Record<ClaimArea, string>> = {};
+  for (const area of CLAIM_AREAS) {
+    const choice = input.areas[area];
+    if (choice !== "none") consents[area] = claimAreaConsentText(review.agencyName, review.workspaceName, area, choice);
+  }
+  return call(deps as AgencyClientDeps, "accept_agency_client_claim_review", {
+    p_token_hash: tokenHash(token), p_actor_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
+    p_facts: input.facts, p_areas: input.areas, p_consents: consents,
+  }, claimReviewAcceptedSchema, "The business couldn't be claimed. Try again.");
+}
 
 export interface SeatBusiness { id: string; name: string; role: "owner" | "admin" | "member" }
 

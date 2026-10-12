@@ -187,7 +187,7 @@ export async function seedFromSite(url: string, deps: SeedDeps = {}): Promise<Si
     found = extract({ url }, crawled);
   } catch (error) {
     const message = error instanceof WebsiteCrawlError ? error.message : "We couldn't read this website. The client was still added; add its details later.";
-    return { scan: { status: "unreachable", seeded: [], name: null, message }, facts: {}, found: [] };
+    return { scan: { status: "unreachable", seeded: [], name: null, message }, facts: {} };
   }
   const text = (ids: string[]) => ids.map((id) => found.facts[id]?.text).filter((value): value is string => Boolean(value));
   const contacts = text(found.contact);

@@ -122,7 +122,19 @@ export interface AddAgencyClientResult {
   ownerClaimError: string | null;
   website: ClientWebsiteEntries;
   aiCheck: ClientAiCheck;
+  /** Only behind the claim review release: what was staged for the owner. */
+  found?: ClientFoundFacts;
 }
+
+/** What an add staged for the owner's claim, and the areas the agency may Prepare until then. */
+export interface ClientFoundFacts {
+  status: "staged" | "owner_claimed" | "unavailable";
+  staged: number;
+  waiting: number;
+  preparing: string[];
+  message?: string;
+}
+export const AGENCY_CLIENT_FOUND_LIMIT = 120;
 
 /** An agency-owned private assessment of the client's public website. */
 export type ClientAiCheck =
