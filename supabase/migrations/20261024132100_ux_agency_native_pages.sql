@@ -70,7 +70,7 @@ language plpgsql security definer set search_path=public,pg_temp as $$
 declare w public.saved_product_work; payload jsonb; form_ok boolean; booking_ok boolean; choices jsonb:='[]';
 begin
  perform public.require_agency_native_page_scope(p_agency_workspace_id,p_workspace_id,p_user_id,p_verified_email);
- for w in select * from public.saved_product_work where workspace_id=p_workspace_id and product_id='websites' and resource_kind='website' and payload->>'status'='published' order by id loop
+ for w in select * from public.saved_product_work spw where spw.workspace_id=p_workspace_id and spw.product_id='websites' and spw.resource_kind='website' and spw.payload->>'status'='published' order by id loop
   form_ok:=false; booking_ok:=false;
   begin payload:=public.read_agency_native_page_work(p_agency_workspace_id,p_workspace_id,p_user_id,p_verified_email,'{"kind":"form"}',w.id); form_ok:=true;
    exception when others then if sqlerrm not in ('agency_page_scope_required','agency_page_unavailable','agency_page_stale') then raise; end if; end;
@@ -119,7 +119,7 @@ begin
   or (select count(*) from jsonb_object_keys(p_document->'nodes'))<>(select count(*)+3 from jsonb_object_keys(doc->'nodes')) then raise exception 'agency_page_invalid'; end if;
  for item in select key,value from jsonb_each(doc->'nodes') loop if p_document->'nodes'->item.key is distinct from item.value then raise exception 'agency_page_invalid'; end if; end loop;
  for item in select key,value from jsonb_each(doc->'facts') loop if p_document->'facts'->item.key is distinct from item.value then raise exception 'agency_page_invalid'; end if; end loop;
- if (p_document->'pages' - (jsonb_array_length(p_document->'pages')-1)) is distinct from doc->'pages' then raise exception 'agency_page_invalid'; end if;
+ if ((p_document->'pages') - (jsonb_array_length(p_document->'pages')-1)) is distinct from doc->'pages' then raise exception 'agency_page_invalid'; end if;
  page:=p_document->'pages'->(jsonb_array_length(doc->'pages')); root:=page->>'root';
  if page is distinct from jsonb_build_object('path',p_input->>'path','title',p_input->>'title','description',p_input->>'description','root',root)
   or exists(select 1 from jsonb_array_elements(doc->'pages') p where p->>'path'=p_input->>'path') then raise exception 'agency_page_invalid'; end if;
@@ -153,7 +153,7 @@ begin
  end loop;
  if (p_payload-'revision'-'status'-'approvedCandidateRevision'-'checkpoint'-'lastError'-'audit'-'candidate'-'history') is distinct from (base-'revision'-'status'-'approvedCandidateRevision'-'checkpoint'-'lastError'-'audit'-'candidate'-'history')
   or p_payload->'revision' is distinct from to_jsonb((base->>'revision')::integer+1)
-  or (p_payload->'history' - (jsonb_array_length(p_payload->'history')-1)) is distinct from base->'history'
+  or ((p_payload->'history') - (jsonb_array_length(p_payload->'history')-1)) is distinct from base->'history'
   or p_payload->'history'->(jsonb_array_length(base->'history'))->>'actorId' is distinct from p_user_id::text
   or p_payload->'history'->(jsonb_array_length(base->'history'))->>'kind' is distinct from 'agency_document_draft' then raise exception 'agency_page_invalid'; end if;
  -- The ordinary native writer requires direct client membership. This scoped

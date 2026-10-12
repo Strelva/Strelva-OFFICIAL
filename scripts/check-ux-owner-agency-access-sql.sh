@@ -26,6 +26,32 @@ contracts() {
   psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-setup-ask-schema.sql" >/dev/null
   psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-export-history.sql" >/dev/null
 }
+populated_rehearsal() {
+  # Populated rollback is rehearsed at this migration's own ordered boundary,
+  # in a throwaway clone, so successor wrappers never sit on top of the inverse.
+  local base_args=("${psql_args[@]}")
+  psql "${base_args[@]}" --command='create database ux_owner_populated template postgres' >/dev/null
+  psql_args=("${base_args[@]}" --dbname=ux_owner_populated)
+  # Retain the contract fixture and a pending same-area amendment to test the
+  # actual rollback, then decline it to prove a populated safe inverse.
+  sed -e 's/^rollback;$/commit;/' -e "s#^\\\\ir #\\\\i $repo_root/tests/#" "$repo_root/tests/ux-owner-agency-access-schema.sql" >"$cluster_root/populated.sql"
+  apply "$cluster_root/populated.sql"
+  psql "${psql_args[@]}" --command="select public.bring_in_agency('7f000000-0000-4000-8000-000000000001','owner@bakery.example.test','7f000000-0000-4000-8000-0000000000b1','7f000000-0000-4000-8000-0000000000a1','[{\"scope\":\"website\",\"level\":\"prepare\"}]','Pending downgrade');" >/dev/null
+  if psql "${psql_args[@]}" --file="$rollback" >"$cluster_root/refusal.txt" 2>&1; then
+    printf 'Populated rollback unexpectedly succeeded.\n' >&2; exit 1
+  fi
+  if ! rg -q 'ux_owner_agency_access_rollback_refused' "$cluster_root/refusal.txt"; then
+    cat "$cluster_root/refusal.txt" >&2; exit 1
+  fi
+  psql "${psql_args[@]}" --command="do \$\$ begin if public.business_scope_full_control('7f000000-0000-4000-8000-0000000000b1','website') is distinct from '7f000000-0000-4000-8000-0000000000a1'::uuid or (select count(*) from public.agency_scope_grants where customer_workspace_id='7f000000-0000-4000-8000-0000000000b1' and status='proposed') <> 1 then raise exception 'rollback refusal changed grants'; end if; end \$\$;" >/dev/null
+  psql "${psql_args[@]}" --command="select public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test','7f000000-0000-4000-8000-0000000000a1','7f000000-0000-4000-8000-0000000000b1',false);" >/dev/null
+  apply "$rollback"
+  apply "$forward"
+  fingerprint populated-reapplied
+  diff -u "$cluster_root/reapplied.txt" "$cluster_root/populated-reapplied.txt" >&2
+  psql_args=("${base_args[@]}")
+  psql "${psql_args[@]}" --command='drop database ux_owner_populated' >/dev/null
+}
 apply "$repo_root/scripts/sql/local-supabase-shim.sql"
 # Install and rehearse this inverse at its actual ordered boundary; later UX
 # migrations depend on the exact wrappers and must not precede their target.
@@ -40,27 +66,11 @@ while IFS= read -r migration; do
     apply "$forward"
     fingerprint reapplied
     diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2
+    populated_rehearsal
   else
     apply "$migration"
   fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 contracts
 fingerprint final
-# Retain the contract fixture and a pending same-area amendment to test the
-# actual rollback, then decline it to prove a populated safe inverse.
-sed 's/^rollback;$/commit;/' "$repo_root/tests/ux-owner-agency-access-schema.sql" >"$cluster_root/populated.sql"
-apply "$cluster_root/populated.sql"
-psql "${psql_args[@]}" --command="select public.bring_in_agency('7f000000-0000-4000-8000-000000000001','owner@bakery.example.test','7f000000-0000-4000-8000-0000000000b1','7f000000-0000-4000-8000-0000000000a1','[{\"scope\":\"website\",\"level\":\"prepare\"}]','Pending downgrade');" >/dev/null
-if psql "${psql_args[@]}" --file="$rollback" >"$cluster_root/refusal.txt" 2>&1; then
-  printf 'Populated rollback unexpectedly succeeded.\n' >&2; exit 1
-fi
-if ! rg -q 'ux_owner_agency_access_rollback_refused' "$cluster_root/refusal.txt"; then
-  cat "$cluster_root/refusal.txt" >&2; exit 1
-fi
-psql "${psql_args[@]}" --command="do \$\$ begin if public.business_scope_full_control('7f000000-0000-4000-8000-0000000000b1','website') is distinct from '7f000000-0000-4000-8000-0000000000a1'::uuid or (select count(*) from public.agency_scope_grants where customer_workspace_id='7f000000-0000-4000-8000-0000000000b1' and status='proposed') <> 1 then raise exception 'rollback refusal changed grants'; end if; end \$\$;" >/dev/null
-psql "${psql_args[@]}" --command="select public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test','7f000000-0000-4000-8000-0000000000a1','7f000000-0000-4000-8000-0000000000b1',false);" >/dev/null
-apply "$rollback"
-apply "$forward"
-fingerprint populated-reapplied
-diff -u "$cluster_root/final.txt" "$cluster_root/populated-reapplied.txt" >&2
 printf 'Owner agency access SQL passed (ordered schema, original and amendment contracts, exact rollback/reapply, populated rollback refusal and safe inverse).\n'

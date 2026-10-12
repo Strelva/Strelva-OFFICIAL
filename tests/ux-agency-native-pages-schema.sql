@@ -47,6 +47,9 @@ end $$;
 -- fictional connected calendar. These inserts simulate qualified prerequisites;
 -- no calendar provider is contacted and no visitor reservation is made.
 insert into public.tenants(id,site_name,stable_id,active) values('page-booking','Page Bookings','7a210000-0000-4000-8000-000000000022',true);
+-- Public booking grants require an active website binding for the same business.
+insert into public.offering_website_bindings(business_workspace_id,tenant_stable_id,tenant_id_at_binding,site_name_at_binding,idempotency_key,command_digest,created_by,updated_by)
+values('7a210000-0000-4000-8000-000000000011','7a210000-0000-4000-8000-000000000022','page-booking','Page Bookings','page-booking-binding',repeat('b',64),'7a210000-0000-4000-8000-000000000001','7a210000-0000-4000-8000-000000000001');
 insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
  values('7a210000-0000-4000-8000-000000000022','page-booking','7a210000-0000-4000-8000-000000000011','7a210000-0000-4000-8000-000000000001','7a210000-0000-4000-8000-000000000032',repeat('c',64),'{}');
 do $$

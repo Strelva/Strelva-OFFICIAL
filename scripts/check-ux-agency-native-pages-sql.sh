@@ -37,7 +37,7 @@ done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sq
 apply "$repo_root/tests/ux-agency-native-pages-schema.sql"
 # Retain the otherwise rolled-back fictional fixture to prove the inverse
 # cannot erase accepted page receipts, and cannot silently change the catalog.
-sed 's/^rollback;$/commit;/' "$repo_root/tests/ux-agency-native-pages-schema.sql" >"$cluster_root/populated.sql"
+sed -e 's/^rollback;$/commit;/' -e "s#^\\\\ir #\\\\i $repo_root/tests/#" "$repo_root/tests/ux-agency-native-pages-schema.sql" >"$cluster_root/populated.sql"
 apply "$cluster_root/populated.sql"
 fingerprint populated_before
 if psql "${psql_args[@]}" --file="$rollback" >"$cluster_root/refusal.txt" 2>&1; then

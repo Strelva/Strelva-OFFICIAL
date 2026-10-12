@@ -2135,7 +2135,7 @@
         },
         {
           "file": "20261024132100_ux_agency_native_pages.sql",
-          "sha256": "3fc3771885ef5d1b3c7b0cbdfc434bbd346aa055ee97d38dd3cd96e6717883c4",
+          "sha256": "67ca0247566566e12308b376a3845d88ebf4217805d20a6937a5bbaa459785b3",
           "rollback": "rollback-20261024132100_ux_agency_native_pages.sql",
           "rollbackSha256": "acdd8dc8689b7fa4a35c86e050dc7e04806edb96c500bc097b842d51b17aa476",
           "rollbackStatus": "Prepared inverse only; ordered disposable SQL, positive form/booking fixtures, populated refusal and reapply qualification UNRUN/held. No production application authorized."

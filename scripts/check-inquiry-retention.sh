@@ -17,7 +17,7 @@ cleanup() {
 trap cleanup EXIT
 psql "${psql_args[@]}" --dbname=postgres -c 'create database inquiry_retention_case template postgres strategy file_copy' >/dev/null
 # The actual full purge fixture leaves realistic retained data after cleanup.
-sed 's/^rollback;$/commit;/' "$repo_root/tests/inquiry-lead-retention.sql" |
+sed -e 's/^rollback;$/commit;/' -e "s#^\\\\ir #\\\\i $repo_root/tests/#" "$repo_root/tests/inquiry-lead-retention.sql" |
   psql "${psql_args[@]}" --dbname=inquiry_retention_case >/dev/null
 psql "${psql_args[@]}" --dbname=inquiry_retention_case <<'SQL' >/dev/null
 alter table public.inquiry_events disable trigger inquiry_events_retention_on_insert;

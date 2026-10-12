@@ -74,9 +74,17 @@ begin
     values (north,bakery,'7f000000-0000-4000-8000-000000000004','active','7f000000-0000-4000-8000-000000000002');
   item := public.open_owner_decision(bakery,jsonb_build_object('kind','copy.routine','route','owner_decides','title','Update the hours line',
     'approveEffect','The new hours go live.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId','hours:1','revisionHash',h,'adminMayDecide',false));
-  result := public.claim_owner_decision(bakery,(item->>'id')::uuid,h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test',null);
-  if result->>'status' <> 'claimed' or result->'item'->>'decidedByKind' is distinct from 'agency_session' and (select decided_by_kind from public.owner_decisions where id=(item->>'id')::uuid) <> 'agency_session' then
-    raise exception 'full-control agency could not decide: %', result;
+  -- AG3 (2026-10-12): once the agency2 boundary is installed, website execution
+  -- is withheld from agency decisions until its resolver consumes an exact
+  -- agency claim. Before that boundary the original contract still holds.
+  -- Positive post-boundary Full-control claims: tests/agency2-decisions-schema.sql.
+  if to_regprocedure('public.read_agency_decision_receipt(uuid,uuid,uuid,text,uuid,text)') is not null then
+    perform pg_temp.expect_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)',bakery,item->>'id',h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test'),'owner_decision_owner_only');
+  else
+    result := public.claim_owner_decision(bakery,(item->>'id')::uuid,h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test',null);
+    if result->>'status' <> 'claimed' or (select decided_by_kind from public.owner_decisions where id=(item->>'id')::uuid) <> 'agency_session' then
+      raise exception 'full-control agency could not decide: %', result;
+    end if;
   end if;
   item := public.open_owner_decision(bakery,jsonb_build_object('kind','google.post','route','owner_decides','title','Post this week''s tip',
     'approveEffect','The post goes up.','notYetEffect','Nothing is posted.','sourceLifecycle','google_post','sourceId','post:1','revisionHash',h,'adminMayDecide',false));
