@@ -1,6 +1,6 @@
 import { inquiryRecordsEnabled, inquiryRecordsRpc, InquiryRecordsError } from "@/platform/infra/inquiry-records";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { readWorkspaceLeads, type WorkspaceLeads, type LeadView } from "./linked-leads";
+import { forwardedLeadView, readWorkspaceLeads, type WorkspaceLeads, type LeadView } from "./linked-leads";
 import { parseWorkspaceLead, type WorkspaceInquiryLead } from "./workspace-records";
 
 export interface InboxCursor { before: string; beforeId: string }
@@ -11,6 +11,7 @@ export interface InboxDependencies {
 }
 const defaults: InboxDependencies = { base: readWorkspaceLeads, source: async () => (await import("./server")).inquiryLeadReadSource(), rpc: inquiryRecordsRpc };
 function view(row: WorkspaceInquiryLead): LeadView {
+  if (row.recordedVia === "forwarded_email") return forwardedLeadView(row);
   return { id: row.connectedSiteId ? row.id : row.leadId, rowId: row.id, name: row.name || "Someone", email: row.email,
     message: row.message, source: row.source, fields: Object.entries(row.fields), createdAt: row.capturedAt,
     ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) };
@@ -29,8 +30,8 @@ export async function readWorkspaceInquiryInbox(actor: WorkspaceActor, workspace
   const rows = raw.map(parseWorkspaceLead);
   if (rows.some(row => row === null)) throw new InquiryRecordsError("failed", "inquiry_inbox_malformed");
   const page = rows as WorkspaceInquiryLead[];
-  const sites = base.sites.map(site => ({ ...site, leads: page.filter(row => site.connected
-    ? site.key === `connected:${row.connectedSiteId}` : row.tenantId === site.tenantId && !row.connectedSiteId).map(view) }));
+  const sites = base.sites.map(site => ({ ...site, leads: page.filter(row => site.forwarded ? row.recordedVia === "forwarded_email" : site.connected
+    ? site.key === `connected:${row.connectedSiteId}` : row.tenantId === site.tenantId && !row.connectedSiteId && row.recordedVia !== "forwarded_email").map(view) }));
   const last = page.at(-1);
   return { ...base, sites, durable: true, paged: true,
     ...(last && page.length === 100 ? { nextPage: { before: last.capturedAt, beforeId: last.id } } : {}) };
