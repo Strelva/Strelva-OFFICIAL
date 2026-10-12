@@ -24,7 +24,7 @@ describe("operator admin form presentation", () => {
     const request = vi.fn<typeof fetch>();
     await act(async () => root.render(createElement(PayLinksView, { request, preview: true, initialLinks: [{ slug: "example", clientName: "Example", amountCents: 12500 }] })));
     expect(host.textContent).toContain("/pay/example");
-    expect(host.textContent).toContain("Platform support cannot create, edit or revoke");
+    expect(host.textContent).toContain("Payment links are created and revoked by the agency in its workspace");
     expect(host.querySelector('a[href="/admin/actions"]')).not.toBeNull();
     expect(host.querySelector("input")).toBeNull();
     expect(Array.from(host.querySelectorAll("button")).some(button => /Create|Revoke/.test(button.textContent || ""))).toBe(false);

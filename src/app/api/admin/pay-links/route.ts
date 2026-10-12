@@ -7,7 +7,7 @@ import { listPayLinks, PayLinkStorageError } from "@/lib/pay-links";
 /** Platform support cannot sell agency work, with either billing flag value. */
 export async function POST(_request: Request) {
   if (!await isSuperAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  return NextResponse.json({ error: "Create pay links through your verified ordinary agency workspace.", agencyPath: "/api/agency/pay-links" }, { status: 410 });
+  return NextResponse.json({ error: "Create pay links through your verified ordinary agency workspace.", agencyPath: "/api/agency/payment-links" }, { status: 410 });
 }
 
 /**
@@ -33,7 +33,8 @@ export async function GET() {
   // Cross-reference the build-payment money trail so the UI can show which links
   // actually converted (a payment whose paySlug matches the link's slug), with
   // enriched data (amount paid, customer email, when it happened).
-  const payments = await listBuildPayments().catch(() => []);
+  let paymentStatusAvailable = true;
+  const payments = await listBuildPayments(200, { readOnly: true, strict: true }).catch(() => { paymentStatusAvailable = false; return []; });
 
   // Build a map: slug -> most-recent payment detail (amountCents, customerEmail, paidAt).
   // A slug can theoretically convert more than once; keep the most-recent by createdAt.
@@ -50,7 +51,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ payLinks, count: payLinks.length, paidPayments });
+  return NextResponse.json({ payLinks, count: payLinks.length, paidPayments, paymentStatusAvailable }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /** Existing service invoices are inspected here; changes belong to their agency. */

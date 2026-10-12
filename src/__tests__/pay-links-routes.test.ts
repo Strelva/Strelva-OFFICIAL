@@ -108,7 +108,7 @@ describe("POST /api/admin/pay-links", () => {
     const { POST } = await import("@/app/api/admin/pay-links/route");
     const res = await POST(adminReq({ slug: "acme", clientName: "Acme", amountCents: 200000, overwrite: true }));
     expect(res.status).toBe(410);
-    expect(await res.json()).toMatchObject({ agencyPath: "/api/agency/pay-links" });
+    expect(await res.json()).toMatchObject({ agencyPath: "/api/agency/payment-links" });
     expect(mockSavePayLink).not.toHaveBeenCalled();
     expect(mockLogAuditEvent).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
@@ -322,4 +322,29 @@ describe("POST /api/pay/[slug]", () => {
     expect(res.status).toBe(429);
     expect(mockGetPayLink).not.toHaveBeenCalled();
   });
+});
+
+it("refuses expired checkout before parsing payment input or calling Stripe", async () => {
+  mockGetPayLink.mockResolvedValue({ slug: "expired", clientName: "Acme", door: "build", amountCents: 50000, createdAt: "2026-10-12", revokedAt: "2026-10-12", revokedBy: "agency-owner" });
+  const { POST } = await import("@/app/api/pay/[slug]/route");
+  const response = await POST(new NextRequest("https://app.example.test/api/pay/expired", { method: "POST", body: "invalid json" }), { params: Promise.resolve({ slug: "expired" }) });
+  expect(response.status).toBe(410); expect((await response.json()).error).toContain("expired"); expect(mockCheckoutCreate).not.toHaveBeenCalled();
+});
+it("keeps support GET read-only and operator-audited", async () => {
+  const { GET, POST, DELETE } = await import("@/app/api/admin/pay-links/route");
+  const { authorizeAdminOperatorRead } = await import("@/platform/operator-read-audit/admission");
+  expect((await GET()).status).toBe(200);
+  expect(mockListBuildPayments).toHaveBeenCalledWith(200, { readOnly: true, strict: true });
+  expect(authorizeAdminOperatorRead).toHaveBeenCalledWith("admin.pay-links.read");
+  expect((await POST(new Request("https://example.test"))).status).toBe(410);
+  expect((await DELETE(new Request("https://example.test"))).status).toBe(410);
+  expect(mockSavePayLink).not.toHaveBeenCalled(); expect(mockDeletePayLink).not.toHaveBeenCalled();
+});
+
+it("an existing unowned link still starts the identical one-off Stripe checkout", async () => {
+  mockGetPayLink.mockResolvedValue({ slug: "legacy", clientName: "Coffee", door: "build", tenantId: "coffee", amountCents: 50000, createdAt: "2026-07-01", createdBy: "old@example.test" });
+  const { POST } = await import("@/app/api/pay/[slug]/route");
+  const response = await POST(payReq("legacy", {}), { params: Promise.resolve({ slug: "legacy" }) });
+  expect(response.status).toBe(200);
+  expect(mockCheckoutCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: "payment", client_reference_id: "coffee", metadata: { paySlug: "legacy", door: "build", paymentPurpose: "build_payment", selectedAmountCents: "50000", tenantId: "coffee" } }));
 });

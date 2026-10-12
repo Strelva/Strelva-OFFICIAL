@@ -48,6 +48,10 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  if (config.revokedAt) {
+    return NextResponse.json({ error: "This payment link has expired. Ask the agency for a new link." }, { status: 410 });
+  }
+
   const body = await readJsonObject(req);
   if (!body) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

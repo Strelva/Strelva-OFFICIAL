@@ -2255,3 +2255,22 @@ Unknown transport results also require refresh; ordinary conflict/validation
 refusals preserve correction. The recovery performs GET only. Existing St*
 primitives and styling remain in use. Unit evidence is local; rendered desktop/
 mobile verification is deferred under the audit’s explicit browser stop point.
+
+### October 12 · agency Payment links
+
+[AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
+composes `StField`, `StTextField`, `StPill`, `StRows`, `StRow`, `StState`,
+`StNotice` and text actions inside the agency shell. The sidebar and agency
+billing link to `/workspace/payment-links?workspaceId=…`. Verified ordinary
+agency owners/admins use the configured legacy merchant account; other agencies
+see their existing Connect readiness and client-agreement path.
+
+Fixed and ranged amounts use USD and $50 steps. Copy, explicit expiration
+review, paid status and retained historical ownership appear in open rows.
+Unconfirmed commands hold the exact submitted terms and retry key; Refresh
+only reads. Incomplete success responses retain that hold. Payment-read outages
+remain unavailable rather than unpaid. Agency identity is captured through the
+existing validated brand resolver; historical records never acquire a current
+actor. Local DOM and route tests cover these contracts. Desktop/phone rendering,
+real Auth and native Redis script execution remain coordinator acceptance work
+under the audit's no-server/no-browser stop point.
