@@ -19,7 +19,7 @@ import { makeRealAdapter } from "@/platform/needs-you/sources/make-real";
 import { providerDeliveryAdapter } from "@/platform/needs-you/sources/provider-delivery";
 import { standingResponsibilityAdapter } from "@/platform/needs-you/sources/standing-responsibility";
 import { versionReleaseAdapter } from "@/platform/needs-you/sources/version-release";
-import { websiteDocumentAdapter } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentAdapter } from "@/server/needs-you/sources/website-document";
 import { workMoneyAdapter, type MoneyAllowanceView } from "@/platform/needs-you/sources/work-money";
 import { workPlanAdapter, type WorkPlanView } from "@/platform/needs-you/sources/work-plan";
 import { workResponsibilityAdapter, type WorkResponsibilityRecord } from "@/platform/needs-you/sources/work-responsibility";

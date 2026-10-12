@@ -187,3 +187,5 @@ export {
   publicBookingRangeSchema,
   publicBookingVisitorSchema,
 } from "./public-booking";
+
+export type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "./public-booking";

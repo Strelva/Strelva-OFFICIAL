@@ -8,6 +8,8 @@ import { registerWorkspacePorts, type WorkspacePorts } from "@/lib/workspace-por
 import { workspacePortLoaders } from "@/server/workspace-ports";
 import { registerTenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 
+import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
+
 const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
 
@@ -30,3 +32,7 @@ registerTenantPublishingPorts(async () => ({
   beginGoogleReconnectOperation: async (...args) => (await import("@/lib/google-access")).beginGoogleReconnectOperation(...args),
   recordGoogleConnection: async (...args) => (await import("@/lib/google-access")).recordGoogleConnection(...args),
 }));
+
+// Product/provider callbacks stay at the app edge; platform booking rules own no product implementation.
+registerCalendarBusyProviderRead(async (...args) => (await import("@/products/scheduling/server")).readWorkspaceProviderAvailability(...args));
+registerBookingRequestNotifier(async (booking) => (await import("@/server/needs-you/server")).notifyBookingRequestNow(booking));

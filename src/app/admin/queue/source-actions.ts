@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSuperAdmin, requireTenantPermission } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
-import { readOperatorQueue } from "@/platform/operator-queue/service";
+import { readOperatorQueue } from "@/server/operator-queue/service";
 import { ServiceRequestService, PostgresServiceRequestStore, type ServiceRequest } from "@/platform/service-requests";
 import type { QueueActionResult } from "./actions";
 import { logAuditEvent } from "@/lib/storage";

@@ -1975,6 +1975,29 @@
       ]
     },
     {
+      "id": "legacy-google-creation-defaults",
+      "status": "Prepared prerequisite only; held and unqualified. Removes known ordinary implicit public creation grants for the canonical creator before the still-unapplied 1751 tail. Hosted default authority, deployment preflight and production application UNRUN/held; no production application authorized.",
+      "items": [
+        {
+          "file": "20261022175050_legacy_google_creation_defaults.sql",
+          "sha256": "f08af96d4f2ebbf12f36027f4ce8e6f1cfd7cf1a69bd4a2faa3215b5125662c5",
+          "rollbackStatus": "No automatic inverse: restoring implicit role creation grants would reopen the unsafe creation policy. Forward-only preparation; production application remains held pending approved owner/default-ACL preflight."
+        }
+      ]
+    },
+    {
+      "id": "review-approval-continuity",
+      "status": "Applied to production 2026-10-09 with dpl_2TfQ9uMPnMcrP1YK63nTBv4yLpfE (live schema 267). Carried into the 1.0 line so a 1.0 deploy keeps it.",
+      "description": "Review approval continuity and atomic provider admission; additive, forward-only authority evidence retained on application rollback",
+      "items": [
+        {
+          "file": "20261023200000_tenant_review_approval_continuity.sql",
+          "sha256": "9a6ff9ecc24b735e2d167f6ebf1840bd011e221e8ff747c8bbc9531f7568a5dd",
+          "rollbackStatus": "forward-only; retain epoch and command evidence; revert app without deleting accepted or unknown outcomes"
+        }
+      ]
+    },
+    {
       "id": "two-doors",
       "status": "ADR 0015 two doors: held and unqualified. Focused local contract only; SQL execution in the ordered workspace runner, hosted Auth and production migration application remain UNRUN; no packet batch or deployment authority granted.",
       "items": [

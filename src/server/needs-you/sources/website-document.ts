@@ -19,12 +19,12 @@
  * a truncated preview never grants confirmation. Not yet and expiry change nothing.
  */
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
-import { siteIdSchema, unresolvedSiteFacts } from "@/products/websites/site-document-schema";
-import { OWNER_ONLY_KINDS, type ChangeKind, type ProposedItem } from "../contracts";
-import type { SourceAdapter } from "../adapters";
-import type { ServiceSession } from "../service-actor";
-import { itemTitle, memberActor, proposeAsMember, revisionOf, splitSource, unchangedOutcome, workspaceHref } from "./shared";
+import type { WebsiteRebuildRecord } from "@/products/websites/client";
+import { siteIdSchema, unresolvedSiteFacts } from "@/products/websites/client";
+import { OWNER_ONLY_KINDS, type ChangeKind, type ProposedItem } from "@/platform/needs-you/contracts";
+import type { SourceAdapter } from "@/platform/needs-you/adapters";
+import type { ServiceSession } from "@/platform/needs-you/service-actor";
+import { itemTitle, memberActor, proposeAsMember, revisionOf, splitSource, unchangedOutcome, workspaceHref } from "@/platform/needs-you/sources/shared";
 
 export interface WebsiteSelection { expectedRevision: number; candidateRevision: number; candidateContentHash: string }
 

@@ -1,6 +1,6 @@
 import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 import type { OwnerInvitationsLoad } from "@/platform/owner-entry/operator-invitations";
-import type { TenantDomainHealth } from "@/lib/domain-monitor";
+import type { TenantDomainHealth } from "@/platform/infra/domain-monitor-contracts";
 
 /** Fictional canon content. These values and transports never enter live routes. */
 export const OPERATOR_CLIENTS = [

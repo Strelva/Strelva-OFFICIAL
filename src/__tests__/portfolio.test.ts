@@ -31,7 +31,6 @@ vi.mock("@/lib/custom-repos", () => ({ getTenantDeliveryModel: mockGetTenantDeli
 vi.mock("@/lib/ops", () => ({ buildOpsReport: mockBuildOpsReport }));
 
 import { buildPortfolioSnapshot } from "@/lib/portfolio";
-import { SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS } from "@/lib/pricing";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -47,7 +46,7 @@ beforeEach(() => {
 describe("buildPortfolioSnapshot", () => {
   it("aggregates launch status, MRR, and drafts across active tenants", async () => {
     mockGetAllTenants.mockResolvedValue([
-      { id: "ready", siteName: "Ready", ownerName: "A", active: true, subscriptionStatus: "active" },
+      { id: "ready", siteName: "Ready", ownerName: "A", active: true, subscriptionStatus: "active", planMonthlyCents: 12900 },
       { id: "blocked", siteName: "Blocked", ownerName: "B", active: true, subscriptionStatus: "none" },
       { id: "archived", siteName: "Old", ownerName: "C", active: false, subscriptionStatus: "none" },
     ]);
@@ -70,10 +69,27 @@ describe("buildPortfolioSnapshot", () => {
     expect(snap.launchReadyCount).toBe(1);
     expect(snap.launchBlockedCount).toBe(1);
     expect(snap.totalDrafts).toBe(2);
-    // One tenant has subscriptionStatus "active" → MRR = 1 × plan price.
-    expect(snap.mrr).toBe(SCAFFOLD_PLAN_MONTHLY_PRICE_DOLLARS);
+    // The active subscription uses this tenant's recorded monthly price.
+    expect(snap.mrr).toBe(129);
     expect(snap.tenants.map((t) => t.id).sort()).toEqual(["blocked", "ready"]);
     expect(snap.ops.activeTenants).toBe(0);
+  });
+
+  it("adds distinct configured billing prices and excludes unconfigured or archived tenants", async () => {
+    mockGetAllTenants.mockResolvedValue([
+      { id: "standard", active: true, subscriptionStatus: "active", planMonthlyCents: 8900 },
+      { id: "custom", active: true, billingType: "custom", subscriptionStatus: "none", planMonthlyCents: 24900 },
+      { id: "unconfigured", active: true, billingType: "none", subscriptionStatus: "none", planMonthlyCents: 19900 },
+      { id: "archived", active: false, subscriptionStatus: "active", planMonthlyCents: 99900 },
+    ]);
+    mockGetEffectiveSubscriptionStatus.mockResolvedValue("active");
+    mockBuildTenantLaunchReadiness.mockReturnValue({ status: "ready", score: 100, items: [] });
+
+    const snap = await buildPortfolioSnapshot();
+
+    expect(snap.mrr).toBe(338);
+    expect(snap.tenantCount).toBe(3);
+    expect(snap.archivedTenantCount).toBe(1);
   });
 
   it("handles an empty portfolio", async () => {

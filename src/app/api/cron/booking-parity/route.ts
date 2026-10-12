@@ -3,7 +3,7 @@ import { requireCronRequest } from "@/lib/cron-auth";
 import { getSupabase } from "@/platform/infra/db/client";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { alertOnce } from "@/platform/infra/monitoring";
-import { runBookingParitySweep } from "@/platform/bookings/parity-sweep";
+import { runBookingParitySweep } from "@/server/bookings/parity-sweep";
 
 export const maxDuration = 120;
 

@@ -21,6 +21,13 @@ begin
   insert into auth.users(id,email,email_confirmed_at,raw_user_meta_data) values
     (owner_id,'actor-owner@example.test',now(),'{"full_name":"Sheri"}'),
     (staff_id,'actor-staff@example.test',now(),'{"name":"Alex"}');
+  -- The focused workspace owner has the minimal Auth shim rather than the
+  -- historical Auth provisioning trigger. Supply the matching app identities
+  -- explicitly; full-history provisioning may already have created them.
+  insert into public.users(id,email,verified_at) values
+    (owner_id,'actor-owner@example.test',now()),
+    (staff_id,'actor-staff@example.test',now())
+    on conflict (id) do update set email=excluded.email,verified_at=excluded.verified_at;
   insert into public.workspaces(id,kind,name,created_by) values
     (business_id,'customer','Actor Fixture',owner_id),(agency_id,'agency','North Studio',staff_id);
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values

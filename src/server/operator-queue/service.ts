@@ -3,12 +3,12 @@ import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import {
   OperatorQueueAccessError, OperatorQueueValidationError, MARK_ACTIONS,
   type MarkAction, type OperatorQueue, type QueueActor, type QueueContext, type QueueItem, type QueueMark,
-} from "./contracts";
-import { projectQueue } from "./project";
-import { readAllSources } from "./sources";
-import { readQueueContext, writeQueueMark } from "./store";
-import { operatorQueueReleaseEnabled } from "./release";
-import { readQueueLeadCounts } from "./lead-counts";
+} from "@/platform/operator-queue/contracts";
+import { projectQueue } from "@/platform/operator-queue/project";
+import { readAllSources } from "@/server/operator-queue/sources";
+import { readQueueContext, writeQueueMark } from "@/platform/operator-queue/store";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
+import { readQueueLeadCounts } from "@/platform/operator-queue/lead-counts";
 
 /**
  * Read the whole queue for a verified operator. The SQL boundary rechecks the

@@ -1,6 +1,6 @@
 import { withCanonicalApprovalStore } from "@/platform/approval-store";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
-import { businessRecordDraftAdapter } from "./sources/business-record-draft";
+import { businessRecordDraftAdapter } from "@/platform/needs-you/sources/business-record-draft";
 import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
@@ -8,35 +8,35 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
-import { connectedSiteSchemaAdapter } from "./sources/connected-site-schema";
+import { connectedSiteSchemaAdapter } from "@/platform/needs-you/sources/connected-site-schema";
 import { getEventRaw, getEvents, getEventsRaw } from "@/lib/events";
 import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { readToolNoticeHandled } from "@/platform/catalog-reports/tool-notices";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
-import { publishingDecisionDeliveryAllowed } from "./publishing-delivery";
+import { publishingDecisionDeliveryAllowed } from "@/platform/needs-you/publishing-delivery";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
-import type { HandledReceipt } from "./contracts";
-import { decidedTenantEventIds, handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
-import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
-import { createNeedsYouService } from "./service";
-import { systemsSourceAdapters } from "./systems-sources";
-import { deliverySourceAdapters } from "./sources/live-delivery";
-import { productSourceAdapters } from "./sources/live-products";
-import { businessFactsAdapter, createBusinessFactReviewStore, type BusinessFactsPorts } from "./sources/business-facts";
+import { serviceRequestAdapter, tenantEventAdapter } from "@/platform/needs-you/adapters";
+import type { HandledReceipt } from "@/platform/needs-you/contracts";
+import { decidedTenantEventIds, handledFromStore, handledFromTenantEvent, mergeHandled } from "@/platform/needs-you/handled";
+import { PostgresNeedsYouStore, type NeedsYouStore } from "@/platform/needs-you/repository";
+import { createNeedsYouService } from "@/platform/needs-you/service";
+import { systemsSourceAdapters } from "@/server/needs-you/systems-sources";
+import { deliverySourceAdapters } from "@/server/needs-you/sources/live-delivery";
+import { productSourceAdapters } from "@/server/needs-you/sources/live-products";
+import { businessFactsAdapter, createBusinessFactReviewStore, type BusinessFactsPorts } from "@/platform/needs-you/sources/business-facts";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
-import { businessPaymentAdapter } from "./sources/business-payment";
-import { inquiryFactAdapter } from "./sources/inquiry-fact";
+import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-payment";
+import { inquiryFactAdapter } from "@/platform/needs-you/sources/inquiry-fact";
 
-import { needsYouReleaseEnabled } from "./release";
-export { needsYouReleaseEnabled } from "./release";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
+export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 
 /** The item store, exposed so the approve route can render its confirm page. */
 export const needsYouStore: NeedsYouStore = PostgresNeedsYouStore;
@@ -75,7 +75,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
     },
     emailAllowed: async row => {
       if (row.sourceLifecycle !== "website_domain") return true;
-      const domains = await import("./sources/website-domain-store");
+      const domains = await import("@/platform/needs-you/sources/website-domain-store");
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },

@@ -6,7 +6,7 @@ import { readPlace } from "@/platform/owner-entry/place-state";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readWorkspaceGoogle } from "@/products/google-listing/server";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
-import { readWorkspaceReviews } from "@/products/google-listing/linked-reviews";
+import { readWorkspaceReviews } from "@/products/google-listing/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Google listing", robots: { index: false, follow: false }, referrer: "no-referrer" };

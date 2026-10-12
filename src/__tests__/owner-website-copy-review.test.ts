@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createNeedsYouService } from "@/platform/needs-you/service";
-import { websiteDocumentAdapter } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentAdapter } from "@/server/needs-you/sources/website-document";
 import type { ServiceSession } from "@/platform/needs-you/service-actor";
 import { createWebsiteRebuildService } from "@/products/websites/rebuild-service";
 import { createWebsiteDocumentStore } from "@/products/websites/document-store";

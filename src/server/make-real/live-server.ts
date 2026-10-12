@@ -4,8 +4,8 @@
  * and the per-workspace flags. Server only. Every outside write here is a
  * call into the path that already owns it (live-adapters.ts has the table).
  */
-import { createGoogleListingAdapter } from "./google-adapter";
-import type { GoogleMakeRealPorts } from "./google-adapter";
+import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
+import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
@@ -19,7 +19,7 @@ import { createSupabasePossibilityRepository } from "@/platform/possibilities/su
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { createNeedsYouApprovalRecords } from "./approvals";
+import { createNeedsYouApprovalRecords } from "@/platform/make-real/approvals";
 import {
   createBookingPageAdapter,
   createHostedWebsiteAdapter,
@@ -27,13 +27,13 @@ import {
   createInternalAppAdapter,
   createTenantContentAdapter,
   type LiveChannelContext,
-} from "./live-adapters";
-import { createLiveMakeRealService, liveReadyPlan, startLiveApproved, type DueActivation } from "./live";
+} from "@/platform/make-real/live-adapters";
+import { createLiveMakeRealService, liveReadyPlan, startLiveApproved, type DueActivation } from "@/platform/make-real/live";
 import { recordServiceAction, startServiceSession, type ServiceSession } from "@/platform/needs-you/service-actor";
 import type { ReadyPlan } from "@/platform/needs-you/sources/make-real";
-import { createSupabaseActivationRepository } from "./supabase-repository";
-import { createSupabaseRevisionContent } from "./supabase-content";
-import { createSystemStoreLiveSystems } from "./systems-adapter";
+import { createSupabaseActivationRepository } from "@/platform/make-real/supabase-repository";
+import { createSupabaseRevisionContent } from "@/platform/make-real/supabase-content";
+import { createSystemStoreLiveSystems } from "@/platform/make-real/systems-adapter";
 
 /** Systems must be on for the workspace, and the channel's own key. */
 export async function makeRealChannelEnabled(workspaceId: string, channel: MakeRealChannel): Promise<boolean> {
@@ -49,14 +49,14 @@ export async function anyMakeRealChannelEnabled(workspaceId: string): Promise<bo
   return false;
 }
 
-export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts, service?: import("./live").LiveMakeRealServiceContext) {
+export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts, service?: import("@/platform/make-real/live").LiveMakeRealServiceContext) {
   const ctx: LiveChannelContext = { actor, enabled: (channel) => makeRealChannelEnabled(workspaceId, channel) };
   return [
     createHostedWebsiteAdapter({
-      read: async (a, workId) => (await import("@/products/websites/rebuild-service")).readWebsiteRebuild(a, workId),
-      approve: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).approveWebsiteRebuild(a, workId, selection),
-      launch: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).launchWebsiteRebuild(a, workId, selection),
-      publishLinked: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).publishWebsiteRebuildOntoLinkedSite(a, workId, selection),
+      read: async (a, workId) => (await import("@/products/websites")).readWebsiteRebuild(a, workId),
+      approve: async (a, workId, selection) => (await import("@/products/websites")).approveWebsiteRebuild(a, workId, selection),
+      launch: async (a, workId, selection) => (await import("@/products/websites")).launchWebsiteRebuild(a, workId, selection),
+      publishLinked: async (a, workId, selection) => (await import("@/products/websites")).publishWebsiteRebuildOntoLinkedSite(a, workId, selection),
     }, ctx),
     createTenantContentAdapter({
       tenantConfig: async (tenantId) => (await getTenantConfig(tenantId)) ?? null,
@@ -66,7 +66,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, 
       publicReadBack: async (tenantId, section, expected) => {
         const tenant = await getTenantConfig(tenantId);
         if (!tenant) return { ok: false, detail: "The published site's address is unavailable." };
-        return (await import("@/products/websites/rebuild-service")).readPublishedWebsiteContent({ tenant, section, expected });
+        return (await import("@/products/websites")).readPublishedWebsiteContent({ tenant, section, expected });
       },
       restore: (section, versionId, tenantId) => restoreVersion(section as ContentSection, versionId, tenantId, "ai"),
     }, ctx),
@@ -74,8 +74,8 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, 
       prepareFollowUp: async (a, selection) => (await import("@/products/inquiries/server")).approveAskInquiryFollowUpPublication(a, selection),
       queue: async (input) => (await import("@/products/inquiries/server")).queueInquiryPublication(input),
       find: async (input) => (await import("@/products/inquiries/server")).findInquiryPublication(input),
-      execute: async (input) => (await import("@/products/inquiries/publication")).executeInquiryPublication(input),
-      claim: async (tenantId, claimId) => (await import("@/products/inquiries/repository")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
+      execute: async (input) => (await import("@/products/inquiries/server")).executeInquiryPublication(input),
+      claim: async (tenantId, claimId) => (await import("@/products/inquiries/server")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
     }, ctx),
     createBookingPageAdapter({
       publish: async (a, input) => (await import("@/products/scheduling/server")).publishPublicWebsiteBookingGrant(a, input),
@@ -188,7 +188,7 @@ export async function activationRunner(workspaceId: string, activationId: string
 
 /**
  * Live plans for the one Make real Needs you source
- * (src/platform/needs-you/systems-sources.ts): stored Ready Possibilities,
+ * (src/server/needs-you/systems-sources.ts): stored Ready Possibilities,
  * only where Systems and at least one live channel are on. Each carries the
  * signed "Try it" link so an owner who never signs in can try it from the
  * email.

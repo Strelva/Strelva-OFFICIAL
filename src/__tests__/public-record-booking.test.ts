@@ -4,7 +4,7 @@ import { setBookingStoreDb } from "@/platform/bookings/store";
 import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { setCalendarBusyPorts } from "@/platform/bookings/calendar-busy";
 import { recordPublicAvailability, confirmPublicRecord, changePublicRecord, cancelPublicRecord } from "@/platform/bookings/public-record";
-import { publicBookingStoreHook } from "@/platform/bookings/public-api";
+import { publicBookingStoreHook } from "@/server/bookings/public-api";
 import { createPublicBookingService, type PublicBookingBinding, type PublicBookingReservationRef } from "@/products/scheduling/public-booking";
 
 let store: ReturnType<typeof fakeBookingStore>;

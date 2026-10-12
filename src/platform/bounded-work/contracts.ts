@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { recordedActorSchema } from "@/platform/presentation/actor";
+import { recordedActorSchema } from "@/platform/workspaces/types";
 export const baseSchema = z.object({
   version: z.literal(1), revision: z.number().int().nonnegative(), title: z.string().trim().min(1).max(160),
   maintenanceActor: recordedActorSchema.nullable().optional().catch(null),

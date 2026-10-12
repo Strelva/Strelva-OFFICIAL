@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { WebsiteDomainView } from "@/products/websites/rebuild-contracts";
+import type { WebsiteDomainView } from "@/products/websites/client";
 import { StEmpty, StHead, StMono, StNotice, StPage, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import styles from "./website-domain-records.module.css";
 

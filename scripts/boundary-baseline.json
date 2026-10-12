@@ -44,10 +44,6 @@
       "src/lib/booking",
       "src/lib/types"
     ],
-    "src/platform/bookings/legacy-ports.ts": [
-      "src/lib/leads",
-      "src/lib/storage/content-store"
-    ],
     "src/platform/bookings/legacy-store.ts": [
       "src/lib/booking",
       "src/lib/storage/content-store",
@@ -97,12 +93,6 @@
       "src/lib/ai-governance",
       "src/lib/types"
     ],
-    "src/platform/make-real/live-server.ts": [
-      "src/lib/apply-section-update",
-      "src/lib/storage",
-      "src/lib/tenants",
-      "src/lib/types"
-    ],
     "src/platform/needs-you/adapters.ts": [
       "src/lib/types"
     ],
@@ -111,10 +101,6 @@
     ],
     "src/platform/needs-you/parity.ts": [
       "src/lib/types"
-    ],
-    "src/platform/needs-you/server.ts": [
-      "src/lib/event-actions",
-      "src/lib/events"
     ],
     "src/platform/needs-you/service.ts": [
       "src/lib/approve-link"
@@ -135,26 +121,9 @@
       "src/lib/domain-monitor",
       "src/lib/types"
     ],
-    "src/platform/operator-queue/service.ts": [
-      "src/lib/tenants"
-    ],
     "src/platform/operator-queue/site-coverage.ts": [
       "src/lib/domain-monitor",
       "src/lib/scan-store",
-      "src/lib/types"
-    ],
-    "src/platform/operator-queue/sources.ts": [
-      "src/lib/access-request-delivery",
-      "src/lib/attention",
-      "src/lib/custom-repos",
-      "src/lib/domain-monitor-store",
-      "src/lib/domains",
-      "src/lib/events",
-      "src/lib/lead-mirror",
-      "src/lib/lead-workflow",
-      "src/lib/maintenance-digest",
-      "src/lib/portfolio",
-      "src/lib/storage",
       "src/lib/types"
     ],
     "src/platform/owner-entry/env.ts": [
@@ -385,50 +354,38 @@
     "src/products/websites/site-seo.ts": [
       "src/lib/tenant-urls",
       "src/lib/types"
+    ],
+    "src/server/make-real/live-server.ts": [
+      "src/lib/apply-section-update",
+      "src/lib/storage",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/server/needs-you/server.ts": [
+      "src/lib/event-actions",
+      "src/lib/events"
+    ],
+    "src/server/operator-queue/sources.ts": [
+      "src/lib/access-request-delivery",
+      "src/lib/attention",
+      "src/lib/custom-repos",
+      "src/lib/domain-monitor-store",
+      "src/lib/domains",
+      "src/lib/events",
+      "src/lib/lead-mirror",
+      "src/lib/lead-workflow",
+      "src/lib/maintenance-digest",
+      "src/lib/portfolio",
+      "src/lib/storage",
+      "src/lib/types"
+    ],
+    "src/server/operator-queue/service.ts": [
+      "src/lib/tenants"
+    ],
+    "src/server/bookings/legacy-ports.ts": [
+      "src/lib/leads",
+      "src/lib/storage/content-store"
     ]
   },
-  "boundaries": [
-    "src/app/agency-websites/[bindingId]/page.tsx -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/api/cron/connected-sites-purge/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/api/cron/website-health/route.ts -> @/products/websites/hosted-routing :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/api/workspace/connected-sites/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/workspace/results/page.tsx -> @/products/websites/linked-results :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/workspace/reviews/page.tsx -> @/products/google-listing/linked-reviews :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/places/WorkspaceInquiries.tsx -> @/products/inquiries/linked-leads :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/places/WorkspaceResults.tsx -> @/products/websites/linked-results :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/places/WorkspaceReviews.tsx -> @/products/google-listing/linked-reviews :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/server.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/server.ts -> @/products/google-listing/service :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/server.ts -> @/products/investigations/system-health :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/server.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/website-detail-server.ts -> @/products/websites/document-store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/workspace/preview/publishing-fixture.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/workspace/preview/systems-projection.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
-    "src/platform/bookings/calendar-busy.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/bookings/legacy-ports.ts -> @/products/scheduling/contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/bookings/manage-server.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/bookings/public-api.ts -> @/products/scheduling/public-booking :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/inquiries/publication :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/inquiries/repository :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/inquiries/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/make-real/live-server.ts -> @/products/websites/rebuild-service :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-delivery.ts -> @/products/operations/responsibilities :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-delivery.ts -> @/products/operations/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-delivery.ts -> @/products/websites/rebuild-release :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-delivery.ts -> @/products/websites/rebuild-service :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-products.ts -> @/products/applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-products.ts -> @/products/custom-applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/live-products.ts -> @/products/work-plans :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/website-document.ts -> @/products/websites/rebuild-contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/sources/website-document.ts -> @/products/websites/site-document-schema :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/systems-sources.ts -> @/experience/systems/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/systems-sources.ts -> @/experience/workspace/contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/needs-you/systems-sources.ts -> @/products/managed-presence/server :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/platform/operator-queue/sources.ts -> @/products/operations/inbox :: Platform modules cannot depend on routes, products, or the experience layer.",
-    "src/products/inquiries/linked-leads.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/products/investigations/system-health.ts -> @/products/websites/rebuild-possibility :: Import a product through its index, contracts, server, or client entry point.",
-    "src/products/publishing/projection.ts -> @/products/google-listing/health :: Import a product through its index, contracts, server, or client entry point."
-  ]
+  "boundaries": []
 }

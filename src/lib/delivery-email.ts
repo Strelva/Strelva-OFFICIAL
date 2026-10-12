@@ -5,7 +5,6 @@ import {
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/platform/infra/email/layout";
 import { sendEmail } from "@/platform/infra/email/send";
 import { cleanSubjectText } from "@/platform/infra/email/text";
-import { actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 
 /**
  * Log a real client-comms send into the tenant's operator CRM activity timeline
@@ -18,12 +17,12 @@ import { actorPresentation, type RecordedActor } from "@/platform/presentation/a
 async function logSentEmailToCrm(
   tenantId: string | undefined,
   summary: string,
-  actor?: RecordedActor,
+  actorName = "Actor not recorded",
 ): Promise<void> {
   if (!tenantId) return;
   try {
     const { addTenantActivity } = await import("@/lib/tenant-crm");
-    await addTenantActivity(tenantId, { kind: "email", summary, author: actorPresentation(actor).name ?? "Actor not recorded" });
+    await addTenantActivity(tenantId, { kind: "email", summary, author: actorName });
   } catch (err) {
     console.error("[delivery-email] CRM comms log failed (non-fatal):", err);
   }
@@ -210,7 +209,7 @@ export async function sendPaymentPastDueEmail(params: {
       options: opts,
     });
     if (!sent) return false;
-    await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email", { kind: "platform" });
+    await logSentEmailToCrm(params.tenantId, "Sent: payment-past-due email", "Strelva");
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Payment-past-due email failed:`, err);

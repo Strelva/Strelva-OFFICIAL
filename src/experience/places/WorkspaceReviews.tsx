@@ -1,5 +1,5 @@
 import { buildGoogleReviewLink, buildReviewShareMessage } from "@/lib/reviews/reputation";
-import type { ReviewView, SiteReviews, WorkspaceReviews } from "@/products/google-listing/linked-reviews";
+import type { ReviewView, SiteReviews, WorkspaceReviews } from "@/products/google-listing/client";
 import { StEmpty, StLabel, StMono, StNotice, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { PublishingPage, type PublishingState } from "@/experience/publishing/PublishingPage";
 import styles from "@/experience/publishing/publishing.module.css";

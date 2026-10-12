@@ -1,13 +1,13 @@
 /** Both receipt and native management use the same /b customer surface. */
-import { bookingScopeFor } from "./booking-scope";
+import { bookingScopeFor } from "@/platform/bookings/booking-scope";
 import { createPublicWebsiteBookingService } from "@/products/scheduling/server";
-import { PublicBookingError } from "./errors";
-import type { ManageDeps } from "./manage";
-import { readReservationByManageTokenHash } from "./store";
-import { bookingAgentLabel } from "./agent-source";
-import { bookingMessagesEnabled, bookingAgentsEnabled, bookingAgentVisibilityEnabled } from "./flags";
-import { nativeBookingByToken, nativeSlots, tokenHash, changeNativeBooking, confirmAgent } from "./native";
-import { deliverBookingUpdates, notifyBookingRequestNow } from "./updates";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import type { ManageDeps } from "@/platform/bookings/manage";
+import { readReservationByManageTokenHash } from "@/platform/bookings/store";
+import { bookingAgentLabel } from "@/platform/bookings/agent-source";
+import { bookingMessagesEnabled, bookingAgentsEnabled, bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
+import { nativeBookingByToken, nativeSlots, tokenHash, changeNativeBooking, confirmAgent } from "@/platform/bookings/native";
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 
 export function manageDeps(): ManageDeps {
   const service = createPublicWebsiteBookingService();

@@ -22,6 +22,12 @@ cleanup_temp_postgres() {
     if ! pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1; then
       pg_ctl -D "$cluster_data" -m immediate -w stop >/dev/null 2>&1 || true
     fi
+    # pg_ctl can return after shutdown while the owned postmaster is briefly
+    # awaiting OS reaping. Observe its exit before reporting a retained server.
+    for _ in {1..20}; do
+      [[ "$cluster_postmaster_pid" =~ ^[0-9]+$ ]] && kill -0 "$cluster_postmaster_pid" 2>/dev/null || break
+      sleep 0.05
+    done
     if [[ "$cluster_postmaster_pid" =~ ^[0-9]+$ ]] && kill -0 "$cluster_postmaster_pid" 2>/dev/null; then
       printf 'Unable to stop owned PostgreSQL PID %s; retained cluster: %s\n' "$cluster_postmaster_pid" "$cluster_root" >&2
       exit 1

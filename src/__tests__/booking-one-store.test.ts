@@ -56,7 +56,7 @@ import { getBookings } from "@/platform/bookings/legacy-store";
 import type { Booking } from "@/lib/types";
 import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { setBookingStoreDb, readTenantBookings, upsertBookingSettings, type BookingStoreDb } from "@/platform/bookings/store";
-import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
+import { publicBookingStoreHook, subtractStoreBookings } from "@/server/bookings/public-api";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingReservationRef } from "@/products/scheduling/public-booking";
 import { recordPublicAvailability, confirmPublicRecord, changePublicRecord, cancelPublicRecord } from "@/platform/bookings/public-record";
 import { BOOKING_STORE_PENDING_KEY } from "@/platform/bookings/tenant";

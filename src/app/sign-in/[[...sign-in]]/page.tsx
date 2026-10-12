@@ -1,4 +1,4 @@
-import { invitationEntryIdentity } from "@/platform/agency-brand/entry";
+import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 import type { Metadata } from "next";

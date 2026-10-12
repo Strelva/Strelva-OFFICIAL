@@ -113,7 +113,7 @@ export interface LeadDependencies {
 export async function readConnectedSiteInquiries(actor: WorkspaceActor, workspaceId: string): Promise<ConnectedSiteInquiries[] | null> {
   const { connectedSitesReleasedFor } = await import("@/products/connected-sites/server");
   if (!(await connectedSitesReleasedFor(actor, workspaceId).catch(() => false))) return null;
-  const { connectedSitesStore } = await import("@/products/connected-sites/store");
+  const { connectedSitesStore } = await import("@/products/connected-sites/server");
   const store = connectedSitesStore();
   const [sites, inquiries] = await Promise.all([store.list(actor, workspaceId), store.inquiries(actor, workspaceId, LEAD_READ_LIMIT)]);
   return sites

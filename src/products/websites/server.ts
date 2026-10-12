@@ -569,3 +569,6 @@ export { extractBusinessFacts } from "./rebuild-pipeline";
 
 /** Product adapter for platform assistant website operations. */
 export { createAgentWebsiteAdapter } from "./agent-adapter";
+
+export { readWorkspaceResults } from "./linked-results";
+export type { SiteResults } from "./linked-results";

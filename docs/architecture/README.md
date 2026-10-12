@@ -28,7 +28,7 @@ src/products     one folder per capability: contracts, server, domain logic
 src/platform     shared layers every capability builds on
   infra/         shared infrastructure both models use: db, redis, auth, email,
                  crypto, rate-limit, logger, ai-models, safe-fetch, model calls
-src/server       server-only wiring (executable capability definitions)
+src/server       server-only product wiring, live sources and compatibility adapters
 src/lib          tenant-model implementations awaiting extraction; may import
                  src/platform/infra, never another workspace layer
 src/proxy.ts     request gating

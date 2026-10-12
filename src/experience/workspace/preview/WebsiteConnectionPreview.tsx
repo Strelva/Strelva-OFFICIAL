@@ -8,7 +8,7 @@ import { ServerVisibility } from "@/experience/connected-sites/ServerVisibility"
 import { expectedConnectedSiteSystemId } from "@/products/connected-sites/client";
 import { WebsiteDomainRecords } from "@/experience/websites/WebsiteDomainRecords";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
-import type { WebsiteDomainView } from "@/products/websites/rebuild-contracts";
+import type { WebsiteDomainView } from "@/products/websites/client";
 
 /** Fictional connection and domain data. The transport never writes to a provider or product API. */
 const WORKSPACE = "7a000000-0000-4000-8000-000000000001";

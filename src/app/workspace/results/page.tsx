@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { resolveRange } from "@/lib/analytics/period";
 import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
-import { readWorkspaceResults } from "@/products/websites/linked-results";
+import { readWorkspaceResults } from "@/products/websites/server";
 import { WorkspaceResultsView } from "@/experience/places/WorkspaceResults";
 
 export const dynamic = "force-dynamic";

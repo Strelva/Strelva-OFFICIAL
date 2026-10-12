@@ -81,3 +81,6 @@ export { parseWebsiteReportView, type WebsiteReportView } from "./report-view";
 
 export { legacyArchiveSummarySchema, type LegacyArchiveSummary } from "./legacy-archive-contracts";
 export { normalizeWebsiteRebuildUrl } from "./rebuild-url";
+
+export { bareHostname } from "./rebuild-possibility";
+export type { SiteResults, WorkspaceResults } from "./linked-results";

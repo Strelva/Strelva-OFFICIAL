@@ -1,6 +1,6 @@
 import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
 import { StPage, StHead, StSection, StRows, StRow, StSurface, StNotice, StEmpty, StMono, StTextButton, StPillLink } from "@/components/ui/strelva/Kit";
-import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/linked-leads";
+import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/client";
 import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { InquiryInbox } from "./InquiryInbox";
 import { HeldInquiryActions } from "./HeldInquiryActions";
