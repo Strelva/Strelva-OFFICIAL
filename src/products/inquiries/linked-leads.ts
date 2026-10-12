@@ -120,7 +120,7 @@ export function isForwardedLead(lead: Pick<WorkspaceInquiryLead, "recordedVia">)
 
 /** Forwarded inquiries, when forwarding is released for this business. */
 export async function readForwardedInquiryLeads(actor: WorkspaceActor, workspaceId: string): Promise<WorkspaceInquiryLead[] | null> {
-  const { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } = await import("@/products/inquiry-forwarding/release");
+  const { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } = await import("@/products/inquiry-forwarding/server");
   if (!inquiryForwardingReleaseEnabled()) return null;
   const { releaseViewerFor } = await import("@/platform/release-flags/viewer");
   if (!(await inquiryForwardingReleasedFor(workspaceId, await releaseViewerFor(actor)))) return null;

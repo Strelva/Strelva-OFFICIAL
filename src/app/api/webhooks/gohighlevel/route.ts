@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ghlImportReleaseEnabled, receiveGhlWebhook } from "@/products/agency-clients/gohighlevel";
+import { ghlImportReleaseEnabled, receiveGhlWebhook } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 

@@ -58,9 +58,20 @@ jobs:
       - name: Ontology invariants
         run: pnpm check:ontology
 
+      - name: PostgreSQL 18 client and server (local SQL proofs are qualified on 18)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+      - name: Install ripgrep (check scripts use rg)
+        run: command -v rg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep)
+
       - name: Workspace ownership SQL
         run: |
           postgres_bin_dir="/opt/homebrew/opt/postgresql@18/bin"
+          [ -x "$postgres_bin_dir/initdb" ] || postgres_bin_dir="/usr/lib/postgresql/18/bin"
           if [ ! -x "$postgres_bin_dir/initdb" ]; then
             postgres_bin_dir="$(pg_config --bindir 2>/dev/null || true)"
           fi

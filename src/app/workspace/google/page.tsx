@@ -8,7 +8,7 @@ import { readPlace } from "@/platform/owner-entry/place-state";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readWorkspaceGoogle } from "@/products/google-listing/server";
-import { GOOGLE_DISCOVER_CHOICES_COOKIE, ownerConnectAvailable, readDiscoveryChoices, readFoundFacts, readGrantAvailable, readGrantProperties, readGrantSummary, readGrantView, safeReturnTo } from "@/products/google-listing/connect";
+import { GOOGLE_DISCOVER_CHOICES_COOKIE, ownerConnectAvailable, readDiscoveryChoices, readFoundFacts, readGrantAvailable, readGrantProperties, readGrantSummary, readGrantView, safeReturnTo } from "@/products/google-listing/server";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
 import { GoogleConnect, type GoogleConnectViewer } from "@/experience/places/GoogleConnect";
 import { GoogleReadGrant } from "@/experience/places/GoogleReadGrant";

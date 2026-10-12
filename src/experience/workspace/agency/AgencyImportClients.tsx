@@ -13,7 +13,7 @@ import {
   type ClientImportRow,
   type ClientImportRowState,
   type ClientImportSource,
-} from "@/products/agency-clients/import-contract";
+} from "@/products/agency-clients/contracts";
 import {
   CLIENT_SHEET_FIELD_LABELS,
   CLIENT_SHEET_FIELDS,
@@ -24,7 +24,7 @@ import {
   type ClientSheetField,
   type ClientSheetMapping,
   type ParsedClientSheet,
-} from "@/products/agency-clients/sheet-source";
+} from "@/products/agency-clients/index";
 
 /**
  * Import clients (GLOSSARY: Import clients). The agency pastes or uploads its

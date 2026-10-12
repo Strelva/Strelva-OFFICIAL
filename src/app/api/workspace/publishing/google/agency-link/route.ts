@@ -1,6 +1,6 @@
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { agencyGoogleConnectLink } from "@/products/google-listing/connect";
+import { agencyGoogleConnectLink } from "@/products/google-listing/server";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";

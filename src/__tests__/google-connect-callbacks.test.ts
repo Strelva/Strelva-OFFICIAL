@@ -4,8 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const f = vi.hoisted(() => ({ actor: vi.fn(), finish: vi.fn(), importFacts: vi.fn(), discover: vi.fn() }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/workspaces/http", async (original) => ({ ...(await original<object>()), workspaceHttpActor: f.actor }));
-vi.mock("@/products/google-listing/server", () => ({ finishNativeGoogleOAuth: f.finish, NATIVE_GOOGLE_OAUTH_COOKIE: "strelva_native_google_oauth" }));
-vi.mock("@/products/google-listing/connect", async (original) => ({ ...(await original<object>()), importGoogleFoundFacts: f.importFacts, finishGoogleDiscovery: f.discover, admitOwnerConnect: vi.fn() }));
+vi.mock("@/products/google-listing/server", async (original) => ({ ...(await original<object>()), finishNativeGoogleOAuth: f.finish, NATIVE_GOOGLE_OAUTH_COOKIE: "strelva_native_google_oauth", importGoogleFoundFacts: f.importFacts, finishGoogleDiscovery: f.discover, admitOwnerConnect: vi.fn() }));
 import { GET as nativeCallback } from "@/app/api/workspace/publishing/google/oauth/callback/route";
 import { GET as discoverCallback } from "@/app/api/workspace/publishing/google/discover/callback/route";
 

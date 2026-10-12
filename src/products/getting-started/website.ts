@@ -1,5 +1,5 @@
 import type { BusinessRecord } from "@/platform/business-record/contracts";
-import { normalizeWebsiteRebuildUrl } from "@/products/websites/rebuild-url";
+import { normalizeWebsiteRebuildUrl } from "@/products/websites/contracts";
 
 /**
  * One website per business: the `website` entry of the business record's

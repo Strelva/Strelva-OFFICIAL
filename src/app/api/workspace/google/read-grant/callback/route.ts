@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { finishReadGrant, READ_GRANT_COOKIE, stateWorkspaceHint } from "@/products/google-listing/connect";
+import { finishReadGrant, READ_GRANT_COOKIE, stateWorkspaceHint } from "@/products/google-listing/server";
 
 export const dynamic = "force-dynamic";
 /** Search Console and Analytics read grant returns here. Its own row; the listing grant is untouched. */

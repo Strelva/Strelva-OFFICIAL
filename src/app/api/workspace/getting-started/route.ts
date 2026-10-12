@@ -6,7 +6,7 @@ import { BusinessRecordValidationError } from "@/platform/business-record/reposi
 import { isWorkspaceBodyTooLarge, readWorkspaceBody, workspaceHttpActor, workspaceJson as json, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError, WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
 import { CHECK_RESULT_ID, gettingStartedActionSchema } from "@/products/getting-started/contracts";
-import { FoundFactInputError } from "@/products/found-facts/store";
+import { FoundFactInputError } from "@/products/found-facts/server";
 import { gettingStarted, GettingStartedInputError, GettingStartedRateLimitError, GettingStartedUnavailableError } from "@/products/getting-started/server";
 
 export const dynamic = "force-dynamic";

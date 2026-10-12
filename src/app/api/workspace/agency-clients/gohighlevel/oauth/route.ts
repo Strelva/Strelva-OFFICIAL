@@ -4,7 +4,7 @@ import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platf
 import {
   assertGhlAgencyManagerForRoute,
 } from "../shared";
-import { createGhlOAuthState, ghlAuthorizationUrl, ghlImportReleaseEnabled, ghlRedirectUri, GhlImportError, GHL_STATE_COOKIE, GHL_STATE_COOKIE_MAX_AGE_SECONDS } from "@/products/agency-clients/gohighlevel";
+import { createGhlOAuthState, ghlAuthorizationUrl, ghlImportReleaseEnabled, ghlRedirectUri, GhlImportError, GHL_STATE_COOKIE, GHL_STATE_COOKIE_MAX_AGE_SECONDS } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import { readBusinessRecord } from "@/platform/business-record/service";
-import { businessWebsite as businessWebsiteFromRecord } from "@/products/getting-started/website";
+import { businessWebsite as businessWebsiteFromRecord } from "@/products/getting-started/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/platform/infra/db/server-client";

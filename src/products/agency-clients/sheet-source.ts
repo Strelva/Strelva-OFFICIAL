@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { parseTrackerCsv } from "@/products/tracker/csv";
+import { parseTrackerCsv } from "@/products/tracker/index";
 import {
   CLIENT_IMPORT_MAX_ROWS,
   clientImportRowSchema,

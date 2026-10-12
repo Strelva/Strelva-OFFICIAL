@@ -84,3 +84,5 @@ export function forwardingLocalPart(address: string, domain: string | null): str
   const local = email.slice(0, at);
   return FORWARDING_LOCAL_PART.test(local) ? local : null;
 }
+
+export { FORWARDING_HOSTS, hostSteps, type ForwardingHostId } from "./hosts";

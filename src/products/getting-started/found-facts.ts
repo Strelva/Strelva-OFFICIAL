@@ -1,5 +1,5 @@
 import { factValueSchemas, type BusinessRecord } from "@/platform/business-record/contracts";
-import type { BusinessFacts } from "@/products/websites/rebuild-pipeline";
+import type { BusinessFacts } from "@/products/websites/server";
 import { FOUND_FACT_LABELS, type FoundFact as StoredFoundFact } from "@/products/found-facts/contracts";
 import type { FoundFact, FoundFactInput } from "./contracts";
 

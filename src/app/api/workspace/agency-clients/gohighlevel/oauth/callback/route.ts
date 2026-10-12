@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { agencyClientsRedirect } from "../../shared";
-import { connectGhlAgency, consumeGhlOAuthState, ghlImportReleaseEnabled, ghlRedirectUri, GhlImportError, GHL_STATE_COOKIE } from "@/products/agency-clients/gohighlevel";
+import { connectGhlAgency, consumeGhlOAuthState, ghlImportReleaseEnabled, ghlRedirectUri, GhlImportError, GHL_STATE_COOKIE } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 

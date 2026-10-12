@@ -14,7 +14,7 @@ vi.mock("@/platform/workspaces", () => ({ listWorkspaces: f.workspace }));
 vi.mock("@/platform/ask/release", () => ({ askReleaseMayBeOn: () => false }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: f.config }));
 vi.mock("@/lib/website-page-data", () => ({ loadSiteEditorData: f.editor, loadBrandKitSettings: vi.fn(), loadCollectionsData: vi.fn(), loadGoogleBusinessData: vi.fn(), siteFrameFor: () => ({ siteUrl: "https://synthetic.example.test", previewUrl: "", siteModel: "food-brand", liveSyncEnabled: false, autoPublish: false }) }));
-vi.mock("@/products/websites/server", () => ({ resolveWorkspaceSite: f.resolve }));
+vi.mock("@/products/websites/server", async (importOriginal) => ({ ...(await importOriginal<object>()), resolveWorkspaceSite: f.resolve }));
 vi.mock("@/products/websites/index", () => ({ listWebsiteRebuilds: f.records, websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: f.connected, readConnectedSites: f.sites }));

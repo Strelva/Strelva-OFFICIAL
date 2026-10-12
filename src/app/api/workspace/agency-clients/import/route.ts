@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { isWorkspaceBodyTooLarge as isBodyTooLarge, readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { clientImportActionSchema } from "@/products/agency-clients/import-contract";
-import { applyClientImport, previewClientImport } from "@/products/agency-clients/import-server";
+import { clientImportActionSchema } from "@/products/agency-clients/contracts";
+import { applyClientImport, previewClientImport } from "@/products/agency-clients/server";
 import { agencyImportReleaseEnabled, AgencyClientError } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";

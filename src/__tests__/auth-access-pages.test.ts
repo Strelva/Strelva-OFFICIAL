@@ -354,7 +354,7 @@ describe("auth access pages", () => {
     for (const next of [undefined, "/workspace?save=scan_public123", "/workspace/account?continue=public"]) {
       const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve(next ? { next } : {}) }));
       expect(html).toContain("New accounts open soon");
-      expect(html).toContain("Want it done for you? Ask Strelva Agency");
+      expect(html).toContain("Want it done for you? Find an agency");
       expect(html).not.toContain('data-supabase="sign-in"');
       expect(html).not.toContain("/workspace/business/new");
       // No agency door either: nothing points at agency sign-up.

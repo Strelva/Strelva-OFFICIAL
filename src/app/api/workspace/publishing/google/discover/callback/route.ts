@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { admitOwnerConnect, finishGoogleDiscovery, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, stateWorkspaceHint } from "@/products/google-listing/connect";
+import { admitOwnerConnect, finishGoogleDiscovery, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, stateWorkspaceHint } from "@/products/google-listing/server";
 
 export const dynamic = "force-dynamic";
 /** Connect Google, step one returns here. The short-lived token is used to

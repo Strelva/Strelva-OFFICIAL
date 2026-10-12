@@ -6,13 +6,10 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { enterCustomerBusiness } from "@/platform/workspaces/business-entry";
 import { listWorkspaces } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type Workspace, type WorkspaceActor } from "@/platform/workspaces/types";
-import { getAiVisibilityResult } from "@/products/ai-visibility/results";
-import { parseAiVisibilityAssessmentPayload } from "@/products/ai-visibility/work";
-import { savePublicAiVisibilityResult } from "@/products/ai-visibility/usecase";
+import { getAiVisibilityResult, parseAiVisibilityAssessmentPayload, savePublicAiVisibilityResult } from "@/products/ai-visibility/server";
 import { getPublicWebsiteAudit, savePublicWebsiteAudit } from "@/products/website-audit/server";
-import { crawlWebsite, WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
-import { extractBusinessFacts } from "@/products/websites/rebuild-pipeline";
-import { decideBusinessFoundFacts, readBusinessFoundFacts, stageOwnerWebsiteFoundFacts } from "@/products/found-facts/store";
+import { crawlWebsite, extractBusinessFacts, WebsiteCrawlError } from "@/products/websites/server";
+import { decideBusinessFoundFacts, readBusinessFoundFacts, stageOwnerWebsiteFoundFacts } from "@/products/found-facts/server";
 import type { FoundFactDecision } from "@/products/found-facts/contracts";
 import { CHECK_RESULT_ID, type CheckForBusiness, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
 import { confirmationValue, foundFactsFromReading, screenFoundFact } from "./found-facts";
@@ -232,3 +229,5 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
 }
 
 export const gettingStarted = createGettingStarted();
+
+export { businessWebsite } from "./website";

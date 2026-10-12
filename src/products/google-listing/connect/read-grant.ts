@@ -4,10 +4,10 @@ import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspa
 import { bindingEncryptionReady, encryptForBinding } from "@/platform/account-bindings/store";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { revokeProviderAuthorization } from "@/platform/infra/provider-revocation";
-import { refreshGoogleTokens, GA4_READ_SCOPE, GSC_READ_SCOPE } from "@/lib/google-token";
-import { queryGscTotals, type GscTotals } from "@/lib/search-console";
-import { queryGa4Report, type Ga4Report } from "@/lib/analytics";
-import { listGa4Resources, listSearchConsoleResources, type GoogleResource } from "@/lib/google-resources";
+import { refreshGoogleTokens, GA4_READ_SCOPE, GSC_READ_SCOPE } from "@/platform/infra/google-token";
+import { queryGscTotals, type GscTotals } from "@/platform/infra/search-console";
+import { queryGa4Report, type Ga4Report } from "@/platform/infra/analytics";
+import { listGa4Resources, listSearchConsoleResources, type GoogleResource } from "@/platform/infra/google-resources";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { googleReadGrantEnabled } from "./flags";
 import { isBusinessOwner } from "./service";

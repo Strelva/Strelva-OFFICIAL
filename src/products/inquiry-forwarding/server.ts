@@ -9,7 +9,7 @@
  * own inbox. Off unless inquiryForwardingReleaseEnabled().
  */
 import { randomBytes } from "node:crypto";
-import { scoreLeadSpam } from "@/lib/lead-spam";
+import { scoreLeadSpam } from "@/platform/infra/lead-spam";
 import { getReceivedEmailMessage, type ReceivedEmailMessageResult } from "@/platform/infra/email/send";
 import type { ReleaseEnvironment } from "@/platform/release-flags/resolve";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -165,3 +165,5 @@ export async function receiveForwardedInquiryEvent(input: { event: unknown; even
     return { status: "unavailable", reason: "forwarding_store_unavailable" };
   }
 }
+
+export { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "./release";

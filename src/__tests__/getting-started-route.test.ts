@@ -6,7 +6,7 @@ vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mock
 vi.mock("@/platform/infra/funnel", () => ({ recordFunnelEvent: mocks.funnel }));
 vi.mock("@/products/getting-started/server", async () => {
   const actual = await vi.importActual<typeof import("@/products/getting-started/server")>("@/products/getting-started/server");
-  return { ...actual, gettingStarted: { readCheck: mocks.readCheck, startFromCheck: mocks.start, read: mocks.read, readWebsite: mocks.readWebsite, confirm: mocks.confirm, websiteHost: actual.createGettingStarted().websiteHost } };
+  return { ...actual, gettingStarted: { readCheck: mocks.readCheck, startFromCheck: mocks.start, read: mocks.read, readWebsite: mocks.readWebsite, decide: mocks.confirm, websiteHost: actual.createGettingStarted().websiteHost } };
 });
 
 import { GET, POST } from "@/app/api/workspace/getting-started/route";
@@ -77,7 +77,7 @@ describe("/api/workspace/getting-started", () => {
     mocks.readWebsite.mockRejectedValueOnce(new WorkspaceAccessError());
     expect((await post({ action: "read_website", workspaceId: BUSINESS, url: "northside.example" })).status).toBe(403);
     mocks.confirm.mockRejectedValueOnce(new Error("db password=secret"));
-    const failed = await post({ action: "confirm_found_facts", workspaceId: BUSINESS, revision: 1, facts: [] });
+    const failed = await post({ action: "decide_found_facts", workspaceId: BUSINESS, revision: 1, decisions: [] });
     expect(failed.status).toBe(503);
     expect(JSON.stringify(await failed.json())).not.toContain("secret");
   });

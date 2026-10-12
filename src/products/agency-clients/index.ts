@@ -37,3 +37,6 @@ export function claimReviewReleaseEnabled(
 ): boolean {
   return agencyAddClientReleaseEnabled(environment) && environment.STRELVA_CLAIM_REVIEW_RELEASE === "1";
 }
+
+export { CLIENT_SHEET_FIELD_LABELS, CLIENT_SHEET_FIELDS, CLIENT_SHEET_MAX_BYTES, clientRowsFromSheet, detectClientSheetColumns, parseClientSheet } from "./sheet-source";
+export type { ClientSheetField, ClientSheetMapping, ParsedClientSheet } from "./sheet-source";

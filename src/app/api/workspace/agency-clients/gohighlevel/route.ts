@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { disconnectGhlAgency, ghlImportReleaseEnabled, GhlImportError, readGhlConnection, readGhlImportRows } from "@/products/agency-clients/gohighlevel";
+import { disconnectGhlAgency, ghlImportReleaseEnabled, GhlImportError, readGhlConnection, readGhlImportRows } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 // A large agency is a few hundred paced HighLevel reads.

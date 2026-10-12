@@ -127,7 +127,7 @@ describe("applyClientImport", () => {
     const inputs = d.add.mock.calls.map(([, input]) => input);
     expect(inputs).toContainEqual({ action: "add", agencyWorkspaceId: AGENCY, idempotencyKey: clientImportIdempotencyKey(AGENCY, "sheet", northside.sourceRef),
       url: "https://northside.example/", name: "Northside Bakery", ownerEmail: "pat@northside.example",
-      foundFacts: { phone: "(716) 555-0142", address: "12 Main St, Buffalo NY" } });
+      foundFacts: { phone: "(716) 555-0142", address: "12 Main St, Buffalo NY", source: { kind: "client_import_sheet", ref: "site:northside.example" } } });
     expect(inputs).toContainEqual({ action: "add", agencyWorkspaceId: AGENCY, idempotencyKey: clientImportIdempotencyKey(AGENCY, "sheet", corner.sourceRef), name: "Corner Plumbing" });
   });
 

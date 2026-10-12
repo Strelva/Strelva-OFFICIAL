@@ -5,7 +5,7 @@ import { readWorkspaceInquiryInbox } from "@/products/inquiries";
 import { z } from "zod";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
-import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@/products/inquiry-forwarding/release";
+import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@/products/inquiry-forwarding/server";
 import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
 import { listWorkspaces } from "@/platform/workspaces";
 import { systemsReleasedFor } from "@/platform/systems-release";

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@/products/inquiry-forwarding/release";
+import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@/products/inquiry-forwarding/server";
 import { issueForwarding, readForwarding, revokeForwarding } from "@/products/inquiry-forwarding/server";
 
 export const dynamic = "force-dynamic";

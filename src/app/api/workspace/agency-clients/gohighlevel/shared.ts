@@ -1,5 +1,5 @@
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { assertGhlAgencyManager, defaultGhlServiceDeps } from "@/products/agency-clients/gohighlevel/service";
+import { assertGhlAgencyManager, defaultGhlServiceDeps } from "@/products/agency-clients/server";
 
 export function assertGhlAgencyManagerForRoute(actor: WorkspaceActor, workspaceId: string): Promise<void> {
   return assertGhlAgencyManager(actor, workspaceId, defaultGhlServiceDeps());

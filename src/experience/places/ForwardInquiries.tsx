@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StMono, StNotice, StPill, StSection, StSegmented, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
 import type { ForwardingView } from "@/products/inquiry-forwarding/contracts";
-import { FORWARDING_HOSTS, hostSteps, type ForwardingHostId } from "@/products/inquiry-forwarding/hosts";
+import { FORWARDING_HOSTS, hostSteps, type ForwardingHostId } from "@/products/inquiry-forwarding/contracts";
 import { whenLabel } from "./WorkspacePlace";
 
 /**

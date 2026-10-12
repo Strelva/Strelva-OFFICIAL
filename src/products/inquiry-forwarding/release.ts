@@ -10,7 +10,7 @@
  */
 import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import type { ReleaseEnvironment, ReleaseViewer } from "@/platform/release-flags/resolve";
-import { inquiryReleaseEnabledForWorkspace, inquiryReleaseMayBeOn } from "@/products/inquiries/release";
+import { inquiryReleaseEnabledForWorkspace, inquiryReleaseMayBeOn } from "@/products/inquiries/server";
 import { forwardingDomain } from "./contracts";
 
 export function inquiryForwardingReleaseEnabled(environment: ReleaseEnvironment = process.env): boolean {

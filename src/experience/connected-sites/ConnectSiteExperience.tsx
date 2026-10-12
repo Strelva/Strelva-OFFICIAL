@@ -7,7 +7,7 @@ import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, 
 import styles from "./connected-sites.module.css";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
-import { GUIDE_ORDER, installGuide, installStepsText } from "@/products/connected-sites/install-guides";
+import { GUIDE_ORDER, installGuide, installStepsText } from "@/products/connected-sites/client";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 

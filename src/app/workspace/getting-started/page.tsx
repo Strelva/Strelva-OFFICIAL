@@ -8,7 +8,7 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { readPlace } from "@/platform/owner-entry/place-state";
 import { gettingStarted } from "@/products/getting-started/server";
 import { connectedSitesReleasedFor } from "@/products/connected-sites/server";
-import { publishingEnabledForWorkspace } from "@/products/publishing/release";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Getting started", robots: { index: false, follow: false }, referrer: "no-referrer" };

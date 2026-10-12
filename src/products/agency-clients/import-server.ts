@@ -19,7 +19,7 @@ import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { factValueSchemas } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { normalizeWebsiteRebuildUrl } from "@/products/websites/rebuild-url";
+import { normalizeWebsiteRebuildUrl } from "@/products/websites/contracts";
 import type { AddAgencyClientInput, AddAgencyClientResult } from "./contracts";
 import {
   clientImportLimitsSchema,
@@ -32,7 +32,7 @@ import {
   type ClientImportRow,
   type ClientImportSource,
 } from "./import-contract";
-import { addAgencyClient, AgencyClientError, agencyClientRpcFailure } from "./server";
+import { addAgencyClient, AgencyClientError, agencyClientRpcFailure } from "./service";
 
 type DbError = { message?: string; code?: string } | null;
 export interface ClientImportDeps {

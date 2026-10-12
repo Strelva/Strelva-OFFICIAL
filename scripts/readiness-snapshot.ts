@@ -253,6 +253,10 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261024132100": "agency_native_page_commands",
   "20261024132400": "ux_agency2_decision_predecessors",
   "20261024200000": "agency_client_add_limit_overrides",
+  "20261024300000": "business_found_facts",
+  "20261024400000": "workspace_google_read_grants",
+  "20261024500000": "inquiry_forwarding_addresses",
+  "20261024600000": "agency_source_connections",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
