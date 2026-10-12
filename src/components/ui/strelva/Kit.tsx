@@ -317,8 +317,8 @@ export function StSurface({ children, tone, pad = true, label, selected }: { chi
   return <div className={`${styles.surface}${pad ? ` ${styles.surfacePad}` : ""}`} data-tone={tone} data-selected={selected || undefined} role={label ? "group" : undefined} aria-label={label}>{children}</div>;
 }
 
-export function StNotice({ children, tone, icon, action }: { children: ReactNode; tone?: "need" | "critical"; icon?: ReactNode; action?: ReactNode }) {
-  return <div className={styles.notice} data-tone={tone} role={tone === "critical" ? "alert" : undefined}>{icon}<div className={styles.noticeBody}>{children}</div>{action ? <div className={styles.noticeAction}>{action}</div> : null}</div>;
+export function StNotice({ children, tone, icon, action, id }: { children: ReactNode; tone?: "need" | "critical"; icon?: ReactNode; action?: ReactNode; id?: string }) {
+  return <div id={id} className={styles.notice} data-tone={tone} role={tone === "critical" ? "alert" : undefined}>{icon}<div className={styles.noticeBody}>{children}</div>{action ? <div className={styles.noticeAction}>{action}</div> : null}</div>;
 }
 
 /** An empty state that says what is true and offers the next step. */

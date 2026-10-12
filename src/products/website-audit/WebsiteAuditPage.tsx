@@ -170,7 +170,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       <StHead title="How healthy is your website?" meta="See what helps people find and use your site, and what needs attention. Free, no account." />
       <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className={styles.form}>
         <div className={styles.address}><StTextField label="Website address" aria-label="Website address" type="text" ref={addressRef} aria-invalid={invalidUrl || undefined} aria-describedby={error ? errorId : undefined} required value={url} onChange={event => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" /><StPill type="submit" size="lg">Check</StPill></div>
-        {error ? <div id={errorId}><StNotice tone="critical">{auditDisplayCopy(error)}</StNotice></div> : null}
+        {error ? <StNotice id={errorId} tone="critical">{auditDisplayCopy(error)}</StNotice> : null}
         <StCopy muted>Strelva reads the public website. This check does not change your site or turn on monitoring.</StCopy>
       </form>
       <StSection title="What you get back"><StCopy>Checks for speed, search, mobile use, structured data, security and accessibility, with the first fixes to consider and a report you can export.</StCopy></StSection>

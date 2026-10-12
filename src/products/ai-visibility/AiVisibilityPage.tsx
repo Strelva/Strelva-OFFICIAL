@@ -146,7 +146,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         <div className={styles.address}><StTextField label="Website" id="website" inputMode="url" autoComplete="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="example.com" aria-invalid={invalidField === "url" || undefined} aria-describedby={invalidField === "url" ? errorId : undefined} /><StPill type="submit" size="lg">Check</StPill></div>
         <StTextField label="Business name" id="business-name" ref={businessRef} required autoComplete="organization" value={business} onChange={event => setBusiness(event.target.value)} aria-invalid={invalidField === "business" || undefined} aria-describedby={error && invalidField !== "url" ? errorId : undefined} description="Gemini needs your business name to check whether it appears in an answer." />
         <details><summary>Make the question more specific</summary><div className={styles.details}><StTextField label="Business category" value={category} onChange={event => setCategory(event.target.value)} placeholder="Your service" /><StTextField label="City and state" autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} /></div></details>
-        {error ? <div id={errorId}><StNotice tone="critical">{error}</StNotice></div> : null}
+        {error ? <StNotice id={errorId} tone="critical">{error}</StNotice> : null}
         <StCopy muted>Strelva reads your website and asks Gemini once when the live check is available. The result says which checks completed.</StCopy>
       </form>
       <StSection title="What you get back"><StCopy>What your website makes readable, whether Gemini names you in one sampled answer, and the one fix to start with.</StCopy></StSection>

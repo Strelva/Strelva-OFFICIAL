@@ -54,7 +54,8 @@ keeps fact values separate from source/action; `StSurface.selected` marks a sele
 account choice; `StTextButton` preserves new-tab link attributes;
 `StSegmented` arrow/Home/End keys skip forbidden choices, with a roving tab stop.
 The hold follows the canon’s 800ms duration; `StNotice.action` keeps recovery
-with its explanation. These additions are presentation only and preserve native
+with its explanation, and `StNotice.id` lets a field's `aria-describedby` name the
+alert itself. These additions are presentation only and preserve native
 form semantics. Rules and adoption lanes:
 `StComposerBar`, `StComposerDock`.
 

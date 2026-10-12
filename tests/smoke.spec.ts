@@ -36,6 +36,7 @@ test("sign-up page renders the current create-account surface", async ({ request
   const response = await request.get("/sign-up");
   expect(response.status()).toBeLessThan(400);
   const html = await response.text();
-  expect(html).toContain("Dashboards are created from your build");
+  expect(html).toContain("Workspace access is invite-only");
+  expect(html).toContain('href="/access-request"');
   expect(html).not.toContain("Dashboard signup is paused");
 });

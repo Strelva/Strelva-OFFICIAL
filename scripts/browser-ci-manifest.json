@@ -1902,7 +1902,7 @@
           "originalStatus": "passed"
         },
         {
-          "title": "mobile product navigation overlays the work and the form remains scrollable",
+          "title": "mobile public navigation stays inline and the form remains reachable",
           "project": "desktop",
           "originalStatus": "passed"
         },
