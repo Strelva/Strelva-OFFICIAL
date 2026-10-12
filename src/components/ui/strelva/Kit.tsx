@@ -343,6 +343,8 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
   </form>;
 }
 
+/** Reserves the children's full height and phone navigation clearance in flow.
+ * Place after the work in its scroll owner, outside any fixed-position wrapper. */
 export function StComposerDock({ children }: { children: ReactNode }) {
   return <div className={styles.composerDock}>{children}</div>;
 }

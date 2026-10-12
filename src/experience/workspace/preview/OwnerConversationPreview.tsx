@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ownerConversationSiteFixture } from "@/experience/ask/website-comparison-fixture";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StEmpty, StHold, StLedger, StMono, StNotice, StPill, StRows, StRow, StSegmented, StSkeleton, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
-import { OWNER_CONVERSATIONS, OWNER_CONVERSATION_BUSINESS, OWNER_CONVERSATION_SITE, OWNER_CONVERSATION_WORKSPACE, ownerConversationMessages, ownerConversationTransport, type OwnerConversationFrame, type OwnerConversationState } from "./owner-conversation-fixture";
+import { OWNER_CONVERSATIONS, OWNER_CONVERSATION_BUSINESS, OWNER_CONVERSATION_WORKSPACE, ownerConversationMessages, ownerConversationTransport, type OwnerConversationFrame, type OwnerConversationState } from "./owner-conversation-fixture";
 import styles from "./owner-conversation.module.css";
 
 /** All object actions in this page change React state only. No authority or provider is simulated. */
@@ -16,13 +18,15 @@ export function OwnerConversationPreview({ frame, state, mode = "light" }: { fra
     <StrelvaShell active={frame === "YsBMM" ? "help" : "ask"} title={fixture.title} systemsReleased appBase="/preview/strelva" accountName="Preview owner" signOut={<StTextButton href="/preview/strelva">Leave preview</StTextButton>}
       businessContext={<span>{OWNER_CONVERSATION_BUSINESS}</span>}
       notice={<StNotice>Fictional conversation and results. Controls change this preview only; nothing is sent, published, booked or saved.</StNotice>}
-      navigation={<StRows>{Object.entries(OWNER_CONVERSATIONS).map(([id, conversation]) => <StRow key={id} href={`/preview/strelva/owner-conversation?frame=${id}&mode=${mode}`} title={conversation.title} selected={id === frame} stackOnPhone={false} />)}</StRows>}
+      navigation={<nav className={styles.conversations} aria-label="Fictional conversations">{Object.entries(OWNER_CONVERSATIONS).map(([id, conversation]) => <Link key={id} href={`/preview/strelva/owner-conversation?frame=${id}&mode=${mode}`} aria-current={id === frame ? "page" : undefined}>{conversation.title}</Link>)}</nav>}
     >
+      <div className={styles.scroll}>
       <AskStrelva key={`${frame}:${state}`} workspaceId={OWNER_CONVERSATION_WORKSPACE} businessName={OWNER_CONVERSATION_BUSINESS} systemName={fixture.scope} request={request}
         initialMessages={messages} readOnly={state === "permission"} readOnlyReason="You can’t ask or approve in this preview state. Open a business where you have access."
         refusalLinks={{ needsYou: "/preview/strelva/owner-decision", help: "/preview/strelva/owner-conversation?frame=YsBMM" }}
         renderResult={message => message.id !== "fixture-result" ? undefined : state === "loading" ? <LoadingResult /> : state === "error" ? <StNotice tone="critical">This saved result could not be read. Nothing changed. <StTextButton href={`/preview/strelva/owner-conversation?frame=${frame}`}>Try again</StTextButton></StNotice> : <ConversationObject frame={frame} />}
       />
+      </div>
     </StrelvaShell>
   </div>;
 }
@@ -47,11 +51,11 @@ function WebsiteReceipt() {
   return <div className={styles.stack}>
     <StSurface pad={false} label="Fictional website receipt">
       <div className={styles.objectHeader}><strong>fictionalfirm.example</strong><StSegmented label="Website comparison" value={view} onChange={setView} options={[{ value: "before", label: "Before" }, { value: "after", label: "After" }]} /></div>
-      <iframe className={styles.site} src={OWNER_CONVERSATION_SITE} title="Fictional firm website preview" sandbox="" loading="lazy" />
+      <iframe className={styles.site} srcDoc={ownerConversationSiteFixture(view === "after" && !undone)} title={`Fictional firm fees page · ${view === "after" && !undone ? "After" : "Before"}`} sandbox="" />
       <StLedger path="fictionalfirm.example/fees" count="1 change" action={<StTextButton onClick={() => { setUndone(!undone); setView(undone ? "after" : "before"); }}>{undone ? "Reapply preview" : "Undo"}</StTextButton>}
         lines={view === "after" && !undone ? [{ sign: "+", text: "Half-day and full-day session fees, linked from Fees" }] : [{ sign: "-", text: "Fees are not shown on this fixture page" }]} />
     </StSurface>
-    {undone ? <StToast>Undone in this preview. No live website changed.</StToast> : <StNotice>Simulated published receipt. The embedded site is an existing fictional preview; this comparison changes the fixture ledger only.</StNotice>}
+    {undone ? <StToast>Undone in this preview. No live website changed.</StToast> : <StNotice>Simulated published receipt. Before and After show fictional website copy and example fees. This comparison changes this preview only.</StNotice>}
     <StTextButton href="/preview/strelva?scenario=mooney&needsYou=on&systems=on&view=needs-you">Review the decisions in the fictional business</StTextButton>
   </div>;
 }
@@ -92,7 +96,7 @@ function IntakeProposal() {
         ["name", "Your name", "Full name"], ["company", "Company", "Company name"], ["conflict", "What is the conflict about?", "A sentence is enough"], ["people", "How many people are involved?", "For example, two managers"], ["dates", "Dates that could work", "Week of …"],
       ] as const).map(([id, label, placeholder]) => <label key={id} className={id === "name" || id === "company" ? styles.halfField : styles.field}>{label}<input value={fields[id]} placeholder={placeholder} onChange={event => setFields(current => ({ ...current, [id]: event.target.value }))} /></label>)}
     </form>
-    <div className={styles.objectFooter}><p>Internal tool. Its records stay separate from Mediation intake. This form keeps input in this view only.</p><StTextButton onClick={() => setRejected(true)} disabled={accepted}>Reject</StTextButton><StHold label={accepted ? "Made in this preview" : "Make it"} onAccept={() => setAccepted(true)} disabled={accepted} /></div>
+    <div className={styles.objectFooter}><p>Internal tool. Its records stay separate from Mediation intake. This form keeps input in this view only.</p><StTextButton onClick={() => setRejected(true)} disabled={accepted}>Not yet</StTextButton><StHold label={accepted ? "Made in this preview" : "Hold to make it live"} onAccept={() => setAccepted(true)} disabled={accepted} /></div>
     {accepted ? <div className={styles.receipt}><StToast>Accepted in this preview. No System or record was saved.</StToast></div> : null}
   </StSurface>;
 }
@@ -120,7 +124,7 @@ function RefusalResult() {
       <StRow title="Ask an agency to do it another way" detail="Becomes a Request. Scope and date still need to be agreed." end={<StTextButton onClick={() => setRequested(true)}>Make it a Request</StTextButton>} /></StRows>
     {requested ? <StToast>Request shown at Asked in this preview. Nothing was filed or accepted.</StToast> : null}
     <StNotice>Saying yes here doesn’t publish anything. The fees update waits in Needs you with its own control, so you see the change before it goes live.</StNotice>
-    <StSurface label="Exact fees decision"><div className={styles.stack}><StState kind="need">Needs you · update the fees page</StState><StLedger path="fictionalfirm.example/fees" lines={[{ sign: "+", text: "Half-day and full-day session fees" }]} /><StHold label={accepted ? "Published in preview" : "Publish fixture"} onAccept={() => setAccepted(true)} disabled={accepted} />{accepted ? <StToast>Accepted in this preview. No live website changed.</StToast> : null}</div></StSurface>
+    <StSurface label="Exact fees decision"><div className={styles.stack}><StState kind="need">Needs you · update the fees page</StState><StLedger path="fictionalfirm.example/fees" lines={[{ sign: "+", text: "Half-day and full-day session fees" }]} /><StHold label={accepted ? "Published in preview" : "Hold to make it live"} onAccept={() => setAccepted(true)} disabled={accepted} />{accepted ? <StToast>Accepted in this preview. No live website changed.</StToast> : null}</div></StSurface>
   </div>;
 }
 

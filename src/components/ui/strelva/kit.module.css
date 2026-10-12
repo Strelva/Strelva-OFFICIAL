@@ -500,14 +500,19 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 @supports not (backdrop-filter: blur(1px)) { .composer { background: var(--st-surface); } }
 
-.composerScope { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--st-inset); color: var(--st-text-2); font-family: var(--st-font-mono); font-size: 12px; animation: var(--kf-enter-start) var(--motion-base) var(--ease-settle) both; }
+.composerScope { display: inline-flex; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--st-inset); color: var(--st-text-2); font-family: var(--st-font-mono); font-size: 12px; animation: var(--kf-enter-start) var(--motion-base) var(--ease-settle) both; }
 .composerInput { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--st-text); font: inherit; font-size: 16px; line-height: 24px; outline: none; }
 .composerInput::placeholder { color: var(--st-text-3); }
 .composerSend { display: grid; width: 36px; height: 36px; flex-shrink: 0; place-items: center; border: 0; border-radius: 999px; background: var(--st-accent); color: var(--st-on-accent); cursor: pointer; }
 .composerSend:disabled { opacity: 0.4; cursor: not-allowed; }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
-.composerDock { position: sticky; bottom: 20px; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
+.composerDock { box-sizing: border-box; position: sticky; bottom: 0; z-index: 20; display: flex; flex: 0 0 auto; justify-content: center; margin-top: auto; padding-block: 24px 20px; pointer-events: none; }
 .composerDock > * { pointer-events: auto; }
+/* Standalone kit pages need a scroll owner too. Keep the complete page and
+   the dock's actual height in flow, rather than shrinking them into the frame.
+   WorkspaceLayout already supplies its own scroll owner and is unaffected. */
+:global([data-frame-main]):has(.composerDock) { overflow-y: auto; }
+:global([data-frame-main]):has(> .composerDock) > * { flex-shrink: 0; }
 
 /* Object with an adjacent explanation, never a dashboard card grid. */
 .split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
@@ -543,7 +548,8 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 textarea.composerInput { resize: none; max-height: 144px; }
 
-@media (max-width: 767px) { .composerDock { bottom: calc(80px + env(safe-area-inset-bottom)); } .composerScope { display: none; } }
+@media (pointer: coarse) { .composerSend { width: 44px; height: 44px; } }
+@media (max-width: 767px) { .composerDock { padding-bottom: calc(80px + env(safe-area-inset-bottom)); } .composerScope { display: none; } }
 
 /* Shared fields, switches and open tables. */
 .input { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
