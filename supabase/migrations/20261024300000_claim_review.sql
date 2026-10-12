@@ -357,8 +357,66 @@ begin
 end;
 $$;
 
+-- Pre-claim Prepare is enforced where effects happen, not only where grants
+-- are read: while an agency-added business waits for its owner, no System goes
+-- live, no Needs you item is approved, the public business page stays
+-- unpublished, and a connected site neither captures forms nor injects data
+-- (the agency may still create, install and verify it). The agency that issued
+-- a claim can't accept it itself. These hold for every caller, flag or not.
+create function public.agency_client_pre_claim(p_workspace_id uuid) returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (select 1 from public.agency_client_additions where customer_workspace_id = p_workspace_id)
+    and public.agency_client_waiting_for_owner(p_workspace_id)
+$$;
+
+create function public.agency_client_pre_claim_guard() returns trigger
+language plpgsql set search_path = public, pg_temp as $$
+begin
+  if tg_table_name = 'systems' then
+    if new.lifecycle = 'live' and old.lifecycle is distinct from 'live' and public.agency_client_pre_claim(new.business_workspace_id) then
+      raise exception 'agency_client_pre_claim_prepare_only';
+    end if;
+  elsif tg_table_name = 'owner_decisions' then
+    if new.state = 'approved' and old.state is distinct from 'approved' and public.agency_client_pre_claim(new.workspace_id) then
+      raise exception 'agency_client_pre_claim_prepare_only';
+    end if;
+  elsif tg_table_name = 'business_pages' then
+    if new.published and (tg_op = 'INSERT' or not old.published) and public.agency_client_pre_claim(new.workspace_id) then
+      raise exception 'agency_client_pre_claim_prepare_only';
+    end if;
+  elsif tg_table_name = 'connected_sites' then
+    if public.agency_client_pre_claim(new.business_workspace_id) then
+      if tg_op = 'INSERT' then
+        new.capture_forms := false;
+        new.inject_schema := false;
+      elsif (new.capture_forms and not old.capture_forms) or (new.inject_schema and not old.inject_schema) then
+        raise exception 'agency_client_pre_claim_prepare_only';
+      end if;
+    end if;
+  elsif tg_table_name = 'agency_client_owner_claims' then
+    if new.status = 'accepted' and old.status <> 'accepted' and exists (select 1 from public.workspace_memberships
+        where workspace_id = new.agency_workspace_id and user_id = new.accepted_by) then
+      raise exception 'agency_client_claim_agency_member';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+create trigger systems_claim_guard before update of lifecycle on public.systems
+  for each row execute function public.agency_client_pre_claim_guard();
+create trigger owner_decisions_pre_claim_guard before update of state on public.owner_decisions
+  for each row execute function public.agency_client_pre_claim_guard();
+create trigger business_pages_pre_claim_guard before insert or update of published on public.business_pages
+  for each row execute function public.agency_client_pre_claim_guard();
+create trigger connected_sites_pre_claim_guard before insert or update of capture_forms, inject_schema on public.connected_sites
+  for each row execute function public.agency_client_pre_claim_guard();
+create trigger agency_client_owner_claims_agency_member_guard before update of status on public.agency_client_owner_claims
+  for each row execute function public.agency_client_pre_claim_guard();
+
 revoke all on function public.business_found_fact_valid(text, text, jsonb) from public, anon, authenticated;
 revoke all on function public.agency_client_claim_review_guard() from public, anon, authenticated, service_role;
+revoke all on function public.agency_client_pre_claim_guard() from public, anon, authenticated, service_role;
+revoke all on function public.agency_client_pre_claim(uuid) from public, anon, authenticated, service_role;
 revoke all on function public.claim_review_areas() from public, anon, authenticated;
 revoke all on function public.agency_client_assert_pre_claim(uuid, text, uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.stage_agency_client_found_facts(uuid, text, uuid, uuid, jsonb) from public, anon, authenticated;

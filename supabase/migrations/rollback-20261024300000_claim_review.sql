@@ -10,6 +10,13 @@ do $$ begin
     raise exception 'claim_review_rollback_refused: found facts, pre-claim grants or claim reviews exist';
   end if;
 end $$;
+drop trigger agency_client_owner_claims_agency_member_guard on public.agency_client_owner_claims;
+drop trigger connected_sites_pre_claim_guard on public.connected_sites;
+drop trigger business_pages_pre_claim_guard on public.business_pages;
+drop trigger owner_decisions_pre_claim_guard on public.owner_decisions;
+drop trigger systems_claim_guard on public.systems;
+drop function public.agency_client_pre_claim_guard();
+drop function public.agency_client_pre_claim(uuid);
 drop function public.accept_agency_client_claim_review(text, uuid, text, jsonb, jsonb, jsonb);
 drop function public.read_agency_client_claim_review(text, uuid, text);
 drop function public.stage_agency_client_found_facts(uuid, text, uuid, uuid, jsonb);

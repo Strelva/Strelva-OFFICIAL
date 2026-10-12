@@ -52,7 +52,7 @@ declare
   pat constant uuid := 'c7000000-0000-4000-8000-000000000004';
   north constant uuid := 'c7000000-0000-4000-8000-0000000000a1';
   other constant uuid := 'c7000000-0000-4000-8000-0000000000b1';
-  token constant text := repeat('c', 64);
+  token text := repeat('c', 64);
   h constant text := repeat('e', 64);
   business uuid; added jsonb; staged jsonb; review jsonb; accepted jsonb; replay jsonb; item jsonb;
   found_phone uuid; found_hours uuid; found_description uuid; found_service uuid; found_person uuid; found_email uuid;
@@ -109,6 +109,25 @@ begin
     'approveEffect','The reply is sent.','notYetEffect','Nothing is sent.','sourceLifecycle','inquiry_reply','sourceId','reply:1','revisionHash',h,'adminMayDecide',false));
   perform pg_temp.cr_expect(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', business, item->>'id', h, 'approve', 'agency', a_owner, 'cr-a-owner@agency-a.example.test'), 'owner_decision_owner_only');
 
+  -- Effects are refused where they happen, whoever calls: no System goes live,
+  -- no item is approved, no public page, no form capture or injected data.
+  insert into public.systems(id, business_workspace_id, name, kind, command_id, command_digest, created_by, updated_by) values
+    ('c7000000-0000-4000-8000-0000000000e1', business, 'Booking page', 'booking', 'c7000000-0000-4000-8000-0000000000e2', repeat('d', 64), a_owner, a_owner);
+  perform pg_temp.cr_expect(format($q$update public.systems set lifecycle = 'live' where id = %L$q$, 'c7000000-0000-4000-8000-0000000000e1'), 'agency_client_pre_claim_prepare_only');
+  perform pg_temp.cr_expect(format($q$update public.owner_decisions set state = 'approved', decided_at = clock_timestamp(), decided_by_kind = 'operator', decided_by = %L where id = %L$q$, a_owner, item->>'id'), 'agency_client_pre_claim_prepare_only');
+  perform pg_temp.cr_expect(format($q$insert into public.business_pages(workspace_id, handle, published, published_at, updated_by) values (%L, 'cr-bakery', true, clock_timestamp(), %L)$q$, business, a_owner), 'agency_client_pre_claim_prepare_only');
+  perform public.create_connected_site(business, a_owner, 'cr-a-owner@agency-a.example.test', jsonb_build_object('publicKey', 'sk_pub_' || repeat('a', 24), 'label', 'CR Bakery',
+    'siteUrl', 'https://cr-bakery.example.test', 'siteHost', 'cr-bakery.example.test', 'allowedOrigins', jsonb_build_array('https://cr-bakery.example.test'), 'verificationToken', repeat('b', 32)));
+  perform pg_temp.cr_assert((select not capture_forms and not inject_schema from public.connected_sites where business_workspace_id = business), 'pre-claim connected site captures nothing');
+  perform pg_temp.cr_expect(format($q$update public.connected_sites set capture_forms = true where business_workspace_id = %L$q$, business), 'agency_client_pre_claim_prepare_only');
+  -- The agency can't claim the business itself, even with a link to its own address.
+  perform public.issue_agency_client_owner_claim(a_owner, 'cr-a-owner@agency-a.example.test', north, business,
+    'cr-a-member@agency-a.example.test', repeat('9', 64), clock_timestamp() + interval '14 days');
+  perform pg_temp.cr_expect(format('select public.accept_agency_client_owner_claim(%L,%L,%L)', repeat('9', 64), a_member, 'cr-a-member@agency-a.example.test'), 'agency_client_claim_agency_member');
+  perform public.issue_agency_client_owner_claim(a_owner, 'cr-a-owner@agency-a.example.test', north, business,
+    'pat@cr-bakery.example.test', repeat('d', 64), clock_timestamp() + interval '14 days');
+  token := repeat('d', 64);
+
   -- A second agency sees nothing of the business before (or after) the claim.
   perform pg_temp.cr_expect(format('select public.read_business_record(%L,%L,%L)', business, b_owner, 'cr-b-owner@agency-b.example.test'), 'business_record_access_denied');
   perform pg_temp.cr_expect(format('select public.read_agency_client_claim_review(%L,%L,%L)', token, b_owner, 'cr-b-owner@agency-b.example.test'), 'agency_client_claim_recipient_mismatch');
@@ -121,7 +140,7 @@ begin
   perform pg_temp.cr_assert(review->>'status' = 'pending' and review->>'agencyName' = 'North Studio' and jsonb_array_length(review->'found') = 7, format('review shows the found facts: %s', review));
   perform pg_temp.cr_assert(review->'found'->0->>'key' = 'phone' and review->'found'->0->>'sourceUrl' = 'https://cr-bakery.example.test/contact'
     and review->'found'->0->>'quote' = 'Call (716) 555-0142', 'each found fact carries its source');
-  perform pg_temp.cr_assert(jsonb_array_length(review->'prepared') = 1 and review->'prepared'->0->>'name' = 'Order form', 'review shows the drafts');
+  perform pg_temp.cr_assert(jsonb_array_length(review->'prepared') = 2 and review->'prepared' @> '[{"name":"Order form"},{"name":"Booking page"}]'::jsonb, 'review shows the drafts');
   select (f->>'id')::uuid into found_phone from jsonb_array_elements(review->'found') f where f->>'key' = 'phone';
   select (f->>'id')::uuid into found_email from jsonb_array_elements(review->'found') f where f->>'key' = 'email';
   select (f->>'id')::uuid into found_hours from jsonb_array_elements(review->'found') f where f->>'key' = 'hours';
@@ -176,6 +195,10 @@ begin
     = 'I let North Studio prepare my Google listing.', 'consent recorded per area');
   perform pg_temp.cr_assert((select areas = '{"website":"full_control","inquiries":"none","bookings":"prepare","google":"prepare","internal_tools":"none"}'::jsonb
     and owner_id = pat and consents ? 'website' and not consents ? 'inquiries' from public.agency_client_claim_reviews where workspace_id = business), 'receipt records every area, none included');
+
+  -- After the claim the owner turns things on.
+  update public.connected_sites set capture_forms = true where business_workspace_id = business;
+  insert into public.business_pages(workspace_id, handle, published, published_at, updated_by) values (business, 'cr-bakery', true, clock_timestamp(), pat);
 
   -- Replay changes nothing.
   replay := public.accept_agency_client_claim_review(token, pat, 'pat@cr-bakery.example.test', '[]',
