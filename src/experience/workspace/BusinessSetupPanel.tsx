@@ -8,6 +8,8 @@ import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
 import { businessStartHref, businessStartAsk, businessStartView, type BusinessStartProduct } from "@/platform/workspaces/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { gettingStartedHref } from "@/platform/business-signup-release";
+import { heldBriefKey } from "@/products/getting-started/contracts";
 
 const choicesSchema = z.object({ actorId: z.string().uuid(), businesses: z.array(z.object({ id: z.string().uuid(), name: z.string() })) });
 export type { BusinessStartProduct } from "@/platform/workspaces/business-start";
@@ -16,7 +18,9 @@ function message(body: unknown, fallback: string): string {
 }
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
-export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct) }: { initialRequest?: string; startProduct?: BusinessStartProduct }) {
+/** With `gettingStarted` (STRELVA_BUSINESS_SIGNUP_RELEASE, decided by the page), a help or website
+ * start lands on the business's Getting started view instead of Help. */
+export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), gettingStarted = false }: { initialRequest?: string; startProduct?: BusinessStartProduct; gettingStarted?: boolean }) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
   const [selected, setSelected] = useState("new");
@@ -87,6 +91,12 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
       const result = businessEntryResultSchema.safeParse(body);
       if (!result.success) throw new Error("Setup returned an unconfirmed result. Retry the retained setup.");
       sessionStorage.removeItem(key); setPending(null);
+      if (gettingStarted && (startProduct === "help" || startProduct === "website")) {
+        // A brief with no agency to send it to is held, not saved: show it back on Getting started.
+        try { if (result.data.agencyRequired && command.initialRequest) sessionStorage.setItem(heldBriefKey(result.data.workspaceId), command.initialRequest); } catch { /* The view says nothing is held. */ }
+        window.location.assign(gettingStartedHref(result.data.workspaceId, result.data.requestId));
+        return;
+      }
       window.location.assign(result.data.requestId ? `/workspace/delivery/${result.data.requestId}` : `/workspace?workspaceId=${encodeURIComponent(result.data.workspaceId)}&view=${businessStartView(startProduct)}`);
     } catch (cause) { if (isCurrent()) setError(cause instanceof Error ? cause.message : "Setup is not confirmed. Retry the retained setup."); }
     finally { mutation.current = false; if (isCurrent()) setSaving(false); }

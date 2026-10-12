@@ -17,6 +17,7 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
 import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import type { ProductDefinition } from "@/platform/products";
 import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
@@ -317,7 +318,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }
