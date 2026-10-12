@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ text: vi.fn(), object: vi.fn(), stream: vi.fn(), rpc: vi.fn(), primary: null as unknown, fallback: null as unknown }));
+const mocks = vi.hoisted(() => ({ text: vi.fn(), object: vi.fn(), stream: vi.fn(), rpc: vi.fn(), workspace: vi.fn(), primary: null as unknown, fallback: null as unknown }));
+vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: mocks.workspace }));
 vi.mock("ai", () => ({ generateText: mocks.text, generateObject: mocks.object, streamText: mocks.stream }));
 vi.mock("@/platform/infra/ai-models", () => ({ getPrimaryModel: () => mocks.primary, getFallbackModel: () => mocks.fallback, isTransientModelError: () => true }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
@@ -22,7 +23,7 @@ function adapter(label = "google/gemini-2.5-flash") {
 function reservations() { return mocks.rpc.mock.calls.filter(([name]) => name === "reserve_business_ai_budget"); }
 beforeEach(() => {
   vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "1");
-  vi.clearAllMocks(); mocks.fallback = null;
+  vi.clearAllMocks(); mocks.workspace.mockResolvedValue(workspaceId); mocks.fallback = null;
   mocks.primary = adapter().config;
   let held = 0;
   mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "business_ai_budget" ? budget : { status: "reserved", reservationId: `d0000000-0000-4000-8000-${String(++held).padStart(12, "0")}`, budget } }));
@@ -37,6 +38,41 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("provider-unit budget admission", () => {
+  it.each(["text", "object", "stream"])("resolves tenant-only %s before reserving and logging the exact workspace", async mode => {
+    const tenant = { purpose: "review_reply" as const, tenantId: "fictional-business" };
+    const sink = createMemoryModelCallSink();
+    if (mode === "text") await generateModelText(tenant, { prompt: "hi" }, { sink });
+    else if (mode === "object") await generateModelObject(tenant, { prompt: "hi" }, { sink });
+    else await streamModelText(tenant, { prompt: "hi" }, async raw => {
+      const result = await raw as unknown as { stream: ReadableStream<unknown> };
+      const reader = result.stream.getReader(); while (!(await reader.read()).done) { /* consume */ }
+    }, { sink, emitted: () => false });
+    expect(mocks.workspace).toHaveBeenCalledExactlyOnceWith("fictional-business");
+    expect(reservations()[0]?.[1]).toMatchObject({ p_workspace_id: workspaceId });
+    expect(sink.rows[0]).toMatchObject({ workspaceId, tenantId: "fictional-business" });
+    expect(mocks.workspace.mock.invocationCallOrder[0]).toBeLessThan(mocks.rpc.mock.invocationCallOrder[0]!);
+  });
+
+  it("keeps tenant context on failed and fallback attempts", async () => {
+    const primary = adapter(), fallback = adapter("test/fallback"), sink = createMemoryModelCallSink();
+    primary.generate.mockRejectedValueOnce(new Error("503 response lost"));
+    mocks.primary = primary.config; mocks.fallback = fallback.config;
+    await generateModelText({ purpose: "review_reply", tenantId: "fictional-business" }, { prompt: "hi" }, { sink });
+    expect(mocks.workspace).toHaveBeenCalledTimes(1);
+    expect(sink.rows).toHaveLength(2);
+    expect(sink.rows.every(row => row.workspaceId === workspaceId && row.tenantId === "fictional-business")).toBe(true);
+  });
+
+  it.each(["missing", "failed"])("pauses unresolved charged scope (%s), even with the budget flag off", async failure => {
+    vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "0");
+    if (failure === "missing") mocks.workspace.mockResolvedValue(null);
+    else mocks.workspace.mockRejectedValue(new Error("mapping unavailable"));
+    mocks.fallback = adapter().config;
+    const sink = createMemoryModelCallSink();
+    await expect(generateModelText({ purpose: "review_reply", tenantId: "unknown" }, { prompt: "hi" }, { sink, shouldFallback: () => true })).rejects.toBeInstanceOf(ModelBudgetUnavailableError);
+    expect(mocks.text).not.toHaveBeenCalled(); expect(mocks.rpc).not.toHaveBeenCalled(); expect(sink.rows).toHaveLength(0);
+  });
+
   it("reserves every actual tool-step request and logs each original start/hold, with no completion-time reset shift", async () => {
     const sink = createMemoryModelCallSink();
     let now = Date.parse("2026-10-31T23:59:59Z");

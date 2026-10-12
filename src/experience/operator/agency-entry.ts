@@ -1,4 +1,18 @@
 import type { AgencySummary } from "@/platform/workspaces/agency-onboarding";
+import { getAuthUserId } from "@/platform/infra/auth";
+import { getTenantAgencySeat } from "@/platform/infra/db/repositories";
+import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
+
+/** Exact client entry requires an ordinary provider seat, even for an operator. */
+export async function tenantAgencyWorkspace(tenantId: string, deps = {
+  user: getAuthUserId, seat: getTenantAgencySeat, workspace: releaseWorkspaceForTenant,
+}): Promise<string | null> {
+  try {
+    const userId = await deps.user();
+    if (!userId || !await deps.seat(userId, tenantId)) return null;
+    return await deps.workspace(tenantId);
+  } catch { return null; }
+}
 
 /** A platform role is not agency membership. Never select another agency or
  * guess a workspace ID when the ordinary member read fails or is ambiguous. */

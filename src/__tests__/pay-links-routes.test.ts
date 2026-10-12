@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import { NextRequest } from "next/server";
-import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
+import { type PayLinkConfig } from "@/lib/pay-links";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
@@ -98,79 +98,20 @@ function payReq(slug: string, body: unknown) {
 }
 
 describe("POST /api/admin/pay-links", () => {
-  it("mints a fixed-amount build link and persists it", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-      }),
-    );
-
-    expect(res.status).toBe(200);
-    const payload = await res.json();
-    expect(payload).toMatchObject({ success: true, slug: "acme-coffee", payUrl: "/pay/acme-coffee" });
-    expect(mockSavePayLink).toHaveBeenCalledTimes(1);
-    const [saved] = mockSavePayLink.mock.calls[0] as [PayLinkConfig];
-    expect(saved).toMatchObject({
-      slug: "acme-coffee",
-      door: "build",
-      amountCents: 200_000,
-      createdBy: "jacob@strelva.com",
-    });
-  });
-
-  it("rejects a non-super-admin with 403", async () => {
+  it("requires platform support even for the compatibility refusal", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
     const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(adminReq({ slug: "x", clientName: "X", door: "build", tenantId: "x", amountCents: 200_000 }));
-    expect(res.status).toBe(403);
+    expect((await POST(adminReq({}))).status).toBe(403);
+  });
+  it.each(["0", "1"])("never sells client work under platform authority with billing flag %s", async flag => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", flag);
+    const { POST } = await import("@/app/api/admin/pay-links/route");
+    const res = await POST(adminReq({ slug: "acme", clientName: "Acme", amountCents: 200000, overwrite: true }));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ agencyPath: "/api/agency/pay-links" });
     expect(mockSavePayLink).not.toHaveBeenCalled();
-  });
-
-  it("rejects a malformed payload with 400", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(adminReq({ slug: "acme", clientName: "Acme", door: "donation", tenantId: "acme", amountCents: 200_000 }));
-    expect(res.status).toBe(400);
-    expect(mockSavePayLink).not.toHaveBeenCalled();
-  });
-
-  it("refuses to overwrite an existing slug with 409 unless overwrite is passed", async () => {
-    mockSavePayLink.mockRejectedValueOnce(new PayLinkConflictError("acme-coffee"));
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-      }),
-    );
-    expect(res.status).toBe(409);
-    // Default save call passes overwrite:false.
-    const [, opts] = mockSavePayLink.mock.calls[0] as [PayLinkConfig, { overwrite?: boolean }];
-    expect(opts).toEqual({ overwrite: false });
-  });
-
-  it("passes overwrite:true through to savePayLink when requested", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-        overwrite: true,
-      }),
-    );
-    expect(res.status).toBe(200);
-    const [, opts] = mockSavePayLink.mock.calls[0] as [PayLinkConfig, { overwrite?: boolean }];
-    expect(opts).toEqual({ overwrite: true });
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
 
@@ -238,36 +179,12 @@ describe("GET /api/admin/pay-links", () => {
 });
 
 describe("DELETE /api/admin/pay-links", () => {
-  function delReq(slug?: string) {
-    const url = slug
-      ? `http://localhost/api/admin/pay-links?slug=${encodeURIComponent(slug)}`
-      : "http://localhost/api/admin/pay-links";
-    return new NextRequest(url, { method: "DELETE" });
-  }
-
-  it("rejects a non-super-admin with 403", async () => {
+  it("requires support and refuses changes to agency service invoices", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    expect((await DELETE(new Request("http://localhost/api/admin/pay-links?slug=acme", { method: "DELETE" }))).status).toBe(410);
+    expect(mockDeletePayLink).not.toHaveBeenCalled(); expect(mockLogAuditEvent).not.toHaveBeenCalled();
     mockIsSuperAdmin.mockResolvedValue(false);
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq("acme-coffee"));
-    expect(res.status).toBe(403);
-    expect(mockDeletePayLink).not.toHaveBeenCalled();
-  });
-
-  it("400s without a slug", async () => {
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq());
-    expect(res.status).toBe(400);
-    expect(mockDeletePayLink).not.toHaveBeenCalled();
-  });
-
-  it("revokes a slug and audits it", async () => {
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq("acme-coffee"));
-    expect(res.status).toBe(200);
-    expect(mockDeletePayLink).toHaveBeenCalledWith("acme-coffee");
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
-    const body = await res.json();
-    expect(body).toMatchObject({ ok: true, removed: true });
+    expect((await DELETE(new Request("http://localhost/api/admin/pay-links", { method: "DELETE" }))).status).toBe(403);
   });
 });
 

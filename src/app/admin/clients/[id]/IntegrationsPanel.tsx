@@ -52,9 +52,6 @@ interface Props {
 export function IntegrationsPanel({ tenantId }: Props) {
   const [connections, setConnections] = useState<SafeConnection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
-  const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  const [disconnectError, setDisconnectError] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch(`/api/admin/tenants/${tenantId}/connections`)
@@ -65,33 +62,6 @@ export function IntegrationsPanel({ tenantId }: Props) {
       })
       .catch(() => setError("Failed to load connections."));
   }, [tenantId]);
-
-  async function handleDisconnect(provider: string) {
-    if (confirming !== provider) {
-      setConfirming(provider);
-      return;
-    }
-    setConfirming(null);
-    setDisconnecting(provider);
-    setDisconnectError((e) => ({ ...e, [provider]: "" }));
-    try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/connections`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Disconnect failed.");
-      if (data?.connections) setConnections(data.connections);
-    } catch (err) {
-      setDisconnectError((e) => ({
-        ...e,
-        [provider]: err instanceof Error ? err.message : "Disconnect failed.",
-      }));
-    } finally {
-      setDisconnecting(null);
-    }
-  }
 
   return (
     <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-4">
@@ -116,8 +86,6 @@ export function IntegrationsPanel({ tenantId }: Props) {
           {connections.map((c) => {
             const pill = statusPill(c.status);
             const label = PROVIDER_LABEL[c.provider] ?? c.provider;
-            const isConfirming = confirming === c.provider;
-            const isDisconnecting = disconnecting === c.provider;
             return (
               <li
                 key={c.provider}
@@ -147,28 +115,8 @@ export function IntegrationsPanel({ tenantId }: Props) {
                       {c.scopes.join(", ")}
                     </p>
                   )}
-                  {disconnectError[c.provider] && (
-                    <p className="mt-1 text-[11px] text-critical">
-                      {disconnectError[c.provider]}
-                    </p>
-                  )}
                 </div>
 
-                <button
-                  onClick={() => handleDisconnect(c.provider)}
-                  disabled={isDisconnecting}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
-                    isConfirming
-                      ? "border-critical/40 bg-critical/10 text-critical hover:bg-critical/20"
-                      : "border-glass-border text-gray-muted hover:border-gray-border hover:text-warm-white"
-                  }`}
-                >
-                  {isDisconnecting
-                    ? "Removing…"
-                    : isConfirming
-                    ? "Confirm remove"
-                    : "Disconnect"}
-                </button>
               </li>
             );
           })}
@@ -176,7 +124,7 @@ export function IntegrationsPanel({ tenantId }: Props) {
       )}
 
       <p className="text-[11px] text-gray-faint">
-        Removing a connection deletes the stored token. The client can reconnect via their Settings.
+        Read-only support metadata. Manage client connections through ordinary business or agency access.
       </p>
     </div>
   );

@@ -519,7 +519,7 @@ export function checkAiReadability(ctx: AuditContext, options: { htmlOnly?: bool
       score: 0,
       message:
         "No structured data found. AI tools like ChatGPT and Google AI Overview cannot reliably understand or cite your business.",
-      details: "Ask Strelva to add structured data (a hidden description of your business) so AI and Google know what you do and where you are.",
+      details: "Add structured data (a hidden description of your business) so AI and Google know what you do and where you are.",
     });
   } else {
     checks.push({
@@ -541,7 +541,7 @@ export function checkAiReadability(ctx: AuditContext, options: { htmlOnly?: bool
         schemas.all.length === 0
           ? "No business schema. AI tools cannot tell what your business is, what it offers, or where it is."
           : "You have some structured data, but nothing that identifies you as a business.",
-      details: "Ask Strelva to add business details (name, address, and phone) in a form AI and Google can read.",
+      details: "Add business details (name, address, and phone) in a form AI and Google can read.",
     });
   } else {
     const primaryType = schemas.all.find((s) => VALID_BUSINESS_TYPES.includes(s.type))!.type;
@@ -649,7 +649,7 @@ export function checkAiReadability(ctx: AuditContext, options: { htmlOnly?: bool
         score >= 80
           ? undefined
           : allPlatforms.length > 0
-            ? "Ask Strelva to declare your social profiles as structured data (sameAs) so AI tools can confirm you're a real business, not just link them in the page."
+            ? "Declare your social profiles as structured data (sameAs) so AI tools can confirm you're a real business, not just link them in the page."
             : "Link your official profiles (Google, LinkedIn, Facebook, and ideally Wikipedia) from the site so AI can confirm you are a real business.",
     });
   }
@@ -664,7 +664,7 @@ export function checkAiReadability(ctx: AuditContext, options: { htmlOnly?: bool
         score: 20,
         message:
           "Your page has almost no text in the initial HTML. AI crawlers can't execute your JavaScript, so they see a nearly blank page.",
-        details: `Only ${access.wordCount} words were readable before any scripts ran. Ask Strelva to serve your text in the page itself so AI and search engines can read it.`,
+        details: `Only ${access.wordCount} words were readable before any scripts ran. Serve your text in the page itself so AI and search engines can read it.`,
       });
     } else if (access.wordCount < 200) {
       checks.push({

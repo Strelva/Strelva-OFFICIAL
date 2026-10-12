@@ -36,7 +36,7 @@ export async function makeRealPath(actor: WorkspaceActor, workspaceId: string, p
   if (!(await ports.liveEnabled(workspaceId))) {
     return stored.sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? { kind: "isolated", possibilityId: stored.sourceRef } : null;
   }
-  if (stored.status !== "ready") return { kind: "live", result: { live: true, status: "not_ready", headline: "It isn't ready to make live yet. Strelva is still building or checking it.", activationId: null } };
+  if (stored.status !== "ready") return { kind: "live", result: { live: true, status: "not_ready", headline: "It isn't ready to make live yet. Building or checks are still needed.", activationId: null } };
   const decided = await ports.approve(actor, workspaceId, possibilityId);
   if (!decided) return { kind: "live", result: { live: true, status: "not_ready", headline: "There is nothing waiting for your approval on this yet.", activationId: null } };
   const headline = decided.status === "done" ? "Live."

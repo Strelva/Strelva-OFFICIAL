@@ -224,10 +224,10 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       sentence: document ? "This website reads confirmed business facts when it renders."
         : connectedOnly ? "Confirmed business facts are filled into the connected site after ownership is proven."
           : entry.savedWorkId ? "This website uses its approved content. Business fact reads are not connected."
-          : native ? "Strelva prepares business fact changes as native website content for review and publishing."
+          : native ? "Business fact changes are prepared as website content for review and publishing."
             : "Changes to this site go through its repository; it does not read the business record.",
       contract: { sourceOfTruth: "The business record's confirmed facts", authority: "Only confirmed public business facts; no contacts, requests or owner-only details.",
-        freshness: automatic ? "Read when the website renders or the connected page loads." : "Changes reach the live site only after Strelva publishes them.",
+        freshness: automatic ? "Read when the website renders or the connected page loads." : "Changes reach the live site only after authorized publication.",
         failureBehavior: automatic ? "If facts cannot be read, the last approved website content stays available." : "A business record change does not automatically change this website." },
     };
     // The spine already projects the connected-site read. Enrich it once,

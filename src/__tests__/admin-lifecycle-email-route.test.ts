@@ -119,16 +119,11 @@ describe("POST /api/admin/tenants/[id]/lifecycle-email", () => {
     );
   });
 
-  it("sends the review-request email with the body reviewUrl", async () => {
+  it("refuses client review solicitation through platform authority before sending", async () => {
     const { POST } = await import("@/app/api/admin/tenants/[id]/lifecycle-email/route");
-    const res = await POST(
-      post({ type: "review-request", reviewUrl: "https://g.page/r/demo/review" }),
-      params("demo"),
-    );
-    expect(res.status).toBe(200);
-    expect(mockSendReviewRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ reviewUrl: "https://g.page/r/demo/review" }),
-    );
+    const res = await POST(post({ type: "review-request", reviewUrl: "https://g.page/r/demo/review" }), params("demo"));
+    expect(res.status).toBe(403);
+    expect(mockSendReviewRequest).not.toHaveBeenCalled(); expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
 
   it("400s when the tenant has no owner email", async () => {
@@ -147,10 +142,10 @@ describe("POST /api/admin/tenants/[id]/lifecycle-email", () => {
     expect(mockSendSiteLive).not.toHaveBeenCalled();
   });
 
-  it("400s review-request when reviewUrl is absent", async () => {
+  it("refuses review-request even when reviewUrl is absent", async () => {
     const { POST } = await import("@/app/api/admin/tenants/[id]/lifecycle-email/route");
     const res = await POST(post({ type: "review-request" }), params("demo"));
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
     expect(mockSendReviewRequest).not.toHaveBeenCalled();
   });
 

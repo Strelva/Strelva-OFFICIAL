@@ -40,7 +40,6 @@ type LifecycleEmailType = "welcome" | "site-live" | "review-request";
 const LIFECYCLE_EMAILS: { type: LifecycleEmailType; label: string }[] = [
   { type: "welcome", label: "Send welcome" },
   { type: "site-live", label: "Send site-live" },
-  { type: "review-request", label: "Send review request" },
 ];
 
 /** Maps each lifecycle type to the summary string logged by delivery-email.ts. */

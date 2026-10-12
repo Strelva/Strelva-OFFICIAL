@@ -15,7 +15,7 @@ describe("business AI budget (ADR 0015)", () => {
     await assertBusinessAiBudget(context, { environment: {}, read });
     await assertBusinessAiBudget({ ...context, purpose: "operator" }, { environment: on, read });
     await assertBusinessAiBudget({ ...context, purpose: "visibility_probe" }, { environment: on, read });
-    await assertBusinessAiBudget({ ...context, workspaceId: null }, { environment: on, read });
+    await expect(assertBusinessAiBudget({ ...context, workspaceId: null }, { environment: on, read })).rejects.toBeInstanceOf(ModelBudgetUnavailableError);
     expect(read).not.toHaveBeenCalled();
   });
 

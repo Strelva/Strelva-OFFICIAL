@@ -18,6 +18,9 @@ export class ModelBudgetUnavailableError extends Error {
 }
 
 const BUSINESS_PAID: ReadonlySet<ModelCallPurpose> = new Set<ModelCallPurpose>(["ask", "ask.background", "rebuild", "work_plan", "report", "review_reply", "suggestion", "weekly_brief"]);
+export function isBusinessPaidModelPurpose(purpose: ModelCallPurpose): boolean {
+  return BUSINESS_PAID.has(purpose);
+}
 const decimal = z.string().regex(/^\d+(?:\.\d{1,8})?$/).refine((value) => Number.isFinite(Number(value)));
 const budgetSchema = z.object({
   spentUsd: decimal,
@@ -80,7 +83,8 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
   reserve?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null) => Promise<BusinessAiReservation | null>;
 } = {}): Promise<string | null> {
   const environment = deps.environment ?? process.env;
-  if (environment.STRELVA_BUSINESS_AI_BUDGET !== "1" || !context.workspaceId || !BUSINESS_PAID.has(context.purpose)) return null;
+  if (environment.STRELVA_BUSINESS_AI_BUDGET !== "1" || !BUSINESS_PAID.has(context.purpose)) return null;
+  if (!context.workspaceId) throw new ModelBudgetUnavailableError();
   const raw = await (deps.read ?? readBusinessAiBudget)(context.workspaceId).catch(() => null);
   const parsed = budgetSchema.safeParse(raw);
   if (!parsed.success || parsed.data.unknownCostCalls > 0) throw new ModelBudgetUnavailableError();

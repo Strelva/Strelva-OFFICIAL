@@ -107,7 +107,7 @@ export function approvedDecisionUndo(lifecycle: string | null, kind: string | nu
       if (kind && SENT_KINDS.has(kind)) return { state: "not_undoable", reason: "It was sent, and a sent reply or post can't be unsent from here." };
       return { state: "undo_needs_review", reason: "Undo drafts a revert for review before it goes live." };
     default:
-      return { state: "not_undoable", reason: "This is an agreement, not an edit. Ask Strelva to change it." };
+      return { state: "not_undoable", reason: "This is an agreement, not an edit. Request a change through your business workspace." };
   }
 }
 

@@ -387,7 +387,7 @@ export function checkTrust(ctx: AuditContext): CategoryResult {
             "Click-to-call",
             35,
             "Your phone number isn't a tap-to-call link, so mobile visitors have to copy it by hand.",
-            "Ask Strelva to make the number a tel: link so mobile visitors can call in one tap.",
+            "Make the number a tel: link so mobile visitors can call in one tap.",
           )
         : a.hasContactMethod
           ? check(

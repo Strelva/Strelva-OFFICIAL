@@ -28,7 +28,8 @@ import {
   type ModelCallRow,
   type ModelCallSink,
 } from "./model-call-log";
-import { assertBusinessAiBudget, ModelBudgetPausedError, ModelBudgetUnavailableError } from "./business-ai-budget";
+import { assertBusinessAiBudget, isBusinessPaidModelPurpose, ModelBudgetPausedError, ModelBudgetUnavailableError } from "./business-ai-budget";
+import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { estimateModelCost, UNKNOWN_COST, type ModelCost } from "./model-prices";
 
 export type { ModelConfig } from "@/platform/infra/ai-models";
@@ -310,10 +311,18 @@ function providerBoundary(context: ModelCallContext, config: ModelConfig, log: A
 async function runAttempts<R>(
   context: ModelCallContext,
   controls: ModelCallControls<R> & { canFallback?: () => boolean },
-  call: (model: ModelConfig, log: AttemptLog) => Promise<R>,
+  call: (model: ModelConfig, log: AttemptLog, resolvedContext: ModelCallContext) => Promise<R>,
   /** Rows from a finished result when no per-step callback fired. */
   settle: (result: R, log: AttemptLog) => void,
 ): Promise<{ result: R; model: ModelConfig; attempt: number }> {
+  // Tenant-only jobs must charge and log the tenant's recorded business, never
+  // an unscoped call. Resolve once for the whole call, including fallbacks.
+  if (!context.workspaceId && context.tenantId && isBusinessPaidModelPurpose(context.purpose)) {
+    const workspaceId = await releaseWorkspaceForTenant(context.tenantId).catch(() => null);
+    if (!workspaceId) throw new ModelBudgetUnavailableError();
+    context = { ...context, workspaceId };
+  }
+  if (isBusinessPaidModelPurpose(context.purpose) && !context.workspaceId) throw new ModelBudgetUnavailableError();
   const models = modelsFor(context, controls);
   if (models.length === 0) throw new NoModelAvailableError();
   const sink = controls.sink ?? defaultSink;
@@ -336,7 +345,7 @@ async function runAttempts<R>(
       }
       let result: R;
       try {
-        result = await call(guardedModel, log);
+        result = await call(guardedModel, log, context);
       } catch (error) {
         if (!(error instanceof ModelBudgetPausedError) && !(error instanceof ModelBudgetUnavailableError)) log.add({}, "error", { error, cost: UNKNOWN_COST });
         throw error;
@@ -408,9 +417,9 @@ export async function generateModelText<R = GenerateTextResult>(
   const outcome = await runAttempts<R>(
     context,
     controls,
-    async (model, log) => {
+    async (model, log, resolvedContext) => {
       const actualOptions = optionsFor(options);
-      await assertSdkOptions(context, actualOptions);
+      await assertSdkOptions(resolvedContext, actualOptions);
       return (await generateText({ ...withStepLog(actualOptions, log), maxRetries: 0, model: model.model } as Parameters<typeof generateText>[0])) as unknown as R;
     },
     (result, log) => {
@@ -431,9 +440,9 @@ export async function generateModelObject<R = Awaited<ReturnType<typeof generate
   const outcome = await runAttempts<R>(
     context,
     controls,
-    async (model) => {
+    async (model, _log, resolvedContext) => {
       const actualOptions = optionsFor(options);
-      await assertSdkOptions(context, actualOptions);
+      await assertSdkOptions(resolvedContext, actualOptions);
       return (await generateObject({ ...actualOptions, maxRetries: 0, model: model.model } as Parameters<typeof generateObject>[0])) as unknown as R;
     },
     (result, log) => log.add(usageOf(result), "ok"),
@@ -455,8 +464,8 @@ export async function streamModelText(
   const outcome = await runAttempts<void>(
     context,
     { ...controls, canFallback: () => !controls.emitted() },
-    async (model, log) => {
-      await assertSdkOptions(context, options);
+    async (model, log, resolvedContext) => {
+      await assertSdkOptions(resolvedContext, options);
       const result = streamText({ ...withStepLog(options, log), maxRetries: 0, model: model.model } as Parameters<typeof streamText>[0]);
       await consume(result, model);
     },

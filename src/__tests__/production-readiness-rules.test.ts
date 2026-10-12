@@ -314,20 +314,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(operatorConsole).toContain('send_invite: { endpoint: "/api/admin/invites", method: "POST" }');
   });
 
-  it("normalizes admin tenant setup request bodies", () => {
+  it("holds legacy operator setup and client-settings writes while preserving platform config validation", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/route.ts"), "utf8");
-
+    expect(source).toContain("Create client workspaces through ordinary agency access");
+    expect(source).toContain("const clientFields");
     expect(source).toContain("readJsonObject(req)");
     expect(source).toContain("Invalid request body");
-    expect(source).toContain("cleanString(rawSiteName)");
-    expect(source).toContain("cleanString(rawOwnerName)");
-    expect(source).toContain("cleanString(rawOwnerEmail)");
-    expect(source).toContain("cleanString(rawSubdomain)");
-    expect(source).toContain("cleanFeatures(features)");
-    // Features are validated against the feature registry (was the inline TENANT_FEATURES set).
-    expect(source).toContain("cleanTenantFeatureIds");
-    expect(source).toContain("normalizeTenantDomain(productionDomain)");
-    expect(source).toContain("normalizeTenantDomain(adminDomain)");
+    expect(source).toContain("applyFeatureChange(currentTenant.features");
+    expect(source).toContain("normalizeTrackPublicKey(rawTrackingPublicKey)");
   });
 
   it("rejects malformed content and page-config write bodies", () => {

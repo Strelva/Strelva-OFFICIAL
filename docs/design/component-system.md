@@ -2124,3 +2124,35 @@ beside the amount and hold the pay action when required terms are absent.
 Visitor and deposit fixtures compose the same shell. Local component and
 contract tests cover those states; browser, SQL execution, provider delivery
 and production proof remain outstanding under the audit's disk stop point.
+
+### October 12 · platform support and ordinary agency boundary (fix pass 2)
+
+[AccessRequestPage](../../src/components/marketing/AccessRequestPage.tsx) starts
+with business account, agency account, agency directory and an explicit Strelva
+Agency service choice. Account entry never opens the sales form. The chosen
+service form retains its pending, error and confirmation states.
+
+Operator client records use the existing kit for read-only goals, business facts
+and automation policy. Report cadence, platform email pauses and release controls
+remain platform operations. Open workspace and Inspect both enter read-only
+support inspection. Client work opens the exact tenant-linked business only
+after a current ordinary agency seat read; otherwise the ordinary agency entry
+explains the missing seat. These links grant no provider or publishing rights.
+
+[PayLinksView](../../src/app/admin/pay-links/PayLinksView.tsx) reads existing
+service records and offers a fresh read after errors. It has no creation or
+revocation controls. Missing reads remain unknown and retained rows are labelled
+stale. [LeadRows](../../src/app/admin/leads/LeadRows.tsx) defaults to read-only
+support inspection; the admin prospect surface supplies that mode explicitly.
+Deployment failures remain visible without a platform publication button.
+Review-solicitation mail is absent from platform CRM actions; account and site
+status notifications keep their existing platform path.
+
+The operator API rejects client setup, client content/settings, sales mutations
+and publication even when one person also has an agency role. The business and
+agency paths retain ordinary membership and effect checks. Tenant inspection
+also refuses write permissions for an ordinary owner until inspection ends.
+
+Local unit/DOM contracts cover separation and refusals. The audit brief forbids
+a dev server, browser and build in this lane; desktop/phone, real Auth and provider
+proof remain coordinator acceptance work.

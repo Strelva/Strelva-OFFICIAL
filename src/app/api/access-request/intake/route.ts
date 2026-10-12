@@ -22,6 +22,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  // Account access is platform entry, not consent to agency sales. These typed
+  // routes never create a delivery lead or send a sales notification.
+  if (body.requestType === "business_access" || body.requestType === "agency_access") {
+    return NextResponse.json({ success: true, requestType: body.requestType,
+      next: body.requestType === "agency_access" ? "/sign-up?as=agency" : "/sign-up" });
+  }
+  if (body.requestType !== "agency_service") {
+    return NextResponse.json({ error: "Choose business access, agency access, or explicitly request Strelva Agency's service." }, { status: 400 });
+  }
+
   const { businessName, description, location, email, phone, currentWebsite, plan, referredBy } = body;
 
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";

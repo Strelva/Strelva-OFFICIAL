@@ -205,7 +205,7 @@ export function hasContext(system: SystemView): boolean {
 
 function ActivationsPanel({ system }: { system: SystemView }) {
   const activations = system.activations ?? [];
-  return <Panel id={`${system.id}-making-live`} title={STATE_LABELS.makingReal} count={activations.length} intro="What landed stays. Strelva tells you when it settles.">
+  return <Panel id={`${system.id}-making-live`} title={STATE_LABELS.makingReal} count={activations.length} intro="What landed stays. Check the receipt to see what settled.">
     <StRows>{activations.map(activation => <StRow key={activation.id} title={activation.title}><MakeRealProgress activation={activation} /></StRow>)}</StRows>
   </Panel>;
 }
@@ -246,7 +246,7 @@ function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useRead
   }
   if (system.surface.kind === "listing") return <ListingSurface surface={system.surface} />;
   if (system.surface.kind === "newsletter" && system.publishing && !localPreview) return <ContentWorkspace key={system.id} workspaceId={workspaceId} systemId={system.id} kind="newsletter" readOnly={readOnly || system.lifecycle === "paused"} />;
-  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. Sending is paused. Approval keeps an immutable issue and receipt; no subscriber receives email.</p></div>;
+  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Each issue starts as a draft. Sending is paused. Approval keeps an immutable issue and receipt; no subscriber receives email.</p></div>;
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
   if (productId === "home_finder") return <div className="p-6"><h2 className="text-sm font-semibold">HomeFinder</h2><p className="mt-2 text-sm text-gray-muted">Open the licensed search settings and installation evidence for this business.</p><a className={styles.linkAction} href={`/workspace/home-finder?${new URLSearchParams({ workspaceId })}`}>Open HomeFinder<ArrowUpRight size={16} aria-hidden="true" /></a></div>;
@@ -346,7 +346,7 @@ async function requestMakeReal(request: typeof fetch, workspaceId: string, possi
 function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; onAsk: (request: string) => void; title: string }) {
   if (outcome.kind === "live") return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
     <h3>{outcome.headline}</h3>
-    <p>{outcome.started ? "Strelva has started this change. Reload this System to see what landed and what still needs attention." : "Reload this System to check the current outcome before trying another change."}</p>
+    <p>{outcome.started ? "This change has started. Reload this System to see what landed and what still needs attention." : "Reload this System to check the current outcome before trying another change."}</p>
   </div>;
   if (outcome.kind !== "result") return <p role={outcome.kind === "error" ? "alert" : "status"} className={styles.makeRealNotice}>{outcome.message}</p>;
   const { result } = outcome;
@@ -358,7 +358,7 @@ function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; on
     {result.unknown.length ? <><h3>Outcome not known</h3><ul>{result.unknown.map(item => <li key={item}>{item}</li>)}</ul></> : null}
     {result.notStarted.length ? <><h3>Not started</h3><ul>{result.notStarted.map(item => <li key={item}>{item}</li>)}</ul></> : null}
     {result.notConnected.length ? <><h3>Not connected</h3><ul>{result.notConnected.map(item => <li key={item}>{item}</li>)}</ul></> : null}
-    <button type="button" className="underline" onClick={() => onAsk(`Make this real: ${title}. `)}>Ask Strelva to finish it</button>
+    <button type="button" className="underline" onClick={() => onAsk(`Make this real: ${title}. `)}>Ask to finish it</button>
   </div>;
 }
 
@@ -386,7 +386,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
       const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
       return <StRow key={possibility.id} title={possibility.title} detail={possibility.summary}>
         <StState kind="draft">{POSSIBILITY_STATUS_LABEL[possibility.status]}</StState>
-        {possibility.staleReason ? <small role="note">{possibility.staleReason} Strelva is refreshing it.</small> : null}
+        {possibility.staleReason ? <small role="note">{possibility.staleReason} A fresh check is needed.</small> : null}
         {possibility.evidence ? <small>{possibility.evidence}</small> : null}
         <small>Changes: {scope.join(", ")}</small>
         <span className={styles.possibilityActions}>

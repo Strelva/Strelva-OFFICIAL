@@ -1,4 +1,5 @@
 import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
+import { tenantAgencyWorkspace } from "@/experience/operator/agency-entry";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -227,16 +228,20 @@ export default async function ClientDetailPage({
   const publicUrl = getTenantPublicUrl(tenant);
   const dashboardUrl = getTenantDashboardFallbackUrl(tenant);
 
-  const inspectHref = `/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`;
+  const inspectHref = new URL(`/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`, dashboardUrl).toString();
+  const agencyWorkspace = await tenantAgencyWorkspace(tenant.id);
+  const agencyWorkHref = agencyWorkspace
+    ? new URL(`/api/admin/inspect?on=0&to=${encodeURIComponent("/workspace?workspaceId=" + agencyWorkspace)}`, dashboardUrl).toString()
+    : "/admin/actions";
   return (
     <StPage>
-      <StHead crumb={{ label: OPERATOR_DESTINATIONS.sites.label, href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active site" : "Archived site"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={dashboardUrl}>Open workspace</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton><StTextButton href={`/admin/convert?slug=${encodeURIComponent(tenant.id)}`}>Conversion dry run</StTextButton></>} />
+      <StHead crumb={{ label: OPERATOR_DESTINATIONS.sites.label, href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active site" : "Archived site"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={inspectHref}>Open workspace (read-only)</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton><StTextButton href={`/admin/convert?slug=${encodeURIComponent(tenant.id)}`}>Conversion dry run</StTextButton></>} />
       <div className={styles.columns}>
         <ReleaseFlagsPanel tenantId={tenant.id} globalOwnerEmailPaused={emailSendingPaused()} />
         <aside className={styles.aside}>
           <StSection title="Owner"><StRows><StRow title={tenant.ownerName || "Owner not recorded"} detail={tenant.ownerEmail || "Owner email not recorded"} /></StRows></StSection>
           {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
-          <StSection title="On behalf of the owner"><p>Client work uses the business or its agency’s ordinary permissions. Every request names who asked.</p><StTextButton href={dashboardUrl}>Open their workspace</StTextButton></StSection>
+          <StSection title="Client work"><p>Client work uses ordinary agency permissions. Platform support inspection is read-only.</p><StTextButton href={agencyWorkHref}>{agencyWorkspace ? "Open client through your agency seat" : "Check ordinary agency access"}</StTextButton></StSection>
           <StState kind={verdict.tone === "red" ? "down" : verdict.tone === "amber" ? "need" : "live"}>{verdict.message}</StState>
           {verdict.detail && <p>{verdict.detail}</p>}
         </aside>

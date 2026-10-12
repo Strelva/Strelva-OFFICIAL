@@ -42,18 +42,14 @@ describe("paper operator records", () => {
     expect(container.textContent).toContain("Platform support cannot approve or reject client content");
     expect(navigation.refresh).not.toHaveBeenCalled();
   });
-  it("keeps leads in place when conversion admission fails", async () => {
-    const request = vi.fn().mockResolvedValue(Response.json({ error: "Denied" }, { status: 403 })); vi.stubGlobal("fetch", request);
+  it("keeps legacy sales and delivery records read-only by default", async () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
     act(() => root.render(createElement(LeadRows, { leads: [lead], initialWorkflow: {} })));
-    await click("Convert"); expect(navigation.push).not.toHaveBeenCalled(); expect(container.querySelector('[role="alert"]')?.textContent).toContain("Couldn't update that lead");
-    expect(request).toHaveBeenCalledWith("/api/admin/leads/test-token/workflow", expect.objectContaining({ body: JSON.stringify({ status: "converting" }) }));
-  });
-  it("restores the existing client stage after a failed optimistic change", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({}, { status: 500 })));
-    act(() => root.render(createElement(LeadRows, { leads: [lead], initialWorkflow: {} })));
-    const select = container.querySelector("select")!;
-    await act(async () => { select.value = "drafting"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(select.value).toBe("received"); expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    const convert = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Convert")!;
+    expect(convert.disabled).toBe(true);
+    expect(container.querySelector<HTMLSelectElement>("select")?.disabled).toBe(true);
+    await click("Convert");
+    expect(navigation.push).not.toHaveBeenCalled(); expect(request).not.toHaveBeenCalled();
   });
   it("requires confirmation for a revalidation retry and retains provider errors", async () => {
     const request = vi.fn().mockResolvedValue(Response.json({ error: "Denied" }, { status: 403 })); vi.stubGlobal("fetch", request);

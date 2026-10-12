@@ -1,5 +1,6 @@
 /** Resolve current ordinary tenant authority separately from platform support. */
 import { getAuthUserId, isSuperAdmin } from "./auth";
+import { isInspecting } from "@/platform/infra/inspect-mode";
 import { getSessionUser } from "./db/server-client";
 import { getMembershipRole, getTenantAgencySeat } from "./db/repositories";
 import { operatorActorId, agencyStaffActorId } from "./tenant-actor";
@@ -62,6 +63,7 @@ export function isDelegateDecider(decider: TenantDecider): boolean {
 /** Resolve ordinary owner/agency authority first. A platform role only grants support inspection when neither exists; failed permission reads never grant ownership. */
 export async function sessionTenantDecider(tenantId: string): Promise<TenantDecider | null> {
   const operator = await verifiedOperator();
+  if (operator && await isInspecting()) return { kind: "operator", operator };
   const userId = operator?.userId ?? await getAuthUserId();
   if (!userId) return null;
   const role = await getMembershipRole(userId, tenantId);
@@ -72,6 +74,5 @@ export async function sessionTenantDecider(tenantId: string): Promise<TenantDeci
   const staff = await agencyStaffOn(tenantId, userId, user?.id === userId ? user.email ?? null : null);
   if (staff) return { kind: "agency_staff", staff };
   if (operator) return { kind: "operator", operator };
-  return { kind: "member", actorId: userId };
+  return role === "admin" || role === "editor" ? { kind: "member", actorId: userId } : null;
 }
-

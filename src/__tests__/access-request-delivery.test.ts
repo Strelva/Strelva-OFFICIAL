@@ -47,13 +47,26 @@ describe("access request delivery flow", () => {
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
 
+  it.each([["business_access", "/sign-up"], ["agency_access", "/sign-up?as=agency"]])("routes %s to platform entry without sales storage or notifications", async (requestType, next) => {
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const res = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType, email: "already@example.invalid" }) }));
+    expect(res.status).toBe(200); expect(await res.json()).toEqual({ success: true, requestType, next });
+    expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "website", "agency_service_unconfirmed"])("rejects an unchosen/unknown sales path: %s", async requestType => {
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const res = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType, businessName: "Demo", email: "owner@example.invalid" }) }));
+    expect(res.status).toBe(400); expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
   it("creates a no-login delivery link and sends the first signup email", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
 
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "Owner@Example.com",
         location: "Buffalo, NY",
@@ -96,7 +109,7 @@ describe("access request delivery flow", () => {
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         phone: "(716) 555-0100",
@@ -130,7 +143,7 @@ describe("access request delivery flow", () => {
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         description: "Build request: weekly proof",
@@ -152,7 +165,7 @@ describe("access request delivery flow", () => {
     const firstResponse = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         description: "Build request: weekly proof",
@@ -165,7 +178,7 @@ describe("access request delivery flow", () => {
     const repeatResponse = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Second Studio",
         email: "Owner@Example.com",
         description: "Build request: another site",
