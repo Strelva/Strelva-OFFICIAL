@@ -1855,14 +1855,14 @@
     },
     {
       "id": "reward-durable-mutations",
-      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards with enabled-event-hook refusal before DDL; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; forward/inverse require actual superuser and no enabled event hooks, managed/provider-hook feasibility HOLD; no provider or commercial authority",
+      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards with enabled-event-hook refusal before DDL; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; forward/inverse run as hosted Supabase postgres and admit only the six Supabase platform event hooks by name, function and owner (Oct 12: rehearsed on a restored production copy, all 118 pending forwards as postgres; repo guard proof GREEN); no provider or commercial authority",
       "items": [
         {
           "file": "20261022175000_reward_durable_mutations.sql",
-          "sha256": "f828c26f6459cca410dd1120df0bf1332905f194f9cc06400110e9ba4b1587b7",
+          "sha256": "a9479c59d8796164fb694043359335bf6d83edeae8a04c465c8b500a144da59c",
           "rollback": "rollback-20261022175000_reward_durable_mutations.sql",
-          "rollbackSha256": "0ad295c0a4e864f3d9deb7140c7f00ba95d5fe465b901f912957117cfff5a238",
-          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse require actual superuser catalog/event-hook exclusion and refuse every enabled event hook; managed/provider-hook feasibility HOLD and actual native qualification UNRUN"
+          "rollbackSha256": "874fbd044657cfc2944ae607707478636ab2ed6f8868068a3814c6eed7e0a262",
+          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse refuse any enabled event hook other than the six Supabase platform hooks; empty inverse and reapply rehearsed as postgres on a restored production copy Oct 12"
         }
       ]
     },
