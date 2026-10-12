@@ -12,6 +12,7 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { AGENCY_START_PATH, agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { BUSINESS_SIGNUP_PATH } from "@/platform/workspaces/business-start";
 import { tenantSignInNext } from "@/platform/owner-entry/env";
 import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 
@@ -95,7 +96,9 @@ export default async function SignUpPage({
   if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   if (workspaceOpen) {
     const asAgency = agencySignupReleaseEnabled() && searchValue(params.as) === "agency";
-    const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || "/workspace";
+    // ADR 0015: "I run a business" goes straight to creating that business,
+    // not to a personal workspace with the business one click away in Help.
+    const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
     const identity = await invitationEntryIdentity(invitationTarget);
     return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
       <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencySignupReleaseEnabled() ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
@@ -103,7 +106,7 @@ export default async function SignUpPage({
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="Workspace access is invite-only" meta="Already have access? Sign in with the email connected to your business. No site yet? Request your build." /><StPillLink href="/access-request">Request your build</StPillLink><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
+  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/access-request">Want it done for you? Ask Strelva Agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
 }
 
 function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {
@@ -115,6 +118,6 @@ function AccountKindChoice({ selected, next }: { selected: "business" | "agency"
   };
   return <nav aria-label="Who this account is for" className="flex flex-col gap-3">
     <p className="text-sm text-gray-muted">Who is this for?</p>
-    {(["business", "agency"] as const).map(kind => <Link key={kind} href={href(kind)} aria-current={selected === kind ? "page" : undefined}><StSurface selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"}><span className="flex gap-3"><input type="radio" checked={selected === kind} readOnly tabIndex={-1} aria-hidden="true" /><span><span className="text-sm font-medium">{kind === "business" ? "I run a business" : "I build for clients"}</span><span className="mt-1 block text-sm text-gray-muted">{kind === "business" ? "Save private work and manage your business." : "Clients own their workspace; you work inside it."}</span></span></span></StSurface></Link>)}
+    {(["business", "agency"] as const).map(kind => <Link key={kind} href={href(kind)} aria-current={selected === kind ? "page" : undefined}><StSurface selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"}><span className="flex gap-3"><input type="radio" checked={selected === kind} readOnly tabIndex={-1} aria-hidden="true" /><span><span className="text-sm font-medium">{kind === "business" ? "I run a business" : "I build for clients"}</span><span className="mt-1 block text-sm text-gray-muted">{kind === "business" ? "Run your site, forms and bookings yourself. Bring in an agency anytime." : "Clients own their workspace; you work inside it."}</span></span></span></StSurface></Link>)}
   </nav>;
 }

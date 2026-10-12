@@ -3,8 +3,8 @@ import type { BoundedStore } from "./repository";
 
 /**
  * Making an internal tool (create, from-source copy, plan output) needs
- * make_systems: the business's acting provider or a delegated agency
- * (docs/product/specs/systems-catalog.md section 4). Owners, admins and
+ * make_systems: the business's own owners and admins (ADR 0015, the business
+ * runs Strelva itself), its acting provider or a delegated agency. Ordinary
  * members get WorkspaceMakeSystemsError, which the HTTP layer turns into
  * MAKE_SYSTEMS_REQUIRED_MESSAGE with a Request action.
  *
@@ -17,7 +17,7 @@ export async function requireSystemMaker(store: BoundedStore, actor: WorkspaceAc
     return;
   }
   const authority = await store.makeSystems(actor, workspaceId);
-  if (authority === "provider" || authority === "agency") return;
+  if (authority === "provider" || authority === "agency" || authority === "owner") return;
   if (authority === "member") throw new WorkspaceMakeSystemsError();
   throw new WorkspaceAccessError();
 }

@@ -1,25 +1,39 @@
 #!/usr/bin/env bash
-# ADR 0015 two doors (20261023140000): the agency-addressed entry and failed
-# plan contract on the full ordered schema. Local throwaway cluster.
+# ADR 0015 two doors (20261023140000+): the agency-addressed entry, failed plan
+# and owner make_systems contracts on the full ordered schema, plus an exact
+# rollback to the prior catalog and a clean reapply. Local throwaway cluster.
+#
+# TWO_DOORS_EXTRA_MIGRATIONS: extra held prerequisites (space-separated
+# paths), applied in name order with the tree, for local runs before they land.
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/temp-postgres.sh"
 create_temp_postgres strelva-two-doors strelva-two-doors-socket
 cluster_port="$((61000 + ($$ % 3000)))"
-for command_name in initdb pg_ctl psql; do
+for command_name in initdb pg_ctl psql diff; do
   command -v "$command_name" >/dev/null || { printf 'Missing %s\n' "$command_name" >&2; exit 1; }
 done
 initdb -D "$cluster_data" --locale=C --encoding=UTF8 --auth=trust --no-instructions >/dev/null
 pg_ctl -D "$cluster_data" -l "$cluster_log" -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" -w start >/dev/null
 read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 psql_args=(--host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --set=ON_ERROR_STOP=1 --no-psqlrc --quiet)
+fingerprint() { psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/$1.txt"; }
+apply() { psql "${psql_args[@]}" --file="$1" >/dev/null 2>"$cluster_root/migration.err" || { printf 'Migration failed: %s\n' "$1" >&2; cat "$cluster_root/migration.err" >&2; exit 1; }; }
+run_contracts() { for contract in "$repo_root"/tests/two-doors-*-schema.sql; do psql "${psql_args[@]}" --file="$contract" >/dev/null; done; }
+
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
-# TWO_DOORS_EXTRA_MIGRATIONS: extra held prerequisites (space-separated paths),
-# applied in name order with the tree, for local runs before they land.
-for migration in $( { find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql'; for extra in ${TWO_DOORS_EXTRA_MIGRATIONS:-}; do printf '%s\n' "$extra"; done; } | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2); do
-  psql "${psql_args[@]}" --file="$migration" >/dev/null 2>"$cluster_root/migration.err" || { printf 'Migration failed: %s\n' "$migration" >&2; cat "$cluster_root/migration.err" >&2; exit 1; }
-done
-for contract in "$repo_root"/tests/two-doors-*-schema.sql; do
-  psql "${psql_args[@]}" --file="$contract" >/dev/null
-done
-printf 'Two doors SQL contract passed.\n'
+ordered=$( { find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql'; for extra in ${TWO_DOORS_EXTRA_MIGRATIONS:-}; do printf '%s\n' "$extra"; done; } | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2)
+forwards=$(printf '%s\n' $ordered | grep '_two_doors_')
+for migration in $ordered; do [[ "$migration" == *_two_doors_* ]] || apply "$migration"; done
+fingerprint before
+for forward in $forwards; do apply "$forward"; done
+run_contracts
+fingerprint after
+for forward in $(printf '%s\n' $forwards | sort -r); do apply "$(dirname "$forward")/rollback-$(basename "$forward")"; done
+fingerprint rolled-back
+diff -u "$cluster_root/before.txt" "$cluster_root/rolled-back.txt" >&2 || { printf 'Two doors rollback did not restore the prior catalog.\n' >&2; exit 1; }
+for forward in $forwards; do apply "$forward"; done
+fingerprint reapplied
+diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2 || { printf 'Two doors reapply differs from the first apply.\n' >&2; exit 1; }
+run_contracts
+printf 'Two doors SQL contract passed (forward, exact rollback, reapply).\n'

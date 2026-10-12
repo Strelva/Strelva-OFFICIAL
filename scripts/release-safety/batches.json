@@ -1497,7 +1497,7 @@
     {
       "batch": "19",
       "status": "private literal #293 AG11 preparation; unmerged; not production-authorized",
-      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34\u201336 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
+      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34–36 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
       "items": [
         {
           "file": "20261020090037_provider_completion_cleanup.sql",
@@ -1971,6 +1971,26 @@
           "file": "20261023130000_provider_change_actor_privacy.sql",
           "sha256": "588810749ffdd8bcb7fe310bc27673933ee4b888a52e10cd7e4a8196b543643a",
           "rollbackStatus": "Privacy correction replaces only presentation; no inverse restoring requester email is prepared. Ordered SQL/hosted qualification remains held; no production application authorized."
+        }
+      ]
+    },
+    {
+      "id": "two-doors",
+      "status": "ADR 0015 two doors: held and unqualified. Focused local contract only; SQL execution in the ordered workspace runner, hosted Auth and production migration application remain UNRUN; no packet batch or deployment authority granted.",
+      "items": [
+        {
+          "file": "20261023140000_two_doors_agency_requests.sql",
+          "sha256": "217cda36e5ed8993df65ee5f99ef37093868247df5001eca3821e6db95b6ebdb",
+          "rollback": "rollback-20261023140000_two_doors_agency_requests.sql",
+          "rollbackSha256": "a9aeee5da5b6c3b4ca27ed8827034d396b6ace200c7c8fad9711ba94b24d6484",
+          "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
+        },
+        {
+          "file": "20261023141000_two_doors_owner_makes_systems.sql",
+          "sha256": "645854ca5f8b8ef02f3f1c7aa93f67f9e16ff05b1139321264751adf9a05a52a",
+          "rollback": "rollback-20261023141000_two_doors_owner_makes_systems.sql",
+          "rollbackSha256": "615a62312610a768105f8be74934677f98e513f9aac57ce0f9f2920f08658716",
+          "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
         }
       ]
     }

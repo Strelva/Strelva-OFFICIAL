@@ -186,7 +186,7 @@ describe("goal to reviewed private application", () => {
     const plan = await createWorkPlan({ actor, workspaceId, userGoal: "Let staff report repairs", generate: async () => generated(draft) });
     database.tables.acting_provider_staff = [];
     await expect(executeWorkPlanOutput({ actor, workspaceId, planWorkId: plan.work.id, outputId: "repair-app", expectedPlanRevision: 1 }))
-      .rejects.toMatchObject({ name: "WorkspaceMakeSystemsError", message: "Ask your agency, or find one." });
+      .rejects.toMatchObject({ name: "WorkspaceMakeSystemsError", message: "Ask an owner or admin of this business, or its agency." });
     expect(database.tables.saved_product_work!.filter((row) => row.product_id === "applications")).toHaveLength(0);
   });
 

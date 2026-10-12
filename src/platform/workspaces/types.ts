@@ -110,7 +110,7 @@ export class WorkspaceAccessError extends Error {
 }
 
 /** Shown to owners, admins and members who try to make or change an internal tool. */
-export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask your agency, or find one.";
+export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask an owner or admin of this business, or its agency.";
 
 /**
  * Only the business's acting provider (an agency's seat and staff row) or a

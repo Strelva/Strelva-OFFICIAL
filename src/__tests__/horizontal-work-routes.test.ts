@@ -319,7 +319,7 @@ describe("horizontal work HTTP authority and execution", () => {
     database.tables.acting_provider_staff = [];
     const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "Ask your agency, or find one.", code: "make_systems_required" });
+    expect(await response.json()).toEqual({ error: "Ask an owner or admin of this business, or its agency.", code: "make_systems_required" });
     expect(database.tables.saved_product_work).toHaveLength(0);
   });
 

@@ -474,20 +474,21 @@ export async function saveWork(input: WorkspaceActor, workspaceId: string, work:
  * agency, Strelva's included), "agency" (an active delegation into this business), "member"
  * (a direct member who may use but not make tools), or null.
  */
-export type MakeSystemsAuthority = "provider" | "agency" | "member" | null;
+/** `owner`: an owner or admin of a customer business making its own Systems (ADR 0015). */
+export type MakeSystemsAuthority = "provider" | "agency" | "owner" | "member" | null;
 
 export async function makeSystemsAuthority(input: WorkspaceActor, workspaceId: string): Promise<MakeSystemsAuthority> {
   const a = actor(input);
   const { data, error } = await rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: a.userId });
   if (error) workspaceDbFailure(error, "Workspace authority is unavailable");
   const value = Array.isArray(data) ? data[0] : data;
-  return value === "provider" || value === "agency" || value === "member" ? value : null;
+  return value === "provider" || value === "agency" || value === "owner" || value === "member" ? value : null;
 }
 
 /** First gate for making or changing an internal tool. SQL rechecks on create. */
-export async function assertCanMakeSystems(input: WorkspaceActor, workspaceId: string): Promise<"provider" | "agency"> {
+export async function assertCanMakeSystems(input: WorkspaceActor, workspaceId: string): Promise<"provider" | "agency" | "owner"> {
   const authority = await makeSystemsAuthority(input, workspaceId);
-  if (authority === "provider" || authority === "agency") return authority;
+  if (authority === "provider" || authority === "agency" || authority === "owner") return authority;
   if (authority === "member") throw new WorkspaceMakeSystemsError();
   throw new WorkspaceAccessError();
 }
