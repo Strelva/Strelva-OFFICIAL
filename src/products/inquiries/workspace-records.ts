@@ -28,6 +28,8 @@ export interface WorkspaceInquiryLead {
   intakeStateAt: string | null;
   contactId: string | null;
   capturedAt: string;
+  /** How the row was recorded; `forwarded_email` for forwarded inquiries (20261024500000). */
+  recordedVia?: string;
   reply?: WorkspaceReplyOutcome;
   replyPermission?: "owner" | "member" | "none";
 }
@@ -62,6 +64,7 @@ export function parseWorkspaceLead(raw: unknown): WorkspaceInquiryLead | null {
     intakeStateAt: str(r.intakeStateAt),
     contactId: str(r.contactId),
     capturedAt: r.capturedAt,
+    ...(str(r.recordedVia) ? { recordedVia: str(r.recordedVia)! } : {}),
     ...(r.replyPermission === undefined ? {} : { replyPermission: r.replyPermission === "owner" || r.replyPermission === "member" ? r.replyPermission : "none" as const }),
     ...(r.reply && typeof r.reply === "object" && typeof (r.reply as Record<string, unknown>).status === "string" ? { reply: { ...(r.reply as Omit<WorkspaceReplyOutcome, "retryable">), retryable: false as const } } : {}),
   };

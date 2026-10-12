@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { reconcileInquiryProviderEvent, reconcileWorkspaceInquiryProviderEvent } from "@/products/inquiries";
 import { reconcileConnectedInquiryOwnerNotice } from "@/products/connected-sites/server";
 import { reconcileInquiryDecisionNotice } from "@/platform/needs-you";
+import { receiveForwardedInquiryEvent, type ForwardedEventResult } from "@/products/inquiry-forwarding/server";
 
 export const dynamic = "force-dynamic";
 const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -72,6 +73,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
   }
 
+  // Mail to a business's forwarding address becomes an Inquiry. Ignored
+  // (and so unchanged behavior) for everything else, and while forwarding is off.
+  const forwarded = await receiveForwardedInquiryEvent({ event, eventId });
+  if (forwarded.status !== "ignored") return forwardedResponse(forwarded);
   const decisionResult = await reconcileInquiryDecisionNotice({ event, eventId });
   const connectedResult = decisionResult.status === "ignored" ? await reconcileConnectedInquiryOwnerNotice({ event, eventId }) : decisionResult;
   const workspaceResult = connectedResult.status === "ignored"
@@ -87,5 +92,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     // is still propagating. The reconciler never invents a delivery or reply.
     return NextResponse.json({ received: false, status: result.status, reason: result.reason }, { status: 503 });
   }
+  if (result.status === "ignored" && result.reason === "provider_event_not_for_inquiry") {
+    // A BCC or auto-forward may not list the forwarding address in To or Cc.
+    const fallback = await receiveForwardedInquiryEvent({ event, eventId }, { inspectHeaders: true });
+    if (fallback.status !== "ignored") return forwardedResponse(fallback);
+  }
+  return NextResponse.json({ received: true, status: result.status });
+}
+
+/** A refused address is final (no retry); only an unreadable message or store is retried. */
+function forwardedResponse(result: Exclude<ForwardedEventResult, { status: "ignored" }>): NextResponse {
+  if (result.status === "unavailable") return NextResponse.json({ received: false, status: result.status, reason: result.reason }, { status: 503 });
   return NextResponse.json({ received: true, status: result.status });
 }
