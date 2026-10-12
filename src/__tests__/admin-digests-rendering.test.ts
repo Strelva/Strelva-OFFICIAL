@@ -10,4 +10,8 @@ describe("admin digest rendering", () => {
     // its request-scoped operator admission or reading pending digests.
     expect(page).toMatch(/^export const dynamic = ["']force-dynamic["'];$/m);
   });
+  it("keeps durable operator admission before pending digest reads", () => {
+    expect(page.indexOf('await authorizeAdminOperatorRead("admin.digests.read")')).toBeGreaterThan(0);
+    expect(page.indexOf('await authorizeAdminOperatorRead("admin.digests.read")')).toBeLessThan(page.indexOf("await listPendingDigests()"));
+  });
 });
