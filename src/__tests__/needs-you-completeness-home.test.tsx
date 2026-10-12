@@ -138,7 +138,7 @@ describe("initiated retry focus across actual partial and failed reads", () => {
     const initial = button("Check again")!; initial.focus(); await click("Check again");
     const failed = button("Check again")!;
     expect(initial.isConnected).toBe(false); expect(document.activeElement).toBe(failed); assertNoClear();
-    expect(text()).toContain("Your decisions could not be checked. Nothing about them changed.");
+    expect(text()).toContain("Your decisions could not be checked. Check again before deciding.");
     await click("Check again");
     expect(failed.isConnected).toBe(false);
     expect(document.activeElement).toBe(node.querySelector(view === "home" ? "#home-attention" : "h1"));
