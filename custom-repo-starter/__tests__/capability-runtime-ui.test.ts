@@ -86,7 +86,7 @@ describe("generated booking runtime pending state", () => {
     root.querySelector<HTMLButtonElement>('button[type="button"]')!.click();
     await settle();
     expect(fetcher.mock.calls[2]![0]).toContain("/readback");
-    expect(root.textContent).toContain("Outlook confirmed this reservation.");
+    expect(root.textContent).toContain("Outlook confirmed this booking.");
   });
 });
 

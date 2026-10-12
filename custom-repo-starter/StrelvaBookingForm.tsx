@@ -149,11 +149,11 @@ export function StrelvaBookingForm({
     if (error instanceof PublicBookingConflictError) { setAlternatives(error); setSlotId(error.nextSlots[0]?.id ?? ""); }
   }
   const reservationLabel = receipt?.status === "confirmed"
-    ? native ? "The business confirmed this booking." : `${providerLabel(schedule.provider)} confirmed this reservation.`
+    ? native ? "The business confirmed this booking." : `${providerLabel(schedule.provider)} confirmed this booking.`
     : receipt?.status === "cancelled"
-      ? "This reservation is cancelled."
+      ? "This booking is cancelled."
       : receipt
-        ? native ? "If you received a confirmation email, confirm within 15 minutes. Your request is waiting for the business to confirm. This time is not confirmed yet." : "If you received a confirmation email, confirm within 15 minutes. We could not confirm this reservation yet. Check the calendar before trying again."
+        ? native ? "If you received a confirmation email, confirm within 15 minutes. Your request is waiting for the business to confirm. This time is not confirmed yet." : "If you received a confirmation email, confirm within 15 minutes. We could not confirm this booking yet. Check the calendar before trying again."
         : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -229,7 +229,7 @@ export function StrelvaBookingForm({
   return (
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
-      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${providerLabel(schedule.provider)} will confirm the reservation.`}</p>
+      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`}</p>
       {native && !testOnly ? <p>Times shown in {visitorTimeZone}.</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>

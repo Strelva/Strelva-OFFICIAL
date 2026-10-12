@@ -68,7 +68,7 @@ test("stopped owners can read back and cancel an accepted calendar event while n
     await page.goto(`/workspace?workspaceId=${workspaceId}&work=${scheduleId}`, { waitUntil: "domcontentloaded" });
     await expect(page.getByRole("status", { name: "Workspace stopped" })).toBeVisible();
     const calendar = page.getByRole("region", { name: "External calendar sync" });
-    await expect(calendar.getByText("Outlook confirmed this reservation.", { exact: true })).toBeVisible();
+    await expect(calendar.getByText("Outlook confirmed this booking.", { exact: true })).toBeVisible();
     const change = calendar.getByRole("button", { name: "Change synced time", exact: true });
     const cancel = calendar.getByRole("button", { name: "Cancel synced reservation", exact: true });
     expect(await change.isDisabled()).toBe(true);

@@ -79,7 +79,7 @@ test("authenticated schedule controls show provider discovery, conflict recovery
     boundedMode = "accepted";
     await page.getByRole("button", { name: "Check the calendar", exact: true }).click();
     await expect.poll(() => writes.filter(item => item.action === "recover")).toHaveLength(1);
-    await expect(page.getByLabel("External calendar sync").getByText("Outlook confirmed this reservation.", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("External calendar sync").getByText("Outlook confirmed this booking.", { exact: true })).toBeVisible();
 
     const workspaceScroll = page.locator("[data-frame-main] > div").first();
     await workspaceScroll.evaluate((element) => element.scrollTo({ top: 0, left: 0 }));

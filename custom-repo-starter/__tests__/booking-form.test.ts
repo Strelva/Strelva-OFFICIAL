@@ -64,7 +64,7 @@ describe("native booking form", () => {
   it("renders a provider-backed schedule without an iframe or provider identifier", async () => {
     await renderForm();
     expect(container.textContent).toContain("Consultation times");
-    expect(container.textContent).toContain("Outlook will confirm the reservation");
+    expect(container.textContent).toContain("Your booking is confirmed on the business's Outlook calendar");
     expect(container.querySelector("iframe")).toBeNull();
     expect(container.textContent).not.toContain("fixture-");
   });
@@ -100,7 +100,7 @@ describe("native booking form", () => {
       setValue(container.querySelector<HTMLInputElement>('input[name="email"]')!, "avery@example.test");
     });
     await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(container.textContent).toContain("Outlook confirmed this reservation.");
+    expect(container.textContent).toContain("Outlook confirmed this booking.");
     expect(onReserve).toHaveBeenCalledTimes(1);
 
     await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Change reservation"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
@@ -109,7 +109,7 @@ describe("native booking form", () => {
 
     await act(async () => (container.querySelector('button[type="button"]') as HTMLButtonElement).click());
     expect(onCancel).toHaveBeenCalledWith(changed);
-    expect(container.textContent).toContain("This reservation is cancelled.");
+    expect(container.textContent).toContain("This booking is cancelled.");
   });
 
   it("connects the generated-site renderer to the public schedule and receipt lifecycle", async () => {
@@ -135,12 +135,12 @@ describe("native booking form", () => {
     });
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(JSON.parse(String((fetcher.mock.calls[1]?.[1] as RequestInit).body))).toMatchObject({ capabilityId: schedule.capabilityId, capabilityVersion: schedule.version, slotId: schedule.slots[0]!.id, requestId: expect.stringMatching(/^request-/) });
-    expect(container.textContent).toContain("Outlook confirmed this reservation.");
+    expect(container.textContent).toContain("Outlook confirmed this booking.");
     await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Change reservation"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     await act(async () => (container.querySelector('button[type="button"]') as HTMLButtonElement).click());
     expect(fetcher.mock.calls[2]?.[0]).toContain("/reservations/reservation-abcdefgh");
     expect(fetcher.mock.calls[3]?.[0]).toContain("/reservations/reservation-abcdefgh");
-    expect(container.textContent).toContain("This reservation is cancelled.");
+    expect(container.textContent).toContain("This booking is cancelled.");
   });
 
   it("reuses the same request id when the first reserve response is lost", async () => {
@@ -165,7 +165,7 @@ describe("native booking form", () => {
     await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     const secondBody = JSON.parse(String((fetcher.mock.calls[2]?.[1] as RequestInit).body));
     expect(secondBody.requestId).toBe(firstBody.requestId);
-    expect(container.textContent).toContain("Outlook confirmed this reservation.");
+    expect(container.textContent).toContain("Outlook confirmed this booking.");
   });
 
   it("restores the same pending request and visitor details after a remount", async () => {
@@ -203,7 +203,7 @@ describe("native booking form", () => {
     await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     const secondBody = JSON.parse(String((fetcher.mock.calls[3]?.[1] as RequestInit).body));
     expect(secondBody.requestId).toBe(firstBody.requestId);
-    expect(container.textContent).toContain("Outlook confirmed this reservation.");
+    expect(container.textContent).toContain("Outlook confirmed this booking.");
   });
 
   it("offers refresh without exposing repeat writes for a pending receipt", async () => {
@@ -283,6 +283,6 @@ describe("native business confirmation", () => {
   });
   it("keeps the original phone-free provider flow when native metadata is absent", async () => {
     await renderForm({ receipt }); expect(container.querySelector('input[name="phone"]')).toBeNull();
-    expect(container.textContent).toContain("Outlook confirmed this reservation."); expect(container.textContent).not.toContain("Times shown in");
+    expect(container.textContent).toContain("Outlook confirmed this booking."); expect(container.textContent).not.toContain("Times shown in");
   });
 });
