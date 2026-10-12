@@ -58,7 +58,7 @@ export function StartBusinessFromCheck({ resultId, workspaceName, savingHere, sa
       const response = await transport("/api/workspace/getting-started", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "start_from_check", resultId, name: name.trim() }) });
       const body: unknown = await response.json().catch(() => null);
       const location = (body as { location?: unknown } | null)?.location;
-      if (!response.ok || typeof location !== "string" || !location.startsWith("/workspace/getting-started?")) throw new Error(errorText(body, "Your business couldn't be started. Nothing new was created; try again."));
+      if (!response.ok || typeof location !== "string" || !location.startsWith("/workspace/getting-started?")) throw new Error(errorText(body, "Your business couldn't be started. Try again; retrying won't create a second one."));
       window.location.assign(location);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Your business couldn't be started. Try again.");
