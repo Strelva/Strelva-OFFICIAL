@@ -15,6 +15,43 @@ afterEach(() => { act(() => root.unmount()); container.remove(); vi.unstubAllGlo
 const payButton = () => Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Accept and pay")!;
 
 describe("business deposit presentation", () => {
+  it.each([undefined, null, {}, { refundable: "yes" }])("holds a deposit when immutable policy is missing or invalid: %s", async cancellationPolicy => {
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy, acceptedTerms: "Work description alone is not a deposit policy." } })));
+    expect(container.textContent).toContain("Refund and cancellation terms are unavailable");
+    expect(payButton()).toBeUndefined();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("shows the issued refundable=%s policy beside the amount", async refundable => {
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy: { refundable } } })));
+    const summary = container.querySelector('[aria-label="Payment amount and terms"]')!;
+    expect(summary.textContent).toContain("$120.00");
+    expect(summary.textContent).toContain(refundable ? "eligible for a refund" : "non-refundable");
+    expect(summary.textContent).not.toContain("until Nov");
+    expect(payButton()).toBeDefined();
+    expect(container.querySelector("main")?.textContent).not.toContain("Strelva");
+  });
+
+  it("keeps immutable quote agreement text beside the amount", async () => {
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, kind: "quote", cancellationPolicy: {}, acceptedTerms: "Agreed cancellation terms: refundable before work starts." } })));
+    expect(container.querySelector('[aria-label="Payment amount and terms"]')?.textContent).toContain("Agreed cancellation terms: refundable before work starts.");
+    expect(payButton()).toBeDefined();
+  });
+
+  it("holds a quote without either agreement text or a valid immutable refund policy", async () => {
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, kind: "quote", cancellationPolicy: {}, acceptedTerms: "  " } })));
+    expect(payButton()).toBeUndefined();
+  });
+
+  it("retains refund terms from the token read and uses them before accepting", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...request, cancellationPolicy: { refundable: false } })));
+    await act(async () => root.render(createElement(BusinessPayment, { token })));
+    expect(container.textContent).toContain("non-refundable");
+    expect(payButton()).toBeDefined();
+    expect(container.querySelector("time")?.textContent).toMatch(/UTC|GMT|EST|EDT/);
+  });
+
   it("keeps the shared-token POST and removes payment action after the provider confirms paid", async () => {
     const fetcher = vi.fn(async () => Response.json({ status: "paid" }));
     vi.stubGlobal("fetch", fetcher);
@@ -75,8 +112,9 @@ describe("fictional deposit preview", () => {
     const button = Array.from(container.querySelectorAll("button")).find(button => button.textContent?.startsWith("Pay [deposit]"))!;
     await act(async () => button.click());
     expect(container.textContent).toContain("Deposit received · simulated");
-    expect(container.textContent).toContain("has not taken a payment or reserved a spot");
+    expect(container.textContent).toContain("has not taken a payment or held a spot");
     expect(fetcher).not.toHaveBeenCalled();
+    expect(container.textContent).not.toMatch(/reservation|Strelva/);
   });
 
   it.each(["loading", "empty", "denied"] as const)("offers no charge in its %s state", async state => {

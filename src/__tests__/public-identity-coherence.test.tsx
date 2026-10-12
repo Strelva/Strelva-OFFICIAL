@@ -11,10 +11,10 @@ import { readPublicBookingIdentity } from "@/platform/bookings/public-identity";
 import BookingConfirmationPage from "@/app/booking-confirm/[token]/page";
 import { GET, POST } from "@/app/api/newsletter/unsubscribe/route";
 import BusinessPayment from "@/app/pay/business/BusinessPayment";
-import { paymentRequestSchema } from "@/platform/connect/contracts";
+import { publicPaymentRequestSchema } from "@/app/pay/business/public-payment";
 const token = "x".repeat(43);
 const identity = { businessName: "Lakeview Yoga", start: "2026-11-06T12:00:00Z", end: "2026-11-06T13:00:00Z", state: "held", bookingStatus: null };
-const payment = paymentRequestSchema.parse({ id: "b2640000-0000-4000-8000-000000000001", workspaceId: "b2640000-0000-4000-8000-000000000002", businessName: "Lakeview Yoga", kind: "deposit", lines: [], amountCents: 2500, currency: "usd", expiresAt: "2099-01-01T00:00:00Z", paid: false, status: "unpaid" });
+const payment = publicPaymentRequestSchema.parse({ id: "b2640000-0000-4000-8000-000000000001", workspaceId: "b2640000-0000-4000-8000-000000000002", businessName: "Lakeview Yoga", kind: "deposit", cancellationPolicy: { refundable: true }, lines: [], amountCents: 2500, currency: "usd", expiresAt: "2099-01-01T00:00:00Z", paid: false, status: "unpaid" });
 beforeEach(() => { vi.resetAllMocks(); m.rpc.mockResolvedValue(identity); m.claims.mockReturnValue({ tenantId: "lakeview", email: "visitor@example.test" }); m.tenant.mockResolvedValue({ siteName: "Lakeview <Yoga>" }); });
 async function confirmation(done = "confirmed") { return renderToStaticMarkup(await BookingConfirmationPage({ params: Promise.resolve({ token }), searchParams: Promise.resolve({ done }) })); }
 describe("token-verified public identity", () => {
@@ -24,16 +24,26 @@ describe("token-verified public identity", () => {
     m.rpc.mockClear(); expect(await readPublicBookingIdentity("invalid")).toBeNull(); expect(m.rpc).not.toHaveBeenCalled();
   });
   it("does not turn a query string into a confirmed booking", async () => {
-    const html = await confirmation(); expect(html).toContain("Lakeview Yoga"); expect(html).toContain("Confirm my email"); expect(html).not.toContain("Your booking is confirmed");
+    const html = await confirmation(); expect(html).toContain("Lakeview Yoga"); expect(html).toContain("Confirm my email"); expect(html).not.toContain("Confirmed");
     m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "requested" });
-    expect(await confirmation()).toContain("Your email is confirmed"); expect(await confirmation()).not.toContain("Your booking is confirmed");
+    expect(await confirmation()).toContain("Waiting on Lakeview Yoga"); expect(await confirmation()).not.toContain("Confirmed");
   });
   it("uses the persisted booking status even if the query claims a different outcome", async () => {
-    m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "confirmed" }); expect(await confirmation("pending")).toContain("Your booking is confirmed");
+    m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "confirmed" }); expect(await confirmation("pending")).toContain("Confirmed");
     m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "cancelled" }); expect(await confirmation()).toContain("Your booking is no longer active");
   });
   it("holds the confirmation form when identity is unavailable", async () => {
     m.rpc.mockRejectedValue(new Error("offline")); const html = await confirmation(); expect(html).not.toContain("<form"); expect(html).not.toContain("Lakeview Yoga"); expect(html).toContain("role=\"alert\"");
+  });
+  it("renders a readable zoned time and the recorded confirmation deadline", async () => {
+    m.rpc.mockResolvedValue({ ...identity, timeZone: "America/New_York", expiresAt: "2026-11-06T12:15:00Z" });
+    const html = await confirmation();
+    expect(html).toContain("7:00 AM EST (America/New_York)"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM EST (America/New_York)");
+    expect(html).not.toContain("2026-11-06T12:00");
+  });
+  it("holds a consumed but unplaced outcome for a read rather than offering another placement", async () => {
+    m.rpc.mockResolvedValue({ ...identity, state: "confirming" });
+    const html = await confirmation(); expect(html).toContain("Outcome not confirmed"); expect(html).toContain("Read current status"); expect(html).not.toContain("<form");
   });
   it("names and escapes the newsletter business on a read-only GET and successful POST", async () => {
     const request = new Request("https://example.test/api/newsletter/unsubscribe?token=fixture");

@@ -1,4 +1,4 @@
-import { publicBookingAdmission } from "@/platform/bookings/public-admission";
+import { publicBookingAdmission, type BookingAdmissionPresentation } from "@/platform/bookings/public-admission";
 import type { PublicBookingAdmission } from "@/platform/bookings/public-request";
 import { z } from "zod";
 import { resolvePublishedPublicBooking } from "./public-booking-server";
@@ -25,7 +25,7 @@ type RecoveryResolver = typeof resolvePublishedPublicBooking;
 type RecoveryTokenStore = Pick<PublicBookingTokenStore, "findByToken" | "save">;
 
 export interface PublicBookingRecoveryDependencies {
-  admission?: Pick<PublicBookingAdmission, "verified">;
+  admission?: Pick<PublicBookingAdmission, "verified"> & Partial<BookingAdmissionPresentation>;
   tokens?: RecoveryTokenStore;
   resolve?: RecoveryResolver;
   calendar?: RecoveryCalendar;
@@ -42,7 +42,7 @@ function unavailable(message = "Booking recovery is temporarily unavailable. Try
 }
 
 function notFound(): PublicBookingError {
-  return new PublicBookingError("not_found", "This reservation is unavailable.");
+  return new PublicBookingError("not_found", "This booking is unavailable.");
 }
 
 function receipt(value: PublicBookingReservationRef): PublicBookingReceipt {
@@ -141,7 +141,10 @@ export async function recoverPublicWebsiteBooking(
 
   // A status refresh cannot recover provider work before the email-only gate,
   // or resurrect an expired/cancelled unconfirmed hold.
-  if (!await (dependencies.admission ?? publicBookingAdmission).verified(ref)) return receipt(ref);
+  const admission = dependencies.admission ?? publicBookingAdmission;
+  const presentation = admission.presentation ? await admission.presentation(ref) : { confirmationRequired: !await admission.verified(ref) };
+  const presentedReceipt = (value: PublicBookingReservationRef) => publicBookingReceiptSchema.parse({ ...receipt(value), ...(value.status !== "cancelled" ? presentation : {}) });
+  if (presentation.confirmationRequired) return presentedReceipt(ref);
 
   let binding: PublicBookingBinding | null;
   try {
@@ -156,7 +159,7 @@ export async function recoverPublicWebsiteBooking(
   let nativeReservation = schedule.reservations.find(candidate => candidate.requestId === ref.requestId);
   if (!nativeReservation) {
     const pending = { ...ref, status: "pending" as const, expectedRevision: schedule.revision };
-    return receipt(await saveToken(tokens, pending));
+    return presentedReceipt(await saveToken(tokens, pending));
   }
 
   await recoverNative(calendar, binding.owner, ref.workId, ref.requestId, ref.provider);
@@ -164,7 +167,7 @@ export async function recoverPublicWebsiteBooking(
   nativeReservation = schedule.reservations.find(candidate => candidate.requestId === ref.requestId);
   if (!nativeReservation) {
     const pending = { ...ref, status: "pending" as const, expectedRevision: schedule.revision };
-    return receipt(await saveToken(tokens, pending));
+    return presentedReceipt(await saveToken(tokens, pending));
   }
 
   const current = await saveToken(tokens, {
@@ -174,5 +177,5 @@ export async function recoverPublicWebsiteBooking(
     end: nativeReservation.end,
     status: statusForNative(nativeReservation),
   });
-  return receipt(current);
+  return presentedReceipt(current);
 }

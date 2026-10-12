@@ -1,5 +1,11 @@
 .shell { min-height: 100dvh; background: var(--visitor-canvas, var(--cream)); color: var(--visitor-text, var(--warm-black)); font-family: var(--visitor-font, var(--font-body)); padding: 64px 24px; }
 .column { max-width: 560px; margin: auto; }
+.wide { max-width: 1200px; margin: auto; }
+.header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.header .brand { margin: 0; overflow-wrap: anywhere; }
+.navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; font-size: 14px; }
+.navigation a { color: inherit; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.navigation a:focus-visible { outline: 2px solid var(--visitor-accent, var(--warm-black)); outline-offset: 3px; }
 .brand { margin: 0 0 18px; font-size: 22px; font-weight: 600; font-family: var(--visitor-display, inherit); }
 .title { margin: 0; font-family: var(--visitor-display, inherit); font-size: 28px; font-weight: 500; line-height: 1.25; letter-spacing: -.6px; }
 .intro { margin: 18px 0 0; color: var(--visitor-muted, var(--gray-muted)); font-size: 15px; line-height: 1.6; }

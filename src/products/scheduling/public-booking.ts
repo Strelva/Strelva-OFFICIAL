@@ -1,6 +1,7 @@
 import { intakeQuestionSchema, validateBookingIntake } from "@/platform/bookings/service-policy";
 import { type PublicBookingAdmission, publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
 import { PublicBookingError } from "@/platform/bookings/errors";
+import type { BookingAdmissionPresentation } from "@/platform/bookings/public-admission";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -88,6 +89,9 @@ export const publicBookingReceiptSchema = z.object({
   start: isoDate,
   end: isoDate,
   timeZone: z.string().trim().min(1).max(128),
+  confirmationRequired: z.boolean().optional(),
+  confirmationExpiresAt: isoDate.optional(),
+  businessName: z.string().trim().min(1).max(160).optional(),
 }).strict().refine(value => Date.parse(value.end) > Date.parse(value.start), "The booking receipt must end after it starts.");
 export type PublicBookingReceipt = z.infer<typeof publicBookingReceiptSchema>;
 
@@ -252,7 +256,7 @@ export interface PublicBookingDependencies {
   calendar: PublicBookingCalendar;
   tokens: PublicBookingTokenStore;
   store?: PublicBookingStoreHook;
-  admission?: PublicBookingAdmission;
+  admission?: PublicBookingAdmission & Partial<BookingAdmissionPresentation>;
   createReservationId?: () => string;
   createRequestId?: () => string;
   createManagementToken?: () => string;
@@ -384,6 +388,15 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
   const requestId = dependencies.createRequestId ?? randomUUID;
   const managementToken = dependencies.createManagementToken ?? (() => randomUUID().replaceAll("-", ""));
 
+  async function presentedReceipt(ref: PublicBookingReservationRef): Promise<PublicBookingReceipt> {
+    const value = receipt(ref);
+    if (ref.status === "cancelled" || !dependencies.admission) return value;
+    const presentation = dependencies.admission.presentation
+      ? await dependencies.admission.presentation(ref)
+      : { confirmationRequired: !await dependencies.admission.verified(ref) };
+    return publicBookingReceiptSchema.parse({ ...value, ...presentation });
+  }
+
   async function read(input: { tenantId: string; capabilityId: string; range?: PublicBookingRange }): Promise<PublicBookingSchedule> {
     const range = parseRange(input.range);
     const binding = await resolveBinding(dependencies, { ...input, range });
@@ -437,7 +450,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
         throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
       }
       if (existing.status !== "cancelled") await dependencies.admission?.send({ tenantId: input.tenantId, requestId: idempotencyRequestId });
-      return receipt(existing);
+      return presentedReceipt(existing);
     }
 
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: input.capabilityId, requestId: idempotencyRequestId });
@@ -479,7 +492,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const title = titleFor(safe);
     const pendingReservationId = safe.recordBooking
       ? publicRecordReservationId(safe.tenantStableId ?? safe.tenantId, idempotencyRequestId)
-      : boundedToken(reservationId(), "The reservation id");
+      : boundedToken(reservationId(), "The booking id");
     const pendingManagementToken = safe.recordBooking
       ? publicRecordManagementToken(safe.tenantStableId ?? safe.tenantId, idempotencyRequestId)
       : boundedToken(managementToken(), "The management token");
@@ -532,11 +545,11 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     if (pending.reservationId !== pendingReservationId) {
       if (safe.recordBooking) await dependencies.store?.release?.(safe, pendingReservationId);
       else await settleStore({ binding: safe, reservationId: pendingReservationId, status: "cancelled", title, start: slot.start, end: slot.end });
-      return receipt(pending);
+      return presentedReceipt(pending);
     }
     if (dependencies.admission) {
       await dependencies.admission.send({ tenantId: input.tenantId, requestId: idempotencyRequestId });
-      return receipt(pending);
+      return presentedReceipt(pending);
     }
     let result: Awaited<ReturnType<PublicBookingCalendar["reserve"]>>;
     try {
@@ -554,7 +567,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     });
     if (ref.requestFingerprint !== requestFingerprint) throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
     await settleStore({ binding: safe, reservationId: ref.reservationId, status: ref.status, title, start: ref.start, end: ref.end, visitor });
-    return receipt(ref);
+    return presentedReceipt(ref);
   }
 
   async function confirm(token: string): Promise<PublicBookingReceipt> {
@@ -580,7 +593,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     await dependencies.admission.placed(ref);
     await settleStore({ binding: safe, reservationId: saved.reservationId, status: saved.status, title: saved.title,
       start: saved.start, end: saved.end, visitor: confirmed.visitor });
-    return receipt(saved);
+    return presentedReceipt(saved);
   }
 
   async function settleStore(input: Parameters<PublicBookingStoreHook["settle"]>[0]): Promise<void> {
@@ -599,13 +612,13 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const token = boundedToken(input.managementToken, "The management token");
     const ref = await findByToken(dependencies, { tenantId: input.tenantId, managementToken: token });
     if (!ref || ref.reservationId !== input.reservationId || ref.capabilityId !== input.capabilityId || ref.status === "cancelled") {
-      throw new PublicBookingError("not_found", "This reservation is unavailable.");
+      throw new PublicBookingError("not_found", "This booking is unavailable.");
     }
     if (dependencies.admission && !await dependencies.admission.verified(ref)) throw new PublicBookingError("conflict", "Confirm the email request before changing its time.");
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, ref.capabilityId);
-    if (safe.paused && safe.recordBooking?.pausedMessage) throw new PublicBookingError("conflict", `${safe.recordBooking.pausedMessage} You can still cancel your reservation.`);
+    if (safe.paused && safe.recordBooking?.pausedMessage) throw new PublicBookingError("conflict", `${safe.recordBooking.pausedMessage} You can still cancel your booking.`);
     if (safe.status === "revoked" || safe.websiteBindingActive === false || safe.paused) throw new PublicBookingError("conflict", "This booking is no longer accepting changes. You can still cancel it.");
     if (input.capabilityVersion !== safe.version || ref.version !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before changing it.");
     const slot = slotFor(safe, input.slotId);
@@ -618,16 +631,16 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     }
     const changed = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.status ?? (result.verification === "verified" ? "confirmed" : "pending") });
     await settleStore({ binding: safe, reservationId: changed.reservationId, status: changed.status, title: changed.title, start: changed.start, end: changed.end });
-    return receipt(changed);
+    return presentedReceipt(changed);
   }
 
   async function cancel(input: { tenantId: string; reservationId: string; managementToken: string }): Promise<PublicBookingReceipt> {
     const token = boundedToken(input.managementToken, "The management token");
     const ref = await findByToken(dependencies, { tenantId: input.tenantId, managementToken: token });
-    if (!ref || ref.reservationId !== input.reservationId) throw new PublicBookingError("not_found", "This reservation is unavailable.");
-    if (ref.status === "cancelled") return receipt(ref);
+    if (!ref || ref.reservationId !== input.reservationId) throw new PublicBookingError("not_found", "This booking is unavailable.");
+    if (ref.status === "cancelled") return presentedReceipt(ref);
     if (dependencies.admission && await dependencies.admission.cancel(ref)) {
-      return receipt(await saveToken(dependencies, { ...ref, status: "cancelled" }));
+      return presentedReceipt(await saveToken(dependencies, { ...ref, status: "cancelled" }));
     }
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
@@ -642,7 +655,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     }
     const cancelled = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.status ?? (result.verification === "verified" ? "cancelled" : "pending") });
     await settleStore({ binding: safe, reservationId: cancelled.reservationId, status: cancelled.status, title: cancelled.title, start: cancelled.start, end: cancelled.end });
-    return receipt(cancelled);
+    return presentedReceipt(cancelled);
   }
 
   return { read, reserve, confirm, change, cancel };

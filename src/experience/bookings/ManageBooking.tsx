@@ -13,9 +13,9 @@ export type { ManageBookingState, ManagedBookingView };
  */
 
 const STATUS: Record<ManagedBookingView["status"], string> = {
-  held: "Waiting for your confirmation",
+  held: "Check your email to confirm",
   confirmed: "Confirmed",
-  pending: "Waiting for the business to confirm",
+  pending: "Waiting on the business",
   cancelled: "Cancelled",
 };
 
@@ -32,7 +32,7 @@ function Summary({ booking }: { booking: ManagedBookingView }) {
           <span className={styles.muted}>{booking.timeZoneLabel}</span>
         </dd>
         <dt >Status</dt>
-        <dd>{STATUS[booking.status]}</dd>
+        <dd>{booking.status === "pending" ? `Waiting on ${booking.siteName || "the business"}` : STATUS[booking.status]}</dd>
         {booking.agentSource ? <><dt >Source</dt><dd className="break-words">{booking.agentSource}</dd></> : null}
       </dl>
     </div>
@@ -75,14 +75,14 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
   const cancelled = booking.status === "cancelled";
   return (
     <VisitorBookingShell siteName={booking.siteName}>
-      <h1 className={styles.title}>{cancelled ? "Your booking is cancelled" : booking.status === "confirmed" ? "You’re booked" : "Your booking request"}</h1>
+      <h1 className={styles.title}>{cancelled ? "Your booking is cancelled" : booking.status === "confirmed" ? "Confirmed" : booking.status === "held" ? "Check your email to confirm" : `Waiting on ${booking.siteName || "the business"}`}</h1>
 
       {state.notice === "confirmed" ? (
         <p role="status" className={styles.notice}>Your booking is confirmed.</p>
       ) : state.notice === "rescheduled" ? (
         <p role="status" className={styles.notice}>Your new time is booked. A confirmation is on its way when email is on for this business.</p>
       ) : state.notice === "pending" ? (
-        <p role="status" className={styles.notice}>Your request is waiting for confirmation. This time is not confirmed yet.</p>
+        <p role="status" className={styles.notice}>Your request is waiting on {booking.siteName || "the business"}. This time is not confirmed yet.</p>
       ) : state.notice === "cancelled" ? (
         <p role="status" className={styles.notice}>Cancelled. The time is open for someone else.</p>
       ) : null}
@@ -93,7 +93,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
       {booking.status === "held" ? (
         <section className="mt-10" aria-labelledby="confirm-booking">
           <h2 id="confirm-booking" className={styles.label}>Confirm this request</h2>
-          <p className={styles.note}>An assistant requested this time. It is held for 15 minutes. Confirm only if you asked for it; otherwise let the hold expire.</p>
+          <p className={styles.note}>This time is held for 15 minutes after the request. Confirm only if you asked for it; otherwise let the hold expire.</p>
           {booking.confirmationRequired ? <form method="post" action={actionUrl} className="mt-4">
             <input type="hidden" name="action" value="confirm" />
             <button type="submit" className={buttonBase}>Confirm my request</button>
