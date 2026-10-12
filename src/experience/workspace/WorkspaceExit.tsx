@@ -100,7 +100,7 @@ export function WorkspaceExit({ workspaceId, request = fetch }: Props) {
         <StRows label="Exit results"><Result label="Assignments revoked" value={state.summary.assignmentsRevoked} /><Result label="Scheduled checks paused" value={state.summary.investigationsPaused} /><Result label="Accepted obligations retained" value={state.summary.retainedAccepted} /><Result label="Unknown obligations retained" value={state.summary.retainedUnknown} /></StRows>
       </div>
     </StSurface>
-    <StNotice>This decision does not change billing or stop an outside provider service. <StTextButton href="/dashboard/settings#plan">Review website billing settings</StTextButton></StNotice>
+    <StNotice>This decision does not change billing or stop an outside provider service. <StTextButton href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</StTextButton></StNotice>
     {state.handoff ? <HandoffPlan plan={state.handoff} /> : null}
     <StSection title="Still needs review">
       {state.retainedObligations.length ? <StRows label="Retained obligations">{state.retainedObligations.map(item => <StRow key={item.workId} title={item.title} detail={obligationEffectLabel(item.effect)} end={<StState kind={item.status === "accepted" ? "live" : "need"}>{obligationStatusLabel(item.status)}</StState>} />)}</StRows> : <StEmpty>No accepted results or unresolved results were found in this exit choice.</StEmpty>}
@@ -116,7 +116,7 @@ export function WorkspaceExit({ workspaceId, request = fetch }: Props) {
       <StRow title="Agency work" detail="This record cannot prove that an outside agency stopped work." end={<StTextButton onClick={() => setEditing(editing === "agency" ? null : "agency")}>Change</StTextButton>}><p className="text-sm leading-6">{agencyParticipation === "keep" ? "Recorded agency work stays available." : "New agency delivery from this workspace is revoked. History stays."}</p></StRow>
       <StRow title="Resources Strelva maintains" detail="Naming someone records responsibility. It does not transfer ownership or access." end={<StTextButton onClick={() => setEditing(editing === "resources" ? null : "resources")}>Change</StTextButton>}><p className="text-sm leading-6">{resourceKind === "stop" ? "Offerings, applications and access maintained here stop. Their records stay." : "Resources stay for the named verified member to review."}</p></StRow>
       <StRow title="Business record and History" detail="Your records stay available for export until you explicitly request deletion." />
-      <StRow title="Billing and outside services" detail="This choice does not change billing or stop an outside service." end={<StTextButton href="/dashboard/settings#plan">Review billing</StTextButton>} />
+      <StRow title="Billing and outside services" detail="This choice does not change billing or stop an outside service." end={<StTextButton href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Manage payments or cancel your plan</StTextButton>} />
     </StRows>
     {editing ? <StSurface label="Change exit choice"><div className="flex flex-col gap-4">
       {editing === "work" ? <><StSection title="Future work"><StSegmented label="Future work" value={futureWork} onChange={setFutureWork} options={[{ value: "pause", label: "Pause new work" }, { value: "cancel", label: "Cancel new work" }]} /></StSection><p className="text-sm text-gray-muted">Only work that has not started can change here.</p></> : null}

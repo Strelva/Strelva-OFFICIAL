@@ -81,7 +81,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
     }
   }
 
-  const nextHref = continuationHref || (scanId && workspaceEnabled ? `/workspace?save=${encodeURIComponent(scanId)}` : agency?.contactUrl || `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`);
+  const nextHref = continuationHref || (scanId && workspaceEnabled ? `/workspace/business/new?check=${encodeURIComponent(scanId)}` : agency?.contactUrl || `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`);
   return <>
     {agency ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
     <div className={styles.split}>
@@ -93,7 +93,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
           <StCopy muted>One answer, sampled once. Asking again can give a different one.</StCopy>
         </div></StSurface>
         {result.measurementStatus === "unavailable" ? <StNotice tone="need">{publicCopy(result.measurementNote || "This check could not measure the website or a Gemini answer.")}</StNotice> : result.measurementStatus === "partial" ? <StNotice>{publicCopy(result.measurementNote || "Only part of this check completed.")}</StNotice> : null}
-        <StSection title={measured ? "The one fix that matters most" : "Next step"}><StCopy>{publicCopy(result.topFix)}</StCopy><div className={styles.actions}><StPillLink href={nextHref}>{scanId && workspaceEnabled || continuationHref ? "Start with this fix" : "Get this fixed"}</StPillLink>{scanId ? <StTextButton onClick={handleShare}>{shareStatus === "copied" ? "Link copied" : "Send this to whoever runs your site"}</StTextButton> : null}</div>{scanId && workspaceEnabled && !continuationHref ? <StCopy muted>Carry a private copy into your workspace. No change to your site is approved here.</StCopy> : null}</StSection>
+        <StSection title={measured ? "The one fix that matters most" : "Next step"}><StCopy>{publicCopy(result.topFix)}</StCopy><div className={styles.actions}><StPillLink href={nextHref}>{scanId && workspaceEnabled || continuationHref ? "Start with this fix" : "Get this fixed"}</StPillLink>{scanId ? <StTextButton onClick={handleShare}>{shareStatus === "copied" ? "Link copied" : "Send this to whoever runs your site"}</StTextButton> : null}</div>{scanId && workspaceEnabled && !continuationHref ? <StCopy muted>Choose your business, keep this check and start with the fix. You review any change before it goes live.</StCopy> : null}</StSection>
       </div>
       <div className={styles.stack}>
         <StSection title="Can Google read your site?">{result.signals.length ? <StRows label="Website readability">{result.signals.map(signal => <StRow key={signal.id} title={publicCopy(signal.label)} detail={publicCopy(signal.detail)} lead={<StState kind={signal.pass ? "live" : "down"}>{signal.pass ? "Found" : "Missing"}</StState>} />)}</StRows> : <StEmpty>Website readability was not measured. Try a reachable public website.</StEmpty>}</StSection>

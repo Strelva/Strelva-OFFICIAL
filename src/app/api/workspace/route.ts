@@ -57,6 +57,7 @@ const actions = z.discriminatedUnion("action", [
     category: z.string().trim().max(160).optional(), location: z.string().trim().max(160).optional() }).strict(),
   z.object({ action: z.literal("recover_assessment"), workspaceId: z.string().uuid(), requestId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("save_website_audit"), workspaceId: z.string().uuid(), resultId: z.string().regex(/^audit_[a-f0-9]{32}$/) }).strict(),
+  z.object({ action: z.literal("save_business_check"), workspaceId: z.string().uuid(), resultId: z.string().regex(/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i) }).strict(),
   z.object({ action: z.literal("save_public_result"), workspaceId: z.string().uuid(),
     resultId: z.string().trim().regex(/^scan_[a-z0-9]+$/i).max(256) }).strict(),
   z.object({ action: z.literal("handoff"), workId: z.string().uuid(), recipientEmail: z.string().trim().email().max(254) }).strict(),
@@ -336,6 +337,16 @@ export async function POST(request: Request) {
     const input = actions.parse(await body(request));
     if (await isRateLimitedWindowedAsync(`workspace:write:${current.userId}`, 60, 60_000)) return json({ error: "Please wait before making another change." }, 429);
     switch (input.action) {
+      case "save_business_check": {
+        const business = (await listWorkspaces(current)).find(item => item.id === input.workspaceId && item.kind === "customer"
+          && item.access === "member" && ["owner", "admin"].includes(item.role || ""));
+        if (!business) throw new WorkspaceAccessError();
+        const work = input.resultId.startsWith("audit_")
+          ? await savePublicWebsiteAudit({ actor: current, workspaceId: business.id, resultId: input.resultId })
+          : (await savePublicAiVisibilityResult({ actor: current, workspaceId: business.id, resultId: input.resultId })).work;
+        void recordFunnelEvent("check_saved", input.resultId, { workspaceId: business.id });
+        return json({ work: await presentSavedWork(current, work) });
+      }
       case "inspect_handoff": {
         const preview = await inspectHandoff(current, input.token);
         return json({ recipientEmail: preview.recipientEmail, agencyName: preview.agencyWorkspace.name,
