@@ -30,10 +30,11 @@ export function morningNeedsYouEmail(input: EmailIdentity & { subject: string; i
     ...input.items.map((item): PaperBlock => ({ kind: "decision", category: item.category, title: item.title, detail: item.detail,
       actions: [...(item.approve ? [{ ...item.approve, style: "primary" as const }] : []), ...(item.notYet ? [{ ...item.notYet, style: "text" as const }] : []), { ...item.open, style: "text" }] })),
     { kind: "label", text: `${STRELVA_HANDLED_LABEL} yesterday` },
-    p(input.receipts ? input.receipts.map(receipt => {
+    // One line per receipt: email HTML collapses a newline inside a paragraph.
+    ...(input.receipts ? input.receipts.map(receipt => {
       const actor = actorPresentation(receipt.actor);
-      return `${actor.name ?? "Actor not recorded"} · ${receipt.action}${actor.credit ? ` · ${actor.credit}` : ""}`;
-    }).join("\n") : input.handled, true),
+      return p(`${actor.name ?? "Actor not recorded"} · ${receipt.action}${actor.credit ? ` · ${actor.credit}` : ""}`, true);
+    }) : [p(input.handled, true)]),
   ] };
 }
 
