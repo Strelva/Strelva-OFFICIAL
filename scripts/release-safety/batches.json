@@ -2121,7 +2121,7 @@
         },
         {
           "file": "20261024124700_ux_integration_booking_actor.sql",
-          "sha256": "f8b8fa378c32b5f421eae2daacd2f203bbfdd74ebd9826feb7569c0a1610ec20",
+          "sha256": "11edebac044d6bdcc6b7d9e89b347202d8e57b8feaa62320beddc5dc82e5637e",
           "rollback": "rollback-20261024124700_ux_integration_booking_actor.sql",
           "rollbackSha256": "0de7257632431559b93820c9ebe53b27babf42b8cd31dd2e43843423fda599d7",
           "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
