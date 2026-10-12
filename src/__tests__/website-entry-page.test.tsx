@@ -35,11 +35,11 @@ beforeEach(() => {
 });
 
 describe("website entry page authorization and release boundaries", () => {
-  it("shows a neutral choice, reads only the selected released provider, and keeps disabled routes closed", async () => {
-    expect(await render()).toContain("Your website in Strelva"); expect(f.sites).not.toHaveBeenCalled(); expect(f.records).not.toHaveBeenCalled();
-    expect(await render({ entry: "connect" })).toContain("Get my two lines"); expect(f.sites).toHaveBeenCalledTimes(1); expect(f.records).not.toHaveBeenCalled();
+  it("opens Keep your site by default, reads only the selected released provider, and keeps disabled routes closed", async () => {
+    const first = await render(); expect(first).toContain("Keep your site"); expect(first).toContain("Prepare a new website"); expect(f.sites).toHaveBeenCalledTimes(1); expect(f.records).not.toHaveBeenCalled();
+    expect(await render({ entry: "connect" })).toContain("Get my two lines"); expect(f.sites).toHaveBeenCalledTimes(2); expect(f.records).not.toHaveBeenCalled();
     f.connected.mockResolvedValue(false);
-    expect(await render({ entry: "connect" })).not.toContain("<form"); expect(f.sites).toHaveBeenCalledTimes(1);
+    expect(await render({ entry: "connect" })).not.toContain("<form"); expect(f.sites).toHaveBeenCalledTimes(2);
     expect(await render({ entry: "rebuild" })).toContain("Your current website"); expect(f.records).toHaveBeenCalledTimes(1);
     f.rebuild.mockResolvedValue(false);
     await expect(render()).rejects.toThrow(`redirect:/workspace?workspaceId=${WS}`);
