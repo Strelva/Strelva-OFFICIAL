@@ -96,7 +96,7 @@ function MissingAdapter() {
 function titleForView(view: InquiryView, audience: "business" | "agency"): string {
   if (view === "home") return audience === "agency" ? "Attention" : "Inquiries";
   return {
-    new: "New", shape: "Shape", work: "Recent changes", plan: "Plan", preview: "Preview", rehearsal: "Rehearsal", receipt: "Receipt", search: "Search", record: "Records", why: "Why", responsibility: "Running", connections: "Connections", onboarding: "Onboarding", account: "Account", attention: "Attention", patterns: "Patterns", home: "Inquiries",
+    new: "New", shape: "Shape", work: "Recent changes", plan: "Plan", preview: "Preview", rehearsal: "Rehearsal", receipt: "Receipt", search: "Search", record: "Records", why: "Why", responsibility: "Running", connections: "Connections", onboarding: "Check my website", account: "Account", attention: "Attention", patterns: "Patterns", home: "Inquiries",
   }[view];
 }
 

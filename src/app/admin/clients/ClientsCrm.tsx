@@ -38,7 +38,7 @@ function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?:
   if (c.launchStatus === "ready" && !c.billingConfigured)
     return { label: "No plan", tone: "warn", detail: "Live but no billing — set a plan" };
   if (!c.billingConfigured || c.launchStatus === "blocked" || c.launchStatus === "watch")
-    return { label: "In build", tone: "neutral", detail: "Still in onboarding" };
+    return { label: "In build", tone: "neutral", detail: "Still getting started" };
   return { label: "Live", tone: "good" };
 }
 

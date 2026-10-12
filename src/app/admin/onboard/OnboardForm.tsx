@@ -260,7 +260,7 @@ export function OnboardForm({ request = fetch, preview = false, initialResult = 
         {(result.manualNext ?? []).filter(raw => !parseItem(raw)).map((raw, index) => <StNotice key={index}>{raw}</StNotice>)}
       </StSection>
       {Object.keys(result.clientEnv).length > 0 && <StSurface label="Repository configuration"><details><summary className="cursor-pointer text-sm text-gray-muted">Repository environment values · <StMono>{Object.keys(result.clientEnv).length}</StMono></summary><div className="mt-4 flex flex-col gap-4"><StNotice>REVALIDATION_SECRET is required and already set on the Vercel project.</StNotice><StTextButton onClick={copyEnv}>{copiedEnv ? "Copied" : "Copy all"}</StTextButton><pre className="whitespace-pre-wrap break-all"><StMono>{envText(result.clientEnv)}</StMono></pre></div></details></StSurface>}
-      <div><StPill variant="soft" onClick={() => { clearStoredResult(); setForm(blank); }}>Onboard another</StPill></div>
+      <div><StPill variant="soft" onClick={() => { clearStoredResult(); setForm(blank); }}>Set up another client</StPill></div>
     </>}
   </StPage>;
 }

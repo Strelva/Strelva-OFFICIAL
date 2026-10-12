@@ -151,7 +151,7 @@ export async function collectWorkspaceExportV3(
     workspaceSnapshot = projectGoogleReviewExport(await snapshot(actor, workspaceId), now().getTime()) as WorkspaceExportSnapshot;
     included.push({ category: "workspace_snapshot_schema_2", count: 1 });
   } else {
-    unavailable.push({ category: "workspace_snapshot_schema_2", reason: "Saved work, apps and onboarding files are exported by the owner's own export; the operator's export carries the business and its sites." });
+    unavailable.push({ category: "workspace_snapshot_schema_2", reason: "Saved work, internal tools and onboarding files are exported by the owner's own export; the operator's export carries the business and its sites." });
   }
   return {
     schemaVersion: 3,
