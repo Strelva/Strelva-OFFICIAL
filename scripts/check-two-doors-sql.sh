@@ -19,7 +19,11 @@ read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 psql_args=(--host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --set=ON_ERROR_STOP=1 --no-psqlrc --quiet)
 fingerprint() { psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/$1.txt"; }
 apply() { psql "${psql_args[@]}" --file="$1" >/dev/null 2>"$cluster_root/migration.err" || { printf 'Migration failed: %s\n' "$1" >&2; cat "$cluster_root/migration.err" >&2; exit 1; }; }
-run_contracts() { for contract in "$repo_root"/tests/two-doors-*-schema.sql; do psql "${psql_args[@]}" --file="$contract" >/dev/null; done; }
+run_contracts() {
+  for contract in "$repo_root"/tests/two-doors-*-schema.sql; do psql "${psql_args[@]}" --file="$contract" >/dev/null; done
+  # The read-only cost report parses and runs on the real schema.
+  psql "${psql_args[@]}" -v days=14 --file="$repo_root/scripts/sql/cost-per-business-report.sql" >/dev/null
+}
 
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 ordered=$( { find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql'; for extra in ${TWO_DOORS_EXTRA_MIGRATIONS:-}; do printf '%s\n' "$extra"; done; } | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2)

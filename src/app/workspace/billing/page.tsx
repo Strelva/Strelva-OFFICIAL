@@ -6,6 +6,8 @@ import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBill
 import { businessBillingEnabled, readAgencyBilling, readBusinessBilling } from "@/platform/business-billing";
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
 import { AgencyBillingView } from "@/experience/workspace/billing/AgencyBillingView";
+import { StartWorkspacePlan } from "@/experience/workspace/billing/StartWorkspacePlan";
+import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { listWorkspaces } from "@/platform/workspaces";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -33,6 +35,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Plan and billing" /><StNotice tone="critical">Billing could not be loaded. Confirm your access and try again.</StNotice><StPillLink variant="soft" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</StPillLink></StPage></StrelvaShell>; }
   return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
     <BusinessBillingView billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
+    {(!billing || billing.state === "none") && workspace?.role === "owner" && selfServeBillingConfig().enabled ? <StartWorkspacePlan workspaceId={workspaceId} /> : null}
     <nav aria-label="Payment and agency settings" className="flex flex-wrap gap-4">
       {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><StTextButton href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</StTextButton><StTextButton href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</StTextButton></> : null}
       {process.env.STRELVA_CONNECT === "1" ? <StTextButton href={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`}>Payments and merchant account</StTextButton> : null}

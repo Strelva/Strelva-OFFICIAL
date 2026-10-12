@@ -28,11 +28,13 @@ import {
   type ModelCallRow,
   type ModelCallSink,
 } from "./model-call-log";
+import { assertBusinessAiBudget } from "./business-ai-budget";
 import { estimateModelCost, UNKNOWN_COST, type ModelCost } from "./model-prices";
 
 export type { ModelConfig } from "@/platform/infra/ai-models";
 export type { ModelCallActorKind, ModelCallPurpose, ModelCallRow, ModelCallSink } from "./model-call-log";
 export { MODEL_CALL_PURPOSES, createMemoryModelCallSink } from "./model-call-log";
+export { ModelBudgetPausedError } from "./business-ai-budget";
 
 /** Who and what a call serves. Unknown fields stay null. */
 export interface ModelCallContext {
@@ -200,6 +202,8 @@ async function runAttempts<R>(
   /** Rows from a finished result when no per-step callback fired. */
   settle: (result: R, log: AttemptLog) => void,
 ): Promise<{ result: R; model: ModelConfig; attempt: number }> {
+  // Usage pauses at the payer's cap before any model runs (ADR 0015; flagged).
+  await assertBusinessAiBudget(context);
   const models = modelsFor(context, controls);
   if (models.length === 0) throw new NoModelAvailableError();
   const sink = controls.sink ?? defaultSink;
