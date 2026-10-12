@@ -71,6 +71,7 @@ function Notice({ message }: { message?: { text: string; tone?: "critical" } }) 
 export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params, choices, foundFacts = [], actions, agencyRequest, returnTo }: GoogleConnectProps) {
   const hidden = <input type="hidden" name="workspaceId" value={workspaceId} />;
   const owner = viewer === "owner" && enabled;
+  const choosing = !hasListing && owner && params.connect === "choose" && Boolean(choices);
   return <div className={styles.stack}>
     <Notice message={params.connect ? CONNECT_MESSAGES[params.connect] : undefined} />
     <Notice message={params.read ? READ_MESSAGES[params.read] : undefined} />
@@ -84,7 +85,7 @@ export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params
       {choices.more ? <p className={styles.copy}>This account manages more listings than fit here. Only the first {choices.listings.length} are shown.</p> : null}
     </StSection> : null}
 
-    {!hasListing ? owner ? <StSection title="Connect Google">
+    {!hasListing ? owner ? choosing ? <form action={actions.start}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StTextButton type="submit">Use a different Google account</StTextButton></form> : <StSection title="Connect Google">
       <p className={styles.copy}>Sign in with the Google account that runs your Business Profile. Strelva reads your listing&apos;s hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you approve it.</p>
       {/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}
       <form action={actions.start} className={styles.actions}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StPill type="submit">Connect Google</StPill>{returnTo ? <StTextButton href={returnTo}>Skip for now</StTextButton> : null}</form>
