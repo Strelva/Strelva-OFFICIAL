@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-09",
+  "mode": "documentation-and-generated-index-only",
+  "sourceSha": "a1306213f42b211d0560af54124770bd49a76545",
+  "checks": {
+    "uniqueWorkIds": 77,
+    "dependencyGraph": "acyclic; all dependencies resolve",
+    "sourceAnchors": 179,
+    "missingAnchors": 0,
+    "localArtifactLinks": "all resolve",
+    "whitespace": "all five task-owned files pass git diff --no-index --check",
+    "desktopPreviewWidth": 728,
+    "mobilePreviewWidth": 360,
+    "horizontalOverflow": false,
+    "indexInteractions": [
+      "core/existing/client/conditional filters",
+      "search",
+      "selection",
+      "dependency navigation",
+      "area filter"
+    ],
+    "consoleExceptions": 0
+  },
+  "applicationTestsRun": false,
+  "productionReadsOrWrites": false,
+  "newDependencies": false,
+  "existingPrLinksConfirmed": [
+    616,
+    618,
+    619,
+    620,
+    621,
+    614,
+    615,
+    608,
+    607,
+    606,
+    204,
+    206
+  ]
+}
