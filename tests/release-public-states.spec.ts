@@ -15,7 +15,7 @@ for (const product of ["visibility", "website"] as const) test(`${product} audit
   const address = page.getByLabel(website ? "Website address" : "Website", { exact: true });
   await address.fill("http://[invalid");
   if (!website) await page.getByLabel("Business name", { exact: true }).fill("Fictional Bakery");
-  const submit = page.getByRole("button", { name: website ? "Scan My Site" : "Run my AI audit", exact: true });
+  const submit = page.getByRole("button", { name: "Check", exact: true });
   await submit.click();
   await expect(address).toHaveAttribute("aria-invalid", "true");
   const error = page.getByRole("main").getByRole("alert");
@@ -37,7 +37,9 @@ for (const product of ["visibility", "website"] as const) test(`${product} audit
   await expect(error).toContainText("Your input is retained");
   const recoveryField = website ? address : page.getByLabel("Business name", { exact: true });
   await expect(recoveryField).toBeFocused();
-  await expect(recoveryField).toHaveAttribute("aria-describedby", await error.getAttribute("id") as string);
+  // The field may also name its own hint; the error must be among its descriptions.
+  const errorId = await error.getAttribute("id") as string;
+  await expect(recoveryField).toHaveAttribute("aria-describedby", new RegExp(`(^| )${errorId}( |$)`));
   await expect(recoveryField).not.toHaveAttribute("aria-invalid", "true");
   await expect(address).toHaveValue("bakery.example");
   await expect(address).not.toHaveAttribute("aria-invalid", "true");
