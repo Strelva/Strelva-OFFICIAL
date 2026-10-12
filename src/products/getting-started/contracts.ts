@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { foundFactDecisionSchema, type FoundFact as StoredFoundFact } from "@/products/found-facts/contracts";
 
 /**
  * Getting started (GLOSSARY): how a business starts on Strelva from what it
@@ -9,46 +10,33 @@ import { z } from "zod";
  * record until the owner confirms it; confirming is the owner's own write.
  */
 
-/*
- * One Found-fact shape for the whole product: these mirror lane L3's
- * `foundFactInputSchema` / `FOUND_FACT_KEYS` in
- * src/products/agency-clients/contracts.ts (table `business_found_facts`,
- * migration 20261024300000_claim_review.sql) field for field. At merge,
- * import them from there and delete these copies. The owner path here does
- * not stage rows: L3's table and RPCs are agency-add/claim only (agency id
- * NOT NULL), so the owner reads and decides in one sitting.
- */
-export const FOUND_FACT_KEYS = ["phone", "email", "address", "hours", "description", "links"] as const;
-export type FoundFactKey = typeof FOUND_FACT_KEYS[number];
-export type FoundFactEntity = "fact" | "service" | "person";
+// The one Found-fact shape and store: src/products/found-facts.
+export { FOUND_FACT_KEYS, FOUND_FACT_LABELS, foundFactInputSchema, type FoundFactInput } from "@/products/found-facts/contracts";
 
-export const FOUND_FACT_LABELS: Record<FoundFactKey | "service" | "person", string> = {
-  phone: "Phone", email: "Email", address: "Address", hours: "Hours", description: "Description", links: "Links",
-  service: "Service", person: "Person",
-};
-
-const sourceUrl = z.string().min(8).max(2048).regex(/^https?:\/\/\S+$/);
-const quote = z.string().trim().min(1).max(300);
-const named = z.object({ name: z.string().trim().min(1).max(160) }).strict();
-
-/** One thing the crawl read, before the owner has seen it (L3's `foundFactInputSchema`). */
-export const foundFactInputSchema = z.discriminatedUnion("entity", [
-  z.object({ entity: z.literal("fact"), key: z.enum(FOUND_FACT_KEYS), value: z.unknown(), sourceUrl, quote }).strict(),
-  z.object({ entity: z.literal("service"), value: named, sourceUrl, quote }).strict(),
-  z.object({ entity: z.literal("person"), value: named, sourceUrl, quote }).strict(),
-]);
-export type FoundFactInput = z.infer<typeof foundFactInputSchema>;
-
-/** A Found fact as the owner sees it here: the L3 input shape plus what the screen needs. */
-export type FoundFact = FoundFactInput & {
-  /** Stable within one reading. */
-  id: string;
+/** A Found fact as the owner sees it here: the stored fact plus what the screen needs. */
+export type FoundFact = StoredFoundFact & {
   label: string;
   /** What the owner reads; for an address, its formatted line. */
   display: string;
   /** What the record holds for this key today, when it differs. */
   current: string | null;
+  /** Whether Getting started can add it to the record (categories can't). */
+  confirmable: boolean;
 };
+
+/** A request typed at setup with no agency: kept on the business, never sent until an agency is brought in. */
+export interface HeldRequest {
+  id: string;
+  text: string;
+  status: "held" | "routed";
+  heldAt: string;
+  requestId: string | null;
+  agencyName: string | null;
+}
+export const heldRequestSchema = z.object({
+  id: z.string().uuid(), text: z.string(), status: z.enum(["held", "routed"]), heldAt: z.string(),
+  requestId: z.string().uuid().nullable(), agencyWorkspaceId: z.string().uuid().nullable(), agencyName: z.string().nullable(), routedAt: z.string().nullable(),
+}).strict();
 
 export interface WebsiteReading {
   url: string;
@@ -65,6 +53,10 @@ export interface GettingStartedBusiness {
   /** Only the business owner confirms found facts into the record. */
   canConfirm: boolean;
   revision: number;
+  /** Found facts still waiting for the owner, from any source (a reading, a listing, the agency's add). */
+  waiting: FoundFact[];
+  /** Requests typed at setup, kept on the business. */
+  held: HeldRequest[];
 }
 
 export interface CheckForBusiness {
@@ -82,14 +74,13 @@ export const gettingStartedActionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("start_from_check"), resultId: z.string().trim().regex(CHECK_RESULT_ID), name: z.string().trim().min(1).max(120) }).strict(),
   z.object({ action: z.literal("read_website"), workspaceId: uuid, url: z.string().trim().min(1).max(2048) }).strict(),
   z.object({
-    action: z.literal("confirm_found_facts"), workspaceId: uuid, revision: z.number().int().min(0),
+    action: z.literal("decide_found_facts"), workspaceId: uuid, revision: z.number().int().min(0),
     website: z.string().trim().min(1).max(2048).optional(),
-    facts: z.array(foundFactInputSchema).max(40),
+    decisions: z.array(foundFactDecisionSchema).max(200),
+    /** The device's time zone, used for found hours only when the record has none. */
+    timeZone: z.string().trim().min(1).max(64).optional(),
   }).strict(),
+  z.object({ action: z.literal("withdraw_held_request"), workspaceId: uuid, heldRequestId: uuid }).strict(),
 ]);
 export type GettingStartedAction = z.infer<typeof gettingStartedActionSchema>;
 
-/** Where a held brief waits in this browser until an agency is brought in. Never sent anywhere. */
-export function heldBriefKey(workspaceId: string): string {
-  return `strelva:getting-started:held-brief:${workspaceId}`;
-}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { foundFactDecisionSchema, foundFactSchema } from "@/products/found-facts/contracts";
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 
 /**
@@ -21,13 +22,20 @@ export const addAgencyClientInputSchema = z.object({
   ownerEmail: email.optional(),
   idempotencyKey: uuid,
   /**
-   * Found facts the agency already holds (Import clients carries a sheet's
-   * phone and address). Stored like scanned facts: the agency's, unconfirmed,
-   * for the owner to confirm at the claim. They win over what the scan found.
+   * Found facts the agency already holds (Import clients carries a sheet's or
+   * a HighLevel sub-account's phone and address). They win over what the scan
+   * found. Behind the claim review they are staged in the one Found-fact
+   * store with their import source; otherwise they are stored like scanned
+   * facts (the agency's, unconfirmed).
    */
   foundFacts: z.object({
     phone: z.string().trim().min(3).max(40).optional(),
     address: z.string().trim().min(1).max(200).optional(),
+    /** Which import and which row they came from. */
+    source: z.object({
+      kind: z.enum(["client_import_sheet", "client_import_gohighlevel"]),
+      ref: z.string().trim().min(1).max(200).regex(/^\S+$/),
+    }).strict().optional(),
   }).strict().optional(),
 }).strict().refine((input) => input.url || input.prospectId || input.name, "Enter the business's website, or choose a prospect.");
 export type AddAgencyClientInput = z.infer<typeof addAgencyClientInputSchema>;
@@ -167,35 +175,11 @@ export const OWNER_CLAIM_LIFETIME_DAYS = 14;
  * the claim the owner decides each area. SQL contract:
  * supabase/migrations/20261024300000_claim_review.sql. */
 
-export const FOUND_FACT_KEYS = ["phone", "email", "address", "hours", "description", "links"] as const;
-export type FoundFactKey = (typeof FOUND_FACT_KEYS)[number];
-export const FOUND_FACT_LABELS: Record<FoundFactKey | "service" | "person", string> = {
-  phone: "Phone", email: "Email", address: "Address", hours: "Hours", description: "Description", links: "Links",
-  service: "Service", person: "Person",
-};
-
-const sourceUrl = z.string().min(8).max(2048).regex(/^https?:\/\/\S+$/);
-const quote = z.string().trim().min(1).max(300);
-const named = z.object({ name: z.string().trim().min(1).max(160) }).strict();
-
-/** One thing the crawl read, before the owner has seen it. */
-export const foundFactInputSchema = z.discriminatedUnion("entity", [
-  z.object({ entity: z.literal("fact"), key: z.enum(FOUND_FACT_KEYS), value: z.unknown(), sourceUrl, quote }).strict(),
-  z.object({ entity: z.literal("service"), value: named, sourceUrl, quote }).strict(),
-  z.object({ entity: z.literal("person"), value: named, sourceUrl, quote }).strict(),
-]);
-export type FoundFactInput = z.infer<typeof foundFactInputSchema>;
-
-/** A staged Found fact, as the owner sees it at the claim. */
-export const foundFactSchema = z.object({
-  id: uuid,
-  entity: z.enum(["fact", "service", "person"]),
-  key: z.enum(FOUND_FACT_KEYS).nullable(),
-  value: z.unknown(),
-  sourceUrl: z.string(),
-  quote: z.string(),
-}).strict();
-export type FoundFact = z.infer<typeof foundFactSchema>;
+// The one Found-fact shape lives in src/products/found-facts/contracts.ts.
+export {
+  FOUND_FACT_KEYS, FOUND_FACT_LABELS, FOUND_FACT_SOURCE_LABELS, foundFactInputSchema, foundFactSchema, importedFoundFactInputSchema,
+  type AgencyFoundFactInput, type FoundFact, type FoundFactInput, type FoundFactKey, type ImportedFoundFactInput,
+} from "@/products/found-facts/contracts";
 
 export const CLAIM_AREAS = ["website", "inquiries", "bookings", "google", "internal_tools"] as const;
 export type ClaimArea = (typeof CLAIM_AREAS)[number];
@@ -216,12 +200,7 @@ export const claimReviewSchema = z.object({
 }).strict();
 export type ClaimReview = z.infer<typeof claimReviewSchema>;
 
-export const claimFactDecisionSchema = z.object({
-  id: uuid,
-  decision: z.enum(["confirm", "change", "remove"]),
-  /** Required for change, and for confirming hours (the owner supplies the time zone). */
-  value: z.unknown().optional(),
-}).strict();
+export const claimFactDecisionSchema = foundFactDecisionSchema;
 export type ClaimFactDecision = z.infer<typeof claimFactDecisionSchema>;
 
 export const claimReviewAcceptInputSchema = z.object({
@@ -233,6 +212,8 @@ export type ClaimReviewAcceptInput = z.infer<typeof claimReviewAcceptInputSchema
 
 export const claimReviewAcceptedSchema = ownerClaimAcceptedSchema.extend({
   areas: z.partialRecord(z.enum(CLAIM_AREAS), z.enum(CLAIM_AREA_CHOICES)).optional(),
-  facts: z.object({ confirmed: z.number().int().min(0), changed: z.number().int().min(0), removed: z.number().int().min(0), waiting: z.number().int().min(0) }).optional(),
+  facts: z.object({ confirmed: z.number().int().min(0), changed: z.number().int().min(0), removed: z.number().int().min(0), later: z.number().int().min(0).optional(), waiting: z.number().int().min(0) }).optional(),
+  /** Areas where the owner chose Full control: it starts when the agency accepts. */
+  waitingForAgency: z.array(z.enum(CLAIM_AREAS)).optional(),
 });
 export type ClaimReviewAccepted = z.infer<typeof claimReviewAcceptedSchema>;

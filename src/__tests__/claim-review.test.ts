@@ -32,7 +32,7 @@ const found: FoundFactInput[] = [
 ];
 const seed = { scan: { status: "scanned" as const, seeded: ["phone"], name: "Northside Bakery", message: null }, facts: { phone: { value: "(716) 555-0142" } }, found };
 const review = { status: "pending", workspaceId: CLIENT, workspaceName: "Northside Bakery", agencyWorkspaceId: AGENCY, agencyName: "North Studio",
-  found: [{ id: FOUND_ID, entity: "fact", key: "phone", value: "(716) 555-0142", sourceUrl: "https://northside-bakery.example/contact", quote: "Call (716) 555-0142" }],
+  found: [{ id: FOUND_ID, entity: "fact", key: "phone", value: "(716) 555-0142", sourceUrl: "https://northside-bakery.example/contact", quote: "Call (716) 555-0142", status: "unconfirmed", sourceKind: "website_crawl", sourceRef: "https://northside-bakery.example/contact", foundBy: "agency", foundAt: "2026-10-12T12:00:00.000Z" }],
   prepared: [{ id: "a9300000-0000-4000-8000-0000000000a9", name: "Order form", kind: "intake" }], fullControlTaken: [] };
 const areas = { website: "full_control", inquiries: "none", bookings: "prepare", google: "prepare", internal_tools: "none" } as const;
 

@@ -171,6 +171,9 @@ export async function applyClientImport(actor: WorkspaceActor, input: ClientImpo
       ...(row.phone && factValueSchemas.phone.safeParse(row.phone).success ? { phone: row.phone } : {}),
       ...(row.address && row.address.length <= 200 ? { address: row.address } : {}),
     };
+    // The row's own import source, so a staged Found fact says where it came from.
+    const sourceRef = row.sourceRef.replace(/\s+/g, "_").slice(0, 200);
+    if (Object.keys(foundFacts).length) Object.assign(foundFacts, { source: { kind: input.source === "gohighlevel" ? "client_import_gohighlevel" : "client_import_sheet", ref: sourceRef } });
     try {
       const result = await deps.add(actor, {
         action: "add",

@@ -158,6 +158,20 @@ begin
   if public.read_inquiry_forwarding(bakery,owner_id,'owner@bakery.example.test')->'address' <> 'null'::jsonb then raise exception 'revoked address still shown'; end if;
   perform pg_temp.expect_error(format('select public.revoke_inquiry_forwarding_address(%L,%L,%L,%L)',florist,florist_owner,'owner@florist.example.test',
     (select id from public.inquiry_forwarding_addresses where local_part=second_local)),'inquiry_forwarding_not_found');
+
+  -- An agent inquiry (agent_workspace_id) held as spam is released by its
+  -- owner without error and, like a forwarded row, writes no inquiry events:
+  -- inquiry_events knows only tenant and connected-site origins.
+  insert into public.business_records(workspace_id,created_by,updated_by) values (florist,florist_owner,florist_owner);
+  insert into public.business_pages(workspace_id,handle,published,published_at,updated_by) values (florist,'florist-fixture',true,now(),florist_owner);
+  result := public.receive_agent_inquiry('workspace:' || florist, jsonb_build_object('origin','agent','type','inquiry','requestId','request-fwd-agent-1',
+    'agent',jsonb_build_object('name','Fixture Assistant'),'customer',jsonb_build_object('name','Dana','email','dana@agent.example.test'),
+    'message','Do you deliver on Sundays?'),repeat('a',64),repeat('b',64),'encrypted-status-1','content_score');
+  held_id := (result->>'inquiryId')::uuid;
+  if not exists (select 1 from public.tenant_leads where id=held_id and agent_workspace_id=florist and intake_state='held_as_spam') then raise exception 'agent row not held'; end if;
+  result := public.decide_held_workspace_lead(florist,florist_owner,'owner@florist.example.test',held_id,'release');
+  if result->>'status' <> 'decided' or result#>>'{lead,intakeState}' <> 'released' then raise exception 'agent release failed: %', result; end if;
+  if exists (select 1 from public.inquiry_events where lead_id=(select lead_id from public.tenant_leads where id=held_id)) then raise exception 'agent rows must not write inquiry events'; end if;
 end $$;
 
 -- Service role only; app roles cannot call or read anything here.

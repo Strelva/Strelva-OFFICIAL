@@ -1,7 +1,7 @@
 import * as cheerio from "cheerio";
 import { factValueSchemas, LINK_KINDS, weeklyHoursSchema } from "@/platform/business-record/contracts";
 import { crawlWebsite, extractBusinessFacts, WebsiteCrawlError } from "@/products/websites/server";
-import type { ClientSiteScan, FoundFactInput, FoundFactKey } from "./contracts";
+import type { AgencyFoundFactInput, ClientSiteScan, FoundFactInput, FoundFactKey } from "./contracts";
 
 /**
  * Seed a new client's business record from its public website: the same
@@ -16,7 +16,7 @@ import type { ClientSiteScan, FoundFactInput, FoundFactKey } from "./contracts";
  */
 
 export type SeedFacts = Partial<Record<"phone" | "email" | "address", { value: unknown }>>;
-export interface SiteSeed { scan: ClientSiteScan; facts: SeedFacts; found?: FoundFactInput[] }
+export interface SiteSeed { scan: ClientSiteScan; facts: SeedFacts; found?: AgencyFoundFactInput[] }
 
 type Crawl = typeof crawlWebsite;
 type Extract = typeof extractBusinessFacts;
@@ -142,7 +142,7 @@ function siteDescription(crawl: Crawled): Sourced | undefined {
 /** Everything the crawl read, as Found facts with their source page and words. Never confirmed here. */
 export function foundFromCrawl(siteUrl: string, found: Found, crawl: Crawled): FoundFactInput[] {
   const out: FoundFactInput[] = [];
-  const add = (key: FoundFactKey, value: unknown, from: Sourced) => {
+  const add = (key: Exclude<FoundFactKey, "categories">, value: unknown, from: Sourced) => {
     out.push({ entity: "fact", key, value, sourceUrl: from.sourceUrl, quote: from.quote });
   };
   const contacts = sourced(found, found.contact);

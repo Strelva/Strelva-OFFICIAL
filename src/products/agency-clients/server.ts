@@ -41,6 +41,7 @@ import {
   claimReviewAcceptedSchema,
   claimReviewSchema,
   type AddAgencyClientInput,
+  type AgencyFoundFactInput,
   type ClaimArea,
   type ClaimAreaChoice,
   type ClaimReview,
@@ -113,6 +114,8 @@ const FAILURES: Array<[string, number, string]> = [
   ["agency_client_claim_invalid", 400, "Check the owner's email address."],
   ["agency_client_claim_review_invalid", 400, "Choose what to do in each area, and check the details you changed."],
   ["agency_client_claim_review_changed", 409, "Something on this page changed. Reload and review it again."],
+  ["found_fact_not_open", 409, "Something on this page changed. Reload and review it again."],
+  ["found_fact_invalid", 400, "Choose what to do in each area, and check the details you changed."],
   ["agency_scope_taken", 409, "Another agency already has full control of one of those areas. Choose Prepare there."],
   ["agency_client_invalid", 400, "Check the business name and website."],
   ["agency_client_limits_reason_required", 400, "Give a reason for changing this agency's limits."],
@@ -195,7 +198,12 @@ async function checkClientSite(actor: WorkspaceActor, client: AgencyClientAdditi
 
 const uuidWorkId = z.string().uuid();
 
-/** The agency's own found facts over the scan's; each must already be a valid record value or it is left out. */
+/**
+ * The agency's own found facts over the scan's; each must already be a valid
+ * record value or it is left out. With an import source they also become
+ * Found facts for the claim review, and the crawl's item for the same key is
+ * dropped so the owner sees one phone and one address.
+ */
 function withFoundFacts(seed: SiteSeed, found: AddAgencyClientInput["foundFacts"]): SiteSeed {
   if (!found) return seed;
   const facts: SeedFacts = { ...seed.facts };
@@ -204,7 +212,14 @@ function withFoundFacts(seed: SiteSeed, found: AddAgencyClientInput["foundFacts"
   if (phone?.success) facts.phone = { value: phone.data };
   if (address?.success) facts.address = { value: address.data };
   const seeded = [...new Set([...seed.scan.seeded, ...(phone?.success ? ["phone"] : []), ...(address?.success ? ["address"] : [])])];
-  return { scan: { ...seed.scan, seeded }, facts };
+  const imported: AgencyFoundFactInput[] = [];
+  if (found.source) {
+    if (phone?.success) imported.push({ entity: "fact", key: "phone", value: phone.data, sourceKind: found.source.kind, sourceRef: found.source.ref });
+    if (address?.success) imported.push({ entity: "fact", key: "address", value: address.data, sourceKind: found.source.kind, sourceRef: found.source.ref });
+  }
+  const keys = new Set(imported.map((item) => item.entity === "fact" ? item.key : ""));
+  const crawled = (seed.found ?? []).filter((item) => !(item.entity === "fact" && keys.has(item.key)));
+  return { scan: { ...seed.scan, seeded }, facts, ...(seed.found || imported.length ? { found: [...imported, ...crawled] } : {}) };
 }
 
 /** Create the client business from a URL or a prospect, then (optionally) its owner claim link. */

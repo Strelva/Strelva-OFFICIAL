@@ -64,16 +64,19 @@ create unique index tenant_leads_forwarded_lead_idx on public.tenant_leads(works
 create index tenant_leads_forwarded_hash_idx on public.tenant_leads(workspace_id, submission_hash, captured_at)
   where forwarding_address_id is not null;
 
--- Forwarded rows carry no inquiry_events rows: inquiry_events has only
--- tenant and connected-site origins, and its retention reads assume those.
--- A held forwarded row can still be released, put back or confirmed as spam;
--- intake_state_at is its record. Every other origin is unchanged.
+-- Forwarded and agent rows carry no inquiry_events rows: inquiry_events has
+-- only tenant and connected-site origins, and its retention reads assume
+-- those. Before this, releasing a held agent inquiry (agent_workspace_id,
+-- 20261020090016) wrote a null-tenant event and failed
+-- inquiry_events_one_origin. A held forwarded or agent row can still be
+-- released, put back or confirmed as spam; intake_state_at is its record.
+-- Tenant and connected-site origins are unchanged.
 create or replace function public.inquiry_lead_event_write(p_lead public.tenant_leads, p_kind text, p_actor text,
   p_actor_id text, p_detail jsonb, p_dedupe text) returns boolean
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare v_id uuid;
 begin
-  if p_lead.forwarding_address_id is not null then return false; end if;
+  if p_lead.forwarding_address_id is not null or p_lead.agent_workspace_id is not null then return false; end if;
   if p_lead.connected_site_id is null then
     return public.inquiry_event_write(p_lead.tenant_stable_id, p_lead.workspace_id, p_lead.lead_id,
       p_kind, p_actor, p_actor_id, p_detail, p_dedupe);

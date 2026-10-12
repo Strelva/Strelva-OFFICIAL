@@ -37,7 +37,7 @@ const workspaceId = "e7520000-0000-4000-8000-000000000002";
 const bindingId = "e7520000-0000-4000-8000-000000000003";
 const scope = "https://www.googleapis.com/auth/business.manage";
 const input = { tenantId, accessToken: "fictional-new", refreshToken: "fictional-refresh", expiresAt: "2099-01-01T00:00:00.000Z", scopes: [scope], accountId: "accounts/fictional", locationId: "new" };
-const target: ReconnectTarget = { id: "e7520000-0000-4000-8000-000000000004", tenantId, tenantStableId, workspaceId, bindingId, recipient: "owner@example.test", openedAt: "2026-10-09T00:00:00.000Z", expiresAt: "2099-01-01T00:00:00.000Z", noticeStatus: "accepted" };
+const target: ReconnectTarget = { id: "e7520000-0000-4000-8000-000000000004", tenantId, tenantStableId, workspaceId, bindingId, recipient: "owner@example.test", openedAt: "2026-10-09T00:00:00.000Z", expiresAt: "2099-01-01T00:00:00.000Z", noticeStatus: "accepted", subject: "fictional-google-subject" };
 const at = (seconds: number) => Date.parse(`2026-10-09T00:00:0${seconds}.000Z`);
 
 beforeEach(() => {
@@ -84,7 +84,7 @@ describe("actual governed Google producers", () => {
   it("refuses a token response begun before a newer completed grant, preserving every store", async () => {
     let release!: (response: Response) => void;
     const pending = new Promise<Response>(resolve => { release = resolve; });
-    const fetcher = vi.fn<typeof fetch>(() => pending);
+    const fetcher = vi.fn<typeof fetch>(async url => String(url).includes("userinfo") ? new Response(JSON.stringify({ sub: target.subject })) : pending);
     const older = finishGoogleReconnect(target, "fictional-code", fetcher);
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     expect(state.rpc.mock.calls.map(([name]) => name)).toEqual(["read_legacy_google_operation"]);

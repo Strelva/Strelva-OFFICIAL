@@ -23,7 +23,8 @@ const WS = "ac000000-0000-4000-8000-000000000010";
 const ID = "ac000000-0000-4000-8000-000000000011";
 const target: ReconnectTarget = { id: ID, bindingId: "ac000000-0000-4000-8000-000000000012", workspaceId: WS,
   tenantId: "fixture-firm", tenantStableId: "ac000000-0000-4000-8000-000000000013", recipient: "owner@example.test",
-  openedAt: "2026-10-05T11:00:00Z", expiresAt: "2026-10-19T11:00:00Z", noticeStatus: "not_sent" };
+  openedAt: "2026-10-05T11:00:00Z", expiresAt: "2026-10-19T11:00:00Z", noticeStatus: "not_sent", subject: "fixture-google-subject" };
+const google = (token: () => Response) => vi.fn(async (url: string | URL | Request) => String(url).includes("userinfo") ? new Response(JSON.stringify({ sub: target.subject })) : token());
 const clock = Date.parse("2026-10-06T11:00:00Z");
 const operation = { tenantId: target.tenantId!, tenantStableId: target.tenantStableId!, workspaceId: WS, bindingId: target.bindingId, bindingUpdatedAt: "2026-10-05T00:00:00Z", locationDigest: "a".repeat(64), startedAt: new Date(clock).toISOString() };
 const accepted = { status: "accepted" as const, providerMessageId: "fixture-receipt", acceptedAt: new Date(clock).toISOString() };
@@ -82,18 +83,18 @@ describe("signed owner reconnect", () => {
   });
   it("uses a Google token double, preserves location, and refuses absent publishing scope or a failed workspace save", async () => {
     const tokenResponse = { access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/business.manage" };
-    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(tokenResponse)));
+    let token = () => new Response(JSON.stringify(tokenResponse)); const fetcher = google(() => token());
     await finishGoogleReconnect(target, "fixture-code", fetcher);
-    expect(fetcher).toHaveBeenCalledTimes(1); expect(mocks.record).toHaveBeenCalledWith(expect.not.objectContaining({ accountId: expect.anything(), locationId: expect.anything() }), expect.any(Number), operation);
-    fetcher.mockResolvedValue(new Response(JSON.stringify({ ...tokenResponse, scope: "other-scope" })));
+    expect(fetcher).toHaveBeenCalledTimes(2); expect(mocks.record).toHaveBeenCalledWith(expect.not.objectContaining({ accountId: expect.anything(), locationId: expect.anything() }), expect.any(Number), operation);
+    token = () => new Response(JSON.stringify({ ...tokenResponse, scope: "other-scope" }));
     await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("permission");
-    fetcher.mockResolvedValue(new Response(JSON.stringify(tokenResponse))); mocks.record.mockResolvedValue({ binding: "failed" });
+    token = () => new Response(JSON.stringify(tokenResponse)); mocks.record.mockResolvedValue({ binding: "failed" });
     await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("workspace");
-    fetcher.mockResolvedValue(new Response("no", { status: 403 })); await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("Google");
+    token = () => new Response("no", { status: 403 }); await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("Google");
   });
   it("carries the operation start from before a delayed token exchange", async () => {
     const startedAt = Date.now();
-    const fetcher = vi.fn(async () => { vi.setSystemTime(startedAt + 10_000); return new Response(JSON.stringify({ access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/business.manage" })); });
+    const fetcher = google(() => { vi.setSystemTime(startedAt + 10_000); return new Response(JSON.stringify({ access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/business.manage" })); });
     await finishGoogleReconnect(target, "fixture-code", fetcher);
     expect(mocks.record.mock.calls.at(-1)?.[1]).toBe(startedAt);
     expect(mocks.begin).toHaveBeenCalledWith(target.tenantId, startedAt);

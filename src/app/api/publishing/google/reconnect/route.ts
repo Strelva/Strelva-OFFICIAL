@@ -34,7 +34,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const begun = await reconnectStore().target("begin", target.id, { browserHash: reconnectHash(nonce), stateHash: reconnectHash(state) });
     if (!begun) return reconnectPage("This link has already been used. Request a new reconnect link.", 410);
     const params = new URLSearchParams({ client_id: clientId, redirect_uri: `${origin}/api/publishing/google/reconnect/callback`,
-      response_type: "code", scope: "https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly",
+      response_type: "code", scope: "openid email https://www.googleapis.com/auth/business.manage https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly",
       access_type: "offline", prompt: "consent", state });
     const response = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`, 303);
     response.headers.set("Cache-Control", "no-store");

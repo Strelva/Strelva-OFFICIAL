@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { StEmpty, StHead, StLabel, StNotice, StPage, StPill, StRow, StRows, StSection, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import { heldBriefKey, type FoundFact, type FoundFactInput, type GettingStartedBusiness, type WebsiteReading } from "@/products/getting-started/contracts";
+import { FOUND_FACT_SOURCE_LABELS } from "@/products/found-facts/contracts";
+import type { FoundFact, GettingStartedBusiness, HeldRequest, WebsiteReading } from "@/products/getting-started/contracts";
 
 export interface GettingStartedLinks {
   home: string;
@@ -17,13 +18,8 @@ export interface GettingStartedLinks {
   request: string | null;
 }
 
-const noSubscription = () => () => undefined;
-
-/** Send back exactly the shared Found-fact shape; screen-only fields stay here. */
-function foundFactInput(fact: FoundFact): FoundFactInput {
-  return fact.entity === "fact"
-    ? { entity: "fact", key: fact.key, value: fact.value, sourceUrl: fact.sourceUrl, quote: fact.quote }
-    : { entity: fact.entity, value: fact.value, sourceUrl: fact.sourceUrl, quote: fact.quote };
+function deviceTimeZone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
 }
 
 function errorText(body: unknown, fallback: string): string {
@@ -44,21 +40,11 @@ function sourceLabel(url: string): string {
 export function GettingStarted({ business, links }: { business: GettingStartedBusiness; links: GettingStartedLinks }) {
   const [website, setWebsite] = useState(business.website);
   const [revision, setRevision] = useState(business.revision);
-  const storedBrief = useSyncExternalStore(noSubscription, () => {
-    try { return window.sessionStorage.getItem(heldBriefKey(business.workspaceId))?.slice(0, 3000) || ""; }
-    catch { return ""; /* Storage unavailable: nothing held here. */ }
-  }, () => "");
-  const [dismissed, setDismissed] = useState(false);
-  const heldBrief = dismissed ? "" : storedBrief;
 
   return <StPage>
     <StHead crumb={{ label: "Business home", href: links.home }} title={business.name} meta={website ? <>Website <a className="underline underline-offset-4" href={website} target="_blank" rel="noopener noreferrer">{sourceLabel(website)}</a></> : "No website on your business yet."} />
     {links.request ? <StNotice action={<StTextButton href={links.request}>Open request</StTextButton>}>Your request went to your agency. Nothing is agreed until they reply with scope and timing.</StNotice> : null}
-    {!links.request && heldBrief ? <StSection title="Your request is waiting" meta="Not sent">
-      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-warm-black">{heldBrief}</p>
-      <p className="mt-3 text-[13px] leading-relaxed text-gray-muted">No agency works with your business yet, so this wasn&rsquo;t sent or saved to your business. It stays in this browser until you bring one in.</p>
-      <div className="mt-3 flex flex-wrap gap-4"><StTextButton href={links.agency}>Bring in an agency</StTextButton><StTextButton onClick={() => { try { window.sessionStorage.removeItem(heldBriefKey(business.workspaceId)); } catch { /* Nothing stored. */ } setDismissed(true); }}>Dismiss</StTextButton></div>
-    </StSection> : null}
+    {!links.request ? <HeldRequests business={business} agencyHref={links.agency} /> : null}
     <StSection title="Start from what you already have" meta="Nothing has to move">
       <UseCurrentWebsite business={business} website={website} revision={revision} detailsHref={links.details} onSaved={(next, savedWebsite) => { setRevision(next); if (savedWebsite) setWebsite(savedWebsite); }} />
       <StRows label="Next steps">
@@ -72,15 +58,44 @@ export function GettingStarted({ business, links }: { business: GettingStartedBu
   </StPage>;
 }
 
+/** Requests typed at setup: kept on the business, sent only to the agency the owner brings in. */
+function HeldRequests({ business, agencyHref }: { business: GettingStartedBusiness; agencyHref: string }) {
+  const transport = useWorkspaceRequest();
+  const [held, setHeld] = useState<HeldRequest[]>(business.held);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  async function withdraw(item: HeldRequest) {
+    setBusy(item.id); setError("");
+    try {
+      const response = await transport("/api/workspace/getting-started", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "withdraw_held_request", workspaceId: business.workspaceId, heldRequestId: item.id }) });
+      const body: unknown = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(errorText(body, "That didn't go through. Try again."));
+      setHeld((body as { held?: HeldRequest[] }).held ?? []);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "That didn't go through. Try again."); }
+    finally { setBusy(null); }
+  }
+  if (!held.length) return null;
+  return <>{held.map(item => item.status === "routed"
+    ? <StNotice key={item.id} action={item.requestId ? <StTextButton href={`/workspace/delivery/${item.requestId}`}>Open request</StTextButton> : undefined}>Your request went to {item.agencyName ?? "your agency"}. Nothing is agreed until they reply with scope and timing.</StNotice>
+    : <StSection key={item.id} title="Your request is waiting" meta="Saved, not sent">
+      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-warm-black">{item.text}</p>
+      <p className="mt-3 text-[13px] leading-relaxed text-gray-muted">No agency works with your business yet, so it hasn&rsquo;t gone anywhere. It&rsquo;s saved to your business and goes to the agency you bring in, once they accept.</p>
+      {business.canConfirm ? <div className="mt-3 flex flex-wrap gap-4"><StTextButton href={agencyHref}>Bring in an agency</StTextButton><StTextButton disabled={busy !== null} onClick={() => void withdraw(item)}>{busy === item.id ? "Withdrawing…" : "Withdraw it"}</StTextButton></div> : null}
+      {error ? <div className="mt-3"><StNotice tone="critical">{error}</StNotice></div> : null}
+    </StSection>)}</>;
+}
+
 function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }: { business: GettingStartedBusiness; website: string | null; revision: number; detailsHref: string; onSaved: (revision: number, website: string | null) => void }) {
   const transport = useWorkspaceRequest();
   const [url, setUrl] = useState(website ?? "");
   const [reading, setReading] = useState<WebsiteReading | null>(null);
+  // What waits for the owner, from any source; a reading replaces it with the latest list.
+  const [facts, setFacts] = useState<FoundFact[]>(business.waiting);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [useAsWebsite, setUseAsWebsite] = useState(!website);
   const [busy, setBusy] = useState<"read" | "save" | null>(null);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState<string[] | null>(null);
+  const [saved, setSaved] = useState<{ added: number; later: number } | null>(null);
   const inFlight = useRef(false);
   const resultsId = useId();
   const resultsRef = useRef<HTMLHeadingElement>(null);
@@ -99,6 +114,18 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
     return parsed;
   }
 
+  async function removeOne(fact: FoundFact) {
+    if (inFlight.current) return;
+    inFlight.current = true; setBusy("save"); setError("");
+    try {
+      const body = await post({ action: "decide_found_facts", workspaceId: business.workspaceId, revision: reading?.revision ?? revision, decisions: [{ id: fact.id, decision: "remove" }] }) as { waiting?: FoundFact[]; revision?: number };
+      setFacts(body.waiting ?? facts.filter(item => item.id !== fact.id));
+      setChosen(current => { const next = new Set(current); next.delete(fact.id); return next; });
+      if (typeof body.revision === "number") { onSaved(body.revision, null); if (reading) setReading({ ...reading, revision: body.revision }); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "That didn't go through. Nothing changed."); }
+    finally { inFlight.current = false; setBusy(null); refocus(urlRef); }
+  }
+
   async function read(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (inFlight.current) return;
@@ -108,20 +135,26 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
       const body = await post({ action: "read_website", workspaceId: business.workspaceId, url: url.trim() }) as { reading?: WebsiteReading };
       if (!body.reading) throw new Error("The reading couldn't be confirmed. Try again.");
       setReading(body.reading);
-      setChosen(new Set(body.reading.facts.filter(fact => !fact.current).map(fact => fact.id)));
+      setFacts(body.reading.facts);
+      setChosen(new Set(body.reading.facts.filter(fact => !fact.current && fact.confirmable && fact.sourceKind === "website_crawl").map(fact => fact.id)));
       setUseAsWebsite(!website);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't read this website."); refocus(urlRef); }
     finally { inFlight.current = false; setBusy(null); }
   }
 
   async function confirm() {
-    if (!reading || inFlight.current) return;
-    const facts = reading.facts.filter(fact => chosen.has(fact.id));
+    if (inFlight.current) return;
+    // Ticked: added to the business. Not ticked: kept here for later, never dropped.
+    const decisions = facts.map(fact => ({ id: fact.id, decision: chosen.has(fact.id) ? "confirm" as const : "later" as const }))
+      .filter(item => item.decision === "confirm" || facts.find(fact => fact.id === item.id)?.status === "unconfirmed");
+    const websiteChosen = Boolean(reading && useAsWebsite);
     inFlight.current = true; setBusy("save"); setError("");
     try {
-      const body = await post({ action: "confirm_found_facts", workspaceId: business.workspaceId, revision: reading.revision, ...(useAsWebsite ? { website: reading.url } : {}), facts: facts.map(foundFactInput) }) as { saved?: string[]; revision?: number };
-      setSaved(body.saved ?? []);
-      onSaved(typeof body.revision === "number" ? body.revision : revision, useAsWebsite ? reading.url : null);
+      const body = await post({ action: "decide_found_facts", workspaceId: business.workspaceId, revision: reading?.revision ?? revision, ...(websiteChosen && reading ? { website: reading.url } : {}), decisions, timeZone: deviceTimeZone() }) as { confirmed?: number; later?: number; websiteSaved?: boolean; revision?: number; waiting?: FoundFact[] };
+      setSaved({ added: (body.confirmed ?? 0) + (body.websiteSaved ? 1 : 0), later: (body.waiting ?? []).length });
+      setFacts(body.waiting ?? []);
+      setChosen(new Set());
+      onSaved(typeof body.revision === "number" ? body.revision : revision, body.websiteSaved && reading ? reading.url : null);
       setReading(null);
       refocus(urlRef);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Your details couldn't be added. Nothing changed."); refocus(confirmRef); }
@@ -130,6 +163,7 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
 
   const toggle = (fact: FoundFact) => setChosen(current => { const next = new Set(current); if (next.has(fact.id)) next.delete(fact.id); else next.add(fact.id); return next; });
   const count = chosen.size + (useAsWebsite && reading ? 1 : 0);
+  const waitingCount = facts.length - chosen.size;
 
   return <div className="mb-6 flex flex-col gap-4">
     <StLabel as="h3">Use my current website</StLabel>
@@ -141,26 +175,31 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
       </form>
       {busy === "read" ? <p role="status" className="text-[13px] text-gray-muted">Reading up to five pages. This can take a few seconds…</p> : null}
       {error ? <StNotice tone="critical">{error}</StNotice> : null}
-      <div role="status">{saved ? <StNotice action={<StTextButton href={detailsHref}>Review business details</StTextButton>}>{saved.length ? "Added to your business. You can change any of it in Business details." : "Nothing new to add. Your business already has these details."}</StNotice> : null}</div>
-      {reading ? <div className="flex flex-col gap-3" aria-labelledby={resultsId}>
-        <h4 id={resultsId} ref={resultsRef} tabIndex={-1} className="text-[15px] font-medium text-warm-black outline-none">Found on {sourceLabel(reading.url)}</h4>
-        {reading.facts.length === 0 ? <StEmpty action={<StTextButton href={detailsHref}>Add details yourself</StTextButton>}>We read {reading.pagesRead === 1 ? "1 page" : `${reading.pagesRead} pages`} but found no details we could add.</StEmpty>
-          : <ul className="flex flex-col" aria-label="Found facts">{reading.facts.map(fact => <li key={fact.id} className="border-b border-gray-border py-3 last:border-b-0">
+      <div role="status">{saved ? <StNotice action={<StTextButton href={detailsHref}>Review business details</StTextButton>}>{saved.added ? "Added to your business. You can change any of it in Business details." : "Nothing was added."}{saved.later ? ` ${saved.later === 1 ? "1 detail waits" : `${saved.later} details wait`} here for later.` : ""}</StNotice> : null}</div>
+      {reading || facts.length ? <div className="flex flex-col gap-3" aria-labelledby={resultsId}>
+        <h4 id={resultsId} ref={resultsRef} tabIndex={-1} className="text-[15px] font-medium text-warm-black outline-none">{reading ? `Found on ${sourceLabel(reading.url)}` : "Waiting for you"}</h4>
+        {reading && facts.length === 0 ? <StEmpty action={<StTextButton href={detailsHref}>Add details yourself</StTextButton>}>We read {reading.pagesRead === 1 ? "1 page" : `${reading.pagesRead} pages`} but found no details we could add.</StEmpty>
+          : <ul className="flex flex-col" aria-label="Found facts">{facts.map(fact => <li key={fact.id} className="border-b border-gray-border py-3 last:border-b-0">
             <label className="flex min-h-11 cursor-pointer items-start gap-3">
-              <input type="checkbox" className="mt-1 size-4 shrink-0 accent-warm-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={chosen.has(fact.id)} disabled={busy !== null} onChange={() => toggle(fact)} />
+              <input type="checkbox" className="mt-1 size-4 shrink-0 accent-warm-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={chosen.has(fact.id)} disabled={busy !== null || !fact.confirmable} onChange={() => toggle(fact)} />
               <span className="flex min-w-0 flex-col gap-1">
                 <span className="text-[12px] text-gray-muted">{fact.label}</span>
                 <span className="break-words text-[14px] text-warm-black">{fact.display}</span>
                 {fact.current ? <span className="text-[12px] text-gray-muted">Replaces {fact.current}</span> : null}
-                <span className="break-words text-[12px] text-gray-muted">From <a className="underline underline-offset-2" href={fact.sourceUrl} target="_blank" rel="noopener noreferrer">{sourceLabel(fact.sourceUrl)}</a>: &ldquo;{fact.quote}&rdquo;</span>
+                {fact.sourceUrl && fact.quote
+                  ? <span className="break-words text-[12px] text-gray-muted">From <a className="underline underline-offset-2" href={fact.sourceUrl} target="_blank" rel="noopener noreferrer">{sourceLabel(fact.sourceUrl)}</a>: &ldquo;{fact.quote}&rdquo;</span>
+                  : <span className="text-[12px] text-gray-muted">{FOUND_FACT_SOURCE_LABELS[fact.sourceKind]}{fact.confirmable ? "" : ". Kept for reference."}</span>}
+                {fact.status === "later" ? <span className="text-[12px] text-gray-muted">You left this for later.</span> : null}
               </span>
             </label>
+            <div className="pl-7"><StTextButton disabled={busy !== null} onClick={() => void removeOne(fact)} aria-label={`Not right: ${fact.label} ${fact.display}`}>Not right</StTextButton></div>
           </li>)}</ul>}
-        {!website ? <label className="flex min-h-11 cursor-pointer items-start gap-3">
+        {!website && reading ? <label className="flex min-h-11 cursor-pointer items-start gap-3">
           <input type="checkbox" className="mt-1 size-4 shrink-0 accent-warm-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={useAsWebsite} disabled={busy !== null} onChange={event => setUseAsWebsite(event.target.checked)} />
           <span className="text-[14px] text-warm-black">Use {sourceLabel(reading.url)} as my business&rsquo;s website</span>
         </label> : null}
-        <div><StPill ref={confirmRef} busy={busy === "save"} disabled={busy === "read" || count === 0} onClick={() => void confirm()}>{count ? `Add ${count === 1 ? "1 detail" : `${count} details`} to my business` : "Choose details to add"}</StPill></div>
+        <div className="flex flex-col gap-2"><div><StPill ref={confirmRef} busy={busy === "save"} disabled={busy === "read" || (count === 0 && !facts.some(fact => fact.status === "unconfirmed"))} onClick={() => void confirm()}>{count ? `Add ${count === 1 ? "1 detail" : `${count} details`} to my business` : "Keep these for later"}</StPill></div>
+          {facts.length && waitingCount > 0 ? <p className="text-[12px] text-gray-muted">Anything you don&rsquo;t tick waits here for later. Nothing joins your business until you add it.</p> : null}</div>
       </div> : null}
     </>}
   </div>;

@@ -15,6 +15,9 @@ export const reconnectTargetSchema = z.object({
   tenantId: z.string().nullable(), tenantStableId: z.string().uuid().nullable(),
   recipient: z.string().email(), openedAt: z.string(), expiresAt: z.string(),
   noticeStatus: z.enum(["not_sent", "sending", "accepted", "suppressed", "failed"]),
+  /** Google account id (`sub`) of the grant being restored. Null/absent when
+   * the original connection never recorded it (legacy tenant OAuth). */
+  subject: z.string().min(1).max(255).nullable().optional(),
 });
 export type ReconnectTarget = z.infer<typeof reconnectTargetSchema>;
 export interface ReconnectDb { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> }
@@ -53,7 +56,7 @@ export function reconnectStore(db: ReconnectDb | null = getSupabase() as unknown
   }
   return {
     async list() { return z.array(z.string().uuid()).parse(await call("list")); },
-    async target(action: "prepare" | "read" | "begin" | "consume" | "notice_claim", id: string, input: Record<string, unknown> = {}) {
+    async target(action: "prepare" | "read" | "begin" | "consume" | "release" | "notice_claim", id: string, input: Record<string, unknown> = {}) {
       return reconnectTargetSchema.nullable().parse(await call(action, id, input));
     },
     async notice(id: string, result: SendEmailResult) {
@@ -109,6 +112,15 @@ export async function chaseGoogleReconnectNotices(deps: { store?: ReconnectStore
   return summary;
 }
 
+/** A reconnect refused before anything was stored. The callback reopens the
+ * episode so the right Google account can retry from the same email link. */
+export class GoogleReconnectRefused extends Error {
+  constructor(message: string) { super(message); this.name = "GoogleReconnectRefused"; }
+}
+export const RECONNECT_UNKNOWN_ACCOUNT = "Strelva doesn't have a record of which Google account was connected before, so this link can't restore it. Ask the owner to connect Google again from Strelva. Nothing was changed.";
+export const RECONNECT_NO_IDENTITY = "Google didn't confirm which account signed in, so nothing was changed. Open the reconnect link again, or ask the owner to connect Google again.";
+export const RECONNECT_DIFFERENT_ACCOUNT = "That's a different Google account from the one connected before. Sign in with the Google account that was connected before, or ask the owner to connect Google again. Nothing was changed.";
+
 /** The grant alone never authorizes a Google write. This only restores the
  * existing binding and retains the selected location, rather than picking the
  * first profile from the owner's account. */
@@ -117,6 +129,9 @@ export async function finishGoogleReconnect(target: ReconnectTarget, code: strin
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("Google reconnect is not configured.");
+  // Whoever opens the email link must not be able to attach a different
+  // Google account; without the original account id there is nothing to match.
+  if (!target.subject) throw new GoogleReconnectRefused(RECONNECT_UNKNOWN_ACCOUNT);
   const tenantPorts = target.tenantId ? await tenantPublishingPorts() : null;
   if (target.tenantId && !tenantPorts?.beginGoogleReconnectOperation) throw new Error("Google reconnect persistence is unavailable.");
   const operation = target.tenantId && tenantPorts?.beginGoogleReconnectOperation ? await tenantPorts.beginGoogleReconnectOperation(target.tenantId, startedAt) : undefined;
@@ -130,6 +145,11 @@ export async function finishGoogleReconnect(target: ReconnectTarget, code: strin
   const tokens = z.object({ access_token: z.string().min(1), refresh_token: z.string().min(1), expires_in: z.number().positive().max(86400), scope: z.string() }).parse(await response.json());
   const scopes = tokens.scope.split(/\s+/).filter(Boolean);
   if (!scopes.includes(MANAGE_SCOPE)) throw new Error("Google publishing permission was not granted.");
+  // Same identity read as native OAuth; checked before any token is stored.
+  const who = await fetcher("https://openidconnect.googleapis.com/v1/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+  const identity = who.ok ? z.object({ sub: z.string().min(1).max(255) }).safeParse(await who.json().catch(() => null)) : null;
+  if (!identity?.success) throw new GoogleReconnectRefused(RECONNECT_NO_IDENTITY);
+  if (identity.data.sub !== target.subject) throw new GoogleReconnectRefused(RECONNECT_DIFFERENT_ACCOUNT);
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
   if (target.tenantId) {
     const outcome = await tenantPorts!.recordGoogleConnection({ tenantId: target.tenantId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt, scopes }, startedAt, operation);

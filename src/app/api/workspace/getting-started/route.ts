@@ -6,6 +6,7 @@ import { BusinessRecordValidationError } from "@/platform/business-record/reposi
 import { isWorkspaceBodyTooLarge, readWorkspaceBody, workspaceHttpActor, workspaceJson as json, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError, WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
 import { CHECK_RESULT_ID, gettingStartedActionSchema } from "@/products/getting-started/contracts";
+import { FoundFactInputError } from "@/products/found-facts/store";
 import { gettingStarted, GettingStartedInputError, GettingStartedRateLimitError, GettingStartedUnavailableError } from "@/products/getting-started/server";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export const maxDuration = 60;
 function failure(error: unknown) {
   if (isWorkspaceBodyTooLarge(error)) return json({ error: "This request is too large." }, 413);
   if (error instanceof z.ZodError) return json({ error: "Check the information supplied and try again." }, 400);
-  if (error instanceof GettingStartedInputError) return json({ error: error.message }, 400);
+  if (error instanceof GettingStartedInputError || error instanceof FoundFactInputError) return json({ error: error.message }, 400);
   if (error instanceof BusinessRecordValidationError) return json({ error: "That detail isn't in a form your business record accepts." }, 400);
   if (error instanceof GettingStartedRateLimitError) return json({ error: error.message }, 429);
   if (error instanceof GettingStartedUnavailableError) return json({ error: error.message }, 422);
@@ -63,8 +64,10 @@ export async function POST(request: Request) {
       }
       case "read_website":
         return json({ reading: await gettingStarted.readWebsite(actor, input.workspaceId, input.url) });
-      case "confirm_found_facts":
-        return json(await gettingStarted.confirm(actor, input));
+      case "decide_found_facts":
+        return json(await gettingStarted.decide(actor, input));
+      case "withdraw_held_request":
+        return json(await gettingStarted.withdrawHeld(actor, input));
     }
   } catch (error) { return failure(error); }
 }

@@ -12,8 +12,11 @@ import { savePublicAiVisibilityResult } from "@/products/ai-visibility/usecase";
 import { getPublicWebsiteAudit, savePublicWebsiteAudit } from "@/products/website-audit/server";
 import { crawlWebsite, WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
 import { extractBusinessFacts } from "@/products/websites/rebuild-pipeline";
-import { CHECK_RESULT_ID, type CheckForBusiness, type FoundFactInput, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
-import { confirmedPatch, foundFactsFromReading } from "./found-facts";
+import { decideBusinessFoundFacts, readBusinessFoundFacts, stageOwnerWebsiteFoundFacts } from "@/products/found-facts/store";
+import type { FoundFactDecision } from "@/products/found-facts/contracts";
+import { CHECK_RESULT_ID, type CheckForBusiness, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
+import { confirmationValue, foundFactsFromReading, screenFoundFact } from "./found-facts";
+import { readHeldRequests, withdrawHeldRequest } from "./held-requests";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "./website";
 
 /** The crawl is kept small: the owner is waiting on the page. */
@@ -43,6 +46,11 @@ export interface GettingStartedDeps {
   crawl: typeof crawlWebsite;
   extract: typeof extractBusinessFacts;
   rateLimited: (key: string, max: number, windowMs: number) => Promise<boolean>;
+  readFound: typeof readBusinessFoundFacts;
+  stageFound: typeof stageOwnerWebsiteFoundFacts;
+  decideFound: typeof decideBusinessFoundFacts;
+  readHeld: typeof readHeldRequests;
+  withdrawHeld: typeof withdrawHeldRequest;
 }
 
 const defaults: GettingStartedDeps = {
@@ -50,6 +58,8 @@ const defaults: GettingStartedDeps = {
   readScan: getAiVisibilityResult, readAudit: getPublicWebsiteAudit,
   saveScan: savePublicAiVisibilityResult, saveAudit: savePublicWebsiteAudit,
   crawl: crawlWebsite, extract: extractBusinessFacts, rateLimited: isRateLimitedWindowedAsync,
+  readFound: readBusinessFoundFacts, stageFound: stageOwnerWebsiteFoundFacts, decideFound: decideBusinessFoundFacts,
+  readHeld: readHeldRequests, withdrawHeld: withdrawHeldRequest,
 };
 
 function uuidFrom(parts: unknown[]): string {
@@ -141,10 +151,22 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
   async function read(actor: WorkspaceActor, workspaceId: string): Promise<GettingStartedBusiness> {
     const workspace = await directBusiness(actor, workspaceId);
     const record: BusinessRecord = await deps.readRecord(actor, workspaceId);
-    return { workspaceId, name: workspace.name, website: businessWebsite(record), canConfirm: record.access === "owner", revision: record.revision };
+    // A store that isn't there yet (migration unapplied) shows nothing waiting rather than failing the page.
+    const [found, held] = await Promise.all([
+      deps.readFound(actor, workspaceId).catch(() => []),
+      deps.readHeld(actor, workspaceId).catch(() => []),
+    ]);
+    return {
+      workspaceId, name: workspace.name, website: businessWebsite(record), canConfirm: record.access === "owner", revision: record.revision,
+      waiting: found.map(fact => screenFoundFact(fact, record)), held,
+    };
   }
 
-  /** "Use my current website": read it and return Found facts. Writes nothing. */
+  /**
+   * "Use my current website": read it and keep what it found beside the
+   * record as Found facts (the one store), so anything the owner leaves for
+   * later is still there next time. Never writes the record.
+   */
   async function readWebsite(actor: WorkspaceActor, workspaceId: string, rawUrl: string): Promise<WebsiteReading> {
     const url = normalizeBusinessWebsite(rawUrl);
     if (!url) throw new GettingStartedInputError("Enter your public website address, like yourbusiness.com.");
@@ -161,27 +183,65 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     } catch (error) {
       throw new GettingStartedUnavailableError(error instanceof WebsiteCrawlError ? error.message : "We couldn't read this website. Check the address, or add your details yourself.");
     }
-    return { url, revision: record.revision, facts: foundFactsFromReading(found, record), pagesRead };
+    const staged = await deps.stageFound(actor, workspaceId, foundFactsFromReading(found, record));
+    return { url, revision: record.revision, facts: staged.found.map(fact => screenFoundFact(fact, record)), pagesRead };
   }
 
-  /** The owner's own write: only what they ticked, against the revision they saw. */
-  async function confirm(actor: WorkspaceActor, input: { workspaceId: string; revision: number; website?: string; facts: FoundFactInput[] }) {
+  /**
+   * The owner decides Found facts, in one transaction against the revision
+   * they saw: confirmed ones become the owner's own verified facts, later
+   * ones keep waiting, removed ones stay out. The website, when given, then
+   * becomes the business's one website (never replacing a different one).
+   */
+  async function decide(actor: WorkspaceActor, input: { workspaceId: string; revision: number; website?: string; decisions: FoundFactDecision[]; timeZone?: string }) {
     await directBusiness(actor, input.workspaceId);
     const record = await deps.readRecord(actor, input.workspaceId);
     if (record.access !== "owner") throw new WorkspaceAccessError();
     if (record.revision !== input.revision) throw new WorkspaceConflictError("Your business details changed since this reading. Read the website again.");
     if (input.website !== undefined && !normalizeBusinessWebsite(input.website)) throw new GettingStartedInputError("Enter your public website address, like yourbusiness.com.");
-    const website = input.website && !(businessWebsite(record) && !sameWebsite(businessWebsite(record), input.website)) ? input.website : undefined;
-    const planned = confirmedPatch(record, input.facts, website);
-    if (planned.kind === "invalid") throw new GettingStartedInputError(planned.message);
-    if (planned.kind === "unchanged") return { saved: [] as string[], revision: record.revision };
-    const result = await deps.patchRecord(actor, input.workspaceId, record.revision, planned.patch, {
-      source: "owner", commandId: uuidFrom(["getting-started:confirm", input.workspaceId, record.revision, planned.patch]),
-    });
-    return { saved: planned.keys, revision: result.revision };
+    const open = new Map((await deps.readFound(actor, input.workspaceId)).map(fact => [fact.id, fact]));
+    const decisions: FoundFactDecision[] = [];
+    for (const decision of input.decisions) {
+      const fact = open.get(decision.id);
+      if (!fact) throw new WorkspaceConflictError("That was already decided. Refresh to see what's still waiting.");
+      if (decision.decision !== "confirm") { decisions.push(decision); continue; }
+      if (fact.key === "categories") throw new GettingStartedInputError("Categories stay for reference. Your business details have no place for them yet.");
+      const planned = confirmationValue(fact, record, input.timeZone);
+      if (planned && "refused" in planned) throw new GettingStartedInputError(planned.refused);
+      decisions.push(planned ? { id: decision.id, decision: "confirm", value: planned.value } : { id: decision.id, decision: "confirm" });
+    }
+    let revision = record.revision;
+    let decided = { confirmed: 0, changed: 0, removed: 0, later: 0 };
+    let waiting = [...open.values()];
+    if (decisions.length) {
+      const result = await deps.decideFound(actor, input.workspaceId, {
+        decisions, expectedRevision: record.revision, commandId: uuidFrom(["getting-started:decide", input.workspaceId, record.revision, decisions]),
+      });
+      revision = result.revision;
+      decided = { confirmed: result.confirmed, changed: result.changed, removed: result.removed, later: result.later };
+      waiting = result.found;
+    }
+    let websiteSaved = false;
+    if (input.website) {
+      const current = businessWebsite(await deps.readRecord(actor, input.workspaceId));
+      if (!current || !sameWebsite(current, input.website)) {
+        await recordWebsite(actor, input.workspaceId, input.website, ["getting-started:website-reading", input.workspaceId, input.website]);
+        const after = await deps.readRecord(actor, input.workspaceId);
+        websiteSaved = sameWebsite(businessWebsite(after), input.website);
+        revision = after.revision;
+      }
+    }
+    const latest = await deps.readRecord(actor, input.workspaceId);
+    return { ...decided, websiteSaved, revision, waiting: waiting.map(fact => screenFoundFact(fact, latest)) };
   }
 
-  return { readCheck, startFromCheck, read, readWebsite, confirm, websiteHost };
+  /** The owner withdraws a held request. Nothing was sent, so nothing is recalled. */
+  async function withdrawHeld(actor: WorkspaceActor, input: { workspaceId: string; heldRequestId: string }) {
+    await directBusiness(actor, input.workspaceId);
+    return { held: await deps.withdrawHeld(actor, input.workspaceId, input.heldRequestId) };
+  }
+
+  return { readCheck, startFromCheck, read, readWebsite, decide, withdrawHeld, websiteHost };
 }
 
 export const gettingStarted = createGettingStarted();

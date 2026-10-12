@@ -19,10 +19,10 @@ const WS = "00000000-0000-4000-8000-000000000013";
 const preview = { workspaceName: "Fictional Bakery", agencyName: "Fictional Studio", recipientEmail: "owner@example.invalid", status: "pending", expiresAt: "2026-10-26T12:00:00Z" };
 const review: ClaimReview = { status: "pending", workspaceId: WS, workspaceName: "Fictional Bakery", agencyWorkspaceId: "00000000-0000-4000-8000-0000000000a1", agencyName: "Fictional Studio",
   found: [
-    { id: "00000000-0000-4000-8000-0000000000f1", entity: "fact", key: "phone", value: "(716) 555-0100", sourceUrl: "https://bakery.example.invalid/contact", quote: "Call (716) 555-0100" },
-    { id: "00000000-0000-4000-8000-0000000000f2", entity: "fact", key: "hours", value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }] }, sourceUrl: "https://bakery.example.invalid/", quote: "Mo 07:00-15:00" },
-    { id: "00000000-0000-4000-8000-0000000000f3", entity: "service", key: null, value: { name: "Custom cakes" }, sourceUrl: "https://bakery.example.invalid/services", quote: "Custom cakes" },
-    { id: "00000000-0000-4000-8000-0000000000f4", entity: "person", key: null, value: { name: "Pat Baker" }, sourceUrl: "https://bakery.example.invalid/about", quote: "Pat Baker" },
+    { id: "00000000-0000-4000-8000-0000000000f1", entity: "fact", key: "phone", value: "(716) 555-0100", sourceUrl: "https://bakery.example.invalid/contact", quote: "Call (716) 555-0100", status: "unconfirmed", sourceKind: "website_crawl", sourceRef: "https://bakery.example.invalid/contact", foundBy: "agency", foundAt: "2026-10-12T12:00:00.000Z" },
+    { id: "00000000-0000-4000-8000-0000000000f2", entity: "fact", key: "hours", value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }] }, sourceUrl: "https://bakery.example.invalid/", quote: "Mo 07:00-15:00", status: "unconfirmed", sourceKind: "website_crawl", sourceRef: "https://bakery.example.invalid/", foundBy: "agency", foundAt: "2026-10-12T12:00:00.000Z" },
+    { id: "00000000-0000-4000-8000-0000000000f3", entity: "service", key: null, value: { name: "Custom cakes" }, sourceUrl: "https://bakery.example.invalid/services", quote: "Custom cakes", status: "unconfirmed", sourceKind: "website_crawl", sourceRef: "https://bakery.example.invalid/services", foundBy: "agency", foundAt: "2026-10-12T12:00:00.000Z" },
+    { id: "00000000-0000-4000-8000-0000000000f4", entity: "person", key: null, value: { name: "Pat Baker" }, sourceUrl: "https://bakery.example.invalid/about", quote: "Pat Baker", status: "unconfirmed", sourceKind: "website_crawl", sourceRef: "https://bakery.example.invalid/about", foundBy: "agency", foundAt: "2026-10-12T12:00:00.000Z" },
   ],
   prepared: [{ id: "00000000-0000-4000-8000-0000000000b1", name: "Order form", kind: "intake" }], fullControlTaken: ["google"] };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -75,7 +75,7 @@ describe("owner claim review", () => {
     expect(container.textContent).toContain("Connect Google");
   });
 
-  it("change sends the corrected value; later leaves the fact out", () => {
+  it("change sends the corrected value; later is sent as later and stays waiting", () => {
     const choices = initialClaimReviewChoices(review, "America/New_York");
     choices.facts["00000000-0000-4000-8000-0000000000f1"] = "change";
     choices.drafts["00000000-0000-4000-8000-0000000000f1"] = " (716) 555-0199 ";
@@ -83,7 +83,7 @@ describe("owner claim review", () => {
     const input = claimReviewInput(review, choices);
     expect(input.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f1", decision: "change", value: "(716) 555-0199" });
     expect(input.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f2", decision: "confirm", value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }], timezone: "America/New_York" } });
-    expect(input.facts.map((item) => item.id)).not.toContain("00000000-0000-4000-8000-0000000000f4");
+    expect(input.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f4", decision: "later" });
   });
 
   it("next steps link to the existing Google and calendar connections, and each can be skipped", async () => {

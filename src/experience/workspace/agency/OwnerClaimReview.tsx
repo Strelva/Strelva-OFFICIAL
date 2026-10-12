@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StCopy, StHead, StInput, StLabel, StMono, StNotice, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { AGENCY_LEVEL_HELP, AGENCY_SCOPE_LABELS } from "@/platform/agency-directory/contract";
 import {
-  CLAIM_AREAS, FOUND_FACT_LABELS,
+  CLAIM_AREAS, FOUND_FACT_LABELS, FOUND_FACT_SOURCE_LABELS,
   type ClaimArea, type ClaimAreaChoice, type ClaimReview, type ClaimReviewAcceptInput, type FoundFact,
 } from "@/products/agency-clients/contracts";
 
@@ -44,6 +44,12 @@ function editable(fact: FoundFact): boolean {
   return fact.entity !== "fact" || ["phone", "email", "description", "address"].includes(fact.key ?? "");
 }
 
+/** Where a found fact came from: the page and its words, or the source in plain words. */
+function FoundSource({ fact }: { fact: FoundFact }) {
+  if (fact.sourceUrl && fact.quote) return <>From <StTextButton href={fact.sourceUrl} target="_blank" rel="noreferrer noopener">{sourceHost(fact.sourceUrl)}</StTextButton>: “{fact.quote}”</>;
+  return <>{FOUND_FACT_SOURCE_LABELS[fact.sourceKind]}</>;
+}
+
 function changedValue(fact: FoundFact, draft: string): unknown {
   const trimmed = draft.trim();
   if (fact.entity !== "fact") return { name: trimmed };
@@ -76,12 +82,12 @@ export function initialClaimReviewChoices(review: ClaimReview, timeZone = device
   };
 }
 
-/** What the owner's choices send. Undecided ("later") facts are left out and stay waiting. */
+/** What the owner's choices send. "Later" is recorded as seen and stays waiting outside the record. */
 export function claimReviewInput(review: ClaimReview, choices: ClaimReviewChoices): ClaimReviewAcceptInput {
   const facts: ClaimReviewAcceptInput["facts"] = [];
   for (const fact of review.found) {
     const choice = choices.facts[fact.id] ?? "later";
-    if (choice === "later") continue;
+    if (choice === "later") { facts.push({ id: fact.id, decision: "later" }); continue; }
     if (choice === "remove") { facts.push({ id: fact.id, decision: "remove" }); continue; }
     if (fact.key === "hours") { facts.push({ id: fact.id, decision: "confirm", value: { ...(fact.value as object), timezone: choices.timeZone.trim() } }); continue; }
     if (choice === "change") { facts.push({ id: fact.id, decision: "change", value: changedValue(fact, choices.drafts[fact.id] ?? "") }); continue; }
@@ -101,8 +107,8 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
     <StHead title={`Take ownership of ${review.workspaceName}`} meta={`Set up by ${review.agencyName}`} />
     <StCopy>Check what {review.agencyName} found and prepared, choose what they may do, then claim your business. Nothing they prepared is live yet.</StCopy>
 
-    <StSection title="We found these on your website" meta={review.found.length ? "Confirm, change or remove each one. Anything you leave for later stays out of your business details." : undefined}>
-      {review.found.length ? <StRows label="Found on your website">{review.found.map((fact) => {
+    <StSection title={review.found.some((fact) => fact.sourceKind !== "website_crawl") ? "We found these about your business" : "We found these on your website"} meta={review.found.length ? "Confirm, change or remove each one. Anything you leave for later stays out of your business details." : undefined}>
+      {review.found.length ? <StRows label="Found about your business">{review.found.map((fact) => {
         const label = fact.entity === "fact" ? FOUND_FACT_LABELS[fact.key ?? "description"] : FOUND_FACT_LABELS[fact.entity];
         const choice = choices.facts[fact.id] ?? "confirm";
         const options = [
@@ -112,7 +118,7 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
           { value: "later" as const, label: "Later" },
         ];
         return <StRow key={fact.id} kind={label} title={foundValueText(fact)}
-          detail={<>From <StTextButton href={fact.sourceUrl} target="_blank" rel="noreferrer noopener">{sourceHost(fact.sourceUrl)}</StTextButton>: “{fact.quote}”</>}
+          detail={<FoundSource fact={fact} />}
           end={<StSegmented label={`${label}: ${foundValueText(fact)}`} value={choice} options={options} onChange={(value) => setFact(fact.id, value)} />}>
           {choice === "change" ? <StInput label={`Correct ${label.toLowerCase()}`} value={choices.drafts[fact.id] ?? ""} maxLength={fact.key === "description" ? 2000 : 200}
             onChange={(event) => onChange({ ...choices, drafts: { ...choices.drafts, [fact.id]: event.target.value } })} /> : null}
@@ -136,7 +142,7 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
       </div>)}</div>
       <div className="mt-4 grid gap-2 text-sm text-gray-muted">
         {levels.has("prepare") ? <p><strong className="text-warm-black">Prepare:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
-        {levels.has("full_control") ? <p><strong className="text-warm-black">Full control:</strong> {AGENCY_LEVEL_HELP.full_control}</p> : null}
+        {levels.has("full_control") ? <p><strong className="text-warm-black">Full control:</strong> {AGENCY_LEVEL_HELP.full_control} It starts when {review.agencyName} accepts it. Until then, nothing changes in that area.</p> : null}
         <p>Payment, adding and ending agencies, your data and leaving Strelva always stay with you.</p>
       </div>
     </StSection>
