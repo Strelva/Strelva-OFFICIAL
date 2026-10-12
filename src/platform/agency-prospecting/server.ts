@@ -26,20 +26,30 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
 }
 
 export async function resolveAgencyAttribution(slug: unknown): Promise<AgencyAttribution | undefined> {
-  // Preserve the public, unattributed path when the new feature is off.
-  if (!agencyProspectingEnabled() || slug === undefined || slug === null) return undefined;
+  // No attribution was requested. A supplied agency must never be silently
+  // replaced with the platform's unattributed acquisition path.
+  if (slug === undefined || slug === null) return undefined;
   if (typeof slug !== "string" || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(slug)) {
     throw new AgencyProspectingError("Invalid agency link.", 400);
+  }
+  if (!agencyProspectingEnabled()) {
+    throw new AgencyProspectingError("This agency check is not available yet. Ask the agency for a new link, or start a free check without agency attribution.", 503);
   }
   const rows = await rpc("agency_prospecting_profile", { p_slug: slug });
   const row = (Array.isArray(rows) ? rows[0] : null) as Row | undefined;
   if (!row) throw new AgencyProspectingError("This agency check is unavailable.", 404);
+  if (row.slug !== slug || typeof row.workspace_id !== "string" || !row.workspace_id) {
+    throw new AgencyProspectingError("This agency link could not be confirmed. Ask the agency for a new link.", 503);
+  }
   const contactUrl = String(row.contact_url);
   try {
     const parsed = new URL(contactUrl);
     if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw new Error("Invalid agency contact URL");
   } catch { throw new AgencyProspectingError("This agency check is unavailable.", 503); }
   const brand = await resolveOwnerBrand(String(row.workspace_id));
+  if (brand.agencyId !== row.workspace_id) {
+    throw new AgencyProspectingError("This agency’s identity could not be confirmed. Ask the agency for a new link or try again later.", 503);
+  }
   return { workspaceId: String(row.workspace_id), slug: String(row.slug), name: brand.name,
     contactUrl, brand: { logoUrl: brand.logoUrl, accentColor: brand.agencyId ? brand.accentColor : null }, ...(brand.replyTo ? { replyTo: brand.replyTo } : {}) };
 }

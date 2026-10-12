@@ -56,11 +56,35 @@ describe("agency public check attribution", () => {
     expect((mocks.rpc.mock.invocationCallOrder[2] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
     expect(mocks.saveResult.mock.calls[0]?.[0]?.agency?.workspaceId).toBe(agency.workspaceId);
   });
-  it("keeps flag-off public behavior and copy unchanged", async () => {
+  it("rejects a requested agency while gated off instead of silently dropping attribution", async () => {
     vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "0");
     const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
-    expect(await response.json()).toMatchObject({ topFix: "Ask Strelva to add schema." });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("agency check is not available yet") });
+    expect(mocks.score).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("keeps the explicitly unattributed check available while prospecting is off", async () => {
+    vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "0");
+    const response = await check(request("/api/ai-visibility", { business: "Acme" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty("agency");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("rejects unavailable agency identity before scoring rather than substituting Strelva", async () => {
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, contact_url: agency.contactUrl }] : null, error: null }));
+    const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("identity could not be confirmed") });
+    expect(mocks.score).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("agency_prospect_admit");
+  });
+  it("rejects a mismatched profile instead of attributing the requested link to another agency", async () => {
+    mocks.rpc.mockResolvedValue({ data: [{ workspace_id: agency.workspaceId, slug: "another-agency", contact_url: agency.contactUrl }], error: null });
+    const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("link could not be confirmed") });
+    expect(mocks.score).not.toHaveBeenCalled();
   });
   it("does not use an agency without explicit attribution", async () => {
     const response = await check(request("/api/ai-visibility", { business: "Acme" }));
@@ -77,7 +101,7 @@ describe("agency public check attribution", () => {
     expect(mocks.score).not.toHaveBeenCalled();
   });
   it("surfaces durable quota failure before expensive work", async () => {
-    mocks.rpc.mockImplementation(async (name: string) => name === "agency_prospect_admit" ? { data: null, error: { message: "agency_prospect_quota" } } : { data: [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl }], error: null });
+    mocks.rpc.mockImplementation(async (name: string) => name === "agency_prospect_admit" ? { data: null, error: { message: "agency_prospect_quota" } } : { data: name === "resolve_owner_brand" ? { agencyId: agency.workspaceId, name: agency.name, brand: null } : [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl }], error: null });
     expect((await check(request("/api/ai-visibility", { business: "Acme", agency: "northside" }))).status).toBe(429);
     expect(mocks.score).not.toHaveBeenCalled();
   });
@@ -116,7 +140,7 @@ describe("agency lead routing", () => {
   it("returns the retained report when agency reply routing becomes unavailable after capture", async () => {
     mocks.rpc.mockImplementation(async (name: string) => {
       if (name === "agency_prospecting_profile" && mocks.rpc.mock.calls.filter(([call]) => call === name).length > 1) return { data: null, error: { message: "Sender lookup unavailable" } };
-      return { data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : null, error: null };
+      return { data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : name === "resolve_owner_brand" ? { agencyId: agency.workspaceId, name: agency.name, brand: null } : null, error: null };
     });
     const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example", agency: "northside" }));
     expect(response.status).toBe(200);
