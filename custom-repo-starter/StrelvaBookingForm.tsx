@@ -142,6 +142,7 @@ export function StrelvaBookingForm({
   const slots = alternatives?.nextSlots ?? schedule.slots;
   const slot = slots.find(value => value.id === slotId);
   const timeZone = native ? visitorTimeZone : alternatives?.timeZone ?? schedule.timeZone;
+  const visitorZoneLabel = native ? zoneName(schedule.slots[0]?.start ?? new Date().toISOString(), visitorTimeZone) : null;
   function showConflict(error: unknown) {
     if (error instanceof PublicBookingConflictError) { setAlternatives(error); setSlotId(error.nextSlots[0]?.id ?? ""); }
   }
@@ -229,7 +230,7 @@ export function StrelvaBookingForm({
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
       <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`}</p>
-      {native && !testOnly ? <p>Times shown in {visitorTimeZone}.</p> : null}
+      {native && !testOnly ? <p>{visitorZoneLabel === "time zone unavailable" ? "Time zone unavailable." : `Times shown in ${visitorZoneLabel}.`}</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>
@@ -280,12 +281,19 @@ export function StrelvaBookingForm({
 
 function formatSlot(slot: Pick<PublicBookingSlot, "start" | "end">, timeZone: string): string {
   try {
-    return `${formatTime(slot.start, timeZone)}–${formatTime(slot.end, timeZone)}`;
+    const range = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone }).formatRange(new Date(slot.start), new Date(slot.end));
+    return `${range} ${zoneName(slot.start, timeZone)}`;
   } catch {
     return `${slot.start}–${slot.end}`;
   }
 }
 
 function formatTime(value: string, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone }).format(new Date(value));
+  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: timeZone === "UTC" ? "short" : "longGeneric", timeZone }).format(new Date(value));
+}
+
+function zoneName(value: string, timeZone: string): string {
+  if (timeZone === "UTC") return "UTC";
+  try { return new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: "longGeneric" }).formatToParts(new Date(value)).find(part => part.type === "timeZoneName")!.value; }
+  catch { return "time zone unavailable"; }
 }

@@ -382,7 +382,36 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
 /** Reserves the children's full height and phone navigation clearance in flow.
  * Place after the work in its scroll owner, outside any fixed-position wrapper. */
 export function StComposerDock({ children }: { children: ReactNode }) {
-  return <div className={styles.composerDock}>{children}</div>;
+  const dockRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    // Native pages can own a nested scroller (Ask, Systems, the workspace).
+    // Reserve space there, rather than on an outer frame that never scrolls.
+    let scroll = dock.parentElement;
+    while (scroll && !scroll.matches("[data-workspace-scroll], [data-frame-main]")) {
+      if (/^(auto|scroll)$/.test(getComputedStyle(scroll).overflowY)) break;
+      scroll = scroll.parentElement;
+    }
+    if (!scroll) return;
+    const previous = scroll.style.getPropertyValue("--st-composer-clearance");
+    const previousPriority = scroll.style.getPropertyPriority("--st-composer-clearance");
+    const alreadyMarked = scroll.hasAttribute("data-st-composer-clearance");
+    scroll.setAttribute("data-st-composer-clearance", "");
+    const measure = () => scroll.style.setProperty("--st-composer-clearance", `${Math.ceil(dock.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(dock);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      if (previous) scroll.style.setProperty("--st-composer-clearance", previous, previousPriority);
+      else scroll.style.removeProperty("--st-composer-clearance");
+      if (!alreadyMarked) scroll.removeAttribute("data-st-composer-clearance");
+    };
+  }, []);
+  return <div ref={dockRef} className={styles.composerDock} data-st-composer-dock>{children}</div>;
 }
 
 /* ---------- Forms and dense comparison ---------- */

@@ -86,8 +86,16 @@ form semantics. Rules and adoption lanes:
 
 October 12 Ask-lane amendment: `StComposerDock` reserves the complete rendered
 composer and bottom-navigation inset in flow; place it after the work in its
-scroll owner, outside fixed wrappers. Composer-bearing AppFrame pages remain
-scrollable. `StComposerBar` Send is 44×44 on coarse pointers. Ask history composes
+scroll owner, outside fixed wrappers. The leftovers amendment measures the dock's
+border box with ResizeObserver and reserves that height on the nearest actual
+scroll owner, with matching focus-scroll padding. Its negative bottom margin
+transfers the dock's flow footprint to that padding once. Shared shell phone
+tokens include the 64px navigation bar and the safe-area inset; pages without a
+dock retain navigation clearance. `data-workspace-scroll` explicitly identifies
+nested workspace and conversation scrollers. Composer-bearing AppFrame pages remain
+scrollable; the linen frame also scrolls long receipts and pages without a dock.
+Kit pages cannot shrink into the dock. `StComposerBar` Send is
+44×44 on coarse pointers. Ask history composes
 the kit text trigger and shared GooeyDisclosure with unique controls, inert
 closed content and reduced motion. The website creation link retains only a
 validated saved-message continuation, including historical answers; its destination
@@ -96,6 +104,21 @@ heading order without adding another H1. Website frames use their parent's bound
 flex space; native bookings and website panels leave the main landmark to the shell.
 Week groups retain spacing and one shared row hairline. Local source/DOM tests pass;
 post-merge desktop/phone visual qualification is pending.
+
+October 12 leftovers: standalone `InquiryExperience` consumes `StrelvaShell`
+for the same workspace header, navigation, brand and bottom account as owner
+pages. Inquiries is the active pinned item; inquiry-specific New, Search,
+Businesses, Recent changes and local Account links remain in-page. Optional
+authorized `business.workspaceId` keeps sidebar links in the displayed business;
+the server's `releases.systems` presentation flag retains its existing scope and
+default, including false on a failed flag read. Optional
+`rightRailId`/`rightRailTitle` preserve the record-history rail's name while
+retaining the shared shell's existing discussion defaults. Visitor booking
+instants and readable email times name the zone once (for example, Eastern Time),
+including client-form ranges. Visitor confirmation/selection deadlines use a
+separate `.deadline` block with 16px vertical spacing. Source and DOM tests are
+local evidence; fresh desktop/phone rendering is deferred under the audit brief's
+dev/build/Playwright prohibition.
 
 L11 keeps the trusted business's display font on `StEntry`'s brand with
 optional `brandFontFamily`; form text retains workspace typography. Missing

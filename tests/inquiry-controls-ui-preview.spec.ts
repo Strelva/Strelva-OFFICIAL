@@ -27,7 +27,7 @@ test.describe("inquiry control surfaces", () => {
 
     await page.getByRole("button", { name: "Plan", exact: true }).click();
     await page.getByRole("button", { name: "Recent changes", exact: true }).click();
-    await page.getByRole("link", { name: "Buffalo Realty inquiries home" }).click();
+    await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "Inquiries", exact: true }).click();
     await page.getByRole("button", { name: "Read the responsibility", exact: true }).click();
     await page.getByLabel("Responsibility title").fill("Handle seller inquiries carefully");
     await page.getByLabel("Scope").fill("Route seller inquiries and prepare a bounded follow-up during approved hours.");

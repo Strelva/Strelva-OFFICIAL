@@ -1,3 +1,4 @@
+import styles from "@/experience/bookings/visitor.module.css";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createHash } from "node:crypto";
@@ -38,8 +39,10 @@ describe("token-verified public identity", () => {
   it("renders a readable zoned time and the recorded confirmation deadline", async () => {
     m.rpc.mockResolvedValue({ ...identity, timeZone: "America/New_York", expiresAt: "2026-11-06T12:15:00Z" });
     const html = await confirmation();
-    expect(html).toContain("7:00 AM EST (America/New_York)"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM EST (America/New_York)");
+    expect(html).toContain("7:00 AM Eastern Time"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time");
     expect(html).not.toContain("2026-11-06T12:00");
+    expect(html).not.toContain("America/New_York");
+    expect(html).toContain(`<p class="${styles.deadline}">Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time.</p>`);
   });
   it("holds a consumed but unplaced outcome for a read rather than offering another placement", async () => {
     m.rpc.mockResolvedValue({ ...identity, state: "confirming" });

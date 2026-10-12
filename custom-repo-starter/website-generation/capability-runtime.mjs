@@ -265,12 +265,21 @@ function mountInquiry(root, config, api) {
 
 function readableTime(value, timeZone) {
   try {
-    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone }).format(new Date(value));
+    return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: timeZone === "UTC" ? "short" : "longGeneric", timeZone }).format(new Date(value));
   } catch { return value; }
 }
 
+function zoneName(value, timeZone) {
+  if (timeZone === "UTC") return "UTC";
+  try { return new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: "longGeneric" }).formatToParts(new Date(value)).find(part => part.type === "timeZoneName").value; }
+  catch { return "time zone unavailable"; }
+}
+
 function slotLabel(slot, timeZone) {
-  return `${readableTime(slot.start, timeZone)}–${readableTime(slot.end, timeZone)}`;
+  try {
+    const range = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone }).formatRange(new Date(slot.start), new Date(slot.end));
+    return `${range} ${zoneName(slot.start, timeZone)}`;
+  } catch { return `${slot.start}–${slot.end}`; }
 }
 
 function mountBooking(root, config, api) {
@@ -284,7 +293,10 @@ function mountBooking(root, config, api) {
     const visitorTimeZone = native ? new Intl.DateTimeFormat().resolvedOptions().timeZone : schedule.timeZone;
     const wrapper = element("section", undefined, { "aria-label": schedule.name });
     wrapper.append(element("h2", schedule.name), element("p", native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`));
-    if (native) wrapper.append(element("p", `Times shown in ${visitorTimeZone}.`));
+    if (native) {
+      const zone = zoneName(schedule.slots[0].start, visitorTimeZone);
+      wrapper.append(element("p", zone === "time zone unavailable" ? "Time zone unavailable." : `Times shown in ${zone}.`));
+    }
     const form = element("form", undefined, { "aria-label": "Reserve a time" });
     const slotSelect = element("select", undefined, { id: "strelva-booking-slot", name: "slot" });
     const renderSlots = () => {

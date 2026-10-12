@@ -29,7 +29,7 @@ export default async function BookingConfirmationPage({ params, searchParams }: 
           : identity?.state === "confirming" ? "Your email was received, but the booking outcome is not confirmed. Reload to read its current status, or contact the business."
           : "Nothing is booked until you confirm your email. The business may then need to accept your request."}</p>
         {identity ? <p className={styles.note}>Requested time: {formatVisitorTime(identity.start, identity.timeZone)}</p> : null}
-        {!done && identity?.expiresAt ? <p className={styles.note}>Confirm by {formatVisitorTime(identity.expiresAt, identity.timeZone)}.</p> : null}
+        {!done && identity?.expiresAt ? <p className={styles.deadline}>Confirm by {formatVisitorTime(identity.expiresAt, identity.timeZone)}.</p> : null}
         {!done && !error && identity?.state === "held" ? <form method="post" action={`/booking-confirm/${encodeURIComponent(token)}/action`} className="mt-6">
           <button type="submit" className={styles.button}>Confirm my email and request this time</button>
         </form> : null}

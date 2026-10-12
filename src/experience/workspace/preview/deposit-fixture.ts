@@ -4,7 +4,7 @@ import type { PublicPaymentRequest } from "@/app/pay/business/public-payment";
 export const depositFixture = {
   business: "Lakeview Yoga",
   title: "Weekend retreat: breath and mobility",
-  date: "Sat–Sun, Nov 7–8, 2026 · 10 AM – 4 PM EST (America/New_York) · with Ana and Theo · 14 spots",
+  date: "Sat–Sun, Nov 7–8, 2026 · 10 AM – 4 PM Eastern Time · with Ana and Theo · 14 spots",
   description: "Two days of slow practice, breathwork and mobility. Lunch included both days. Beginners welcome.",
   deposit: "[deposit]",
   balance: "[balance]",

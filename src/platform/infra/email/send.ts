@@ -119,7 +119,7 @@ export function readableBookingInstant(value: string, timeZone: string): string 
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return value;
   try {
-    return `${new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(date)} (${timeZone})`;
+    return new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: timeZone === "UTC" ? "short" : "longGeneric" }).format(date);
   } catch { return readableBookingInstant(value, "UTC"); }
 }
 
@@ -132,7 +132,12 @@ function readableBookingRow(row: { label: string; value: string }, timeZone: str
   if (row.label === "Time" && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(row.value)) {
     const [hour, minute] = row.value.split(":").map(Number);
     const clock = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", hour: "numeric", minute: "2-digit" }).format(new Date(Date.UTC(2000, 0, 1, hour, minute)));
-    return { ...row, value: `${clock} (${timeZone ?? "time zone unavailable"})` };
+    let zone = "time zone unavailable";
+    if (timeZone) {
+      try { zone = timeZone === "UTC" ? "UTC" : new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longGeneric" }).formatToParts(new Date(0)).find(part => part.type === "timeZoneName")!.value; }
+      catch { /* Keep the recorded local clock; its zone could not be read. */ }
+    }
+    return { ...row, value: `${clock} ${zone}` };
   }
   return row;
 }

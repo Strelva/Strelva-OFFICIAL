@@ -41,7 +41,7 @@ it("uses the verified business name, reply destination and readable local confir
   const payload = mocks.send.mock.calls[0]![0];
   expect(payload).toMatchObject({ from: '"Lakeview Yoga" <bookings@mail.strelva.com>', replyTo: "hello@lakeview.example" });
   for (const body of [payload.html, payload.text]) {
-    expect(body).toContain("Lakeview Yoga"); expect(body).toContain("10:00 AM (America/New_York)");
+    expect(body).toContain("Lakeview Yoga"); expect(body).toContain("10:00 AM Eastern Time");
     expect(body).not.toContain("2026-11-03T"); expect(body).not.toContain("Unverified supplied name");
   }
 });
@@ -77,15 +77,21 @@ it("revalidates newsletter envelope identity and never falls back to Strelva rep
   expect(await sendBatchWithReceipt(batch)).toMatchObject({ status: "suppressed", reason: "business_reply_identity_unavailable" }); expect(mocks.batch).not.toHaveBeenCalled();
 });
 it("keeps local times explicit across daylight-saving offsets and an unavailable zone", () => {
-  expect(readableBookingInstant("2026-03-08T07:00:00Z", "America/New_York")).toContain("3:00 AM (America/New_York)");
-  expect(readableBookingInstant("2026-11-01T06:00:00Z", "America/New_York")).toContain("1:00 AM (America/New_York)");
-  expect(readableBookingInstant("2026-11-03T15:00:00Z", "Invalid/Zone")).toContain("3:00 PM (UTC)");
+  expect(readableBookingInstant("2026-03-08T07:00:00Z", "America/New_York")).toContain("3:00 AM Eastern Time");
+  expect(readableBookingInstant("2026-11-01T06:00:00Z", "America/New_York")).toContain("1:00 AM Eastern Time");
+  expect(readableBookingInstant("2026-11-03T15:00:00Z", "Invalid/Zone")).toContain("3:00 PM UTC");
+  for (const zone of ["America/New_York", "America/Los_Angeles", "UTC", "Invalid/Zone"]) {
+    const readable = readableBookingInstant("2026-11-03T15:00:00Z", zone);
+    expect(readable).not.toContain("(");
+    expect(readable).not.toContain("America/");
+    expect(readable.match(/Eastern Time|Pacific Time|UTC/g)).toHaveLength(1);
+  }
 });
 
 it("formats legacy local date and clock rows without shifting the business date", async () => {
   await sendEmailWithReceipt({ ...booking, options: { heading: "Booking", rows: [{ label: "Date", value: "2026-11-03" }, { label: "Time", value: "10:00" }] } });
   const payload = mocks.send.mock.calls[0]![0];
-  expect(payload.text).toContain("Tue, Nov 3, 2026"); expect(payload.text).toContain("10:00 AM (America/New_York)");
+  expect(payload.text).toContain("Tue, Nov 3, 2026"); expect(payload.text).toContain("10:00 AM Eastern Time");
 });
 it("enforces workspace exclusions even when a legacy sender supplies only a tenant", async () => {
   mocks.override.mockImplementation(async (key: string) => key === `workspace:${workspaceId}` ? "off" : "inherit");

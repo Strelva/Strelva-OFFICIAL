@@ -23,6 +23,8 @@ import type {
 
 export type InquiryExperienceProps = {
   audience?: "business" | "agency";
+  /** Explicit workspace presentation flag; absent keeps the existing release default. */
+  systemsReleased?: boolean;
   scenario?: string;
   initialView?: InquiryView;
   initialRequestId?: string | null;

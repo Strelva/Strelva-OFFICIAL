@@ -21,7 +21,7 @@ export function OwnerConversationPreview({ frame, state, mode = "light" }: { fra
       notice={<StNotice>Fictional conversation and results. Controls change this preview only; nothing is sent, published, booked or saved.</StNotice>}
       navigation={<nav className={styles.conversations} aria-label="Fictional conversations">{Object.entries(OWNER_CONVERSATIONS).map(([id, conversation]) => <Link key={id} href={`/preview/strelva/owner-conversation?frame=${id}&mode=${mode}`} aria-current={id === frame ? "page" : undefined}>{conversation.title}</Link>)}</nav>}
     >
-      <div className={styles.scroll}>
+      <div className={styles.scroll} data-workspace-scroll>
       <AskStrelva key={`${frame}:${state}`} workspaceId={OWNER_CONVERSATION_WORKSPACE} businessName={OWNER_CONVERSATION_BUSINESS} systemName={fixture.scope} request={request}
         initialMessages={messages} readOnly={state === "permission"} readOnlyReason="You can’t ask or approve in this preview state. Open a business where you have access."
         refusalLinks={{ needsYou: "/preview/strelva/owner-decision", help: "/preview/strelva/owner-conversation?frame=YsBMM" }}

@@ -275,6 +275,9 @@ export class InquiryConcurrencyError extends Error {
 type SurfaceContext = {
   tenantId: string;
   businessId: string;
+  /** Workspace mapping resolved by the authorized route, never a tenant UUID guess. */
+  workspaceId?: string;
+  systemsReleased?: boolean;
   config: TenantConfig;
   audience?: "business" | "agency";
   repository?: InquiryRepository;
@@ -680,10 +683,12 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   } catch { /* Leave connection availability explicit when its authority cannot be read. */ }
   return {
     revision: workspace.snapshot?.revision ?? null,
+    ...(input.workspaceId ? { releases: { systems: input.systemsReleased === true } } : {}),
     servingAgency: await resolveTenantBrand(input.tenantId),
     business: {
       id: input.businessId,
       tenantId: input.tenantId,
+      ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
       name: businessName,
       domain: website,
       role: businessRole,

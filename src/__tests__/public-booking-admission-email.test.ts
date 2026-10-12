@@ -27,7 +27,7 @@ describe("public booking confirmation email boundary", () => {
   it("sends the private confirmation token only to the captured customer, with one stable send key", async () => {
     await publicBookingAdmission.send(row); await publicBookingAdmission.send(row);
     const [first, second] = m.send.mock.calls.map(c => c[0]);
-    expect(first).toMatchObject({ audience: "customer", tenantId: "fixture", to: "dana@example.test", fromAddress: "bookings@mail.strelva.com", fromName: "Lakeview Yoga", subject: "Confirm your booking request with Lakeview Yoga", authorship: "business", businessName: "Lakeview Yoga", options: { rows: [{ label: "Requested time", value: expect.stringContaining("7:00 AM EST (America/New_York)") }, { label: "Confirm by", value: expect.stringContaining("7:00 AM EST (America/New_York)") }], button: { url: `https://app.example.test/booking-confirm/${token}` } } });
+    expect(first).toMatchObject({ audience: "customer", tenantId: "fixture", to: "dana@example.test", fromAddress: "bookings@mail.strelva.com", fromName: "Lakeview Yoga", subject: "Confirm your booking request with Lakeview Yoga", authorship: "business", businessName: "Lakeview Yoga", options: { rows: [{ label: "Requested time", value: expect.stringContaining("7:00 AM Eastern Time") }, { label: "Confirm by", value: expect.stringContaining("7:00 AM Eastern Time") }], button: { url: `https://app.example.test/booking-confirm/${token}` } } });
     expect(first.idempotencyKey).toBe(second.idempotencyKey); expect(first.idempotencyKey).not.toContain(token);
   });
   it("refuses admission before storage or mail when customer email is disabled", async () => {

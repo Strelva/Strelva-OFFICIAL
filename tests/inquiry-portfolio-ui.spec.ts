@@ -8,7 +8,7 @@ test("attention opens the selected draft without losing preview work", async ({ 
   await page.getByLabel("What should your inquiry form do?").fill("Collect quote requests for repairs");
   await page.getByRole("button", { name: "Shape this request" }).click();
   await page.getByRole("button", { name: "Go with this shape" }).click();
-  await page.getByRole("link", { name: "Buffalo Realty inquiries home" }).click();
+  await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "Inquiries", exact: true }).click();
   await page.getByRole("button", { name: "Needs you across businesses" }).click();
   await expect(page.getByRole("heading", { name: "One business decision at a time." })).toBeVisible();
   await page.getByRole("link", { name: "Open this work" }).click();
@@ -25,7 +25,7 @@ test("a copied pattern uses the chosen staff and needs its own rehearsal", async
   await page.getByRole("button", { name: "Run rehearsal", exact: true }).click();
   await page.getByRole("button", { name: "Make it live", exact: true }).click();
   await page.getByRole("button", { name: "Recent changes", exact: true }).click();
-  await page.getByRole("link", { name: "Buffalo Realty inquiries home" }).click();
+  await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "Inquiries", exact: true }).click();
   await page.getByRole("button", { name: "Reuse an inquiry pattern" }).click();
   await expect(page.getByText(/Source: Buffalo Realty/)).toBeVisible();
   await page.getByLabel("Destination for Buffalo Realty").fill("team@example.test");

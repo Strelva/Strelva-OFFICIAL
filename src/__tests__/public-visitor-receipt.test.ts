@@ -18,10 +18,16 @@ describe("public visitor receipt projections", () => {
     m.rpc.mockResolvedValue({ status: "unknown" }); expect(await readVisitorInquiryReceipt(token)).toBeNull();
     m.rpc.mockResolvedValue({ start: "2026-11-06T15:00:00Z", end: "2026-11-06T16:00:00Z", state: "held", bookingStatus: null }); expect(await readVisitorConfirmation(token)).toBeNull();
   });
-  it("names the fallback zone honestly and distinguishes summer from winter", () => {
-    expect(formatVisitorTime("2026-07-06T14:00:00Z", "America/New_York")).toContain("10:00 AM EDT (America/New_York)");
-    expect(formatVisitorTime("2026-11-06T14:00:00Z", "America/New_York")).toContain("9:00 AM EST (America/New_York)");
-    expect(formatVisitorTime("2026-11-06T14:00:00Z", "invalid-zone")).toContain("2:00 PM UTC (UTC)");
+  it("shows one readable zone with the correct summer, winter and fallback clocks", () => {
+    expect(formatVisitorTime("2026-07-06T14:00:00Z", "America/New_York")).toContain("10:00 AM Eastern Time");
+    expect(formatVisitorTime("2026-11-06T14:00:00Z", "America/New_York")).toContain("9:00 AM Eastern Time");
+    expect(formatVisitorTime("2026-11-06T14:00:00Z", "invalid-zone")).toContain("2:00 PM UTC");
+    for (const zone of ["America/New_York", "America/Los_Angeles", "UTC", "invalid-zone"]) {
+      const text = formatVisitorTime("2026-11-06T14:00:00Z", zone);
+      expect(text).not.toContain("(");
+      expect(text).not.toContain("America/");
+      expect(text.match(/Eastern Time|Pacific Time|UTC/g)).toHaveLength(1);
+    }
   });
   it("prepares read-only, service-only SQL with a bounded inquiry receipt and a matching inverse", () => {
     const forward = readFileSync("supabase/migrations/20261024124500_ux_visitor_booking_receipts.sql", "utf8");

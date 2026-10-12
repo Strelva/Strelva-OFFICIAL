@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SendEmailInput } from "@/platform/infra/email/send";
 import { runBookingLifecycle, type BookingLifecyclePorts } from "@/platform/bookings/lifecycle";
-import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail } from "@/platform/bookings/emails";
+import { bookingWhen, customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail } from "@/platform/bookings/emails";
 import { bookingRequestAdapter, bookingRequestGoneReason } from "@/platform/bookings/needs-you-adapter";
 import { bookingRemindersEnabled } from "@/platform/bookings/flags";
 import type { StoreBooking } from "@/platform/bookings/store";
@@ -63,13 +63,13 @@ describe("booking lifecycle run", () => {
 
     const lapse = sent.find((s) => s.idempotencyKey === "booking-message:m-lapse")!;
     expect(lapse).toMatchObject({ audience: "customer", to: "dana@example.test", fromName: "The Mooney Firm", fromAddress: "bookings@mail.strelva.com" });
-    expect(lapse.subject).toBe("Your request for Thu, Nov 12 at 2:00 PM (America/New_York) wasn't confirmed");
+    expect(lapse.subject).toBe("Your request for Thu, Nov 12 at 2:00 PM Eastern Time wasn't confirmed");
     expect(lapse.options?.bullets?.map((b) => b.title)).toEqual(["Wed, Nov 4 at 9:00 AM", "Wed, Nov 4 at 9:30 AM"]);
     expect(lapse.options?.button?.url).toBe("https://attymooney.example");
 
     const reminder = sent.find((s) => s.idempotencyKey === "booking-message:m-24")!;
     expect(reminder).toMatchObject({ audience: "customer", to: "dana@example.test", fromAddress: "bookings@mail.strelva.com" });
-    expect(reminder.subject).toBe("Reminder: Consultation with The Mooney Firm, Tue, Nov 3 at 10:00 AM (America/New_York)");
+    expect(reminder.subject).toBe("Reminder: Consultation with The Mooney Firm, Tue, Nov 3 at 10:00 AM Eastern Time");
     expect(reminder.options?.button).toEqual({ label: "Change or cancel", url: "https://app.strelva.example/b/tok" });
 
     const owner = sent.find((s) => s.idempotencyKey === "booking-message:m-owner")!;
@@ -159,13 +159,17 @@ describe("booking lifecycle run", () => {
 });
 
 describe("booking emails", () => {
+  it("keeps the local clock without calling it UTC when its saved zone is invalid", () => {
+    expect(bookingWhen(booking({ timeZone: "Invalid/Zone", localStart: "14:30" }))).toEqual({ day: "Tue, Nov 3", time: "2:30 PM time zone unavailable" });
+    expect(bookingWhen(booking({ timeZone: "UTC", localStart: "14:30" })).time).toBe("2:30 PM UTC");
+  });
   it("says what changed and what the customer can do, in the booking's own time", () => {
     const soon = customerReminderEmail({ booking: booking({ localStart: "14:30" }), kind: "reminder_2h", businessName: "Mooney", manageUrl: null });
-    expect(soon.subject).toBe("Today at 2:30 PM (America/New_York): Consultation with Mooney");
+    expect(soon.subject).toBe("Today at 2:30 PM Eastern Time: Consultation with Mooney");
     expect(soon.options.paragraphs?.[1]).toBe("Need to change or cancel? Reply to this email and the business will help.");
     expect(soon.options.button).toBeUndefined();
     const owner = ownerRequestReminderEmail({ booking: booking({ status: "requested" }), businessName: "Mooney", openUrl: "https://x" });
-    expect(owner.subject).toBe("Still waiting on you: Dana Reed, Tue, Nov 3 10:00 AM (America/New_York)");
+    expect(owner.subject).toBe("Still waiting on you: Dana Reed, Tue, Nov 3 10:00 AM Eastern Time");
     expect(owner.options.paragraphs?.join(" ")).toContain("never confirmed by silence");
     const lapsed = requestLapsedEmail({ booking: booking(), businessName: "Mooney", alternatives: ["a", "b", "c", "d"], bookAgainUrl: null });
     expect(lapsed.options.bullets).toHaveLength(3);

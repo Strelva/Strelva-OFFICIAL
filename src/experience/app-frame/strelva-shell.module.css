@@ -1,7 +1,28 @@
 .root {
+  --st-phone-navigation-height: 0px;
+  --st-workspace-safe-area: 0px;
   min-width: 0;
   min-height: 0;
   color-scheme: dark;
+}
+
+/* Shared phone clearance also protects pages that have tabs but no dock. */
+@media (max-width: 767px) {
+  .root {
+    --st-phone-navigation-height: 64px;
+    --st-workspace-safe-area: env(safe-area-inset-bottom, 0px);
+  }
+
+  .root :is([data-frame-main], [data-workspace-scroll]):not([data-st-composer-clearance]) {
+    box-sizing: border-box;
+    padding-bottom: calc(var(--st-phone-navigation-height) + var(--st-workspace-safe-area));
+    scroll-padding-bottom: calc(var(--st-phone-navigation-height) + var(--st-workspace-safe-area));
+  }
+
+  /* A nested scroll owner reserves its own inset. */
+  .root [data-frame-main]:has([data-workspace-scroll], [data-st-composer-clearance]):not([data-st-composer-clearance]) {
+    padding-bottom: 0;
+  }
 }
 
 /* October 6, 2026: linen content in DM Sans beside the ink rail. */
@@ -14,6 +35,12 @@
 
 .root[data-workspace-theme="linen"] .shell {
   --app-navigation-width: 248px;
+}
+
+/* Long workspace pages also scroll when a permission/loading state removes
+   the dock, or when the page is a read-only receipt. */
+.root[data-workspace-theme="linen"] :global([data-frame-main]) {
+  overflow-y: auto;
 }
 
 .shell {

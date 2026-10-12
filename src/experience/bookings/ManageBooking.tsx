@@ -122,7 +122,7 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
                           <label key={slot.id} className={styles.choice}>
                             <input type="radio" name="slotId" value={slot.id} required className="peer sr-only" />
                             <span>
-                              {slot.time}
+                              {slot.time} {booking.timeZoneLabel}
                             </span>
                           </label>
                         ))}

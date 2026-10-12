@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrelvaBookingForm, StrelvaConnectedBookingForm } from "../StrelvaBookingForm";
 import { PublicBookingConflictError, bookingRequestStorageKey, clearBookingRequestDraft, createBookingRequestId } from "../booking-client";
@@ -264,11 +265,17 @@ describe("fresh conflict choices", () => {
 
 
 describe("native business confirmation", () => {
+  it("renders a neutral zone note before hydration when the saved schedule zone is invalid", () => {
+    const html = renderToStaticMarkup(createElement(StrelvaBookingForm, { schedule: { ...schedule, bookingAuthority: "business", timeZone: "Invalid/Zone" }, onReserve: vi.fn() }));
+    expect(html).toContain("Time zone unavailable.");
+    expect(html).not.toContain("Times shown in Invalid/Zone");
+    expect(html).not.toContain(" UTC");
+  });
   it("shows local timezone and optional phone without claiming a calendar write", async () => {
     const native = { ...schedule, bookingAuthority: "business" as const };
     const onReserve = vi.fn().mockResolvedValue(receipt);
     await renderForm({ schedule: native, onReserve });
-    expect(container.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat().resolvedOptions().timeZone}.`);
+    expect(container.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value}.`);
     expect(container.textContent).not.toContain("Outlook will confirm");
     const name = container.querySelector<HTMLInputElement>('input[name="name"]')!; const email = container.querySelector<HTMLInputElement>('input[name="email"]')!;
     const phone = container.querySelector<HTMLInputElement>('input[name="phone"]')!;
@@ -290,6 +297,15 @@ describe("native business confirmation", () => {
 
 
 describe("booking receipt next action", () => {
+  it("shows one human-readable zone per offered range and receipt", async () => {
+    await renderForm({ receipt });
+    const option = container.querySelector("option")!;
+    const summary = container.querySelector('section[aria-label="Booking receipt"]')!;
+    expect(option.textContent).toContain("Eastern Time");
+    expect(option.textContent?.match(/Eastern Time/g)).toHaveLength(1);
+    expect(summary.textContent?.match(/Eastern Time/g)).toHaveLength(1);
+    expect(container.textContent).not.toContain("America/New_York");
+  });
   it("puts email confirmation and its zoned deadline before business confirmation", async () => {
     const awaitingEmail = { ...receipt, confirmationRequired: true, confirmationExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), businessName: "Northstar" };
     const onReconcile = vi.fn().mockResolvedValue({ ...awaitingEmail, status: "pending", confirmationRequired: false });
@@ -297,7 +313,7 @@ describe("booking receipt next action", () => {
     const section = container.querySelector('section[aria-label="Booking receipt"]')!;
     expect(section.querySelector("h3")?.textContent).toBe("Check your email to confirm");
     expect(section.textContent).toContain("Confirm by");
-    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(new Date(awaitingEmail.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
+    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(awaitingEmail.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
     expect(section.textContent).toContain("use its link");
     expect(section.textContent).not.toContain("Cancel booking");
     await act(async () => (section.querySelector("button") as HTMLButtonElement).click());

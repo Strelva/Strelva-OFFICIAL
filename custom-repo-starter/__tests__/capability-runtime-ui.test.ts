@@ -113,13 +113,25 @@ describe("generated booking conflict guidance", () => {
 
 
 describe("native business receipt and phone", () => {
+  it("keeps the generated form available with a neutral note when the browser zone cannot be read", async () => {
+    const options = new Intl.DateTimeFormat().resolvedOptions();
+    const zone = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ ...options, timeZone: "Invalid/Zone" });
+    try {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(response({ ...schedule, bookingAuthority: "business" })));
+      const root = document.createElement("div"); root.setAttribute("data-strelva-capability", "booking"); root.setAttribute("data-strelva-config", JSON.stringify(config)); document.body.append(root);
+      mountPublishedCapabilities(document); await settle();
+      expect(root.textContent).toContain("Time zone unavailable.");
+      expect(root.querySelector('form[aria-label="Reserve a time"]')).not.toBeNull();
+      expect(root.textContent).not.toContain(" UTC");
+    } finally { zone.mockRestore(); }
+  });
   it("keeps phone and shows business confirmation without asserting a provider copy", async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(response({ ...schedule, bookingAuthority: "business" }))
       .mockResolvedValueOnce(response(pending,201)).mockResolvedValueOnce(response(confirmed));
     vi.stubGlobal("fetch",fetcher);
     const root=document.createElement("div");root.setAttribute("data-strelva-capability","booking");root.setAttribute("data-strelva-config",JSON.stringify(config));document.body.append(root);
     mountPublishedCapabilities(document);await settle();
-    expect(root.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat().resolvedOptions().timeZone}.`);
+    expect(root.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value}.`);
     const name=root.querySelector<HTMLInputElement>("#strelva-booking-name")!;const email=root.querySelector<HTMLInputElement>("#strelva-booking-email")!;const phone=root.querySelector<HTMLInputElement>("#strelva-booking-phone")!;
     name.value="Dana";email.value="dana@example.test";phone.value=" 716-555-0123 ";
     root.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await settle();
@@ -152,7 +164,7 @@ describe("generated booking receipt next action", () => {
     const section = root.querySelector('section[aria-label="Booking receipt"]')!;
     expect(section.querySelector("h3")?.textContent).toBe("Check your email to confirm");
     expect(section.textContent).toContain("Confirm by");
-    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(new Date(metadata.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
+    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(metadata.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
     expect(section.textContent).not.toContain("Cancel booking");
     section.querySelector<HTMLButtonElement>("button")!.click();
     await settle();
@@ -178,7 +190,8 @@ describe("generated booking receipt next action", () => {
     root.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await settle();
     expect(root.querySelector('section[aria-label="Booking receipt"] h3')?.textContent).toBe("Outcome not confirmed");
-    expect(root.querySelector("option")?.textContent).toMatch(/EDT|GMT-4/);
+    expect(root.querySelector("option")?.textContent).toContain("Eastern Time");
+    expect(root.querySelector("option")?.textContent?.match(/Eastern Time/g)).toHaveLength(1);
     expect(root.textContent).not.toContain("Waiting on");
     expect(root.textContent).not.toContain("confirmation email");
   });

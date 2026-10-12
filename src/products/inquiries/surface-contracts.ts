@@ -46,11 +46,15 @@ export type InquirySurfaceSnapshot = {
     id: string;
     /** Routing slug used by server-authorized operational commands. */
     tenantId?: string;
+    /** Trusted installed-workspace association; absent for an unmapped tenant. */
+    workspaceId?: string;
     name: string;
     domain: string | null;
     role: "owner" | "agency_member" | "read_only";
     description: string;
   };
+  /** Authorized presentation flags for the mapped workspace; absent keeps defaults off. */
+  releases?: { systems: boolean };
   /** Current serving agency presentation, independent of historical receipt actors. */
   servingAgency?: import("@/platform/infra/agency-brand").OwnerBrand | null;
   state: InquiryEngineState;

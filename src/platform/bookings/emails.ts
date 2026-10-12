@@ -11,6 +11,7 @@
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { cleanSubjectText } from "@/platform/infra/email/text";
 import type { StoreBooking } from "./store";
+import { visitorTimeZoneLabel } from "./public-admission-time";
 
 /** "Tue, Nov 3" and "10:00 AM" in the booking's own zone. */
 export function bookingWhen(booking: Pick<StoreBooking, "localDate" | "localStart"> & Partial<Pick<StoreBooking, "timeZone">>): { day: string; time: string } {
@@ -20,7 +21,7 @@ export function bookingWhen(booking: Pick<StoreBooking, "localDate" | "localStar
     : new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(date);
   const [h, m] = booking.localStart.split(":").map(Number);
   const hour = ((h ?? 0) % 12) || 12;
-  return { day, time: `${hour}:${String(m ?? 0).padStart(2, "0")} ${(h ?? 0) < 12 ? "AM" : "PM"}${booking.timeZone ? ` (${booking.timeZone})` : ""}` };
+  return { day, time: `${hour}:${String(m ?? 0).padStart(2, "0")} ${(h ?? 0) < 12 ? "AM" : "PM"}${booking.timeZone ? ` ${visitorTimeZoneLabel(`${booking.localDate}T12:00:00Z`, booking.timeZone, "time zone unavailable")}` : ""}` };
 }
 
 function first(name: string): string {

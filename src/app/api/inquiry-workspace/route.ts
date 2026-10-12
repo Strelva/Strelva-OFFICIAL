@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { readJsonObject } from "@/lib/request-body";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import { sessionTenantDecider } from "@/lib/operator-decisions";
 import { requireActiveSubscription } from "@/lib/subscription";
 import {
@@ -69,7 +70,12 @@ async function contextFor(request: Request, body?: Record<string, unknown>, audi
     tenantStableId: config.stableId,
     fallbackBusinessId: config.stableId ?? tenant,
   });
-  return { tenantId: tenant, config, businessId: workspace.businessId, exitCompleted: workspace.exitCompleted } as const;
+  return { tenantId: tenant, config, businessId: workspace.businessId, ...(workspace.mapped ? { workspaceId: workspace.businessId } : {}), exitCompleted: workspace.exitCompleted } as const;
+}
+
+/** Presentation only; failed flag reads keep the existing off state. */
+async function readSystemsPresentation(workspaceId: string, userId: string | null): Promise<boolean> {
+  return userId ? systemsReleasedFor({ userId }, workspaceId).catch(() => false) : false;
 }
 
 function expectedRevision(value: unknown): number | null | undefined {
@@ -97,7 +103,11 @@ export async function GET(request: Request) {
   try {
     const context = await contextFor(request, undefined, true);
     if ("error" in context && context.error) return context.error;
-    const result = await readInquirySurface({ tenantId: context.tenantId, businessId: context.businessId, config: context.config });
+    const navigation = context.workspaceId ? {
+      workspaceId: context.workspaceId,
+      systemsReleased: await readSystemsPresentation(context.workspaceId, await getAuthUserId()),
+    } : {};
+    const result = await readInquirySurface({ tenantId: context.tenantId, businessId: context.businessId, ...navigation, config: context.config });
     return json({ snapshot: result.snapshot });
   } catch (error) {
     return failure(error);
@@ -130,7 +140,8 @@ export async function POST(request: Request) {
       const blocked = await requireActiveSubscription(context.tenantId);
       if (blocked) return blocked;
     }
-    const result = await executeInquirySurface({ context, action, expectedRevision: revision, actorId });
+    const navigation = context.workspaceId ? { systemsReleased: await readSystemsPresentation(context.workspaceId, actorId) } : {};
+    const result = await executeInquirySurface({ context: { ...context, ...navigation }, action, expectedRevision: revision, actorId });
     return json(result);
   } catch (error) {
     return failure(error);

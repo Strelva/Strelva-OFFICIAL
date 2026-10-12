@@ -48,6 +48,8 @@ interface Props {
   startDisabled?: boolean;
   contentId?: string;
   rightRail?: ReactNode;
+  rightRailId?: string;
+  rightRailTitle?: string;
   rightRailOpen?: boolean;
   onCloseRightRail?: () => void;
   rightRailTriggerRef?: RefObject<HTMLButtonElement | null>;
@@ -67,7 +69,7 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspaceName, brandWorkspaceId, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
+export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspaceName, brandWorkspaceId, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailId = "managed-discussion", rightRailTitle = "Ask Strelva", rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
   const navigationName = workspaceName || plainWorkspaceName(businessContext) || undefined;
   const brandId = brandWorkspaceId || workspaceId;
   const brandScope = brandId ? `workspaceId=${encodeURIComponent(brandId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
@@ -117,7 +119,7 @@ export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspace
     <AppFrame className={styles.shell} navigationLabel={`${navigationName || "Workspace"} navigation`} navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
       navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={agencyNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
-      notice={notice} rightRail={rightRail} rightRailId="managed-discussion" rightRailTitle="Ask Strelva" rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
+      notice={notice} rightRail={rightRail} rightRailId={rightRailId} rightRailTitle={rightRailTitle} rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>
     {searchItems ? <WorkspaceSearchDialog systemsReleased={systemsReleased} key={workspaceId || searchScopeName} storageKey={workspaceId && accountDetail ? `strelva:search-query:v1:${encodeURIComponent(accountDetail)}:${workspaceId}` : undefined} open={searchOpen} items={searchItems} scopeName={searchScopeName} onClose={() => setSearchOpen(false)} /> : null}
   </div>;
