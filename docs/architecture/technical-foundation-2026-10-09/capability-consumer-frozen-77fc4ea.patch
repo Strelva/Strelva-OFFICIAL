@@ -1,0 +1,183 @@
+diff --git a/src/platform/capabilities/inventory-contracts.ts b/src/platform/capabilities/inventory-contracts.ts
+--- a/src/platform/capabilities/inventory-contracts.ts
++++ b/src/platform/capabilities/inventory-contracts.ts
+@@ -29,6 +29,12 @@
+   | "prerequisite_missing"
+   | "prerequisite_unknown";
+
++/** Supplemental proof values bound to one already-authorized workspace read. */
++export interface CapabilityAvailabilitySnapshot {
++  readonly workspaceId: string;
++  readonly entries: readonly CapabilityAvailabilityView[];
++}
++
+ export interface CapabilityAvailabilityView {
+   readonly key: string;
+   readonly state: CapabilityAvailabilityState;
+diff --git a/src/experience/workspace/contracts.ts b/src/experience/workspace/contracts.ts
+--- a/src/experience/workspace/contracts.ts
++++ b/src/experience/workspace/contracts.ts
+@@ -1,3 +1,4 @@
++import type { CapabilityAvailabilitySnapshot } from "@/platform/capabilities/inventory-contracts";
+ import type { RecordedActor } from "@/platform/presentation/actor";
+ import type { OwnerBrand } from "@/platform/infra/agency-brand";
+ import type { ConnectionKind, ConnectionState, SystemLifecycle, SystemRef } from "@/platform/systems/contracts";
+@@ -162,6 +163,8 @@
+    * not an agency, or when the provider list could not be read. Additive. */
+   providedClients?: WorkspaceProvidedClient[];
+   products: WorkspaceProduct[];
++  /** Supplemental qualification evidence, never current callback authority or write outcome. */
++  capabilityAvailability?: CapabilityAvailabilitySnapshot;
+   /** The business's Systems from the spine, with health and Possibilities.
+    * Absent for personal and agency workspaces. Additive. */
+   systems?: WorkspaceSystems;
+diff --git a/src/app/api/workspace/route.ts b/src/app/api/workspace/route.ts
+--- a/src/app/api/workspace/route.ts
++++ b/src/app/api/workspace/route.ts
+@@ -18,6 +18,7 @@
+ import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+ import type { ProductDefinition } from "@/platform/products";
+ import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
++import { readWorkspaceCapabilityAvailability } from "@/server/capability-consumer-availability";
+ import {
+   acceptHandoff, createAgencyWorkspace, createdAgencyApplicationWorkIds, makeSystemsAuthority, createHandoff, ensurePersonalWorkspace, getWork,
+   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
+@@ -299,6 +300,11 @@
+     // Inquiry work is intentionally absent while its explicit exposure flag is
+     // off for this workspace. The route still enforces the flag per site.
+     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
++    // Supplemental proof read follows required authority reads. It cannot make a
++    // failed GET succeed or restore callback authority from a cached work value.
++    const capabilityAvailability = await readWorkspaceCapabilityAvailability(selected.id, {
++      operator: await operator, tester: false, userId: current.userId,
++    });
+     const snapshot: WorkspaceSnapshot = {
+       canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency",
+       ownerBrand,
+@@ -315,6 +321,7 @@
+       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
+       ...(providedClients ? { providedClients } : {}),
+       products,
++      ...(capabilityAvailability ? { capabilityAvailability } : {}),
+       ...(systems ? { systems } : {}),
+       releases: { ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+     };
+diff --git a/src/app/api/workspace/ask/route.ts b/src/app/api/workspace/ask/route.ts
+--- a/src/app/api/workspace/ask/route.ts
++++ b/src/app/api/workspace/ask/route.ts
+@@ -1,4 +1,5 @@
+ import { stepCountIs } from "ai";
++import { readWorkspaceCapabilityAvailability } from "@/server/capability-consumer-availability";
+ import { isSuperAdmin } from "@/platform/infra/auth";
+ import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
+ import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
+@@ -120,9 +121,20 @@
+         ...(needsYouReleaseEnabled() ? { sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }) } : {}),
+       }),
+       async stream(input, consume, emitted) {
++        // startAskTurn already checked current member/target and release scope.
++        // This context is proof metadata; per-tool current authority still decides.
++        const availability = await releaseViewerFor(actor)
++          .then(viewer => readWorkspaceCapabilityAvailability(input.context.workspaceId, viewer))
++          .catch(() => null);
++        const qualificationContext = availability
++          ? `
++
++Qualification evidence for the selected business (not permission or the outcome of a write). Unknown means evidence could not be confirmed; it does not mean a change failed or may be retried. Existing native commands independently decide admission:
++${JSON.stringify(availability)}`
++          : "";
+         await streamModelText(
+           { purpose: "ask", ...input.context },
+-          { system: input.system, messages: input.messages, tools: input.tools, stopWhen: stepCountIs(8) },
++          { system: input.system + qualificationContext, messages: input.messages, tools: input.tools, stopWhen: stepCountIs(8) },
+           (result) => consume(result.fullStream as AsyncIterable<{ type: string } & Record<string, unknown>>),
+           { emitted },
+         );
+diff --git a/src/platform/agent-channel/protected-tools.ts b/src/platform/agent-channel/protected-tools.ts
+--- a/src/platform/agent-channel/protected-tools.ts
++++ b/src/platform/agent-channel/protected-tools.ts
+@@ -1,4 +1,5 @@
+ import { z } from "zod";
++import type { CapabilityAvailabilitySnapshot } from "@/platform/capabilities/inventory-contracts";
+ import { readBookingContext } from "@/platform/bookings/store";
+ import { resourceUrl, validateAgentToken, inspectAgentToken, oauthRpc, hash } from "./oauth";
+ import type { BusinessDirectory } from "./public-tools";
+@@ -53,7 +54,10 @@
+ }).strict();
+
+ /** Request-local closure; tokens or actor identity are never saved on a shared server. */
+-export function withProtectedTools(base: McpServer, directory: BusinessDirectory, websites: AgentWebsitePort): McpServer {
++export function withProtectedTools(
++  base: McpServer, directory: BusinessDirectory, websites: AgentWebsitePort,
++  readAvailability?: (scope: { workspaceId: string; userId: string }) => Promise<CapabilityAvailabilitySnapshot | null>,
++): McpServer {
+   let tokenHash: string | null = null;
+   let principal: Awaited<ReturnType<typeof validateAgentToken>> = null;
+   const challenge = (scope: string, insufficient = false) => new Response(null, { status: insufficient ? 403 : 401, headers: {
+@@ -102,7 +106,13 @@
+         if (name !== "read_business_context") return { ok: true, value };
+         const context = assistantBusinessContext(value);
+         if (context.workspaceId !== principal.workspaceId) throw new Error("business_context_mismatch");
+-        return { ok: true, value: context };
++        const availabilityScope = { workspaceId: principal.workspaceId, userId: principal.userId };
++        const availability = await Promise.resolve()
++          .then(() => readAvailability?.(availabilityScope))
++          .catch(() => null);
++        // Public discovery and all write tools stay unchanged. Bind optional
++        // proof metadata to the current native read; never substitute a scope.
++        return { ok: true, value: { ...context, ...(availability?.workspaceId === availabilityScope.workspaceId ? { capabilityAvailability: availability } : {}) } };
+       } catch (error) {
+         if (name.includes("website") && error instanceof Error) {
+           if (/website_revision_conflict|bounded_revision_conflict/.test(error.message)) return { ok: false, message: "This website changed. Read it again before preparing a new proposal." };
+diff --git a/src/app/api/mcp/public/route.ts b/src/app/api/mcp/public/route.ts
+--- a/src/app/api/mcp/public/route.ts
++++ b/src/app/api/mcp/public/route.ts
+@@ -4,6 +4,7 @@
+ import { methodNotAllowed, serveMcp } from "@/platform/agent-channel/protocol";
+ import { platformMcpServer } from "@/platform/agent-channel/public-tools";
+ import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
++import { readWorkspaceCapabilityAvailability } from "@/server/capability-consumer-availability";
+ import { createAgentWebsiteAdapter } from "@/products/websites/server";
+ import { oauthRpc, oauthOrigin } from "@/platform/agent-channel/oauth";
+ import { tenantDirectory } from "../_directory";
+@@ -14,5 +15,6 @@
+ export const GET = methodNotAllowed;
+ export const DELETE = methodNotAllowed;
+ export async function POST(request: Request) {
+-  return serveMcp(request, withProtectedTools(server, tenantDirectory, createAgentWebsiteAdapter(oauthRpc, oauthOrigin())));
++  return serveMcp(request, withProtectedTools(server, tenantDirectory, createAgentWebsiteAdapter(oauthRpc, oauthOrigin()),
++    scope => readWorkspaceCapabilityAvailability(scope.workspaceId, { operator: false, tester: false, userId: scope.userId })));
+ }
+diff --git a/src/server/capability-consumer-availability.ts b/src/server/capability-consumer-availability.ts
+new file mode 100644
+--- /dev/null
++++ b/src/server/capability-consumer-availability.ts
+@@ -0,0 +1,28 @@
++import "server-only";
++import { capabilityAvailability } from "@/capability-availability";
++import { listCapabilities, workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
++import { EXECUTABLE_CAPABILITY_DEFINITIONS } from "@/server/capabilities";
++import type { CapabilityAvailabilitySnapshot } from "@/platform/capabilities/inventory-contracts";
++import type { ReleaseViewer } from "@/platform/release-flags/resolve";
++
++/** App-edge projection shared by authenticated consumers, not public discovery.
++ * Existing owners select the keys; internal-only operations and tenant catalog
++ * slices are not newly exposed. No installation or tool/operation alias inferred.
++ * Missing owner prerequisite readers remain unknown. No runtime admission change. */
++export async function readWorkspaceCapabilityAvailability(
++  workspaceId: string, viewer: ReleaseViewer,
++): Promise<CapabilityAvailabilitySnapshot | null> {
++  try {
++    const keys = [
++      ...workspaceDiscoveryProducts().map(item => `product:${item.id}`),
++      ...workspaceExecutables().map(item => `workspace_executable:${item.id}`),
++      ...listCapabilities({ kind: "offering" }).map(item => item.key),
++      ...EXECUTABLE_CAPABILITY_DEFINITIONS.filter(item => item.support !== "internal_only").map(item => `operation:${item.id}@${item.version}`),
++    ];
++    return { workspaceId, entries: await capabilityAvailability(keys, { workspaceId, viewer }) };
++  } catch {
++    // An optional proof read cannot overturn a completed required native read.
++    // Absence is unconfirmed evidence, never available execution or a write result.
++    return null;
++  }
++}
