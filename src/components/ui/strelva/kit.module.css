@@ -20,6 +20,8 @@
 .textFieldInput:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .textFieldInput[aria-invalid="true"] { border-color: var(--st-critical); }
 .textFieldInput:disabled { opacity: 0.5; cursor: not-allowed; }
+.textFieldInput[type="color"] { height: 48px; padding: 6px 10px; cursor: pointer; }
+.textFieldInput[type="file"]::file-selector-button { min-height: 32px; margin-right: 12px; padding: 4px 12px; border: 0; border-radius: var(--st-r-md, 12px); background: var(--st-inset); color: var(--st-text); font: inherit; cursor: pointer; }
 .textFieldMessage { margin: 0; font-size: 12px; line-height: 20px; color: var(--st-text-3); }
 .textFieldMessage[data-error="true"] { color: var(--st-critical); }
 .page {

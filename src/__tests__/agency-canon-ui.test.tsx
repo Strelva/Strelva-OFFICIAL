@@ -35,7 +35,7 @@ describe("fictional agency canon surfaces", () => {
     for (const frame of agencyCanonFrames) {
       for (const state of ["loading", "empty", "error", "permission"] as const) {
         const html = renderToStaticMarkup(createElement(AgencyCanonPreview, { frame, state, mode: "light" }));
-        expect(html).not.toContain("Hold to approve");
+        expect(html).not.toContain("Hold to make it live");
         expect(html).not.toContain("Send to Harbor Dental");
         if (state === "loading") expect(html).toContain("role=\"status\"");
         if (state === "error") expect(html).toContain("role=\"alert\"");
@@ -52,7 +52,7 @@ describe("fictional agency canon surfaces", () => {
     act(() => { setter.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(container.textContent).toContain("A typed yes does not approve");
-    expect(container.textContent).toContain("Hold to approve");
+    expect(container.textContent).toContain("Hold to make it live");
     expect(container.textContent).not.toContain("Approved in preview");
     act(() => root.unmount());
   });

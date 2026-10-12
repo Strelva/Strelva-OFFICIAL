@@ -49,12 +49,12 @@ it("lists only ready clients with explicit server eligibility", async () => {
   expect([...node.querySelectorAll("option")].map(option => option.textContent)).toEqual(["Choose a client", "Eligible business"]);
 });
 
-it("qualifies the verification promise for owners, admins and assigned staff", async () => {
+it("keeps client authority separate from an agency qualification", async () => {
   const node = await render(createElement(AgencyVerification, { onboarding: {
     agency: { id: agencyId, name: "North Studio", role: "member" }, effects: [],
-  } }));
-  expect(node.textContent).toContain("Agency owners and admins can build, preview and rehearse in their agency");
-  expect(node.textContent).toContain("open Build for a client and choose a business where you also have current owner or admin authoring access");
-  expect(node.textContent).toContain("prepare only drafts the client has separately authorized");
-  expect(node.textContent).not.toContain("You can build, preview and rehearse");
+  }, fictionalQualification: { workspaceId: agencyId, canSubmit: false, submissions: [], effects: [{ effect: "publish", available: false }] } }));
+  expect(node.textContent).toContain("Get verified for client work");
+  expect(node.textContent).toContain("Client access, owner decisions and release gates still apply");
+  expect(node.textContent).toContain("An agency owner or admin submits evidence");
+  expect(node.querySelector("form")).toBeNull();
 });

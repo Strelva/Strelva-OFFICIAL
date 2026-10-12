@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { StHead, StPage, StSection, StSkeleton } from "@/components/ui/strelva/Kit";
 import { AgencyBrandEditor } from "./AgencyBrandEditor";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { renderEmailHtml } from "@/platform/infra/email/layout";
@@ -22,5 +23,5 @@ export function AgencyBrandFixture({ brand }: { brand: OwnerBrand }) {
     return () => { cancelAnimationFrame(frame); window.fetch = original; };
   }, [brand]);
   const html = renderEmailHtml({ brand, heading: "Your weekly report", paragraphs: ["Your website is working. One decision needs you."], button: { label: "Open Needs you", url: "https://app.strelva.com/workspace" }, footerNote: "for The Mooney Firm" });
-  return <div className="mx-auto w-full max-w-4xl overflow-y-auto p-6"><h1 className="font-display text-2xl">Your agency brand</h1>{ready ? <AgencyBrandEditor workspaceId={brand.agencyId!} /> : <p role="status">Loading fixture</p>}<h2 className="mt-8 text-xl">Owner email</h2><iframe title="Owner email preview" srcDoc={html} sandbox="" style={{ width: "100%", height: 600, border: 0 }} /></div>;
+  return <StPage><StHead title="Your agency brand" meta="Choose the name, color and logo your clients see." />{ready ? <AgencyBrandEditor workspaceId={brand.agencyId!} /> : <StSkeleton label="Loading fixture" />}<StSection title="Owner email"><iframe title="Owner email preview" srcDoc={html} sandbox="" style={{ width: "100%", height: 600, border: 0 }} /></StSection></StPage>;
 }

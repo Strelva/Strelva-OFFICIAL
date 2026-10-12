@@ -112,7 +112,10 @@ export const agencyLibraryVersionSchema = z.object({
   context: z.object({ kind: z.enum(["location", "customer_segment", "agency_client", "franchise"]), label: z.string().min(1).max(200) }).strict(),
   baselineRevision: z.number().int().min(1),
   currentRelease: z.number().int().min(1).nullable(),
-  /** Against the source's latest revision. `unavailable`: the Version could not be read. */
+  /** Exact qualified offer used for this comparison. Missing means no actionable offer. */
+  improvementRevision: z.number().int().positive().nullable().optional(),
+  localChanges: z.number().int().nonnegative().nullable().optional(),
+  /** Against that qualified offer. `unavailable`: the Version could not be read. */
   state: z.enum(VERSION_IMPROVEMENT_STATES),
   conflicts: z.array(z.object({ path: z.string().max(300), local: z.unknown(), upstream: z.unknown() }).strict()).max(200),
   missingBindings: z.array(z.string().max(80)).max(50),

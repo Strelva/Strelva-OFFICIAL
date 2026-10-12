@@ -7,9 +7,9 @@ const workspaceId = "11111111-1111-4111-8111-111111111111", systemId = "22222222
 const roots: ReturnType<typeof createRoot>[] = [];
 function view(state = "private", workspace = workspaceId, system = systemId) { return { workspaceId: workspace, systemId: system, source: { listingState: state }, revision: { source: { revisionId, number: 1 }, qualification: null }, canReview: false }; }
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
-async function mount(request: typeof fetch) {
+async function mount(request: typeof fetch, onChanged?: () => void) {
   const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
-  await act(async () => root.render(createElement(SourcePackageControls, { request, workspaceId, systemId })));
+  await act(async () => root.render(createElement(SourcePackageControls, { request, workspaceId, systemId, onChanged })));
   await open(node); return { node, root };
 }
 async function open(node: HTMLElement) { await act(async () => { const details = node.querySelector("details")!; details.open = true; details.dispatchEvent(new Event("toggle")); }); }
@@ -26,12 +26,15 @@ describe("source package immutable uncertain command recovery", () => {
     for (const value of ["application.records", "business.contacts", "internal_tool.notices", "owner_recipient.email", "booking_calendar", "people.email"]) expect(node.textContent).not.toContain(value);
   });
   it("holds a lost listing response; current read confirms the state without resending", async () => {
+    const changed = vi.fn();
     let state = "private";
     const request = vi.fn<typeof fetch>(async (_url, init) => { if (init?.method === "POST") { state = "listed"; throw new Error("response lost"); } return response(view(state)); });
-    const { node } = await mount(request); await listing(node, "listed");
+    const { node } = await mount(request, changed); await listing(node, "listed");
+    expect(changed).not.toHaveBeenCalled();
     expect(node.querySelector("select")!.disabled).toBe(true);
     expect(node.textContent).toContain("Previous request held");
     await refresh(node);
+    expect(changed).toHaveBeenCalledTimes(1);
     expect(node.querySelector("select")!.disabled).toBe(false); expect(node.querySelector("select")!.value).toBe("listed");
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
@@ -40,7 +43,7 @@ describe("source package immutable uncertain command recovery", () => {
     const { node } = await mount(request);
     expect(node.querySelector('[role="alert"]')!.textContent).toContain("could not be confirmed");
     expect(Array.from(node.querySelectorAll("button")).some(button => button.textContent?.includes("Read current package"))).toBe(true);
-    expect(node.textContent).not.toContain("Reading this source’s exact revision");
+    expect(node.textContent).not.toContain("Reading this source’s exact release");
   });
   it("keeps a contradictory or foreign current read held instead of overwriting it with another listing command", async () => {
     let wrongScope = false;
