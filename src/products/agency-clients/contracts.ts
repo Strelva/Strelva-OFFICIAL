@@ -137,3 +137,81 @@ export function clientWebsiteEntries(customerWorkspaceId: string): ClientWebsite
 
 export const OWNER_CLAIM_PATH = "/workspace/claim/";
 export const OWNER_CLAIM_LIFETIME_DAYS = 14;
+
+/* ── Claim review (STRELVA_CLAIM_REVIEW_RELEASE) ─────────────────────────────
+ * GLOSSARY: Found fact, Claim, Prepare / Full control. What the add found on
+ * the client's site is staged as Found facts (with the page and words it came
+ * from) and joins the business record only when the owner confirms it at the
+ * claim. Until the claim, the adding agency holds Prepare in every area; at
+ * the claim the owner decides each area. SQL contract:
+ * supabase/migrations/20261024300000_claim_review.sql. */
+
+export const FOUND_FACT_KEYS = ["phone", "email", "address", "hours", "description", "links"] as const;
+export type FoundFactKey = (typeof FOUND_FACT_KEYS)[number];
+export const FOUND_FACT_LABELS: Record<FoundFactKey | "service" | "person", string> = {
+  phone: "Phone", email: "Email", address: "Address", hours: "Hours", description: "Description", links: "Links",
+  service: "Service", person: "Person",
+};
+
+const sourceUrl = z.string().min(8).max(2048).regex(/^https?:\/\/\S+$/);
+const quote = z.string().trim().min(1).max(300);
+const named = z.object({ name: z.string().trim().min(1).max(160) }).strict();
+
+/** One thing the crawl read, before the owner has seen it. */
+export const foundFactInputSchema = z.discriminatedUnion("entity", [
+  z.object({ entity: z.literal("fact"), key: z.enum(FOUND_FACT_KEYS), value: z.unknown(), sourceUrl, quote }).strict(),
+  z.object({ entity: z.literal("service"), value: named, sourceUrl, quote }).strict(),
+  z.object({ entity: z.literal("person"), value: named, sourceUrl, quote }).strict(),
+]);
+export type FoundFactInput = z.infer<typeof foundFactInputSchema>;
+
+/** A staged Found fact, as the owner sees it at the claim. */
+export const foundFactSchema = z.object({
+  id: uuid,
+  entity: z.enum(["fact", "service", "person"]),
+  key: z.enum(FOUND_FACT_KEYS).nullable(),
+  value: z.unknown(),
+  sourceUrl: z.string(),
+  quote: z.string(),
+}).strict();
+export type FoundFact = z.infer<typeof foundFactSchema>;
+
+export const CLAIM_AREAS = ["website", "inquiries", "bookings", "google", "internal_tools"] as const;
+export type ClaimArea = (typeof CLAIM_AREAS)[number];
+export const CLAIM_AREA_CHOICES = ["prepare", "full_control", "none"] as const;
+export type ClaimAreaChoice = (typeof CLAIM_AREA_CHOICES)[number];
+const areaChoice = z.enum(CLAIM_AREA_CHOICES);
+
+export const claimReviewSchema = z.object({
+  status: z.enum(["pending", "accepted", "revoked", "expired"]),
+  workspaceId: uuid,
+  workspaceName: z.string(),
+  agencyWorkspaceId: uuid,
+  agencyName: z.string(),
+  found: z.array(foundFactSchema),
+  prepared: z.array(z.object({ id: uuid, name: z.string(), kind: z.string() }).strict()),
+  /** Areas where another agency already holds Full control; Full control can't be chosen there. */
+  fullControlTaken: z.array(z.enum(CLAIM_AREAS)),
+}).strict();
+export type ClaimReview = z.infer<typeof claimReviewSchema>;
+
+export const claimFactDecisionSchema = z.object({
+  id: uuid,
+  decision: z.enum(["confirm", "change", "remove"]),
+  /** Required for change, and for confirming hours (the owner supplies the time zone). */
+  value: z.unknown().optional(),
+}).strict();
+export type ClaimFactDecision = z.infer<typeof claimFactDecisionSchema>;
+
+export const claimReviewAcceptInputSchema = z.object({
+  facts: z.array(claimFactDecisionSchema).max(200)
+    .refine((items) => new Set(items.map((item) => item.id)).size === items.length, "Decide each found fact once."),
+  areas: z.object({ website: areaChoice, inquiries: areaChoice, bookings: areaChoice, google: areaChoice, internal_tools: areaChoice }).strict(),
+}).strict();
+export type ClaimReviewAcceptInput = z.infer<typeof claimReviewAcceptInputSchema>;
+
+export const claimReviewAcceptedSchema = ownerClaimAcceptedSchema.extend({
+  areas: z.partialRecord(z.enum(CLAIM_AREAS), z.enum(CLAIM_AREA_CHOICES)).optional(),
+  facts: z.object({ confirmed: z.number().int().min(0), changed: z.number().int().min(0), removed: z.number().int().min(0), waiting: z.number().int().min(0) }).optional(),
+});
+export type ClaimReviewAccepted = z.infer<typeof claimReviewAcceptedSchema>;
