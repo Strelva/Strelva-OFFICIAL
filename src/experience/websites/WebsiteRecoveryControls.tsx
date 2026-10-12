@@ -125,7 +125,7 @@ function CutoverUndoSession({ record, request = fetch, readOnly = false, disable
   return <section ref={scopeRef} className="mt-6 grid gap-3" aria-labelledby="cutover-undo-heading" aria-busy={busy || undefined}>
     <h3 id="cutover-undo-heading" className="text-base font-medium">Return to the previous website</h3>
     <p className="text-sm text-gray-muted">Restore the domain&rsquo;s previous DNS records and test the old project first. After you confirm both steps, Strelva switches its routing back. Your saved rebuild and history stay available.</p>
-    {saved ? <p ref={receiptRef} tabIndex={-1} role="status" className="text-sm">The previous website was restored. The undo receipt for website version {saved.revision} is saved.</p> : <>
+    {saved ? <p ref={receiptRef} tabIndex={-1} role="status" className="text-sm">The previous website was restored. The undo receipt for website Release {saved.revision} is saved.</p> : <>
       <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
         <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={domainRestored} disabled={busy || unknown || readOnly || disabled} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setDomainRestored(event.target.checked); }} />I restored the domain&rsquo;s previous DNS records.</label>
         <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={fallbackVerified} disabled={busy || unknown || readOnly || disabled} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setFallbackVerified(event.target.checked); }} />I opened and tested the previous website.</label>

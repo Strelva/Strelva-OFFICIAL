@@ -248,7 +248,7 @@ describe("owner journey copy and links", () => {
       "src/components/dashboard/OwnershipSection.tsx",
     ].map(readRepoFile).join("\n");
 
-    expect(ownerFiles).toContain("Make live");
+    expect(ownerFiles).toContain("Make it live");
     expect(ownerFiles).toContain("Skip");
     expect(ownerFiles).toContain("Needs You");
     expect(ownerFiles).toContain("Nothing needs you right now");

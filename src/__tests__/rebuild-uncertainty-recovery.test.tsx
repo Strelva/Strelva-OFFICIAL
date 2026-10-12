@@ -10,16 +10,16 @@ beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); node = docum
 afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi.unstubAllGlobals(); });
 function record(): RebuildView { const value = fixtureRebuild(); value.status = 'approved'; value.approved = true; value.candidate!.facts = {}; return value; }
 function button(label: string) { return Array.from(node.querySelectorAll('button')).find(b => (b.getAttribute('aria-label') ?? b.textContent?.trim()) === label)!; }
-function publish() { button('Publish approved website').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })); }
+function publish() { button('Hold to make it live').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true })); }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (value: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; }
 function scope(value: RebuildView, transport: RebuildTransport, readOnly = false) { return createElement(RebuildExperience, { workspaceId: value.workspaceId, workId: value.workId, initialRecord: value, transport, readOnly }); }
-async function unknown(value: RebuildView, transport: RebuildTransport) { await act(async () => root.render(scope(value, transport))); button('Publish approved website').focus(); await act(async () => publish()); }
+async function unknown(value: RebuildView, transport: RebuildTransport) { await act(async () => root.render(scope(value, transport))); button('Hold to make it live').focus(); await act(async () => publish()); }
 it('recovers an unknown write to the actual reload action and synchronously admits one read, including read-only access', async () => {
   const value = record(); const pending = deferred<RebuildView>(); const next = { ...value, approved: false, status: 'review' as const };
   const read = vi.fn(() => pending.promise); const mutate = vi.fn(async () => { throw new RebuildUnconfirmedError(); });
   const transport = { read, mutate, start: async () => value };
   await unknown(value, transport); expect(document.activeElement).toBe(button('Reload current state'));
-  expect(button('Publish approved website').disabled).toBe(true);
+  expect(button('Hold to make it live').disabled).toBe(true);
   await act(async () => root.render(scope(value, transport, true)));
   await act(async () => { button('Reload current state').click(); button('Reload current state').click(); });
   expect(read).toHaveBeenCalledTimes(1);
@@ -37,7 +37,7 @@ it.each(['success', 'failure'] as const)('preserves outside keyboard choice duri
 });
 it('preserves outside keyboard choice before the unknown write response', async () => {
   const value = record(); const pending = deferred<RebuildView>(); const transport = { read: async () => value, mutate: () => pending.promise, start: async () => value };
-  await act(async () => root.render(scope(value, transport))); button('Publish approved website').focus();
+  await act(async () => root.render(scope(value, transport))); button('Hold to make it live').focus();
   await act(async () => publish());
   const outside = document.createElement('button'); document.body.append(outside); outside.focus();
   await act(async () => pending.reject(new RebuildUnconfirmedError()));
@@ -50,23 +50,23 @@ it.each(['permission', 'work', 'workspace'] as const)('does not adopt delayed ol
   await act(async () => root.render(scope(current, transport, change === 'permission')));
   await act(async () => pending.resolve({ ...value, title: 'OLD RESPONSE MUST NOT APPEAR' }));
   expect(node.textContent).not.toContain('OLD RESPONSE MUST NOT APPEAR');
-  if (change === 'permission') { expect(button('Reload current state')).toBeDefined(); await act(async () => root.render(scope(value, transport))); expect(button('Publish approved website').disabled).toBe(true); }
+  if (change === 'permission') { expect(button('Reload current state')).toBeDefined(); await act(async () => root.render(scope(value, transport))); expect(button('Hold to make it live').disabled).toBe(true); }
   else { expect(node.textContent).toContain('Current other website'); expect(button('Reload current state')).toBeUndefined(); }
 });
 it.each(['unknown', 'success'] as const)('retains current-work uncertainty across permission loss before write %s and later regain', async outcome => {
   const value = record(); const pending = deferred<RebuildView>(); const transport = { read: async () => value, mutate: () => pending.promise, start: async () => value };
-  await act(async () => root.render(scope(value, transport))); button('Publish approved website').focus();
+  await act(async () => root.render(scope(value, transport))); button('Hold to make it live').focus();
   await act(async () => publish());
   await act(async () => root.render(scope(value, transport, true)));
   await act(async () => outcome === 'unknown' ? pending.reject(new RebuildUnconfirmedError()) : pending.resolve({ ...value, status: 'published' }));
   await act(async () => root.render(scope(value, transport)));
-  expect(button('Publish approved website').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
+  expect(button('Hold to make it live').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
   expect(node.textContent).not.toContain('This exact preview is approved.'); expect(node.textContent).not.toContain('This revision has been published.');
 });
 it.each(['workspaceId', 'workId'] as const)('refuses a current-state acknowledgment for another %s', async field => {
   const value = record(); const transport = { read: async () => ({ ...value, [field]: '72000000-0000-4000-8000-000000000004' }), mutate: async () => { throw new RebuildUnconfirmedError(); }, start: async () => value };
   await unknown(value, transport); await act(async () => button('Reload current state').click());
-  expect(button('Publish approved website').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
+  expect(button('Hold to make it live').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
   expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not be loaded');
 });
 it('invalidates a pending current read even when permission is lost and regained before its response', async () => {
@@ -76,7 +76,7 @@ it('invalidates a pending current read even when permission is lost and regained
   await act(async () => root.render(scope(value, transport)));
   await act(async () => pending.resolve({ ...value, title: 'PREVIOUS PERMISSION RESPONSE' }));
   expect(node.textContent).not.toContain('PREVIOUS PERMISSION RESPONSE');
-  expect(button('Publish approved website').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
+  expect(button('Hold to make it live').disabled).toBe(true); expect(button('Reload current state')).toBeDefined();
 });
 it('fences an unknown write settlement before React commits its lock', async () => {
   const value = record(); const pending = deferred<RebuildView>(); const mutate = vi.fn(() => pending.promise);
@@ -102,14 +102,14 @@ it('retains the current revision and unknown lock when a standalone saved-state 
   const transport = { read: async () => ({ ...value, revision: 4, title: 'STALE SAVED STATE' }), mutate: async () => { throw new RebuildUnconfirmedError(); }, start: async () => value };
   await unknown(value, transport); await act(async () => button('Reload current state').click());
   expect(node.textContent).not.toContain('STALE SAVED STATE');
-  expect(button('Reload current state')).toBeDefined(); expect(button('Publish approved website').disabled).toBe(true);
+  expect(button('Reload current state')).toBeDefined(); expect(button('Hold to make it live').disabled).toBe(true);
 });
 
 it('requires the held-control shortcut before starting publication', async () => {
   const value = record(); const mutate = vi.fn(async () => ({ ...value, status: 'published' as const }));
   const transport = { read: async () => value, mutate, start: async () => value };
   await act(async () => root.render(scope(value, transport)));
-  await act(async () => button('Publish approved website').click());
+  await act(async () => button('Hold to make it live').click());
   expect(mutate).not.toHaveBeenCalled();
   await act(async () => publish());
   expect(mutate).toHaveBeenCalledExactlyOnceWith(value, 'launch');

@@ -103,7 +103,7 @@ export function WebsiteCanonPreview({ initialView, state = "ready", mode = "ligh
                         {!published && publishStep === null ? <>
                           <StLedger path="/fees" count="2 lines" lines={[{ sign: "-", text: "Half-day: [2026 fee]" }, { sign: "+", text: `Half-day: ${halfDay}` }, { sign: "-", text: "Full-day: [2026 fee]" }, { sign: "+", text: `Full-day: ${fullDay}` }]} />
                           <StSection title="After you publish, Strelva Agency"><StSteps label="After publication" steps={[{ title: "Reads the live page back and compares it", state: "pending" }, { title: "Updates fees in your business record", state: "pending" }, { title: "Keeps the earlier page so you can undo", state: "pending" }]} /></StSection>
-                          {editing ? <StSurface label="Edit proposed fees"><form className={styles.editForm} onSubmit={event => { event.preventDefault(); setEditing(false); setMessage("Wording saved for review in this preview. Nothing is live yet."); }}><label>Half-day fee<input value={halfDay} onChange={event => setHalfDay(event.target.value)} required /></label><label>Full-day fee<input value={fullDay} onChange={event => setFullDay(event.target.value)} required /></label><StPill variant="soft" type="submit">Save wording for review</StPill></form></StSurface> : <StHold label="Hold to publish" onAccept={publish} block />}
+                          {editing ? <StSurface label="Edit proposed fees"><form className={styles.editForm} onSubmit={event => { event.preventDefault(); setEditing(false); setMessage("Wording saved for review in this preview. Nothing is live yet."); }}><label>Half-day fee<input value={halfDay} onChange={event => setHalfDay(event.target.value)} required /></label><label>Full-day fee<input value={fullDay} onChange={event => setFullDay(event.target.value)} required /></label><StPill variant="soft" type="submit">Save wording for review</StPill></form></StSurface> : <StHold label="Hold to make it live" onAccept={publish} block />}
                           <div className={styles.actions}><StTextButton onClick={() => setMessage("Kept for later in this preview. Nothing is live yet.")}>Not yet</StTextButton><StTextButton onClick={() => setEditing(!editing)}>{editing ? "Cancel editing" : "Change the wording"}</StTextButton></div>
                         </> : <>
                           <StSteps label={published ? "Publication receipt" : "Publishing the fictional page"} steps={[
@@ -129,7 +129,7 @@ export function WebsiteCanonPreview({ initialView, state = "ready", mode = "ligh
                     </div>}
                   </>}
         </StPage>
-        <StComposerDock><StComposerBar scope={view === "pause" ? "Mediation sessions" : "attymooney.com"} placeholder={review ? "Ask about this change" : "Ask Strelva to change or make something"} value={ask} onChange={setAsk} disabled={!canAct} onSubmit={() => { setMessage("Strelva kept your words in this fictional preview. Publishing still needs the change's own Hold to publish control."); setAsk(""); }} /></StComposerDock>
+        <StComposerDock><StComposerBar scope={view === "pause" ? "Mediation sessions" : "attymooney.com"} placeholder={review ? "Ask about this change" : "Ask Strelva to change or make something"} value={ask} onChange={setAsk} disabled={!canAct} onSubmit={() => { setMessage("Strelva kept your words in this fictional preview. Publishing still needs the change's own Hold to make it live control."); setAsk(""); }} /></StComposerDock>
       </div>
     </AppFrame>
   </div>;

@@ -10,7 +10,7 @@ export function TrackerHandoffPreview({ preview }: { preview: TrackerPreview }) 
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Spreadsheet tracker</p>
         <h2 id="tracker-handoff-title" className="mt-2 font-display text-[28px] font-medium text-warm-black">{preview.title}</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">
-          Read-only preview · revision {preview.revision} · {preview.rowCount} {preview.rowCount === 1 ? "row" : "rows"} · {preview.historyCount} recorded {preview.historyCount === 1 ? "edit" : "edits"}
+          Read-only preview · Release {preview.revision} · {preview.rowCount} {preview.rowCount === 1 ? "row" : "rows"} · {preview.historyCount} recorded {preview.historyCount === 1 ? "edit" : "edits"}
         </p>
         <p className="mt-1 text-[12px] text-gray-muted">Source: {preview.source.fileName}</p>
       </div>

@@ -213,7 +213,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
               <StMono as="time" dateTime={receipt.recordedAt}>{when(receipt.recordedAt)}</StMono>
             </li>)}</ul> : <p className={styles.muted}>Asked {when(item.createdAt)}.</p>}
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
-              <StPill busy={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</StPill>
+              <StPill busy={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Make it live</StPill>
               <StPill variant="soft" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</StPill>
               <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current agency authority.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}

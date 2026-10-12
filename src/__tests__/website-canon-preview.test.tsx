@@ -26,8 +26,8 @@ it("requires the hold control, records publication steps, then keeps undo as a n
   const request = vi.fn(); vi.stubGlobal("fetch", request);
   await render("review");
   await act(async () => button("Before").click()); expect(container.querySelector('[aria-label="Fees page 2026"]')).not.toBeNull();
-  await act(async () => button("Hold to publish").click()); expect(container.querySelector("h1")?.textContent).toBe("Update the fees page for 2027");
-  await accept("Hold to publish");
+  await act(async () => button("Hold to make it live").click()); expect(container.querySelector("h1")?.textContent).toBe("Update the fees page for 2027");
+  await accept("Hold to make it live");
   expect(container.textContent).toContain("Rehearsing publication locally");
   for (let step = 0; step < 4; step++) await act(async () => vi.advanceTimersByTime(500));
   expect(container.querySelector("h1")?.textContent).toBe("The fees page is live");
@@ -45,7 +45,7 @@ it("requires the hold control, records publication steps, then keeps undo as a n
 it("hides website content and consequential controls when access is unavailable", async () => {
   await render("review", "permission");
   expect(container.textContent).toContain("This business is unavailable to your account");
-  expect(button("Hold to publish")).toBeUndefined();
+  expect(button("Hold to make it live")).toBeUndefined();
   expect(container.querySelector('[aria-label="Fees page 2027"]')).toBeNull();
   expect(container.querySelector("input")?.disabled).toBe(true);
 });

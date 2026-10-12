@@ -33,12 +33,12 @@ describe("shared document history", () => {
   it("opens earlier pages in read-only mode without losing recent edits", async () => {
     const transport = api(); await mount(transport);
     expect(container.textContent).toContain("You have read-only access.");
-    expect(container.textContent).toContain("Revision 45:"); expect(container.textContent).not.toContain("Revision 25:");
+    expect(container.textContent).toContain("Release 45:"); expect(container.textContent).not.toContain("Release 25:");
     await act(async () => button("Load earlier changes").click());
-    expect(container.textContent).toContain("Revision 25:"); expect(container.textContent).toContain("Revision 6:");
+    expect(container.textContent).toContain("Release 25:"); expect(container.textContent).toContain("Release 6:");
     expect(transport.history).toHaveBeenCalledWith(workId, 26, expect.any(AbortSignal));
     await act(async () => button("Load earlier changes").click());
-    expect(container.textContent).toContain("Revision 1:"); expect(button("Load earlier changes")).toBeUndefined();
+    expect(container.textContent).toContain("Release 1:"); expect(button("Load earlier changes")).toBeUndefined();
     expect(container.querySelectorAll("ol > li")).toHaveLength(45); expect(transport.write).not.toHaveBeenCalled();
   });
   it("keeps earlier-change controls absent and does no history reads with the flag off", async () => {

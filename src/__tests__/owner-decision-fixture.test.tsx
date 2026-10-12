@@ -42,11 +42,11 @@ describe("fictional owner decision transport", () => {
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "yes"); input.dispatchEvent(new Event("input", { bubbles: true })); });
     await act(async () => input.closest("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.textContent).toContain("A typed yes changes nothing.");
-    const hold = node.querySelector<HTMLButtonElement>('button[aria-label="Make it live: Let attorneys request a session date"]')!;
+    const hold = node.querySelector<HTMLButtonElement>('button[aria-label="Hold to make it live: Let attorneys request a session date"]')!;
     await act(async () => hold.click());
-    expect(node.querySelector('button[aria-label="Make it live: Let attorneys request a session date"]')).not.toBeNull();
+    expect(node.querySelector('button[aria-label="Hold to make it live: Let attorneys request a session date"]')).not.toBeNull();
     await act(async () => hold.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true, cancelable: true })));
-    expect(node.querySelector('button[aria-label="Make it live: Let attorneys request a session date"]')).toBeNull();
+    expect(node.querySelector('button[aria-label="Hold to make it live: Let attorneys request a session date"]')).toBeNull();
     expect(node.textContent).toContain("Nothing needs you.");
   });
 });
