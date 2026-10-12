@@ -17,7 +17,7 @@ vi.mock("@/products/ai-visibility/server", async importOriginal => ({
 }));
 vi.mock("@/lib/access-request-delivery", () => ({ createDeliveryStatusToken: () => "token", getExistingLeadToken: mocks.getLeadToken, saveDeliveryLead: mocks.saveLead }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate, rateLimitKey: () => "test-ip" }));
-vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ get: mocks.redisGet, set: vi.fn() }) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ get: mocks.redisGet, set: vi.fn().mockResolvedValue("OK") }) }));
 vi.mock("@/lib/audit/checks", () => ({ runAudit: mocks.audit }));
 vi.mock("@/lib/audit-report-store", () => ({ saveAuditReport: mocks.saveReport }));
 vi.mock("@/lib/audit-report-email", () => ({ sendAuditReportEmail: mocks.email }));
@@ -26,6 +26,8 @@ vi.mock("@/lib/slack", () => ({ sendSlackNotification: mocks.slack }));
 import { POST as check } from "@/app/api/ai-visibility/route";
 import { POST as monitor } from "@/app/api/ai-visibility/[id]/monitor/route";
 import { POST as lead } from "@/app/api/audit/lead/route";
+import { POST as combinedCheck } from "@/app/api/audit/check/route";
+import { admitPublicAgencyCheck, withCombinedCheckAdmission } from "@/platform/agency-prospecting/check-admission";
 import { POST as scan } from "@/app/api/audit/scan/route";
 import { POST as exportAudit } from "@/app/api/audit/report/route";
 import { GET as prospects } from "@/app/api/workspace/prospects/route";
@@ -186,5 +188,59 @@ describe("agency member read boundary", () => {
   it("returns 403 for another agency without exposing rows", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "agency_prospect_access" } });
     expect((await prospects(new Request(`https://app.strelva.com/api/workspace/prospects?workspace=${agency.workspaceId}`))).status).toBe(403);
+  });
+});
+
+
+describe("combined public agency admission", () => {
+  it("charges one atomic admission before either scorer while preserving both contracts", async () => {
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 200, data: { agency } }, ai: { status: 200, data: { agency } } });
+    const admission = mocks.rpc.mock.calls.flatMap((call, index) => call[0] === "agency_prospect_admit" ? [index] : []);
+    expect(admission).toHaveLength(1);
+    const order = mocks.rpc.mock.invocationCallOrder[admission[0]!]!;
+    expect(order).toBeLessThan(mocks.audit.mock.invocationCallOrder[0]!);
+    expect(order).toBeLessThan(mocks.score.mock.invocationCallOrder[0]!);
+  });
+  it("holds both sections on quota refusal, with one refusal and no provider calls", async () => {
+    const normal = mocks.rpc.getMockImplementation()!;
+    mocks.rpc.mockImplementation((name: string, args: unknown) => name === "agency_prospect_admit"
+      ? Promise.resolve({ data: null, error: { message: "agency_prospect_quota" } }) : normal(name, args));
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 429 }, ai: { status: 429 } });
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(1);
+    expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("preserves a successful section after the other provider fails", async () => {
+    mocks.audit.mockRejectedValue(new Error("Site offline"));
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 500 }, ai: { status: 200 } });
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(1);
+  });
+  it("refuses a second resolved agency in the same concurrent check scope", async () => {
+    const outcomes = await withCombinedCheckAdmission(async () => Promise.allSettled([
+      admitPublicAgencyCheck(agency),
+      admitPublicAgencyCheck({ ...agency, workspaceId: "22222222-2222-4222-8222-222222222222" }),
+    ]));
+    expect(outcomes[0]?.status).toBe("fulfilled");
+    expect(outcomes[1]).toMatchObject({ status: "rejected", reason: { status: 503, message: "The agency identity changed during this check. Please try again." } });
+    const admissions = mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit");
+    expect(admissions).toHaveLength(1);
+    expect(admissions[0]?.[1]).toMatchObject({ p_workspace_id: agency.workspaceId });
+  });
+  it("never shares admission across independent checks or standalone routes", async () => {
+    const body = { business: "Acme", url: "acme.example", agency: agency.slug };
+    await Promise.all([combinedCheck(request("/api/audit/check", body)), combinedCheck(request("/api/audit/check", body))]);
+    await check(request("/api/ai-visibility", body));
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(3);
+  });
+  it.each(["category", "city", "source", "agency"])("rejects malformed %s before either child can consume quota or run", async field => {
+    expect((await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", [field]: { bad: "shape" } }))).status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.rate).not.toHaveBeenCalled();
+    expect(mocks.score).not.toHaveBeenCalled(); expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("rejects incomplete combined input before any read or quota admission", async () => {
+    expect((await combinedCheck(request("/api/audit/check", { url: "acme.example" }))).status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.score).not.toHaveBeenCalled();
   });
 });

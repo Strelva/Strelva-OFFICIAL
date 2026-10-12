@@ -191,6 +191,8 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
   const { snapshot, view, navigate, basePath } = useInquiry();
   const recent = snapshot.state.requests.slice(0, 3);
   const agency = snapshot.audience === "agency";
+  const servingAgency = snapshot.servingAgency;
+  const workspaceName = agency ? `${servingAgency?.agencyId ? servingAgency.name : "Agency identity unavailable"} / ${snapshot.business.name}` : snapshot.business.name;
   return <aside className={sidebarStyles.sidebar} data-open={mobileOpen}>
     <div className={sidebarStyles.brandRow}>
       <Link href={basePath} className={sidebarStyles.brand} onClick={(event) => {
@@ -199,9 +201,11 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
           navigate("home", { requestId: null, inquiryId: null });
         }
         onClose();
-      }} aria-label={`${snapshot.business.name} inquiries home`}><span>{snapshot.business.name}</span></Link>
+      }} aria-label={`${workspaceName} inquiries home`}><span>{workspaceName}</span></Link>
+      <span className={sidebarStyles.platformMark} role="img" aria-label="Strelva platform"><LogoMark aria-hidden="true" /></span>
       <button className={sidebarStyles.mobileClose} type="button" onClick={onClose} aria-label="Close inquiry navigation"><X size={18} /></button>
     </div>
+    {servingAgency?.agencyId ? <p className={sidebarStyles.brandCredit}>Runs on Strelva</p> : servingAgency ? <p className={sidebarStyles.brandCredit}>Agency identity unavailable</p> : null}
     <div className={sidebarStyles.body}>
       <nav className={sidebarStyles.primary} aria-label="Inquiries">
         <SidebarButton icon={LayoutList} label="Inquiries" active={view === "home"} onClick={() => { navigate("home", { requestId: null, inquiryId: null }); onClose(); }} />
@@ -213,7 +217,6 @@ function InquirySidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClose:
       {recent.length > 0 ? <section className={sidebarStyles.recent} aria-label="Recent inquiry changes"><h2>Recent</h2>{recent.map((work) => <button className={sidebarStyles.navItem} key={work.id} type="button" title={work.intent} onClick={() => { navigate("work", { requestId: work.id }); onClose(); }}><span>{work.intent}</span></button>)}</section> : null}
     </div>
     <div className={sidebarStyles.footer}>
-      <div className={styles.platformMark} aria-label="Strelva platform"><LogoMark aria-hidden="true" />Strelva</div>
       <button type="button" className={sidebarStyles.account} aria-current={view === "account" ? "page" : undefined} onClick={() => { navigate("account"); onClose(); }}><span className={sidebarStyles.avatar} aria-hidden="true"><UserRound size={16} /></span><span><strong>{snapshot.account?.name || "Your account"}</strong><small>{snapshot.account?.email || "Account"}</small></span></button>
     </div>
   </aside>;

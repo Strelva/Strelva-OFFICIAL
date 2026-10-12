@@ -52,6 +52,53 @@ async function email(value = "owner@example.com") {
 afterEach(async () => { await act(async () => root?.unmount()); root = undefined; container?.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("first client handoff", () => {
+  it("business-owned website uses the existing business claim and never proposes artifact transfer", async () => {
+    const record = fixtureRebuild();
+    const agencyWorkspaceId = "d2950000-0000-4000-8000-0000000000a2";
+    const request = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const path = String(input);
+      if (path.startsWith("/api/workspace?")) return Response.json({ workspaceId: record.workspaceId, handoffs: [], workspaces: [{ id: record.workspaceId, kind: "customer" }] });
+      if (path.endsWith("/sharing")) return Response.json({ kind: "customer", workspaceId: record.workspaceId, workId: record.workId, agencyWorkspaceId, ownerClaimed: false, pendingClaim: null });
+      if (path.startsWith("/api/agency-onboarding?")) return Response.json({ error: "Not an agency" }, { status: 403 });
+      if (init?.method === "POST" && path === "/api/workspace/agency-clients") return Response.json({ ownerClaim: { claimId: "d2950000-0000-4000-8000-0000000000c1", customerWorkspaceId: record.workspaceId, workspaceName: record.title, recipientEmail: "owner@example.com", expiresAt: expiresAt(), createdAt: createdAt(), replacedPending: false, claimPath: `/workspace/claim/${"a".repeat(43)}`, delivery: { status: "not_sent", reason: "gated", decision: "R08", agencyEmailVerified: false } } });
+      throw new Error(path);
+    });
+    vi.stubGlobal("fetch", request); await mount(record); await email();
+    expect(container.textContent).toContain("No agency artifact is transferred");
+    await act(async () => button("Prepare business owner claim link")!.click());
+    expect(request).toHaveBeenCalledWith("/api/workspace/agency-clients", expect.objectContaining({ method: "POST", body: JSON.stringify({ action: "owner_link", agencyWorkspaceId, customerWorkspaceId: record.workspaceId, ownerEmail: "owner@example.com" }) }));
+    expect(request.mock.calls.some(([path]) => String(path).endsWith("/handoff"))).toBe(false);
+    expect(container.querySelector<HTMLInputElement>('input[readonly]')?.value).toContain("/workspace/claim/");
+  });
+  it("verified publication of the already claimed business-owned website completes its actual Live step", async () => {
+    const record = { ...fixtureRebuild(), approved: true, status: "published" as const, readBack: "verified" as const, publishedUrl: "https://client.example" };
+    const request = vi.fn(async (input: string | URL | Request) => {
+      const path = String(input);
+      if (path.startsWith("/api/workspace?")) return Response.json({ workspaceId: record.workspaceId, handoffs: [], workspaces: [{ id: record.workspaceId, kind: "customer" }] });
+      if (path.endsWith("/sharing")) return Response.json({ kind: "customer", workspaceId: record.workspaceId, workId: record.workId, agencyWorkspaceId: "d2950000-0000-4000-8000-0000000000a2", ownerClaimed: true, pendingClaim: null });
+      return Response.json({ error: "Not an agency" }, { status: 403 });
+    });
+    vi.stubGlobal("fetch", request); await mount(record);
+    expect(container.textContent).toContain("Live, with publication verified");
+    expect(container.querySelectorAll('[data-state="done"]')).toHaveLength(4);
+    expect(button("Prepare business owner claim link")).toBeUndefined();
+  });
+  it.each([false, true])("received business publication must match the authorized destination identity (foreign=%s)", async foreign => {
+    const record = { ...fixtureRebuild(), approved: true };
+    const destinationWork = "d2950000-0000-4000-8000-0000000000d1", destinationBusiness = "d2950000-0000-4000-8000-0000000000b1";
+    const request = responses(record);
+    handoffs = [{ id: "accepted", sourceWorkId: record.workId, recipientEmail: "owner@example.com", status: "accepted", expiresAt: expiresAt(), createdAt: createdAt(), customerWorkspaceId: destinationBusiness, customerWorkId: destinationWork } as typeof handoffs[number]];
+    const original = request.getMockImplementation()!;
+    request.mockImplementation(async (input, init) => String(input) === `/api/websites/${destinationWork}/rebuild` ? Response.json({ workId: destinationWork, workspaceId: foreign ? record.workspaceId : destinationBusiness, rebuild: {
+      version: 2, revision: 1, title: "Client website", input: { requestId: "native-client-destination", url: "https://example.com" }, status: "published", stages: [], checkpoint: null, skippedPaths: [],
+      candidate: { revision: 1, contentHash: record.candidate!.contentHash, document: fixtureSiteDocument, previewHref: `/api/websites/${destinationWork}/preview` }, approvedCandidateRevision: 1, tenantId: "fictional-client",
+      launch: { receipt: { status: "published", receiptId: "receipt-client", provider: "fixture", providerUrl: "https://client.example", evidence: "Fictional verified publication", artifactHash: record.candidate!.contentHash, candidateRevision: 1, publishedAt: createdAt() }, readBack: { status: "verified", checkedAt: createdAt(), message: "Verified fictional document" } },
+      lastError: null, createdBy: "owner", createdAt: createdAt(), history: [],
+    } }) : original(input, init));
+    vi.stubGlobal("fetch", request); await mount(record);
+    if (foreign) { expect(container.textContent).not.toContain("Live, with publication verified"); expect(container.querySelectorAll('[data-state="done"]')).toHaveLength(3); }
+    else { expect(container.textContent).toContain("Live, with publication verified"); expect(container.querySelectorAll('[data-state="done"]')).toHaveLength(4); expect(container.querySelector('a[href*="work=d2950000"]')).not.toBeNull(); }
+  });
   it("has one named journey with no invented completed steps", () => {
     const html = renderToStaticMarkup(createElement(FirstClientHandoff, { status: "Ready to draft", detail: "Client added", draft: "pending", review: "pending", claim: "unverified", live: "pending", action: "Start draft" }));
     expect(html).toContain("First client handoff progress");

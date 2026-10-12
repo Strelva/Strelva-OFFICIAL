@@ -80,18 +80,18 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
   const nothing = state.status === "ready" && state.complete && state.items.length === 0 && extraCount === 0;
   if (nothing && outcomes.length === 0 && !empty) return null;
   const count = (state.status === "ready" ? state.items.length : 0) + extraCount;
-  const canDecide = state.status === "ready" && state.role !== "member";
+  const canDecide = state.status === "ready" && (state.authority === "agency" ? state.canDecide === true : state.canDecide !== false && state.role !== "member");
   const deck = variant === "deck";
   return <section className={styles.section} aria-labelledby="home-attention">
     <header className={deck ? styles.srOnly : styles.header}>
       <h2 ref={heading} tabIndex={-1} id="home-attention"><StBeacon kind="need" />Needs you{state.status === "ready" && count > 0 ? <StMono>{count}</StMono> : null}</h2>
-      {!deck && state.status === "ready" && state.complete && count > 0 ? <p>{decisionCount(count)} waiting on {state.role === "member" ? "the owner" : "you"}.</p> : null}
+      {!deck && state.status === "ready" && state.complete && count > 0 ? <p>{decisionCount(count)} waiting on {canDecide ? "you" : "the owner"}.</p> : null}
     </header>
     {state.status === "loading" ? <div className={styles.loading}><p role="status">Checking what needs you…</p><StSkeleton width="78%" /><StSkeleton width="55%" /></div> : null}
     {state.status === "error" ? <StNotice tone="critical">{state.message} <StTextButton ref={retryButton} onClick={retry}>Check again</StTextButton></StNotice> : null}
     {state.status === "ready" && !state.complete ? <StNotice tone="need"><span role="status">Some decisions could not be checked. <StTextButton ref={retryButton} onClick={retry}>Check again</StTextButton></span></StNotice> : null}
     {nothing && empty ? empty : null}
-    {state.status === "ready" && state.role === "member" && state.items.length ? <StNotice>Only the owner can decide these. You can see what is waiting.</StNotice> : null}
+    {state.status === "ready" && !canDecide && state.items.length ? <StNotice>Only the owner can decide these. You can see what is waiting.</StNotice> : null}
     {state.status === "ready" && (state.items.length || extra) ? <StRows label="Decisions waiting on you">
       {state.items.map(item => {
         const busy = pending === item.id;
@@ -139,7 +139,7 @@ interface HandledProps {
 /** What changed: the last 7 days of recorded changes, with honest undo. */
 export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback, title = STRELVA_HANDLED_LABEL, headingId = "home-handled" }: HandledProps) {
   if (state.status === "disabled") return null;
-  const canUndo = state.status === "ready" && state.role !== "member";
+  const canUndo = state.status === "ready" && state.authority !== "agency" && state.role !== "member";
   const undoUnconfirmed = Object.values(notices).some(notice => notice.text.includes("Outcome not confirmed"));
   return <StSection title={title} meta="Last 7 days" id={headingId}>
     {state.status === "loading" ? <div className={styles.loading}><p role="status">Checking recent changes…</p><StSkeleton width="72%" /></div>

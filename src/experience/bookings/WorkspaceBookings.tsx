@@ -1,3 +1,4 @@
+import { actorLabel } from "@/platform/presentation/actor";
 import { StPage, StHead, StRows, StRow, StSection, StNotice, StEmpty, StState, StMono, StTextButton, StPillLink } from "@/components/ui/strelva/Kit";
 import { addDays, type BookingRow, type BookingView, type SiteBookings, type WorkspaceBookings as Bookings } from "@/products/bookings/server";
 import { BookingActions } from "./BookingActions";
@@ -79,7 +80,7 @@ function BookingItem({ booking, site, workspaceId, view, readOnly }: { booking: 
             {booking.agentName ? <p className="mt-2 text-gray-muted">Booked through {booking.agentName}. Assistant names are supplied at booking.</p> : null}
             {booking.evidence.history.length === 0 ? <p className="mt-2 text-gray-muted">No history is recorded yet.</p> : <ol className="mt-2 space-y-2">{booking.evidence.history.map((entry, index) => (
               <li key={index} className="text-gray-muted">
-                <p>{entry.kind === "change" ? `${entry.reason ?? STATUS[entry.to]} · ${entry.actor === "visitor" ? "Customer" : entry.actor === "strelva" ? "Strelva" : entry.actor.charAt(0).toUpperCase() + entry.actor.slice(1)}` : `${entry.reminder === "reminder_24h" ? "24-hour reminder" : entry.reminder === "reminder_2h" ? "2-hour reminder" : entry.reminder === "request_owner_reminder" ? "Owner reminder" : "Request expiry notice"} · ${entry.status === "sent" ? "Accepted by email provider" : entry.status === "claimed" ? "Delivery not confirmed" : entry.status === "suppressed" ? "Not sent: email is disabled" : entry.status === "skipped" ? "Not sent" : "Delivery failed"}`}</p>
+                <p>{entry.kind === "change" ? `${entry.reason ?? STATUS[entry.to]} · ${entry.actorSnapshot ? actorLabel(entry.actorSnapshot) : entry.actor === "visitor" ? "Customer" : entry.actor === "strelva" ? "Strelva" : entry.actor.charAt(0).toUpperCase() + entry.actor.slice(1)}` : `${entry.reminder === "reminder_24h" ? "24-hour reminder" : entry.reminder === "reminder_2h" ? "2-hour reminder" : entry.reminder === "request_owner_reminder" ? "Owner reminder" : "Request expiry notice"} · ${entry.status === "sent" ? "Accepted by email provider" : entry.status === "claimed" ? "Delivery not confirmed" : entry.status === "suppressed" ? "Not sent: email is disabled" : entry.status === "skipped" ? "Not sent" : "Delivery failed"}`}</p>
                 <time dateTime={entry.at}>{new Date(entry.at).toLocaleString("en-US", { timeZone: site.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</time>
               </li>
             ))}</ol>}
@@ -126,7 +127,7 @@ function SiteSection({ site, bookings, workspaceId, many, rulesEnabled }: { site
             </p>
           ) : null}
           {days.map((date) => (
-            <div key={date} className={bookings.view === "week" ? "border-t border-gray-border pt-4 first:border-t-0 first:pt-0 [&+&]:mt-4" : "mt-2"}>
+            <div key={date} className={bookings.view === "week" ? "pt-4 first:pt-0 [&+&]:mt-4" : "mt-2"}>
               {bookings.view === "week" ? (
                 <h3 className="text-sm font-medium">
                   {dayLabel(date, "short")}
@@ -157,7 +158,7 @@ export function WorkspaceBookings({ workspaceId, state, view, rulesEnabled = fal
     ? view === "day" ? dayLabel(ready.from) : `Week of ${dayLabel(ready.from, "short")}`
     : view === "day" ? "Today" : "This week";
   return (
-    <main data-dashboard data-workspace-theme="linen"><StPage>
+    <div data-dashboard data-workspace-theme="linen"><StPage>
       <StHead crumb={{ label: "Home", href: homeHref }} title={heading} meta={view === "day" ? ready?.readOnly ? "Shared appointments, in order. The owner decides booking requests." : "Who's coming in, in order. Check people in as they arrive." : ready?.native ? "Every booking this week, kept in this business’s Bookings System." : "Every booking this week, from your website and the tools it connects to."} />
         {state.kind === "permission" ? (
           <StNotice tone="critical">
@@ -195,6 +196,6 @@ export function WorkspaceBookings({ workspaceId, state, view, rulesEnabled = fal
             ) : ready!.sites.map((site) => <SiteSection key={site.tenantId} site={site} bookings={ready!} workspaceId={workspaceId} many={ready!.sites.length > 1} rulesEnabled={rulesEnabled} />)}
           </>
         )}
-    </StPage></main>
+    </StPage></div>
   );
 }

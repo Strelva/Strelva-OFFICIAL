@@ -2,7 +2,7 @@ import { Clock3 } from "lucide-react";
 import type { InquiryBookingChoice as Choice } from "@/products/inquiries";
 import { VisitorBookingShell } from "./VisitorBookingShell";
 import styles from "./visitor.module.css";
-import { bookingReceiptLabel } from "@/products/scheduling/public-visitor-contracts";
+import { bookingReceiptLabel } from "@/products/scheduling/contracts";
 import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 /** Signed inquiry handoff. Read-only until the customer explicitly posts one time. */
 export function InquiryBookingChoice({ choice, actionUrl, unavailable, error, businessName, now }: { now?: number; businessName?: string; choice: Choice | null; actionUrl: string; unavailable?: boolean; error?: string }) {

@@ -74,7 +74,7 @@ export async function reserveBusinessAiBudget(workspaceId: string, maximumCostUs
  * reservation into that attempt's log rows. Missing bounds or unavailable state
  * pause capped work. Failed/unknown calls retain their full reservation until reset.
  */
-export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpose; workspaceId?: string | null; maximumCostUsd?: string }, deps: {
+export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpose; workspaceId?: string | null; maximumCostUsd?: string | (() => string | undefined) }, deps: {
   environment?: Record<string, string | undefined>;
   read?: (workspaceId: string) => Promise<BusinessAiBudget | null>;
   reserve?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null) => Promise<BusinessAiReservation | null>;
@@ -89,9 +89,12 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
   if (cap === null) return null;
   const committed = Number(budget.spentUsd) + Number(budget.reservedUsd);
   if (committed >= cap) throw new ModelBudgetPausedError(committed, cap);
-  if (!decimal.safeParse(context.maximumCostUsd).success || Number(context.maximumCostUsd) <= 0) throw new ModelBudgetUnavailableError();
+  let maximumCostUsd: string | undefined;
+  try { maximumCostUsd = typeof context.maximumCostUsd === "function" ? context.maximumCostUsd() : context.maximumCostUsd; }
+  catch { throw new ModelBudgetUnavailableError(); }
+  if (!decimal.safeParse(maximumCostUsd).success || Number(maximumCostUsd) <= 0) throw new ModelBudgetUnavailableError();
   const reservation = await (deps.reserve ?? reserveBusinessAiBudget)(
-    context.workspaceId, context.maximumCostUsd!, budget.subscribed ? null : environment.STRELVA_FREE_MONTHLY_AI_CAP_USD ?? null,
+    context.workspaceId, maximumCostUsd!, budget.subscribed ? null : environment.STRELVA_FREE_MONTHLY_AI_CAP_USD ?? null,
   ).catch(() => null);
   const result = reservationSchema.safeParse(reservation);
   if (!result.success || result.data.budget.unknownCostCalls > 0) throw new ModelBudgetUnavailableError();

@@ -63,6 +63,7 @@ export function createPreviewInquiryAdapter(
       role: scenarioName === "read-only" ? "read_only" : audience === "agency" ? "agency_member" : "owner",
       description: profile.description,
     },
+    servingAgency: audience === "agency" ? { agencyId: "fictional-north-studio", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" } : null,
     connections: ["google", "email", "calendar", "stripe", "mls"].map((id) => ({
       id: id as "google" | "email" | "calendar" | "stripe" | "mls",
       label: { google: "Google", email: "Email", calendar: "Calendar", stripe: "Stripe", mls: "MLS" }[id]!,

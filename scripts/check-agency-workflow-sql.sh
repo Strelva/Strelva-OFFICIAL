@@ -30,6 +30,7 @@ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >
 migration_count=0
 owner_link_fingerprint_query="select target,md5(pg_get_functiondef(target::regprocedure)) from unnest(array['public.strelva_owner_decision_link_session(uuid,uuid,text,text,text)','public.assert_owner_decision_link(uuid,uuid,uuid,text,text)','public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)']) target order by target"
 while IFS= read -r migration; do
+  [[ "$(basename "$migration")" == 2026102412* ]] && continue
   if [[ "$(basename "$migration")" == "20261015120000_owner_link_provider_identity.sql" ]]; then
     psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-before.hashes"
   fi
@@ -134,3 +135,6 @@ printf 'Agency workflow SQL passed on %s ordered migrations: add client, seat-on
 
 # #251: bounded platform support reads; pure snapshot APIs remain unchanged.
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
+
+# Qualify the UX successor only after historical owner-claim inverses finish.
+bash "$repo_root/scripts/check-ux-audit-sql.sh"

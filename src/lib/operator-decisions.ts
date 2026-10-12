@@ -1,77 +1,11 @@
-/**
- * Who decides a tenant event, and how a delegate's decision is recorded.
- *
- * Every signed-in approval of a tenant event goes through here: the dashboard
- * queue, the event route, review replies, and the /admin queue and portfolio.
- * Two kinds of people decide for a business without being its owner:
- *
- * - A Strelva operator: an active super admin who is not an owner member of
- *   the tenant. Decides as `operator:<user id>`.
- * - Agency staff: a member of an agency holding an active provider seat on the
- *   business the tenant is linked to (ADR 0012), who is not its owner member.
- *   Decides as `agency-staff:<agency id>:<user id>`.
- *
- * A delegate runs the same governed spine as the owner (`resolveEventAction`)
- * under that actor, so receipts name them, Google sees an operator
- * instruction, and the owner's auto-publish streak never moves. A delegate
- * never decides an item routed to the owner, and their access is re-read
- * before each effect.
- *
- * Each delegate decision writes to `audit_logs`: one row before the effect
- * and one with its result. No attempt row means no effect.
- */
-import { getAuthUserId, isSuperAdmin } from "@/platform/infra/auth";
-import { getSessionUser } from "@/platform/infra/db/server-client";
-import { getMembershipRole, getTenantAgencySeat } from "@/platform/infra/db/repositories";
+/** Tenant decision authority. Owners and authorized agency staff decide content; platform support only triages requests or marks a quote as required. */
+import { getTenantAgencySeat } from "@/platform/infra/db/repositories";
 import { getEventRaw } from "./events";
-import { agencyStaffActorId, operatorActorId, resolveEventAction, type EventWorkflowAction } from "./event-actions";
+import { resolveEventAction, type EventWorkflowAction } from "./event-actions";
 import { logAuditEvent, type AuditLogEntry } from "./storage";
 import type { UnifiedEvent } from "./types";
-
-export interface VerifiedOperator {
-  userId: string;
-  verifiedEmail: string;
-  /** `operator:<userId>`, the actor the approve path records. */
-  actorId: string;
-}
-
-/**
- * The signed-in operator, read now: a verified session and an unrevoked
- * super_admins row. Call it again before each effect in a batch so a
- * revocation stops the rest.
- */
-export async function verifiedOperator(): Promise<VerifiedOperator | null> {
-  if (!(await isSuperAdmin())) return null;
-  const user = await getSessionUser();
-  if (!user?.email || !user.email_confirmed_at) return null;
-  try {
-    return { userId: user.id, verifiedEmail: user.email.trim().toLowerCase(), actorId: operatorActorId(user.id) };
-  } catch {
-    return null;
-  }
-}
-
-/** Still the same unrevoked operator as at the start of the batch. */
-export async function operatorStillActive(operator: VerifiedOperator): Promise<boolean> {
-  const current = await verifiedOperator();
-  return current?.userId === operator.userId;
-}
-
-export interface AgencyStaff {
-  userId: string;
-  /** The session's email, for the audit row. */
-  email: string | null;
-  agencyWorkspaceId: string;
-  /** `agency-staff:<agency id>:<user id>`, the actor the approve path records. */
-  actorId: string;
-}
-
-/** The agency staff member deciding on this tenant, read now, or null. */
-async function agencyStaffOn(tenantId: string, userId: string, email: string | null): Promise<AgencyStaff | null> {
-  const agencyWorkspaceId = await getTenantAgencySeat(userId, tenantId);
-  if (!agencyWorkspaceId) return null;
-  return { userId, email, agencyWorkspaceId, actorId: agencyStaffActorId(agencyWorkspaceId, userId) };
-}
+import { operatorStillActive, type VerifiedOperator, type AgencyStaff, type TenantDecider } from "@/platform/infra/tenant-decisions";
+export { verifiedOperator, operatorStillActive, sessionTenantDecider, isDelegateDecider, type VerifiedOperator, type AgencyStaff, type TenantDecider } from "@/platform/infra/tenant-decisions";
 
 export async function auditOperatorDecision(input: {
   operator: VerifiedOperator;
@@ -96,40 +30,6 @@ export async function auditOperatorDecision(input: {
  * drafted for the owner's decision. Only the owner decides it. */
 export function isOwnerDecision(event: UnifiedEvent): boolean {
   return event.metadata?.reviewAudience === "owner";
-}
-
-export type TenantDecider =
-  | { kind: "member"; actorId: string }
-  | { kind: "operator"; operator: VerifiedOperator }
-  | { kind: "agency_staff"; staff: AgencyStaff };
-
-/** Someone deciding for the business who is not its owner. */
-export function isDelegateDecider(decider: TenantDecider): boolean {
-  return decider.kind !== "member";
-}
-
-/**
- * Who the signed-in session decides as on this tenant. An active super admin
- * is an operator unless they are an owner member of the tenant; a failed
- * membership read counts as not an owner. Anyone else who isn't an owner
- * member is agency staff when an agency they belong to holds the business's
- * provider seat; if that can't be read this throws, so nothing is decided as
- * the owner. Call after the route's tenant permission check, which still
- * decides whether they may act at all.
- */
-export async function sessionTenantDecider(tenantId: string): Promise<TenantDecider | null> {
-  const operator = await verifiedOperator();
-  if (operator && (await getMembershipRole(operator.userId, tenantId).catch(() => null)) !== "owner") {
-    return { kind: "operator", operator };
-  }
-  const userId = await getAuthUserId();
-  if (!userId) return null;
-  if ((await getMembershipRole(userId, tenantId)) !== "owner") {
-    const user = await getSessionUser();
-    const staff = await agencyStaffOn(tenantId, userId, user?.id === userId ? user.email ?? null : null);
-    if (staff) return { kind: "agency_staff", staff };
-  }
-  return { kind: "member", actorId: userId };
 }
 
 export type DecisionResult = { changed: boolean; reason?: string };
@@ -180,12 +80,20 @@ function agencyStaffDelegate(staff: AgencyStaff): Delegate {
 }
 
 /**
- * An operator's decision on one tenant event. Refuses an owner-routed item
- * and anything `accept` rejects, writes the attempt row, runs the governed
- * spine as the operator, then writes the result row.
+ * Platform support only triages requests or marks a quote as required.
+ * Content and acceptance decisions are refused before effects.
  */
 export async function decideTenantEventAsOperator(operator: VerifiedOperator, input: DelegateDecisionInput): Promise<DecisionResult> {
-  return decideAsDelegate(operatorDelegate(operator), input);
+  // Platform support may triage a request or mark it quote-required; it never
+  // accepts client work, authors content or decides whether content goes live.
+  if (input.action === "triaged" || input.action === "quoted") {
+    return decideAsDelegate(operatorDelegate(operator), { ...input, accept: event => event.type === "change_request" && (!input.accept || input.accept(event)) });
+  }
+  if (!await operatorStillActive(operator)) return { changed: false, reason: "operator_access_changed" };
+  const event = await getEventRaw(input.eventId);
+  if (!event) return { changed: false, reason: "not_found" };
+  if (event.tenantId !== input.tenantId) return { changed: false, reason: "wrong_tenant" };
+  return { changed: false, reason: "platform_content_authority_retired" };
 }
 
 /** Agency staff's decision on one tenant event, the same way as an operator's. */
@@ -240,6 +148,7 @@ export async function decideTenantEvent(
 
 /** HTTP status and message for a refused delegate decision, or null. */
 export function operatorRefusal(reason: string | undefined): { status: number; error: string } | null {
+  if (reason === "platform_content_authority_retired") return { status: 403, error: "Platform support cannot decide client content or accept client work. Open the business workspace with ordinary agency or owner access." };
   if (reason === "owner_decides") return { status: 403, error: "The owner decides this one. Nothing changed." };
   if (reason === "not_operator_decidable") return { status: 403, error: "This item can't be decided here. Nothing changed." };
   if (reason === "operator_access_changed") return { status: 403, error: "Your operator access changed. Nothing changed." };

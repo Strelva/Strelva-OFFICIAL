@@ -70,7 +70,8 @@ export function StField({ label, children, hint }: { label: ReactNode; children:
   return <div className={styles.field}><label className={styles.fieldLabel}>{label}{children}</label>{hint ? <p className={styles.fieldHint}>{hint}</p> : null}</div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef, titleRef }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef, titleRef, as: Heading = "h1" }: {
+  as?: "h1" | "h2" | "h3";
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
@@ -89,7 +90,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRe
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={headingRef ?? titleRef} tabIndex={headingRef || titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<Heading ref={headingRef ?? titleRef} tabIndex={headingRef || titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</Heading></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}

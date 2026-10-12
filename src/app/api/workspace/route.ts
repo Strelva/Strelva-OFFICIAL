@@ -313,7 +313,7 @@ export async function GET(request: Request) {
       pendingAssessments,
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
-      handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
+      handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt, customerWorkspaceId, customerWorkId }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt, ...(status === "accepted" ? { customerWorkspaceId, customerWorkId } : {}) })),
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
       ...(providedClients ? { providedClients } : {}),
       products,

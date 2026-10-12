@@ -1,5 +1,5 @@
 /* Managed pages retain their DashboardProvider and tenant routing on paper. */
-.frame { display: flex; height: 100dvh; min-height: 0; flex-direction: column; background: radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
+.frame { display: flex; flex: 1; min-height: 0; overflow: hidden; flex-direction: column; background: radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif; }
 .bar { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 1016px; margin-inline: auto; padding: 40px 48px 0; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; }
 .tabs a { flex: none; min-height: 44px; padding: 10px 12px; border-radius: var(--st-r-sm); color: var(--st-text-2); font-size: 13px; font-weight: 500; white-space: nowrap; }

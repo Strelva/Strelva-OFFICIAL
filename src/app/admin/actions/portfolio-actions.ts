@@ -1,18 +1,4 @@
-/**
- * Portfolio actions — the operator's single "clear the whole portfolio" surface.
- *
- * Aggregates every pending approval/draft across ALL clients into one queue,
- * grouped by client, so one operator managing many sites sees "12 items across
- * 4 clients waiting for you" instead of opening each dashboard. Bulk-approve
- * resolves each item through the SAME governed spine as the client dashboard
- * (`resolveEventAction`) — never a shortcut that bypasses approval — so an
- * external write that fails leaves its item pending and is reported honestly.
- *
- * The page reads `getPortfolioActions`; the server action resolves the
- * verified operator, then calls `bulkResolvePortfolioActions` as that operator. A transient read
- * failure keeps the overview usable, but is carried as an explicit incomplete
- * source so an empty result can never masquerade as a verified clear queue.
- */
+/** Pending client drafts for audited support inspection. Owner and agency decisions require ordinary workspace permissions. */
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getEvents } from "@/lib/events";
 import { decideTenantEventAsOperator, type VerifiedOperator } from "@/lib/operator-decisions";
@@ -208,19 +194,7 @@ export interface PortfolioResolveResult {
   reason?: string;
 }
 
-/**
- * Approve a batch of items, each through `resolveEventAction` — the governed
- * path that performs the external write (post to Google, publish reply, apply
- * content) BEFORE flipping the event to resolved. Honest partial failure: a
- * write that fails comes back `changed:false` with the underlying reason and the
- * item stays pending, never silently marked done. Sequential so concurrent
- * external writes don't stampede an integration; the batch is a handful of items.
- *
- * Every item runs as the verified operator, never as the owner, through the
- * shared operator decision (`decideTenantEventAsOperator`): it re-checks that
- * the operator is still active, refuses a draft routed to the owner or one
- * this queue can't approve, and writes an audit row before and after.
- */
+/** Retained compatibility call; every operator content approval is refused by the shared authority boundary. */
 export async function bulkResolvePortfolioActions(
   items: PortfolioResolveInput[],
   operator: VerifiedOperator,
@@ -248,8 +222,7 @@ export async function bulkResolvePortfolioActions(
         reason: res.reason,
       });
     } catch (err) {
-      // A single item throwing must not abort the rest of the batch. The
-      // decision already wrote its result row.
+      // A failed admission read must not abort the rest of the inspection.
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,

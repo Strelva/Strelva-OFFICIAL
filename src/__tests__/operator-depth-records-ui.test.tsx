@@ -21,13 +21,13 @@ async function click(label: string) { const button = [...container.querySelector
 const lead: DeliveryLead = { businessName: "Test business", email: "owner@example.test", statusToken: "test-token", deliveryStatus: "received", submittedAt: "2026-10-01T12:00:00Z", statusUpdatedAt: "2026-10-01T12:00:00Z" };
 
 describe("paper operator records", () => {
-  it("shows the complete field diff and keeps rejection behind the existing second click", async () => {
-    const request = vi.fn().mockResolvedValue(Response.json({ success: true })); vi.stubGlobal("fetch", request);
+  it("shows complete field differences without any operator decision controls", () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
     act(() => root.render(createElement(DraftActions, { tenant: "test", section: "hero", preview: { type: "content_update", metadata: { diffs: [{ field: "Headline", type: "changed", before: "Old title", after: "New title" }] } } })));
     expect(container.textContent).toContain("Old title"); expect(container.textContent).toContain("New title");
-    await click("Reject"); expect(request).not.toHaveBeenCalled(); await click("Confirm reject?");
-    expect(request).toHaveBeenCalledWith("/api/admin/drafts", expect.objectContaining({ method: "POST", body: JSON.stringify({ tenant: "test", section: "hero", action: "reject" }) }));
-    expect(navigation.refresh).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("button")).toBeNull();
+    expect(container.querySelector('a[href="/workspace"]')?.textContent).toBe("Open business workspace");
+    expect(request).not.toHaveBeenCalled();
   });
   it("keeps the exact Google draft destination and formats proposed hours without inventing prior hours", () => {
     act(() => root.render(createElement(DraftChangePreview, {event:{type:"content_update",metadata:{kind:"gbp_post_draft",summary:"A proposed post",ctaUrl:"https://example.test/contact"}}})));
@@ -37,10 +37,10 @@ describe("paper operator records", () => {
     act(() => root.render(createElement(DraftChangePreview, {event:{type:"unrelated",metadata:{kind:"gbp_post_draft",summary:"Do not approve this"}}})));
     expect(container.textContent).toBe("");
   });
-  it("keeps an approval refusal visible without claiming the draft changed", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Operator access required" }, { status: 403 })));
+  it("explains that inspection grants no content authority", () => {
     act(() => root.render(createElement(DraftActions, { tenant: "test", section: "hero" })));
-    await click("Approve"); expect(container.querySelector('[role="alert"]')?.textContent).toContain("Operator access required"); expect(navigation.refresh).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Platform support cannot approve or reject client content");
+    expect(navigation.refresh).not.toHaveBeenCalled();
   });
   it("keeps leads in place when conversion admission fails", async () => {
     const request = vi.fn().mockResolvedValue(Response.json({ error: "Denied" }, { status: 403 })); vi.stubGlobal("fetch", request);

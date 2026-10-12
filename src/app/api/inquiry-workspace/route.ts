@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { readJsonObject } from "@/lib/request-body";
+import { sessionTenantDecider } from "@/lib/operator-decisions";
 import { requireActiveSubscription } from "@/lib/subscription";
 import {
   InquiryConcurrencyError,
@@ -114,6 +115,9 @@ export async function POST(request: Request) {
     if (!body) return json({ error: "Invalid request body." }, 400);
     const context = await contextFor(request, body);
     if ("error" in context && context.error) return context.error;
+    const decider = await sessionTenantDecider(context.tenantId);
+    if (!decider) return json({ error: "Unauthorized" }, 401);
+    if (decider.kind === "operator") return json({ error: "Platform support cannot author inquiry changes. Open the business workspace with ordinary agency or owner access." }, 403);
     if (context.exitCompleted) return json({ error: "Inquiry configuration is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
     const actorId = await getAuthUserId();
     if (!actorId) return json({ error: "Unauthorized" }, 401);

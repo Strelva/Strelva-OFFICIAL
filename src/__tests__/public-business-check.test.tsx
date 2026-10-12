@@ -10,6 +10,7 @@ const scanId = `scan_${"b".repeat(32)}`;
 const agency = { workspaceId: "agency-id", slug: "fictional-studio", name: "Fictional Studio", contactUrl: "https://studio.example", brand: { logoUrl: null, accentColor: null } };
 const website = { url: "https://bakery.example/", scannedAt: "2026-10-12T12:00:00Z", overallScore: 80, grade: "B", categories: [], reportId };
 const ai = { business: "Fictional Bakery", url: "https://bakery.example", score: 70, grade: "C", verdict: "Website measured.", signals: [], citation: { probed: true, mentioned: true, recommended: false, note: "Gemini named Fictional Bakery." }, topFix: "Add opening hours.", scanId, measurementStatus: "measured" };
+const pair = (website: unknown, ai: unknown, websiteStatus = 200, aiStatus = 200) => ({ website: { status: websiteStatus, data: website }, ai: { status: aiStatus, data: ai } });
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 let root: Root;
 let container: HTMLDivElement;
@@ -39,16 +40,18 @@ describe("one public business check", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
   it("runs both existing contracts with attribution and keeps both retained IDs and combined share link", async () => {
-    const fetch = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(response({ ...(path === "/api/audit/scan" ? website : ai), agency })));
+    const fetch = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation(() => Promise.resolve(response(pair({ ...website, agency }, { ...ai, agency }))));
     vi.stubGlobal("fetch", fetch);
     const clipboard = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: clipboard } });
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialUrl: "bakery.example", initialBusiness: "Fictional Bakery", agency, workspaceEnabled: true })));
     await submit();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({ url: "bakery.example", agency: agency.slug });
-    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toMatchObject({ business: "Fictional Bakery", agency: agency.slug, source: "fixture" });
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toMatchObject({ business: "Fictional Bakery", agency: agency.slug, source: "fixture" });
     expect(container.textContent).toContain("Gemini named Fictional Bakery.");
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-agency-brand]")).toHaveLength(1);
     expect(container.textContent).toContain("recurring Gemini checks");
     expect(window.location.search).toContain(`report=${reportId}`);
     expect(window.location.search).toContain(`scan=${scanId}`);
@@ -57,7 +60,7 @@ describe("one public business check", () => {
     expect(clipboard).toHaveBeenCalledWith(`${window.location.origin}/audit?scan=${scanId}&report=${reportId}&agency=${agency.slug}`);
   });
   it("keeps the retained scan's email request action in the combined result", async () => {
-    const fetch = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(response(path === "/api/audit/scan" ? website : path === "/api/ai-visibility" ? ai : {})));
+    const fetch = vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(response(path === "/api/audit/check" ? pair(website, ai) : {})));
     vi.stubGlobal("fetch", fetch);
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialUrl: "bakery.example", initialBusiness: "Fictional Bakery" })));
     await submit();
@@ -67,8 +70,8 @@ describe("one public business check", () => {
       email.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await submit();
-    expect(fetch.mock.calls[2]?.[0]).toBe(`/api/ai-visibility/${scanId}/monitor`);
-    expect(JSON.parse(String(fetch.mock.calls[2]?.[1]?.body))).toEqual({ email: "owner@example.invalid" });
+    expect(fetch.mock.calls[1]?.[0]).toBe(`/api/ai-visibility/${scanId}/monitor`);
+    expect(JSON.parse(String(fetch.mock.calls[1]?.[1]?.body))).toEqual({ email: "owner@example.invalid" });
     expect(container.textContent).toContain("Your interest is saved.");
   });
   it("admits one pair of scans even when submit events repeat while pending", async () => {
@@ -80,12 +83,12 @@ describe("one public business check", () => {
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
-    expect(fetch).toHaveBeenCalledTimes(2);
-    await act(async () => { finishes[0]?.(response(website)); finishes[1]?.(response(ai)); });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await act(async () => { finishes[0]?.(response(pair(website, ai))); });
     expect(container.textContent).toContain("Your website check");
   });
   it("retains successful website findings when Gemini fails, with no fabricated result", async () => {
-    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(path === "/api/audit/scan" ? response(website) : response({ error: "Provider unavailable." }, 503))));
+    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation(() => Promise.resolve(response(pair(website, { error: "Provider unavailable." }, 200, 503)))));
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialUrl: "bakery.example", initialBusiness: "Fictional Bakery" })));
     await submit();
     expect(container.textContent).toContain("Your website check");
@@ -94,7 +97,7 @@ describe("one public business check", () => {
     expect(container.textContent).toContain("Save as PDF");
   });
   it("retains Gemini findings when website health fails", async () => {
-    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(path === "/api/audit/scan" ? response({ error: "Site unavailable." }, 503) : response(ai))));
+    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation(() => Promise.resolve(response(pair({ error: "Site unavailable." }, ai, 503)))));
     await act(async () => root.render(createElement(WebsiteAuditPage, { initialUrl: "bakery.example", initialBusiness: "Fictional Bakery" })));
     await submit();
     expect(container.textContent).toContain("Website check unavailable: Site unavailable.");
@@ -102,7 +105,7 @@ describe("one public business check", () => {
     expect(container.textContent).not.toContain("80/100");
   });
   it("refuses silent attribution loss and unreadable provider responses", async () => {
-    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation((path: string) => Promise.resolve(path === "/api/audit/scan" ? response(website) : response({ agency }))));
+    vi.stubGlobal("fetch", vi.fn<(path: string, init?: RequestInit) => Promise<Response>>().mockImplementation(() => Promise.resolve(response(pair(website, { agency })))));
     const result = await runPublicBusinessCheck({ url: "bakery.example", business: "Fictional Bakery", agency });
     expect(result.website).toBeNull(); expect(result.ai).toBeNull();
     expect(result.websiteError).toContain("agency identity could not be confirmed");

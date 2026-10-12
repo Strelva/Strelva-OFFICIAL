@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => {
   class InquiryValidationError extends Error {}
   return {
     verifyAuth: vi.fn(),
+    decider: vi.fn(),
     actor: vi.fn(),
     access: vi.fn(),
     permission: vi.fn(),
@@ -30,6 +31,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock("@/lib/operator-decisions", () => ({ sessionTenantDecider: mocks.decider }));
 vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: mocks.verifyAuth,
   getAuthUserId: mocks.actor,
@@ -83,6 +85,7 @@ describe("authenticated inquiry workspace route", () => {
     mocks.release.mockReturnValue(true);
     mocks.verifyAuth.mockResolvedValue(true);
     mocks.actor.mockResolvedValue("owner-1");
+    mocks.decider.mockResolvedValue({ kind: "member", actorId: "owner-1" });
     mocks.access.mockImplementation(async (tenant: string) => tenant === "tenant-a" ? null : new Response(null, { status: 404 }));
     mocks.permission.mockResolvedValue(null);
     mocks.routedTenant.mockResolvedValue("tenant-a");
@@ -97,6 +100,22 @@ describe("authenticated inquiry workspace route", () => {
       exitCompleted: false,
       mapped: false,
     }));
+  });
+
+  it.each(["start", "edit-draft", "publish", "undo", "set-email-consent"])("refuses forged platform-authorized %s commands before action parsing and writes", async kind => {
+    mocks.decider.mockResolvedValue({ kind: "operator", operator: { userId: "operator-1" } });
+    expect((await POST(postRequest({ tenantId: "tenant-a", expectedRevision: 4, action: { kind } }))).status).toBe(403);
+    expect(mocks.parse).not.toHaveBeenCalled(); expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("retains audited operator support inspection without mutation", async () => {
+    mocks.decider.mockResolvedValue({ kind: "operator", operator: { userId: "operator-1" } });
+    expect((await GET(getRequest())).status).toBe(200);
+    expect(mocks.read).toHaveBeenCalled(); expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("accepts independently authorized ordinary agency commands", async () => {
+    mocks.decider.mockResolvedValue({ kind: "agency_staff", staff: { userId: "owner-1", agencyWorkspaceId: "agency-1" } });
+    expect((await POST(postRequest({ tenantId: "tenant-a", expectedRevision: 4, action: canonicalAction }))).status).toBe(200);
+    expect(mocks.execute).toHaveBeenCalled();
   });
 
   it("keeps both methods closed before authentication when the release is disabled", async () => {

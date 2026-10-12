@@ -56,7 +56,7 @@ describe("the one JSON-LD serializer", () => {
     expect(ld.areaServed).toEqual(["Buffalo"]);
     expect(ld.paymentAccepted).toBe("Cash, Credit card");
     const sheet = businessFactSheet(facts, "https://app.example/biz/barber");
-    for (const term of ["Notice: 0 hours.", "Deposit required.", "Amount: 20%.", "Cash, Credit card", "Minimum age: 0.", "No waiver required.", "No guardian required.", "No reservation required.", "Advance notice: 0 hours.", "Book up to 30 days ahead.", "Response within 24 hours."]) {
+    for (const term of ["Notice: 0 hours.", "Deposit required.", "Amount: 20%.", "Cash, Credit card", "Minimum age: 0.", "No waiver required.", "No guardian required.", "No booking required.", "Advance notice: 0 hours.", "Book up to 30 days ahead.", "Response within 24 hours."]) {
       expect(sheet).toContain(term);
       expect(JSON.stringify(ld)).toContain(term);
     }
@@ -67,7 +67,7 @@ describe("the one JSON-LD serializer", () => {
     expect(businessFactSheet(unknown, "https://app.example")).not.toContain("Business policies");
     expect(businessJsonLd(unknown)).not.toHaveProperty("additionalProperty");
     const minimal = { ...facts, policies: { booking_rules: { ...facts.policies!.booking_rules!, value: { summary: "Ask us." } } } };
-    expect(businessFactSheet(minimal, "https://app.example")).not.toContain("No reservation required");
+    expect(businessFactSheet(minimal, "https://app.example")).not.toContain("No booking required");
   });
 
   it("names no url when the block is for any site, and nothing at all without a confirmed name", () => {

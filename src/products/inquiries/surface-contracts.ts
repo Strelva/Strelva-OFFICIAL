@@ -51,6 +51,8 @@ export type InquirySurfaceSnapshot = {
     role: "owner" | "agency_member" | "read_only";
     description: string;
   };
+  /** Current serving agency presentation, independent of historical receipt actors. */
+  servingAgency?: import("@/platform/infra/agency-brand").OwnerBrand | null;
   state: InquiryEngineState;
   capabilities: InquiryCapabilityState[];
   connections: import("./contracts").InquiryConnectionView[];

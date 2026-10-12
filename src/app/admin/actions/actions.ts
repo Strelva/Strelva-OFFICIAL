@@ -1,23 +1,15 @@
 "use server";
 
-/**
- * Server action behind the portfolio bulk-approve buttons. Re-verifies the
- * operator independently (the /admin layout gate does NOT protect a server
- * action's POST surface), then resolves each item as that operator through the
- * governed `bulkResolvePortfolioActions` → `resolveEventAction` spine. Returns per-item
- * results so the UI can report honest partial failures.
- */
+/** Support may route work to its owner, but never author or approve it. */
 import { isSuperAdmin } from "@/platform/infra/auth";
-import { auditOperatorDecision, verifiedOperator } from "@/lib/operator-decisions";
+import { auditOperatorDecision, operatorStillActive, verifiedOperator } from "@/lib/operator-decisions";
 import { getAllTenants } from "@/lib/tenants";
 import { escalateEventToOwner } from "@/lib/event-actions";
 import {
-  bulkResolvePortfolioActions,
   type PortfolioResolveInput,
   type PortfolioResolveResult,
 } from "./portfolio-actions";
 import {
-  draftOpportunityForClients,
   type OpportunityKind,
   type OpportunityDraftResult,
 } from "./portfolio-opportunities";
@@ -31,24 +23,8 @@ export async function resolvePortfolioActions(
   if (!operator) return { ok: false, results: [] };
   if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
 
-  // Validate tenantIds against known DB records so client-supplied IDs cannot
-  // reference tenants that don't exist. The event resolution also enforces
-  // per-event tenant binding (wrong_tenant check), but filtering here makes the
-  // guard explicit and avoids unnecessary work for entirely bogus IDs.
-  const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
-
-  const safe = items
-    .filter(
-      (i) =>
-        i &&
-        typeof i.tenantId === "string" &&
-        typeof i.eventId === "string" &&
-        knownTenantIds.has(i.tenantId),
-    )
-    .slice(0, MAX_BATCH);
-
-  const results = await bulkResolvePortfolioActions(safe, operator);
-  return { ok: true, results };
+  return { ok: false, results: items.slice(0, MAX_BATCH).filter(item => item && typeof item.tenantId === "string" && typeof item.eventId === "string")
+    .map(item => ({ ...item, changed: false, reason: "platform_content_authority_retired" })) };
 }
 
 /**
@@ -85,7 +61,9 @@ export async function escalatePortfolioActions(
       } catch {
         return { eventId: i.eventId, changed: false, reason: "audit_unavailable" };
       }
-      const result = await escalateEventToOwner(i.tenantId, i.eventId);
+      const result = await operatorStillActive(operator)
+        ? await escalateEventToOwner(i.tenantId, i.eventId)
+        : { changed: false, reason: "operator_access_changed" };
       await auditOperatorDecision({ ...audit, phase: "result", detail: { changed: result.changed, reason: result.reason ?? null } })
         .catch(() => console.error(`[admin/actions] audit result row failed for ${i.eventId}; its attempt row stands.`));
       return { eventId: i.eventId, ...result };
@@ -94,32 +72,12 @@ export async function escalatePortfolioActions(
   return { ok: true, results };
 }
 
-const OPPORTUNITY_KINDS: ReadonlySet<OpportunityKind> = new Set([
-  "unreplied_reviews",
-  "stale_sites",
-  "low_health",
-]);
-
-/**
- * "Draft these" for a portfolio opportunity. Re-verifies super-admin (the /admin
- * layout gate does NOT protect a server action's POST surface), then fans the
- * selected clients through the governed draft path — every draft lands PENDING for
- * approval, nothing is published. Returns per-client results for honest reporting.
- */
+/** Retired compatibility action. Platform support never authors client work. */
 export async function draftPortfolioOpportunity(
-  kind: OpportunityKind,
+  _kind: OpportunityKind,
   tenantIds: string[],
 ): Promise<{ ok: boolean; results: OpportunityDraftResult[] }> {
-  if (!(await isSuperAdmin())) return { ok: false, results: [] };
-  if (!OPPORTUNITY_KINDS.has(kind)) return { ok: false, results: [] };
-  if (!Array.isArray(tenantIds) || tenantIds.length === 0) return { ok: true, results: [] };
-
-  const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
-
-  const safe = tenantIds
-    .filter((id) => typeof id === "string" && id.length > 0 && knownTenantIds.has(id))
-    .slice(0, MAX_BATCH);
-
-  const results = await draftOpportunityForClients(kind, safe);
-  return { ok: true, results };
+  if (!await isSuperAdmin()) return { ok: false, results: [] };
+  return { ok: false, results: Array.isArray(tenantIds) ? tenantIds.slice(0, MAX_BATCH).filter(id => typeof id === "string")
+    .map(tenantId => ({ tenantId, drafted: false, reason: "platform_content_authority_retired" })) : [] };
 }

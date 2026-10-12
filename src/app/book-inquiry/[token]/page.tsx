@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InquiryBookingOffer } from "@/experience/bookings/InquiryBookingOffer";
 import { bookingInquiryOffersEnabled, readInquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
-import { readVisitorPresentationTime, readVisitorInquiryReceipt } from "@/products/scheduling/public-visitor-receipt";
+import { readVisitorPresentationTime, readVisitorInquiryReceipt } from "@/products/scheduling/server";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Choose a booking time", robots: { index: false, follow: false }, referrer: "no-referrer" };
 export default async function Page({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ error?: string }> }) {

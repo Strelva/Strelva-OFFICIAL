@@ -68,20 +68,20 @@ describe("platform public routing", () => {
 });
 
 describe("honest two-door entry", () => {
-  it("keeps both jobs visible when signup is gated off, with a working free check", () => {
+  it("keeps both jobs visible when signup is gated off, with a working free check", async () => {
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).toContain("I run a business"); expect(html).toContain("I build for clients");
     expect(html).toContain("coming soon"); expect(html).toContain('href="/audit"');
     expect(html).not.toContain("Request your build");
-    const agency = renderToStaticMarkup(<AgenciesPage />);
+    const agency = renderToStaticMarkup(await AgenciesPage());
     expect(agency).toContain("Agency signup is coming soon"); expect(agency).not.toContain('href="/sign-up?as=agency"');
   });
-  it("opens each existing door only when its release gates permit it", () => {
+  it("opens each existing door only when its release gates permit it", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     expect(renderToStaticMarkup(<HomePage />)).toContain('href="/sign-up?as=business"');
-    expect(renderToStaticMarkup(<AgenciesPage />)).not.toContain('href="/sign-up?as=agency"');
+    expect(renderToStaticMarkup(await AgenciesPage())).not.toContain('href="/sign-up?as=agency"');
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
-    expect(renderToStaticMarkup(<AgenciesPage />)).toContain('href="/sign-up?as=agency"');
+    expect(renderToStaticMarkup(await AgenciesPage())).toContain('href="/sign-up?as=agency"');
   });
   it("shows account access for a real session and never invented pricing", async () => {
     mocks.user.mockResolvedValue({ id: "owner", email: "owner@example.invalid" });

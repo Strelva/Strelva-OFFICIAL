@@ -16,7 +16,7 @@ import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspa
 import { resolveAskTarget, type AskResolution, type ResolvedSite } from "./resolution";
 import type { TenantAskTools } from "./tenant-tools-adapter";
 import { askToolLabel, buildAskTools, type AskReceiptItem } from "./tools";
-import { websiteRebuildReleasedFor } from "@/products/websites/index";
+import { websiteRebuildReleasedFor } from "@/platform/website-rebuild-release";
 
 /**
  * One Ask Strelva turn: resolve, classify, then (only when needed) run the
@@ -243,7 +243,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
             workspaceId: request.workspaceId, systemId, words: lastUserText, outcome, read: [],
             askedOnBehalf: request.askedOnBehalf ?? null, topic, idempotencyKey: `ask:${deps.newTurnId()}:1`,
           });
-          onReceipt({ kind: "request", toolId: "classifier", status: "filed", ids: [filed.id], summary: outcome });
+          onReceipt({ kind: "request", toolId: "classifier", status: "filed", ids: [filed.id], agencyName: filed.agencyName, actor: filed.actor, summary: outcome });
           record({ status: "queued", message: `Request filed for ${filed.agencyName} (${filed.id}).` });
           return true;
         } catch (error) {

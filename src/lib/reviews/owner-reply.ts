@@ -4,8 +4,8 @@
  * /dashboard/reviews). Callers authorize first and say who is deciding
  * (`sessionTenantDecider`); this only acts.
  *
- * An operator or agency staff member replying posts under their own operator
- * instruction, audited, never as the owner's approval, and never over a draft
+ * An authorized agency staff member replies under their agency instruction,
+ * audited, never as the owner's approval, and never over a draft
  * routed to the owner.
  *
  * A Google review on a connected listing is PUBLISHED through the governed
@@ -104,9 +104,11 @@ export type OwnerReviewReplyResult =
   | { status: "replied"; review: ReviewItem; published: boolean }
   | { status: "not_found" }
   | { status: "owner_decides" }
-  | { status: "publish_failed" };
+  | { status: "publish_failed" }
+  | { status: "platform_content_authority_retired" };
 
 export async function submitOwnerReviewReply(tenant: string, reviewId: string, reply: string, decider: TenantDecider): Promise<OwnerReviewReplyResult> {
+  if (decider.kind === "operator") return { status: "platform_content_authority_retired" };
   const review = (await getReviews(tenant)).find((r) => r.id === reviewId);
   if (!review) return { status: "not_found" };
 

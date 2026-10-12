@@ -5,21 +5,23 @@ import { z } from "zod";
 import { StPill, StPillLink, StNotice, StSurface, StTextButton, StSkeleton } from "@/components/ui/strelva/Kit";
 import { TextInput } from "@/components/ui/TextInput";
 import { FirstClientHandoff } from "@/experience/workspace/agency/FirstClientHandoff";
+import { BusinessWebsiteSharing } from "./BusinessWebsiteSharing";
 import { parseRebuildView, type RebuildView } from "./rebuild-transport";
 
 const handoffSchema = z.object({
   id: z.string(), sourceWorkId: z.string(), recipientEmail: z.string().email(),
   status: z.enum(["pending", "accepted", "expired", "revoked"]),
+  customerWorkspaceId: z.string().optional(), customerWorkId: z.string().optional(),
   expiresAt: z.string().datetime({ offset: true }), createdAt: z.string().datetime({ offset: true }),
 });
 type Handoff = z.infer<typeof handoffSchema>;
-const snapshotSchema = z.object({ workspaceId: z.string(), handoffs: z.array(handoffSchema) });
+const snapshotSchema = z.object({ workspaceId: z.string(), handoffs: z.array(handoffSchema), workspaces: z.array(z.object({ id: z.string(), kind: z.string() })).optional() });
 const onboardingSchema = z.object({ onboarding: z.object({ agency: z.object({ id: z.string() }), effects: z.array(z.object({ effect: z.string(), verified: z.boolean() })) }) });
 const reviewLinkSchema = z.object({ previewHref: z.string(), expiresAt: z.string().datetime({ offset: true }), recipientEmail: z.string().email() });
 const reviewIdentitySchema = z.object({ workspaceId: z.string(), workId: z.string(), revision: z.number(), contentHash: z.string(), recipientEmail: z.string(), expiresAt: z.number() });
 const claimLinkSchema = z.object({ token: z.string().regex(/^[a-zA-Z0-9_-]{43}$/), handoff: handoffSchema });
 type PrivateLink = { action: "share" | "handoff"; href: string; expiresAt: string; recipientEmail: string; candidateHash: string; handoffId?: string };
-type Current = { record: RebuildView; handoff: Handoff | null; claimKnown: boolean; publishing: boolean | null };
+type Current = { record: RebuildView; handoff: Handoff | null; claimKnown: boolean; publishing: boolean | null; businessOwned: boolean; received: RebuildView | null };
 
 async function json(response: Response) {
   const value: unknown = await response.json();
@@ -64,7 +66,16 @@ function ScopedSharing({ workId, readOnly, record: suppliedRecord }: { workId: s
       const latest = snapshot?.handoffs.filter(item => item.sourceWorkId === workId).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0] ?? null;
       const onboarding = onboardingResult.status === "fulfilled" && onboardingResult.value.onboarding.agency.id === record.workspaceId ? onboardingResult.value.onboarding : null;
       if (latest && ["revoked", "expired"].includes(latest.status)) setUncertain(false);
-      setCurrent({ record, handoff: latest, claimKnown: Boolean(snapshot), publishing: onboarding?.effects.find(effect => effect.effect === "publish")?.verified ?? null });
+      let received: RebuildView | null = null;
+      if (latest?.status === "accepted" && latest.customerWorkId && latest.customerWorkspaceId) {
+        try {
+          const destination = parseRebuildView(await json(await fetch(`/api/websites/${encodeURIComponent(latest.customerWorkId)}/rebuild`, { cache: "no-store", credentials: "same-origin", signal })));
+          if (destination.workId === latest.customerWorkId && destination.workspaceId === latest.customerWorkspaceId) received = destination;
+        } catch { /* A missing/revoked destination read never confirms the client Live step. */ }
+      }
+      if (!active()) return;
+      setCurrent({ record, handoff: latest, claimKnown: Boolean(snapshot), publishing: onboarding?.effects.find(effect => effect.effect === "publish")?.verified ?? null,
+        businessOwned: snapshot?.workspaces?.find(value => value.id === record.workspaceId)?.kind === "customer", received });
       setError(snapshot ? "" : "Owner claim status could not be read. Preparing another claim stays unavailable until a current read succeeds.");
     } catch (cause) {
       if (active()) { setCurrent(null); setError(cause instanceof z.ZodError || cause instanceof SyntaxError ? "The saved handoff returned incomplete information. Refresh its current status." : cause instanceof Error ? cause.message : "The handoff could not be read."); }
@@ -83,6 +94,7 @@ function ScopedSharing({ workId, readOnly, record: suppliedRecord }: { workId: s
   const claimed = handoff?.status === "accepted";
   const pending = handoff?.status === "pending" && Date.parse(handoff.expiresAt) > Date.now();
   const published = record?.status === "published";
+  const clientLive = claimed && current?.received?.status === "published" && current.received.readBack === "verified" && Boolean(current.received.publishedUrl);
   const sourceLive = published && record.readBack === "verified" && Boolean(record.publishedUrl);
   const reviewLink = link?.action === "share" && link.candidateHash === candidate?.contentHash && Date.parse(link.expiresAt) > Date.now() ? link : null;
   const claimLink = link?.action === "handoff" && link.handoffId === handoff?.id && pending ? link : null;
@@ -145,8 +157,8 @@ function ScopedSharing({ workId, readOnly, record: suppliedRecord }: { workId: s
   const needsRead = uncertain || !current?.claimKnown;
   const action: "share" | "handoff" = record?.approved ? "handoff" : "share";
   const needsEmail = Boolean(candidate && !published && !claimed && !pending && !visibleLink && !(action === "handoff" && needsRead));
-  const status = sourceLive ? "Source website live · client launch unconfirmed" : published ? "Published · outcome not fully verified" : claimed ? "Owner accepted the handoff" : pending ? "Waiting for the owner to accept" : !candidate ? "Draft not ready" : record?.approved ? "Review approved · prepare owner claim" : "Draft ready for owner review";
-  const detail = sourceLive ? "The source website has a verified read-back. This does not confirm the owner’s business copy is live. Ownership and publishing verification remain separate records."
+  const status = clientLive ? "Live, with publication verified" : sourceLive ? "Source website live · client launch unconfirmed" : published ? "Published · outcome not fully verified" : claimed ? "Owner accepted the handoff" : pending ? "Waiting for the owner to accept" : !candidate ? "Draft not ready" : record?.approved ? "Review approved · prepare owner claim" : "Draft ready for owner review";
+  const detail = clientLive ? "The owner’s received business website has its own verified publication. Source and client identities were checked separately." : sourceLive ? "The source website has a verified read-back. This does not confirm the owner’s business copy is live. Ownership and publishing verification remain separate records."
     : published ? "Publication was recorded, but live read-back is not confirmed. Do not treat it as a completed launch."
     : claimed ? "The owner received a copy in their chosen business. They review and make that copy live there; this source does not prove the business copy is live."
     : pending ? `The claim is addressed to ${handoff.recipientEmail}. Preparing or copying its link does not record acceptance.`
@@ -154,6 +166,7 @@ function ScopedSharing({ workId, readOnly, record: suppliedRecord }: { workId: s
     : record?.approved ? "Approval is recorded for the current draft. Prepare a recipient-bound claim; the owner must sign in and accept it."
     : "Create a private link for the owner to inspect this exact draft. Only a saved approval completes review.";
   const nextAction = reading ? <StPill disabled busy>Reading handoff status</StPill>
+    : clientLive && current?.received ? <StPillLink href={`/workspace?${new URLSearchParams({ workspaceId: current.received.workspaceId, work: current.received.workId, view: "websites" })}`}>Open client website</StPillLink>
     : sourceLive ? <StTextButton onClick={() => void read()}>Check current status</StTextButton>
     : !candidate && current ? <StPillLink href={`/workspace?workspaceId=${encodeURIComponent(current.record.workspaceId)}&work=${encodeURIComponent(workId)}`}>Open website draft</StPillLink>
     : published || claimed || !current || needsRead && action === "handoff" ? <StPill variant="soft" disabled={busy} onClick={() => void read()}>Read current handoff status</StPill>
@@ -161,12 +174,14 @@ function ScopedSharing({ workId, readOnly, record: suppliedRecord }: { workId: s
     : pending ? <StPill variant="soft" onClick={() => void read()}>Check owner acceptance</StPill>
     : <StPill type="submit" disabled={readOnly || busy || !email.trim()} busy={busy}>{action === "share" ? "Create private review link" : "Prepare owner claim link"}</StPill>;
 
+  if (current?.businessOwned) return <BusinessWebsiteSharing key={record!.workId} record={record!} readOnly={readOnly} />;
+
   return <div className="mt-8">
     {!current && reading ? <StSkeleton label="Reading first client handoff" /> : <form onSubmit={event => { event.preventDefault(); void makeLink(action); }}>
       <FirstClientHandoff status={current ? status : "Handoff status unavailable"} detail={current ? detail : "A current saved read is required before continuing."}
         draft={candidate ? "done" : "unverified"} review={record?.approved ? "done" : candidate ? "active" : "pending"}
         claim={claimed ? "done" : pending ? "active" : current?.claimKnown ? "pending" : "unverified"}
-        live={published || claimed ? "unverified" : "pending"} readiness={readiness}
+        live={clientLive ? "done" : published || claimed ? "unverified" : "pending"} readiness={readiness}
         action={<>{needsEmail ? <div className="mb-4"><TextInput type="email" label="Owner's email" value={email} onChange={event => setEmail(event.target.value)} disabled={readOnly || busy} maxLength={254} required /></div> : null}{nextAction}</>} />
     </form>}
     {readOnly ? <StNotice>You have read-only access. An authorized agency member prepares private links.</StNotice> : null}

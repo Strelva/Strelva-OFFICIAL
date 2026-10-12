@@ -9,7 +9,7 @@ export function PublishingPreviewFrame({ children, place, mode = "light", public
   const [ask, setAsk] = useState("");
   const [asked, setAsked] = useState(false);
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode === "dark" ? "dark" : "light"}>
-    {publicPage ? <><p role="note" style={{ padding: "8px 20px", margin: 0, fontSize: 12 }}>Local preview · fictional records · no live actions</p>{children}</> : <StrelvaShell ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} title="" systemsReleased accountName="sheri" workspaceName="The Mooney Firm" active="system"
+    {publicPage ? <><p role="note" style={{ padding: "8px 20px", margin: 0, fontSize: 12 }}>Local preview · fictional records · no live actions</p>{children}</> : <StrelvaShell ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} title="" systemsReleased signedIn signOut={null} appBase="/preview/strelva" accountName="sheri" workspaceName="The Mooney Firm" active="system"
       notice={<p role="note" style={{ margin: 0, fontSize: 12 }}>Local preview · fictional records · no Google changes or email sends</p>}
       pinned={[{ id: "website", title: "attymooney.com", kind: "website", href: "/preview/strelva?scenario=mooney" }, { id: "google", title: "Google listing", kind: "listing", current: place === "Google listing", href: "/preview/strelva/publishing?kind=google" }, { id: "newsletter", title: "Newsletter", kind: "newsletter", current: place === "Newsletter", href: "/preview/strelva/publishing?kind=newsletter" }]}>
       {children}

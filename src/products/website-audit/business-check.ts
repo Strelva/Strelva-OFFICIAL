@@ -11,25 +11,34 @@ export async function runPublicBusinessCheck(input: {
   const attribution = input.agency ? { agency: input.agency.slug } : {};
   const params = new URLSearchParams(window.location.search);
   const source = params.get("utm_source") || params.get("ref") || undefined;
-  async function post(path: string, body: unknown) {
-    const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    const data = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : `Check failed (${response.status})`);
-    if (!data || typeof data !== "object") throw new Error("The check returned an unreadable result. Please try again.");
+  const response = await fetch("/api/audit/check", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url: input.url, business: input.business, category: input.category || undefined, city: input.city || undefined, source, ...attribution }),
+  });
+  const paired = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(typeof paired?.error === "string" ? paired.error : `Check failed (${response.status})`);
+  async function readSection(section: unknown) {
+    if (!section || typeof section !== "object") throw new Error("The check returned an unreadable result. Please try again.");
+    const { status, data } = section as { status?: unknown; data?: unknown };
+    if (typeof status !== "number" || !Number.isInteger(status) || status < 200 || status > 599) throw new Error("The check returned an unreadable result. Please try again.");
+    const result = data as Record<string, unknown> | null;
+    if (status >= 300) throw new Error(typeof result?.error === "string" ? result.error : `Check failed (${status})`);
+    if (!result || typeof result !== "object") throw new Error("The check returned an unreadable result. Please try again.");
     // An attributed check must never silently become an unattributed report.
-    if (input.agency && (data.agency?.slug !== input.agency.slug || data.agency?.workspaceId !== input.agency.workspaceId)) {
+    const recordedAgency = result.agency as AgencyAttribution | undefined;
+    if (input.agency && (recordedAgency?.slug !== input.agency.slug || recordedAgency?.workspaceId !== input.agency.workspaceId)) {
       throw new Error("The agency identity could not be confirmed. Ask the agency for a working check link.");
     }
-    return data;
+    return result;
   }
   const [website, ai] = await Promise.allSettled([
-    post("/api/audit/scan", { url: input.url, ...attribution }).then(data => {
+    readSection(paired?.website).then(data => {
       if (!parseWebsiteAudit(data)) throw new Error("The website check returned an unreadable result.");
-      return data as AuditResult & { reportId?: string };
+      return data as unknown as AuditResult & { reportId?: string };
     }),
-    post("/api/ai-visibility", { business: input.business, url: input.url, category: input.category || undefined, city: input.city || undefined, source, ...attribution }).then(data => {
+    readSection(paired?.ai).then(data => {
       if (!parseAiVisibilityAssessmentPayload(data)) throw new Error("The Gemini check returned an unreadable result.");
-      return data as AiVisibilityResult & { scanId?: string };
+      return data as unknown as AiVisibilityResult & { scanId?: string };
     }),
   ]);
   const websiteResult = website.status === "fulfilled" ? website.value : null;

@@ -1,4 +1,5 @@
-vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: ["gldf", "fixture"], ownerAuthorship: "platform", businessName: "Good Life Daily Foods", replyTo: "owner@gldf.example", timeZone: "America/New_York" }) }));
+const emailContext = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: emailContext }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,7 +31,8 @@ beforeEach(() => {
   vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
   vi.stubEnv("APPROVE_LINK_SECRET", "test-only-secret");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.strelva.example");
-  mockGetContent.mockResolvedValue({ siteName: "Good Life Daily Foods" });
+  mockGetContent.mockResolvedValue({ siteName: "Outdated cached business" });
+  emailContext.mockResolvedValue({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: ["gldf", "fixture"], ownerAuthorship: "platform", businessName: "Good Life Daily Foods", replyTo: "owner@gldf.example", timeZone: "America/New_York" });
   batchSend.mockImplementation(async (payload: unknown[]) => ({ data: { data: payload.map((_, i) => ({ id: `msg_${i}` })) }, error: null }));
 });
 
@@ -43,6 +45,11 @@ describe("sendNewsletter", () => {
     expect(result).toMatchObject({ success: true, subscriberCount: 2, receipt: { accepted: 2, failedBatches: 0, from: "newsletter@mail.strelva.com" } });
     const [payload, options] = batchSend.mock.calls[0]!;
     expect(payload.map((m: { to: string }) => m.to)).toEqual(["reader0@example.test", "reader1@example.test"]);
+    expect(payload[0].html).toContain("Good Life Daily Foods");
+    expect(payload[0].text).toContain("Good Life Daily Foods");
+    expect(payload[0].html).not.toContain("Strelva");
+    expect(payload[0].text).not.toContain("Outdated cached business");
+    expect(mockGetContent).not.toHaveBeenCalled();
     expect(payload[0].from).toBe('"Good Life Daily Foods" <newsletter@mail.strelva.com>');
     expect(payload[0].headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
     const url = /^<(https:\/\/app\.strelva\.example\/api\/newsletter\/unsubscribe\?token=[^>]+)>$/.exec(payload[0].headers["List-Unsubscribe"])![1]!;
@@ -69,6 +76,13 @@ describe("sendNewsletter", () => {
     const retry = await sendNewsletter("gldf", { subject: "s", body: "b", idempotencyKeyPrefix: "evt_9" });
     expect(retry.success).toBe(true);
     expect(batchSend.mock.calls.slice(2).map(([, options]) => options.idempotencyKey)).toEqual(firstKeys);
+  });
+
+  it.each([null, { businessName: "Good Life Daily Foods", replyTo: null }, { businessName: null, replyTo: "owner@gldf.example" }])("holds newsletters when business identity is incomplete", async context => {
+    emailContext.mockResolvedValue(context);
+    mockGetSubscribers.mockResolvedValue(subscribers(2));
+    expect(await sendNewsletter("gldf", { subject: "News", body: "Words" })).toMatchObject({ success: false, reason: "business_identity_unavailable", subscriberCount: 0 });
+    expect(batchSend).not.toHaveBeenCalled();
   });
 
   it("reports no subscribers without touching the provider", async () => {

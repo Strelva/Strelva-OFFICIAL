@@ -1,37 +1,8 @@
-/**
- * Portfolio opportunities — the PROACTIVE layer above the pending-approval queue.
- *
- * The approval queue (portfolio-actions.ts) only shows work that already exists as
- * a draft. This layer scans every active client for actionable-but-not-yet-drafted
- * opportunities — unreplied reviews, sites gone stale, health that has slipped —
- * and groups them so one operator sees the whole portfolio's LATENT work at a
- * glance and can queue it in a single pass.
- *
- * "Draft these" never publishes anything. It routes each tenant through an EXISTING
- * governed draft path:
- *   • unreplied reviews → `draftReviewReply` + a pending `review_reply_draft` event
- *     (the exact path the review poller uses) → lands in the approvable queue below,
- *   • stale sites / low health → `generateProactiveSuggestions` → pending suggestion
- *     cards in each client's own "Needs you" queue.
- * Both land in each client's PENDING queue for owner/operator approval — never
- * auto-published. Every scan read and every draft is per-tenant isolated: one
- * client failing degrades that client, never the whole pass. Read failures are
- * carried in the snapshot so an empty opportunity list is never presented as
- * verified when coverage is incomplete.
- *
- * Pure of auth/HTTP (like portfolio-actions.ts): the page reads the scan, the
- * server action gates super-admin then calls the draft dispatcher.
- */
-import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
+/** Read-only portfolio signals for platform support. Draft creation is retired here; ordinary owner and agency permissions govern client work. */
+import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getReviews } from "@/lib/reviews";
 import { getOwnerRetentionSignals } from "@/lib/retention";
 import { getScanSummaries, type ScanSummary } from "@/lib/scan-store";
-import { generateProactiveSuggestions } from "@/lib/proactive-suggestions";
-import { draftReviewReply } from "@/lib/review-replies";
-import { storeRecentReply } from "@/lib/review-replies";
-import { addEvent, getEvents } from "@/lib/events";
-import type { UnifiedEvent } from "@/lib/types";
-
 /** A site with no owner AI activity for this many days is "stale" on the operator surface. */
 const STALE_SITE_DAYS = 30;
 /** Health grades that read as "slipping" and worth a proactive nudge. */
@@ -259,109 +230,10 @@ export interface OpportunityDraftResult {
   reason?: string;
 }
 
-/** Whether a pending review_reply_draft already exists for this review id. */
-function alreadyDrafted(pending: UnifiedEvent[], reviewId: string): boolean {
-  return pending.some(
-    (e) =>
-      e.type === "review" &&
-      e.metadata?.kind === "review_reply_draft" &&
-      e.metadata?.reviewId === reviewId,
-  );
-}
-
-/**
- * Draft a filter-safe reply to a client's most-recent unreplied review and queue
- * it as a pending `review_reply_draft` — the SAME governed path the review poller
- * uses (drafted, linted, never auto-published; the owner/operator approves it in
- * the queue below). Idempotent: skips a review that already has a pending draft.
- */
-async function draftReviewReplyForTenant(tenantId: string): Promise<OpportunityDraftResult> {
-  const tenant = await getTenantConfig(tenantId).catch(() => null);
-  if (!tenant) return { tenantId, drafted: false, reason: "tenant_not_found" };
-
-  const reviews = await getReviews(tenantId).catch(() => []);
-  // getReviews is newest-first, so the first unreplied one is the most recent.
-  const review = reviews.find((r) => !hasReply(r.reply));
-  if (!review) return { tenantId, drafted: false, reason: "no_unreplied_review" };
-
-  const reviewId = review.externalId ?? review.id;
-  const pending = await getEvents(tenantId, { status: "pending", limit: 200 }).catch(
-    () => [] as UnifiedEvent[],
-  );
-  if (alreadyDrafted(pending, reviewId)) {
-    return { tenantId, drafted: false, reason: "already_drafted" };
-  }
-
-  const draftedReply = await draftReviewReply(
-    {
-      reviewId,
-      reviewerName: review.author,
-      rating: review.rating,
-      comment: review.text,
-    },
-    tenant,
-  );
-
-  await addEvent({
-    tenantId,
-    source: "ai",
-    type: "review",
-    title: `Drafted reply for ${review.author}'s ${review.rating}-star review`,
-    body: draftedReply,
-    // Always pending — a human must approve before it publishes to Google.
-    status: "pending",
-    metadata: {
-      kind: "review_reply_draft",
-      reviewId,
-      rating: review.rating,
-      author: review.author,
-      draftedReply,
-    },
-  });
-  await storeRecentReply(tenantId, draftedReply).catch(() => {});
-
-  return { tenantId, drafted: true };
-}
-
-/**
- * Fan a "Draft these" click across the selected clients, routing each through the
- * governed draft path for the opportunity kind. Sequential so concurrent Gemini
- * calls don't stampede (the batch is a handful of clients). Per-tenant isolation:
- * one client throwing is reported as `drafted:false` and never aborts the rest.
- *
- *   • unreplied_reviews → a pending review_reply_draft (approvable in the queue),
- *   • stale_sites / low_health → generateProactiveSuggestions (suggestion cards in
- *     the client's own queue). It returns the REAL count of suggestions queued —
- *     a client offered in the group but producing 0 (e.g. a stale one-pager with
- *     no content engine and no unreplied review) is reported honestly as
- *     `drafted:false, reason:"nothing_to_draft"`, never as a phantom "drafted".
- */
+/** Retained compatibility entry point; platform operators cannot author client work. */
 export async function draftOpportunityForClients(
-  kind: OpportunityKind,
+  _kind: OpportunityKind,
   tenantIds: string[],
 ): Promise<OpportunityDraftResult[]> {
-  const results: OpportunityDraftResult[] = [];
-  for (const tenantId of tenantIds) {
-    try {
-      if (kind === "unreplied_reviews") {
-        results.push(await draftReviewReplyForTenant(tenantId));
-      } else {
-        // stale_sites + low_health both clear through the governed proactive
-        // generator, which queues pending suggestion cards for approval.
-        const drafted = await generateProactiveSuggestions(tenantId);
-        results.push(
-          drafted > 0
-            ? { tenantId, drafted: true }
-            : { tenantId, drafted: false, reason: "nothing_to_draft" },
-        );
-      }
-    } catch (err) {
-      results.push({
-        tenantId,
-        drafted: false,
-        reason: err instanceof Error ? err.message : "error",
-      });
-    }
-  }
-  return results;
+  return tenantIds.map(tenantId => ({ tenantId, drafted: false, reason: "platform_content_authority_retired" }));
 }

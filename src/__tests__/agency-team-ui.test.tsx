@@ -71,7 +71,9 @@ it("requires explicit removal confirmation and removes the person after success"
   await click(button(node, "Remove staff"));
   const confirmation = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Confirm removal"))!;
   await click(confirmation); expect(writes(request)).toHaveLength(0);
-  await act(async () => confirmation.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+  const reviewed = node.querySelector<HTMLButtonElement>('button[aria-label="Confirm: Confirm removal"]')!;
+  expect(reviewed).not.toBeNull();
+  await click(reviewed);
   expect(writes(request)[0]).toEqual({ action: "remove", workspaceId: TEAM_AGENCY, userId: TEAM_STAFF });
   expect(node.textContent).not.toContain("sam@agency.example.test");
 });

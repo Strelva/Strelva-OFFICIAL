@@ -17,6 +17,7 @@ interface AiVisibilityResultViewProps {
   headingRef?: Ref<HTMLHeadingElement>;
   sample?: { prompt: string; lines: { text: string; wrong?: boolean }[]; explanation: string };
   continuationHref?: string;
+  embedded?: boolean;
 }
 
 type MonitorState = "idle" | "saving" | "saved" | "error";
@@ -26,7 +27,7 @@ function publicCopy(value: string) {
   return value.replace(/\bAI[- ]crawler/gi, "assistant crawler").replace(/\bAI\b/g, "assistants").replace(/\bagent(s?)\b/gi, (_, plural: string) => `assistant${plural.toLowerCase()}`).replace(/\bautomation\b/gi, "scheduled work").replace(/\bworkflow\b/gi, "process").replace(/\btask\b/gi, "work");
 }
 
-export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef, sample, continuationHref }: AiVisibilityResultViewProps) {
+export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef, sample, continuationHref, embedded = false }: AiVisibilityResultViewProps) {
   const result = attributedAiVisibility(raw, raw.agency);
   const agency = result.agency;
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
@@ -83,11 +84,11 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
 
   const nextHref = continuationHref || (scanId && workspaceEnabled ? `/workspace/business/new?check=${encodeURIComponent(scanId)}` : agency?.contactUrl || `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`);
   return <>
-    {agency ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
+    {agency && !embedded ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
     <div className={styles.split}>
       <div className={styles.stack}>
         {result.url ? <StMono>{result.url}</StMono> : null}
-        <StHead titleRef={headingRef} title={sample ? `Gemini gets ${sample.lines.filter(line => line.wrong).length} things wrong about ${result.business}.` : `Gemini check for ${result.business}`} meta={sample ? undefined : publicCopy(result.verdict)} />
+        <StHead as={embedded ? "h3" : "h1"} titleRef={headingRef} title={sample ? `Gemini gets ${sample.lines.filter(line => line.wrong).length} things wrong about ${result.business}.` : `Gemini check for ${result.business}`} meta={sample ? undefined : publicCopy(result.verdict)} />
         <StSurface label="Gemini result"><div className={styles.stack}>
           {sample ? <><StLabel>We asked: “{sample.prompt}”</StLabel><blockquote className={styles.quote}>{sample.lines.map((line, index) => <p key={index} className={line.wrong ? styles.wrong : undefined}>{line.text}</p>)}</blockquote><StCopy muted>{sample.explanation}</StCopy></> : <><StLabel>{result.citation.probed ? "One sampled Gemini answer" : "Gemini answer unavailable"}</StLabel><StCopy>{publicCopy(result.citation.note)}</StCopy><StCopy muted>The saved check records whether Gemini named your business. Its full answer and claim-by-claim accuracy were not saved.</StCopy></>}
           <StCopy muted>One answer, sampled once. Asking again can give a different one.</StCopy>

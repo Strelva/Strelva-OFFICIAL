@@ -26,7 +26,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 function siteChangesFixture(mode: "ready" | "empty" | "error"): typeof fetch {
   let requests: SiteChangeRequest[] = mode === "empty" ? [] : [
     { id: "c7a1e0b2-0000-4000-8000-000000000001", request: "Add a private events page with a short inquiry form", status: "requested", accepted: "accepted", createdAt: "2026-10-03T14:00:00Z", updatedAt: "2026-10-05T16:20:00Z",
-      receipts: [{ id: "d0000000-0000-4000-8000-000000000001", kind: "preview", previewUrl: "https://mclears-git-private-events.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: "Built on a branch. Form posts to Inquiries.", recordedAt: "2026-10-05T16:20:00Z" }] },
+      receipts: [{ id: "d0000000-0000-4000-8000-000000000001", kind: "preview", previewUrl: "https://mclears-git-private-events.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: "The preview includes a form that sends inquiries to this business.", recordedAt: "2026-10-05T16:20:00Z" }] },
     { id: "c7a1e0b2-0000-4000-8000-000000000002", request: "Swap the footer phone number to the new line", status: "requested", accepted: "accepted", createdAt: "2026-09-28T10:00:00Z", updatedAt: "2026-09-30T12:00:00Z",
       receipts: [
         { id: "d0000000-0000-4000-8000-000000000002", kind: "preview", previewUrl: "https://mclears-git-footer.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: null, recordedAt: "2026-09-29T09:00:00Z" },

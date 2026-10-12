@@ -76,7 +76,7 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     const outcome = (["saved", "unchanged", "conflict", "invalid", "denied", "failed"] as const).find((item) => item === result) as DetailsSaveOutcome | undefined;
     const action = async () => { "use server"; };
     const data = { record: record(state === "member" ? "member" : "owner"), operator: false, sites: [SITE], denied: [] };
-    return <StrelvaShell signedIn={false} appBase="/preview/strelva" active="settings" title="Business details" businessContext="Juniper Bakery" systemsReleased><WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
+    return <StrelvaShell signedIn signOut={null} accountName="Fictional owner" appBase="/preview/strelva" active="settings" title="Business details" businessContext="Juniper Bakery" systemsReleased><WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
       state={frame(state === "member" ? undefined : state, data, { ...data, record: { ...record("owner"), facts: {}, services: [], people: [] }, sites: [] }, data, { ...data, denied: DENIED })} /></StrelvaShell>;
   }
 

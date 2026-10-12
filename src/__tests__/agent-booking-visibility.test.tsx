@@ -171,6 +171,6 @@ it("names the source in customer receipts without confusing a request with confi
   const receipt = { siteName: "Fixture", title: "Consultation", day: "Friday", time: "10:00", timeZoneLabel: "UTC", status: "pending" as const, confirmationRequired: true };
   const render = (agentSource?: string) => renderToStaticMarkup(createElement(ManageBooking, { actionUrl: "/b/fixture", state: { kind: "ready", booking: { ...receipt, ...(agentSource ? { agentSource } : {}) }, days: [], slotsUnavailable: false, changesClosed: true } }));
   expect(render("Booked through Claude <script>")).toContain("Booked through Claude &lt;script&gt;");
-  expect(render("Booked through Claude")).toContain("Waiting for the business to confirm");
+  expect(render("Booked through Claude")).toContain("Waiting on Fixture");
   expect(render()).not.toContain(">Source<");
 });

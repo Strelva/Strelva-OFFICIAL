@@ -28,30 +28,28 @@ describe("operator depth review", () => {
     expect(container.textContent).toContain("No verified approvals");
     expect(container.textContent).not.toContain("Portfolio is clear");
   });
-  it("retains the deliberate bulk confirmation and leaves refused approvals waiting", async () => {
-    const resolveActions = vi.fn().mockResolvedValue({ ok: false, results: [] });
-    act(() => root.render(createElement(PortfolioActionsClient, { snapshot, resolveActions })));
-    await click("Approve all 1");
-    expect(resolveActions).not.toHaveBeenCalled();
-    await click("Confirm — publish 1 across all clients?");
-    expect(resolveActions).toHaveBeenCalledWith([{ tenantId: "sample", eventId: "edit-1" }]);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Operator permission could not be confirmed");
+  it("never exposes bulk or single operator content approval", () => {
+    act(() => root.render(createElement(PortfolioActionsClient, { snapshot })));
     expect(container.textContent).toContain("Update opening hours");
+    expect([...container.querySelectorAll("button")].some(button => /Approve|Publish/.test(button.textContent ?? ""))).toBe(false);
+    expect(mocks.resolve).not.toHaveBeenCalled();
   });
-  it("keeps a per-item external failure visible in the pending row", async () => {
-    const resolveActions = vi.fn().mockResolvedValue({ ok: true, results: [{ eventId: "edit-1", changed: false, reason: "gbp_hours_failed" }] });
-    act(() => root.render(createElement(PortfolioActionsClient, { snapshot, resolveActions })));
-    await click("Approve");
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Hours update failed. Still pending");
+  it("retains pending work when its owner handoff fails", async () => {
+    const escalateActions = vi.fn().mockResolvedValue({ ok: false, results: [] });
+    act(() => root.render(createElement(PortfolioActionsClient, { snapshot, escalateActions })));
+    await click("Ask the owner");
+    expect(escalateActions).toHaveBeenCalledWith([{ tenantId: "sample", eventId: "edit-1" }]);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("handoff could not be confirmed");
     expect(container.textContent).toContain("Update opening hours");
+    expect(mocks.resolve).not.toHaveBeenCalled();
   });
-  it("reports denied drafting without claiming a draft was created", async () => {
-    const draftOpportunity = vi.fn().mockResolvedValue({ ok: false, results: [] });
+  it("keeps portfolio observations read-only without inventing Strelva Agency authorship", () => {
+    const draftOpportunity = vi.fn();
     act(() => root.render(createElement(PortfolioOpportunitiesClient, { snapshot: { groups: [{ kind: "low_health", title: "Site health", summary: "A client has an unresolved check.", actionLabel: "Draft fixes", clients: [{ tenantId: "sample", siteName: "Sample site", detail: "Grade D" }] }], totalOpportunities: 1, availability: "complete", incomplete: [] }, draftOpportunity })));
-    await click("Draft fixes");
-    expect(draftOpportunity).toHaveBeenCalledWith("low_health", ["sample"]);
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("No draft has been confirmed");
-    expect(container.textContent).not.toContain("AI");
+    expect(container.textContent).toContain("Sample site");
+    expect(container.querySelector("button")).toBeNull();
+    expect(container.textContent).not.toContain("Strelva Agency prepares");
+    expect(draftOpportunity).not.toHaveBeenCalled();
   });
   it("retains previous audit measurements when scan permission is denied", async () => {
     const request = vi.fn().mockResolvedValue(Response.json({ error: "Operator access required" }, { status: 403 }));
@@ -80,15 +78,12 @@ describe("operator depth review", () => {
     expect(container.textContent).toContain("Named operator");
     expect(container.textContent).toContain("page-1");
   });
-  it("keeps a digest on denial and removes it only after successful decision", async () => {
-    const request = vi.fn().mockResolvedValueOnce(Response.json({ error: "Operator access required" }, { status: 403 })).mockResolvedValueOnce(Response.json({ ok: true }));
+  it("retains digest inspection without calls to the retired decision route", () => {
+    const request = vi.fn();
     act(() => root.render(createElement(MaintenanceDigests, { initialDigests: [digest], request })));
-    await click("Approve");
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Operator access required");
     expect(container.textContent).toContain("Improve page speed");
-    await click("Dismiss");
-    expect(request.mock.calls[1]?.[1]?.body).toBe(JSON.stringify({ tenant: "sample", decision: "dismissed" }));
-    expect(container.textContent).toContain("Nothing needs review");
-    expect(container.textContent).not.toContain("Improve page speed");
+    expect(container.querySelector("button")).toBeNull();
+    expect(container.querySelector('a[href="/workspace"]')).not.toBeNull();
+    expect(request).not.toHaveBeenCalled();
   });
 });

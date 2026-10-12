@@ -50,9 +50,9 @@ describe("isolated operator depth specimens", () => {
     expect([...container.querySelectorAll("button")].some(button => /Approve|Publish|Provision/.test(button.textContent ?? ""))).toBe(false);
     expect(calls.server).not.toHaveBeenCalled(); expect(calls.fetch).not.toHaveBeenCalled();
   });
-  it("labels the retained digest controls as a legacy local rehearsal", async () => {
+  it("keeps retained digests available for support inspection", async () => {
     await act(async () => root.render(createElement(OperatorDepthPreview, { surface: "digests" })));
-    expect(container.textContent).toContain("Retained legacy rehearsal");
+    expect(container.textContent).toContain("Retained support inspection");
     expect(container.textContent).toContain("owner’s workspace");
     expect(calls.server).not.toHaveBeenCalled(); expect(calls.fetch).not.toHaveBeenCalled();
   });

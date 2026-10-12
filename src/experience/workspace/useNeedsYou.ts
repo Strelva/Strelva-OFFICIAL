@@ -7,6 +7,9 @@ import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const responseSchema = z.object({
   role: z.enum(["owner", "admin", "member"]),
+  authority: z.enum(["member", "agency"]).optional(),
+  canDecide: z.boolean().optional(),
+  agencyWorkspaceId: z.string().uuid().optional(),
   items: z.array(ownerDecisionSchema),
   complete: z.boolean(),
   handled: z.array(handledReceiptSchema),
@@ -17,7 +20,7 @@ export type NeedsYouState =
   | { status: "disabled" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; role: "owner" | "admin" | "member"; items: OwnerDecision[]; complete: boolean; handled: HandledReceipt[]; handledAvailable: boolean };
+  | { status: "ready"; role: "owner" | "admin" | "member"; authority?: "member" | "agency"; canDecide?: boolean; agencyWorkspaceId?: string; items: OwnerDecision[]; complete: boolean; handled: HandledReceipt[]; handledAvailable: boolean };
 
 export type ItemNotice = { tone: "done" | "info" | "error"; text: string };
 
@@ -97,7 +100,7 @@ export function useNeedsYou(workspaceId: string | undefined) {
     try {
       const response = await transport("/api/workspace/needs-you", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId, itemId: item.id, revision: item.revisionHash, decision }),
+        body: JSON.stringify({ workspaceId, itemId: item.id, revision: item.revisionHash, decision, ...(result?.workspaceId === workspaceId && result.state.status === "ready" && result.state.authority === "agency" ? { asAgency: true, agencyWorkspaceId: result.state.agencyWorkspaceId } : {}) }),
       });
       const body = (await response.json().catch(() => null)) as { status?: string } | null;
       const notice = body?.status && Object.hasOwn(DECIDE_COPY, body.status) ? DECIDE_COPY[body.status] : undefined;
@@ -111,7 +114,7 @@ export function useNeedsYou(workspaceId: string | undefined) {
     } finally {
       if (!unconfirmed.current) { writing.current = false; setPending(null); }
     }
-  }, [workspaceId, transport, refresh, markUnconfirmed]);
+  }, [workspaceId, transport, refresh, markUnconfirmed, result]);
 
   const undo = useCallback(async (receipt: HandledReceipt) => {
     if (!workspaceId || writing.current || unconfirmed.current) return;

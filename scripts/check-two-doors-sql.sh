@@ -29,7 +29,9 @@ run_contracts() {
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 ordered=$( { find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql'; for extra in ${TWO_DOORS_EXTRA_MIGRATIONS:-}; do printf '%s\n' "$extra"; done; } | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2)
 forwards=$(printf '%s\n' $ordered | grep '_two_doors_')
-for migration in $ordered; do [[ "$migration" == *_two_doors_* ]] || apply "$migration"; done
+for migration in $ordered; do
+  [[ "$migration" == *_two_doors_* || "$(basename "$migration")" == 2026102412* ]] || apply "$migration"
+done
 fingerprint before
 for forward in $forwards; do apply "$forward"; done
 run_contracts
@@ -41,4 +43,7 @@ for forward in $forwards; do apply "$forward"; done
 fingerprint reapplied
 diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2 || { printf 'Two doors reapply differs from the first apply.\n' >&2; exit 1; }
 run_contracts
-printf 'Two doors SQL contract passed (forward, exact rollback, reapply).\n'
+for migration in $ordered; do
+  [[ "$(basename "$migration")" != 2026102412* ]] || apply "$migration"
+done
+printf 'Two doors SQL contract passed (forward, exact rollback, reapply, ordered UX successors).\n'

@@ -203,6 +203,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
           {message.pending && !message.content ? <StSurface label="Strelva is working"><p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel || "Strelva is reading…"}</p></StSurface> : <p className={styles.text}>{message.content}</p>}
           {message.pending && message.content && toolLabel ? <p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel}</p> : null}
           {renderResult?.(message) ?? (message.result ? <TurnReceipt result={message.result} /> : null)}
+          {message.role === "assistant" && message.result?.creationAction ? <StTextButton tone="accent" href={message.result.creationAction.href}>{message.result.creationAction.label}</StTextButton> : null}
           {message.result?.kind === "refusal" ? <div className={styles.refusalActions}>{message.result.items.some(item => item.summary === "approval_in_chat") ? <StTextButton href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</StTextButton> : null}<StTextButton href={refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>Ask for help</StTextButton></div> : null}
         </div>
       </article>)}

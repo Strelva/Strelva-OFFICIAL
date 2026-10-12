@@ -245,3 +245,15 @@ describe("The Needs you place", () => {
     expect(html).toContain("id=\"business-start-title\"");
   });
 });
+
+it("offers scoped agency decisions only with explicit server capability, without granting owner Undo", () => {
+  const agency = ready({ role: "member", authority: "agency", canDecide: true });
+  const html = needs(agency);
+  expect(html).toContain("waiting on you");
+  expect(html).toContain('aria-label="Not yet:');
+  expect(html).not.toContain("Only the owner can decide");
+  expect(handled(agency)).not.toContain('aria-label="Undo:');
+  expect(needs(ready({ role: "member", authority: "agency" }))).not.toContain('aria-label="Not yet:');
+  expect(needs(ready({ role: "member", canDecide: true }))).not.toContain('aria-label="Not yet:');
+  expect(needs(ready({ role: "owner", canDecide: false }))).not.toContain('aria-label="Not yet:');
+});

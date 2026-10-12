@@ -177,9 +177,9 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
   }
 
   return <section ref={scope} aria-labelledby="site-changes-title"><StPage className={styles.wrap}>
-    <StHead titleId="site-changes-title" title={`Ask for a change to ${siteLabel}`} meta={editing === "request"
+    <StHead as="h2" titleId="site-changes-title" title={`Ask for a change to ${siteLabel}`} meta={editing === "request"
       ? "This site runs on its own code. Request a change from the selected agency and review its preview before approving publication."
-      : "Text and photos change in the editor. Request a new page, feature or design change from the selected agency, then review its preview."} />
+      : `Text and photos on ${siteLabel} change in the editor. Request a new page, feature or design change from the selected agency, then review its preview.`} />
 
     {canAsk ? <form className={styles.form} onSubmit={(event) => void ask(event)}>
       <label htmlFor="site-change-words">What should change?</label>

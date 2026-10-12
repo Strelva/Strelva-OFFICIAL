@@ -27,6 +27,8 @@ it("requires the hold control, records publication steps, then keeps undo as a n
   await render("review");
   await act(async () => button("Before").click()); expect(container.querySelector('[aria-label="Fees page 2026"]')).not.toBeNull();
   await act(async () => button("Hold to make it live").click()); expect(container.querySelector("h1")?.textContent).toBe("Update the fees page for 2027");
+  expect(container.querySelector('[role="group"][aria-label^="Confirm:"]')).not.toBeNull();
+  await act(async () => button("Cancel").click());
   await accept("Hold to make it live");
   expect(container.textContent).toContain("Rehearsing publication locally");
   for (let step = 0; step < 4; step++) await act(async () => vi.advanceTimersByTime(500));
@@ -69,6 +71,7 @@ it("preserves reservations when the fictional session form is paused and resumed
 it("requires explicit acceptance before a fictional incident rollback", async () => {
   await render("checks");
   await act(async () => button("Hold to roll back").click()); expect(container.textContent).toContain("No response from the site");
+  await act(async () => button("Cancel").click());
   await accept("Hold to roll back"); expect(container.querySelector("h1")?.textContent).toBe("The last working copy is restored");
   expect(container.textContent).toContain("Fictional rollback receipt recorded");
 });

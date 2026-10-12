@@ -96,3 +96,34 @@ it("distinguishes a paused Ask release from unavailable conversation storage", (
   expect(askHistoryFailure(503, null)).toBe("unavailable");
   expect(askHistoryFailure(403, { error: "Ask Strelva is not enabled." })).toBe("unavailable");
 });
+
+
+describe("saved website creation action", () => {
+  const href = `/workspace/business/new/website?workspaceId=${WS}&conversationId=${SYSTEM}&messageId=aaaaaaaa-0000-4000-8000-000000000002`;
+  const action = { kind: "website", label: "Prepare a website", href };
+  it("keeps the same bounded link in streamed and reopened historical results", () => {
+    for (const raw of [{ ask: { kind: "answer", items: [], creationAction: action } }, { kind: "answer", items: [], creationAction: action }]) {
+      const result = readAskResult(raw)!;
+      expect(result.creationAction).toEqual(action);
+      const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Juniper", initialMessages: [{ id: "historical", role: "assistant", content: "Your website ask is saved.", result }] }));
+      expect(html).toContain(`href="${href.replaceAll("&", "&amp;")}"`);
+      expect(html).toContain("Prepare a website");
+    }
+  });
+  it.each([
+    "https://evil.example" + href,
+    "/workspace/business/new/website-other?workspaceId=" + WS,
+    href + "&request=private-words",
+    href + "&workspaceId=" + WS,
+    href + "#outside",
+    href.replace(WS, "not-a-uuid"),
+    href.replace("messageId=", "messageId=&other="),
+    href.replace("/workspace/", "/workspace/../workspace/"),
+  ])("ignores unsafe continuation %s without dropping the answer", invalid => {
+    expect(readAskResult({ kind: "answer", creationAction: { ...action, href: invalid } })).toMatchObject({ kind: "answer" });
+    expect(readAskResult({ kind: "answer", creationAction: { ...action, href: invalid } })?.creationAction).toBeUndefined();
+  });
+  it.each([{ ...action, kind: "publish" }, { ...action, label: "" }, { ...action, label: "x".repeat(121) }])("ignores unsupported or unbounded action metadata", invalid => {
+    expect(readAskResult({ kind: "answer", creationAction: invalid })?.creationAction).toBeUndefined();
+  });
+});

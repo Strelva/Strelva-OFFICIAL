@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     const decider = await sessionTenantDecider(site.tenantId);
     if (!decider) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
     const result = await submitOwnerReviewReply(site.tenantId, body.reviewId, body.reply, decider);
+    if (result.status === "platform_content_authority_retired") return workspaceJson({ error: "Platform support cannot author client replies. Open the business workspace with ordinary agency or owner access." }, 403);
     if (result.status === "not_found") return workspaceJson({ error: "Review not found." }, 404);
     if (result.status === "owner_decides") return workspaceJson({ error: "The owner decides this reply. Nothing was posted." }, 403);
     if (result.status === "publish_failed") return workspaceJson({ error: "Could not publish the reply to Google.", published: false }, 502);

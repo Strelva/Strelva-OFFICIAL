@@ -75,9 +75,10 @@ describe("auth access pages", () => {
     }));
 
     expect(html).toContain("New accounts open soon");
-    // The closed door points at the free check; Strelva Agency is one labeled choice (ADR 0015).
+    // The closed door points at the free check and neutral agency directory.
     expect(html).toContain('href="/audit"');
-    expect(html).toContain("Want it done for you? Ask Strelva Agency");
+    expect(html).toContain("Want it done for you? Find an agency");
+    expect(html).toContain('href="/agencies"');
     expect(html).not.toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });

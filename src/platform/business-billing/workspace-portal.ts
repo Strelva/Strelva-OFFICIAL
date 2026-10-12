@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { z } from "zod";
-import { getStripe } from "@/lib/billing";
+import { getStripe } from "@/platform/infra/stripe";
 import { getSupabase, type Db } from "@/platform/infra/db/client";
 import { listWorkspaces } from "@/platform/workspaces";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";

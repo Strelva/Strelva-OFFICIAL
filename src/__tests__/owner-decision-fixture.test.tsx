@@ -44,8 +44,13 @@ describe("fictional owner decision transport", () => {
     expect(node.textContent).toContain("A typed yes changes nothing.");
     const hold = node.querySelector<HTMLButtonElement>('button[aria-label="Hold to make it live: Let attorneys request a session date"]')!;
     await act(async () => hold.click());
-    expect(node.querySelector('button[aria-label="Hold to make it live: Let attorneys request a session date"]')).not.toBeNull();
-    await act(async () => hold.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true, cancelable: true })));
+    expect(node.querySelector('button[aria-label="Confirm: Hold to make it live: Let attorneys request a session date"]')).not.toBeNull();
+    expect(node.textContent).not.toContain("Nothing needs you.");
+    const cancel = [...node.querySelectorAll("button")].find(button => button.textContent === "Cancel")!;
+    await act(async () => cancel.click());
+    const restored = node.querySelector<HTMLButtonElement>('button[aria-label="Hold to make it live: Let attorneys request a session date"]')!;
+    expect(document.activeElement).toBe(restored);
+    await act(async () => restored.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true, cancelable: true })));
     expect(node.querySelector('button[aria-label="Hold to make it live: Let attorneys request a session date"]')).toBeNull();
     expect(node.textContent).toContain("Nothing needs you.");
   });

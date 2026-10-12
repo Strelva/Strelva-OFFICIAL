@@ -1,4 +1,4 @@
-import { readVisitorConfirmation } from "@/products/scheduling/public-visitor-receipt";
+import { readVisitorConfirmation } from "@/products/scheduling/server";
 import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 import type { Metadata } from "next";
 import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";

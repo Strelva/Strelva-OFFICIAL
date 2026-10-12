@@ -217,21 +217,10 @@ describe("POST /api/reviews/reply", () => {
     expect(mockLogActivity).toHaveBeenCalledWith(expect.objectContaining({ actor: "user" }), "test-tenant");
   });
 
-  it("a Strelva operator replies as the operator, with audit rows around the post (#530)", async () => {
+  it.each(["rev_1", "rev_2"])("refuses operator authorship of %s before client reads or draft/local writes", async reviewId => {
     signInAsOperator();
-    const res = await postReply({ reviewId: "rev_1", reply: "Thanks Jane!" });
-    expect(res.status).toBe(200);
-    expect(mockMembershipRole).toHaveBeenCalledWith(OPERATOR_ID, "test-tenant");
-    expect(mockResolveEventAction).toHaveBeenCalledWith("test-tenant", "evt_new", "approved", `operator:${OPERATOR_ID}`);
-    expect(mockAudit).toHaveBeenCalledTimes(2);
-    expect(mockAudit).toHaveBeenNthCalledWith(1, expect.objectContaining({
-      tenant: "test-tenant", action: "dashboard.review_reply.approved", targetId: "evt_new",
-      actor: expect.objectContaining({ userId: OPERATOR_ID, type: "super_admin" }),
-      metadata: expect.objectContaining({ phase: "attempt", actor: `operator:${OPERATOR_ID}` }),
-    }));
-    expect(mockAudit).toHaveBeenNthCalledWith(2, expect.objectContaining({ metadata: expect.objectContaining({ phase: "result", changed: true }) }));
-    expect(mockAudit.mock.invocationCallOrder[0]!).toBeLessThan(mockResolveEventAction.mock.invocationCallOrder[0]!);
-    expect(mockLogActivity).toHaveBeenCalledWith(expect.objectContaining({ actor: "admin" }), "test-tenant");
+    expect((await postReply({ reviewId, reply: "Thanks!" })).status).toBe(403);
+    for (const call of [mockGetReviews, mockGetConnection, mockGetEvents, mockAddEvent, mockUpdateEvent, mockResolveEventAction, mockReplyToReview, mockLogActivity, mockAudit]) expect(call).not.toHaveBeenCalled();
   });
 
   it("a super admin who owns the tenant replies as its owner", async () => {
@@ -259,7 +248,7 @@ describe("POST /api/reviews/reply", () => {
     signInAsOperator();
     mockAudit.mockRejectedValue(new Error("audit down"));
     const res = await postReply({ reviewId: "rev_1", reply: "Thanks Jane!" });
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(403);
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(mockReplyToReview).not.toHaveBeenCalled();
   });

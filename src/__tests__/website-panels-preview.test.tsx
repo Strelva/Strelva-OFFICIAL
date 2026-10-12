@@ -25,7 +25,7 @@ describe("website canon fixture panels", () => {
   });
   it("gives the single visit series an accessible data summary", () => {
     const node = page("results");
-    expect(node.querySelector('[role="img"]')?.getAttribute("aria-label")).toContain("32, 35, 28, 39, 49, 43, 33, 53, 60, 45, 57, 64");
+    expect(node.querySelector('[role="img"][aria-label^="Weekly visits"]')?.getAttribute("aria-label")).toContain("32, 35, 28, 39, 49, 43, 33, 53, 60, 45, 57, 64");
     expect(node.querySelectorAll("table tbody tr")).toHaveLength(4);
     expect(node.textContent).toContain("Strelva can’t say that one caused the other");
   });

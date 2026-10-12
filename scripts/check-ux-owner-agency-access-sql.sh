@@ -23,26 +23,29 @@ fingerprint() { psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_ro
 contracts() {
   psql "${psql_args[@]}" --file="$repo_root/tests/two-doors-bring-in-an-agency-schema.sql" >/dev/null
   psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-agency-access-schema.sql" >/dev/null
-  if [[ -f "$repo_root/tests/ux-owner-setup-ask-schema.sql" ]]; then
-    psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-setup-ask-schema.sql" >/dev/null
-  fi
+  psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-setup-ask-schema.sql" >/dev/null
   psql "${psql_args[@]}" --file="$repo_root/tests/ux-owner-export-history.sql" >/dev/null
 }
 apply "$repo_root/scripts/sql/local-supabase-shim.sql"
+# Install and rehearse this inverse at its actual ordered boundary; later UX
+# migrations depend on the exact wrappers and must not precede their target.
 while IFS= read -r migration; do
-  [[ "$migration" == "$forward" ]] || apply "$migration"
+  if [[ "$migration" == "$forward" ]]; then
+    fingerprint before
+    apply "$forward"
+    fingerprint after
+    apply "$rollback"
+    fingerprint reverted
+    diff -u "$cluster_root/before.txt" "$cluster_root/reverted.txt" >&2
+    apply "$forward"
+    fingerprint reapplied
+    diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2
+  else
+    apply "$migration"
+  fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
-fingerprint before
-apply "$forward"
 contracts
-fingerprint after
-apply "$rollback"
-fingerprint reverted
-diff -u "$cluster_root/before.txt" "$cluster_root/reverted.txt" >&2
-apply "$forward"
-fingerprint reapplied
-diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2
-contracts
+fingerprint final
 # Retain the contract fixture and a pending same-area amendment to test the
 # actual rollback, then decline it to prove a populated safe inverse.
 sed 's/^rollback;$/commit;/' "$repo_root/tests/ux-owner-agency-access-schema.sql" >"$cluster_root/populated.sql"
@@ -57,7 +60,7 @@ fi
 psql "${psql_args[@]}" --command="do \$\$ begin if public.business_scope_full_control('7f000000-0000-4000-8000-0000000000b1','website') is distinct from '7f000000-0000-4000-8000-0000000000a1'::uuid or (select count(*) from public.agency_scope_grants where customer_workspace_id='7f000000-0000-4000-8000-0000000000b1' and status='proposed') <> 1 then raise exception 'rollback refusal changed grants'; end if; end \$\$;" >/dev/null
 psql "${psql_args[@]}" --command="select public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test','7f000000-0000-4000-8000-0000000000a1','7f000000-0000-4000-8000-0000000000b1',false);" >/dev/null
 apply "$rollback"
-fingerprint populated-reverted
-diff -u "$cluster_root/before.txt" "$cluster_root/populated-reverted.txt" >&2
 apply "$forward"
+fingerprint populated-reapplied
+diff -u "$cluster_root/final.txt" "$cluster_root/populated-reapplied.txt" >&2
 printf 'Owner agency access SQL passed (ordered schema, original and amendment contracts, exact rollback/reapply, populated rollback refusal and safe inverse).\n'

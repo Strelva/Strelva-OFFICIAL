@@ -1,4 +1,5 @@
-import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { admitPublicAgencyCheck } from "@/platform/agency-prospecting/check-admission";
+import { resolveAgencyAttribution, AgencyProspectingError } from "@/platform/agency-prospecting/server";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import { attributedAudit } from "@/lib/audit/attribution";
 import { NextRequest, NextResponse } from "next/server";
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
   let agency: AgencyAttribution | undefined;
   try {
     agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
-    if (agency) await admitAgencyCheck(agency);
+    if (agency) await admitPublicAgencyCheck(agency);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Agency check unavailable." },
       { status: error instanceof AgencyProspectingError ? error.status : 503 });

@@ -4,8 +4,12 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   get: vi.fn(),
   receivingList: vi.fn(),
+  context: vi.fn(),
+  override: vi.fn(),
 }));
 
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: mocks.context }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: mocks.override }));
 vi.mock("resend", () => ({
   Resend: class {
     emails = { send: mocks.send, get: mocks.get, receiving: { list: mocks.receivingList } };
@@ -33,6 +37,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("RESEND_API_KEY", "re_test");
   vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+  mocks.context.mockResolvedValue({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: ["acme"], ownerAuthorship: "platform", businessName: "Acme", replyTo: "owner@acme.example", timeZone: "America/New_York" });
+  mocks.override.mockResolvedValue("inherit");
   mocks.send.mockResolvedValue({ data: { id: "provider-1" }, error: null });
   mocks.get.mockResolvedValue({
     data: {
@@ -55,11 +61,25 @@ describe("inquiry email provider boundary", () => {
     expect(result).toMatchObject({ status: "accepted", providerMessageId: "provider-1" });
     expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({
       to: message.to,
+      replyTo: message.replyTo,
       tags: expect.arrayContaining([
         { name: "strelva_tenant_id", value: "acme" },
         { name: "strelva_inquiry_id", value: "lead-1" },
       ]),
     }), { idempotencyKey: message.idempotencyKey });
+  });
+
+  it("checks tenant exclusions for customer replies and keeps provider calls held", async () => {
+    mocks.override.mockResolvedValue("off");
+    expect(await createEmailInquiryTransport({ allowExternalSends: true }).send(message)).toMatchObject({ status: "rejected", outcome: "suppressed" });
+    expect(mocks.context).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "acme" }));
+    expect(mocks.send).not.toHaveBeenCalled();
+  });
+
+  it("resolves direct-owner authorship without requiring an agency", async () => {
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
+    expect(await createEmailInquiryTransport({ allowExternalSends: true }).send({ ...message, audience: "client" })).toMatchObject({ status: "accepted" });
+    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ from: '"Strelva" <hello@updates.strelva.com>' }), expect.anything());
   });
 
   it("maps provider read-back bounce evidence without sending again", async () => {

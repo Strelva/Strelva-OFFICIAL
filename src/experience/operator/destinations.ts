@@ -8,6 +8,8 @@ export const OPERATOR_DESTINATIONS = {
   inquiryReview: { href: "/admin/client-leads/inquiries", label: "Inquiry review", group: "Support", icon: "inquiries" },
   inquiries: { href: "/admin/client-leads", label: "Client inquiries", group: "Support", icon: "inquiries" },
   billingGroups: { href: "/admin/accounts", label: "Billing groups", group: "Support", icon: "billing", badgeKey: "accounts" },
+  qualification: { href: "/admin/qualification", label: "Agency qualification", group: "Operations", icon: "policy" },
+  conversion: { href: "/admin/convert", label: "Convert a site", group: "Support", icon: "sites" },
   policy: { href: "/admin/needs-you", label: "Who decides", group: "Operations", icon: "policy" },
   work: { href: "/admin/work", label: "Internal work", group: "Operations", icon: "work" },
   health: { href: "/admin/ops", label: "Operational health", group: "System administration", icon: "checks", badgeKey: "ops" },

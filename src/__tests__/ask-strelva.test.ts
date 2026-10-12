@@ -273,6 +273,18 @@ async function run(deps: AskTurnDeps, text: string, extra: Record<string, unknow
 }
 
 describe("startAskTurn", () => {
+  it("keeps the saved classifier Request recipient and actor in streaming and history", async () => {
+    const h = harness();
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    const savedActor = { kind: "person" as const, displayName: "Original Filer" };
+    h.deps.requests.file = async () => ({ id: "req-saved", status: "requested", agencyName: "Original Studio", actor: savedActor });
+    const result = await run(h.deps, "Rebuild my website");
+    const ask = result.result?.ask as { items: unknown[]; conversationId: string };
+    expect(ask.items).toContainEqual(expect.objectContaining({ toolId: "classifier", agencyName: "Original Studio", actor: savedActor }));
+    const conversation = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.at(-1)?.result?.items).toContainEqual(expect.objectContaining({ agencyName: "Original Studio", actor: savedActor }));
+  });
   it("returns a working creation action tied to the exact saved owner's website ask", async () => {
     const h = harness({ managedWebsites: [] });
     const history = createInMemoryAskHistory({ roleOf: () => "owner" });

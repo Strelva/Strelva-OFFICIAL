@@ -44,3 +44,5 @@ export const outlookCalendarConsentAction: CalendarProviderConsentAction = {
   message: "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.",
 };
 export * from "./public-booking-contracts";
+
+export { inquiryReceiptSchema, bookingReceiptLabel, type InquiryReceipt } from "./public-visitor-contracts";

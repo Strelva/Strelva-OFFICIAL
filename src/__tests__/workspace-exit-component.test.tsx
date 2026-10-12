@@ -62,7 +62,9 @@ describe("workspace exit request lifetime", () => {
     expect(save).toBeDefined();
     await act(async () => save!.click());
     expect(pending).toHaveLength(0);
-    await act(async () => save!.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })));
+    await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Cancel")!.click());
+    const currentSave = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent?.includes("Hold to leave"))!;
+    await act(async () => currentSave.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })));
     expect(pending).toHaveLength(1);
 
     await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: secondWorkspace, request })));

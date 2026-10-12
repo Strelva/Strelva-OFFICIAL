@@ -5,6 +5,7 @@ vi.mock("@/products/ai-visibility/server", () => ({ getAiVisibilityResult: mocks
 vi.mock("@/platform/agency-prospecting/server", () => ({ resolveAgencyAttribution: mocks.agency, AgencyProspectingError: class extends Error { constructor(message: string, public status: number) { super(message); } } }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.enabled }));
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`); }, notFound: () => { throw new Error("not-found"); } }));
+import AgencyEmbed from "@/app/embed/agency/[slug]/[tool]/page";
 import AuditPage from "@/app/(product)/audit/page";
 import AiPage from "@/app/(product)/ai-visibility/page";
 import SharedAiPage, { generateMetadata } from "@/app/(product)/ai-visibility/[id]/page";
@@ -79,5 +80,36 @@ describe("combined report export", () => {
     const html = withGeminiReportSection("<body></body>", null, "Gemini check unavailable: provider offline.");
     expect(html).toContain("Gemini check unavailable: provider offline.");
     expect(html).not.toContain("Gemini named");
+  });
+});
+
+
+describe("combined agency embed aliases", () => {
+  it.each(["audit", "ai-visibility"])("%s restores both sections under the admitted agency", async (tool) => {
+    mocks.agency.mockResolvedValue(agency);
+    mocks.ai.mockResolvedValue({ id: "scan_id", result: { ...ai, agency } });
+    mocks.audit.mockResolvedValue({ url: "https://example.invalid/", agency });
+    const page = await AgencyEmbed({ params: Promise.resolve({ slug: "studio", tool }), searchParams: Promise.resolve({ scan: "scan_id", report: "audit_id" }) });
+    expect(page.props.initialAiResult.business).toBe(ai.business);
+    expect(page.props.initialResult.url).toBe("https://example.invalid/");
+    expect(page.props.agency).toEqual(agency);
+  });
+  it.each(["https://example.invalid:8443/", "http://example.invalid/", "https://example.invalid/?business=other", "not-a-url"])("refuses a report for a distinct or unreadable URL %s", async url => {
+    mocks.agency.mockResolvedValue(agency);
+    mocks.ai.mockResolvedValue({ id: "scan_id", result: { ...ai, agency } });
+    mocks.audit.mockResolvedValue({ url, agency });
+    await expect(AgencyEmbed({ params: Promise.resolve({ slug: "studio", tool: "audit" }), searchParams: Promise.resolve({ scan: "scan_id", report: "audit_id" }) })).rejects.toThrow("not-found");
+  });
+  it("refuses two unreadable retained website identities", async () => {
+    mocks.agency.mockResolvedValue(agency);
+    mocks.ai.mockResolvedValue({ id: "scan_id", result: { ...ai, url: "not-a-url", agency } });
+    mocks.audit.mockResolvedValue({ url: "also-not-a-url", agency });
+    await expect(AgencyEmbed({ params: Promise.resolve({ slug: "studio", tool: "audit" }), searchParams: Promise.resolve({ scan: "scan_id", report: "audit_id" }) })).rejects.toThrow("not-found");
+  });
+  it("refuses a retained pair belonging to different websites", async () => {
+    mocks.agency.mockResolvedValue(agency);
+    mocks.ai.mockResolvedValue({ id: "scan_id", result: { ...ai, agency } });
+    mocks.audit.mockResolvedValue({ url: "https://other.invalid/", agency });
+    await expect(AgencyEmbed({ params: Promise.resolve({ slug: "studio", tool: "audit" }), searchParams: Promise.resolve({ scan: "scan_id", report: "audit_id" }) })).rejects.toThrow("not-found");
   });
 });

@@ -1,15 +1,18 @@
 import { isValidElement, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), business: vi.fn(), agency: vi.fn(), serving: vi.fn(), availability: vi.fn(), invoice: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), business: vi.fn(), agency: vi.fn(), serving: vi.fn(), availability: vi.fn(), invoice: vi.fn(), budget: vi.fn(), cap: vi.fn(), checkout: vi.fn() }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.list }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: async () => ({ userId: "owner", verifiedEmail: "owner@example.test" }) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/business-billing", () => ({ businessBillingEnabled: () => true, readBusinessBilling: mocks.business, readAgencyBilling: mocks.agency }));
-vi.mock("@/platform/business-billing/workspace-checkout", () => ({ selfServeBillingConfig: () => ({ enabled: false }) }));
+vi.mock("@/platform/business-billing/workspace-checkout", () => ({ selfServeBillingConfig: mocks.checkout }));
 vi.mock("@/platform/agency-directory", () => ({ readBusinessAgencies: mocks.serving }));
 vi.mock("@/platform/agency-billing", () => ({ commandAgencyInvoice: mocks.invoice }));
 vi.mock("@/platform/connect/checkout-availability", () => ({ readCheckoutAvailability: mocks.availability }));
+vi.mock("@/platform/infra/business-ai-budget", () => ({ readBusinessAiBudget: mocks.budget, businessAiCapUsd: mocks.cap }));
+import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
+import { BusinessAiBudgetSummary, StartWorkspacePlan } from "@/experience/workspace/billing/StartWorkspacePlan";
 import BillingPage from "@/app/workspace/billing/page";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
@@ -23,7 +26,8 @@ function propsFor(node: ReactNode, type: unknown): Record<string, unknown> | und
 }
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubEnv("STRELVA_CONNECT", "0");
-  mocks.list.mockResolvedValue([{ id: "business", kind: "customer", role: "owner", name: "Client business" }, { id: "unrelated-agency", kind: "agency", role: "owner", name: "Owner's other agency" }]);
+  mocks.list.mockResolvedValue([{ id: "business", kind: "customer", access: "member", role: "owner", name: "Client business" }, { id: "unrelated-agency", kind: "agency", role: "owner", name: "Owner's other agency" }]);
+  mocks.checkout.mockReturnValue({ enabled: false }); mocks.budget.mockResolvedValue({ spentUsd: "0.20", reservedUsd: "0.10" }); mocks.cap.mockReturnValue(1);
   mocks.business.mockResolvedValue(null); mocks.agency.mockResolvedValue(null); mocks.availability.mockResolvedValue({ status: "ready" });
   mocks.serving.mockResolvedValue([{ agencyWorkspaceId: "serving-agency", name: "Cedar Studio", seat: true, ofRecord: true, scopes: [] }, { agencyWorkspaceId: "proposed-agency", name: "Waiting Agency", seat: false, ofRecord: false, scopes: [{ status: "proposed" }] }]);
 });
@@ -41,7 +45,7 @@ it("fails visibly instead of falling back to member agencies when serving-agency
   expect(propsFor(page, WorkspacePayerTransition)?.agencyChoicesError).toContain("could not be loaded");
 });
 it("does not read agency choices for a non-owner", async () => {
-  mocks.list.mockResolvedValue([{ id: "business", kind: "customer", role: "admin", name: "Client business" }]);
+  mocks.list.mockResolvedValue([{ id: "business", kind: "customer", access: "member", role: "admin", name: "Client business" }]);
   const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
   expect(propsFor(page, WorkspacePayerTransition)?.canPropose).toBe(false); expect(mocks.serving).not.toHaveBeenCalled();
 });
@@ -68,4 +72,43 @@ it("does not read merchant state from a mismatched or unauthorized invoice", asy
   mocks.invoice.mockRejectedValueOnce(new Error("denied"));
   const denied = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business", invoiceId: "invoice" }) });
   expect(mocks.availability).not.toHaveBeenCalled(); expect(propsFor(denied, AgencyInvoiceAcceptance)?.checkoutAvailability).toEqual({ status: "unavailable" });
+});
+
+it("supplies exact member-owner billing controls and one real budget summary after billing authorization", async () => {
+  vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "1");
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, BusinessBillingView)).toMatchObject({ workspaceId: "business", canManage: true });
+  expect(propsFor(page, BusinessAiBudgetSummary)).toMatchObject({ budget: { spentUsd: "0.20", reservedUsd: "0.10" }, capUsd: 1, enforced: true });
+  expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
+  expect(mocks.budget).toHaveBeenCalledWith("business");
+  expect(mocks.business.mock.invocationCallOrder[0]).toBeLessThan(mocks.budget.mock.invocationCallOrder[0]!);
+});
+it("supplies the usage projection through plan start without duplicating the summary", async () => {
+  mocks.checkout.mockReturnValue({ enabled: true });
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, StartWorkspacePlan)).toMatchObject({ workspaceId: "business", budget: { spentUsd: "0.20", reservedUsd: "0.10" }, capUsd: 1, budgetEnforced: false });
+  expect(propsFor(page, BusinessAiBudgetSummary)).toBeUndefined();
+});
+it("keeps the real budget visible for subscribed businesses", async () => {
+  mocks.business.mockResolvedValue({ state: "active" }); mocks.checkout.mockReturnValue({ enabled: true });
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, BusinessAiBudgetSummary)?.capUsd).toBe(1); expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
+});
+it("does not perform the service-role budget read or grant management for a provider seat, unknown scope, or denied billing", async () => {
+  for (const workspaces of [[], [{ id: "business", kind: "customer", access: "provider_seat", role: "owner" }]]) {
+    mocks.list.mockResolvedValue(workspaces);
+    const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+    expect(propsFor(page, BusinessBillingView)?.canManage).toBe(false); expect(propsFor(page, BusinessAiBudgetSummary)).toBeUndefined();
+  }
+  mocks.business.mockRejectedValueOnce(new Error("denied"));
+  await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(mocks.budget).not.toHaveBeenCalled();
+});
+it("shows unavailable projection after budget or cap failures without breaking authorized billing", async () => {
+  mocks.budget.mockRejectedValueOnce(new Error("offline"));
+  const failedRead = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(failedRead, BusinessAiBudgetSummary)).toMatchObject({ budget: null, capUsd: null });
+  mocks.cap.mockImplementationOnce(() => { throw new Error("invalid cap"); });
+  const failedCap = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(failedCap, BusinessAiBudgetSummary)).toMatchObject({ budget: null, capUsd: null });
 });

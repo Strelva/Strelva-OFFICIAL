@@ -63,8 +63,8 @@ October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/compone
 full-card account choices use native radio semantics, a shared group name, visible
 focus and kit-selected marks; route-backed choices use the same card with
 `aria-current`. The input remains accessible without the browser's blue radio.
-The local entry preview uses these cards. Live sign-up adoption belongs to the
-owner audit lane. [WorkspaceSurfaceShell](../../src/experience/workspace/WorkspaceSurfaceShell.tsx)
+The local entry preview and live sign-up use these cards; account choices
+preserve their release gating and bounded return destination. [WorkspaceSurfaceShell](../../src/experience/workspace/WorkspaceSurfaceShell.tsx)
 keeps native bookings, site pages, invitations and Version review branches in
 the common workspace frame. Website publishing uses kit fields, open entry rows
 and a single standalone title; customer relationships retain their distinct job
@@ -83,6 +83,19 @@ with its explanation, and `StNotice.id` lets a field's `aria-describedby` name t
 alert itself. These additions are presentation only and preserve native
 form semantics. Rules and adoption lanes:
 `StComposerBar`, `StComposerDock`.
+
+October 12 Ask-lane amendment: `StComposerDock` reserves the complete rendered
+composer and bottom-navigation inset in flow; place it after the work in its
+scroll owner, outside fixed wrappers. Composer-bearing AppFrame pages remain
+scrollable. `StComposerBar` Send is 44×44 on coarse pointers. Ask history composes
+the kit text trigger and shared GooeyDisclosure with unique controls, inert
+closed content and reduced motion. The website creation link retains only a
+validated saved-message continuation, including historical answers; its destination
+rechecks current authority. `StHead as="h2"|"h3"` lets embedded panels preserve
+heading order without adding another H1. Website frames use their parent's bounded
+flex space; native bookings and website panels leave the main landmark to the shell.
+Week groups retain spacing and one shared row hairline. Local source/DOM tests pass;
+post-merge desktop/phone visual qualification is pending.
 
 L11 keeps the trusted business's display font on `StEntry`'s brand with
 optional `brandFontFamily`; form text retains workspace typography. Missing
@@ -1257,6 +1270,21 @@ provider writes. `/preview/strelva/portability?surface=export|exit&state=ready|l
 is gated by development and `STRELVA_UI_PREVIEW=1`; fixtures prove presentation,
 not export completeness or production handoff.
 
+October 12 owner amendment: authorized recent export history recovers retained
+ready archives and active builds on navigation, with actual expiry and unreadable
+history distinguished from empty records. `WorkspaceExit` and
+[BusinessBillingView](../../src/experience/workspace/billing/BusinessBillingView.tsx)
+link to the exact business's billing page; owner-only portal controls retain a
+separate cancellation review, busy/error states and fresh server payer authority.
+Hosted Stripe cancellation and actual archive completeness remain unqualified.
+[BusinessSetupPanel](../../src/experience/workspace/BusinessSetupPanel.tsx) retains
+the saved owner Ask/check and opens Home with its original words after setup;
+unknown save outcomes recover the exact command. [BringInAgency](../../src/experience/workspace/BringInAgency.tsx)
+excludes current/proposed agencies and prepares complete scope amendments while
+active grants remain until acceptance. Decline keeps those active grants. These
+are local source/DOM contracts; ordered SQL and rendered qualification remain
+outstanding.
+
 
 October 7, 2026, local: the System Versions panel now shows each scoped sibling’s reusable definition changes in keyboard-native disclosures, with source-baseline and local values, removed-path labels, and explicit empty/Not verified states. Private records, bindings, grants, maintenance authority and secret-shaped content are omitted by the scoped PostgreSQL projection. `sibling=ready|empty|unavailable` selects fictional comparison states in the existing preview.
 
@@ -1284,6 +1312,14 @@ this semantic result contract.
 owned forms/result geometry and semantic marketing tokens. Public attributed
 results add name-only agency identity, neutral provider advice and an agency
 contact CTA. Embed routes compose those same components without account chrome.
+October 12 combined-check amendment: both `audit` and `ai-visibility` embed aliases
+compose `WebsiteAuditPage`. `AiVisibilityResultView embedded` uses an H3 beneath
+the outer Gemini section and renders the agency identity only once, retaining
+monitor/contact and saved-check continuation actions. The combined public transport
+shares one agency quota admission while preserving independent section results;
+malformed optional fields are refused before either section runs. Agency and
+complete normalized website identities must agree before restoring paired reports.
+These amendments have source/DOM proof only; post-merge rendered acceptance is pending.
 The shared email layout retains optional `preparedBy` compatibility; absent identity
 retains the existing Strelva logo markup. The agency brand contract below owns rich identity.
 The agency prospects page uses a semantic table, scoped to direct agency members.
@@ -1306,8 +1342,18 @@ renders a bounded raster logo, wrapping name, optional reply contact and retaine
 "Runs on Strelva." credit. Any six-digit accent may fill the identity; black or
 white text is selected at 4.5:1 minimum contrast. The sidebar `rail` variant uses
 the owned surface and an accent rule, avoiding a second name/logo block.
-`StrelvaShell.ownerBrand` supplies workspace identity; legacy tenant shells read
-the authorized owner-brand endpoint. A changed workspace cannot reuse the last
+Workspace identity leads the shared header. `StrelvaShell.workspaceName` is
+separate from `ownerBrand`; agency / client views can supply `brandWorkspaceId`
+for the agency's separately authorized brand. Agency credit is non-interactive.
+The platform mark appears once in the fixed header position. Plain context labels
+use this header, while selectors remain below it. `WorkspacePhoneTabs` uses
+Ask Strelva and hides Systems until released. Preview shells use explicit
+fictional account identity and `signOut={null}` to avoid real sign-out actions.
+Legacy tenant shells read the authorized owner-brand endpoint.
+Standalone `InquiryExperience.servingAgency` carries current serving identity
+separately from historical receipt actors: agency views use `[Agency] / [Business]`,
+owner views use the business name, with one header platform mark and neutral
+identity failure. A changed workspace cannot reuse the last
 workspace's fetched identity. Strelva controls and authority remain explicit.
 
 `AgencyBrandEditor` composes owned `TextInput` and `Button` with native file input,
@@ -2029,6 +2075,14 @@ claim and Live status. Prepared links, owner acceptance and verified publication
 remain distinct evidence. Source publication never proves the owner’s separate
 client copy is live. These changes have local source/DOM evidence; actual
 Auth, provider execution and desktop/phone rendering require separate proof.
+
+October 12 integration: [BusinessWebsiteSharing](../../src/experience/websites/BusinessWebsiteSharing.tsx)
+uses those same steps for a website already owned by the business. It reads the
+existing owner claim and prepares the existing business `owner_link`; it never
+transfers an artifact. Agency-owned sharing reads the received business/work IDs
+and requires that destination's own verified publication before showing Live.
+Missing or foreign destination reads remain unconfirmed. Lost claim responses
+require a current read before another command. Local source/DOM proof only.
 ### October 12 · visitor booking and payment shell
 
 [VisitorBookingShell](../../src/experience/bookings/VisitorBookingShell.tsx) is

@@ -111,6 +111,8 @@ it('requires the held-control shortcut before starting publication', async () =>
   await act(async () => root.render(scope(value, transport)));
   await act(async () => button('Hold to make it live').click());
   expect(mutate).not.toHaveBeenCalled();
+  expect(node.querySelector('[role="group"][aria-label^="Confirm:"]')).not.toBeNull();
+  await act(async () => button('Cancel').click());
   await act(async () => publish());
   expect(mutate).toHaveBeenCalledExactlyOnceWith(value, 'launch');
 });

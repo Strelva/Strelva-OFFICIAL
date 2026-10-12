@@ -28,7 +28,7 @@ import {
   type ModelCallRow,
   type ModelCallSink,
 } from "./model-call-log";
-import { assertBusinessAiBudget } from "./business-ai-budget";
+import { assertBusinessAiBudget, ModelBudgetPausedError, ModelBudgetUnavailableError } from "./business-ai-budget";
 import { estimateModelCost, UNKNOWN_COST, type ModelCost } from "./model-prices";
 
 export type { ModelConfig } from "@/platform/infra/ai-models";
@@ -136,6 +136,9 @@ function usageOf(value: unknown): StepUsage {
 class AttemptLog {
   private readonly rows: ModelCallRow[] = [];
   private lastAt: number;
+  private unit: { calledAt: string; reservationId: string | null; recorded: boolean } | null = null;
+  providerBoundary = false;
+  budgetRefusal: ModelBudgetPausedError | ModelBudgetUnavailableError | null = null;
   constructor(
     private readonly context: ModelCallContext,
     private readonly model: ModelConfig,
@@ -145,15 +148,23 @@ class AttemptLog {
     this.lastAt = now();
   }
 
+  startProviderUnit(reservationId: string | null) {
+    this.lastAt = this.now();
+    this.unit = { calledAt: new Date(this.lastAt).toISOString(), reservationId, recorded: false };
+  }
+
   get stepCount(): number {
     return this.rows.length;
   }
 
   add(usage: StepUsage, outcome: "ok" | "error", options: { error?: unknown; cost?: ModelCost } = {}) {
+    if (this.providerBoundary && (!this.unit || this.unit.recorded)) return;
+    if (this.unit) this.unit.recorded = true;
     const at = this.now();
     const cost = options.cost ?? estimateModelCost(this.model.label, usage);
     this.rows.push({
-      calledAt: new Date().toISOString(),
+      calledAt: this.unit?.calledAt ?? new Date(this.lastAt).toISOString(),
+      budgetReservationId: this.unit?.reservationId ?? null,
       purpose: this.context.purpose,
       workspaceId: this.context.workspaceId ?? null,
       systemId: this.context.systemId ?? null,
@@ -195,6 +206,107 @@ class AttemptLog {
   }
 }
 
+/** Provider usage shapes differ between the v2 and v3 adapters. */
+function providerUsage(value: unknown): StepUsage {
+  if (!value || typeof value !== "object") return {};
+  const usage = (value as { usage?: Record<string, unknown> }).usage;
+  if (!usage) return {};
+  const tokens = (key: string) => {
+    const v = usage[key];
+    if (typeof v === "number") return v;
+    if (v && typeof v === "object" && "total" in v && typeof v.total === "number") return v.total;
+    return null;
+  };
+  return { inputTokens: tokens("inputTokens"), outputTokens: tokens("outputTokens") };
+}
+
+/** The initial qualified path is text only, with a hard output/reasoning ceiling. */
+function boundedTextRequest(request: unknown): boolean {
+  if (!request || typeof request !== "object") return false;
+  const value = request as Record<string, unknown>;
+  if (!Number.isSafeInteger(value.maxOutputTokens) || Number(value.maxOutputTokens) <= 0 || value.providerOptions) return false;
+  if (Array.isArray(value.tools) && value.tools.length > 0) return false;
+  if (!Array.isArray(value.prompt)) return false;
+  return value.prompt.every(message => {
+    if (!message || typeof message !== "object") return false;
+    const content = (message as { content?: unknown }).content;
+    return typeof content === "string" || (Array.isArray(content) && content.every(part => part && typeof part === "object" && part.type === "text" && typeof part.text === "string"));
+  });
+}
+
+/** SDK hooks can substitute another model or perform hidden calls. Capped work pauses. */
+async function assertSdkOptions(context: ModelCallContext, options: Record<string, unknown>) {
+  if (options.prepareStep || options.experimental_repairToolCall || options.tools) await assertBusinessAiBudget(context);
+}
+
+/**
+ * The SDK can perform multiple requests per attempt. Intercept the actual
+ * provider methods, so each fallback/tool step reserves separately and a failed
+ * or unreadable request retains its hold. SDK retries are disabled at every entry.
+ */
+function providerBoundary(context: ModelCallContext, config: ModelConfig, log: AttemptLog): ModelConfig {
+  const adapter = config.model;
+  if (typeof adapter !== "object" || !adapter || !("doGenerate" in adapter) || !("doStream" in adapter)) return config;
+  log.providerBoundary = true;
+  const admit = async (request: unknown, operation: "generate" | "stream") => {
+    try {
+      const reservation = await assertBusinessAiBudget({ ...context, maximumCostUsd: () => {
+        if (!config.billingCeiling?.qualification.trim() || !boundedTextRequest(request)) return undefined;
+        return config.billingCeiling.maximumCostUsd(request, operation) ?? undefined;
+      } });
+      log.startProviderUnit(reservation);
+    } catch (error) {
+      // SDK streams may expose this as an error part or wrap the original error.
+      // Preserve the admission refusal so no consumer/fallback policy can hide it.
+      if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) log.budgetRefusal = error;
+      throw error;
+    }
+  };
+  return { ...config, model: new Proxy(adapter, {
+    get(target, property, receiver) {
+      if (property === "doGenerate") return async (request: unknown) => {
+        await admit(request, "generate");
+        try {
+          const result = await (target.doGenerate as (request: unknown) => Promise<unknown>).call(target, request);
+          log.add(providerUsage(result), "ok");
+          return result;
+        } catch (error) {
+          log.add({}, "error", { error, cost: UNKNOWN_COST });
+          throw error;
+        }
+      };
+      if (property === "doStream") return async (request: unknown) => {
+        await admit(request, "stream");
+        let recorded = false;
+        const fail = (error: unknown) => {
+          if (!recorded) { recorded = true; log.add({}, "error", { error, cost: UNKNOWN_COST }); }
+        };
+        try {
+          const result = await (target.doStream as (request: unknown) => Promise<{ stream: ReadableStream<unknown> }>).call(target, request);
+          // Count a stream once. A missing finish/usage, cancellation, transport
+          // failure or provider error keeps unknown cost and the original hold.
+          const reader = result.stream.getReader();
+          const stream = new ReadableStream<unknown>({
+            async pull(controller) {
+              try {
+                const next = await reader.read();
+                if (next.done) { fail(new Error("Stream ended without usage")); controller.close(); return; }
+                const part = next.value as { type?: string; error?: unknown };
+                if (part?.type === "finish") { recorded = true; log.add(providerUsage(part), "ok"); }
+                else if (part?.type === "error") fail(part.error);
+                controller.enqueue(next.value);
+              } catch (error) { fail(error); controller.error(error); }
+            },
+            async cancel(reason) { fail(reason); await reader.cancel(reason); },
+          });
+          return { ...result, stream };
+        } catch (error) { fail(error); throw error; }
+      };
+      return Reflect.get(target, property, receiver);
+    },
+  }) };
+}
+
 async function runAttempts<R>(
   context: ModelCallContext,
   controls: ModelCallControls<R> & { canFallback?: () => boolean },
@@ -202,8 +314,6 @@ async function runAttempts<R>(
   /** Rows from a finished result when no per-step callback fired. */
   settle: (result: R, log: AttemptLog) => void,
 ): Promise<{ result: R; model: ModelConfig; attempt: number }> {
-  // Usage pauses at the payer's cap before any model runs (ADR 0015; flagged).
-  await assertBusinessAiBudget(context);
   const models = modelsFor(context, controls);
   if (models.length === 0) throw new NoModelAvailableError();
   const sink = controls.sink ?? defaultSink;
@@ -216,14 +326,22 @@ async function runAttempts<R>(
     // (budget admission) or rejects its output afterwards (validation) adds
     // no row, because no further provider call happened.
     const run = async () => {
+      // A wrapper may refuse before this point without committing any usage.
+      // Real model objects admit each doGenerate/doStream, including SDK tool
+      // steps. A model identifier/unqualified adapter cannot bypass admission.
+      const guardedModel = providerBoundary(context, model, log);
+      if (!log.providerBoundary) {
+        const reservation = await assertBusinessAiBudget(context);
+        log.startProviderUnit(reservation);
+      }
       let result: R;
       try {
-        result = await call(model, log);
+        result = await call(guardedModel, log);
       } catch (error) {
-        log.add({}, "error", { error, cost: UNKNOWN_COST });
+        if (!(error instanceof ModelBudgetPausedError) && !(error instanceof ModelBudgetUnavailableError)) log.add({}, "error", { error, cost: UNKNOWN_COST });
         throw error;
       }
-      if (log.stepCount === 0) settle(result, log);
+      if (!log.providerBoundary && log.stepCount === 0) settle(result, log);
       return result;
     };
     try {
@@ -235,6 +353,8 @@ async function runAttempts<R>(
       return { result, model, attempt: index + 1 };
     } catch (error) {
       await log.flush(sink);
+      if (log.budgetRefusal) throw log.budgetRefusal;
+      if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) throw error;
       const next = models[index + 1];
       if (!next) throw error;
       if (controls.canFallback && !controls.canFallback()) throw error;
@@ -268,6 +388,7 @@ export interface ModelCallOutcome<R> {
 }
 
 function withStepLog<O extends { onStepFinish?: unknown }>(options: O, log: AttemptLog): O {
+  if (log.providerBoundary) return options;
   const original = options.onStepFinish as ((event: unknown) => unknown) | undefined;
   return {
     ...options,
@@ -287,7 +408,11 @@ export async function generateModelText<R = GenerateTextResult>(
   const outcome = await runAttempts<R>(
     context,
     controls,
-    async (model, log) => (await generateText({ ...withStepLog(optionsFor(options), log), model: model.model } as Parameters<typeof generateText>[0])) as unknown as R,
+    async (model, log) => {
+      const actualOptions = optionsFor(options);
+      await assertSdkOptions(context, actualOptions);
+      return (await generateText({ ...withStepLog(actualOptions, log), maxRetries: 0, model: model.model } as Parameters<typeof generateText>[0])) as unknown as R;
+    },
     (result, log) => {
       const steps = (result as { steps?: unknown }).steps;
       if (Array.isArray(steps) && steps.length > 0) for (const step of steps) log.add(usageOf(step), "ok");
@@ -306,7 +431,11 @@ export async function generateModelObject<R = Awaited<ReturnType<typeof generate
   const outcome = await runAttempts<R>(
     context,
     controls,
-    async (model) => (await generateObject({ ...optionsFor(options), model: model.model } as Parameters<typeof generateObject>[0])) as unknown as R,
+    async (model) => {
+      const actualOptions = optionsFor(options);
+      await assertSdkOptions(context, actualOptions);
+      return (await generateObject({ ...actualOptions, maxRetries: 0, model: model.model } as Parameters<typeof generateObject>[0])) as unknown as R;
+    },
     (result, log) => log.add(usageOf(result), "ok"),
   );
   return { result: outcome.result, modelLabel: outcome.model.label, attempt: outcome.attempt };
@@ -327,7 +456,8 @@ export async function streamModelText(
     context,
     { ...controls, canFallback: () => !controls.emitted() },
     async (model, log) => {
-      const result = streamText({ ...withStepLog(options, log), model: model.model } as Parameters<typeof streamText>[0]);
+      await assertSdkOptions(context, options);
+      const result = streamText({ ...withStepLog(options, log), maxRetries: 0, model: model.model } as Parameters<typeof streamText>[0]);
       await consume(result, model);
     },
     (_result, log) => log.add({}, "ok"),

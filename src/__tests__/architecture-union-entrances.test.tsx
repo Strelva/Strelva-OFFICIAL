@@ -159,7 +159,7 @@ for (const entrance of entrances) {
     expect(posts).toHaveLength(2);
     expect(JSON.parse(String(posts[1]![1]!.body))).toMatchObject({ expectedRevision: 2 });
     expect(tool().textContent).toContain("Fact confirmed in a new revision");
-    expect(tool().textContent).toContain("Revision 3");
+    expect(tool().textContent).toContain("Release 3");
   });
 }
 

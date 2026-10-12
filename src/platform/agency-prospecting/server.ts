@@ -74,7 +74,9 @@ export async function agencyReplyTo(agency: AgencyAttribution): Promise<string> 
   const rows = await rpc("agency_prospecting_profile", { p_slug: agency.slug });
   const row = (Array.isArray(rows) ? rows[0] : null) as Row | undefined;
   if (!row || row.workspace_id !== agency.workspaceId) throw new AgencyProspectingError("Agency email is unavailable.", 503);
-  return (await resolveAgencyEmailIdentity(agency.workspaceId))?.replyTo ?? process.env.REPLY_TO_EMAIL ?? "hello@strelva.com";
+  const identity = await resolveAgencyEmailIdentity(agency.workspaceId);
+  if (!identity?.replyTo) throw new AgencyProspectingError("Agency reply routing could not be confirmed. No email was sent.", 503);
+  return identity.replyTo;
 }
 
 export interface AgencyProspect {

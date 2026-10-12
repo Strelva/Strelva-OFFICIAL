@@ -1,4 +1,4 @@
-import { readVisitorPresentationTime } from "@/products/scheduling/public-visitor-receipt";
+import { readVisitorPresentationTime } from "@/products/scheduling/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InquiryBookingChoice } from "@/experience/bookings/InquiryBookingChoice";

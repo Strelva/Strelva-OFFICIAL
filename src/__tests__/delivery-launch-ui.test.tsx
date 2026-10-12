@@ -49,6 +49,7 @@ describe("agency and native entry interfaces",()=>{
   expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("website_delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
   await act(async()=>button("Accept scope and start 24-hour delivery").click());
   expect(calls).toHaveLength(1);
+  await act(async()=>button("Cancel").click());
   await act(async()=>button("Accept scope and start 24-hour delivery").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
   const command=JSON.parse(String(calls[1]!.init?.body));expect(command).toMatchObject({requestId,expectedRevision:3,change:{kind:"agree"}});
   await resolve(1,{error:{message:"Response lost"}},503);

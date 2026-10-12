@@ -72,7 +72,7 @@ tail_started=0
 early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
-  if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* ]]; then continue; fi
+  if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* || "$migration_name" == 20261024* ]]; then continue; fi
   # Coherence projections wrap October 20-22 readers; they follow that tail below.
   if [[ "$migration_name" == 20261023* && "$migration_name" != "20261023200000_tenant_review_approval_continuity.sql" ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then
@@ -579,3 +579,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261023200000_ten
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql"
 python3 "$repo_root/scripts/check-review-approval-concurrency.py" "${psql_args[@]}"
 printf 'Review approval continuity and dispatch admission passed on the upgraded final schema.\n'
+
+# One command also owns every UX fixture and each lane inverse/race runner.
+# The fresh ordered cluster protects intentionally historical fixtures above.
+bash "$repo_root/scripts/check-ux-audit-sql.sh"

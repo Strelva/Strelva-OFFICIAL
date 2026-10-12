@@ -2,7 +2,7 @@ import { Clock3 } from "lucide-react";
 import type { InquiryBookingOffer as Offer } from "@/platform/bookings/inquiry-offers";
 import { VisitorBookingShell } from "./VisitorBookingShell";
 import styles from "./visitor.module.css";
-import { bookingReceiptLabel, type InquiryReceipt } from "@/products/scheduling/public-visitor-contracts";
+import { bookingReceiptLabel, type InquiryReceipt } from "@/products/scheduling/contracts";
 import { formatVisitorTime } from "@/platform/bookings/public-admission-time";
 /** Plain customer form: keyboard usable, never preselects a commitment. */
 export function InquiryBookingOffer({ offer, actionUrl, error, unavailable, receipt, now }: { now?: number; offer: Offer | null; actionUrl: string; error?: boolean; unavailable?: boolean; receipt?: InquiryReceipt | null }) {

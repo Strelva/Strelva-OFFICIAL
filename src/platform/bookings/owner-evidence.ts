@@ -1,11 +1,13 @@
 /** Bounded owner-list evidence; returns no provider credentials or customer bearer tokens. */
 import { z } from "zod";
+import { recordedActorSchema } from "@/platform/presentation/actor";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { bookingStoreDb, BookingStoreError, parseStoreBooking, STORE_BOOKING_STATUSES, type StoreBooking } from "./store";
 
 const historyEntry = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("change"), actor: z.enum(["visitor", "owner", "member", "strelva", "import", "migration", "system"]),
+    actorSnapshot: recordedActorSchema.nullable().optional().catch(null),
     from: z.enum(STORE_BOOKING_STATUSES).nullable(), to: z.enum(STORE_BOOKING_STATUSES), reason: z.string().nullable(), at: z.string().datetime({ offset: true }) }),
   z.object({ kind: z.literal("reminder"), reminder: z.enum(["reminder_24h", "reminder_2h", "request_owner_reminder", "request_lapsed"]),
     status: z.enum(["claimed", "sent", "suppressed", "failed", "skipped"]), at: z.string().datetime({ offset: true }) }),

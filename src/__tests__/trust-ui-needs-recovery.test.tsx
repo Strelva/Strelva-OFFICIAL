@@ -78,3 +78,16 @@ it("a 5xx decision response is uncertain even if it contains a familiar status",
   await act(async () => hook.decide(item, "approve"));
   expect(hook.notices[item.id]!.text).toContain("Outcome not confirmed"); expect(hook.pending).toBe(item.id);
 });
+
+it("retains exact agency capability and submits the agency decision identity", async () => {
+  const agencyWorkspaceId = "b0000000-0000-4000-8000-000000000001";
+  let command: Record<string, unknown> | undefined;
+  const request = vi.fn(async (_input: unknown, init?: RequestInit) => {
+    if (init?.method === "POST") { command = JSON.parse(String(init.body)); return Response.json({ status: "done" }); }
+    return Response.json(ready({ role: "member", authority: "agency", canDecide: true, agencyWorkspaceId, handled: [], handledAvailable: false }));
+  });
+  await mount(request as typeof fetch);
+  expect(hook.state).toMatchObject({ status: "ready", role: "member", authority: "agency", canDecide: true, agencyWorkspaceId });
+  await act(async () => hook.decide(item, "approve"));
+  expect(command).toEqual({ workspaceId: WS, itemId: item.id, revision: item.revisionHash, decision: "approve", asAgency: true, agencyWorkspaceId });
+});

@@ -44,7 +44,7 @@ export function handledFromStore(row: Record<string, unknown>): HandledReceipt |
   const at = str(row.at);
   const id = str(row.id);
   if (!at || !id) return null;
-  const recorded = recordedActor(row.actor);
+  const recorded = recordedActor(row.store === "owner_decisions" && ("decidedActor" in row || row.decidedByKind === "agency_session") ? row.decidedActor : row.actor);
   // A recorded support source cannot be relabeled as agency client work.
   const actor = row.actorKind === "operator" || (row.actorKind === undefined && row.source === "operator")
     ? (recorded?.kind === "operator" ? recorded : { kind: "operator" as const }) : recorded;
@@ -146,6 +146,10 @@ function decisionReceipt(row: Record<string, unknown>, id: string, at: string, a
   const unverified = row.outcome === "done_unverified";
   const evidence = unverified ? { providerAccepted: true, readBack: "not_verified" as const } : null;
   const booking = lifecycle === "booking_request" ? title.replace(/^Booking request:\s*/, "") : null;
+  if (booking && row.outcomeReason === "already_resolved") {
+    return { ...base, evidence: null, sentence: "The booking request was already resolved. This decision made no new change.", changed: null,
+      undo: { state: "not_undoable", reason: "This decision made no new change. Read the booking's recorded history for its current status." } };
+  }
   if (row.state === "declined") {
     if (booking) {
       return { ...base, evidence, sentence: actorSentence(actor, `declined the booking request and released the time: ${booking}`), changed: str(row.notYetEffect),

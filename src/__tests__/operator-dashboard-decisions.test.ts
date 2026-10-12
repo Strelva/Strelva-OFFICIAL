@@ -94,26 +94,11 @@ describe("PATCH /api/queue/:id", () => {
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it("an operator approves as operator:<id>, never as the owner, with audit rows around the effect", async () => {
+  it("platform operator approvals are retired even on non-owner-routed drafts", async () => {
     signInAsOperator();
-    const res = await queue("evt-1", "approved");
-    expect(res.status).toBe(200);
-    expect(mocks.role).toHaveBeenCalledWith(OPERATOR_ID, "client-site");
-    expect(mocks.resolve).toHaveBeenCalledWith("client-site", "evt-1", "approved", `operator:${OPERATOR_ID}`);
-    expect(mocks.audit).toHaveBeenCalledTimes(2);
-    expect(mocks.audit).toHaveBeenNthCalledWith(1, {
-      tenant: "client-site",
-      actor: { userId: OPERATOR_ID, email: "operator@strelva.example.test", type: "super_admin", isSuperAdmin: true },
-      action: "dashboard.queue.approved",
-      targetType: "event",
-      targetId: "evt-1",
-      metadata: { phase: "attempt", actor: `operator:${OPERATOR_ID}`, decision: "approved", eventType: "newsletter_draft", eventKind: null },
-    });
-    expect(mocks.audit).toHaveBeenNthCalledWith(2, expect.objectContaining({
-      metadata: expect.objectContaining({ phase: "result", changed: true, reason: null }),
-    }));
-    expect(mocks.audit.mock.invocationCallOrder[0]!).toBeLessThan(mocks.resolve.mock.invocationCallOrder[0]!);
-    expect(mocks.resolve.mock.invocationCallOrder[0]!).toBeLessThan(mocks.audit.mock.invocationCallOrder[1]!);
+    for (const action of ["approved", "dismissed"]) expect((await queue("evt-1", action)).status).toBe(403);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 
   it("an operator can't approve or dismiss an item routed to the owner", async () => {
@@ -122,7 +107,7 @@ describe("PATCH /api/queue/:id", () => {
     for (const action of ["approved", "dismissed"]) {
       const res = await queue("evt-owner", action);
       expect(res.status).toBe(403);
-      expect(await res.json()).toEqual({ error: "The owner decides this one. Nothing changed." });
+      expect(await res.json()).toEqual({ error: "Platform support cannot decide client content or accept client work. Open the business workspace with ordinary agency or owner access." });
     }
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
@@ -134,11 +119,11 @@ describe("PATCH /api/queue/:id", () => {
     expect(mocks.resolve).toHaveBeenCalledWith("client-site", "evt-owner", "approved", OWNER_ID);
   });
 
-  it("an operator does nothing when the audit row can't be written", async () => {
+  it("retirement takes precedence over an unavailable audit writer", async () => {
     signInAsOperator();
     mocks.audit.mockRejectedValue(new Error("audit down"));
     const res = await queue("evt-1", "approved");
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(403);
     expect(mocks.resolve).not.toHaveBeenCalled();
   });
 
@@ -149,6 +134,14 @@ describe("PATCH /api/queue/:id", () => {
     expect(res.status).toBe(403);
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.audit).not.toHaveBeenCalled();
+  });
+
+  it("allows a platform operator to act through an independently verified ordinary agency seat", async () => {
+    signInAsOperator();
+    mocks.agency.mockResolvedValue(AGENCY_ID);
+    expect((await queue("evt-1", "approved")).status).toBe(200);
+    expect(mocks.resolve).toHaveBeenCalledWith("client-site", "evt-1", "approved", `agency-staff:${AGENCY_ID}:${OPERATOR_ID}`);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ actor: expect.objectContaining({ type: "user", isSuperAdmin: false }) }));
   });
 
   it("a super admin who owns the tenant approves as its owner", async () => {
@@ -186,12 +179,11 @@ describe("PATCH /api/events/:id", () => {
     expect(mocks.audit).not.toHaveBeenCalled();
   });
 
-  it("an operator decides as the operator, audited", async () => {
+  it("platform operator event decisions are retired", async () => {
     signInAsOperator();
-    expect((await events("evt-1", "approved")).status).toBe(200);
-    expect(mocks.resolve).toHaveBeenCalledWith("client-site", "evt-1", "approved", `operator:${OPERATOR_ID}`);
-    expect(mocks.audit).toHaveBeenNthCalledWith(1, expect.objectContaining({ action: "dashboard.event.approved", metadata: expect.objectContaining({ phase: "attempt" }) }));
-    expect(mocks.audit).toHaveBeenNthCalledWith(2, expect.objectContaining({ metadata: expect.objectContaining({ phase: "result", changed: true }) }));
+    expect((await events("evt-1", "approved")).status).toBe(403);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 
   it("an operator can't decide an owner-routed item", async () => {
@@ -201,13 +193,12 @@ describe("PATCH /api/events/:id", () => {
     expect(mocks.resolve).not.toHaveBeenCalled();
   });
 
-  it("records a result row when the effect throws", async () => {
+  it("never reaches a throwing content effect under platform authority", async () => {
     signInAsOperator();
     mocks.resolve.mockRejectedValue(new Error("boom"));
-    expect((await events("evt-1", "approved")).status).toBe(500);
-    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({
-      metadata: expect.objectContaining({ phase: "result", changed: false, reason: "boom" }),
-    }));
+    expect((await events("evt-1", "approved")).status).toBe(403);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.audit).not.toHaveBeenCalled();
   });
 });
 

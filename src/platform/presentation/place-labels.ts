@@ -23,7 +23,7 @@ export const STATE_LABELS = {
   lifecycle: { draft: "Draft", live: "Live", paused: "Paused" },
   health: { healthy: "Working", degraded: "Something is off", blocked: "Not working", unknown: "Unknown" },
   possibility: { exploring: "Exploring", ready: "Ready" },
-  history: "History", makeReal: "Make real", makingReal: "Making real…", partlyLive: "Partly live",
+  history: "History", makeReal: "Make it live", makingReal: "Making it live…", partlyLive: "Partly live",
 } as const;
 
 export const CONNECTION_LABELS = {
