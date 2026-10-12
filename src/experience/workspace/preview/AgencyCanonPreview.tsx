@@ -44,8 +44,8 @@ export function AgencyCanonPreview({ frame, state, mode }: { frame: AgencyCanonF
     setNewRequest(false); setChanges(false); setRequest("");
   }
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
-    <StrelvaShell title="" theme="linen" ownerBrand={preparerBrand} signedIn={false} signInHref="/preview/strelva?scenario=agency" accountName={owner ? "Owner" : "You"} accountDetail={owner ? "Harbor Dental" : "Agency owner"}
-      systemsReleased active={owner ? "home" : undefined} businessContext={<StLabel>{owner ? "Harbor Dental" : frame === "client" ? "North Studio / Harbor Dental" : "North Studio"}</StLabel>}
+    <StrelvaShell title="" theme="linen" ownerBrand={preparerBrand} signedIn signOut={null} signInHref="/preview/strelva?scenario=agency" accountName={owner ? "Owner" : "You"} accountDetail={owner ? "Harbor Dental" : "Agency owner"}
+      systemsReleased active={owner ? "home" : undefined} workspaceName={owner ? "Harbor Dental" : frame === "client" ? "North Studio / Harbor Dental" : "North Studio"}
       agencyNavigation={owner || frame === "client" ? undefined : { active, hrefs: { clients: "/preview/strelva?scenario=agency", queue: "/preview/strelva?scenario=agency&agencyView=queue", library: "/preview/strelva/agency-library" } }}
       allClients={frame === "client" ? { href: "/preview/strelva?scenario=agency&agencyView=clients" } : undefined}
       pinned={owner || frame === "client" ? [{ id: "intake", title: "New patient intake", href: owner ? link("approval") : link("client"), kind: "inquiries", current: true }] : []}

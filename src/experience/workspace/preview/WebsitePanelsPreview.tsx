@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { StComposerBar, StComposerDock, StEmpty, StHead, StHold, StLabel, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { PREVIEW_STRELVA_AGENCY_BRAND } from "./chrome-fixture";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import styles from "./website-panels-preview.module.css";
 
@@ -66,7 +67,7 @@ export function WebsitePanelsPreview({ view, state, mode }: { view: WebsitePanel
   function previewAction(text: string) { setNotice(`${text} Preview only; nothing on the site changed.`); }
   const article = ARTICLES[selectedArticle]!;
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
-    <StrelvaShell title="" active="home" systemsReleased businessContext="The Mooney Firm" accountName="Sheri" signOut={null} appBase="/preview/strelva" pinned={[{ id: "website", title: DOMAIN, kind: "website", href: "/preview/strelva/website-panels", current: true }, { id: "inquiries", title: "Inquiries", kind: "inquiries", href: "/preview/strelva?scenario=systems" }]}>
+    <StrelvaShell ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} title="" active="home" systemsReleased workspaceName="The Mooney Firm" accountName="Sheri" signOut={null} appBase="/preview/strelva" pinned={[{ id: "website", title: DOMAIN, kind: "website", href: "/preview/strelva/website-panels", current: true }, { id: "inquiries", title: "Inquiries", kind: "inquiries", href: "/preview/strelva?scenario=systems" }]}>
       <StPage>
         <StHead crumb={{ label: DOMAIN, href: "/preview/strelva?scenario=systems" }} title={TITLES[view]} meta={state === "empty" ? "No data recorded for this site yet" : META[view]} />
         {readOnly ? <StNotice>You can read this site’s information. Only an owner or admin can change it.</StNotice> : null}

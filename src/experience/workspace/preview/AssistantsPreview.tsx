@@ -9,7 +9,7 @@ import styles from "@/experience/product/assistants/assistants.module.css";
 export function AssistantsPreview({ state }: { state: AssistantViewState }) {
   const [question, setQuestion] = useState("");
   const [notice, setNotice] = useState("");
-  return <StrelvaShell active="system" title="" accountName="Fictional owner" businessContext={assistantsBusiness} systemsReleased pinned={[
+  return <StrelvaShell active="system" title="" accountName="Fictional owner" workspaceName={assistantsBusiness} systemsReleased pinned={[
     { id: "website", title: "fictional-mediation.example.test", href: "/preview/strelva/business-profile", kind: "website" },
     { id: "inquiries", title: "Inquiries", href: "/preview/strelva/assistants", kind: "inquiries" },
     { id: "assistants", title: "Assistants", href: "/preview/strelva/assistants", kind: "app", current: true },

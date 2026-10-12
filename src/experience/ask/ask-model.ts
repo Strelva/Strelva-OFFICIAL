@@ -1,3 +1,4 @@
+import { actorLabel, recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 
 /**
@@ -19,6 +20,9 @@ export interface AskReceiptItemView {
   status: "queued" | "drafted" | "opened" | "filed" | "refused" | "failed";
   ids: string[];
   summary: string;
+  actor?: RecordedActor | null;
+  /** Recorded recipient of this Request, never the current viewer’s agency. */
+  agencyName?: string | null;
   needsYou?: { route: string; itemRef: string | null; decideAt: string | null };
 }
 
@@ -74,6 +78,8 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
       status: entry.status as AskReceiptItemView["status"],
       ids: Array.isArray(entry.ids) ? entry.ids.filter((id): id is string => typeof id === "string").slice(0, 10) : [],
       summary: text(entry.summary, 300),
+      actor: recordedActor(entry.actor),
+      agencyName: text(entry.agencyName, 120).trim() || null,
       ...(needs ? { needsYou: { route: text(needs.route, 40), itemRef: typeof needs.itemRef === "string" ? needs.itemRef : null, decideAt: typeof needs.decideAt === "string" ? needs.decideAt : null } } : {}),
     }];
   }).slice(0, 20) : [];
@@ -128,7 +134,7 @@ export function receiptLines(result: AskTurnResult): ReceiptLine[] {
     if (item.kind === "possibility") {
       return [{ key, tone: "done", text: `Opened a Possibility: ${item.summary || "an alternative"}. Nothing live changed. Make real is a separate step.`, ref }];
     }
-    return [{ key, tone: "done", text: `Filed for Strelva: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.`, ref }];
+    return [{ key, tone: "done", text: `Request filed${item.agencyName ? ` for ${item.agencyName}` : ""}: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.${item.actor ? ` Filed by ${actorLabel(item.actor)}.` : ""}`, ref }];
   });
 }
 

@@ -20,7 +20,7 @@ describe("Ask Strelva receipts", () => {
 
   it("names each of the four results honestly", () => {
     const request = readAskResult({ kind: "request", items: [{ kind: "request", toolId: "create_request", status: "filed", ids: ["r1"], summary: "A private events page" }] })!;
-    expect(receiptLines(request)[0]!.text).toBe("Filed for Strelva: A private events page. It's at Asked; scope and timing are agreed with you next.");
+    expect(receiptLines(request)[0]!.text).toBe("Request filed: A private events page. It's at Asked; scope and timing are agreed with you next.");
     expect(receiptLines(request)[0]!.text).not.toMatch(/accepted/i);
     const possibility = readAskResult({ kind: "possibility", items: [{ kind: "possibility", toolId: "open_possibility", status: "opened", ids: ["p1"], summary: "Consult booking · Draft" }] })!;
     expect(receiptLines(possibility)[0]!.text).toContain("Nothing live changed");

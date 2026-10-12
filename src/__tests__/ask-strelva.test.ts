@@ -531,10 +531,22 @@ describe("createServiceRequestAdapter (ADR 0015)", () => {
   const AGENCY = "00000000-0000-4000-8000-0000000000cc";
   const input = { workspaceId: WS, systemId: null, words: "Redo the site", outcome: "Redo the website", read: [], askedOnBehalf: null, topic: "managed.redo_website", idempotencyKey: "ask:t:1" };
   it("addresses the Request to the recorded agency as an ordinary agency provider", async () => {
-    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z" }));
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { agencyName: "North Studio" } }));
     const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "North Studio" }));
     await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "North Studio" });
     expect(execute).toHaveBeenCalledWith(actor, expect.objectContaining({ provider: { kind: "agency", agencyWorkspaceId: AGENCY } }));
+  });
+  it("keeps a saved Request's original recipient and actor when a filing is replayed", async () => {
+    const originalActor = { kind: "person", displayName: "Jo" };
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { agencyName: "Original Studio", actor: originalActor } }));
+    const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "New Studio" }));
+    await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "Original Studio", actor: originalActor });
+    expect(execute).toHaveBeenCalledWith(actor, expect.objectContaining({ context: expect.not.objectContaining({ agencyName: expect.anything(), actor: expect.anything() }) }));
+  });
+  it("keeps old or malformed saved attribution unknown instead of adopting today's agency", async () => {
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { actor: { kind: "agency" } } }));
+    const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "New Studio" }));
+    await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "" });
   });
   it("refuses before saving when there is no single recorded agency", async () => {
     const execute = vi.fn();

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
+import { PREVIEW_STRELVA_AGENCY_BRAND } from "./chrome-fixture";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StEmpty, StHold, StLedger, StMono, StNotice, StPill, StRows, StRow, StSegmented, StSkeleton, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 import { OWNER_CONVERSATIONS, OWNER_CONVERSATION_BUSINESS, OWNER_CONVERSATION_SITE, OWNER_CONVERSATION_WORKSPACE, ownerConversationMessages, ownerConversationTransport, type OwnerConversationFrame, type OwnerConversationState } from "./owner-conversation-fixture";
@@ -13,8 +14,8 @@ export function OwnerConversationPreview({ frame, state, mode = "light" }: { fra
   const request = useMemo(() => ownerConversationTransport(state), [state]);
   const messages = useMemo(() => state === "permission" ? [] : ownerConversationMessages(frame, state), [frame, state]);
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
-    <StrelvaShell active={frame === "YsBMM" ? "help" : "ask"} title={fixture.title} systemsReleased appBase="/preview/strelva" accountName="Preview owner" signOut={<StTextButton href="/preview/strelva">Leave preview</StTextButton>}
-      businessContext={<span>{OWNER_CONVERSATION_BUSINESS}</span>}
+    <StrelvaShell ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} active={frame === "YsBMM" ? "help" : "ask"} title={fixture.title} systemsReleased appBase="/preview/strelva" accountName="Preview owner" signOut={<StTextButton href="/preview/strelva">Leave preview</StTextButton>}
+      workspaceName={OWNER_CONVERSATION_BUSINESS}
       notice={<StNotice>Fictional conversation and results. Controls change this preview only; nothing is sent, published, booked or saved.</StNotice>}
       navigation={<StRows>{Object.entries(OWNER_CONVERSATIONS).map(([id, conversation]) => <StRow key={id} href={`/preview/strelva/owner-conversation?frame=${id}&mode=${mode}`} title={conversation.title} selected={id === frame} stackOnPhone={false} />)}</StRows>}
     >

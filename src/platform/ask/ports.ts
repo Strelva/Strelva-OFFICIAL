@@ -1,3 +1,4 @@
+import { recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import type { UnifiedEvent } from "@/lib/types";
 import { observedTenantRoute } from "@/platform/needs-you/tenant-classify";
 import { createPossibility, type DeclaredEffect, type SystemChange, type PossibilityRepository } from "@/platform/possibilities";
@@ -161,6 +162,7 @@ export interface AskFiledRequest {
   status: "requested";
   /** The agency the Request went to, by its display name. */
   agencyName: string;
+  actor?: RecordedActor | null;
 }
 
 /** The business's recorded agency, if any (ADR 0015: never a default). */
@@ -188,6 +190,7 @@ export interface AskRequestPort {
 
 export interface ServiceRequestLike {
   id: string;
+  context?: Record<string, unknown>;
   request: string;
   status: string;
   providerAcceptance: { status: string };
@@ -229,7 +232,9 @@ export function createServiceRequestAdapter(service: {
         provider: { kind: "agency", agencyWorkspaceId: agency.agencyWorkspaceId },
         idempotencyKey: input.idempotencyKey,
       });
-      return { id: saved.id, status: "requested", agencyName: agency.name };
+      const captured = recordedActor(saved.context?.actor);
+      const agencyName = saved.context ? (typeof saved.context.agencyName === "string" ? saved.context.agencyName : "") : "";
+      return { id: saved.id, status: "requested", agencyName, ...(captured ? { actor: captured } : {}) };
     },
     async list(actor, workspaceId) {
       const rows = await service.list(actor, { businessId: workspaceId });

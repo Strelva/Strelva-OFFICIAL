@@ -2,6 +2,7 @@
 
 import { HEALTH_LABEL } from "@/experience/systems/model";
 import { useState } from "react";
+import { PREVIEW_NORTH_BRAND } from "./chrome-fixture";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSkeleton, StState, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
@@ -29,7 +30,7 @@ export function AgencyPortfolioPreview({ surface, state, mode }: { surface: "cli
   const ready = state === "ready" || recovered;
   const base = "/preview/strelva/agency-portfolio";
   const hrefs = { clients: `${base}?surface=clients`, queue: `${base}?surface=queue`, library: "/preview/strelva/agency-library", team: "/preview/strelva/agency-people?surface=team" };
-  return <div data-workspace-theme="linen" data-workspace-mode={mode}><StrelvaShell title="North Studio" accountName="You" accountDetail="Agency owner" signOut={null} systemsReleased businessContext={<span>North Studio</span>} agencyNavigation={{ active: surface === "queue" ? "queue" : "clients", hrefs }}>
+  return <div data-workspace-theme="linen" data-workspace-mode={mode}><StrelvaShell ownerBrand={PREVIEW_NORTH_BRAND} workspaceName="North Studio" title="North Studio" accountName="You" accountDetail="Agency owner" signOut={null} systemsReleased agencyNavigation={{ active: surface === "queue" ? "queue" : "clients", hrefs }}>
     <StPage width={surface === "clients" ? "wide" : "column"}>
       <StHead title={surface === "home" ? "North Studio" : surface === "clients" ? "Clients" : "Queue"} meta={surface === "queue" ? `${queue.length} items · oldest first within each kind · due clocks from what you promised` : surface === "home" ? "3 clients · 1 thing waiting on you" : "4 clients · 4 things waiting · read 2:06 PM"} actions={surface === "home" ? <StPillLink href="/preview/strelva/agency-canon?frame=requests">New request</StPillLink> : undefined} />
       {!ready ? state === "loading" ? <div role="status" className="space-y-4"><p>Reading {surface === "home" ? "your clients" : surface}…</p><StSkeleton width="85%" /><StSkeleton width="60%" /><StSkeleton /></div> : state === "empty" ? <StEmpty>{surface === "queue" ? "Nothing is waiting across clients." : "No clients yet. A client appears once they share work with your agency."}</StEmpty> : <StNotice tone={state === "error" ? "critical" : "need"}>{state === "permission" ? "Clients, Queue, Library and Team are for agency members. Ask an agency owner to check your access." : <>{surface === "queue" ? "The Queue" : "Clients"} could not be loaded. The read is incomplete. <StPill variant="soft" onClick={() => setRecovered(true)}>Retry</StPill></>}</StNotice> : <>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { PREVIEW_STRELVA_AGENCY_BRAND } from "./chrome-fixture";
 import { type StrelvaPinnedItem, StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StComposerBar, StComposerDock, StNotice } from "@/components/ui/strelva/Kit";
 
@@ -15,7 +16,7 @@ export function SystemsCanonShell({ children, businessName = "The Mooney Firm", 
     { id: "tracker", title: "Matter tracker", href: "/preview/strelva/import", kind: "tracker" as const },
   ].map(item => ({ ...item, current: item.title === systemName }));
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
-    <StrelvaShell title="" systemsReleased pinned={suppliedPins ?? pins} businessContext={businessName} accountName={accountName} appBase="/preview/strelva"
+    <StrelvaShell ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} title="" systemsReleased pinned={suppliedPins ?? pins} workspaceName={businessName} accountName={accountName} appBase="/preview/strelva"
       notice={<p className="px-5 pt-2 text-xs text-gray-muted" role="note">Fictional preview · changes reset on reload · no live actions</p>}>
       {children}
       <StComposerDock><div className="flex w-full flex-col items-center gap-2">

@@ -29,7 +29,7 @@ export function EnterprisePreview({ view, state, locationId }: { view: "location
     setNotice("Fictional access review exported. This is not a live audit log.");
   }
   return <div>
-    <StrelvaShell title="" businessContext={<span>Lakeshore PT</span>} accountName="Ops lead" systemsReleased pinned={[{ id: "all-clinics", title: "All clinics", href: BASE, kind: "app" }, ...ENTERPRISE_LOCATIONS.map(location => ({ id: location.id, title: location.name, href: `${BASE}?location=${location.id}`, kind: "app" as const }))]} notice={<p className="px-6 py-2 text-xs text-gray-muted">Fictional clinics and people · local preview only · no live changes</p>}>
+    <StrelvaShell title="" workspaceName="Lakeshore PT" accountName="Ops lead" systemsReleased pinned={[{ id: "all-clinics", title: "All clinics", href: BASE, kind: "app" }, ...ENTERPRISE_LOCATIONS.map(location => ({ id: location.id, title: location.name, href: `${BASE}?location=${location.id}`, kind: "app" as const }))]} notice={<p className="px-6 py-2 text-xs text-gray-muted">Fictional clinics and people · local preview only · no live changes</p>}>
       <StPage>
         <StHead title={title} beacon={view === "access-review" ? "need" : view === "push" ? "draft" : undefined} crumb={view !== "locations" ? { label: "All clinics", href: BASE } : undefined} meta={view === "locations" ? "6 clinics · 4 standards · 2 things need the ops lead" : view === "push" ? "Adds a question about prior surgery · each manager says yes for their clinic." : `Due Oct 31 · ${ENTERPRISE_REVIEW.length} people · ${ENTERPRISE_REVIEW.filter(person => person.inactive).length} haven't signed in for 60+ days`} />
         {notice ? <StToast>{notice}</StToast> : null}
