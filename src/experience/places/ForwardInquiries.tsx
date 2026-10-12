@@ -15,7 +15,7 @@ import { whenLabel } from "./WorkspacePlace";
 const POLL_MS = 5_000;
 const TEST_WINDOW_MS = 10 * 60_000;
 
-type Load = { kind: "loading" } | { kind: "ready"; view: ForwardingView } | { kind: "error"; message: string };
+export type Load = { kind: "loading" } | { kind: "ready"; view: ForwardingView } | { kind: "error"; message: string };
 
 export function forwardingErrorMessage(status: number, body: { error?: string } | null): string {
   if (status === 401) return "Sign in again to continue. Nothing changed.";
@@ -32,17 +32,20 @@ function arrivedLabel(view: ForwardingView): string {
   return `Last arrived ${whenLabel(latest.capturedAt, true)}: ${latest.name}${latest.subject ? `, “${latest.subject}”` : ""}.${held}`;
 }
 
-export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
-  const [load, setLoad] = useState<Load>({ kind: "loading" });
+/** `fixture` (preview only) renders a fixed state and makes no requests. */
+export function ForwardInquiries({ workspaceId, fixture }: { workspaceId: string; fixture?: Load }) {
+  const [load, setLoad] = useState<Load>(fixture ?? { kind: "loading" });
   const [busy, setBusy] = useState<"issue" | "rotate" | "revoke" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [host, setHost] = useState<ForwardingHostId>("gmail");
   const [testSince, setTestSince] = useState<{ at: number; latestId: string | null; hadConfirmation: boolean } | null>(null);
   const [confirmRotate, setConfirmRotate] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const [copied, setCopied] = useState(false);
   const mounted = useRef(true);
 
   const read = useCallback(async (): Promise<ForwardingView | null> => {
+    if (fixture) return null;
     try {
       const response = await fetch(`/api/workspace/inquiry-forwarding?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store" });
       const body = await response.json().catch(() => null) as { forwarding?: ForwardingView; error?: string } | null;
@@ -57,7 +60,7 @@ export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
       if (mounted.current) setLoad({ kind: "error", message: "The forwarding address couldn't load. Reload to try again." });
       return null;
     }
-  }, [workspaceId]);
+  }, [workspaceId, fixture]);
 
   useEffect(() => {
     mounted.current = true;
@@ -78,7 +81,7 @@ export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
   }, [polling, read]);
 
   async function change(action: "issue" | "rotate" | "revoke") {
-    if (busy) return;
+    if (busy || fixture) return;
     setBusy(action);
     setError(null);
     try {
@@ -93,6 +96,7 @@ export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
         setLoad({ kind: "ready", view: body.forwarding });
         setTestSince(null);
         setConfirmRotate(false);
+        setConfirmStop(false);
       }
     } catch {
       setError("This couldn't be confirmed. Reload to see the current address before trying again.");
@@ -124,7 +128,7 @@ export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
       : <p className="text-sm">The owner hasn&apos;t set up forwarding yet.</p>) : null}
     {view?.address && email ? <div className="mt-2 grid gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <StMono size="value"><span className="break-all">{email}</span></StMono>
+        <span className="min-w-0 break-all font-mono text-base">{email}</span>
         <StTextButton onClick={() => void copy(email)} aria-label={`Copy ${email}`}>{copied ? "Copied" : "Copy"}</StTextButton>
       </div>
       <p role="status" className="text-sm">{testArrived ? `Your test arrived. Forwarding works. ${arrivedLabel(view)}` : arrivedLabel(view)}</p>
@@ -145,9 +149,11 @@ export function ForwardInquiries({ workspaceId }: { workspaceId: string }) {
       {view.canManage ? <div className="grid gap-2 text-sm">
         {confirmRotate ? <StNotice tone="need" action={<span className="flex gap-3"><StTextButton onClick={() => void change("rotate")} disabled={Boolean(busy)}>Make a new address</StTextButton><StTextButton onClick={() => setConfirmRotate(false)}>Keep this one</StTextButton></span>}>
           The current address stops working at once. Update every forwarding rule and form to the new one.
+        </StNotice> : confirmStop ? <StNotice tone="critical" action={<span className="flex gap-3"><StTextButton tone="danger" onClick={() => void change("revoke")} disabled={Boolean(busy)}>Stop forwarding</StTextButton><StTextButton onClick={() => setConfirmStop(false)}>Keep forwarding</StTextButton></span>}>
+          Email sent to this address after you stop is dropped, not kept. Inquiries already here stay.
         </StNotice> : <div className="flex flex-wrap gap-4">
           <StTextButton onClick={() => setConfirmRotate(true)} disabled={Boolean(busy)}>Make a new address</StTextButton>
-          <StTextButton tone="danger" onClick={() => void change("revoke")} disabled={Boolean(busy)}>Stop forwarding</StTextButton>
+          <StTextButton tone="danger" onClick={() => setConfirmStop(true)} disabled={Boolean(busy)}>Stop forwarding</StTextButton>
         </div>}
       </div> : null}
       <p className="text-xs leading-5 text-gray-muted">Strelva keeps each forwarded message&apos;s sender, subject and words as an inquiry for this business, never attachments. Inquiries stay with the business and go when it is deleted. Email to a stopped address is dropped.</p>
