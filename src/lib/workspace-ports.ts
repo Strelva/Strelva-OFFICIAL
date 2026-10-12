@@ -166,10 +166,22 @@ export interface TenantBusinessContext {
 }
 
 export interface BusinessRecordPort {
+  readTenantReviewApprovalAuthority(tenantId: string): Promise<TenantReviewApprovalAuthority | null>;
+  admitTenantReviewApprovalDispatch(input: Record<string, unknown>): Promise<{ admitted: boolean; grantId: string }>;
+  settleTenantReviewDispatchAdmission(grantId: string, ledgerId: string, request: Record<string, unknown>, responseStatus: number): Promise<void>;
   ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
   readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
+}
+
+export interface TenantReviewApprovalAuthority {
+  tenantId: string;
+  workspaceId: string | null;
+  recipient: string;
+  version: string;
+  conversionAt: string | null;
+  legacyAllowed: boolean;
 }
 
 // ── Google account bindings (src/platform/account-bindings) ────────────────────
@@ -286,6 +298,7 @@ export interface InquiriesPort {
 
 /** Opaque: built by the port, handed back to it. */
 export type TenantReplyDepsHandle = object;
+export type TenantReviewDispatchHook = (location: { accountId: string; locationId: string }, reviewId: string, text: string, receiptId: string) => Promise<{ settle(responseStatus: number): Promise<void> }>;
 
 export type TenantReplyAuthority =
   | { kind: "auto_reply_policy"; rating: number }

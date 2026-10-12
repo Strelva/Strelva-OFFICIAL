@@ -125,6 +125,7 @@ psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-bounda
 cmp "$cluster_root/owner-boundary-after.hash" "$cluster_root/owner-boundary-reapplied.hash"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/final-functions-after.catalog"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql" >/dev/null
 cmp "$cluster_root/final-functions-before.catalog" "$cluster_root/final-functions-after.catalog"
 # The contract rolls back every fictional row, including the immutable history.
 remaining="$(psql "${psql_args[@]}" -Atc "select count(*) from public.users where email like 'aw-%@%.example.test'")"
