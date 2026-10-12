@@ -106,7 +106,7 @@ export default async function SignUpPage({
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/access-request">Want it done for you? Ask Strelva Agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
+  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/agencies">Want it done for you? Find an agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
 }
 
 function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {

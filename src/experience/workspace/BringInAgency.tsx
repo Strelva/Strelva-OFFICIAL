@@ -10,6 +10,7 @@ import {
 type DirectoryAgency = { agencyWorkspaceId: string; name: string; summary: string };
 type BusinessAgency = { agencyWorkspaceId: string; name: string; seat: boolean; ofRecord: boolean; scopes: Array<{ scope: AgencyScope; level: AgencyLevel; status: "proposed" | "active" }> };
 type Choice = AgencyLevel | "off";
+type AgencyChoice = DirectoryAgency & { changing?: boolean };
 type Transport = (input: string, init?: RequestInit) => Promise<Response>;
 
 const LEVEL_OPTIONS = [
@@ -19,7 +20,10 @@ const LEVEL_OPTIONS = [
 ];
 
 function scopeSummary(scopes: BusinessAgency["scopes"]): string {
-  return scopes.map(item => `${AGENCY_SCOPE_LABELS[item.scope]} · ${AGENCY_LEVEL_LABELS[item.level]}`).join(", ");
+  const active = scopes.filter(item => item.status === "active");
+  const proposed = scopes.filter(item => item.status === "proposed");
+  const describe = (items: BusinessAgency["scopes"]) => items.map(item => `${AGENCY_SCOPE_LABELS[item.scope]} · ${AGENCY_LEVEL_LABELS[item.level]}`).join(", ");
+  return [active.length ? `Current: ${describe(active)}` : "", proposed.length ? `Proposed: ${describe(proposed)}` : ""].filter(Boolean).join(". ");
 }
 
 /**
@@ -29,7 +33,7 @@ function scopeSummary(scopes: BusinessAgency["scopes"]): string {
  */
 export function BringInAgency({ workspaceId, canManage, transport = fetch }: { workspaceId: string; canManage: boolean; transport?: Transport }) {
   const [state, setState] = useState<{ loading: boolean; error: string; directory: DirectoryAgency[]; agencies: BusinessAgency[] }>({ loading: true, error: "", directory: [], agencies: [] });
-  const [choosing, setChoosing] = useState<DirectoryAgency | null>(null);
+  const [choosing, setChoosing] = useState<AgencyChoice | null>(null);
   const [levels, setLevels] = useState<Record<AgencyScope, Choice>>(() => Object.fromEntries(AGENCY_SCOPES.map(scope => [scope, "off"])) as Record<AgencyScope, Choice>);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -55,14 +59,29 @@ export function BringInAgency({ workspaceId, canManage, transport = fetch }: { w
     try {
       const response = await transport("/api/workspace/agencies", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
       const result = await response.json() as { agencies?: BusinessAgency[]; error?: string };
-      if (!response.ok) throw new Error(result.error || "That couldn't be confirmed. Nothing changed.");
+      if (!response.ok && response.status < 500) {
+        setMessage(result.error || "That request was rejected. Review the areas and try again.");
+        return;
+      }
+      if (!response.ok || !Array.isArray(result.agencies)) throw new Error("Outcome not confirmed.");
       setState(current => ({ ...current, agencies: result.agencies ?? current.agencies }));
       setChoosing(null);
       setLevels(Object.fromEntries(AGENCY_SCOPES.map(scope => [scope, "off"])) as Record<AgencyScope, Choice>);
       setMessage(done);
-    } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "That couldn't be confirmed. Nothing changed.");
+    } catch {
+      setChoosing(null);
+      setMessage("Outcome not confirmed. We are checking current access. Review the current and proposed areas before sending another request.");
+      await load();
     } finally { setBusy(false); }
+  }
+
+  function choose(agency: DirectoryAgency | BusinessAgency) {
+    const changing = "scopes" in agency;
+    const scopes = changing ? (agency.scopes.some(item => item.status === "proposed")
+      ? agency.scopes.filter(item => item.status === "proposed") : agency.scopes) : [];
+    setLevels(Object.fromEntries(AGENCY_SCOPES.map(scope => [scope, scopes.find(item => item.scope === scope)?.level ?? "off"])) as Record<AgencyScope, Choice>);
+    setChoosing({ agencyWorkspaceId: agency.agencyWorkspaceId, name: agency.name, summary: changing ? "Change what this agency can do." : agency.summary, changing });
+    setMessage("");
   }
 
   const current = new Set(state.agencies.map(agency => agency.agencyWorkspaceId));
@@ -75,15 +94,16 @@ export function BringInAgency({ workspaceId, canManage, transport = fetch }: { w
         const waiting = agency.scopes.some(item => item.status === "proposed");
         return <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.scopes.length ? scopeSummary(agency.scopes) : "Works on this business"}
           value={waiting ? "Waiting for them to accept" : agency.ofRecord ? "Your main agency" : undefined}
-          end={canManage ? <StTextButton disabled={busy} onClick={() => void send("DELETE", { agencyWorkspaceId: agency.agencyWorkspaceId }, `${agency.name} no longer has access. Your data stays here.`)}>End access</StTextButton> : undefined} />;
+          end={canManage ? <span className="flex flex-wrap items-center gap-4"><StTextButton disabled={busy} onClick={() => choose(agency)}>Change access</StTextButton><StTextButton disabled={busy} onClick={() => void send("DELETE", { agencyWorkspaceId: agency.agencyWorkspaceId }, `${agency.name} no longer has access. Your data stays here.`)}>End access</StTextButton></span> : undefined} />;
       })}</StRows> : null}
-      {!canManage ? <p>Only an owner can bring in or end an agency.</p> : choosing ? <StSurface label={`Bring in ${choosing.name}`}>
+      {!canManage ? <p>Only an owner can bring in, change or end an agency.</p> : choosing ? <StSurface label={`${choosing.changing ? "Change access for" : "Bring in"} ${choosing.name}`}>
         <p className="mb-4"><strong>{choosing.name}</strong> · {choosing.summary}</p>
+        {choosing.changing ? <p className="mb-4 text-sm text-gray-muted">Choose the complete set of areas they should handle. Current access stays in place until they accept. Areas set to Not this end on acceptance. To remove every area now, use End access.</p> : null}
         <div className="grid gap-3">{AGENCY_SCOPES.map(scope => <div key={scope} className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-medium">{AGENCY_SCOPE_LABELS[scope]}</p>
           <StSegmented label={`${AGENCY_SCOPE_LABELS[scope]} for ${choosing.name}`} value={levels[scope]} options={LEVEL_OPTIONS}
             disabledValues={takenFullControl.has(scope) ? ["full_control"] : []} disabledReason="Another agency already has full control here."
-            onChange={value => setLevels(current => ({ ...current, [scope]: value }))} />
+            onChange={busy ? undefined : value => setLevels(current => ({ ...current, [scope]: value }))} />
         </div>)}</div>
         <div className="mt-5 grid gap-2 text-sm text-gray-muted">
           {selected.some(item => item.level === "prepare") ? <p><strong className="text-warm-black">{AGENCY_LEVEL_LABELS.prepare}:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
@@ -95,7 +115,7 @@ export function BringInAgency({ workspaceId, canManage, transport = fetch }: { w
           <StTextButton disabled={busy} onClick={() => setChoosing(null)}>Cancel</StTextButton>
         </div>
       </StSurface> : available.length ? <><StLabel>Agencies you can bring in</StLabel><StRows label="Agencies you can bring in">{available.map(agency => <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.summary}
-          onClick={() => { setChoosing(agency); setMessage(""); }} value="Choose" />)}</StRows></>
+          onClick={() => choose(agency)} value="Choose" />)}</StRows></>
         : <StEmpty>No other agencies are listed yet.</StEmpty>}
     </>}
     {message ? <p role="status">{message}</p> : null}

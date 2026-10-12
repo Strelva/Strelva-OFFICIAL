@@ -144,7 +144,23 @@ export function workspaceReturnTarget(value: string | null): string | null {
       || target.searchParams.getAll("date").length > 1 || (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
-  if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
+  if (value?.startsWith("/workspace/business/new/website?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const params = target.searchParams;
+    if (target.hash || target.pathname !== "/workspace/business/new/website" || params.size !== 3
+      || ["workspaceId", "conversationId", "messageId"].some(key => params.getAll(key).length !== 1 || !UUID.test(params.get(key) || ""))
+      || [...params.keys()].some(key => !["workspaceId", "conversationId", "messageId"].includes(key))) return null;
+    return `${target.pathname}?${params}`;
+  }
+  if (value?.startsWith("/workspace/business/new?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const params = target.searchParams;
+    if (target.hash || target.pathname !== "/workspace/business/new" || !params.size
+      || [...params].some(([key, item]) => params.getAll(key).length !== 1
+        || (key === "start" ? !isBusinessStartProduct(item) : key === "check" ? !/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(item) : true))) return null;
+    return `${target.pathname}?${params}`;
+  }
+  if (value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;
     const entry = [...target.searchParams][0];

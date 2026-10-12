@@ -471,6 +471,22 @@ describe("release-one private workspace routes", () => {
     });
     expect(await response.json()).toMatchObject({ work: { id: workId }, alreadySaved: false });
   });
+  it("carries a free check only into the explicitly selected manageable business", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    const response = await POST(request({ action: "save_business_check", workspaceId, resultId: "scan_abc123" }));
+    expect(response.status).toBe(200);
+    expect(mocks.savePublicResult).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId, resultId: "scan_abc123" });
+    expect((await response.json()).work.workspaceId).toBe(workspaceId);
+  });
+  it.each([
+    { ...workspace }, { ...workspace, kind: "customer", role: "member" },
+    { ...workspace, kind: "customer", access: "provider_seat" }, { ...workspace, kind: "customer", access: "delegated_read" },
+  ])("refuses an owner check import outside direct business management", async selected => {
+    mocks.list.mockResolvedValue([selected]);
+    expect((await POST(request({ action: "save_business_check", workspaceId, resultId: "scan_abc123" }))).status).toBe(403);
+    expect(mocks.savePublicResult).not.toHaveBeenCalled();
+    expect(mocks.saveAudit).not.toHaveBeenCalled();
+  });
   it("keeps retained-result failures honest at the HTTP boundary", async () => {
     const unavailable = new Error("internal retained-result details");
     unavailable.name = "PublicAiVisibilityResultUnavailableError";

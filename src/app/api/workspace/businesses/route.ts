@@ -24,7 +24,7 @@ export async function GET() {
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email." }, 401);
     const workspaces = await listWorkspaces(actor);
-    return json({ actorId: actor.userId, businesses: workspaces
+    return json({ actorId: actor.userId, actorEmail: actor.verifiedEmail, businesses: workspaces
       .filter(item => item.kind === "customer" && item.access === "member" && ["owner", "admin"].includes(item.role || ""))
       .map(({ id, name }) => ({ id, name })) });
   } catch (error) { return failure(error); }
