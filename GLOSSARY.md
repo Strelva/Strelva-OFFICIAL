@@ -239,6 +239,12 @@ _Avoid_: Ready-made, catalog item, plugin, template (as synonyms); app (for a
 business's own System); an outside platform's app (Strelva's listing in another
 product is not an App)
 
+**Bundle**:
+An App made of several Systems that install together. Each becomes the
+business's own System, in Draft, and each keeps its own History and Health.
+Who runs each one is decided per area, as with any App.
+_Avoid_: package, suite, plan (a Bundle is not a price)
+
 **Library**:
 An agency's own Apps and their client Versions, with improvements and conflicts;
 an App a business sees in Apps is the same reusable definition, installed without
