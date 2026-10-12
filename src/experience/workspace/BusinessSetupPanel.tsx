@@ -106,8 +106,8 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
         throw new Error("Your ask is saved, but it could not be carried to Home. Allow session storage, then retry this setup.");
       }
       sessionStorage.removeItem(key); setPending(null);
-      if (gettingStarted && (startProduct === "help" || startProduct === "website")) {
-        // A brief with no agency to send it to is held on the business (heldRequestId); Getting started shows it.
+      // A typed request opened an Ask conversation: Home shows it. Otherwise a help or website start lands on Getting started.
+      if (gettingStarted && !result.data.askConversationId && (startProduct === "help" || startProduct === "website")) {
         navigate(gettingStartedHref(result.data.workspaceId, result.data.requestId));
         return;
       }

@@ -7,41 +7,8 @@ declare owner_id uuid := '10000000-0000-4000-8000-000000000001'; member_id uuid 
   biz uuid := '20000000-0000-4000-8000-000000000001'; agency uuid := '20000000-0000-4000-8000-000000000002';
   binding uuid := '30000000-0000-4000-8000-000000000001'; r jsonb; fact uuid; ok boolean;
 begin
-  -- Owner reads Google; facts stay beside the record, open.
-  r := public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/loc1',
-    '[{"key":"phone","value":"(716) 555-0100"},{"key":"categories","value":["Bakery"]}]');
-  if jsonb_array_length(r) <> 2 then raise exception 'expected two open found facts, got %', r; end if;
-  if (select count(*) from public.business_google_found_facts where status <> 'open') <> 0 then raise exception 'import confirmed something'; end if;
-  -- A member reads; a member cannot record or settle.
-  if jsonb_array_length(public.read_google_found_facts(member_id, 'member@example.test', biz)) <> 2 then raise exception 'member read failed'; end if;
-  begin perform public.record_google_found_facts(member_id, 'member@example.test', biz, 'accounts/1/locations/loc1', '[]'); ok := false;
-  exception when others then ok := sqlerrm like '%found_fact_denied%'; end;
-  if not ok then raise exception 'member recorded found facts'; end if;
-  begin perform public.read_google_found_facts(outsider, 'out@example.test', biz); ok := false; exception when others then ok := true; end;
-  if not ok then raise exception 'outsider read found facts'; end if;
-  -- Only a listing this business's connected grant holds.
-  begin perform public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/other', '[]'); ok := false;
-  exception when others then ok := sqlerrm like '%found_fact_listing_not_connected%'; end;
-  if not ok then raise exception 'foreign listing accepted'; end if;
-  -- Re-read replaces the open value; never two open rows per key.
-  perform public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/loc1', '[{"key":"phone","value":"(716) 555-0199"}]');
-  if (select count(*) from public.business_google_found_facts where fact_key = 'phone' and status = 'open') <> 1
-    or (select value #>> '{}' from public.business_google_found_facts where fact_key = 'phone' and status = 'open') <> '(716) 555-0199' then raise exception 'reread did not replace'; end if;
-  -- Dismiss; the same value is not reopened, a changed one is.
-  select id into fact from public.business_google_found_facts where fact_key = 'phone' and status = 'open';
-  perform public.settle_google_found_fact(owner_id, 'owner@example.test', biz, fact, 'dismissed');
-  perform public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/loc1', '[{"key":"phone","value":"(716) 555-0199"}]');
-  if exists (select 1 from public.business_google_found_facts where fact_key = 'phone' and status = 'open') then raise exception 'dismissed value reopened'; end if;
-  perform public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/loc1', '[{"key":"phone","value":"(716) 555-0200"}]');
-  if not exists (select 1 from public.business_google_found_facts where fact_key = 'phone' and status = 'open') then raise exception 'changed value not reopened'; end if;
-  begin perform public.settle_google_found_fact(owner_id, 'owner@example.test', biz, fact, 'confirmed'); ok := false;
-  exception when others then ok := sqlerrm like '%found_fact_not_open%'; end;
-  if not ok then raise exception 'settled twice'; end if;
-  -- Disconnected grant: no new found facts.
+  -- Google found facts live in business_found_facts (claim-review-schema.sql). A disconnected grant: agency gets a reconnect link.
   update public.workspace_account_bindings set status = 'needs_reauth' where id = binding;
-  begin perform public.record_google_found_facts(owner_id, 'owner@example.test', biz, 'accounts/1/locations/loc1', '[]'); ok := false;
-  exception when others then ok := true; end;
-  if not ok then raise exception 'recorded from a disconnected grant'; end if;
 
   -- Agency link: staffed member with the active Google area only.
   r := public.agency_google_connect_link(staff_id, 'staff@example.test', biz);

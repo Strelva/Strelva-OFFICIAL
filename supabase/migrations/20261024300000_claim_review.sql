@@ -515,6 +515,7 @@ create function public.accept_agency_client_claim_review(
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
+  any_full_control boolean;
   result jsonb;
   claim public.agency_client_owner_claims%rowtype;
   area text; choice text;
@@ -546,6 +547,9 @@ begin
   update public.agency_scope_grants set status = 'ended', ended_by = p_actor_id, ended_at = clock_timestamp()
     where customer_workspace_id = claim.customer_workspace_id and agency_workspace_id = claim.agency_workspace_id
       and status in ('proposed','active');
+  -- A Full control proposal is a complete replacement when the agency accepts
+  -- (respond_to_agency_proposal), so it also carries the owner's Prepare areas.
+  any_full_control := exists (select 1 from jsonb_each_text(p_areas) a where a.value = 'full_control');
   foreach area in array public.claim_review_areas() loop
     choice := p_areas->>area;
     continue when choice = 'none';
@@ -556,6 +560,12 @@ begin
             proposed_by, responded_by, responded_at, basis)
           values (claim.customer_workspace_id, claim.agency_workspace_id, area, 'prepare', 'active', kept_consents->>area,
             p_actor_id, claim.created_by, clock_timestamp(), 'claim');
+        if any_full_control then
+          insert into public.agency_scope_grants(customer_workspace_id, agency_workspace_id, scope, level, status, consent,
+              proposed_by, basis)
+            values (claim.customer_workspace_id, claim.agency_workspace_id, area, 'prepare', 'proposed', kept_consents->>area,
+              p_actor_id, 'claim');
+        end if;
       else
         -- Full control is the owner's proposal; the agency accepts before anything changes.
         insert into public.agency_scope_grants(customer_workspace_id, agency_workspace_id, scope, level, status, consent,

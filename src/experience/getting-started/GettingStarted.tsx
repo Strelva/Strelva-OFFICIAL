@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { StEmpty, StHead, StLabel, StNotice, StPage, StPill, StRow, StRows, StSection, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { FOUND_FACT_SOURCE_LABELS } from "@/products/found-facts/contracts";
-import type { FoundFact, GettingStartedBusiness, HeldRequest, WebsiteReading } from "@/products/getting-started/contracts";
+import type { FoundFact, GettingStartedBusiness, WebsiteReading } from "@/products/getting-started/contracts";
 
 export interface GettingStartedLinks {
   home: string;
@@ -44,7 +44,6 @@ export function GettingStarted({ business, links }: { business: GettingStartedBu
   return <StPage>
     <StHead crumb={{ label: "Business home", href: links.home }} title={business.name} meta={website ? <>Website <a className="underline underline-offset-4" href={website} target="_blank" rel="noopener noreferrer">{sourceLabel(website)}</a></> : "No website on your business yet."} />
     {links.request ? <StNotice action={<StTextButton href={links.request}>Open request</StTextButton>}>Your request went to your agency. Nothing is agreed until they reply with scope and timing.</StNotice> : null}
-    {!links.request ? <HeldRequests business={business} agencyHref={links.agency} /> : null}
     <StSection title="Start from what you already have" meta="Nothing has to move">
       <UseCurrentWebsite business={business} website={website} revision={revision} detailsHref={links.details} onSaved={(next, savedWebsite) => { setRevision(next); if (savedWebsite) setWebsite(savedWebsite); }} />
       <StRows label="Next steps">
@@ -56,33 +55,6 @@ export function GettingStarted({ business, links }: { business: GettingStartedBu
     </StSection>
     <div><StTextButton href={links.home}>Go to your business home</StTextButton></div>
   </StPage>;
-}
-
-/** Requests typed at setup: kept on the business, sent only to the agency the owner brings in. */
-function HeldRequests({ business, agencyHref }: { business: GettingStartedBusiness; agencyHref: string }) {
-  const transport = useWorkspaceRequest();
-  const [held, setHeld] = useState<HeldRequest[]>(business.held);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  async function withdraw(item: HeldRequest) {
-    setBusy(item.id); setError("");
-    try {
-      const response = await transport("/api/workspace/getting-started", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "withdraw_held_request", workspaceId: business.workspaceId, heldRequestId: item.id }) });
-      const body: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(errorText(body, "That didn't go through. Try again."));
-      setHeld((body as { held?: HeldRequest[] }).held ?? []);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "That didn't go through. Try again."); }
-    finally { setBusy(null); }
-  }
-  if (!held.length) return null;
-  return <>{held.map(item => item.status === "routed"
-    ? <StNotice key={item.id} action={item.requestId ? <StTextButton href={`/workspace/delivery/${item.requestId}`}>Open request</StTextButton> : undefined}>Your request went to {item.agencyName ?? "your agency"}. Nothing is agreed until they reply with scope and timing.</StNotice>
-    : <StSection key={item.id} title="Your request is waiting" meta="Saved, not sent">
-      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-warm-black">{item.text}</p>
-      <p className="mt-3 text-[13px] leading-relaxed text-gray-muted">No agency works with your business yet, so it hasn&rsquo;t gone anywhere. It&rsquo;s saved to your business and goes to the agency you bring in, once they accept.</p>
-      {business.canConfirm ? <div className="mt-3 flex flex-wrap gap-4"><StTextButton href={agencyHref}>Bring in an agency</StTextButton><StTextButton disabled={busy !== null} onClick={() => void withdraw(item)}>{busy === item.id ? "Withdrawing…" : "Withdraw it"}</StTextButton></div> : null}
-      {error ? <div className="mt-3"><StNotice tone="critical">{error}</StNotice></div> : null}
-    </StSection>)}</>;
 }
 
 function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }: { business: GettingStartedBusiness; website: string | null; revision: number; detailsHref: string; onSaved: (revision: number, website: string | null) => void }) {

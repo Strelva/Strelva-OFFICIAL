@@ -16,7 +16,6 @@ import { decideBusinessFoundFacts, readBusinessFoundFacts, stageOwnerWebsiteFoun
 import type { FoundFactDecision } from "@/products/found-facts/contracts";
 import { CHECK_RESULT_ID, type CheckForBusiness, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
 import { confirmationValue, foundFactsFromReading, screenFoundFact } from "./found-facts";
-import { readHeldRequests, withdrawHeldRequest } from "./held-requests";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "./website";
 
 /** The crawl is kept small: the owner is waiting on the page. */
@@ -49,8 +48,6 @@ export interface GettingStartedDeps {
   readFound: typeof readBusinessFoundFacts;
   stageFound: typeof stageOwnerWebsiteFoundFacts;
   decideFound: typeof decideBusinessFoundFacts;
-  readHeld: typeof readHeldRequests;
-  withdrawHeld: typeof withdrawHeldRequest;
 }
 
 const defaults: GettingStartedDeps = {
@@ -59,7 +56,6 @@ const defaults: GettingStartedDeps = {
   saveScan: savePublicAiVisibilityResult, saveAudit: savePublicWebsiteAudit,
   crawl: crawlWebsite, extract: extractBusinessFacts, rateLimited: isRateLimitedWindowedAsync,
   readFound: readBusinessFoundFacts, stageFound: stageOwnerWebsiteFoundFacts, decideFound: decideBusinessFoundFacts,
-  readHeld: readHeldRequests, withdrawHeld: withdrawHeldRequest,
 };
 
 function uuidFrom(parts: unknown[]): string {
@@ -152,13 +148,10 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     const workspace = await directBusiness(actor, workspaceId);
     const record: BusinessRecord = await deps.readRecord(actor, workspaceId);
     // A store that isn't there yet (migration unapplied) shows nothing waiting rather than failing the page.
-    const [found, held] = await Promise.all([
-      deps.readFound(actor, workspaceId).catch(() => []),
-      deps.readHeld(actor, workspaceId).catch(() => []),
-    ]);
+    const found = await deps.readFound(actor, workspaceId).catch(() => []);
     return {
       workspaceId, name: workspace.name, website: businessWebsite(record), canConfirm: record.access === "owner", revision: record.revision,
-      waiting: found.map(fact => screenFoundFact(fact, record)), held,
+      waiting: found.map(fact => screenFoundFact(fact, record)),
     };
   }
 
@@ -235,13 +228,7 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     return { ...decided, websiteSaved, revision, waiting: waiting.map(fact => screenFoundFact(fact, latest)) };
   }
 
-  /** The owner withdraws a held request. Nothing was sent, so nothing is recalled. */
-  async function withdrawHeld(actor: WorkspaceActor, input: { workspaceId: string; heldRequestId: string }) {
-    await directBusiness(actor, input.workspaceId);
-    return { held: await deps.withdrawHeld(actor, input.workspaceId, input.heldRequestId) };
-  }
-
-  return { readCheck, startFromCheck, read, readWebsite, decide, withdrawHeld, websiteHost };
+  return { readCheck, startFromCheck, read, readWebsite, decide, websiteHost };
 }
 
 export const gettingStarted = createGettingStarted();

@@ -24,20 +24,6 @@ export type FoundFact = StoredFoundFact & {
   confirmable: boolean;
 };
 
-/** A request typed at setup with no agency: kept on the business, never sent until an agency is brought in. */
-export interface HeldRequest {
-  id: string;
-  text: string;
-  status: "held" | "routed";
-  heldAt: string;
-  requestId: string | null;
-  agencyName: string | null;
-}
-export const heldRequestSchema = z.object({
-  id: z.string().uuid(), text: z.string(), status: z.enum(["held", "routed"]), heldAt: z.string(),
-  requestId: z.string().uuid().nullable(), agencyWorkspaceId: z.string().uuid().nullable(), agencyName: z.string().nullable(), routedAt: z.string().nullable(),
-}).strict();
-
 export interface WebsiteReading {
   url: string;
   /** The record revision the facts were compared against; confirming checks it. */
@@ -55,8 +41,6 @@ export interface GettingStartedBusiness {
   revision: number;
   /** Found facts still waiting for the owner, from any source (a reading, a listing, the agency's add). */
   waiting: FoundFact[];
-  /** Requests typed at setup, kept on the business. */
-  held: HeldRequest[];
 }
 
 export interface CheckForBusiness {
@@ -80,7 +64,6 @@ export const gettingStartedActionSchema = z.discriminatedUnion("action", [
     /** The device's time zone, used for found hours only when the record has none. */
     timeZone: z.string().trim().min(1).max(64).optional(),
   }).strict(),
-  z.object({ action: z.literal("withdraw_held_request"), workspaceId: uuid, heldRequestId: uuid }).strict(),
 ]);
 export type GettingStartedAction = z.infer<typeof gettingStartedActionSchema>;
 

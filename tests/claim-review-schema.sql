@@ -195,17 +195,17 @@ begin
   perform pg_temp.cr_assert((select jsonb_object_agg(scope, level) from public.agency_scope_grants where customer_workspace_id = business and status = 'active')
     = '{"bookings":"prepare","google":"prepare"}'::jsonb, 'active grants are the owner''s Prepare choices');
   perform pg_temp.cr_assert((select jsonb_object_agg(scope, level) from public.agency_scope_grants where customer_workspace_id = business and status = 'proposed')
-    = '{"website":"full_control"}'::jsonb and accepted->'waitingForAgency' = '["website"]'::jsonb, 'full control is proposed to the agency');
+    = '{"website":"full_control","bookings":"prepare","google":"prepare"}'::jsonb and accepted->'waitingForAgency' = '["website"]'::jsonb, 'the owner''s complete set is proposed to the agency');
   perform pg_temp.cr_assert(public.business_scope_full_control(business, 'website') is null, 'no full control before the agency accepts');
   item := public.open_owner_decision(business, jsonb_build_object('kind','copy.routine','route','owner_decides','title','Update the footer',
     'approveEffect','The footer changes.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId','footer:1','revisionHash',h,'adminMayDecide',false));
   perform pg_temp.cr_expect(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', business, item->>'id', h, 'approve', 'agency', a_owner, 'cr-a-owner@agency-a.example.test'), 'owner_decision_owner_only');
   perform pg_temp.cr_assert(public.read_agency_proposals(a_owner, 'cr-a-owner@agency-a.example.test', north) @> jsonb_build_array(jsonb_build_object('businessWorkspaceId', business)), 'the agency sees the proposal');
   -- A plain member of the agency can't accept for it; the agency owner accepts in one click.
-  perform pg_temp.cr_expect(format('select public.respond_to_agency_proposal(%L,%L,%L,%L,true)', a_member, 'cr-a-member@agency-a.example.test', north, business), 'agency_directory_denied');
-  perform pg_temp.cr_assert(public.respond_to_agency_proposal(a_owner, 'cr-a-owner@agency-a.example.test', north, business, true)->>'status' = 'accepted', 'agency accepted');
+  perform pg_temp.cr_expect(format('select public.respond_to_agency_proposal(%L,%L,%L,%L,true,%L)', a_member, 'cr-a-member@agency-a.example.test', north, business, public.agency_proposal_identity(business, north)), 'agency_directory_denied');
+  perform pg_temp.cr_assert(public.respond_to_agency_proposal(a_owner, 'cr-a-owner@agency-a.example.test', north, business, true, public.agency_proposal_identity(business, north))->>'status' = 'accepted', 'agency accepted');
   perform pg_temp.cr_assert((select jsonb_object_agg(scope, level) from public.agency_scope_grants where customer_workspace_id = business and status = 'active')
-    = '{"website":"full_control","bookings":"prepare","google":"prepare"}'::jsonb, 'after acceptance the grants are exactly the owner''s choices');
+    = '{"website":"full_control","bookings":"prepare","google":"prepare"}'::jsonb, format('after acceptance the grants are exactly the owner''s choices: %s', (select jsonb_agg(jsonb_build_array(scope, level, status, basis)) from public.agency_scope_grants where customer_workspace_id = business)));
   perform pg_temp.cr_assert((select consent from public.agency_scope_grants where customer_workspace_id = business and status = 'active' and scope = 'google')
     = 'I let North Studio prepare my Google listing.', 'consent recorded per area');
   perform pg_temp.cr_assert((select areas = '{"website":"full_control","inquiries":"none","bookings":"prepare","google":"prepare","internal_tools":"none"}'::jsonb
@@ -225,7 +225,8 @@ begin
   -- Full control decides its area only; owner-only rights stay the owner's.
   item := public.open_owner_decision(business, jsonb_build_object('kind','copy.routine','route','owner_decides','title','Update the hours line',
     'approveEffect','The new hours go live.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId','hours:1','revisionHash',h,'adminMayDecide',false));
-  perform pg_temp.cr_assert(public.claim_owner_decision(business, (item->>'id')::uuid, h, 'approve', 'agency', a_owner, 'cr-a-owner@agency-a.example.test', null)->>'status' = 'claimed', 'full control decides website items');
+  -- 20261024132400: website documents stay with the owner until resolvers consume an exact agency claim.
+  perform pg_temp.cr_expect(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', business, item->>'id', h, 'approve', 'agency', a_owner, 'cr-a-owner@agency-a.example.test'), 'owner_decision_owner_only');
   item := public.open_owner_decision(business, jsonb_build_object('kind','google.post','route','owner_decides','title','Post this week',
     'approveEffect','The post goes up.','notYetEffect','Nothing is posted.','sourceLifecycle','google_post','sourceId','post:2','revisionHash',h,'adminMayDecide',false));
   perform pg_temp.cr_expect(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', business, item->>'id', h, 'approve', 'agency', a_owner, 'cr-a-owner@agency-a.example.test'), 'owner_decision_owner_only');

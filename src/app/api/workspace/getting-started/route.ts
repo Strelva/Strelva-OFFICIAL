@@ -66,8 +66,6 @@ export async function POST(request: Request) {
         return json({ reading: await gettingStarted.readWebsite(actor, input.workspaceId, input.url) });
       case "decide_found_facts":
         return json(await gettingStarted.decide(actor, input));
-      case "withdraw_held_request":
-        return json(await gettingStarted.withdrawHeld(actor, input));
     }
   } catch (error) { return failure(error); }
 }

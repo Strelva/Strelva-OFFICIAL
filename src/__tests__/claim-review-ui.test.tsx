@@ -70,7 +70,7 @@ describe("owner claim review", () => {
     expect(body.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f1", decision: "confirm" });
     expect(body.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f4", decision: "remove" });
     expect(body.facts.find((item: { id: string }) => item.id.endsWith("f2")).value.timezone).toEqual(expect.any(String));
-    expect(body.facts.some((item: { id: string }) => item.id.endsWith("f3"))).toBe(false);
+    expect(body.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f3", decision: "later" });
     expect(container.textContent).toContain("Fictional Bakery is yours");
     expect(container.textContent).toContain("Connect Google");
   });

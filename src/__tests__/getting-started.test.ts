@@ -4,8 +4,9 @@ import { BusinessRecordConflictError } from "@/platform/business-record/reposito
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import type { BusinessFacts } from "@/products/websites/rebuild-pipeline";
 import { WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
-import { confirmedPatch, foundFactsFromReading } from "@/products/getting-started/found-facts";
-import { foundFactInputSchema } from "@/products/getting-started/contracts";
+import { confirmationValue, foundFactsFromReading, screenFoundFact } from "@/products/getting-started/found-facts";
+import { foundFactInputSchema, gettingStartedActionSchema } from "@/products/getting-started/contracts";
+import type { FoundFact as StoredFoundFact, FoundFactInput } from "@/products/found-facts/contracts";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "@/products/getting-started/website";
 import { createGettingStarted, GettingStartedInputError, GettingStartedRateLimitError, GettingStartedUnavailableError, type GettingStartedDeps } from "@/products/getting-started/server";
 
@@ -37,6 +38,12 @@ function reading(): BusinessFacts {
   };
 }
 
+function stored(input: FoundFactInput, index = 1): StoredFoundFact {
+  return { ...input, id: `5a000000-0000-4000-8000-${index.toString(16).padStart(12, "0")}`, key: input.entity === "fact" ? input.key : null,
+    status: "unconfirmed", sourceKind: "website_crawl", sourceRef: input.sourceUrl, foundBy: "owner", foundAt: "2026-10-12T00:00:00.000Z" };
+}
+const openFacts = () => foundFactsFromReading(reading(), record()).map((input, index) => stored(input, index + 1));
+
 function deps(over: Partial<GettingStartedDeps> = {}): GettingStartedDeps {
   return {
     listWorkspaces: vi.fn().mockResolvedValue([]),
@@ -50,8 +57,11 @@ function deps(over: Partial<GettingStartedDeps> = {}): GettingStartedDeps {
     crawl: vi.fn().mockResolvedValue({ pages: [{}, {}], skipped: [], assets: [], crawledAt: "", bytes: 0, elapsedMs: 0, limited: false }),
     extract: vi.fn().mockReturnValue(reading()),
     rateLimited: vi.fn().mockResolvedValue(false),
+    readFound: vi.fn().mockResolvedValue(openFacts()),
+    stageFound: vi.fn(async (_actor, _workspaceId, inputs: FoundFactInput[]) => ({ staged: inputs.length, found: inputs.map((input, index) => stored(input, index + 1)) })),
+    decideFound: vi.fn().mockResolvedValue({ confirmed: 1, changed: 0, removed: 0, later: 0, waiting: 0, revision: 4, found: [] }),
     ...over,
-  } as GettingStartedDeps;
+  };
 }
 const owned = (id: string, name = "Northside Bakery") => ({ id, kind: "customer", name, createdBy: USER, createdAt: "", updatedAt: "", role: "owner", access: "member" });
 
@@ -75,45 +85,45 @@ describe("one website on the business record", () => {
 });
 
 describe("found facts (the shared Found-fact shape)", () => {
-  const key = (item: { entity: string; key?: string }) => item.entity === "fact" ? item.key : item.entity;
+  const key = (item: { entity: string; key?: string | null }) => item.entity === "fact" ? item.key : item.entity;
   it("offers only record-shaped facts, each with its page and quote, in L3's input shape", () => {
-    const facts = foundFactsFromReading(reading(), record());
+    const inputs = foundFactsFromReading(reading(), record());
+    const facts = inputs.map((input, index) => screenFoundFact(stored(input, index + 1), record()));
     expect(facts.map(item => [key(item), item.display])).toEqual([
       ["phone", "(716) 555-0100"], ["email", "hello@northside.example"],
       ["address", "12 Elm St, Buffalo, NY 14201"], ["service", "Custom cakes"], ["service", "Bread"],
     ]);
     expect(facts.find(item => key(item) === "email")).toMatchObject({ entity: "fact", key: "email", sourceUrl: "https://northside.example/contact", quote: "Hello@Northside.example" });
     expect(facts.find(item => item.display === "Bread")).toMatchObject({ entity: "service", value: { name: "Bread" } });
-    for (const item of facts) {
-      const { id: _id, label: _label, display: _display, current: _current, ...input } = item;
-      expect(foundFactInputSchema.safeParse(input).success).toBe(true);
-    }
+    for (const input of inputs) expect(foundFactInputSchema.safeParse(input).success).toBe(true);
   });
 
   it("skips what the record already holds and shows what a fact would replace", () => {
-    const facts = foundFactsFromReading(reading(), record({
+    const current = record({
       facts: { phone: fact("716-555-0199"), email: fact("hello@northside.example") },
       services: [{ id: "5a000000-0000-4000-8000-0000000000c1", name: "bread", description: null, durationMinutes: null, priceText: null, active: true, position: 0, externalRef: null, source: "owner", verified: false, updatedAt: "2026-10-12T00:00:00.000Z" }],
-    }));
+    });
+    const facts = foundFactsFromReading(reading(), current).map((input, index) => screenFoundFact(stored(input, index + 1), current));
     expect(facts.some(item => key(item) === "email")).toBe(false);
     expect(facts.find(item => key(item) === "phone")?.current).toBe("716-555-0199");
     expect(facts.filter(item => item.entity === "service").map(item => item.display)).toEqual(["Custom cakes"]);
   });
 
-  it("builds the owner's write from ticked facts only, revalidating each value", () => {
-    const src = { sourceUrl: "https://northside.example/", quote: "q" };
-    const planned = confirmedPatch(record(), [
-      { entity: "fact", key: "phone", value: "(716) 555-0100", ...src },
-      { entity: "service", value: { name: "Custom cakes" }, ...src },
-      { entity: "service", value: { name: "custom cakes" }, ...src },
-    ], "northside.example");
-    expect(planned).toEqual({ kind: "patch", keys: ["phone", "links", "services"], patch: {
-      facts: { phone: { value: "(716) 555-0100" }, links: { value: [{ kind: "website", url: "https://northside.example/" }] } },
-      services: [{ op: "upsert", name: "Custom cakes" }],
-    } });
-    expect(confirmedPatch(record(), [{ entity: "fact", key: "email", value: "not an email", ...src }])).toMatchObject({ kind: "invalid" });
-    expect(confirmedPatch(record(), [{ entity: "fact", key: "hours", value: { weekly: [] }, ...src }])).toMatchObject({ kind: "invalid" });
-    expect(confirmedPatch(record({ facts: { phone: fact("(716) 555-0100") } }), [{ entity: "fact", key: "phone", value: "(716) 555-0100", ...src }])).toEqual({ kind: "unchanged" });
+  it("prepares hours with the record's time zone or the owner's device, and refuses unusable hours", () => {
+    const hours = { key: "hours" as const, value: { weekly: [{ day: 1, opens: "07:00", closes: "15:00" }] } };
+    expect(confirmationValue(hours, record(), "America/New_York")).toEqual({ value: { ...hours.value, timezone: "America/New_York" } });
+    expect(confirmationValue(hours, record({ facts: { hours: fact({ ...hours.value, timezone: "America/Chicago" }) } }), "America/New_York"))
+      .toEqual({ value: { ...hours.value, timezone: "America/Chicago" } });
+    expect(confirmationValue(hours, record())).toHaveProperty("refused");
+    expect(confirmationValue({ key: "hours", value: { weekly: [{ day: 8, opens: "invalid", closes: "15:00" }] } }, record(), "America/New_York")).toHaveProperty("refused");
+  });
+
+  it("keeps the record's other links when confirming found links and leaves ordinary values to the store", () => {
+    const current = record({ facts: { links: fact([{ kind: "instagram", url: "https://instagram.com/x" }]) } });
+    expect(confirmationValue({ key: "links", value: [{ kind: "website", url: "https://northside.example/" }] }, current)).toEqual({ value: [
+      { kind: "website", url: "https://northside.example/" }, { kind: "instagram", url: "https://instagram.com/x" },
+    ] });
+    expect(confirmationValue({ key: "phone", value: "(716) 555-0100" }, record())).toBeNull();
   });
 });
 
@@ -176,13 +186,16 @@ describe("check to business", () => {
 describe("Use my current website", () => {
   const member = () => deps({ listWorkspaces: vi.fn().mockResolvedValue([owned(BUSINESS)]) });
 
-  it("reads the site into found facts and writes nothing", async () => {
+  it("stages the website reading in the shared store without writing the business record", async () => {
     const d = member();
     const result = await createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example");
     expect(result).toMatchObject({ url: "https://northside.example/", revision: 3, pagesRead: 2 });
     expect(result.facts.length).toBe(5);
     expect(d.crawl).toHaveBeenCalledWith("https://northside.example/", { maxPages: 5, timeoutMs: 15_000, maxBytes: 2_000_000 });
+    expect(d.stageFound).toHaveBeenCalledWith(ACTOR, BUSINESS, foundFactsFromReading(reading(), record()));
+    expect(result.facts).toEqual(openFacts().map(item => screenFoundFact(item, record())));
     expect(d.patchRecord).not.toHaveBeenCalled();
+    expect(d.decideFound).not.toHaveBeenCalled();
   });
 
   it("refuses non-owners, other businesses, bad addresses and too many reads", async () => {
@@ -200,17 +213,72 @@ describe("Use my current website", () => {
     await expect(createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example")).rejects.toThrow("This website asks crawlers not to read it.");
   });
 
-  it("confirms only the ticked facts as the owner's own write against the revision shown", async () => {
+  it("decide_found_facts confirms stored IDs against the shown revision, with a stable command ID", async () => {
     const d = member();
-    const saved = await createGettingStarted(d).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, website: "northside.example", facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] });
-    expect(saved).toEqual({ saved: ["email", "links"], revision: 4 });
-    expect(d.patchRecord).toHaveBeenCalledWith(ACTOR, BUSINESS, 3, { facts: { email: { value: "hello@northside.example" }, links: { value: [{ kind: "website", url: "https://northside.example/" }] } } }, expect.objectContaining({ source: "owner" }));
+    const service = createGettingStarted(d);
+    const decisions = [{ id: openFacts()[1]!.id, decision: "confirm" as const }];
+    const input = gettingStartedActionSchema.parse({ action: "decide_found_facts", workspaceId: BUSINESS, revision: 3, decisions });
+    expect(input.action).toBe("decide_found_facts");
+    const saved = await service.decide(ACTOR, { workspaceId: BUSINESS, revision: 3, decisions });
+    expect(saved).toEqual({ confirmed: 1, changed: 0, removed: 0, later: 0, websiteSaved: false, revision: 4, waiting: [] });
+    expect(d.decideFound).toHaveBeenCalledWith(ACTOR, BUSINESS, { decisions, expectedRevision: 3, commandId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    await service.decide(ACTOR, { workspaceId: BUSINESS, revision: 3, decisions });
+    expect(vi.mocked(d.decideFound).mock.calls[1]![2].commandId).toBe(vi.mocked(d.decideFound).mock.calls[0]![2].commandId);
+    expect(d.patchRecord).not.toHaveBeenCalled();
   });
 
-  it("refuses a stale reading and a non-owner confirmation", async () => {
-    await expect(createGettingStarted(member()).confirm(ACTOR, { workspaceId: BUSINESS, revision: 2, facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] })).rejects.toBeInstanceOf(WorkspaceConflictError);
+  it("saves the chosen website as the owner's own write after deciding facts", async () => {
+    const d = member();
+    const afterFacts = record({ revision: 4 });
+    const afterWebsite = record({ revision: 5, facts: { links: fact([{ kind: "website", url: "https://northside.example/" }]) } });
+    vi.mocked(d.readRecord).mockResolvedValueOnce(record()).mockResolvedValueOnce(afterFacts).mockResolvedValueOnce(afterFacts).mockResolvedValue(afterWebsite);
+    const saved = await createGettingStarted(d).decide(ACTOR, { workspaceId: BUSINESS, revision: 3, website: "northside.example", decisions: [{ id: openFacts()[1]!.id, decision: "confirm" }] });
+    expect(saved).toMatchObject({ confirmed: 1, websiteSaved: true, revision: 5 });
+    expect(d.patchRecord).toHaveBeenCalledWith(ACTOR, BUSINESS, 4, { facts: { links: { value: [{ kind: "website", url: "https://northside.example/" }] } } }, expect.objectContaining({ source: "owner" }));
+    expect(vi.mocked(d.decideFound).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(d.patchRecord).mock.invocationCallOrder[0]!);
+  });
+
+  it("removes rejected facts and keeps later facts waiting without writing them to the record", async () => {
+    const remaining = { ...openFacts()[1]!, status: "later" as const };
+    const d = member();
+    vi.mocked(d.decideFound).mockResolvedValue({ confirmed: 0, changed: 0, removed: 1, later: 1, waiting: 1, revision: 3, found: [remaining] });
+    const decisions = [{ id: openFacts()[0]!.id, decision: "remove" as const }, { id: remaining.id, decision: "later" as const }];
+    const saved = await createGettingStarted(d).decide(ACTOR, { workspaceId: BUSINESS, revision: 3, decisions });
+    expect(d.decideFound).toHaveBeenCalledWith(ACTOR, BUSINESS, expect.objectContaining({ decisions, expectedRevision: 3 }));
+    expect(saved).toEqual({ confirmed: 0, changed: 0, removed: 1, later: 1, websiteSaved: false, revision: 3, waiting: [screenFoundFact(remaining, record())] });
+    expect(d.patchRecord).not.toHaveBeenCalled();
+  });
+
+  it("refuses a stale reading and a non-owner decision before touching the store", async () => {
+    const decisions = [{ id: openFacts()[0]!.id, decision: "confirm" as const }];
+    const stale = member();
+    await expect(createGettingStarted(stale).decide(ACTOR, { workspaceId: BUSINESS, revision: 2, decisions })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(stale.readFound).not.toHaveBeenCalled();
+    expect(stale.decideFound).not.toHaveBeenCalled();
     const admin = member(); vi.mocked(admin.readRecord).mockResolvedValue(record({ access: "admin" }));
-    await expect(createGettingStarted(admin).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(createGettingStarted(admin).decide(ACTOR, { workspaceId: BUSINESS, revision: 3, decisions })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(admin.decideFound).not.toHaveBeenCalled();
     expect(admin.patchRecord).not.toHaveBeenCalled();
+  });
+
+  it("preserves a revision conflict during the store transaction without retrying or saving the website", async () => {
+    const conflict = new BusinessRecordConflictError("business_record_revision_conflict", "changed");
+    const d = member(); vi.mocked(d.decideFound).mockRejectedValue(conflict);
+    await expect(createGettingStarted(d).decide(ACTOR, { workspaceId: BUSINESS, revision: 3, website: "northside.example", decisions: [{ id: openFacts()[0]!.id, decision: "confirm" }] })).rejects.toBe(conflict);
+    expect(d.decideFound).toHaveBeenCalledTimes(1);
+    expect(d.patchRecord).not.toHaveBeenCalled();
+  });
+
+  it("refuses a fact that has already been decided", async () => {
+    const d = member(); vi.mocked(d.readFound).mockResolvedValue([]);
+    await expect(createGettingStarted(d).decide(ACTOR, { workspaceId: BUSINESS, revision: 3, decisions: [{ id: openFacts()[0]!.id, decision: "confirm" }] })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(d.decideFound).not.toHaveBeenCalled();
+  });
+
+  it("reads stored waiting facts with the record's current value and tolerates an unavailable store", async () => {
+    const d = member(); vi.mocked(d.readRecord).mockResolvedValue(record({ facts: { phone: fact("716-555-0199") } }));
+    expect(await createGettingStarted(d).read(ACTOR, BUSINESS)).toMatchObject({ waiting: [expect.objectContaining({ current: "716-555-0199" }), ...openFacts().slice(1).map(item => screenFoundFact(item, record()))] });
+    vi.mocked(d.readFound).mockRejectedValue(new Error("store unavailable"));
+    expect(await createGettingStarted(d).read(ACTOR, BUSINESS)).toMatchObject({ waiting: [], canConfirm: true });
   });
 });
