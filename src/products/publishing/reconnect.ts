@@ -10,13 +10,13 @@ import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from 
 
 export const GOOGLE_RECONNECT_COOKIE = "strelva_google_reconnect";
 const MANAGE_SCOPE = "https://www.googleapis.com/auth/business.manage";
-const targetSchema = z.object({
+export const reconnectTargetSchema = z.object({
   id: z.string().uuid(), bindingId: z.string().uuid(), workspaceId: z.string().uuid(),
   tenantId: z.string().nullable(), tenantStableId: z.string().uuid().nullable(),
   recipient: z.string().email(), openedAt: z.string(), expiresAt: z.string(),
   noticeStatus: z.enum(["not_sent", "sending", "accepted", "suppressed", "failed"]),
 });
-export type ReconnectTarget = z.infer<typeof targetSchema>;
+export type ReconnectTarget = z.infer<typeof reconnectTargetSchema>;
 export interface ReconnectDb { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> }
 export function reconnectHash(value: string): string { return createHash("sha256").update(value).digest("hex"); }
 
@@ -54,7 +54,7 @@ export function reconnectStore(db: ReconnectDb | null = getSupabase() as unknown
   return {
     async list() { return z.array(z.string().uuid()).parse(await call("list")); },
     async target(action: "prepare" | "read" | "begin" | "consume" | "notice_claim", id: string, input: Record<string, unknown> = {}) {
-      return targetSchema.nullable().parse(await call(action, id, input));
+      return reconnectTargetSchema.nullable().parse(await call(action, id, input));
     },
     async notice(id: string, result: SendEmailResult) {
       await call("notice", id, { status: result.status, providerMessageId: result.status === "accepted" ? result.providerMessageId : null });
