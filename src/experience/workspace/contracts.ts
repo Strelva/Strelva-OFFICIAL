@@ -194,6 +194,8 @@ export interface WorkspaceReleases {
   agencySetup?: boolean;
   /** STRELVA_AGENCY_ADD_CLIENT_RELEASE: agency Home links to /workspace/agency/clients/new (#259). */
   agencyAddClient?: boolean;
+  /** STRELVA_AGENCY_IMPORT_RELEASE on top of the add-client release: agency Home links to /workspace/agency/clients/import. */
+  agencyImportClients?: boolean;
 }
 
 /**

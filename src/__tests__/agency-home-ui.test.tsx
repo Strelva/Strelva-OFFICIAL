@@ -234,3 +234,31 @@ it("opens agent bookings for the selected client without nesting a link in the c
   expect(links[0]?.getAttribute("href")).toBe(`/workspace/bookings?workspaceId=${row(1).workspaceId}&view=week&source=agent`);
   expect(links[0]?.closest("button")).toBeNull();
 });
+
+describe("Import clients entry (flagged)", () => {
+  async function renderWith(releases: WorkspaceSnapshot["releases"]) {
+    const node = document.createElement("div"); document.body.appendChild(node);
+    const root = createRoot(node); roots.push(root);
+    await act(async () => {
+      root.render(createElement(WorkspaceRequestContext.Provider, { value: router({}) }, createElement(AgencyHome, {
+        snapshot: { ...snapshot(true), releases }, busy: false, onWorkspace: vi.fn(), onOpenClientWork: vi.fn(), onOpenWork: vi.fn(), onStart: vi.fn(),
+      })));
+    });
+    await settle();
+    return node;
+  }
+  const importLinks = (node: HTMLElement) => [...node.querySelectorAll("a")].filter((link) => link.getAttribute("href")?.startsWith("/workspace/agency/clients/import"));
+
+  it("sits next to Add a client only when the import release is on", async () => {
+    const on = await renderWith({ systems: true, agencyAddClient: true, agencyImportClients: true });
+    const links = importLinks(on);
+    expect(links).toHaveLength(1);
+    expect(links[0]!.textContent).toBe("Import clients");
+    expect(links[0]!.getAttribute("href")).toBe(`/workspace/agency/clients/import?workspaceId=${AGENCY}`);
+    const off = await renderWith({ systems: true, agencyAddClient: true });
+    expect(importLinks(off)).toHaveLength(0);
+    // The release-off zoom keeps its own header, with the same entry.
+    const legacy = await renderWith({ systems: false, agencyAddClient: true, agencyImportClients: true });
+    expect(importLinks(legacy).map((link) => link.textContent)).toEqual(["Import clients"]);
+  });
+});
