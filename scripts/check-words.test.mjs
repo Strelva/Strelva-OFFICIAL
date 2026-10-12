@@ -59,3 +59,55 @@ test("Ready-made is retired; Apps names reusable Systems while Private app stays
   assert.deepEqual(check('const screen = <h2>Apps from creators</h2>; const label = { title: "Apps" };'), []);
   assert.equal(check('const title = "Private app";')[0].word, "Private app");
 });
+
+test("Make real remains a concept but never a button label", () => {
+  assert.deepEqual(check('const screen = <section><h2>Make real</h2><p>Make real turns a Possibility on.</p></section>;'), []);
+  for (const source of [
+    'const screen = <button>Make real</button>;',
+    'const screen = <StPill><span>Make real</span></StPill>;',
+    'const action = "Make real"; const screen = <StPill>{action}</StPill>;',
+    'const action = "Make real"; const screen = <StHold label={action} />;',
+    'const screen = <StPill>{retry ? "Retry Make real" : "Make real"}</StPill>;',
+    'const screen = <StHold label="Make real" />;',
+    'const labels = { makeReal: "Make real" };',
+  ]) assert.ok(check(source).some(hit => hit.word === "Make real (button)"));
+  assert.deepEqual(check('const screen = <StPill>Make it live</StPill>; const hold = <StHold label="Hold to make it live" />;'), []);
+  assert.deepEqual(check('const screen = <StHold label="Hold to confirm" />; const send = <StPill>Send to Harbor Dental</StPill>;'), []);
+  assert.equal(check('const screen = <StHold label="Hold to publish" />;')[0].word, "Hold to publish");
+  assert.equal(check('const screen = <StHold label={busy ? "Saving…" : "Hold to approve"} />;')[0].word, "Hold to approve");
+});
+
+test("retires conflicting approval, source and list copy", () => {
+  assert.deepEqual(check('const screen = <section><Button>Approve and publish</Button><h2>Source revisions</h2><p>Filed for Strelva: a page</p><a>All files and results</a></section>;').map(hit => hit.word), ["Approve and publish", "Source revisions", "Filed for Strelva", "All files and results"]);
+});
+
+test("finds literal, interpolated and JSX short release labels without renaming IDs", () => {
+  for (const source of [
+    'const screen = <StMono>r12</StMono>;',
+    'const copy = { revision: "r12+1", label: "Library r12" };',
+    'const screen = <StSection title={`Package r${revision}`} />;',
+    'const screen = <StMono>r{revision}</StMono>;',
+    'const title = `From Library r${revision}`;',
+  ]) assert.ok(check(source).some(hit => hit.word === "r-number revision label"));
+  assert.ok(check('const title = `Package r${revision}`;').some(hit => hit.word === "Package r"));
+  assert.deepEqual(check('const screen = <StMono>Release 12 + 1 local change</StMono>; const title = `Release ${revision} draft`;'), []);
+  assert.deepEqual(check('const record = { id: "r12", requestId: "r12", revisionId: "r12" }; type Revision = "r12"; const path = "/releases/r12"; const screen = <div data-id="r12" />;'), []);
+  assert.deepEqual(check('const record = { recordId: `r${number}`, sourceRevisionId: "r12" }; const screen = <div className={"r12"} data-id={`r${number}`} />;'), []);
+  assert.deepEqual(screenWordProblems('const tag = `candidate-r${revision}`;', "src/app/api/websites/candidate-http.ts"), []);
+  assert.deepEqual(screenWordProblems('const suffixes = "r123.example.test";', "src/products/websites/public-suffix-data.ts"), []);
+});
+
+test("reservation is forbidden in visitor copy, including generated site runtimes", () => {
+  for (const name of [
+    "src/experience/bookings/PublicBooking.tsx", "src/app/b/token/page.tsx",
+    "src/app/booking-confirm/token/page.tsx", "src/app/pay/business/page.tsx",
+    "src/app/preview/strelva/deposit/page.tsx", "src/products/connected-sites/form.ts",
+    "custom-repo-starter/StrelvaBookingForm.tsx", "custom-repo-starter/website-generation/capability-runtime.mjs",
+    "public/connect.js",
+  ]) {
+    assert.ok(screenWordProblems('const screen = `<p>Your reservation is held.</p>`;', name).some(hit => hit.word === "reservation (visitor)"), name);
+    assert.deepEqual(screenWordProblems('const contract = { kind: "reservation" }; const route = "/reservations";', name), []);
+  }
+  assert.deepEqual(check('const message = "A held reservation is an internal scheduling record.";'), []);
+  assert.deepEqual(screenWordProblems('throw new Error("A provider reservation needs recovery.");', "src/products/scheduling/calendar/service.ts"), []);
+});

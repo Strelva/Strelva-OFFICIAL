@@ -8,5 +8,9 @@ function canonical(value: unknown): unknown {
   return value;
 }
 export function siteDocumentHash(document: SiteDocument): string {
-  return createHash("sha256").update(JSON.stringify(canonical(siteDocumentSchema.parse(document))), "utf8").digest("hex");
+  return createHash("sha256").update(siteDocumentCanonicalJson(document), "utf8").digest("hex");
+}
+/** Native canonical bytes, also bound to scoped SQL document append commands. */
+export function siteDocumentCanonicalJson(document: SiteDocument): string {
+  return JSON.stringify(canonical(siteDocumentSchema.parse(document)));
 }

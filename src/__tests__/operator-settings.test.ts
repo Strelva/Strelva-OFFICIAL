@@ -89,10 +89,10 @@ describe("getClientEmailOverride / setClientEmailOverride", () => {
     expect(await getClientEmailOverride(TENANT)).toBe("off");
   });
 
-  it("defaults to 'inherit' without Redis (can't fabricate an 'on')", async () => {
+  it("defaults to 'off' without Redis (can't lose an exclusion)", async () => {
     mockGetRedis.mockReturnValue(null);
     const { getClientEmailOverride } = await import("@/platform/infra/email/client-override");
-    expect(await getClientEmailOverride(TENANT)).toBe("inherit");
+    expect(await getClientEmailOverride(TENANT)).toBe("off");
   });
 });
 
@@ -130,52 +130,27 @@ describe("POST /api/admin/tenants/[id]/operator-settings", () => {
     expect(res.status).toBe(404);
   });
 
-  it("sets each store, audit-logs the changed keys, and returns the final values", async () => {
-    const redis = fakeRedis();
-    mockGetRedis.mockReturnValue(redis);
+  it("keeps platform reporting/email controls and audits only those keys", async () => {
+    const redis = fakeRedis(); mockGetRedis.mockReturnValue(redis);
     const { POST } = await import("@/app/api/admin/tenants/[id]/operator-settings/route");
-    const res = await POST(
-      postReq({
-        reportCadence: "weekly",
-        replyMode: "auto",
-        contentAutonomy: "auto",
-        clientEmail: "on",
-      }),
-      { params: Promise.resolve({ id: TENANT }) },
-    );
+    const res = await POST(postReq({ reportCadence: "weekly", clientEmail: "off" }), { params: Promise.resolve({ id: TENANT }) });
     expect(res.status).toBe(200);
-    const payload = await res.json();
-    expect(payload).toEqual({
-      reportCadence: "weekly",
-      replyMode: "auto",
-      contentAutonomy: "auto",
-      clientEmail: "on",
-    });
-
-    // Each store was written.
-    expect(redis.store.get(`reb:report-cadence:${TENANT}`)).toBe("weekly");
-    expect(redis.store.get(`reb:content-autonomy:${TENANT}`)).toBe("auto");
-    expect(redis.store.get(`reb:client-email:${TENANT}`)).toBe("on");
-    const voice = redis.store.get(`reb:reply-voice:${TENANT}`) as { mode: string };
-    expect(voice.mode).toBe("auto");
-
-    // Audit-logged with the changed keys.
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
-    const [entry] = mockLogAuditEvent.mock.calls[0] as [Record<string, unknown>];
-    expect(entry).toMatchObject({
-      action: "tenant.operator-settings",
-      targetType: "tenant",
-      targetId: TENANT,
-    });
-    expect((entry.metadata as { fields: string[] }).fields).toEqual([
-      "reportCadence",
-      "replyMode",
-      "contentAutonomy",
-      "clientEmail",
-    ]);
+    expect(await res.json()).toMatchObject({ reportCadence: "weekly", clientEmail: "off" });
+    expect(mockLogAuditEvent.mock.calls[0]?.[0].metadata.fields).toEqual(["reportCadence", "clientEmail"]);
   });
 
-  it("preserves reply guidance + templates when only the mode is changed", async () => {
+  it("refuses client policy before applying any mixed platform controls", async () => {
+    const redis = fakeRedis(); mockGetRedis.mockReturnValue(redis);
+    const { POST } = await import("@/app/api/admin/tenants/[id]/operator-settings/route");
+    for (const policy of [{ replyMode: "auto" }, { contentAutonomy: "auto" }]) {
+      const res = await POST(postReq({ reportCadence: "weekly", clientEmail: "on", ...policy }), { params: Promise.resolve({ id: TENANT }) });
+      expect(res.status).toBe(403);
+    }
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("refuses mode changes and preserves reply guidance + templates", async () => {
     const redis = fakeRedis();
     redis.store.set(`reb:reply-voice:${TENANT}`, {
       mode: "approve",
@@ -192,7 +167,7 @@ describe("POST /api/admin/tenants/[id]/operator-settings", () => {
       guidance: string;
       templates: { example: string }[];
     };
-    expect(voice.mode).toBe("auto");
+    expect(voice.mode).toBe("approve");
     expect(voice.guidance).toBe("warm and local");
     expect(voice.templates[0]!.example).toBe("Thanks so much!");
   });

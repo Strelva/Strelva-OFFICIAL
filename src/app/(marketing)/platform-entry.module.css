@@ -1,0 +1,36 @@
+.frame {
+  /* Retained guides, legal and account pages still read these public roles. */
+  --m-bg: var(--st-canvas);
+  --m-panel: var(--st-surface);
+  --m-panel-strong: var(--st-inset);
+  --m-paper: var(--st-surface);
+  --m-paper-muted: var(--st-inset);
+  --m-paper-line: var(--st-line);
+  --m-surface: var(--st-surface);
+  --m-raised: var(--st-surface);
+  --m-rule: var(--st-line);
+  --m-rule-soft: var(--st-line);
+  --m-text: var(--st-text);
+  --m-text-2: var(--st-text-2);
+  --m-text-3: var(--st-text-3);
+  --m-ink: var(--st-text);
+  --m-ink-2: var(--st-text-2);
+  --m-accent: var(--st-accent);
+  --m-accent-strong: var(--st-accent-hover);
+  --m-accent-soft: var(--st-ring);
+  --m-accent-faint: var(--st-ring);
+  --m-data: var(--st-text-2);
+  --m-success: var(--st-live);
+  --m-danger: var(--st-critical);
+  --m-button: var(--st-accent);
+  --m-button-text: var(--st-on-accent);
+  min-height: 100dvh; display: flex; flex-direction: column; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), system-ui, sans-serif;
+}
+.frame :focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 24px 40px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; color: var(--st-text); font-size: 16px; font-weight: 500; text-decoration: none; }
+.brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
+.header nav, .footer { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.content { flex: 1; }
+.footer { justify-content: center; padding: 24px; }
+@media (max-width: 767px) { .header { padding: 16px 24px; gap: 16px; flex-wrap: wrap; } }

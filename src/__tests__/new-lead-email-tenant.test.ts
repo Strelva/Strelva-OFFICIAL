@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/platform/agency-brand/server", () => ({
   resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
@@ -39,7 +40,7 @@ describe("sendNewLeadEmail tenant", () => {
   it("a client armed with the override gets the notice while client mail is paused", async () => {
     override.mockResolvedValue("on");
     await expect(sendNewLeadEmail({ ...params, tenantId: "mclears-cottage" })).resolves.toBe(true);
-    expect(override).toHaveBeenCalledWith("mclears-cottage");
+    expect(override).toHaveBeenCalledWith("mclears-cottage", { failClosed: true });
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]![0]).toMatchObject({ to: "owner@example.test", subject: "Someone reached out through your website" });
     expect(addTenantActivity).toHaveBeenCalledWith("mclears-cottage", expect.objectContaining({ summary: "Sent: new-lead email" }));

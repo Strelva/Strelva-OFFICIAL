@@ -59,7 +59,7 @@ describe("independently released website entry", () => {
     expect(field.disabled).toBe(true);
     expect(button("Check this website request")).toBeDefined();
     expect(start).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, url: "https://synthetic.example.test", requestId: expect.any(String) }));
-    expect(node.textContent).not.toContain("Publish approved website");
+    expect(node.textContent).not.toContain("Hold to make it live");
   });
   it("reopens persisted work for managed owner review and disables member intake", async () => {
     const record = fixtureRebuild(); record.approved = true; record.status = "approved";
@@ -67,7 +67,7 @@ describe("independently released website entry", () => {
     const transport: RebuildTransport = { read, start: vi.fn(async () => record), mutate: vi.fn(async () => record) };
     await mount(createElement(WebsiteEntry, { workspaceId: WS, connectedEnabled: true, rebuildEnabled: true, path: "rebuild", canManage: true, initialWorkId: record.workId, rebuilds: [record], transport }));
     expect(read).toHaveBeenCalledWith(WS, record.workId, expect.any(AbortSignal));
-    expect(node.textContent).toContain("No agency publication authority is shown here."); expect(node.textContent).not.toContain("Publish approved website");
+    expect(node.textContent).toContain("No agency publication authority is shown here."); expect(node.textContent).not.toContain("Hold to make it live");
     await act(async () => root!.render(createElement(WebsiteEntry, { key: "member", workspaceId: WS, connectedEnabled: false, rebuildEnabled: true, path: "rebuild", canManage: false, transport })));
     expect(button("Build a private preview").disabled).toBe(true);
   });
@@ -113,7 +113,7 @@ describe("domain and cutover recovery decisions", () => {
     expect(button("Restore previous website").disabled).toBe(true);
     await act(async () => button("Check this undo command").click());
     expect(request.mock.calls[1]?.[1]?.body).toBe(request.mock.calls[0]?.[1]?.body);
-    expect(node.textContent).toContain("undo receipt for website version 1 is saved");
+    expect(node.textContent).toContain("undo receipt for website Release 1 is saved");
   });
 });
 

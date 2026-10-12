@@ -24,7 +24,7 @@ describe("booking messages", () => {
    const deps = fixture(audience, status);
    await deliverBookingUpdates("b1", deps);
    const input = vi.mocked(deps.send).mock.calls[0]![0];
-   expect(input).toMatchObject({ workspaceId: "ws1", authorship: audience === "client" ? "agency" : "business", options: { heading } });
+   expect(input).toMatchObject({ workspaceId: "ws1", authorship: audience === "client" ? undefined : "business", options: { heading } });
    if (audience === "client") expect(input.options?.paragraphs?.[0]).toContain("Dana");
    else expect(input.businessName).toBe("Fixture Firm");
  });

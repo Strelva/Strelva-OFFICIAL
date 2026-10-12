@@ -189,3 +189,5 @@ export {
 } from "./public-booking";
 
 export type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "./public-booking";
+
+export { readVisitorPresentationTime, readVisitorInquiryReceipt, readVisitorConfirmation } from "./public-visitor-receipt";

@@ -205,7 +205,7 @@ function LeadCard({
 export function LeadRows({
   leads,
   initialWorkflow,
-  readOnly = false,
+  readOnly = true,
 }: {
   leads: DeliveryLead[];
   initialWorkflow: Record<string, LeadWorkflow>;

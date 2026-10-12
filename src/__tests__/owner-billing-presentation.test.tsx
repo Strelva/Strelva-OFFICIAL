@@ -17,7 +17,7 @@ describe("owner billing presentation", () => {
     const html = render(billing);
     expect(html).toContain("$150.00 / month");
     expect(html).toContain("The next charge date is not available in this record.");
-    expect(html).toContain("Payment receipts are available in your existing billing settings.");
+    expect(html).toContain("Open payment management below to review receipts from Stripe.");
     expect(html).not.toContain("card ending");
     expect(html).not.toContain("Every System");
   });

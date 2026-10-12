@@ -20,7 +20,7 @@ describe("Ask Strelva receipts", () => {
 
   it("names each of the four results honestly", () => {
     const request = readAskResult({ kind: "request", items: [{ kind: "request", toolId: "create_request", status: "filed", ids: ["r1"], summary: "A private events page" }] })!;
-    expect(receiptLines(request)[0]!.text).toBe("Filed for Strelva: A private events page. It's at Asked; scope and timing are agreed with you next.");
+    expect(receiptLines(request)[0]!.text).toBe("Request filed: A private events page. It's at Asked; scope and timing are agreed with you next.");
     expect(receiptLines(request)[0]!.text).not.toMatch(/accepted/i);
     const possibility = readAskResult({ kind: "possibility", items: [{ kind: "possibility", toolId: "open_possibility", status: "opened", ids: ["p1"], summary: "Consult booking · Draft" }] })!;
     expect(receiptLines(possibility)[0]!.text).toContain("Nothing live changed");
@@ -95,4 +95,45 @@ it("distinguishes a paused Ask release from unavailable conversation storage", (
   expect(askHistoryFailure(503, { error: "The operation could not be confirmed." })).toBe("unavailable");
   expect(askHistoryFailure(503, null)).toBe("unavailable");
   expect(askHistoryFailure(403, { error: "Ask Strelva is not enabled." })).toBe("unavailable");
+});
+
+
+describe("saved website creation action", () => {
+  const href = `/workspace/business/new/website?workspaceId=${WS}&conversationId=${SYSTEM}&messageId=aaaaaaaa-0000-4000-8000-000000000002`;
+  const action = { kind: "website", label: "Prepare a website", href };
+  it("keeps the same bounded link in streamed and reopened historical results", () => {
+    for (const raw of [{ ask: { kind: "answer", items: [], creationAction: action } }, { kind: "answer", items: [], creationAction: action }]) {
+      const result = readAskResult(raw)!;
+      expect(result.creationAction).toEqual(action);
+      const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Juniper", initialMessages: [{ id: "historical", role: "assistant", content: "Your website ask is saved.", result }] }));
+      expect(html).toContain(`href="${href.replaceAll("&", "&amp;")}"`);
+      expect(html).toContain("Prepare a website");
+    }
+  });
+  it.each([
+    "https://evil.example" + href,
+    "/workspace/business/new/website-other?workspaceId=" + WS,
+    href + "&request=private-words",
+    href + "&workspaceId=" + WS,
+    href + "#outside",
+    href.replace(WS, "not-a-uuid"),
+    href.replace("messageId=", "messageId=&other="),
+    href.replace("/workspace/", "/workspace/../workspace/"),
+  ])("ignores unsafe continuation %s without dropping the answer", invalid => {
+    expect(readAskResult({ kind: "answer", creationAction: { ...action, href: invalid } })).toMatchObject({ kind: "answer" });
+    expect(readAskResult({ kind: "answer", creationAction: { ...action, href: invalid } })?.creationAction).toBeUndefined();
+  });
+  it.each([{ ...action, kind: "publish" }, { ...action, label: "" }, { ...action, label: "x".repeat(121) }])("ignores unsupported or unbounded action metadata", invalid => {
+    expect(readAskResult({ kind: "answer", creationAction: invalid })?.creationAction).toBeUndefined();
+  });
+});
+
+
+describe("saved booking action parser",()=>{
+ it("carries booking creation but refuses a website path disguised as booking",()=>{
+  const query=new URLSearchParams({workspaceId:"ab200000-0000-4000-8000-000000000002",conversationId:"ab200000-0000-4000-8000-000000000003",messageId:"ab200000-0000-4000-8000-000000000004"});
+  const creationAction={kind:"booking",label:"Prepare bookings",href:`/workspace/business/new/booking?${query}`};
+  expect(readAskResult({kind:"answer",items:[],creationAction})?.creationAction).toEqual(creationAction);
+  expect(readAskResult({kind:"answer",items:[],creationAction:{...creationAction,href:`/workspace/business/new/website?${query}`}})?.creationAction).toBeUndefined();
+ });
 });

@@ -1,5 +1,6 @@
+import { admitPublicAgencyCheck } from "@/platform/agency-prospecting/check-admission";
 import { recordFunnelEvent } from "@/platform/infra/funnel";
-import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { resolveAgencyAttribution, AgencyProspectingError } from "@/platform/agency-prospecting/server";
 import { attributedAiVisibility } from "@/products/ai-visibility/server";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
-    if (agency) await admitAgencyCheck(agency);
+    if (agency) await admitPublicAgencyCheck(agency);
     const scored = await scoreAiVisibility(input);
     const agentBookingAvailability = bookingAgentVisibilityEnabled()
       ? await readAgentBookingAvailability(tenantDirectory, input.business, input.url)

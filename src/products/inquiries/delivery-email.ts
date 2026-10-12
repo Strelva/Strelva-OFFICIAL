@@ -34,10 +34,10 @@ export function createEmailInquiryTransport(options: { allowExternalSends?: bool
         }
         const sent = await sendEmailWithReceipt({
           audience: message.audience,
-          authorship: message.audience === "customer" ? "business" : "agency",
+          authorship: message.audience === "customer" ? "business" : undefined,
           ...(message.audience === "customer" ? { fromName: message.fromName, businessName: message.options.businessName } : {}),
           ...(message.audience === "customer" ? { fromAddress: `hello@${CLIENT_MAIL_DOMAIN}` } : {}),
-          tenantId: message.audience === "client" ? message.tenantId : undefined,
+          tenantId: message.tenantId,
           to: message.to,
           ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName } : {}),
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),

@@ -20,10 +20,13 @@
 .textFieldInput:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
 .textFieldInput[aria-invalid="true"] { border-color: var(--st-critical); }
 .textFieldInput:disabled { opacity: 0.5; cursor: not-allowed; }
+.textFieldInput[type="color"] { height: 48px; padding: 6px 10px; cursor: pointer; }
+.textFieldInput[type="file"]::file-selector-button { min-height: 32px; margin-right: 12px; padding: 4px 12px; border: 0; border-radius: var(--st-r-md, 12px); background: var(--st-inset); color: var(--st-text); font: inherit; cursor: pointer; }
 .textFieldMessage { margin: 0; font-size: 12px; line-height: 20px; color: var(--st-text-3); }
 .textFieldMessage[data-error="true"] { color: var(--st-critical); }
 .page {
   box-sizing: border-box;
+  flex-shrink: 0;
   width: 100%;
   max-width: calc(var(--st-column, 920px) + 2 * var(--st-page-pad, 48px));
   margin-inline: auto;
@@ -428,6 +431,14 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 /* Touch has no keyboard shortcut to show. */
 @media (pointer: coarse) { .holdKeys { display: none; } }
 
+/* Click and assistive activation use an explicit second confirmation. */
+.holdConfirmation { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.holdConfirmation > span { color: var(--st-text); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .holdFill { transform: none; transition: none; opacity: 0; }
+  .hold[data-holding="true"] .holdFill { opacity: 1; }
+}
+
 /* ---------- Toast ---------- */
 .toast {
   display: inline-flex;
@@ -500,14 +511,30 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 @supports not (backdrop-filter: blur(1px)) { .composer { background: var(--st-surface); } }
 
-.composerScope { display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--st-inset); color: var(--st-text-2); font-family: var(--st-font-mono); font-size: 12px; animation: var(--kf-enter-start) var(--motion-base) var(--ease-settle) both; }
+.composerScope { display: inline-flex; flex-shrink: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; background: var(--st-inset); color: var(--st-text-2); font-family: var(--st-font-mono); font-size: 12px; animation: var(--kf-enter-start) var(--motion-base) var(--ease-settle) both; }
 .composerInput { min-width: 0; flex: 1; border: 0; background: transparent; color: var(--st-text); font: inherit; font-size: 16px; line-height: 24px; outline: none; }
 .composerInput::placeholder { color: var(--st-text-3); }
 .composerSend { display: grid; width: 36px; height: 36px; flex-shrink: 0; place-items: center; border: 0; border-radius: 999px; background: var(--st-accent); color: var(--st-on-accent); cursor: pointer; }
 .composerSend:disabled { opacity: 0.4; cursor: not-allowed; }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
-.composerDock { position: sticky; bottom: 20px; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
+.composerDock { box-sizing: border-box; position: sticky; bottom: 0; z-index: 20; display: flex; flex: 0 0 auto; justify-content: center; margin-top: auto; padding-block: 24px 20px; pointer-events: none; }
 .composerDock > * { pointer-events: auto; }
+.composerDock { margin-bottom: calc(-1 * var(--st-composer-clearance, 0px)); }
+/* Standalone kit pages need a scroll owner too. Keep the complete page and
+   the dock's actual height in flow, rather than shrinking them into the frame.
+   WorkspaceLayout already supplies its own scroll owner and is unaffected. */
+:global([data-frame-main]):has(.composerDock) { overflow-y: auto; }
+:global([data-frame-main]):has(> .composerDock) > * { flex-shrink: 0; }
+/* The dock measures its complete border box, including the phone tabs and
+   safe area below it. Keep that clearance in the actual scroll owner so the
+   last action can move above the bar; focus scrolling uses the same inset.
+   The negative dock margin transfers its flow space to this padding, so the
+   measured height is reserved once rather than adding a second blank tail. */
+:global([data-st-composer-clearance]) {
+  box-sizing: border-box;
+  padding-bottom: var(--st-composer-clearance, 0px);
+  scroll-padding-bottom: var(--st-composer-clearance, 0px);
+}
 
 /* Object with an adjacent explanation, never a dashboard card grid. */
 .split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
@@ -543,7 +570,8 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 textarea.composerInput { resize: none; max-height: 144px; }
 
-@media (max-width: 767px) { .composerDock { bottom: calc(80px + env(safe-area-inset-bottom)); } .composerScope { display: none; } }
+@media (pointer: coarse) { .composerSend { width: 44px; height: 44px; } }
+@media (max-width: 767px) { .composerDock { padding-bottom: calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); } .composerScope { display: none; } }
 
 /* Shared fields, switches and open tables. */
 .input { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }

@@ -23,7 +23,7 @@ async function render(request: typeof fetch, readOnly = false) {
   await act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(SystemVersionImprovements, { workspaceId, systemId, versionId, readOnly }))));
   return node;
 }
-function button(node: HTMLElement, label = "Make real") { return [...node.querySelectorAll("button")].find(button => button.textContent === label)!; }
+function button(node: HTMLElement, label = "Make it live") { return [...node.querySelectorAll("button")].find(button => button.textContent === label)!; }
 function done(extra: Partial<OwnerDecision> = {}) { return { status: "done", item: item({ state: "approved", outcome: "done", receiptRef: `version_release:${versionId}:2`, ...extra }) }; }
 function requestFor(over: { getItem?: OwnerDecision; post?: () => Promise<Response>; view?: unknown; role?: string } = {}) {
   return vi.fn<typeof fetch>(async (input, init) => {
@@ -71,7 +71,7 @@ describe("Version Make real uses the one owner decision", () => {
     const request = requestFor({ post }); const node = await render(request);
     await act(async () => button(node).click());
     expect(node.querySelector('[role="alert"]')?.textContent).toBe("Reply lost");
-    await act(async () => button(node, "Retry Make real").click());
+    await act(async () => button(node, "Make it live").click());
     const writes = request.mock.calls.filter(([, init]) => init?.method === "POST");
     expect(writes).toHaveLength(2); expect(writes[0]?.[1]?.body).toEqual(writes[1]?.[1]?.body);
     expect(request.mock.calls.filter(([input, init]) => String(input).startsWith("/api/workspace/needs-you?") && init?.method !== "POST")).toHaveLength(1);

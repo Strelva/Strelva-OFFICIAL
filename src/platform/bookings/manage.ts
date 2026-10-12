@@ -11,6 +11,7 @@
  * read-back. Nothing here writes a second path.
  */
 import { createHash } from "node:crypto";
+import { visitorTimeZoneLabel } from "./public-admission-time";
 import type { ManagedReservation } from "./store";
 
 export interface ManagedBookingView {
@@ -92,15 +93,6 @@ function label(iso: string, timeZone: string): { day: string; time: string } {
   }
 }
 
-function zoneLabel(iso: string, timeZone: string): string {
-  try {
-    const part = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longGeneric" }).formatToParts(new Date(iso)).find((p) => p.type === "timeZoneName");
-    return part?.value ?? timeZone;
-  } catch {
-    return timeZone;
-  }
-}
-
 export function managedView(reservation: ManagedReservation): ManagedBookingView {
   const when = label(reservation.start, reservation.timeZone);
   return {
@@ -108,7 +100,7 @@ export function managedView(reservation: ManagedReservation): ManagedBookingView
     title: reservation.title,
     day: when.day,
     time: when.time,
-    timeZoneLabel: zoneLabel(reservation.start, reservation.timeZone),
+    timeZoneLabel: visitorTimeZoneLabel(reservation.start, reservation.timeZone),
     status: reservation.status,
     ...(reservation.agentSource ? { agentSource: reservation.agentSource } : {}),
     confirmationRequired: reservation.confirmationRequired,

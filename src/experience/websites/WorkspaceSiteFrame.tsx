@@ -50,7 +50,7 @@ export function WorkspaceSiteFrame(props: WorkspaceSiteFrameProps) {
       </nav>
     </header>
     {props.notice ? <div className={styles.notice}><StNotice>{props.notice}</StNotice></div> : null}
-    <main id="workspace-site-main" className={styles.panel} data-tab={tab}>
+    <div id="workspace-site-main" className={styles.panel} data-tab={tab}>
       <DashboardProvider
         tenantId={props.tenantId}
         dashboardBasePath={tenantRoot}
@@ -65,13 +65,13 @@ export function WorkspaceSiteFrame(props: WorkspaceSiteFrameProps) {
       >
         {props.children}
       </DashboardProvider>
-    </main>
+    </div>
   </div>;
 }
 
 /** The same frame's states when there is no site to show. */
 export function WorkspaceSiteMessage({ title, body, href, action }: { title: string; body: string; href: string; action: string }) {
   return <div data-dashboard data-workspace-theme="linen" className={styles.frame}>
-    <main><StPage><StHead title={title} meta={body} /><StTextButton href={href}>{action}</StTextButton></StPage></main>
+    <div className={styles.panel}><StPage><StHead title={title} meta={body} /><StTextButton href={href}>{action}</StTextButton></StPage></div>
   </div>;
 }

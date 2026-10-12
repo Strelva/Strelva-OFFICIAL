@@ -70,7 +70,8 @@ export function StField({ label, children, hint }: { label: ReactNode; children:
   return <div className={styles.field}><label className={styles.fieldLabel}>{label}{children}</label>{hint ? <p className={styles.fieldHint}>{hint}</p> : null}</div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef, titleRef }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef, titleRef, as: Heading = "h1" }: {
+  as?: "h1" | "h2" | "h3";
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
@@ -89,7 +90,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRe
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={headingRef ?? titleRef} tabIndex={headingRef || titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<Heading ref={headingRef ?? titleRef} tabIndex={headingRef || titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</Heading></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}
@@ -251,17 +252,24 @@ const HOLD_MS = strelvaDuration.hold * 1000;
 /**
  * For consequential yeses (publish, confirm a booking, leave). Press and hold
  * with pointer, Space or Enter; Command/Ctrl + Enter while focused accepts at
- * once. Reduced motion keeps the hold, without the moving fill.
+ * once. A click opens a separate confirmation using the same callback and
+ * disabled gate. Reduced motion keeps the duration with a static indicator.
  */
 export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
   const [progress, setProgress] = useState(0);
   const [holding, setHolding] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
   const done = useRef(false);
   const accept = useRef(onAccept);
   const blocked = useRef(disabled);
   const hintId = useId();
+  const button = useRef<HTMLButtonElement>(null);
+  const cancelled = useRef(false);
+  useLayoutEffect(() => {
+    if (!confirming && cancelled.current) { cancelled.current = false; button.current?.focus(); }
+  }, [confirming]);
 
   const stop = useCallback(() => {
     if (frame.current) cancelAnimationFrame(frame.current);
@@ -272,7 +280,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
   }, []);
 
   const begin = useCallback(() => {
-    if (disabled || frame.current) return;
+    if (disabled || confirming || frame.current) return;
     done.current = false;
     start.current = performance.now();
     setHolding(true);
@@ -284,14 +292,36 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
-  }, [disabled, stop]);
+  }, [disabled, confirming, stop]);
 
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
   useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
+  useEffect(() => {
+    if (disabled) {
+      if (frame.current) cancelAnimationFrame(frame.current);
+      frame.current = null;
+      start.current = null;
+    }
+  }, [disabled]);
+  if (disabled && (confirming || holding || progress !== 0)) {
+    setConfirming(false); setHolding(false); setProgress(0);
+  }
+  const action = label.replace(/^Hold to /i, "");
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
+  if (confirming && !disabled) return <span className={styles.holdConfirmation} role="group" aria-label={`Confirm: ${ariaLabel ?? action}`}>
+    <span role="status">Confirm {action.charAt(0).toLowerCase() + action.slice(1)}?</span>
+    <StPill autoFocus aria-label={`Confirm: ${ariaLabel ?? action}`} onClick={() => {
+      if (blocked.current || done.current) return;
+      done.current = true;
+      setConfirming(false);
+      accept.current();
+    }}>{action}</StPill>
+    <StTextButton onClick={() => { done.current = false; cancelled.current = true; setConfirming(false); }}>Cancel</StTextButton>
+  </span>;
+
+  return <button ref={button} type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
     style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
-    onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
+    onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
     onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
     onBlur={stop}
     onKeyDown={event => {
@@ -299,10 +329,16 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
       if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); begin(); }
     }}
     onKeyUp={event => { if (event.key === " " || event.key === "Enter") stop(); }}
-    onClick={event => event.preventDefault()}>
+    onClick={event => {
+      event.preventDefault();
+      if (blocked.current) return;
+      if (done.current) { done.current = false; return; }
+      stop();
+      setConfirming(true);
+    }}>
     <span className={styles.holdFill} aria-hidden="true" />
     <span className={styles.holdLabel}>{label}</span>
-    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
+    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold, or click to review a confirmation. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
   </button>;
 }
 
@@ -343,8 +379,39 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
   </form>;
 }
 
+/** Reserves the children's full height and phone navigation clearance in flow.
+ * Place after the work in its scroll owner, outside any fixed-position wrapper. */
 export function StComposerDock({ children }: { children: ReactNode }) {
-  return <div className={styles.composerDock}>{children}</div>;
+  const dockRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    // Native pages can own a nested scroller (Ask, Systems, the workspace).
+    // Reserve space there, rather than on an outer frame that never scrolls.
+    let scroll = dock.parentElement;
+    while (scroll && !scroll.matches("[data-workspace-scroll], [data-frame-main]")) {
+      if (/^(auto|scroll)$/.test(getComputedStyle(scroll).overflowY)) break;
+      scroll = scroll.parentElement;
+    }
+    if (!scroll) return;
+    const previous = scroll.style.getPropertyValue("--st-composer-clearance");
+    const previousPriority = scroll.style.getPropertyPriority("--st-composer-clearance");
+    const alreadyMarked = scroll.hasAttribute("data-st-composer-clearance");
+    scroll.setAttribute("data-st-composer-clearance", "");
+    const measure = () => scroll.style.setProperty("--st-composer-clearance", `${Math.ceil(dock.getBoundingClientRect().height)}px`);
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(dock);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      if (previous) scroll.style.setProperty("--st-composer-clearance", previous, previousPriority);
+      else scroll.style.removeProperty("--st-composer-clearance");
+      if (!alreadyMarked) scroll.removeAttribute("data-st-composer-clearance");
+    };
+  }, []);
+  return <div ref={dockRef} className={styles.composerDock} data-st-composer-dock>{children}</div>;
 }
 
 /* ---------- Forms and dense comparison ---------- */

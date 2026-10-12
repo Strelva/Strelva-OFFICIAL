@@ -40,10 +40,8 @@ export function QueueSourceActions({ item, onResult }: { item: QueueItem; onResu
       <p className="text-[13px] text-warm-white">{request.request}</p>
       <p className="text-[12px] text-gray-muted">Requested result: {request.outcome}</p>
       <ul className="list-inside list-disc text-[12px] text-gray-muted">{request.scope.map(scope => <li key={scope}>{scope}</li>)}</ul>
-      <p className="text-[12px] text-gray-muted">Accepting means Strelva will consider this work. Scope and deadline still need agreement.</p>
+      <p className="text-[12px] text-gray-muted">The serving agency handles this request in its client workspace. Scope and deadline still need agreement.</p>
       <div className="flex flex-wrap gap-2">
-        <Button size="lg" disabled={pending} onClick={() => run("accept_request")}>Accept request</Button>
-        <Button size="lg" variant="secondary" disabled={pending} onClick={() => run("decline_request")}>Decline request</Button>
         <Button size="lg" variant="ghost" disabled={pending} onClick={() => setRequest(null)}>Cancel</Button>
       </div>
     </>}

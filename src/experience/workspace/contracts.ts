@@ -173,6 +173,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** Full schema-3 export archive; absent keeps the bounded legacy snapshot label. */
+  exportSchema3?: boolean;
   /** Renewable owner assistant connections: STRELVA_MCP_OAUTH and workspace release. */
   assistantConnections?: boolean;
   /** Agency-owned public check leads, off unless explicitly released. */
@@ -337,6 +339,8 @@ export interface WorkspaceSystemConnection {
 }
 
 export interface WorkspaceSystemPossibility {
+  /** Server-qualified execution for this exact plan; absent is unavailable. */
+  executionAvailability?: "live" | "rehearsal" | "unavailable";
   /** Read-only source lineage; these Systems are not mutation targets. */
   sourceSystemIds?: string[];
   /** Names of separate native Systems this candidate introduces. */
@@ -412,6 +416,7 @@ export type WorkspaceAction =
   | { action: "assess"; workspaceId: string; requestId?: string; business: string; url?: string; category?: string; location?: string }
   | { action: "recover_assessment"; workspaceId: string; requestId: string }
   | { action: "save_website_audit"; workspaceId: string; resultId: string }
+  | { action: "save_business_check"; workspaceId: string; resultId: string }
   | { action: "save_public_result"; workspaceId: string; resultId: string }
   | { action: "handoff"; workId: string; recipientEmail: string }
   | { action: "inspect_handoff"; token: string }

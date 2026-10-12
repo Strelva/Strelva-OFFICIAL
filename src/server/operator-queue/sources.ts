@@ -96,11 +96,14 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
         || (event.type === "review" && event.metadata?.kind === "review_reply_draft");
       if (!isDraft) continue;
       const kind: QueueKind = event.metadata?.reviewAudience === "owner" ? "owner_pending" : "draft_review";
+      const workspaceId = context?.links.find(link => link.tenantId === event.tenantId)?.workspaceId ?? null;
       const base: QueueItemRaw = {
-        kind, sourceRef: ref, tenantId: event.tenantId, workspaceId: null,
+        kind, sourceRef: ref, tenantId: event.tenantId, workspaceId,
         title: event.title || "Draft to review", openedAt: event.createdAt,
         facts: { expiresAt: new Date(Date.parse(event.createdAt) + EVENT_RETENTION_DAYS * DAY).toISOString() },
-        href: kind === "owner_pending" ? clientHref(event.tenantId, "needs-you") : "/admin/actions",
+        href: workspaceId
+          ? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`
+          : clientHref(event.tenantId, "needs-you"),
         ...(kind === "draft_review" ? { review: { type: event.type, metadata: event.metadata } } : {}),
       };
       if (event.status === "pending") {
@@ -119,7 +122,7 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
     return (["draft_review", "owner_pending", "change_request"] as const).map((kind) => ({ kind, source, ok: false as const, reason }));
   }
   return [
-    { kind: "draft_review", source: "Strelva drafts", ok: true, rows: drafts },
+    { kind: "draft_review", source: "Client drafts", ok: true, rows: drafts },
     { kind: "owner_pending", source: "Owner approvals", ok: true, rows: owner },
     { kind: "change_request", source: "Change requests", ok: true, rows: changes },
   ];

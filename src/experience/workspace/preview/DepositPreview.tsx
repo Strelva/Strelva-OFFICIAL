@@ -2,40 +2,42 @@
 
 import { useState } from "react";
 import { Lock } from "lucide-react";
-import { StEmpty, StTextField, StHead, StLabel, StNotice, StPill, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
-import { PaymentLayout, PaymentSplit } from "@/experience/product/public-payment/PaymentLayout";
-import styles from "@/experience/product/public-payment/payment.module.css";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";
+import visitor from "@/experience/bookings/visitor.module.css";
+import styles from "@/app/pay/business/payment.module.css";
 import { depositFixture as fixture, type DepositPreviewState } from "./deposit-fixture";
 
-/** No fetch, provider, card input, persisted reservation, or real payment. */
+/** No fetch, provider, card input, persisted booking, or real payment. */
 export function DepositPreview({ state }: { state: DepositPreviewState }) {
   const [simulated, setSimulated] = useState(false);
   const paid = state === "paid" || simulated;
-  return <PaymentLayout brand={fixture.business} navigation={<><StTextButton href="#retreat">Workshops</StTextButton><StTextButton href="#price">Pricing</StTextButton></>}>
-    <PaymentSplit description={<>
-      <div id="retreat"><StHead title={<span className="font-display">{fixture.title}</span>} meta={fixture.date} /></div>
-      <p className={styles.introduction}>{fixture.description}</p>
-      <div id="price" className={styles.amounts}>
-        <div className={styles.amount}><StLabel>Today</StLabel><span className={styles.amountValue}>{fixture.deposit}</span></div>
-        <div className={styles.amount}><StLabel>At the studio</StLabel><span className={styles.amountValue}>{fixture.balance}</span></div>
-      </div>
-    </>}>
-      {state === "loading" ? <StSurface><div className={styles.state} role="status" aria-label="Loading deposit details"><StSkeleton width="60%" /><StSkeleton /><StSkeleton /><span>Loading deposit details…</span></div></StSurface>
-        : state === "empty" ? <StEmpty>No deposit is available for this retreat. Ask the studio about the next dates.</StEmpty>
-          : state === "denied" ? <StNotice tone="critical">This payment link is unavailable. Ask the studio for a current link.</StNotice>
-            : <StSurface pad={false} label="Deposit form"><div className={styles.form}>
-              <h2 className={`${styles.formTitle} font-display`}>{paid ? "Your spot" : "Hold your spot"}</h2>
-              {paid ? <><StState kind="live">Deposit received · simulated</StState><p className={styles.term}>This preview has not taken a payment or reserved a spot.</p></> : <>
-                <StTextField label="Name" value={fixture.name} readOnly />
-                <StTextField label="Email" type="email" value={fixture.email} readOnly />
-                <StTextField label="Card" value={fixture.card} readOnly />
-                <div className={styles.fieldsPair}><StTextField label="Expires" value={fixture.expires} readOnly /><StTextField label="CVC" value={fixture.cvc} readOnly /></div>
-                {state === "error" ? <StNotice tone="critical">Payment could not be started. No charge was made in this preview.</StNotice> : null}
-                <StPill size="lg" block onClick={() => setSimulated(true)}>Pay {fixture.deposit} and hold my spot</StPill>
-                <p className={`${styles.caption} ${styles.security}`}><Lock size={12} aria-hidden="true" />{fixture.terms}</p>
+  return <VisitorBookingShell siteName={fixture.business} wide navigation={<><a className={visitor.text} href="#retreat">Workshops</a><a className={visitor.text} href="#price">Pricing</a></>}>
+    <div className={styles.split}>
+      <section className={styles.description}>
+        <div id="retreat"><h1 className={visitor.title}>{fixture.title}</h1><p className={visitor.note}>{fixture.date}</p></div>
+        <p className={visitor.intro}>{fixture.description}</p>
+        <div id="price" className={styles.amounts}>
+          <div className={styles.amount}><span className={visitor.label}>Today</span><span className={styles.amountValue}>{fixture.deposit}</span><p className={styles.terms}>{fixture.cancellationTerms}</p></div>
+          <div className={styles.amount}><span className={visitor.label}>At the studio</span><span className={styles.amountValue}>{fixture.balance}</span></div>
+        </div>
+      </section>
+      {state === "loading" ? <section className={`${visitor.surface} ${styles.form}`}><div className={styles.state} role="status" aria-label="Loading deposit details"><StSkeleton width="60%" /><StSkeleton /><StSkeleton /><span>Loading deposit details…</span></div></section>
+        : state === "empty" ? <p className={visitor.notice}>No deposit is available for this retreat. Ask the studio about the next dates.</p>
+          : state === "denied" ? <p className={`${visitor.notice} ${visitor.error}`} role="alert">This payment link is unavailable. Ask the studio for a current link.</p>
+            : <section className={`${visitor.surface} ${styles.form}`} aria-label="Deposit form">
+              <h2 className={visitor.title}>{paid ? "Your spot" : "Hold your spot"}</h2>
+              {paid ? <><p role="status">Deposit received · simulated</p><p className={styles.terms}>This preview has not taken a payment or held a spot.</p></> : <>
+                <label className={visitor.field}>Name<input className={visitor.input} value={fixture.name} readOnly /></label>
+                <label className={visitor.field}>Email<input className={visitor.input} type="email" value={fixture.email} readOnly /></label>
+                <label className={visitor.field}>Card<input className={visitor.input} value={fixture.card} readOnly /></label>
+                <div className={styles.fieldsPair}><label className={visitor.field}>Expires<input className={visitor.input} value={fixture.expires} readOnly /></label><label className={visitor.field}>CVC<input className={visitor.input} value={fixture.cvc} readOnly /></label></div>
+                {state === "error" ? <p className={`${visitor.notice} ${visitor.error}`} role="alert">Payment could not be started. No charge was made in this preview.</p> : null}
+                <button className={`${visitor.button} ${visitor.block}`} type="button" onClick={() => setSimulated(true)}>Pay {fixture.deposit} and hold my spot</button>
+                <p className={`${visitor.note} ${styles.security}`}><Lock size={14} aria-hidden="true" />{fixture.terms}</p>
               </>}
-            </div></StSurface>}
-    </PaymentSplit>
-    <div className={styles.fixtureNote}><p className={styles.caption}>Fictional design preview. Card details are a read-only specimen. No payment or reservation is made.</p></div>
-  </PaymentLayout>;
+            </section>}
+    </div>
+    <p className={`${visitor.note} ${visitor.section}`}>Fictional design preview. Card details are a read-only specimen. No payment or booking is made.</p>
+  </VisitorBookingShell>;
 }

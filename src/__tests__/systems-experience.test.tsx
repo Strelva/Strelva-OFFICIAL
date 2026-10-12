@@ -33,7 +33,7 @@ const mooney = projection({
     entry(INTAKE_SYSTEM, "internal_app", "Mediation intake", { savedWorkId: "intake" }),
   ],
   connections: [{ id: "c1", sourceId: INBOX, kind: "appear", targetSystemId: SITE, targetLabel: "The Mooney Firm", state: "connected", purpose: "Inquiry form on the site" }],
-  possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
+  possibilities: [{ executionAvailability: "rehearsal", id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
 });
 
 describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
@@ -52,7 +52,7 @@ describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
 });
 
 it("uses recorded agency identity equally and never claims a requested provider operates the site", () => {
-  for (const name of ["Strelva", "Another agency"]) {
+  for (const name of ["Strelva Agency", "Another agency"]) {
     const projected = { ...mooney, providerOfRecord: { agencyWorkspaceId: "20000000-0000-4000-8000-000000000001", name } };
     expect(readBusinessSystems({ snapshot: snapshot([], projected), sites: [mooneySite] }).systems[0]?.operatedBy).toBe(name);
   }
@@ -64,7 +64,7 @@ describe("Systems read adapter over the spine projection", () => {
   it("shows the business facts boundary for repo-only, native content, and hosted websites", () => {
     for (const scenario of [
       { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Changes to this site go through its repository" },
-      { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "native website content" },
+      { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "website content for review and publishing" },
       { editing: "native" as const, savedWorkId: "document", status: "not_connected", sentence: "not connected", businessFactsConnected: false },
       { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders", businessFactsConnected: true },
     ]) {
@@ -198,7 +198,7 @@ describe("Make real and the System page", () => {
     health: { state: "unknown", summary: "Nothing has checked this yet." },
     surface: { kind: "website", domain: "attymooney.com", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", previewLabel: "attymooney.com, as visitors see it now", manageHref: "/dashboard" },
     operatedBy: "Strelva Agency", connections: [], versions: [],
-    possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
+    possibilities: [{ executionAvailability: "rehearsal", id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
   };
   const render = (overrides: Partial<Parameters<typeof SystemPage>[0]> = {}) => renderToStaticMarkup(createElement(SystemPage, {
     system: site, systems: [site], workspaceId: BUSINESS, readOnly: false, canMakeReal: true, sources: [], systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined, ...overrides,
@@ -213,7 +213,7 @@ describe("Make real and the System page", () => {
     const html = render();
     expect(html).toContain("<h1");
     expect(html).toContain('title="attymooney.com as visitors see it"');
-    for (const heading of ["Possibilities", "Make real", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
+    for (const heading of ["Possibilities", "Rehearse this change", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
     expect(html).toContain("Live");
     expect(html).toContain("Unknown. Nothing has checked this yet.");
     expect(html).not.toContain("Not checked here yet");
@@ -282,13 +282,13 @@ describe("Make real and the System page", () => {
       ] }],
       history: [{ id: "h1", sentence: "Started running it", at: "2026-10-01T12:00:00Z" }],
     } });
-    expect(html).toContain("Making real…");
+    expect(html).toContain("Making it live…");
     expect(html).toContain("Partly live");
     expect(html).toContain("Waiting: Google hasn&#x27;t approved Strelva&#x27;s access yet.");
     expect(html).toContain("History");
     expect(html).toContain("Started running it");
     expect(html).not.toMatch(/>Version[^s]/);
-    const order = ["Making real…", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
+    const order = ["Making it live…", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
@@ -296,13 +296,13 @@ describe("Make real and the System page", () => {
     const html = render({ system: { ...site, kind: "bookings", lifecycle: "paused", surface: { kind: "work", workId: "w", productId: "unknown" },
       possibilities: [{ ...site.possibilities[0]!, status: "exploring", staleReason: "attymooney.com changed since this was built." }] } });
     expect(html).toContain("Paused. Bookings already made are kept.");
-    expect(html).toContain("attymooney.com changed since this was built. Strelva is refreshing it.");
+    expect(html).toContain("attymooney.com changed since this was built. A fresh check is needed.");
   });
 
   it("gives a non-owner a visible permission state on Make real", () => {
     const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
     expect(html).toContain("Only an owner of this business can make a possibility real.");
-    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Make real/)).not.toBeNull();
+    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Rehearse this change/)).not.toBeNull();
   });
 
   it("explains a missing System without leaking another business", () => {

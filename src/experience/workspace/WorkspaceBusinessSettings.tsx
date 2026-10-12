@@ -55,6 +55,7 @@ export function WorkspaceBusinessSettings({
   accountHref,
   needsYouReleased = false,
   assistantConnectionsReleased = false,
+  exportSchema3 = false,
 }: {
   workspace?: WorkspaceSummary;
   sites: readonly ManagedWorkSummary[];
@@ -68,6 +69,7 @@ export function WorkspaceBusinessSettings({
   /** STRELVA_NEEDS_YOU_RELEASE: off renders this page exactly as before. */
   needsYouReleased?: boolean;
   assistantConnectionsReleased?: boolean;
+  exportSchema3?: boolean;
 }) {
   const readOnly = workspace?.access === "delegated_read" || workspace?.access === "provider_seat";
   const business = workspace?.kind === "customer";
@@ -91,7 +93,7 @@ export function WorkspaceBusinessSettings({
       <StSurface label="Business information"><StLabel>Business information</StLabel><h2 className="mt-4 text-xl font-medium">{workspace?.name || "Current business"}</h2><p className="mt-3 text-sm">{readOnly ? "Read-only access" : workspace?.role === "owner" ? "You are the owner" : workspace?.role === "admin" ? "Administrator" : "Business member"}</p><StNotice>Business details hold shared facts such as hours and services. Each System declares which facts it reads; connected sites and independently edited content need their own update.</StNotice><StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId: workspace?.id ?? "" })}`}>Open the business record</StTextButton></StSurface>
       <StSection title={PLACE_LABELS.access}><StRows><StRow title="Who can see and change this business" detail={readOnly ? "The business owner controls changes to People & access." : "Membership and permissions belong to this business."} href={href("access")} end="Open" /></StRows></StSection>
       <StSection title="Systems and files"><StEmpty>Internal tools, documents, onboarding cases, requests, and other saved results stay with this business. A managed website is not required.</StEmpty></StSection>
-      <StSection title="Plan and ownership"><StRows><StRow title="Plan and billing" href={`/workspace/billing?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title="Export all workspace data" href={`/workspace/export?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title="Leaving Strelva" href={`/workspace/exit?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Review" /></StRows></StSection>
+      <StSection title="Plan and ownership"><StRows><StRow title="Plan and billing" href={`/workspace/billing?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title={exportSchema3 ? "Export workspace archive" : "Export available workspace snapshot"} href={`/workspace/export?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Open" /><StRow title="Leaving Strelva" href={`/workspace/exit?workspaceId=${encodeURIComponent(workspace?.id ?? "")}`} end="Review" /></StRows></StSection>
     </StSplit>}
     {assistantConnectionsReleased && business && workspace ? <StSection title="Connected assistants"><StRows><StRow title="Read business facts and prepare website changes" detail="The business owner controls access." href={`/connect?workspaceId=${encodeURIComponent(workspace.id)}`} end="Manage assistant connections" /></StRows></StSection> : null}
     {workspace && (workspace.kind === "customer" || workspace.kind === "agency") ? <StSection title="Units"><StRows><StRow title="Businesses grouped under this organization" detail="Your membership controls what you can change." href={`/workspace/units?${new URLSearchParams({ workspaceId: workspace.id })}`} end="Open units" /></StRows></StSection> : null}

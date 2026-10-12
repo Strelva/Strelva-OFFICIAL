@@ -3,6 +3,7 @@
 -- scope, agency decisions inside full_control only, and ending one agency.
 \set ON_ERROR_STOP 1
 begin;
+\ir support/agency-proposal-response.sql
 create function pg_temp.expect_error(statement text, expected text) returns void language plpgsql as $$
 begin
   begin execute statement; exception when others then
@@ -54,7 +55,7 @@ begin
   -- One full_control agency per scope, even while proposed.
   perform pg_temp.expect_error(format('select public.bring_in_agency(%L,%L,%L,%L,%L,%L)',owner_id,'owner@bakery.example.test',bakery,strelva_agency,'[{"scope":"website","level":"full_control"}]','I agree'),'agency_scope_taken');
 
-  result := public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test',north,bakery,true);
+  result := pg_temp.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test',north,bakery,true);
   if result->>'status' <> 'accepted' then raise exception 'acceptance failed: %', result; end if;
   if not exists (select 1 from public.provider_seats where customer_workspace_id=bakery and agency_workspace_id=north and status='active') then raise exception 'acceptance opened no seat'; end if;
   if not exists (select 1 from public.workspace_providers where customer_workspace_id=bakery and provider_workspace_id=north and status='active') then raise exception 'first agency should be of record'; end if;
@@ -62,7 +63,7 @@ begin
 
   -- A second agency for another scope: the business has several agencies.
   perform public.bring_in_agency(owner_id,'owner@bakery.example.test',bakery,strelva_agency,'[{"scope":"bookings","level":"full_control"}]','Strelva Agency may run bookings.');
-  perform public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000003','lead@strelva-agency.example.test',strelva_agency,bakery,true);
+  perform pg_temp.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000003','lead@strelva-agency.example.test',strelva_agency,bakery,true);
   agencies := public.read_business_agencies(owner_id,'owner@bakery.example.test',bakery);
   if jsonb_array_length(agencies) <> 2 then raise exception 'expected two agencies: %', agencies; end if;
   if public.business_single_agency(bakery) is not null then raise exception 'two agencies must not resolve to one'; end if;
@@ -73,9 +74,17 @@ begin
     values (north,bakery,'7f000000-0000-4000-8000-000000000004','active','7f000000-0000-4000-8000-000000000002');
   item := public.open_owner_decision(bakery,jsonb_build_object('kind','copy.routine','route','owner_decides','title','Update the hours line',
     'approveEffect','The new hours go live.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId','hours:1','revisionHash',h,'adminMayDecide',false));
-  result := public.claim_owner_decision(bakery,(item->>'id')::uuid,h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test',null);
-  if result->>'status' <> 'claimed' or result->'item'->>'decidedByKind' is distinct from 'agency_session' and (select decided_by_kind from public.owner_decisions where id=(item->>'id')::uuid) <> 'agency_session' then
-    raise exception 'full-control agency could not decide: %', result;
+  -- AG3 (2026-10-12): once the agency2 boundary is installed, website execution
+  -- is withheld from agency decisions until its resolver consumes an exact
+  -- agency claim. Before that boundary the original contract still holds.
+  -- Positive post-boundary Full-control claims: tests/agency2-decisions-schema.sql.
+  if to_regprocedure('public.read_agency_decision_receipt(uuid,uuid,uuid,text,uuid,text)') is not null then
+    perform pg_temp.expect_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)',bakery,item->>'id',h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test'),'owner_decision_owner_only');
+  else
+    result := public.claim_owner_decision(bakery,(item->>'id')::uuid,h,'approve','agency','7f000000-0000-4000-8000-000000000004','staff@north.example.test',null);
+    if result->>'status' <> 'claimed' or (select decided_by_kind from public.owner_decisions where id=(item->>'id')::uuid) <> 'agency_session' then
+      raise exception 'full-control agency could not decide: %', result;
+    end if;
   end if;
   item := public.open_owner_decision(bakery,jsonb_build_object('kind','google.post','route','owner_decides','title','Post this week''s tip',
     'approveEffect','The post goes up.','notYetEffect','Nothing is posted.','sourceLifecycle','google_post','sourceId','post:1','revisionHash',h,'adminMayDecide',false));

@@ -9,9 +9,7 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import {
   sendWelcomeEmail,
   sendSiteLiveEmail,
-  sendReviewRequestEmail,
 } from "@/lib/delivery-email";
-import { buildGoogleReviewLink } from "@/lib/reviews/reputation";
 
 /**
  * Operator "send" actions for the three client lifecycle emails (welcome,
@@ -51,13 +49,17 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { type, reviewUrl } = (body ?? {}) as { type?: unknown; reviewUrl?: unknown };
+  const { type } = (body ?? {}) as { type?: unknown };
 
   if (!isLifecycleType(type)) {
     return NextResponse.json(
       { error: `type must be one of: ${TYPES.join(", ")}.` },
       { status: 400 },
     );
+  }
+
+  if (type === "review-request") {
+    return NextResponse.json({ error: "Client review requests require ordinary business or agency access. Nothing was sent." }, { status: 403 });
   }
 
   const email = (await releasedOwnerNoticeEmail(config))?.trim();
@@ -81,22 +83,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "This client has no site URL on file." }, { status: 400 });
     }
     sent = await sendSiteLiveEmail({ email, businessName, siteUrl, dashboardUrl, tenantId: id });
-  } else {
-    // Prefer an explicit operator override; otherwise auto-resolve the review
-    // link from the client's own Google Place ID (the same link the client
-    // dashboard builds) so the operator doesn't have to look it up.
-    const override = typeof reviewUrl === "string" ? reviewUrl.trim() : "";
-    const url = override || buildGoogleReviewLink(config.reviewsConfig?.googlePlaceId) || "";
-    if (!url) {
-      return NextResponse.json(
-        {
-          error:
-            "No review link for this client. Add a Google Place ID to their reviews config, or paste a review URL.",
-        },
-        { status: 400 },
-      );
-    }
-    sent = await sendReviewRequestEmail({ email, businessName, reviewUrl: url, ownerName, tenantId: id });
   }
 
   // A false return can mean "paused" or "send failed". Surface paused distinctly

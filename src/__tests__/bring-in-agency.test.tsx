@@ -58,10 +58,92 @@ describe("Bring in an agency (ADR 0015)", () => {
     expect([...bookings.querySelectorAll("button")].find(button => button.textContent === "Full control")!.disabled).toBe(false);
   });
 
+  it("changes an existing unlisted agency's complete access through acceptance, without granting it immediately", async () => {
+    const scopes = [{ scope: "website", level: "full_control", status: "active" }, { scope: "google", level: "prepare", status: "active" }];
+    const writes: unknown[] = [];
+    await mount(async (_input, init) => {
+      if (init?.method === "POST") {
+        writes.push(JSON.parse(String(init.body)));
+        return json({ agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [...scopes,
+          { scope: "website", level: "prepare", status: "proposed" }, { scope: "bookings", level: "full_control", status: "proposed" }] }] });
+      }
+      return json({ directory: [], agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes }] });
+    });
+    await act(async () => byText("Change access")!.click());
+    const area = (name: string) => container.querySelector(`[aria-label="${name} for North Studio"]`)!;
+    const option = (name: string, level: string) => [...area(name).querySelectorAll("button")].find(button => button.textContent === level)!;
+    expect(option("Website", "Full control").getAttribute("aria-checked")).toBe("true");
+    expect(option("Website", "Full control").disabled).toBe(false);
+    expect(option("Google", "Prepare").getAttribute("aria-checked")).toBe("true");
+    expect(container.textContent).toContain("Current access stays in place until they accept");
+    await act(async () => { option("Website", "Prepare").click(); option("Google", "Not this").click(); option("Bookings", "Full control").click(); });
+    await act(async () => byText("Send to North Studio")!.click());
+    expect(writes).toEqual([{ workspaceId: WORKSPACE, agencyWorkspaceId: NORTH, scopes: [{ scope: "website", level: "prepare" }, { scope: "bookings", level: "full_control" }] }]);
+    expect(container.textContent).toContain("Current: Website · Full control, Google · Prepare");
+    expect(container.textContent).toContain("Proposed: Website · Prepare, Bookings · Full control");
+    expect(container.textContent).toContain("Nothing changes until they accept");
+    await act(async () => byText("Change access")!.click());
+    expect(option("Website", "Prepare").getAttribute("aria-checked")).toBe("true");
+    expect(option("Google", "Not this").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("requires at least one replacement area and keeps End access available for removal", async () => {
+    await mount(async () => json({ directory: [], agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true,
+      scopes: [{ scope: "website", level: "prepare", status: "active" }] }] }));
+    await act(async () => byText("Change access")!.click());
+    const website = container.querySelector('[aria-label="Website for North Studio"]')!;
+    await act(async () => [...website.querySelectorAll("button")].find(button => button.textContent === "Not this")!.click());
+    expect(byText("Send to North Studio")!.disabled).toBe(true);
+    expect(byText("End access")!.disabled).toBe(false);
+    expect(container.textContent).toContain("To remove every area now, use End access");
+  });
+
+  it("does not offer current agencies again in the directory, and Cancel keeps access unchanged", async () => {
+    const writes = vi.fn();
+    await mount(async (_input, init) => {
+      if (init?.method) writes(init);
+      return json({ directory: [{ agencyWorkspaceId: NORTH, name: "North Studio", summary: "Websites" }],
+        agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [{ scope: "website", level: "prepare", status: "active" }] }] });
+    });
+    expect(container.textContent).not.toContain("Agencies you can bring in");
+    await act(async () => byText("Change access")!.click());
+    await act(async () => byText("Cancel")!.click());
+    expect(writes).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Current: Website · Prepare");
+  });
+
+  it("keeps the proposed choices available when the server rejects an amendment", async () => {
+    await mount(async (_input, init) => init?.method ? json({ error: "Another agency already has full control." }, 409) : json({ directory: [],
+      agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [{ scope: "website", level: "prepare", status: "active" }] }] }));
+    await act(async () => byText("Change access")!.click());
+    await act(async () => byText("Send to North Studio")!.click());
+    expect(container.textContent).toContain("Another agency already has full control.");
+    expect(byText("Send to North Studio")).toBeDefined();
+    expect(container.textContent).toContain("Current: Website · Prepare");
+  });
+
+  it("re-reads an unconfirmed amendment before allowing another proposal", async () => {
+    let reads = 0;
+    await mount(async (_input, init) => {
+      if (init?.method === "POST") throw new TypeError("Connection lost");
+      reads++;
+      return json({ directory: [], agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true,
+        scopes: [{ scope: "website", level: "prepare", status: reads === 1 ? "active" : "proposed" }] }] });
+    });
+    await act(async () => byText("Change access")!.click());
+    await act(async () => byText("Send to North Studio")!.click());
+    expect(reads).toBe(2);
+    expect(container.textContent).toContain("Outcome not confirmed");
+    expect(container.textContent).toContain("Proposed: Website · Prepare");
+    expect(byText("Send to North Studio")).toBeUndefined();
+    expect(byText("Change access")).toBeDefined();
+  });
+
   it("lets only an owner bring in or end agencies, and reports a failed load honestly", async () => {
     await mount(async () => json({ directory: [], agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [] }] }), false);
-    expect(container.textContent).toContain("Only an owner can bring in or end an agency.");
+    expect(container.textContent).toContain("Only an owner can bring in, change or end an agency.");
     expect(byText("End access")).toBeUndefined();
+    expect(byText("Change access")).toBeUndefined();
     await act(async () => root!.unmount()); container.remove();
     await mount(async () => json({ error: "Agencies couldn't be loaded. Nothing changed." }, 503));
     expect(container.textContent).toContain("Agencies couldn't be loaded. Nothing changed.");

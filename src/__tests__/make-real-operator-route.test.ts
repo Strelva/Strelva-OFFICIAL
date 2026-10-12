@@ -1,7 +1,6 @@
 const admission = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: admission, authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 const deps = vi.hoisted(() => ({
   admin: true,
@@ -51,55 +50,14 @@ describe("operator Make real tools", () => {
 
   it("reads the step log, the operator view and the customer's words", async () => {
     const body = await (await GET(new Request(`http://localhost:3000/api/admin/make-real?workspaceId=${WS}&activationId=act-1`))).json();
-    expect(body.customer).toMatchObject({ headline: "Nothing changed yet. Strelva is on it.", checking: true });
+    expect(body.customer).toMatchObject({ headline: "Nothing changed yet. The outcome needs review.", checking: true });
     expect(body.view).toMatchObject({ needsReconciliation: true });
   });
 
-  it("for a business Strelva runs, acts as Strelva (system), logged first, with the operator named", async () => {
-    const SERVICE = { userId: "f1000000-0000-4000-8000-0000000000b1", verifiedEmail: "operator@strelva.test" };
-    const session = { kind: "strelva_system", label: "Strelva (system)", sessionId: "f1000000-0000-4000-8000-0000000000c1", workspaceId: WS, purpose: "make_real_resume", onBehalf: { role: "admin" }, actor: SERVICE };
-    deps.runner.mockResolvedValue({ actor: SERVICE, service: session });
-    await post({ action: "resume", workspaceId: WS, activationId: "act-1" });
-    expect(deps.record).toHaveBeenCalledWith(session, "resume", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
-    expect(deps.resume).toHaveBeenCalledWith(SERVICE, WS, "act-1", "Strelva (system) for operator ops@strelva.test", session);
-    expect(deps.record.mock.invocationCallOrder[0]).toBeLessThan(deps.resume.mock.invocationCallOrder[0]!);
-    await post({ action: "reconcile", workspaceId: WS, activationId: "act-1", stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03" });
-    expect(deps.record).toHaveBeenLastCalledWith(session, "reconcile", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
-    expect(deps.reconcile).toHaveBeenLastCalledWith(SERVICE, WS, "act-1", { stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03", note: "Strelva (system) for operator ops@strelva.test" }, session);
-    await post({ action: "rollback", workspaceId: WS, activationId: "act-1", confirm: true });
-    expect(deps.record).toHaveBeenLastCalledWith(session, "rollback", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
-    expect(deps.rollback).toHaveBeenLastCalledWith(SERVICE, WS, "act-1", "Strelva (system) for operator ops@strelva.test", session);
-    expect(deps.record.mock.invocationCallOrder.at(-1)).toBeLessThan(deps.rollback.mock.invocationCallOrder.at(-1)!);
-    // Not logged, not run.
-    deps.record.mockRejectedValueOnce(new Error("log down"));
-    deps.resume.mockClear();
-    expect((await post({ action: "resume", workspaceId: WS, activationId: "act-1" })).status).toBe(503);
-    expect(deps.resume).not.toHaveBeenCalled();
-  });
-
-  it("runs each action as the starting owner and names the operator", async () => {
-    await post({ action: "resume", workspaceId: WS, activationId: "act-1" });
-    expect(deps.resume).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test", undefined);
-    await post({ action: "reconcile", workspaceId: WS, activationId: "act-1", stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03" });
-    expect(deps.reconcile).toHaveBeenCalledWith(OWNER, WS, "act-1", { stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03", note: "operator ops@strelva.test" }, undefined);
-    await post({ action: "rollback", workspaceId: WS, activationId: "act-1", confirm: true });
-    expect(deps.rollback).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test", undefined);
-  });
-
-  it("needs evidence to reconcile and an explicit confirm to roll back", async () => {
-    expect((await post({ action: "reconcile", workspaceId: WS, activationId: "act-1", stepId: "effect:x", resolution: "completed", evidence: "ok" })).status).toBe(400);
-    expect((await post({ action: "rollback", workspaceId: WS, activationId: "act-1" })).status).toBe(400);
-    expect(deps.rollback).not.toHaveBeenCalled();
-  });
-
-  it("says why when the runner refuses, and 404s an activation with no starter", async () => {
-    deps.resume.mockRejectedValue(new WorkspaceConflictError("A worker may still be running this step. Wait before resuming."));
-    const response = await post({ action: "resume", workspaceId: WS, activationId: "act-1" });
-    expect(response.status).toBe(409);
-    expect((await response.json()).error).toMatch(/still be running/);
-    deps.starter.mockResolvedValue(null);
-    deps.runner.mockResolvedValue(null);
-    expect((await post({ action: "resume", workspaceId: WS, activationId: "act-1" })).status).toBe(404);
+  it.each(["resume", "rollback", "reconcile"])("refuses client %s without acquiring an owner or service runner", async action => {
+    const res = await post({ action, workspaceId: WS, activationId: "act-1", confirm: true, stepId: "effect:x", resolution: "completed", evidence: "Provider accepted the write." });
+    expect(res.status).toBe(410);
+    for (const fn of [deps.runner, deps.record, deps.resume, deps.rollback, deps.reconcile]) expect(fn).not.toHaveBeenCalled();
   });
 
   it("admits the human operator while preserving the starting owner and typed system engine actors", async () => {

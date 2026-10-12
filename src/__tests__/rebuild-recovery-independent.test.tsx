@@ -44,7 +44,7 @@ it('can read the actual committed current candidate without replay after history
   expect(current.rebuild.revision).toBeGreaterThan(prior.revision);
   expect(mutationCount).toBe(1);
   expect(node.textContent).not.toContain('This exact preview is approved.');
-  expect(find('Publish approved website')).toBeUndefined();
+  expect(find('Hold to make it live')).toBeUndefined();
   expect(node.textContent).toContain(corrected);
   expect(node.querySelector('[role="alert"]')).toBeNull();
   expect(find('Reload current state')).toBeUndefined();

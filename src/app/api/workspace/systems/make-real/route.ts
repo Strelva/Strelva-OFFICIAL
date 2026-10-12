@@ -20,16 +20,17 @@ export const dynamic = "force-dynamic";
 const input = z.object({
   workspaceId: z.string().uuid(),
   possibilityId: z.string().min(1).max(120),
+  /** Bind the visible action; a rehearsal must never become a live approval. */
+  executionMode: z.enum(["live", "rehearsal"]).optional(),
   expectedPlan: z.object({ candidateRevision: z.number().int().positive(), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }).strict().optional(),
 }).strict();
 
 /**
  * Make real for a Ready Possibility.
  *
- * With a `make_real_live:<channel>` flag on for the business and a stored
- * Possibility, the owner's tap is the Needs you decision for the plan and
- * starts the durable, live activation (src/experience/systems/live-make-real):
- * the response is `{ live }`. Otherwise it runs on an isolated copy, as below.
+ * With every exact effect channel released and a stored Possibility, the
+ * owner's live action decides the Needs you plan and starts activation. An
+ * explicit rehearsal uses only the isolated runner and cannot approve a plan.
  *
  * Owners of the business only. The isolated runner is wired to isolated adapters and
  * an in-memory copy of the affected Systems (src/platform/make-real/sandbox):
@@ -40,11 +41,9 @@ const input = z.object({
  * A 1.0.0 launch feature: it also needs STRELVA_SYSTEMS_RELEASE, checked
  * before any session or body read.
  *
- * A stored Possibility with a live channel on runs live: the tap is the
- * owner's Needs you decision (makeRealPath). Otherwise it runs on the
- * isolated copy; with STRELVA_NEEDS_YOU_RELEASE on, that too is the owner's
- * one approval for the plan through the same `make_real` item Home and the
- * email show. Off, it runs as before.
+ * Callers without an executionMode retain the previous isolated approval
+ * path. The current System page binds its visible live/rehearsal choice, and
+ * a changed choice is refused before a live approval.
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
@@ -64,12 +63,14 @@ export async function POST(request: Request) {
     }
     const exit = await readWorkspaceExit(actor, workspace.id).catch(() => null);
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
-    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts(body.expectedPlan));
+    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts(body.expectedPlan), body.executionMode);
     if (!path) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
     // Funnel (ADR 0015): the first time this business makes something real. One row per business.
     const firstLive = () => void recordFunnelEvent("first_live", workspace.id, { workspaceId: workspace.id });
-    if (path.kind === "live") { firstLive(); return workspaceJson({ live: path.result }); }
-    if (needsYouReleaseEnabled()) {
+    if (path.kind === "live") { if (path.result.activationId) firstLive(); return workspaceJson({ live: path.result }); }
+    // An explicit rehearsal never decides a Needs you item: channel flags may
+    // change again while it runs, but the isolated runner cannot publish.
+    if (needsYouReleaseEnabled() && body.executionMode !== "rehearsal") {
       const decided = await makeRealThroughNeedsYou(actor, workspace.id, path.possibilityId, {
         google: googleMakeRealPorts,
         store: needsYouStore, appOrigin: needsYouAppOrigin(), sendEmail: sendEmailWithReceipt,
@@ -82,7 +83,6 @@ export async function POST(request: Request) {
         return workspaceJson({ error: "This changed since you opened it. Reload and look again. Nothing changed.", status: decided.status }, 409);
       }
       if (!decided.result) return workspaceJson({ error: "Make real could not start. Nothing changed. Try again in a moment.", status: decided.status, reason: decided.reason }, 409);
-      firstLive();
       return workspaceJson({ result: decided.result, decision: decided.status });
     }
     const managed = await listManagedPresenceWork().catch(() => ({ managedWork: [] as Array<{ id: string; domain?: string }> }));
@@ -91,7 +91,6 @@ export async function POST(request: Request) {
       siteDomains: new Map(managed.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }, path.possibilityId, { canActivate: true });
     if (!result) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
-    firstLive();
     return workspaceJson({ result });
   } catch (error) {
     return workspaceHttpFailure(error);

@@ -1,7 +1,7 @@
 /** Screen words only. Stable product IDs and routes keep their existing names. */
 export const PLACE_LABELS = {
   home: "Home", needsYou: "Needs you", requests: "Requests", running: "Running",
-  systems: "Systems", systemsAndFiles: "All systems and files", apps: "Apps",
+  filesAndResults: "Files and results", systems: "Systems", systemsAndFiles: "All systems and files", apps: "Apps",
   yours: "Yours", whatChanged: "What changed", businessDetails: "Business details",
   access: "People & access", help: "Help", account: "Account", system: "System", ask: "Ask Strelva",
 } as const;
@@ -23,7 +23,7 @@ export const STATE_LABELS = {
   lifecycle: { draft: "Draft", live: "Live", paused: "Paused" },
   health: { healthy: "Working", degraded: "Something is off", blocked: "Not working", unknown: "Unknown" },
   possibility: { exploring: "Exploring", ready: "Ready" },
-  history: "History", makeReal: "Make real", makingReal: "Making real…", partlyLive: "Partly live",
+  history: "History", makeReal: "Make it live", makingReal: "Making it live…", partlyLive: "Partly live",
 } as const;
 
 export const CONNECTION_LABELS = {

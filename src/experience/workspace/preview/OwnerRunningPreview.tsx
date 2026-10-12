@@ -18,7 +18,7 @@ export function OwnerRunningPreview({ state, dark = false }: { state: OwnerRunni
   const [ask, setAsk] = useState("");
   const [draft, setDraft] = useState("");
   return <div data-workspace-theme="linen" data-workspace-mode={dark ? "dark" : "light"}>
-    <StrelvaShell title="Running" active="ongoing" systemsReleased businessContext={<span>Fictional Workshop</span>} accountName="Fictional owner" signOut={<span>Local preview</span>}
+    <StrelvaShell title="Running" active="ongoing" systemsReleased workspaceName="Fictional Workshop" accountName="Fictional owner" signOut={<span>Local preview</span>}
       notice={<p role="note" className="px-5 py-3 text-sm text-gray-muted">Local rehearsal · fictional checks and times. No provider checks, messages or business changes run here.</p>}
     >
       <StPage>

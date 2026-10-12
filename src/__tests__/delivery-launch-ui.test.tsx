@@ -49,6 +49,7 @@ describe("agency and native entry interfaces",()=>{
   expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("website_delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
   await act(async()=>button("Accept scope and start 24-hour delivery").click());
   expect(calls).toHaveLength(1);
+  await act(async()=>button("Cancel").click());
   await act(async()=>button("Accept scope and start 24-hour delivery").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
   const command=JSON.parse(String(calls[1]!.init?.body));expect(command).toMatchObject({requestId,expectedRevision:3,change:{kind:"agree"}});
   await resolve(1,{error:{message:"Response lost"}},503);
@@ -83,14 +84,14 @@ describe("agency and native entry interfaces",()=>{
   expect(container.querySelector('a[href^="/sign-in"]')?.getAttribute("href")).toBe(`/sign-in?next=${encodeURIComponent(`/workspace/delivery?businessId=${businessId}`)}`);
  });
  it("requires an explicit business name before any setup mutation",async()=>{
-  await render(createElement(BusinessSetupPanel,{initialRequest:saved.request}));await resolve(0,{actorId,businesses:[]});
-  expect(button("Save business and request").disabled).toBe(true);expect(calls).toHaveLength(1);
+  await render(createElement(BusinessSetupPanel,{initialRequest:saved.request}));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});
+  expect(button("Save business and ask").disabled).toBe(true);expect(calls).toHaveLength(1);
   expect(container.textContent).toContain("No website purchase is required");
  });
  it("recovers a pending atomic business request without making a second one",async()=>{
   const command={destination:{kind:"new",name:"Juniper"},initialRequest:saved.request,idempotencyKey:businessId};
   sessionStorage.setItem(`strelva:business-entry:${actorId}`,JSON.stringify(command));
-  await render(createElement(BusinessSetupPanel,{startProduct:"applications"}));await resolve(0,{actorId,businesses:[]});
+  await render(createElement(BusinessSetupPanel,{startProduct:"applications"}));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});
   expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("Juniper");
   await act(async()=>container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
   expect(JSON.parse(String(calls[1]!.init?.body))).toEqual(command);await resolve(1,{error:"Uncertain"},503);
@@ -98,6 +99,6 @@ describe("agency and native entry interfaces",()=>{
  });
  it("does not load another actor's retained business setup",async()=>{
   sessionStorage.setItem(`strelva:business-entry:${businessId}`,JSON.stringify({destination:{kind:"new",name:"Other business"},initialRequest:saved.request,idempotencyKey:businessId}));
-  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry safely")).toBeUndefined();
+  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry safely")).toBeUndefined();
  });
 });

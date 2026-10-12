@@ -4,14 +4,14 @@ import type { Metadata } from "next";
 import { getHostedSite } from "@/products/websites/index";
 import { safeJsonLd, siteDocumentJsonLd, siteDocumentMetadata } from "@/products/websites/index";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import { IframeScrollListener } from "@/components/public/IframeScrollListener";
 import { EditModeOverlay } from "@/components/public/EditModeOverlay";
 import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
 import { defaults } from "@/lib/defaults";
-import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
+import { getTenantFromHeaders, getTenantFromHost, isPreviewMode } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { themeContentToCssVars } from "@/lib/design-tokens";
@@ -23,6 +23,10 @@ async function isAdminDomain(): Promise<boolean> {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  if (!h.get("x-tenant") && !getTenantFromHost(h.get("host") || "")) {
+    return { title: "Strelva", robots: { index: false, follow: false } };
+  }
   const hosted = await getHostedSite();
   if (hosted) return siteDocumentMetadata(hosted.document, "/", hosted.origin, hosted.preview);
   const tenant = await getTenantFromHeaders();
@@ -211,6 +215,9 @@ export default async function TenantPublicLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // DEFAULT_TENANT is a legacy fixture fallback, never a public platform brand.
+  const h = await headers();
+  if (!h.get("x-tenant") && !getTenantFromHost(h.get("host") || "")) notFound();
   const [tenant, isPreview, isAdmin] = await Promise.all([
     getTenantFromHeaders(),
     isPreviewMode(),

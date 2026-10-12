@@ -3,23 +3,27 @@ import { readInquirySurface } from "@/products/inquiries/server";
 import { InMemoryInquiryRepository } from "@/products/inquiries/repository";
 import { bookingLifecyclePorts } from "@/platform/bookings/lifecycle-ports";
 import type { TenantConfig } from "@/lib/types";
-const mocks = vi.hoisted(() => ({ context: vi.fn(), tenant: vi.fn(), owner: vi.fn() }));
+const mocks = vi.hoisted(() => ({ context: vi.fn(), tenant: vi.fn(), owner: vi.fn(), brand: vi.fn(), decider: vi.fn(), role: vi.fn() }));
+vi.mock("@/lib/operator-decisions", () => ({ sessionTenantDecider: mocks.decider }));
+vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mocks.brand }));
 vi.mock("@/platform/business-record/public-reader", () => ({ readReleasedTenantBusinessContext: mocks.context }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: mocks.owner }));
-vi.mock("@/platform/infra/auth", () => ({ getTenantRole: async () => "owner", roleHasPermission: () => true }));
+vi.mock("@/platform/infra/auth", () => ({ getTenantRole: mocks.role, roleHasPermission: () => true }));
 vi.mock("@/products/inquiries/delivery-surface", () => ({
   projectInquiryDeliveryTimeline: async (input: { state: unknown }) => ({ state: input.state, evidence: {} }),
 }));
 vi.mock("@/products/inquiries/email-consent", () => ({ projectInquiryEmailConnection: async () => ({ id: "email", status: "disconnected" }) }));
 const config: TenantConfig = { id: "fixture", subdomain: "fixture", siteName: "Old website name", ownerName: "Owner", industry: "wellness", createdAt: "2026-10-07", template: "wellness", active: true };
-beforeEach(() => { vi.clearAllMocks(); mocks.tenant.mockResolvedValue(config); mocks.owner.mockResolvedValue("record-owner@example.test"); });
+beforeEach(() => { vi.clearAllMocks(); mocks.role.mockResolvedValue("owner"); mocks.decider.mockResolvedValue({ kind: "operator" }); mocks.tenant.mockResolvedValue(config); mocks.brand.mockResolvedValue({ agencyId: "active-agency", name: "Current Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" }); mocks.owner.mockResolvedValue("record-owner@example.test"); });
 afterEach(() => vi.restoreAllMocks());
 describe("one record across client surfaces", () => {
   it("shows current confirmed business facts in inquiries and identifies their source", async () => {
     mocks.context.mockResolvedValue({ facts: { display_name: "Current business", description: "Current description" }, services: [] });
     const { snapshot } = await readInquirySurface({ tenantId: "fixture", businessId: "fixture", config, repository: new InMemoryInquiryRepository() });
+    expect(snapshot.servingAgency).toMatchObject({ agencyId: "active-agency", name: "Current Studio" });
+    expect(mocks.brand).toHaveBeenCalledWith("fixture");
     expect(snapshot.business).toMatchObject({ name: "Current business", description: "Current description" });
     expect(snapshot.onboarding.statements.find(statement => statement.id === "business")).toMatchObject({ value: "Current business", provenance: "Business record" });
   });
@@ -29,6 +33,14 @@ describe("one record across client surfaces", () => {
     expect(snapshot.business.name).toBe("Old website name");
     expect(snapshot.onboarding.statements.find(statement => statement.id === "business")?.provenance).toBe("Tenant settings");
   });
+  it("removes content capabilities from platform support inspection", async () => {
+    mocks.role.mockResolvedValue("super_admin");
+    mocks.context.mockResolvedValue(null);
+    const { snapshot } = await readInquirySurface({ tenantId: "fixture", businessId: "fixture", config, repository: new InMemoryInquiryRepository() });
+    expect(snapshot.readOnly).toBe(true);
+    expect(Object.values(snapshot.permissions ?? {})).toEqual([false, false, false, false, false, false, false]);
+  });
+
   it("booking notices use the same business name and one owner recipient", async () => {
     mocks.context.mockResolvedValue({ facts: { legal_name: "Current legal name" }, services: [] });
     const input = { tenantId: "fixture" } as Parameters<typeof bookingLifecyclePorts.business>[0];

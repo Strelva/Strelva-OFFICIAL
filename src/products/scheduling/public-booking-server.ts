@@ -271,7 +271,7 @@ function nativeCalendar(): PublicBookingCalendar {
     expectedStatus: "accepted" | "cancelled" = "accepted",
   ) {
     const reservation = schedule.reservations.find(item => item.requestId === requestId);
-    if (!reservation) throw new Error("The native reservation could not be read back.");
+    if (!reservation) throw new Error("The booking could not be read back.");
     return {
       verification: reservation.status === expectedStatus && reservation.verification === "verified" ? "verified" as const : "pending" as const,
       start: reservation.start || fallback.start,

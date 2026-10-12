@@ -58,6 +58,7 @@ const actions = z.discriminatedUnion("action", [
     category: z.string().trim().max(160).optional(), location: z.string().trim().max(160).optional() }).strict(),
   z.object({ action: z.literal("recover_assessment"), workspaceId: z.string().uuid(), requestId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("save_website_audit"), workspaceId: z.string().uuid(), resultId: z.string().regex(/^audit_[a-f0-9]{32}$/) }).strict(),
+  z.object({ action: z.literal("save_business_check"), workspaceId: z.string().uuid(), resultId: z.string().regex(/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i) }).strict(),
   z.object({ action: z.literal("save_public_result"), workspaceId: z.string().uuid(),
     resultId: z.string().trim().regex(/^scan_[a-z0-9]+$/i).max(256) }).strict(),
   z.object({ action: z.literal("handoff"), workId: z.string().uuid(), recipientEmail: z.string().trim().email().max(254) }).strict(),
@@ -313,12 +314,12 @@ export async function GET(request: Request) {
       pendingAssessments,
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
-      handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
+      handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt, customerWorkspaceId, customerWorkId }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt, ...(status === "accepted" ? { customerWorkspaceId, customerWorkId } : {}) })),
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }
@@ -337,6 +338,16 @@ export async function POST(request: Request) {
     const input = actions.parse(await body(request));
     if (await isRateLimitedWindowedAsync(`workspace:write:${current.userId}`, 60, 60_000)) return json({ error: "Please wait before making another change." }, 429);
     switch (input.action) {
+      case "save_business_check": {
+        const business = (await listWorkspaces(current)).find(item => item.id === input.workspaceId && item.kind === "customer"
+          && item.access === "member" && ["owner", "admin"].includes(item.role || ""));
+        if (!business) throw new WorkspaceAccessError();
+        const work = input.resultId.startsWith("audit_")
+          ? await savePublicWebsiteAudit({ actor: current, workspaceId: business.id, resultId: input.resultId })
+          : (await savePublicAiVisibilityResult({ actor: current, workspaceId: business.id, resultId: input.resultId })).work;
+        void recordFunnelEvent("check_saved", input.resultId, { workspaceId: business.id });
+        return json({ work: await presentSavedWork(current, work) });
+      }
       case "inspect_handoff": {
         const preview = await inspectHandoff(current, input.token);
         return json({ recipientEmail: preview.recipientEmail, agencyName: preview.agencyWorkspace.name,

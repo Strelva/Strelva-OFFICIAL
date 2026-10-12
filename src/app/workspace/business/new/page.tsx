@@ -6,6 +6,8 @@ import { BusinessSetupPanel } from "@/experience/workspace/BusinessSetupPanel";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import { BUSINESS_START_PRODUCTS } from "@/platform/workspaces/business-start";
+import { StCopy, StNotice, StPage, StTextButton } from "@/components/ui/strelva/Kit";
+import { readSetupCheck } from "./check-context";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your business", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -14,5 +16,8 @@ export default async function BusinessSetupPage({ searchParams }: { searchParams
   const query = await searchParams;
   const start = z.enum(BUSINESS_START_PRODUCTS).safeParse(query.start || "help");
   if (!start.success) notFound();
-  return <StrelvaShell title="Your business"><div className="mx-auto w-full max-w-2xl p-6"><BusinessSetupPanel key={start.data} startProduct={start.data} gettingStarted={businessSignupReleaseEnabled()} /></div></StrelvaShell>;
+  const checkId = typeof query.check === "string" ? query.check : undefined;
+  if (query.check !== undefined && !checkId) notFound();
+  const check = checkId ? await readSetupCheck(checkId).catch(() => null) : null;
+  return <StrelvaShell title="Your business"><StPage>{checkId && !check ? <><StNotice tone="need">This check is unavailable. Run the free check again to carry its evidence and fix into your business.</StNotice><StTextButton href="/audit">Check your business</StTextButton></> : <>{check ? <StCopy>Your check and its first fix come with you. Choose the business that owns this work.</StCopy> : null}<BusinessSetupPanel key={`${start.data}:${checkId ?? ""}`} startProduct={start.data} initialRequest={check?.request} initialName={check?.businessName} sourceCheckId={checkId} gettingStarted={businessSignupReleaseEnabled()} /></>}</StPage></StrelvaShell>;
 }

@@ -6,6 +6,7 @@ export const businessEntryInputSchema = z.object({
     z.object({ kind: z.literal("existing"), workspaceId: z.string().uuid() }).strict(),
   ]),
   initialRequest: z.string().trim().min(1).max(3000).nullable(),
+  sourceCheckId: z.string().regex(/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i).optional(),
   idempotencyKey: z.string().uuid(),
 }).strict();
 export const businessEntryResultSchema = z.object({
@@ -14,5 +15,6 @@ export const businessEntryResultSchema = z.object({
   agencyRequired: z.boolean().optional(),
   /** The held request kept on the business (20261024100000), when there was no single agency. */
   heldRequestId: z.string().uuid().nullable().optional(),
+  askConversationId: z.string().uuid().nullable().optional(),
 }).strict();
 export type BusinessEntryInput = z.infer<typeof businessEntryInputSchema>;

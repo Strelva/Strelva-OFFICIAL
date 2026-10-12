@@ -1,3 +1,4 @@
+import { formatVisitorTime } from "./public-admission-time";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /** Inquiry → three open times → a requested booking in the one store.
  * Off by default. A choice is a short-lived bearer link; GET never reserves. */
@@ -113,7 +114,6 @@ export async function chooseInquiryBookingOffer(token: string, start: string): P
   return booking;
 }
 export function bookingOfferEmailOptions(offer: InquiryBookingOffer): Pick<EmailOptions, "rows" | "button"> {
-  const format = new Intl.DateTimeFormat("en-US", { timeZone: offer.timeZone, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-  return { rows: offer.slots.map(s => ({ label: offer.serviceName, value: `${format.format(new Date(s.start))} (${offer.timeZone})` })),
+  return { rows: offer.slots.map(s => ({ label: offer.serviceName, value: formatVisitorTime(s.start, offer.timeZone) })),
     button: { label: "Choose a time to request", url: offer.url } };
 }

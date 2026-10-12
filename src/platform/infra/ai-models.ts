@@ -18,6 +18,16 @@ const PRIMARY_MODEL_ID = "gemini-2.5-flash";
 export interface ModelConfig {
   model: LanguageModel;
   label: string;
+  /**
+   * Only a qualified adapter with an enforced billing ceiling may supply this.
+   * It must reject unsupported modalities/options and bound every billable input,
+   * output (including reasoning), tool and provider-internal request. This is
+   * never derived from our list-price estimate. No production adapter is qualified.
+   */
+  billingCeiling?: {
+    qualification: string;
+    maximumCostUsd: (request: unknown, operation: "generate" | "stream") => string | null;
+  };
 }
 
 export function getPrimaryModel(): ModelConfig {

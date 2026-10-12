@@ -144,10 +144,10 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
           {actionsEnabled && <QueueSourceActions item={item} onResult={onResult} />}
           {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}
           {actionsEnabled && item.kind === "draft_review" && item.move === "strelva" && <div className="mb-3 flex flex-wrap gap-2">
-            {(["approve", "skip", "escalate"] as const).map((action) => <StPill variant="soft" key={action} disabled={pending} onClick={() => start(async () => {
+            {(["escalate"] as const).map((action) => <StPill variant="soft" key={action} disabled={pending} onClick={() => start(async () => {
               const result = await resolveQueueDraftsAction({ keys: [item.key], action });
               onResult(result); router.refresh();
-            })}>{action === "approve" ? "Approve" : action === "skip" ? "Skip" : "Ask the owner"}</StPill>)}
+            })}>Ask the owner</StPill>)}
           </div>}
           <div className="flex flex-wrap gap-1.5">
             <StPill variant="soft" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</StPill>
@@ -271,7 +271,7 @@ export function QueueBoard({ queue, me, actionsEnabled = false }: { queue: Opera
   );
 }
 
-/** Review the actual proposed changes before a per-business bulk approval. */
+/** Review the actual proposed changes before a per-business bulk routing. */
 function BulkDraftReview({ items, onResult }: { items: QueueItem[]; onResult: (result: QueueActionResult) => void }) {
   const drafts = items.filter((item) => item.kind === "draft_review" && item.move === "strelva" && item.review);
   const [open, setOpen] = useState(false);
@@ -287,9 +287,9 @@ function BulkDraftReview({ items, onResult }: { items: QueueItem[]; onResult: (r
         {item.review && <QueueEventDetail event={item.review} />}
       </div>)}
       <StPill variant="soft" busy={pending} disabled={pending || !selected.length} onClick={() => start(async () => {
-        const result = await resolveQueueDraftsAction({ keys: selected, action: "approve" }); onResult(result);
+        const result = await resolveQueueDraftsAction({ keys: selected, action: "escalate" }); onResult(result);
         setSelected((keys) => keys.filter((key) => !result.results.some((row) => row.key === key && row.changed))); router.refresh();
-      })}>Approve {selected.length} reviewed drafts</StPill>
+      })}>Ask the owner to review {selected.length} drafts</StPill>
     </div>}
   </div>;
 }

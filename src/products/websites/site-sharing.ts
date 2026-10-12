@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import { assertWorkspaceMember, getWork, listWorkspaces, createHandoff } from "@/platform/workspaces/repository";
+import { assertWorkspaceWebsiteAccess, assertWorkspaceMember, getWork, listWorkspaces, createHandoff } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 
 const shareSchema = z.object({ version: z.literal(1), workspaceId: z.string().min(1).max(128), workId: z.string().min(1).max(128), revision: z.number().int().positive(), contentHash: z.string().regex(/^[a-f0-9]{64}$/), createdBy: z.string().min(1).max(128), creatorEmail: z.string().email().max(254), recipientEmail: z.string().email().max(254), expiresAt: z.number().int().positive() }).strict();
@@ -32,11 +32,49 @@ export async function assertAgencyWebsite(actor: WorkspaceActor, workId: string)
   if (workspace?.kind !== "agency") throw new WorkspaceAccessError("Only agency-owned websites can be shared or handed off");
   return work;
 }
+/** Business-owned drafts retain their existing provider-seat boundary and owner claim.
+ * This authorizes a private exact-candidate read, never an ownership transfer. */
+export async function readWebsiteSharingContext(actor: WorkspaceActor, workId: string) {
+  const work = await getWork(actor, workId);
+  if (!work || work.productId !== "websites") throw new WorkspaceAccessError();
+  const workspaces = await listWorkspaces(actor);
+  const workspace = workspaces.find(value => value.id === work.workspaceId);
+  if (workspace?.kind === "agency") {
+    await assertAgencyWebsite(actor, workId);
+    return { kind: "agency" as const, workspaceId: work.workspaceId, workId };
+  }
+  if (workspace?.kind !== "customer" || workspace.access !== "provider_seat") throw new WorkspaceAccessError();
+  await assertWorkspaceWebsiteAccess(actor, work.workspaceId);
+  const agencies = workspaces.filter(value => value.kind === "agency" && value.access === "member");
+  const { listAgencyClientAdditions } = await import("@/products/agency-clients/server");
+  const clients = (await Promise.all(agencies.map(value => listAgencyClientAdditions(actor, value.id)))).flat()
+    .filter(value => value.customerWorkspaceId === work.workspaceId && value.seatActive);
+  if (clients.length !== 1) throw new WorkspaceAccessError("The business owner claim could not be confirmed for one current agency.");
+  const client = clients[0]!;
+  return { kind: "customer" as const, workspaceId: work.workspaceId, workId, agencyWorkspaceId: client.agencyWorkspaceId,
+    ownerClaimed: client.ownerClaimed, pendingClaim: client.pendingClaim };
+}
+
+export async function assertWebsiteReviewScope(actor: WorkspaceActor, workId: string, recipientEmail?: string) {
+  const context = await readWebsiteSharingContext(actor, workId);
+  const work = await getWork(actor, workId);
+  if (context.kind === "customer") {
+    const agency = (await listWorkspaces(actor)).find(value => value.id === context.agencyWorkspaceId && value.kind === "agency" && value.access === "member");
+    // A read-only seat cannot expose the client's draft to another account.
+    // Only its creator, currently an agency owner/admin, may issue the exact
+    // review for the saved pending owner claim. Claimed owners use their own workspace.
+    if (!work || work.createdBy !== actor.userId || !agency || !["owner", "admin"].includes(agency.role ?? "")
+      || context.ownerClaimed || !context.pendingClaim || Date.parse(context.pendingClaim.expiresAt) <= Date.now()
+      || recipientEmail?.trim().toLowerCase() !== context.pendingClaim.recipientEmail.trim().toLowerCase()) throw new WorkspaceAccessError("The private review must match this business's current owner claim.");
+  }
+  return work;
+}
+
 export async function authorizeWebsiteShare(actor: WorkspaceActor, share: WebsiteShare) {
   if (actor.verifiedEmail.trim().toLowerCase() !== share.recipientEmail) throw new WorkspaceAccessError();
   // Recheck the creator's present membership and agency ownership on every read.
-  const work = await assertAgencyWebsite({ userId: share.createdBy, verifiedEmail: share.creatorEmail },share.workId);
-  if (work.workspaceId !== share.workspaceId) throw new WorkspaceAccessError();
+  const work = await assertWebsiteReviewScope({ userId: share.createdBy, verifiedEmail: share.creatorEmail },share.workId,share.recipientEmail);
+  if (!work || work.workspaceId !== share.workspaceId) throw new WorkspaceAccessError();
   return work;
 }
 export async function createWebsiteHandoff(actor: WorkspaceActor, workId: string, recipientEmail: string) {

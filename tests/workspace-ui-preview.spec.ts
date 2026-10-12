@@ -110,13 +110,13 @@ test("shared workspace resumes inquiry work inside the one Strelva frame", async
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Inquiry work: Start", exact: true }).click();
   await page.getByRole("button", { name: "Open Buffalo Realty", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What should Strelva handle?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Inquiries" })).toBeVisible();
   await expect(page.getByLabel("Strelva navigation", { exact: true })).toHaveCount(1);
   await expect(page.getByRole("navigation", { name: "Inquiry navigation", exact: true })).toHaveCount(0);
-  await page.getByRole("navigation", { name: "Inquiry work", exact: true }).getByRole("button", { name: "New", exact: true }).click();
-  await page.getByLabel("What should Strelva handle?").fill("Collect quote requests and route them to the recorded inbox.");
+  await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("What should your inquiry form do?").fill("Collect quote requests and route them to the recorded inbox.");
   await page.getByRole("button", { name: "Shape this request" }).click();
-  await expect(page.getByRole("heading", { name: "What this work touches" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What this request touches" })).toBeVisible();
   await expect(page).toHaveURL(/view=inquiries/);
   await expect(page).toHaveURL(/inquiryView=shape/);
   await expect(page).toHaveURL(/inquiryRequest=fixture_request_/);

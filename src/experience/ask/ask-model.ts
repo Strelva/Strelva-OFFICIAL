@@ -1,3 +1,4 @@
+import { actorLabel, recordedActor, type RecordedActor } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 
 /**
@@ -19,6 +20,9 @@ export interface AskReceiptItemView {
   status: "queued" | "drafted" | "opened" | "filed" | "refused" | "failed";
   ids: string[];
   summary: string;
+  actor?: RecordedActor | null;
+  /** Recorded recipient of this Request, never the current viewer’s agency. */
+  agencyName?: string | null;
   needsYou?: { route: string; itemRef: string | null; decideAt: string | null };
 }
 
@@ -28,6 +32,7 @@ export interface AskTurnResult {
   systemId: string | null;
   conversationId: string | null;
   saved: boolean;
+  creationAction?: { kind: "website" | "booking"; label: string; href: string };
 }
 
 export interface AskMessageView {
@@ -56,6 +61,21 @@ function text(value: unknown, max = 600): string {
   return typeof value === "string" ? value.slice(0, max) : "";
 }
 
+/** Only the bounded saved-message continuation can become a creation link. */
+function readCreationAction(raw: unknown): AskTurnResult["creationAction"] {
+  if (!raw || typeof raw !== "object") return undefined;
+  const value = raw as Record<string, unknown>;
+  if ((value.kind !== "website" && value.kind !== "booking") || typeof value.label !== "string" || !value.label.trim() || value.label.length > 120 || typeof value.href !== "string") return undefined;
+  const path = `/workspace/business/new/${value.kind}`;
+  if (!value.href.startsWith(`${path}?`) || value.href.includes("\\") || /[\s#]/.test(value.href)) return undefined;
+  const url = new URL(value.href, "https://strelva.invalid");
+  if (url.pathname !== path) return undefined;
+  const keys = ["workspaceId", "conversationId", "messageId"];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if ([...url.searchParams.keys()].some(key => !keys.includes(key)) || keys.some(key => url.searchParams.getAll(key).length !== 1 || !uuid.test(url.searchParams.get(key) ?? ""))) return undefined;
+  return { kind: value.kind, label: value.label.trim(), href: value.href };
+}
+
 /** Reads the `ask` block of a streamed result, or a stored message's result. Anything malformed reads as no result. */
 export function readAskResult(raw: unknown): AskTurnResult | null {
   if (!raw || typeof raw !== "object") return null;
@@ -74,15 +94,19 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
       status: entry.status as AskReceiptItemView["status"],
       ids: Array.isArray(entry.ids) ? entry.ids.filter((id): id is string => typeof id === "string").slice(0, 10) : [],
       summary: text(entry.summary, 300),
+      actor: recordedActor(entry.actor),
+      agencyName: text(entry.agencyName, 120).trim() || null,
       ...(needs ? { needsYou: { route: text(needs.route, 40), itemRef: typeof needs.itemRef === "string" ? needs.itemRef : null, decideAt: typeof needs.decideAt === "string" ? needs.decideAt : null } } : {}),
     }];
   }).slice(0, 20) : [];
+  const creationAction = readCreationAction(value.creationAction);
   return {
     kind: kind as AskResultKind,
     items,
     systemId: typeof value.systemId === "string" ? value.systemId : null,
     conversationId: typeof value.conversationId === "string" ? value.conversationId : null,
     saved: value.saved === true,
+    ...(creationAction ? { creationAction } : {}),
   };
 }
 
@@ -128,7 +152,7 @@ export function receiptLines(result: AskTurnResult): ReceiptLine[] {
     if (item.kind === "possibility") {
       return [{ key, tone: "done", text: `Opened a Possibility: ${item.summary || "an alternative"}. Nothing live changed. Make real is a separate step.`, ref }];
     }
-    return [{ key, tone: "done", text: `Filed for Strelva: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.`, ref }];
+    return [{ key, tone: "done", text: `Request filed${item.agencyName ? ` for ${item.agencyName}` : ""}: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.${item.actor ? ` Filed by ${actorLabel(item.actor)}.` : ""}`, ref }];
   });
 }
 

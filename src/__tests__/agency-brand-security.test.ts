@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: [], ownerAuthorship: "agency", businessName: "Fixture business", replyTo: "owner@example.test", timeZone: "America/New_York" }) }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), tenant: vi.fn(), send: vi.fn(), from: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mock.rpc, from: mock.from }) }));
@@ -91,7 +92,7 @@ describe("agency brand review regressions", () => {
     mock.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? profile : { ...row, replyTo: null }, error: null }));
     await sendEmailWithReceipt({ ...message, replyTo: "owner@example.test" });
     expect(payload().replyTo).toBe("hello@strelva.com");
-    expect(await agencyReplyTo(agency)).toBe("hello@strelva.com");
+    await expect(agencyReplyTo(agency)).rejects.toMatchObject({ status: 503 });
   });
   it.each(["missing column", "thrown lookup"])("falls back across owner, tenant, prospect and send on %s", async failure => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -103,8 +104,8 @@ describe("agency brand review regressions", () => {
     mock.tenant.mockResolvedValue(id);
     expect(await resolveOwnerBrand(id)).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
     expect(await resolveTenantBrand("tenant")).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
-    expect(await resolveAgencyAttribution("north")).toMatchObject({ name: "Agency identity unavailable" });
-    expect(await agencyReplyTo(agency)).toBe("hello@strelva.com");
+    await expect(resolveAgencyAttribution("north")).rejects.toMatchObject({ status: 503 });
+    await expect(agencyReplyTo(agency)).rejects.toMatchObject({ status: 503 });
     await expect(sendEmailWithReceipt(message)).resolves.toMatchObject({ status: "suppressed", reason: "agency_identity_unavailable" });
     expect(mock.send).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalled(); warn.mockRestore();

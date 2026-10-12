@@ -111,7 +111,7 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     for (const [id, value] of Object.entries(edits)) { document.nodes[id]!.props = object(value.props) as CatalogNode["props"]; document.nodes[id]!.children = value.children; }
     if (!siteDocumentSchema.safeParse(document).success) { setError("The section settings do not match this website component. Correct the settings before saving."); return; }
     setSaving(true); setError(""); setSaved("");
-    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSaved(`Saved draft revision ${result.website.rebuild.candidate?.revision}. The client can now review it.`); }
+    try { const result = await transport.save(bindingId, website, state!.section!, ops); setState(current => current ? { ...current, ...result } : current); setEdits({}); setSaved(`Saved draft Release ${result.website.rebuild.candidate?.revision}. The client can now review it.`); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "The draft could not be saved. Your edits are preserved."); if (cause instanceof AgencyDocumentTransportError && cause.requiresPermissionReload) setPermissionChecked(false); }
     finally { setSaving(false); }
   }
@@ -123,7 +123,7 @@ export function AgencyWebsiteDocumentDraftExperience({ bindingId, transport = ag
     {!loading && state && !state.grant ? <StEmpty>The client needs to enable draft editing before you can update this website.</StEmpty> : null}
     {!loading && state?.grant && !active ? <StNotice tone="need">This draft permission is {!permissionChecked ? "unconfirmed" : state.grant.status === "revoked" ? "revoked" : "expired"}. Saving is unavailable. Website history stays with the client.</StNotice> : null}
     {!loading && candidate && state?.grant && active ? <div className="grid min-w-0 gap-8 lg:grid-cols-2">
-      <StSection title={website!.rebuild.title}><p className="m-0 text-sm text-gray-muted"><StMono>Revision {candidate.revision}</StMono> · Permission: {state.section} · Expires {new Date(state.grant.expiresAt).toLocaleString()}</p>
+      <StSection title={website!.rebuild.title}><p className="m-0 text-sm text-gray-muted"><StMono>Release {candidate.revision}</StMono> · Permission: {state.section} · Expires {new Date(state.grant.expiresAt).toLocaleString()}</p>
         {state.sections.length > 1 ? <SelectInput label="Assigned section" value={state.section ?? ""} options={state.sections.map(value => ({ value, label: value }))} onChange={event => setScope(event.target.value)} disabled={saving || Object.keys(edits).length > 0} helperText={Object.keys(edits).length > 0 ? "Save or reload your edits before changing the assigned section." : undefined} /> : null}
         {node && edit ? <><SelectInput label="Section to edit" value={node.id} onChange={event => setSelected(event.target.value)} options={nodes.map(item => ({ value: item.id, label: `${item.type} · ${"title" in item.props && typeof item.props.title === "string" ? item.props.title : item.id}` }))} disabled={saving} />
           {Object.entries(props ?? {}).filter(([,value]) => typeof value === "string").map(([key,value]) => <TextArea key={key} label={key.replace(/([A-Z])/g, " $1").replace(/^./, character => character.toUpperCase())} value={String(value)} rows={key === "body" || key === "text" ? 4 : 2} onChange={event => field(key, event.target.value)} disabled={saving} />)}

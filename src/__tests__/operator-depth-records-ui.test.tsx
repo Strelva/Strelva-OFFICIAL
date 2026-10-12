@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DraftChangePreview } from "@/app/admin/drafts/DraftChangePreview";
 import { DraftActions } from "@/app/admin/drafts/DraftActions";
 import { LeadRows } from "@/app/admin/leads/LeadRows";
+import { LeadsView } from "@/app/admin/leads/LeadsView";
 import { RetryRevalidationButton } from "@/app/admin/ops/RetryRevalidationButton";
 import { OpsView } from "@/app/admin/ops/OpsView";
 import type { DeliveryLead } from "@/lib/access-request-delivery";
@@ -21,13 +22,21 @@ async function click(label: string) { const button = [...container.querySelector
 const lead: DeliveryLead = { businessName: "Test business", email: "owner@example.test", statusToken: "test-token", deliveryStatus: "received", submittedAt: "2026-10-01T12:00:00Z", statusUpdatedAt: "2026-10-01T12:00:00Z" };
 
 describe("paper operator records", () => {
-  it("shows the complete field diff and keeps rejection behind the existing second click", async () => {
-    const request = vi.fn().mockResolvedValue(Response.json({ success: true })); vi.stubGlobal("fetch", request);
+  it("keeps the admin lead list read-only and explains the ordinary agency home", () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
+    act(() => root.render(createElement(LeadsView, { leads: [lead], initialWorkflow: {} })));
+    expect(container.textContent).toContain("Strelva Agency manages its leads in its workspace");
+    expect(container.querySelector("select:not(:disabled),textarea:not(:disabled)")).toBeNull();
+    expect([...container.querySelectorAll("button:not(:disabled)")].some(button => /Convert|Dismiss|Save note/.test(button.textContent || ""))).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+  });
+  it("shows complete field differences without any operator decision controls", () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
     act(() => root.render(createElement(DraftActions, { tenant: "test", section: "hero", preview: { type: "content_update", metadata: { diffs: [{ field: "Headline", type: "changed", before: "Old title", after: "New title" }] } } })));
     expect(container.textContent).toContain("Old title"); expect(container.textContent).toContain("New title");
-    await click("Reject"); expect(request).not.toHaveBeenCalled(); await click("Confirm reject?");
-    expect(request).toHaveBeenCalledWith("/api/admin/drafts", expect.objectContaining({ method: "POST", body: JSON.stringify({ tenant: "test", section: "hero", action: "reject" }) }));
-    expect(navigation.refresh).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("button")).toBeNull();
+    expect(container.querySelector('a[href="/workspace"]')?.textContent).toBe("Open business workspace");
+    expect(request).not.toHaveBeenCalled();
   });
   it("keeps the exact Google draft destination and formats proposed hours without inventing prior hours", () => {
     act(() => root.render(createElement(DraftChangePreview, {event:{type:"content_update",metadata:{kind:"gbp_post_draft",summary:"A proposed post",ctaUrl:"https://example.test/contact"}}})));
@@ -37,23 +46,19 @@ describe("paper operator records", () => {
     act(() => root.render(createElement(DraftChangePreview, {event:{type:"unrelated",metadata:{kind:"gbp_post_draft",summary:"Do not approve this"}}})));
     expect(container.textContent).toBe("");
   });
-  it("keeps an approval refusal visible without claiming the draft changed", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Operator access required" }, { status: 403 })));
+  it("explains that inspection grants no content authority", () => {
     act(() => root.render(createElement(DraftActions, { tenant: "test", section: "hero" })));
-    await click("Approve"); expect(container.querySelector('[role="alert"]')?.textContent).toContain("Operator access required"); expect(navigation.refresh).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Platform support cannot approve or reject client content");
+    expect(navigation.refresh).not.toHaveBeenCalled();
   });
-  it("keeps leads in place when conversion admission fails", async () => {
-    const request = vi.fn().mockResolvedValue(Response.json({ error: "Denied" }, { status: 403 })); vi.stubGlobal("fetch", request);
+  it("keeps legacy sales and delivery records read-only by default", async () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
     act(() => root.render(createElement(LeadRows, { leads: [lead], initialWorkflow: {} })));
-    await click("Convert"); expect(navigation.push).not.toHaveBeenCalled(); expect(container.querySelector('[role="alert"]')?.textContent).toContain("Couldn't update that lead");
-    expect(request).toHaveBeenCalledWith("/api/admin/leads/test-token/workflow", expect.objectContaining({ body: JSON.stringify({ status: "converting" }) }));
-  });
-  it("restores the existing client stage after a failed optimistic change", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({}, { status: 500 })));
-    act(() => root.render(createElement(LeadRows, { leads: [lead], initialWorkflow: {} })));
-    const select = container.querySelector("select")!;
-    await act(async () => { select.value = "drafting"; select.dispatchEvent(new Event("change", { bubbles: true })); });
-    expect(select.value).toBe("received"); expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    const convert = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Convert")!;
+    expect(convert.disabled).toBe(true);
+    expect(container.querySelector<HTMLSelectElement>("select")?.disabled).toBe(true);
+    await click("Convert");
+    expect(navigation.push).not.toHaveBeenCalled(); expect(request).not.toHaveBeenCalled();
   });
   it("requires confirmation for a revalidation retry and retains provider errors", async () => {
     const request = vi.fn().mockResolvedValue(Response.json({ error: "Denied" }, { status: 403 })); vi.stubGlobal("fetch", request);

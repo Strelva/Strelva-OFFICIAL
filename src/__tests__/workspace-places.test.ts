@@ -36,12 +36,12 @@ describe("workspace places", () => {
     expect(sectionTitle("home")).toBe("Home");
     expect(sectionTitle("requests")).toBe("Requests");
     expect(sectionTitle("ongoing")).toBe("Running");
-    // The legacy app address uses the same Internal tools kind name.
-    expect(sectionTitle("work")).toBe("Internal tools");
-    expect(sectionTitle("products")).toBe("Internal tools");
-    expect(sectionTitle("apps", true)).toBe("Systems");
-    expect(sectionTitle("work", true)).toBe("Systems");
-    expect(sectionTitle("products", true)).toBe("Systems");
+    // The legacy list addresses share the same flag-dependent list label.
+    expect(sectionTitle("work")).toBe("Files and results");
+    expect(sectionTitle("products")).toBe("Files and results");
+    expect(sectionTitle("apps", true)).toBe("All systems and files");
+    expect(sectionTitle("work", true)).toBe("All systems and files");
+    expect(sectionTitle("products", true)).toBe("All systems and files");
     expect(sectionTitle("settings")).toBe("Business details");
     expect(sectionTitle("access")).toBe("People & access");
   });

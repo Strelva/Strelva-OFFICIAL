@@ -29,7 +29,7 @@ import { deliverySourceAdapters } from "@/server/needs-you/sources/live-delivery
 import { productSourceAdapters } from "@/server/needs-you/sources/live-products";
 import { businessFactsAdapter, createBusinessFactReviewStore, type BusinessFactsPorts } from "@/platform/needs-you/sources/business-facts";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
-import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
+import { decideScopedAgencyBookingRequest, decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
 import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-payment";
@@ -108,6 +108,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         // Nothing to read until the store receives writes (and its migration exists).
         requests: async (workspaceId) => (bookingStoreWriteEnabled() ? readWorkspaceBookingRequests(workspaceId) : []),
         decide: (workspaceId, bookingId, decision, actor) => decideBookingRequest(workspaceId, bookingId, decision, actor),
+        decideAgency: (workspaceId, bookingId, decision, decisionId) => decideScopedAgencyBookingRequest(workspaceId, bookingId, decision, decisionId),
         // Why a request stopped waiting (its own 72-hour clock, a cancel) for the closed item.
         booking: (workspaceId, bookingId) => readWorkspaceBooking(workspaceId, bookingId),
         afterDecision: async (booking) => {

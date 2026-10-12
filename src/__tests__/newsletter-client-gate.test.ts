@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: [], ownerAuthorship: "agency", businessName: "Fixture business", replyTo: "owner@example.test", timeZone: "America/New_York" }) }));
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const provider = vi.hoisted(() => vi.fn());
 const override = vi.hoisted(() => vi.fn());
@@ -27,7 +28,7 @@ it("still requires the independent customer consent gate for an armed tenant", a
   expect(await sendBatchWithReceipt(input)).toMatchObject({ status: "suppressed", reason: "not sent: gated" }); expect(provider).not.toHaveBeenCalled();
 });
 it("rechecks a client gate flipped after preflight", async () => {
-  override.mockResolvedValueOnce("on").mockResolvedValueOnce("off"); expect(await batchEmailSuppression(input)).toBeNull();
+  override.mockResolvedValueOnce("on").mockResolvedValueOnce("on").mockResolvedValueOnce("on").mockResolvedValueOnce("on").mockResolvedValueOnce("off"); expect(await batchEmailSuppression(input)).toBeNull();
   expect(await sendBatchWithReceipt(input)).toMatchObject({ status: "suppressed", reason: "not sent: gated" }); expect(provider).not.toHaveBeenCalled();
 });
 it("does not fabricate acceptance when provider ids are missing", async () => {

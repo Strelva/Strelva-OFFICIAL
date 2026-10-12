@@ -57,7 +57,7 @@ it("assigns one member through the bulk RPC contract and refreshes confirmed sta
 });
 it("sends one bulk mutation for the selected people and clients", async () => {
   const { node, request } = await render();
-  const bulk = node.querySelector("details")!;
+  const bulk = [...node.querySelectorAll("details")].find(item => item.querySelector("summary")?.textContent === "Assign several people or clients")!;
   const boxes = bulk.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
   await click(boxes[1]!); await click(boxes[3]!); await click(boxes[4]!);
   await click(button(node, "Assign selected"));
@@ -71,13 +71,15 @@ it("requires explicit removal confirmation and removes the person after success"
   await click(button(node, "Remove staff"));
   const confirmation = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Confirm removal"))!;
   await click(confirmation); expect(writes(request)).toHaveLength(0);
-  await act(async () => confirmation.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+  const reviewed = node.querySelector<HTMLButtonElement>('button[aria-label="Confirm: Confirm removal"]')!;
+  expect(reviewed).not.toBeNull();
+  await click(reviewed);
   expect(writes(request)[0]).toEqual({ action: "remove", workspaceId: TEAM_AGENCY, userId: TEAM_STAFF });
   expect(node.textContent).not.toContain("sam@agency.example.test");
 });
 it("requires reload after an unconfirmed write and suppresses repeat mutations", async () => {
   const { node, request } = await render("action-error");
-  const bulk = node.querySelector("details")!; const boxes = bulk.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+  const bulk = [...node.querySelectorAll("details")].find(item => item.querySelector("summary")?.textContent === "Assign several people or clients")!; const boxes = bulk.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
   await click(boxes[1]!); await click(boxes[3]!); await click(button(node, "Assign selected"));
   expect(node.querySelector('[role="alert"]')?.textContent).toContain("Reload before making another change");
   expect(button(node, "Assign selected").disabled).toBe(true);

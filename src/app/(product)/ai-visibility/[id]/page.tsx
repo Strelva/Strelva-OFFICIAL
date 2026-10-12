@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
-import { AiVisibilityPage } from "@/products/ai-visibility";
+import { notFound, redirect } from "next/navigation";
+import { businessCheckHref } from "@/products/website-audit/client";
 import { getAiVisibilityResult, recordAiVisibilityResultView } from "@/products/ai-visibility/server";
-import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> },
@@ -22,11 +21,11 @@ export async function generateMetadata(
 }
 
 export default async function SharedAiVisibilityPage(
-  { params }: { params: Promise<{ id: string }> },
+  { params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> },
 ) {
   const { id } = await params;
   const stored = await getAiVisibilityResult(id);
   if (!stored) notFound();
   await recordAiVisibilityResultView(id).catch(() => {});
-  return <AiVisibilityPage initialResult={stored.result} agency={stored.result.agency} scanId={id} workspaceEnabled={workspaceReleaseEnabled()} />;
+  redirect(businessCheckHref({ ...await searchParams, scan: id }));
 }

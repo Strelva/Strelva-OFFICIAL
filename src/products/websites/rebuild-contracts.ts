@@ -2,6 +2,7 @@ import { z } from "zod";
 import { siteDocumentSchema } from "./site-document-schema";
 import { websiteLaunchReceiptSchema, websiteCapabilitySelectionSchema } from "./contracts";
 import { rebuildAuditSchema, rebuildAuditSnapshotSchema } from "./rebuild-audit-contracts";
+import { recordedActorSchema } from "@/platform/workspaces/types";
 
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const instant = z.string().datetime({ offset: true });
@@ -34,6 +35,8 @@ export const websiteRebuildSchema = z.object({
   candidate: z.object({ revision: z.number().int().positive(), contentHash: hash, document: siteDocumentSchema, previewHref: z.string().startsWith("/api/websites/") }).strict().nullable(),
   approvedCandidateRevision: z.number().int().positive().nullable(), tenantId: z.string().regex(/^[a-z0-9-]+$/).nullable(),
   publishedCapabilitySelection: websiteCapabilitySelectionSchema.optional(),
+  /** Scoped page author, captured by the native submission transaction. */
+  agencyPageOrigin: recordedActorSchema.optional(),
   launch: z.object({ receipt: websiteLaunchReceiptSchema.nullable(), readBack: z.object({ status: z.enum(["verified", "failed", "pending"]), checkedAt: instant, message: z.string().max(1000) }).strict().nullable() }).strict(),
   lastError: z.string().max(1000).nullable(), createdBy: z.string().min(1), createdAt: instant,
   history: z.array(z.object({ revision: z.number().int().positive(), kind: z.string().min(1).max(80), actorId: z.string().min(1), at: instant }).strict()).max(500),

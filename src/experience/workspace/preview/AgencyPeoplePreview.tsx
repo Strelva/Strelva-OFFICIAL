@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PREVIEW_NORTH_BRAND } from "./chrome-fixture";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StComposerBar, StComposerDock, StHead, StNotice, StPage, StPill, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
 import { AgencyTeamPreview } from "../agency/AgencyTeamPreview";
@@ -22,10 +23,10 @@ export function AgencyPeoplePreview({ surface, state, role = "agency", mode = "l
   }, [state]);
   const effects: AgencyEffectState[] = ["publish", "google", "email", "payments"].map(effect => ({ effect: effect as AgencyEffectState["effect"], verified: state === "verified" || (state === "partial" && effect === "publish"), recordedAt: null }));
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
-    <StrelvaShell title="North Studio" context={<span>North Studio</span>} accountName="You" accountDetail="Agency owner" systemsReleased agencyNavigation={{ active: surface === "team" ? "team" : "clients", hrefs: { clients: "/preview/strelva?scenario=agency", queue: "/preview/strelva?scenario=agency&agencyView=queue", library: "/preview/strelva?scenario=agency&agencyView=library", team: "/preview/strelva/agency-people?surface=team" } }}>
+    <StrelvaShell ownerBrand={PREVIEW_NORTH_BRAND} workspaceName="North Studio" title="North Studio" accountName="You" accountDetail="Agency owner" systemsReleased agencyNavigation={{ active: surface === "team" ? "team" : "clients", hrefs: { clients: "/preview/strelva?scenario=agency", queue: "/preview/strelva?scenario=agency&agencyView=queue", library: "/preview/strelva?scenario=agency&agencyView=library", team: "/preview/strelva/agency-people?surface=team" } }}>
       <StPage>
-        {surface === "team" ? <><StHead title="Team" meta="People at North Studio. Each client still approves what goes live." /><AgencyTeamPreview state={state} /></> : null}
-        {surface === "verification" ? state === "loading" ? <><StHead title="Verification" /><StSkeleton label="Loading verification" /></> : state === "error" || state === "permission" ? <><StHead title="Verification" /><StNotice tone="critical">{state === "permission" ? "This agency’s verification is not available to your account." : "Verification could not be loaded. Outside changes stay locked."}</StNotice></> : <AgencyVerification onboarding={{ agency: { id: "22222222-2222-4222-8222-222222222222", name: "North Studio", role: "owner" }, effects: state === "empty" ? [] : effects }} /> : null}
+        {surface === "team" ? <><StHead title="Team" meta="Invite a teammate and assign their clients." /><AgencyTeamPreview state={state} /></> : null}
+        {surface === "verification" ? state === "loading" ? <><StHead title="Verification" /><StSkeleton label="Loading verification" /></> : state === "error" || state === "permission" ? <><StHead title="Verification" /><StNotice tone="critical">{state === "permission" ? "This agency’s verification is not available to your account." : "Verification could not be loaded. Outside changes stay locked."}</StNotice></> : <AgencyVerification fictionalQualification={{ workspaceId: "22222222-2222-4222-8222-222222222222", canSubmit: true, submissions: [], effects: effects.map(item => ({ effect: item.effect, available: item.verified })) }} onboarding={{ agency: { id: "22222222-2222-4222-8222-222222222222", name: "North Studio", role: "owner" }, effects: state === "empty" ? [] : effects }} /> : null}
         {surface === "handoff" ? <>
           <StHead crumb={{ label: "Clients", href: "/preview/strelva?scenario=agency" }} title="Fieldwork Studio is moving to Pine & Co." meta="Jo decided on Oct 8 · takes effect Oct 22 · you don’t need to approve" beacon="draft" />
           {!['loading', 'empty', 'error', 'permission'].includes(state) ? <>
@@ -33,11 +34,11 @@ export function AgencyPeoplePreview({ surface, state, role = "agency", mode = "l
               <StSection title="Goes with Fieldwork"><StRows>
                 <StRow title="Every System, keeps running as it is today" />
                 <StRow title="All history and receipts, including your work" />
-                <StRow title="Their Version of Intake form, frozen at r6" />
+                <StRow title="Their Version of Intake form, frozen at Release 6" />
               </StRows></StSection>
               <StSection title="Stays with North Studio"><StRows>
                 <StRow title="Intake form as a source in your Library" />
-                <StRow title="Credit for r1–r6, shown to Pine & Co." />
+                <StRow title="Credit for Release 1–Release 6, shown to Pine & Co." />
                 <StRow title="Your minutes and notes on Fieldwork" />
               </StRows></StSection>
             </div>

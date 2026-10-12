@@ -211,8 +211,10 @@ describe.runIf(Boolean(PSQL))("Library and Review all on local PostgreSQL", () =
     expect(harbor.baselineRevision).toBe(2);
     expect(harbor.currentRelease).toBeNull();
     expect((await versions.readVersion(owners[2]!, ids[2]!)).baselineRevision).toBe(1);
-    // A stale revision is refused as a whole.
-    await expect(reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids }, h.db!)).rejects.toThrow(/newer revision/);
+    // A stale release never moves a Version backwards: clients already past it are skipped.
+    const stale = await reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids.slice(0, 2) }, h.db!, async () => { throw new Error("must not prepare"); });
+    expect(stale.results.map((item) => item.outcome)).toEqual(["skipped_up_to_date", "skipped_up_to_date"]);
+    expect((await versions.readVersion(owners[0]!, ids[0]!)).baselineRevision).toBe(2);
     // Someone outside the agency reads nothing.
     await expect(readAgencyLibrary({ userId: owners[0]!.userId, verifiedEmail: owners[0]!.verifiedEmail! }, agency, h.db!)).rejects.toBeInstanceOf(VersionAccessError);
   }, 30_000);

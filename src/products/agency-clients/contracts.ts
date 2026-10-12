@@ -18,6 +18,8 @@ export const addAgencyClientInputSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   url: z.string().trim().min(4).max(2048).optional(),
   prospectId: uuid.optional(),
+  /** Agency-owned intake identity; the server checks access before creating a business. */
+  leadToken: z.string().regex(/^[a-f0-9]{36}$/).optional(),
   /** Where the owner claim link is addressed. Nothing is sent to it. */
   ownerEmail: email.optional(),
   idempotencyKey: uuid,
@@ -37,7 +39,9 @@ export const addAgencyClientInputSchema = z.object({
       ref: z.string().trim().min(1).max(200).regex(/^\S+$/),
     }).strict().optional(),
   }).strict().optional(),
-}).strict().refine((input) => input.url || input.prospectId || input.name, "Enter the business's website, or choose a prospect.");
+}).strict().refine((input) => input.url || input.prospectId || input.name, "Enter the business's website, or choose a prospect.")
+  .refine((input) => !input.leadToken || !input.prospectId, "Choose either an agency lead or a prospect.")
+  .refine((input) => !input.leadToken || Boolean(input.name), "Enter the lead's business name before adding the client.");
 export type AddAgencyClientInput = z.infer<typeof addAgencyClientInputSchema>;
 
 export const issueOwnerClaimInputSchema = z.object({
@@ -141,6 +145,8 @@ export interface AddAgencyClientResult {
   aiCheck: ClientAiCheck;
   /** Only behind the claim review release: what was staged for the owner. */
   found?: ClientFoundFacts;
+  /** Business creation and marking its source lead converted have separate receipts. */
+  leadConversion?: { status: "converted" | "unconfirmed"; message?: string };
 }
 
 /** What an add staged for the owner's claim, and the areas the agency may Prepare until then. */

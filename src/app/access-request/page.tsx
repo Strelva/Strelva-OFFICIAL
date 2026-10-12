@@ -5,9 +5,9 @@ import { CHECK_RESULT_ID } from "@/products/getting-started/contracts";
 import { gettingStarted } from "@/products/getting-started/server";
 
 export const metadata: Metadata = {
-  title: "Request your build",
+  title: "Open your account or choose an agency",
   description:
-    "Strelva Agency builds your site, manages it for you, and sends a weekly plain-English recap. You own everything. Runs on Strelva.",
+    "Open your business or agency account on Strelva, or choose an agency to do the work.",
 };
 
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {

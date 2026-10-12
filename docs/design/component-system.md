@@ -35,8 +35,27 @@ Strelva on phone use the shared names registry. Possibility remains a working
 alternative, never a bare suggestion or research Proposal. Library and Apps
 share qualified reusable definitions without client data or grants;
 starters and managed services remain separately identified.
+
+October 12 approval copy uses **Make it live**, or **Hold to make it live** for
+press-and-hold controls. **Make real** stays the concept name, never a button.
+Private preview approval and launch preparation remain distinct actions where
+they do not publish. A numbered revision reads **Release 12** on both sides;
+local work reads **Release 12 + 1 local change**, and a draft **Release 13 draft**.
+The usage column is **Time this month**. [GLOSSARY.md](../../GLOSSARY.md) owns
+these terms. Systems, Version improvements, website publication, the kit
+specimen and the website/Possibility previews adopt these labels without
+changing commands or authority. Source and DOM checks are local; the October 12
+audit brief prohibits browser/build runs until the lanes merge.
 `pnpm check:words` is required by ADR 0014; this amendment makes no claim that
 it or the rendered coherence changes have passed in this worktree.
+
+October 12 follow-up: Agency Clients and Queue consume the Library's exact
+qualified Version comparison. Counts read **improvements to review** because
+conflicts and missing accounts still require work; Queue names those states
+and links to the client's exact System. Declined, adopted and unqualified
+releases are absent. Failed comparisons preserve known offers and display
+**Improvements unavailable** alongside an incomplete Queue. Source/unit proof
+is separate from the still-pending desktop/mobile rendered acceptance.
 
 ## Strelva 1.0 kit, October 9, 2026 (local)
 
@@ -47,6 +66,20 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
 `StComposerBar`, `StComposerDock`, `StSplit`, `StField`, `StEntry`.
+
+October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/components/ui/strelva/ChoiceCards.tsx):
+full-card account choices use native radio semantics, a shared group name, visible
+focus and kit-selected marks; route-backed choices use the same card with
+`aria-current`. The input remains accessible without the browser's blue radio.
+The local entry preview and live sign-up use these cards; account choices
+preserve their release gating and bounded return destination. [WorkspaceSurfaceShell](../../src/experience/workspace/WorkspaceSurfaceShell.tsx)
+keeps native bookings, site pages, invitations and Version review branches in
+the common workspace frame. Website publishing uses kit fields, open entry rows
+and a single standalone title; customer relationships retain their distinct job
+in open kit rows. The inquiry experience retains its state machine and history
+rail while adopting paper tokens, kit controls and shared sidebar geometry.
+Local unit checks cover these contracts; rendered desktop/mobile proof remains
+pending under the October 12 disk constraint. See the audit legacy handoff.
 L6 adds native labeled fields (44px minimum), a responsive object/consequence
 split within the calm column, and the 400px sign-in entry column (`width="account"` gives the personal account
 a wider column with the same brand/help header). `StRow.value`
@@ -58,6 +91,42 @@ with its explanation, and `StNotice.id` lets a field's `aria-describedby` name t
 alert itself. These additions are presentation only and preserve native
 form semantics. Rules and adoption lanes:
 `StComposerBar`, `StComposerDock`.
+
+October 12 Ask-lane amendment: `StComposerDock` reserves the complete rendered
+composer and bottom-navigation inset in flow; place it after the work in its
+scroll owner, outside fixed wrappers. The leftovers amendment measures the dock's
+border box with ResizeObserver and reserves that height on the nearest actual
+scroll owner, with matching focus-scroll padding. Its negative bottom margin
+transfers the dock's flow footprint to that padding once. Shared shell phone
+tokens include the 64px navigation bar and the safe-area inset; pages without a
+dock retain navigation clearance. `data-workspace-scroll` explicitly identifies
+nested workspace and conversation scrollers. Composer-bearing AppFrame pages remain
+scrollable; the linen frame also scrolls long receipts and pages without a dock.
+Kit pages cannot shrink into the dock. `StComposerBar` Send is
+44×44 on coarse pointers. Ask history composes
+the kit text trigger and shared GooeyDisclosure with unique controls, inert
+closed content and reduced motion. The website creation link retains only a
+validated saved-message continuation, including historical answers; its destination
+rechecks current authority. `StHead as="h2"|"h3"` lets embedded panels preserve
+heading order without adding another H1. Website frames use their parent's bounded
+flex space; native bookings and website panels leave the main landmark to the shell.
+Week groups retain spacing and one shared row hairline. Local source/DOM tests pass;
+post-merge desktop/phone visual qualification is pending.
+
+October 12 leftovers: standalone `InquiryExperience` consumes `StrelvaShell`
+for the same workspace header, navigation, brand and bottom account as owner
+pages. Inquiries is the active pinned item; inquiry-specific New, Search,
+Businesses, Recent changes and local Account links remain in-page. Optional
+authorized `business.workspaceId` keeps sidebar links in the displayed business;
+the server's `releases.systems` presentation flag retains its existing scope and
+default, including false on a failed flag read. Optional
+`rightRailId`/`rightRailTitle` preserve the record-history rail's name while
+retaining the shared shell's existing discussion defaults. Visitor booking
+instants and readable email times name the zone once (for example, Eastern Time),
+including client-form ranges. Visitor confirmation/selection deadlines use a
+separate `.deadline` block with 16px vertical spacing. Source and DOM tests are
+local evidence; fresh desktop/phone rendering is deferred under the audit brief's
+dev/build/Playwright prohibition.
 
 L11 keeps the trusted business's display font on `StEntry`'s brand with
 optional `brandFontFamily`; form text retains workspace typography. Missing
@@ -91,6 +160,14 @@ hint, so publication controls retain one stable accessible name. External
 `StTextButton` links retain their `target` and `rel` attributes. A hold cancels
 on disabled access or focus loss; its shortcut cancels an in-flight hold and
 ignores key repeat. Bounded DOM tests cover these acceptance/focus contracts.
+
+October 12 trust-ui adds click and assistive activation to `StHold`: a plain
+click opens an explicit confirmation with Cancel, using the current acceptance
+callback and the same disabled gate. Completed holds consume their follow-up
+click once. Reduced motion keeps the 800ms hold and shows a static active fill.
+Local DOM checks cover click, cancellation, revoked access, completed holds and
+keyboard acceptance; rendered desktop/mobile and assistive-device proof remains
+pending the post-merge pass (the audit brief prohibits local app/Playwright runs).
 
 The L2 website lane recomposes the website System iframe, request/rebuild review,
 retained draft history, connected-site verification and visitor-form controls on
@@ -977,7 +1054,7 @@ fixtures live at `/preview/strelva/publishing`; these do not prove provider writ
 | Card | [Card.tsx](../../src/components/ui/Card.tsx) | Default solid surface; padding none/sm/md/lg. md is 24 px padding/radius; sm is 16/16; lg is 32/24. `interactive` changes hover styling only, not semantics. |
 | Toggle | [Toggle.tsx](../../src/components/ui/Toggle.tsx) | Controlled checked/onChange, required accessible label, optional disabled, 44 px minimum hit height. |
 | Agency client and Queue rows | [AgencyViews.tsx](../../src/experience/workspace/agency/AgencyViews.tsx) | Existing row controls and tokens; released operator overview adds a separate health label beside lifecycle, scoped links into the client's System, and a named incomplete-source alert. Missing or stale health says Not verified. The old overview remains when the operator release flag is off. |
-| Version Possibilities | [SystemVersionImprovements.tsx](../../src/experience/systems/SystemVersionImprovements.tsx), [SystemPage.tsx](../../src/experience/systems/SystemPage.tsx) | Version improvements and unreleased alternatives share the existing Possibilities panel. Native disclosure compares current and alternative definitions; closed native app candidates reuse ApplicationDraftPreview with isolated test records. Conflicts show both values, and shared fields/buttons prepare a draft. Make real approves the existing exact `version_release` Needs you item; only the business owner can decide. Row revision pins invalidate edited candidates. Failed, foreign, stale and uncertain acknowledgments stay visible, and retries retain the same decision command. Local DOM tests cover these states. After the collaborative host disconnected, the existing headless Playwright runner verified 1280px/390px preparation and same-decision Make real, isolated native-app submission, keyboard focus, no page overflow, and mobile loading/error/empty/read-only/missing-account fixtures. These are fictional local records; no authenticated provider or production proof. |
+| Version Possibilities | [SystemVersionImprovements.tsx](../../src/experience/systems/SystemVersionImprovements.tsx), [SystemPage.tsx](../../src/experience/systems/SystemPage.tsx) | Version improvements and unreleased alternatives share the existing Possibilities panel. Native disclosure compares current and alternative definitions; closed native app candidates reuse ApplicationDraftPreview with isolated test records. Conflicts show both values, and shared fields/buttons prepare a draft. The Make it live button approves the existing exact `version_release` Needs you item; only the business owner can decide. Row revision pins invalidate edited candidates. Failed, foreign, stale and uncertain acknowledgments stay visible, and retries retain the same decision command. Local DOM tests cover these states. After the collaborative host disconnected, the existing headless Playwright runner verified 1280px/390px preparation and same-decision Make real, isolated native-app submission, keyboard focus, no page overflow, and mobile loading/error/empty/read-only/missing-account fixtures. These are fictional local records; no authenticated provider or production proof. |
 | Operator queue | [QueueBoard.tsx](../../src/app/admin/queue/QueueBoard.tsx), [QueueSourceActions.tsx](../../src/app/admin/queue/QueueSourceActions.tsx), [QueueLoadState.tsx](../../src/app/admin/queue/QueueLoadState.tsx) | October 9 L8: composes `StPage`/`StHead`, open `StRows`/`StRow`, state marks and pill/text controls. Existing native source actions and fields retain their original authority. Source parity and client lead counts sit in a disclosure; all close/minutes, notes, handoff and parked actions remain. Owner decisions offer only Stop chasing in the operator close form. The real loading, unavailable and permission states share the preview specimens at `/preview/strelva/operator-queue?scenario=loading`, `error`, or `denied`. |
 | AtmosphericCard | [AtmosphericCard.tsx](../../src/components/ui/atmosphere/AtmosphericCard.tsx) | Semantic section, ref forwarding, theme light/dark, numeric composition variant 0–5, contentClassName, optional controlled paused/onPausedChange. |
 | AtmosphericCardHeader / Detail / Footer | [AtmosphericCardParts.tsx](../../src/components/ui/atmosphere/AtmosphericCardParts.tsx) | Content slots inheriting card roles. Header accepts an optional decorative icon; caller supplies heading semantics. Detail is optional, never automatic filler. |
@@ -1247,6 +1324,21 @@ provider writes. `/preview/strelva/portability?surface=export|exit&state=ready|l
 is gated by development and `STRELVA_UI_PREVIEW=1`; fixtures prove presentation,
 not export completeness or production handoff.
 
+October 12 owner amendment: authorized recent export history recovers retained
+ready archives and active builds on navigation, with actual expiry and unreadable
+history distinguished from empty records. `WorkspaceExit` and
+[BusinessBillingView](../../src/experience/workspace/billing/BusinessBillingView.tsx)
+link to the exact business's billing page; owner-only portal controls retain a
+separate cancellation review, busy/error states and fresh server payer authority.
+Hosted Stripe cancellation and actual archive completeness remain unqualified.
+[BusinessSetupPanel](../../src/experience/workspace/BusinessSetupPanel.tsx) retains
+the saved owner Ask/check and opens Home with its original words after setup;
+unknown save outcomes recover the exact command. [BringInAgency](../../src/experience/workspace/BringInAgency.tsx)
+excludes current/proposed agencies and prepares complete scope amendments while
+active grants remain until acceptance. Decline keeps those active grants. These
+are local source/DOM contracts; ordered SQL and rendered qualification remain
+outstanding.
+
 
 October 7, 2026, local: the System Versions panel now shows each scoped sibling’s reusable definition changes in keyboard-native disclosures, with source-baseline and local values, removed-path labels, and explicit empty/Not verified states. Private records, bindings, grants, maintenance authority and secret-shaped content are omitted by the scoped PostgreSQL projection. `sibling=ready|empty|unavailable` selects fictional comparison states in the existing preview.
 
@@ -1274,6 +1366,14 @@ this semantic result contract.
 owned forms/result geometry and semantic marketing tokens. Public attributed
 results add name-only agency identity, neutral provider advice and an agency
 contact CTA. Embed routes compose those same components without account chrome.
+October 12 combined-check amendment: both `audit` and `ai-visibility` embed aliases
+compose `WebsiteAuditPage`. `AiVisibilityResultView embedded` uses an H3 beneath
+the outer Gemini section and renders the agency identity only once, retaining
+monitor/contact and saved-check continuation actions. The combined public transport
+shares one agency quota admission while preserving independent section results;
+malformed optional fields are refused before either section runs. Agency and
+complete normalized website identities must agree before restoring paired reports.
+These amendments have source/DOM proof only; post-merge rendered acceptance is pending.
 The shared email layout retains optional `preparedBy` compatibility; absent identity
 retains the existing Strelva logo markup. The agency brand contract below owns rich identity.
 The agency prospects page uses a semantic table, scoped to direct agency members.
@@ -1296,8 +1396,18 @@ renders a bounded raster logo, wrapping name, optional reply contact and retaine
 "Runs on Strelva." credit. Any six-digit accent may fill the identity; black or
 white text is selected at 4.5:1 minimum contrast. The sidebar `rail` variant uses
 the owned surface and an accent rule, avoiding a second name/logo block.
-`StrelvaShell.ownerBrand` supplies workspace identity; legacy tenant shells read
-the authorized owner-brand endpoint. A changed workspace cannot reuse the last
+Workspace identity leads the shared header. `StrelvaShell.workspaceName` is
+separate from `ownerBrand`; agency / client views can supply `brandWorkspaceId`
+for the agency's separately authorized brand. Agency credit is non-interactive.
+The platform mark appears once in the fixed header position. Plain context labels
+use this header, while selectors remain below it. `WorkspacePhoneTabs` uses
+Ask Strelva and hides Systems until released. Preview shells use explicit
+fictional account identity and `signOut={null}` to avoid real sign-out actions.
+Legacy tenant shells read the authorized owner-brand endpoint.
+Standalone `InquiryExperience.servingAgency` carries current serving identity
+separately from historical receipt actors: agency views use `[Agency] / [Business]`,
+owner views use the business name, with one header platform mark and neutral
+identity failure. A changed workspace cannot reuse the last
 workspace's fetched identity. Strelva controls and authority remain explicit.
 
 `AgencyBrandEditor` composes owned `TextInput` and `Button` with native file input,
@@ -1982,3 +2092,243 @@ A staff assignment permits scoped client reads, not arbitrary new-System
 authoring. Exact existing drafts need their separate client authorization.
 No writer or eligibility grant is widened by this presentation correction.
 Local fixtures and unit tests do not qualify hosted authority or email delivery.
+
+AG2 adds Form page and Booking page choices to AgencyAuthoring. AgencyNativePage
+uses the kit's fields, review surface, notices and Send to business action. A
+staffed agency needs active website plus inquiry/booking scope; this path adds
+one page to an unchanged published native website with its own current native
+connection. Internal tool authoring keeps its existing eligibility. Review is
+local; Send persists a website candidate and durable command receipt in one
+transaction. Retried sends retain their exact command; no publication or email
+is implied. Businesses without a qualified native site/connection see the
+missing prerequisite. Desktop/phone rendered acceptance remains outstanding.
+
+### October 12 · agency brand fields
+
+AgencyBrandEditor composes the existing `StTextField` with native `color` and
+`file` input semantics, and kit buttons for Save and Remove logo. The kit owns
+the 48px color picker and file-selector button paint through `kit.module.css`;
+labels, errors, keyboard focus and disabled states keep the existing field
+contract. Logo format and size are checked before reading; server image validation
+remains authoritative. Unconfirmed saves require a saved-brand read before another
+write. Initial read failures offer that same recovery. These are source and DOM
+contracts; desktop/phone rendered acceptance remains outstanding.
+
+### October 12 · agency decision, Library and payer review
+
+Agency Clients exposes a scoped Full-control decision panel on kit rows with the
+exact review, consequence, recorded actor, `Hold to make it live` and `Not yet`.
+Booking commitments retain `Hold to confirm`. Owner-only payer, exit, access and
+private details do not become agency decisions. A lost response triggers a current
+read before controls return; unreadable reviews stay disabled.
+
+Library selections carry each Version's exact qualified Release through
+preparation. Latest publication is displayed separately from qualified offers.
+Confirmed source/offer mutations refresh the Library; Refresh Library recovers
+stale or uncertain reads without replaying a write. Release labels and Time this
+month now match owner language in agency compositions and fictional previews.
+
+Agency billing offers serving agencies through the authorized business-agency
+read. `AgencyPayerRequests` composes kit sections, surfaces and pills to show only
+pending requests addressed to that agency. Checkout defaults closed and distinguishes
+Coming soon, setup required, unavailable and ready. Merchant readiness and the
+existing server fulfillment guard both remain required.
+
+`FirstClientHandoff` composes kit steps around the recorded Draft, Review, Owner
+claim and Live status. Prepared links, owner acceptance and verified publication
+remain distinct evidence. Source publication never proves the owner’s separate
+client copy is live. These changes have local source/DOM evidence; actual
+Auth, provider execution and desktop/phone rendering require separate proof.
+
+October 12 integration: [BusinessWebsiteSharing](../../src/experience/websites/BusinessWebsiteSharing.tsx)
+uses those same steps for a website already owned by the business. It reads the
+existing owner claim and prepares the existing business `owner_link`; it never
+transfers an artifact. Agency-owned sharing reads the received business/work IDs
+and requires that destination's own verified publication before showing Live.
+Missing or foreign destination reads remain unconfirmed. Lost claim responses
+require a current read before another command. Local source/DOM proof only.
+### October 12 · visitor booking and payment shell
+
+[VisitorBookingShell](../../src/experience/bookings/VisitorBookingShell.tsx) is
+the shared business header, type and button system for booking choices,
+confirmation, management and business payments. Its optional `wide` and
+`navigation` props retain the same header for wider calendar and payment
+layouts. Unknown business identity shows neutral copy. The existing
+`--visitor-*` variables supply business colors; primary buttons use the business
+accent or neutral ink, with paired foreground, visible focus and 44px targets.
+The business is the only visible brand.
+
+Inquiry receipts distinguish customer email confirmation, waiting on the
+business, confirmed and ended states. Saved confirmation deadlines and readable
+times include a zone. Public payments place issued refund/cancellation terms
+beside the amount and hold the pay action when required terms are absent.
+Visitor and deposit fixtures compose the same shell. Local component and
+contract tests cover those states; browser, SQL execution, provider delivery
+and production proof remain outstanding under the audit's disk stop point.
+
+### October 12 · platform support and ordinary agency boundary (fix pass 2)
+
+[AccessRequestPage](../../src/components/marketing/AccessRequestPage.tsx) starts
+with business account, agency account, agency directory and an explicit Strelva
+Agency service choice. Account entry never opens the sales form. The chosen
+service form retains its pending, error and confirmation states.
+
+Operator client records use the existing kit for read-only goals, business facts
+and automation policy. Report cadence, platform email pauses and release controls
+remain platform operations. Open workspace and Inspect both enter read-only
+support inspection. Client work opens the exact tenant-linked business only
+after a current ordinary agency seat read; otherwise the ordinary agency entry
+explains the missing seat. These links grant no provider or publishing rights.
+
+[PayLinksView](../../src/app/admin/pay-links/PayLinksView.tsx) reads existing
+service records and offers a fresh read after errors. It has no creation or
+revocation controls. Missing reads remain unknown and retained rows are labelled
+stale. [LeadRows](../../src/app/admin/leads/LeadRows.tsx) defaults to read-only
+support inspection; the admin prospect surface supplies that mode explicitly.
+Deployment failures remain visible without a platform publication button.
+Review-solicitation mail is absent from platform CRM actions; account and site
+status notifications keep their existing platform path.
+
+The operator API rejects client setup, client content/settings, sales mutations
+and publication even when one person also has an agency role. The business and
+agency paths retain ordinary membership and effect checks. Tenant inspection
+also refuses write permissions for an ordinary owner until inspection ends.
+
+Local unit/DOM contracts cover separation and refusals. The audit brief forbids
+a dev server, browser and build in this lane; desktop/phone, real Auth and provider
+proof remain coordinator acceptance work.
+
+### October 12 · owner flow follow-up (owner2)
+
+[SystemPage](../../src/experience/systems/SystemPage.tsx) carries the exact
+plan's server-qualified execution availability through its existing pill:
+**Make it live** for live execution, **Rehearse this change** for an isolated
+rebuild, and disabled **Live unavailable** when no execution is released.
+Rehearsal says that live Systems stay unchanged; unreadable availability cannot
+become a live action. Permission, stale-plan and uncertain-outcome recovery
+remain separate holds.
+
+[WorkspaceBusinessSettings](../../src/experience/workspace/WorkspaceBusinessSettings.tsx)
+uses the server's schema-3 flag to label its export as **Export workspace
+archive** or **Export available workspace snapshot**. The saved-message booking
+entry composes existing native scheduling controls and explicitly distinguishes
+availability preparation from publishing a visitor page. Local component and
+contract tests cover the transitions; current desktop/mobile rendering remains
+unrun under the audit's no-server/no-Playwright stop point.
+### October 12 · agency exact decision recovery (AG3, AG7)
+
+`AgencyClientDecisions` reconciles a lost or malformed command response by
+reading that exact business, agency, decision and reviewed revision. A current
+open review, recorded claim still executing, completed action, pending
+confirmation and failed action remain distinct. Unreadable or revoked receipt
+access keeps approval unavailable; a Refresh never repeats the command.
+Recorded outcomes retain the deciding actor and offer Check recorded outcome.
+The same person may hold a platform support role and an ordinary agency seat;
+explicit agency selection still requires every current staff/seat/grant check.
+Website, domain and Possibility source execution stays with the owner until
+those resolvers consume an exact agency claim. The agency reader and SQL claim
+predicate both withhold them. Component/route tests are local DOM and transport
+evidence; SQL, authenticated desktop/mobile rendering and provider delivery
+remain unproven under the audit's stop point.
+
+### October 12 · add-client claim recovery (AG6)
+
+[AgencyAddClient](../../src/experience/workspace/agency/AgencyAddClient.tsx)
+retains its last successful client rows when a read fails, labels their claim
+status as stale and keeps Refresh present in loading, empty and failed states.
+A current scoped client read precedes owner-link issuance. Lost or malformed
+claim responses hold issuance until Refresh owner claim succeeds; a discovered
+pending claim names its recipient and requires a separate **Replace pending
+owner link** action. Owner acceptance, ended seats and unreadable claims stop
+replacement. Recovery reads never replay writes. Local DOM tests cover these
+states; desktop/phone rendering, authenticated delivery and production remain
+unqualified under the audit stop point.
+
+### October 12 · exact agency access review (AG4)
+
+`AgencyProposals` carries the server's immutable proposal fingerprint through
+Accept and Decline. A replaced proposal requires **Refresh requests** and a new
+review of its current consent and scope levels. An unconfirmed response retains
+the row and disables responses until a successful read; a malformed success
+never claims the business became a client. The same kit row, section action,
+pills and text buttons retain their existing focus and phone contracts.
+SQL rechecks the proposing owner's current verified identity and owner
+membership at acceptance. Local DOM/API contracts are separate from disposable
+Postgres, authenticated browser and production proof.
+### October 12 · operator evidence and release receipts (ops2)
+
+[ClientsCrm](../../src/app/admin/clients/ClientsCrm.tsx) carries unavailable reads
+and missing/stale site scans beside the business identity, on mobile as well as
+desktop. An incomplete verdict is **Unverified**, enters Needs attention and
+never enters Live. Retained grades carry the scan time and historical label.
+Known subscription risk remains visible above uncertainty.
+
+[UptimeBoard](../../src/app/admin/uptime/UptimeBoard.tsx) distinguishes no readable
+snapshot from a successful empty check. Stored timestamps use the domain-monitor
+heartbeat allowance; stale or invalid times label responses as last checks and
+withhold current live styling. Freshness is reevaluated every minute. Run again
+is explicit and failed refreshes preserve prior evidence and its qualification.
+Certificate lifetime, form delivery and thirty-day uptime remain unmeasured.
+
+[ReleaseFlagsPanel](../../src/app/admin/clients/[id]/ReleaseFlagsPanel.tsx) keeps
+the accepted mutation receipt separate from current flag/history readback. An
+accepted change with unavailable readback clears the submitted reason, preserves
+the previous view and holds further writes until **Refresh flags** succeeds.
+Unknown transport results also require refresh; ordinary conflict/validation
+refusals preserve correction. The recovery performs GET only. Existing St*
+primitives and styling remain in use. Unit evidence is local; rendered desktop/
+mobile verification is deferred under the audit’s explicit browser stop point.
+
+### October 12 · agency Payment links
+
+[AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
+composes `StField`, `StTextField`, `StPill`, `StRows`, `StRow`, `StState`,
+`StNotice` and text actions inside the agency shell. The sidebar and agency
+billing link to `/workspace/payment-links?workspaceId=…`. Verified ordinary
+agency owners/admins use the configured legacy merchant account; other agencies
+see their existing Connect readiness and client-agreement path.
+
+Fixed and ranged amounts use USD and $50 steps. Copy, explicit expiration
+review, paid status and retained historical ownership appear in open rows.
+Unconfirmed commands hold the exact submitted terms and retry key; Refresh
+only reads. Incomplete success responses retain that hold. Payment-read outages
+remain unavailable rather than unpaid. Agency identity is captured through the
+existing validated brand resolver; historical records never acquire a current
+actor. Local DOM and route tests cover these contracts. Desktop/phone rendering,
+real Auth and native Redis script execution remain coordinator acceptance work
+under the audit's no-server/no-browser stop point.
+
+### October 12 · Strelva Agency lead management
+
+[AgencyLeads](../../src/experience/workspace/leads/AgencyLeads.tsx) composes the
+existing St* rows, fields, notices, states and text actions in agency chrome.
+Only the configured agency's ordinary verified owners/admins see its Leads
+place beside Payment links. The shared shell reads membership-only admission;
+unknown admission and member roles hide the place. The agency identity uses the
+existing validated brand resolver. Other agencies receive no lead-feed claim.
+
+Rows retain request context, historical ownership qualification, canonical
+status and appended notes. Empty, loading, error, permission and stale states
+retain Refresh. Uncertain writes hold the exact submitted body and key; Refresh
+only reads. Convert opens the ordinary agency add-client flow through an opaque
+lead token. Preparing that form stays Converting; confirmed client creation is
+Converted. Release-disabled client creation holds that action.
+
+[AgencyAddClient](../../src/experience/workspace/agency/AgencyAddClient.tsx)
+receives server-authorized lead prefill, including a name-only client when no
+website exists. It requires a reviewed business name and uses the existing URL
+normalizer before reserving conversion. Lost replies and reloads recover the
+original actor's persisted request and key; an unavailable or foreign request
+stays held. A confirmed business with an unconfirmed lead update retains both
+facts and offers exact-request recovery. No owner email is sent.
+
+[AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
+receives lead name and bounded scope text through the same authorized server
+read. Changing the source token resets the draft fields and client selection,
+while an earlier uncertain payment command retains its submitted terms and key.
+Prices remain a separate review. The admin lead list remains disabled support
+inspection and names the agency workspace as the place to manage leads.
+
+Local DOM, route and mocked-store tests cover these contracts. Native Redis
+execution, actual Auth and desktop/phone rendering remain unproven under the
+lane brief's explicit no-server/no-browser/no-socket stop point.

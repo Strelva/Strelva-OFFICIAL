@@ -23,10 +23,11 @@ import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueue
 import { AgencyAuthoring } from "./agency/AgencyAuthoring";
 import { ProviderClientQueue } from "./agency/ProviderClientQueue";
 import { AgencyTeamView } from "./agency/AgencyTeamView";
+import { AgencyBrandEditor } from "./agency/AgencyBrandEditor";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
-import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import type { AgencyLastGoodRead } from "./agency/AgencyViews";
 
 type ClientsState =
@@ -294,7 +295,7 @@ export function AgencyHome({
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your Apps. Qualified revisions you share appear in your clients’ Apps." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
+    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your sources. Qualified releases you share appear in your clients’ Apps." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
   </section>;
 
   const creditSection = credits.length ? <section className="mt-12" aria-labelledby={`${id}-credits`}>
@@ -356,6 +357,7 @@ export function AgencyHome({
         <h2 id={`${id}-access`} className={sectionTitle}>Team and access</h2>
         {accessNote}
       </section>
+      {current?.role === "owner" ? <StSection id="agency-brand" title="Agency brand"><AgencyBrandEditor workspaceId={snapshot.workspaceId} request={request} /></StSection> : null}
       {creditSection}
     </div>;
   }
@@ -369,7 +371,7 @@ export function AgencyHome({
   };
 
   return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
-    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Package a revision"} meta={<>{agencyName}{combined ? <> · <StMono>Loaded {combined.clients.length} of {combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
+    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · <StMono>Loaded {combined.clients.length} of {combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
       {snapshot.releases?.agencyImportClients ? <StPillLink variant="soft" href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Import clients</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
@@ -412,13 +414,14 @@ export function AgencyHome({
     </TabsPanel>
 
     <TabsPanel id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
-      <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest revision. Nothing reaches a client until its owner approves.</p>
+      <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest release. Nothing reaches a client until its owner approves.</p>
       {libraryOpened || view === "library" ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
       {(libraryOpened || view === "library") && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
     </TabsPanel>
 
     <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {view === "team" ? <AgencyTeamView key={snapshot.workspaceId} workspaceId={snapshot.workspaceId} /> : null}
+      {view === "team" && current?.role === "owner" ? <StSection id="agency-brand" title="Agency brand"><AgencyBrandEditor workspaceId={snapshot.workspaceId} request={request} /></StSection> : null}
       {accessNote}
     </TabsPanel>
 

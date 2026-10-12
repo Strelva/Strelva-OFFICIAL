@@ -12,6 +12,17 @@ const managedShell = () => readFileSync(path.join(root, "src/components/dashboar
 const workspaceSignOut = () => readFileSync(path.join(root, "src/experience/workspace/WorkspaceSignOutButton.tsx"), "utf8");
 
 describe("shared app frame accessibility contract", () => {
+  it("places configured agency Leads next to Payment links and hides it without current admission", () => {
+    const workspaceId = "11111111-1111-4111-8111-111111111111";
+    const base = { workspaceId, workspaceName: "Strelva Agency", children: createElement("p", null, "Agency"), signOut: null };
+    const authorized = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation: { leadsAvailable: true, leadsCurrent: true } }));
+    expect(authorized).toContain(`/workspace/leads?workspaceId=${workspaceId}`);
+    expect(authorized).toContain('aria-current="page"'); expect(authorized).toContain("Payment links");
+    for (const agencyNavigation of [{ leadsAvailable: false }, {}]) {
+      const html = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation }));
+      expect(html).not.toContain("/workspace/leads?"); expect(html).toContain("Payment links");
+    }
+  });
   it("keeps collapsed navigation and mobile modal surfaces out of competing focus trees", () => {
     const source = frame();
     const styles = frameStyles();
@@ -54,16 +65,16 @@ describe("shared app frame accessibility contract", () => {
       signOut: createElement("button", { type: "button" }, "Sign out"),
       children: createElement("p", null, "Workspace"),
     };
-    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "All files and results".
+    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "Files and results".
     // The Customers page is retired in both states (October 6); its old address opens Home.
     const before = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
-    expect(before).toContain("All files and results");
+    expect(before).toContain("Files and results");
     expect(before).not.toContain(">Customers<");
     expect(before).not.toContain('href="/workspace?view=customers"');
     expect(before).not.toContain("All systems and files");
     const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
 
-    expect(html).toContain('aria-label="Strelva navigation"');
+    expect(html).toContain('aria-label="Workspace navigation"');
     expect(html).toContain('aria-label="Main"');
     expect(html).toContain('aria-label="Workspace utilities"');
     for (const label of [">Home<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {

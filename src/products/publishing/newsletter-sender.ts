@@ -1,3 +1,5 @@
+import { resolveEmailBusinessContext, type EmailBusinessContext } from "@/platform/infra/email/business-context";
+import { escapeEmailHtml } from "@/platform/infra/email/escape";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
@@ -49,6 +51,7 @@ export async function sendApprovedNewsletterIssues(deps: {
   enabled?: () => boolean;
   released?: (workspaceId: string) => Promise<boolean>;
   suppression?: (tenantId: string) => Promise<string | null>;
+  identity?: (scope: { workspaceId: string; tenantId: string }) => Promise<EmailBusinessContext | null>;
   send?: (input: SendBatchInput) => Promise<SendBatchResult>;
 } = {}): Promise<{ accepted: number; gated: number; suppressed: number; unknown: number; failed: number }> {
   const summary = { accepted: 0, gated: 0, suppressed: 0, unknown: 0, failed: 0 };
@@ -62,10 +65,14 @@ export async function sendApprovedNewsletterIssues(deps: {
       remaining -= 1;
       const released = await (deps.released ?? (id => workspaceReleaseFlagEnabled("publishing", id)))(batch.workspaceId).catch(() => false);
       const suppression = released ? await (deps.suppression ?? (tenant => batchEmailSuppression(deliveryPolicy(tenant))))(batch.tenantId) : "not sent: gated";
+      const identity = !suppression ? await (deps.identity ?? resolveEmailBusinessContext)({ workspaceId: batch.workspaceId, tenantId: batch.tenantId }).catch(() => null) : null;
       let receipt: NewsletterReceipt;
       if (suppression) {
         receipt = { status: "gated", detail: suppression };
+      } else if (!identity?.businessName || !identity.replyTo) {
+        receipt = { status: "gated", detail: "not sent: business reply identity unavailable" };
       } else {
+        const businessName = identity.businessName;
         // Validate all pre-send configuration before crossing the one-way marker.
         let messages: SendBatchInput["messages"] | null = null;
         try {
@@ -75,7 +82,7 @@ export async function sendApprovedNewsletterIssues(deps: {
           messages = batch.recipients.map(email => {
             const unsubscribe = buildUnsubscribeUrl(origin, { tenantId: batch.tenantId, email });
             return { to: email, subject: batch.subject.replace(/<[^>]*>/g, " ").replace(/[\r\n\t]+/g, " ").trim(),
-              html: `${html}<p><a href="${unsubscribe}">Unsubscribe</a></p>`, text: `${text}\n\nUnsubscribe: ${unsubscribe}`,
+              html: `<header><p>${escapeEmailHtml(businessName)}</p></header>${html}<p><a href="${unsubscribe}">Unsubscribe</a></p>`, text: `${businessName}\n\n${text}\n\nUnsubscribe: ${unsubscribe}`,
               headers: { "List-Unsubscribe": `<${unsubscribe}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
           });
         } catch {
@@ -93,7 +100,7 @@ export async function sendApprovedNewsletterIssues(deps: {
         } else {
           try {
             const result = await (deps.send ?? sendBatchWithReceipt)({
-              ...deliveryPolicy(batch.tenantId), fromName: "Newsletter", fromAddress: `newsletter@${CLIENT_MAIL_DOMAIN}`,
+              ...deliveryPolicy(batch.tenantId), workspaceId: batch.workspaceId, fromName: identity.businessName, replyTo: identity.replyTo, fromAddress: `newsletter@${CLIENT_MAIL_DOMAIN}`,
               idempotencyKey: `workspace-newsletter:${batch.id}`,
               messages: messages.filter(message => recipients.includes(message.to)),
             });

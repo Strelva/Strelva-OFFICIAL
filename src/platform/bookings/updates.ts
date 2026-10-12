@@ -22,7 +22,7 @@ export async function bookingCustomerEmailAllowed(tenantId: string | null, works
     workspaceId = tenantId.slice("workspace:".length);
     tenantId = null;
   }
-  if (tenantId) return await getClientEmailOverride(tenantId) !== "off";
+  if (tenantId) return await getClientEmailOverride(tenantId, { failClosed: true }) !== "off";
   if (!z.string().uuid().safeParse(workspaceId).success) return false;
   // Native businesses have no tenant override to inherit. Explicit operator
   // arming is required in addition to both global email gates.
@@ -89,8 +89,8 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const tokenCipher = state === "held" ? row.access?.confirm_ciphertext : row.access?.manage_ciphertext;
       const token = typeof tokenCipher === "string" ? decryptSecret(tokenCipher) : null;
       const url = row.audience === "client" ? `${bookingAppOrigin()}/workspace/bookings?${new URLSearchParams({ workspaceId: booking.workspaceId ?? "", date: booking.localDate })}` : bookingManagePageEnabled() ? token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : await deps.manageUrl?.(booking).catch(() => null) : null;
-      const result = await deps.send({ audience: row.audience, authorship: row.audience === "client" ? "agency" : "business", workspaceId: booking.workspaceId ?? undefined, tenantId: booking.tenantId ?? undefined, to,
-        fromName: business.name, businessName: row.audience === "customer" ? business.name : undefined, fromAddress: "bookings@mail.strelva.com",
+      const result = await deps.send({ audience: row.audience, authorship: row.audience === "client" ? undefined : "business", workspaceId: booking.workspaceId ?? undefined, tenantId: booking.tenantId ?? undefined, to,
+        ...(row.audience === "customer" ? { fromName: business.name, businessName: business.name, fromAddress: "bookings@mail.strelva.com" } : {}),
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
         idempotencyKey: `booking-update:${row.messageId}`,
         options: { heading: title, paragraphs: [row.audience === "client"
@@ -105,7 +105,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
           : state === "declined" ? "This time was not confirmed. Reply to ask about another time."
           : "Your time is confirmed.",
           ...(business.address ? [`Where: ${business.address}`] : [])],
-          rows: [{ label: "Service", value: booking.serviceName }, { label: "When", value: `${when.day}, ${when.time} (${booking.timeZone})` }, ...(agentSource ? [{ label: "Source", value: agentSource }] : [])],
+          rows: [{ label: "Service", value: booking.serviceName }, { label: "When", value: `${when.day}, ${when.time}` }, ...(agentSource ? [{ label: "Source", value: agentSource }] : [])],
           ...(url ? { button: { label: row.audience === "client" ? "Open bookings" : state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}) },
         ...(state === "confirmed" && row.audience === "customer" ? { attachments: [{ filename: "booking.ics", content: Buffer.from(calendarFile(booking, business.name, business.address ?? "")).toString("base64") }] } : {}),
       });

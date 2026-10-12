@@ -5,6 +5,8 @@ import { systemHref } from "@/experience/systems/model";
 import ProviderChangeNotices from "@/app/workspace/provider-change/ProviderChangeNotices";
 import VersionReviewPage from "@/app/workspace/version-review/page";
 import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
+vi.mock("next/navigation", async importOriginal => ({ ...(await importOriginal<typeof import("next/navigation")>()), useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+
 const mocks = vi.hoisted(() => ({ actor: vi.fn(), version: vi.fn(), decision: vi.fn() }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
@@ -35,6 +37,7 @@ describe("agency Library coherence", () => {
     mocks.version.mockRejectedValue(new Error("Access refused"));
     const html = renderToStaticMarkup(await VersionReviewPage({ searchParams: Promise.resolve({ workspaceId, systemId, decisionId }) }));
     expect(mocks.decision).not.toHaveBeenCalled(); expect(html).toContain("could not be verified");
+    expect(html).toContain('data-workspace-theme="linen"'); expect(html).toContain("Back to workspace");
   });
   it.each(["systemId", "workspaceId", "sourceId", "sourceLifecycle"])("refuses a decision from a different %s", async key => {
     mocks.decision.mockResolvedValue({ ...(await mocks.decision()), [key]: "different" });

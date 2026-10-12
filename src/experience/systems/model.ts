@@ -59,6 +59,8 @@ export interface SystemConnection {
 export type PossibilityStatus = "exploring" | "ready";
 
 export interface SystemPossibility {
+  /** Server-qualified execution for this exact plan; absent is unavailable. */
+  executionAvailability?: "live" | "rehearsal" | "unavailable";
   id: string;
   title: string;
   summary: string;

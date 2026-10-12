@@ -1,3 +1,5 @@
+import { executionAvailability, livePlanChannelsAvailable } from "@/platform/make-real/execution-availability";
+import { makeRealChannelEnabled } from "./live-server";
 import { bookingCalendarConnectionStates, readBookingCalendarEvidence } from "./calendar-evidence";
 import { getInquiryRepository } from "@/products/inquiries/server";
 import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/server";
@@ -245,6 +247,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
     ...(input.publishing !== undefined ? { publishing: publishingView(input.publishing) } : {}),
     possibilities: possibilities.map(({ candidate, sandbox, affects }) => ({
       id: sandbox.possibility.id,
+      executionAvailability: "rehearsal",
       title: sandbox.possibility.title,
       summary: candidate.summary,
       status: sandbox.possibility.status === "ready" ? "ready" : "exploring",
@@ -499,11 +502,20 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     return detail ? revisionHistory(item.system.id, detail.revisions) : [];
   }))).flat();
   const running = withActivation.flatMap((row) => row.activation && row.activation.status !== "made_real" && row.activation.status !== "rolled_back" ? [{ possibility: row.possibility, activation: row.activation }] : []);
+  const channelChecks = new Map<string, Promise<boolean>>();
+  const channelEnabled = (channel: Parameters<typeof makeRealChannelEnabled>[1]) => {
+    if (!channelChecks.has(channel)) channelChecks.set(channel, makeRealChannelEnabled(deps.businessId, channel));
+    return channelChecks.get(channel)!;
+  };
+  const availability = new Map(await Promise.all(stored.map(async ({ possibility, sourceRef }) => {
+    const live = await livePlanChannelsAvailable(possibility.effects.map(effect => effect.channel), channelEnabled);
+    return [possibility.id, executionAvailability(true, sourceRef, live)] as const;
+  })));
   return {
     ...projection,
     possibilities: [
       ...projection.possibilities.filter((item) => !storedWork.has(item.workId)),
-      ...storedPossibilityViews(stored, input.candidates),
+      ...storedPossibilityViews(stored, input.candidates).map(item => ({ ...item, executionAvailability: availability.get(item.id) ?? "unavailable" as const })),
     ],
     activations: activationViews(running),
     history,
@@ -550,6 +562,7 @@ export async function makeRealForWorkspace(deps: LiveSystemsDeps, possibilityId:
 
 /** A Ready plan as Needs you sees it: one owner decision per plan. */
 export interface ReadyMakeRealPlan {
+  actor?: import("@/platform/presentation/actor").RecordedActor;
   possibilityId: string;
   candidateRevision: number;
   /** Covers every effect, change, connection and introduced System of this candidate. */
@@ -583,6 +596,7 @@ export async function readyMakeRealPlans(deps: LiveSystemsDeps): Promise<ReadyMa
         introducesSystem: p.introduces.length > 0,
         systemId: item.site.system.id,
         sourceRebuild: item.candidate.workId,
+        ...(item.candidate.actor ? { actor: item.candidate.actor } : {}),
       };
     });
 }

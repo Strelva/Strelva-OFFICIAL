@@ -142,14 +142,14 @@ describe("the workspace section", () => {
   it("gives a manager the address form, the block and a check", () => {
     const html = render();
     expect(html).toContain('value="fictional-barber"');
-    expect(html).toContain("Publish page");
+    expect(html).toContain("Make it live");
     expect(html).toContain("&lt;script type=&quot;application/ld+json&quot; data-strelva-schema=&quot;1&quot;&gt;");
     expect(html).toContain("Check barber.example");
     expect(html).toContain("History reference 0123456789abcdef");
   });
   it("shows a member the block but not the publish form", () => {
     const html = render({ canManage: false });
-    expect(html).not.toContain("Publish page");
+    expect(html).not.toContain("Make it live");
     expect(html).toContain("An owner or admin of this business publishes its page.");
     expect(html).toContain("Copy block");
   });

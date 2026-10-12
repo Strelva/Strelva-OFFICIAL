@@ -19,6 +19,8 @@ import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { billingLabel, billingMonthlyCents, isBillingConfigured, resolveBillingType } from "@/lib/billing-type";
+import { createClientReadHealth, scanEvidenceIssue } from "./[id]/client-read-health";
+import { StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 
 /** The client's public domain (bare host), from productionDomain or siteUrl; null for
  *  a tenant not yet on its own domain (a *.strelva.com / *.vercel.app placeholder). */
@@ -41,34 +43,43 @@ export default async function AdminClientsPage() {
 
   const [tenants, clientBusinessCount] = await Promise.all([getAllTenants(), readClientBusinessCount()]);
 
+  const portfolioHealth = createClientReadHealth();
+
   // Per-site signals: health grade, launch status, at-risk.
   const [atRiskSignals, rows] = await Promise.all([
-    getAtRiskTenants().catch((): AtRiskSignal[] => []),
+    getAtRiskTenants().catch(portfolioHealth.fallback("Subscription risk", [] as AtRiskSignal[])),
     Promise.all(
       tenants.map(async (t) => {
+        const health = createClientReadHealth();
         const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, scan] = await Promise.all([
-          getActivity(t.id).catch(() => []),
-          listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
-          listThreads(t.id).catch(() => []),
-          getWeeklyBrief(t.id).catch(() => null),
-          getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
-          getScanSummary(t.id).catch(() => null),
+          getActivity(t.id).catch(health.fallback("Activity", [])),
+          listDrafts(t.id).catch(health.fallback("Content drafts", {})),
+          listThreads(t.id).catch(health.fallback("Conversations", [])),
+          getWeeklyBrief(t.id).catch(health.fallback("Weekly brief", null)),
+          getEffectiveSubscriptionStatus(t.id).catch(health.fallback("Subscription status", t.subscriptionStatus ?? "none")),
+          getScanSummary(t.id, { requireStore: true }).catch(health.fallback("Site scan", null)),
         ]);
-        const launchReadiness = buildTenantLaunchReadiness({
-          tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
-          infrastructure: getTenantLaunchReadinessResults(t),
-          activity,
-          threadCount: threads.length,
-          hasOwnerMessage: tenantHasOwnerMessage(threads),
-          draftCount: Object.keys(drafts).length,
-          hasWeeklyBrief: Boolean(weeklyBrief),
-        });
+        let launchReadiness = null;
+        try {
+          launchReadiness = buildTenantLaunchReadiness({
+            tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
+            infrastructure: getTenantLaunchReadinessResults(t),
+            activity,
+            threadCount: threads.length,
+            hasOwnerMessage: tenantHasOwnerMessage(threads),
+            draftCount: Object.keys(drafts).length,
+            hasWeeklyBrief: Boolean(weeklyBrief),
+          });
+        } catch { health.unavailable("Launch readiness"); }
+        const scanIssue = scanEvidenceIssue(scan);
         return {
           id: t.id,
           lastActivity: activity[0]?.time ?? null,
           seoGrade: scan?.grade ?? null,
-          launchScore: launchReadiness.score,
-          launchStatus: launchReadiness.status,
+          launchStatus: health.detail() ? null : launchReadiness?.status ?? null,
+          evidenceIssue: [health.detail(), scanIssue].filter(Boolean).join(" ") || null,
+          scanIssue,
+          scannedAt: scan?.scannedAt ?? null,
         };
       })
     ),
@@ -92,6 +103,9 @@ export default async function AdminClientsPage() {
       atRiskReason: atRiskById.get(t.id)?.reasons[0] ?? null,
       seoGrade: row?.seoGrade ?? null,
       launchStatus: row?.launchStatus ?? null,
+      evidenceIssue: [portfolioHealth.detail(), row?.evidenceIssue].filter(Boolean).join(" ") || null,
+      scanIssue: row?.scanIssue ?? null,
+      scannedAt: row?.scannedAt ?? null,
       billingLabel: billingLabel(t),
       billingConfigured: isBillingConfigured(t),
     };
@@ -138,6 +152,7 @@ export default async function AdminClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <StTextButton href="/admin/convert">Conversion dry run</StTextButton>
           <ScanAllButton />
           <Link
             href="/admin/onboard"
@@ -148,6 +163,7 @@ export default async function AdminClientsPage() {
         </div>
       </div>
 
+      {portfolioHealth.detail() && <StNotice tone="critical">{portfolioHealth.detail()}</StNotice>}
       <ClientsCrm clients={clients} />
     </div>
   );

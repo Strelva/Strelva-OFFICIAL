@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { StTextButton } from "@/components/ui/strelva/Kit";
 import { visibilityHeadline } from "@/lib/visibility/diagnose";
 import type { VisibilityFinding, VisibilitySummary } from "@/lib/visibility/diagnose";
 import type { VisibilityDiff } from "@/lib/visibility/snapshots";
@@ -27,30 +27,7 @@ function diffLine(d: VisibilityDiff): string[] {
   return lines;
 }
 
-export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
-  const [drafting, setDrafting] = useState<string | null>(null);
-  const [results, setResults] = useState<Record<string, string>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  async function draftFix(query: string) {
-    setDrafting(query);
-    setErrors((e) => ({ ...e, [query]: "" }));
-    try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/visibility`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Draft failed");
-      setResults((r) => ({ ...r, [query]: data.message || "Draft queued for review." }));
-    } catch (err) {
-      setErrors((e) => ({ ...e, [query]: err instanceof Error ? err.message : "Draft failed" }));
-    } finally {
-      setDrafting(null);
-    }
-  }
-
+export function VisibilityPanel({ summary, findings, diff }: Props) {
   if (!summary) {
     return (
       <div role="status" className="rounded-2xl border border-glass-border bg-glass p-5">
@@ -122,19 +99,9 @@ export function VisibilityPanel({ tenantId, summary, findings, diff }: Props) {
                   <p className="text-xs text-gray-muted mt-1">{f.recommendation}</p>
                 </div>
                 {f.actionable === "on_site" && (
-                  <button
-                    onClick={() => draftFix(f.query)}
-                    disabled={drafting === f.query}
-                    className="shrink-0 rounded-lg border border-glass-border px-3 py-1.5 text-xs text-warm-white hover:bg-glass-border disabled:opacity-50"
-                  >
-                    {drafting === f.query ? "Drafting…" : "Draft fix"}
-                  </button>
+                  <StTextButton href="/workspace">Open workspace</StTextButton>
                 )}
               </div>
-              {results[f.query] && (
-                <p className="mt-2 text-xs text-positive">Queued for review: {results[f.query]}</p>
-              )}
-              {errors[f.query] && <p className="mt-2 text-xs text-critical">{errors[f.query]}</p>}
             </li>
           ))}
         </ul>

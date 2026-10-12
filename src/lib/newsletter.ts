@@ -1,7 +1,7 @@
-import { getTenantConfig } from "@/lib/tenants";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash } from "node:crypto";
-import { getSubscribers, getContent } from "./storage";
+import { getSubscribers } from "./storage";
+import { resolveEmailBusinessContext } from "@/platform/infra/email/business-context";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
 import { CLIENT_MAIL_DOMAIN, sendBatchWithReceipt } from "@/platform/infra/email/send";
@@ -26,7 +26,7 @@ export interface SendNewsletterResult {
   /** Recipients the provider accepted. Accepted, not delivered. */
   subscriberCount: number;
   devMode?: boolean;
-  reason?: "no_subscribers" | "paused" | "send_failed";
+  reason?: "no_subscribers" | "paused" | "send_failed" | "business_identity_unavailable";
   /** Receipt detail (publishing spec, section 3 item 12). */
   receipt?: {
     activeSubscribers: number;
@@ -66,9 +66,11 @@ export async function sendNewsletter(
     return { success: false, subscriberCount: 0, reason: "no_subscribers" };
   }
 
-  const settings = await getContent("settings", tenant);
-  const tenantConfig = await getTenantConfig(tenant);
-  const fromName = sanitizeEmailSubjectText(tenantConfig?.siteName || settings.siteName || "Newsletter");
+  const context = await resolveEmailBusinessContext({ tenantId: tenant });
+  if (!context?.businessName || !context.replyTo) {
+    return { success: false, subscriberCount: 0, reason: "business_identity_unavailable" };
+  }
+  const fromName = sanitizeEmailSubjectText(context.businessName);
   const fromAddress = `newsletter@${CLIENT_MAIL_DOMAIN}`;
   const safeHtml = sanitizeEmailHtml(body);
   const safeText = htmlToPlainText(body);
@@ -107,8 +109,8 @@ export async function sendNewsletter(
           return {
             to: subscriber.email,
             subject: safeSubject,
-            html: `<header><p>${escapeEmailHtml(fromName)}</p></header>${safeHtml}<footer><p>Runs on Strelva.</p><a href="${escapeEmailHtml(unsubscribe)}">Unsubscribe from ${escapeEmailHtml(fromName)} newsletter</a></footer>`,
-            text: `${fromName}\n\n${safeText}\n\nRuns on Strelva.\nUnsubscribe: ${unsubscribe}`,
+            html: `<header><p>${escapeEmailHtml(fromName)}</p></header>${safeHtml}<footer><a href="${escapeEmailHtml(unsubscribe)}">Unsubscribe from ${escapeEmailHtml(fromName)} newsletter</a></footer>`,
+            text: `${fromName}\n\n${safeText}\n\nUnsubscribe: ${unsubscribe}`,
             headers: {
               "List-Unsubscribe": `<${unsubscribe}>`,
               "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",

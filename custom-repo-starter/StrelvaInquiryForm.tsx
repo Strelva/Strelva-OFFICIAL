@@ -72,12 +72,12 @@ export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send r
         </div>;
       })}
     </fieldset>
-    <p>Strelva helps this business handle your request.</p>
+    <p>Your request goes to this business.</p>
     {onSubmit ? <button type="submit" disabled={pending} style={{ minHeight: "2.75rem", padding: ".65rem 1rem", font: "inherit" }}>{pending ? "Sending…" : submitLabel}</button> : <p>Preview only. This form does not send a request.</p>}
-    {offer && "url" in offer ? <section aria-label="Suggested booking times"><p>You can also request a time. The business will confirm it.</p><ul>{offer.slots.map(slot => <li key={slot.start}>{offer.serviceName} · {new Intl.DateTimeFormat(undefined, { timeZone: offer.timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(slot.start))}</li>)}</ul><a href={offer.url}>Choose a time to request</a></section> : null}
+    {offer && "url" in offer ? <section aria-label="Suggested booking times"><p>You can also request a time. Check your email to confirm, then wait for the business to accept it.</p><ul>{offer.slots.map(slot => <li key={slot.start}>{offer.serviceName} · {new Intl.DateTimeFormat(undefined, { timeZone: offer.timeZone, year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "longGeneric" }).format(new Date(slot.start))}</li>)}</ul><a href={offer.url}>Choose a time to request</a></section> : null}
     {offer && !("url" in offer) ? <section aria-label="Appointment times" style={{ marginTop: "1.5rem" }}>
       <h3>Request a time for {offer.serviceName}</h3>
-      <p>The business must confirm your appointment.</p>
+      <p>Choose a time, then check your email to confirm. The business may then need to accept your request.</p>
       <ul style={{ display: "grid", gap: ".75rem", padding: 0, listStyle: "none" }}>{offer.slots.map((slot) => <li key={slot.chooseUrl}><a href={slot.chooseUrl} style={{ display: "inline-flex", minHeight: "2.75rem", alignItems: "center" }}>{slot.label}</a></li>)}</ul>
     </section> : null}
     {status ? <p role={status.kind === "error" ? "alert" : "status"}>{status.text}</p> : null}

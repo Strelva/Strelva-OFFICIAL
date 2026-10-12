@@ -20,12 +20,12 @@ describe("website canon fixture panels", () => {
   });
   it("blocks article publish for permission state while retaining the draft", () => {
     const node = page("articles", "permission");
-    expect([...node.querySelectorAll("button")].find(button => button.textContent?.includes("Hold to publish"))?.disabled).toBe(true);
+    expect([...node.querySelectorAll("button")].find(button => button.textContent?.includes("Hold to make it live"))?.disabled).toBe(true);
     expect(node.textContent).toContain("What happens in a mediation session");
   });
   it("gives the single visit series an accessible data summary", () => {
     const node = page("results");
-    expect(node.querySelector('[role="img"]')?.getAttribute("aria-label")).toContain("32, 35, 28, 39, 49, 43, 33, 53, 60, 45, 57, 64");
+    expect(node.querySelector('[role="img"][aria-label^="Weekly visits"]')?.getAttribute("aria-label")).toContain("32, 35, 28, 39, 49, 43, 33, 53, 60, 45, 57, 64");
     expect(node.querySelectorAll("table tbody tr")).toHaveLength(4);
     expect(node.textContent).toContain("Strelva can’t say that one caused the other");
   });

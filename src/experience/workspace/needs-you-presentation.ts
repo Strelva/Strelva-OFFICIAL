@@ -42,10 +42,14 @@ function source(item: OwnerDecision): string {
 
 function verb(item: OwnerDecision): string {
   if (item.sourceLifecycle === "connected_site_schema") return "Acknowledge";
-  if (item.kind === "system.go_live") return "Make it live";
-  if (item.kind === "google.post" || item.kind === "google.photo") return "Post it";
+  // The website source has separate preview approval and publication stages,
+  // even when both carry the same change kind. Preview approval is not launch.
+  if (item.sourceLifecycle === "website_document" && item.sourceId.endsWith(":approve")) return "Approve this preview";
+  if (item.kind === "system.go_live" || item.kind === "system.change_live"
+    || item.kind === "copy.routine" || item.kind === "copy.marketing" || item.kind === "structure"
+    || item.kind === "google.post" || item.kind === "google.photo") return "Hold to make it live";
   if (item.kind === "customer.message" || item.kind.startsWith("review.reply")) return "Send";
-  if (isBooking(item)) return "Confirm";
+  if (isBooking(item)) return "Hold to confirm";
   return "Approve";
 }
 

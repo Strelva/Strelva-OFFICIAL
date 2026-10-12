@@ -1,9 +1,9 @@
 import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
-import { StEntry, StHead, StSurface, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { StEntry, StHead, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import Link from "next/link";
+import { StChoiceLink } from "@/components/ui/strelva/ChoiceCards";
 import { headers } from "next/headers";
 import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -111,7 +111,7 @@ export default async function SignUpPage({
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/access-request">Want it done for you? Ask Strelva Agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton>{workspaceOpen && agencyDoor ? <StTextButton href="/sign-up?as=agency">Build for clients? Create an agency account</StTextButton> : null}</StEntry>;
+  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/agencies">Want it done for you? Find an agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton>{workspaceOpen && agencyDoor ? <StTextButton href="/sign-up?as=agency">Build for clients? Create an agency account</StTextButton> : null}</StEntry>;
 }
 
 function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {
@@ -123,6 +123,6 @@ function AccountKindChoice({ selected, next }: { selected: "business" | "agency"
   };
   return <nav aria-label="Who this account is for" className="flex flex-col gap-3">
     <p className="text-sm text-gray-muted">Who is this for?</p>
-    {(["business", "agency"] as const).map(kind => <Link key={kind} href={href(kind)} aria-current={selected === kind ? "page" : undefined}><StSurface selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"}><span className="flex gap-3"><input type="radio" checked={selected === kind} readOnly tabIndex={-1} aria-hidden="true" /><span><span className="text-sm font-medium">{kind === "business" ? "I run a business" : "I build for clients"}</span><span className="mt-1 block text-sm text-gray-muted">{kind === "business" ? "Run your site, forms and bookings yourself. Bring in an agency anytime." : "Clients own their workspace; you work inside it."}</span></span></span></StSurface></Link>)}
+    {(["business", "agency"] as const).map(kind => <StChoiceLink key={kind} href={href(kind)} selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"} detail={kind === "business" ? "Run your site, forms and bookings yourself. Bring in an agency anytime." : "Clients own their workspace; you work inside it."} />)}
   </nav>;
 }

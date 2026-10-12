@@ -22,6 +22,6 @@ export default async function InquiryBookingPreview({ searchParams }: { searchPa
   if (status === "receipt") return <InquiryBookingReceiptFixture />;
   const index = typeof query.slot === "string" && /^[0-2]$/.test(query.slot) ? Number(query.slot) : 0;
   const slot = offer.slots[index]!;
-  const booking = status === "requested" || status === "confirmed" ? parseStoreBooking({ id, start: slot.start, end: slot.end, status, origin: "inquiry", serviceName: offer.serviceName, inquiryId: "lead_fixture", timeZone: offer.timeZone, customer: { name: "Dana Reed", email: "dana@example.test" } }) : null;
-  return <InquiryBookingChoice choice={status === "expired" || status === "error" ? null : { offer, booking }} unavailable={status === "error"} actionUrl="/preview/strelva/inquiry-booking/action" error={status === "conflict" ? "unavailable" : status === "rate" ? "rate" : undefined} />;
+  const booking = status === "held" || status === "requested" || status === "confirmed" ? parseStoreBooking({ id, start: slot.start, end: slot.end, status, createdAt: "2026-11-06T13:55:00Z", origin: "inquiry", serviceName: offer.serviceName, inquiryId: "lead_fixture", timeZone: offer.timeZone, customer: { name: "Dana Reed", email: "dana@example.test" } }) : null;
+  return <InquiryBookingChoice now={Date.parse("2026-11-05T14:45:00Z")} businessName="The Mooney Firm" choice={status === "expired" || status === "error" ? null : { offer, booking }} unavailable={status === "error"} actionUrl="/preview/strelva/inquiry-booking/action" error={status === "conflict" ? "unavailable" : status === "rate" ? "rate" : undefined} />;
 }

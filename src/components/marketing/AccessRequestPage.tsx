@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { StCopy, StEntry, StField, StHead, StMono, StNotice, StPill, StPillLink, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 
@@ -40,6 +40,7 @@ export function AccessRequestPage({ initialFeedback, carried }: { initialFeedbac
 function AccessRequestForm({ initialFeedback, carried }: { initialFeedback?: InitialFeedback; carried?: Carried }) {
   const searchParams = useSearchParams();
   const ref = searchParams.get("ref") || "";
+  const [agencyServiceChosen, setAgencyServiceChosen] = useState(Boolean(initialFeedback));
   const [businessName, setBusinessName] = useState(carried?.businessName || "");
   const [email, setEmail] = useState(initialFeedback?.email || "");
   const [phone, setPhone] = useState("");
@@ -50,6 +51,14 @@ function AccessRequestForm({ initialFeedback, carried }: { initialFeedback?: Ini
   const [state, setState] = useState<FormState>(initialFeedback?.state || "idle");
   const [message, setMessage] = useState(initialFeedback?.message || "");
   const [statusUrl, setStatusUrl] = useState(initialFeedback?.statusUrl || "");
+  const heading = useRef<HTMLDivElement>(null);
+  const view = !agencyServiceChosen ? "choice" : state === "success" ? "confirmation" : "service";
+  const previousView = useRef(view);
+  useEffect(() => {
+    if (previousView.current === view) return;
+    previousView.current = view;
+    heading.current?.focus();
+  }, [view]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,6 +92,7 @@ function AccessRequestForm({ initialFeedback, carried }: { initialFeedback?: Ini
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          requestType: "agency_service",
           businessName: cleanBusinessName,
           email: cleanEmail,
           phone: cleanPhone,
@@ -132,17 +142,31 @@ function AccessRequestForm({ initialFeedback, carried }: { initialFeedback?: Ini
     }
   }
 
+  if (!agencyServiceChosen) return <StEntry>
+    <div ref={heading} tabIndex={-1}><StHead title="What do you need?" meta="Open your platform account or choose an agency to do the work." /></div>
+    <StSection title="Use Strelva"><StRows>
+      <StRow title="Open my business account" detail="Run your business yourself. Bring in an agency anytime." href="/sign-up" />
+      <StRow title="Open my agency account" detail="Build and run systems for your clients." href="/sign-up?as=agency" />
+    </StRows></StSection>
+    <StSection title="Have an agency do it"><StRows>
+      <StRow title="Find an agency" detail="Choose from the agency directory." href="/agencies" />
+      <StRow title="Ask Strelva Agency to do it for you" detail="Strelva Agency · Runs on Strelva. Request a website build." onClick={() => setAgencyServiceChosen(true)} />
+    </StRows></StSection>
+    <StTextButton href="/sign-in">Already have an account? Sign in</StTextButton>
+  </StEntry>;
+
   return <StEntry>
     <p className="text-sm text-gray-muted">Strelva Agency · Runs on Strelva</p>
     {state === "success" ? <>
-      <StHead title="Request received" />
+      <div ref={heading} tabIndex={-1}><StHead title="Request received" /></div>
       <StState kind="live">Received</StState>
       <StCopy>{message}</StCopy>
       <StCopy muted>Request email: <StMono>{email.trim().toLowerCase()}</StMono></StCopy>
       {statusUrl ? <StPillLink href={statusUrl}>Track delivery status</StPillLink> : null}
       <StTextButton href="/">Back to launch page</StTextButton>
     </> : <>
-      <StHead title="Request your build" meta="Tell Strelva Agency about your business and what your website should help customers do." />
+      <div ref={heading} tabIndex={-1}><StHead title="Request your build" meta="Tell Strelva Agency about your business and what your website should help customers do." /></div>
+      <StTextButton onClick={() => setAgencyServiceChosen(false)} disabled={state === "submitting"}>Choose another path</StTextButton>
       <form className="flex flex-col gap-5" onSubmit={onSubmit} noValidate aria-describedby={message ? "intake-status" : undefined} aria-busy={state === "submitting"}>
         <StField label="Business"><input id="business-name" value={businessName} onChange={event => setBusinessName(event.target.value)} autoComplete="organization" required /></StField>
         <StField label="City"><input id="location" value={location} onChange={event => setLocation(event.target.value)} autoComplete="address-level2" /></StField>

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
 import { getRedis } from "@/platform/infra/redis";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 
 const TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const USER_URL = "https://api.calendly.com/users/me";
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
   }
   const tenantId = verifiedState.tenantId;
 
-  const accessDenied = await requireTenantAccess(tenantId);
+  const accessDenied = await requireTenantPermission(tenantId, "settings:write");
   if (accessDenied) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Access denied")}`

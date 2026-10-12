@@ -289,3 +289,35 @@ and `db push --include-all`; inspect the linked dry run and require exactly the
 receipt's pending files. The local helper does not verify hosted history or the
 Supabase CLI's behavior. `--include-all` handles the out-of-order September 28
 file; it is not permission to push an unreviewed tail.
+
+## October 12 UX audit: registered preparation only
+
+The `ux-audit-2026-10-12` proposed inventory entry pins each forward and
+matching inverse under `2026102412…`. It has no packet batch. Offline staging
+checks its source digests alongside two-doors and every other held tail;
+registration grants no migration application or deployment authority. The
+354-file neutral-money historical ledger and its native qualification are
+unchanged. All UX SQL execution and hosted qualification remain UNRUN/held.
+
+`bash scripts/check-ux-audit-sql.sh` owns the fresh ordered schema, each empty
+inverse/reapply at its installation boundary, every new owner/agency/chrome
+fixture, actual populated snapshot refusal, and the portable trust-email,
+budget reservation, owner-access and agency-qualification lane runners. Both
+`pnpm check:agency-workflow` and `pnpm check:workspace-sql` run it after their
+historical fixtures; `pnpm check:workspace-upgrade` does too. Historical
+verification and owner-claim inverse fixtures run before the new qualification
+and decision successors so they retain their original schema contract. The
+budget lane proof retains concurrent cap admission and populated inverse
+refusal. These jobs require local PostgreSQL shared memory and cannot execute
+in the audit sandbox (`shmget: Operation not permitted`). A passing offline
+inventory/source check is not native SQL or hosted delivery proof.
+
+Operator conversion stays behind default-off `STRELVA_TENANT_CONVERSION`.
+Remote conversion additionally requires default-off
+`STRELVA_TENANT_CONVERSION_PRODUCTION_APPROVED` and Jacob's explicit authority.
+Neither gate grants client content approval to platform operators. Optional
+`STRELVA_MARKETING_ORIGIN` must be an HTTP(S) origin without credentials and
+must differ from the requesting platform/app host; invalid or looping values
+fall back to the local paper entry. These configuration names are documented
+for preparation only. Production environment changes and the new production
+deploy they require still need Jacob's explicit yes.

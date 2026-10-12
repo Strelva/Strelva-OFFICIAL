@@ -147,7 +147,7 @@ describe("decided Needs you items in What changed", () => {
       }
     }
     expect(approvedDecisionUndo("tenant_event", "copy.routine", null).state).toBe("undo_needs_review");
-    expect(approvedDecisionUndo("work_money", "money", null)).toEqual({ state: "not_undoable", reason: "This is an agreement, not an edit. Ask Strelva to change it." });
+    expect(approvedDecisionUndo("work_money", "money", null)).toEqual({ state: "not_undoable", reason: "This is an agreement, not an edit. Request a change through your business workspace." });
   });
 
   it("drops withdrawn or superseded rows and anything without an id or time", () => {

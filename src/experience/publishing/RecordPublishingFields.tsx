@@ -68,7 +68,7 @@ export function RecordPublishingFields({ record, approvalCopy, readOnly = false,
         {!readOnly ? <StPill variant="soft" disabled={disabled || (hours.overrides?.length ?? 0) >= 366} onClick={() => change({ ...hours, overrides: [...(hours.overrides ?? []), { date: "", closed: true }] })}>Add holiday or special date</StPill> : null}
       </fieldset>
       {approvalCopy ? <StNotice>{approvalCopy}</StNotice> : null}
-      {!readOnly ? <StPill type="submit" busy={busy}>{approvalCopy ? "Save and approve Google changes" : "Save publishing facts"}</StPill> : <StNotice>Only the owner can save and approve these facts.</StNotice>}
+      {!readOnly ? <StPill type="submit" busy={busy}>{approvalCopy ? "Make it live" : "Save publishing facts"}</StPill> : <StNotice>Only the owner can save and approve these facts.</StNotice>}
     </form>
     {error ? <StNotice tone="critical">{error}</StNotice> : null}
     {result ? <div role="status" className="grid gap-2 text-sm"><p>{result.record.changeCount ? "Saved to your business record." : "Nothing changed in your record."}</p>{result.propagationError ? <StNotice tone="need">{result.propagationError}</StNotice> : null}<StRows label="Google change results">{result.google.map((effect, index) => <StRow key={index} title={<>{effect.locationId} · {effect.kind}</>} detail={<>{statusText[effect.status]}.{effect.reason ? ` ${effect.reason}` : ""}</>} />)}</StRows><StTextButton href={`/workspace/google?workspaceId=${record.workspaceId}`}>Review Google drafts and receipts</StTextButton></div> : null}

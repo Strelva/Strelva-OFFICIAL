@@ -20,6 +20,7 @@ import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enab
 import { customersReleaseEnabled } from "./platform/customers/release";
 import { workspaceReleaseEnabled } from "./platform/workspace-release";
 import { OWNER_ENTRY_PATH, ownerEntryPossible } from "./platform/owner-entry/env";
+import { isPlatformPublicPath, marketingEntryTarget } from "./app/(marketing)/platform-routing";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
@@ -193,7 +194,9 @@ export function resolveTenantFromDomainMap(
 }
 
 export function shouldRewriteMarketingRoot(host: string, pathname: string): boolean {
-  return isMarketingHost(host) && pathname === "/";
+  const hostname = host.toLowerCase().split(":")[0]!;
+  const platform = isMarketingHost(host) || hostname === new URL(CONTROL_PLANE_URL).hostname || hostname.endsWith(".vercel.app");
+  return platform && pathname === "/";
 }
 
 // Root domains under which `admin.<root>` is the OPERATOR console host (not a
@@ -672,12 +675,23 @@ export default async function proxy(req: NextRequest) {
     return applySecurityHeaders(new NextResponse(cron.message, { status: cron.status }), req);
   }
 
-  // Rewrite marketing host root to /home to avoid route conflict with tenant pages
+  // The platform entry never uses tenant fixtures. Optional marketing routing
+  // is server configuration, not a query-selected redirect destination.
   const hostWithoutPort = host.split(":")[0]!;
-  if (!devPreviewRequest && shouldRewriteMarketingRoot(host, pathname)) {
+  const platformEntry = shouldRewriteMarketingRoot(host, "/");
+  if (!devPreviewRequest && platformEntry && (pathname === "/" || pathname === "/home")) {
+    const target = marketingEntryTarget(host, req.nextUrl.search);
+    if (target) return applySecurityHeaders(NextResponse.redirect(target), req);
     const url = req.nextUrl.clone();
     url.pathname = "/home";
-    return applySecurityHeaders(NextResponse.rewrite(url), req);
+    const headers = new Headers(req.headers);
+    for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
+    return applySecurityHeaders(pathname === "/" ? NextResponse.rewrite(url, { request: { headers } }) : NextResponse.next({ request: { headers } }), req);
+  }
+  if (platformEntry && isPlatformPublicPath(pathname)) {
+    const headers = new Headers(req.headers);
+    for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
+    return applySecurityHeaders(NextResponse.next({ request: { headers } }), req);
   }
 
   // Bare admin host (admin.strelva.com / admin.localhost) -> the operator console
@@ -757,6 +771,17 @@ export default async function proxy(req: NextRequest) {
 
   if (!tenantId && devAccessBypass && (pathname.startsWith("/dashboard") || pathname.startsWith("/api/") || devPreviewRequest)) {
     tenantId = getDevAccessTenant();
+  }
+
+  // Platform paths stay outside the tenant catch-all, including custom domains.
+  // Tenant sites can link here but cannot supply their visible brand or routing.
+  if (isPlatformPublicPath(pathname)) {
+    if (tenantId) {
+      return applySecurityHeaders(NextResponse.redirect(new URL(pathname + req.nextUrl.search, CONTROL_PLANE_URL)), req);
+    }
+    const headers = new Headers(req.headers);
+    for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
+    return applySecurityHeaders(NextResponse.next({ request: { headers } }), req);
   }
 
   if (tenantId) {

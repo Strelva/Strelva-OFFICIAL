@@ -6,6 +6,8 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { createWorkPlanRequestSchema, executeWorkPlanOutputRequestSchema } from "@/products/work-plans/contracts";
 import { executeAgencyBuild, packageAgencySystem, prepareAgencyBuild, readPackageChoices } from "@/experience/workspace/agency/authoring-server";
+import { agencyPageInputSchema } from "@/products/websites/contracts";
+import { readAgencyPageChoices, sendAgencyNativePage } from "@/products/websites/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -24,6 +26,12 @@ export async function GET(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in to continue." }, 401);
     const workspaceId = uuid.parse(new URL(request.url).searchParams.get("agencyWorkspaceId"));
     if (!(await systemsReleasedFor(actor, workspaceId))) return workspaceJson({ error: "Agency authoring is not enabled." }, 503);
+    const query = new URL(request.url).searchParams;
+    if (query.get("action") === "pages") {
+      const clientId = uuid.parse(query.get("workspaceId"));
+      if (!(await systemsReleasedFor(actor, clientId))) return workspaceJson({ error: "Agency authoring is not enabled for this business." }, 503);
+      return workspaceJson(await readAgencyPageChoices(actor, workspaceId, clientId));
+    }
     return workspaceJson(await readPackageChoices(actor, workspaceId));
   } catch (error) { return failure(error); }
 }
@@ -36,11 +44,12 @@ export async function POST(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in to continue." }, 401);
     const query = new URL(request.url).searchParams;
     const agencyWorkspaceId = uuid.parse(query.get("agencyWorkspaceId"));
-    const action = z.enum(["prepare", "execute", "package"]).parse(query.get("action"));
+    const action = z.enum(["prepare", "execute", "package", "send-page"]).parse(query.get("action"));
     const raw = await readWorkspaceBody(request, 128_000);
-    const input = action === "prepare" ? createWorkPlanRequestSchema.parse(raw) : action === "execute" ? executeWorkPlanOutputRequestSchema.parse(raw) : packageBody.parse(raw);
+    const input = action === "prepare" ? createWorkPlanRequestSchema.parse(raw) : action === "execute" ? executeWorkPlanOutputRequestSchema.parse(raw) : action === "send-page" ? agencyPageInputSchema.parse(raw) : packageBody.parse(raw);
     if (!(await systemsReleasedFor(actor, agencyWorkspaceId)) || !(await systemsReleasedFor(actor, input.workspaceId))) return workspaceJson({ error: "Agency authoring is not enabled for this client. Nothing changed." }, 503);
     if (await isRateLimitedWindowedAsync(`workspace:agency-authoring:${actor.userId}`, 10, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
+    if (action === "send-page") return workspaceJson(await sendAgencyNativePage(actor, agencyWorkspaceId, input), 201);
     if (action === "package") {
       const body = packageBody.parse(input);
       if (body.workspaceId !== agencyWorkspaceId) return workspaceJson({ error: "Package only a System owned by this agency." }, 403);

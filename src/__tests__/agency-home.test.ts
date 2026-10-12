@@ -69,7 +69,7 @@ function queueItem(id: string, since: string, extra: Partial<AgencyQueueItem> = 
 function source(): AgencyLibrarySource {
   const version = (id: string, clientName: string, state: AgencyLibrarySource["versions"][number]["state"], extra: Partial<AgencyLibrarySource["versions"][number]> = {}) => ({
     versionId: id, workspaceId: uuid("c0000000", id.length), clientName, systemId: uuid("52000000", id.length), systemName: "Inquiry intake",
-    context: { kind: "agency_client" as const, label: clientName }, baselineRevision: 3, currentRelease: 1,
+    context: { kind: "agency_client" as const, label: clientName }, baselineRevision: 3, improvementRevision: 4, currentRelease: 1,
     state, conflicts: [], missingBindings: [], declinedReason: null, ...extra,
   });
   return {

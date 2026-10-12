@@ -402,6 +402,18 @@ export async function decideBookingRequest(
   return { status: data.status, booking };
 }
 
+/** Source-owned execution of an already claimed selected-agency decision. */
+export async function decideScopedAgencyBookingRequest(
+  workspaceId: string, bookingId: string, decision: "approve" | "not_yet", decisionId: string, db?: BookingStoreDb | null,
+): Promise<{ status: "decided" | "already_decided"; booking: StoreBooking }> {
+  const data = await call<{ status?: string; booking?: unknown }>("decide_scoped_agency_booking_request", {
+    p_workspace_id: workspaceId, p_booking_id: bookingId, p_decision: decision, p_decision_id: decisionId,
+  }, db);
+  const booking = parseStoreBooking(data?.booking);
+  if (!booking || (data?.status !== "decided" && data?.status !== "already_decided")) throw new BookingStoreError("failed", "booking_store_unexpected_response");
+  return { status: data.status, booking };
+}
+
 // --- After a booking is taken (20261009110000_booking_lifecycle.sql) ---------------
 
 export type BookingMessageKind = "reminder_24h" | "reminder_2h" | "request_owner_reminder" | "request_lapsed";

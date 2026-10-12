@@ -20,6 +20,10 @@ export interface ClientRow {
   seoGrade: LetterGrade | null;
   /** Managed-readiness verdict, or null. Only "blocked" is a real problem. */
   launchStatus: "ready" | "watch" | "blocked" | null;
+  /** Evidence gaps prevent a current Live verdict; retained grades stay labelled. */
+  evidenceIssue?: string | null;
+  scanIssue?: string | null;
+  scannedAt?: string | null;
   /** Human billing label, e.g. "Growth · $199/mo" / "Legacy case study" / "No plan set". */
   billingLabel: string;
   /** Whether billing is set up (tier/custom/case_study). false = "none". */
@@ -29,9 +33,10 @@ export interface ClientRow {
 type StatusTone = "good" | "warn" | "crit" | "neutral";
 
 /** One clear verdict per site, absorbing active / at-risk / billing / readiness. */
-function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
+export function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
   if (!c.active) return { label: "Archived", tone: "neutral" };
   if (c.atRiskReason) return { label: "At risk", tone: "crit", detail: c.atRiskReason };
+  if (c.evidenceIssue || c.launchStatus === null) return { label: "Unverified", tone: "warn", detail: c.evidenceIssue ?? "Launch readiness unavailable. Open the site support record to check." };
   // A live client with no plan is a real revenue leak (amber). But a client still
   // in onboarding without billing is the NORMAL state — show it as a calm neutral
   // "In build", not an amber warning on every pre-launch row.
@@ -131,12 +136,14 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
                       <p className="mt-0.5 truncate text-[11.5px] text-gray-muted">
                         {c.domain || c.ownerEmail || <span className="text-gray-faint">no domain yet</span>}
                       </p>
+                      {c.evidenceIssue && <p className="mt-1 text-[11.5px] text-gray-muted">{c.evidenceIssue}</p>}
+                      {c.scannedAt && <p className="mt-1 text-[11.5px] text-gray-muted">Last site scan: {Number.isFinite(Date.parse(c.scannedAt)) ? new Date(c.scannedAt).toLocaleString() : "Time unverified"}{c.scanIssue ? " · Historical grade" : ""}</p>}
                     </div>
                   </div>
 
                   {/* Health grade */}
                   <div className="pointer-events-none relative z-[1] hidden w-[52px] justify-center md:flex">
-                    {c.seoGrade ? <Grade grade={c.seoGrade} /> : <span className="text-[12px] text-gray-faint" title="Not scanned yet">&mdash;</span>}
+                    {c.seoGrade ? <span title={c.scanIssue ?? `Site scan: ${c.scannedAt ?? "Time unverified"}`}><Grade grade={c.seoGrade} /></span> : <span className="text-[12px] text-gray-faint" title="Not scanned yet">&mdash;</span>}
                   </div>
 
                   {/* Billing — the plan when set; a quiet dash otherwise (the Status

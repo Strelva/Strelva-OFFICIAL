@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
+import { sessionTenantDecider } from "@/lib/operator-decisions";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";
 import {
@@ -173,6 +174,9 @@ export async function POST(request: Request) {
     if (!body) return json({ error: "Invalid request body." }, 400);
     const context = await contextFor(body);
     if ("error" in context && context.error) return context.error;
+    const decider = await sessionTenantDecider(context.tenantId);
+    if (!decider) return json({ error: "Unauthorized" }, 401);
+    if (decider.kind === "operator") return json({ error: "Platform support cannot prepare or approve client messages. Open the business workspace with ordinary agency or owner access." }, 403);
     const actorId = await getAuthUserId();
     if (!actorId) return json({ error: "Unauthorized" }, 401);
     const requestOperation = operation(body.operation);

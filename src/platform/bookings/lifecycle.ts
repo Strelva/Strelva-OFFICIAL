@@ -111,7 +111,7 @@ async function deliver(
   try {
     const result = await ports.send({
       audience,
-      authorship: audience === "customer" ? "business" : "agency",
+      authorship: audience === "customer" ? "business" : undefined,
       workspaceId: booking.workspaceId ?? undefined,
       ...(business.tenantId ? { tenantId: business.tenantId } : {}),
       ...(audience === "customer" ? { fromName: business.name, businessName: business.name, fromAddress: CUSTOMER_FROM } : {}),

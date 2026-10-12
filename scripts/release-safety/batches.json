@@ -1855,14 +1855,14 @@
     },
     {
       "id": "reward-durable-mutations",
-      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards with enabled-event-hook refusal before DDL; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; forward/inverse require actual superuser and no enabled event hooks, managed/provider-hook feasibility HOLD; no provider or commercial authority",
+      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards with enabled-event-hook refusal before DDL; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; forward/inverse run as hosted Supabase postgres and admit only the six Supabase platform event hooks by name, function and owner (Oct 12: rehearsed on a restored production copy, all 118 pending forwards as postgres; repo guard proof GREEN); no provider or commercial authority",
       "items": [
         {
           "file": "20261022175000_reward_durable_mutations.sql",
-          "sha256": "f828c26f6459cca410dd1120df0bf1332905f194f9cc06400110e9ba4b1587b7",
+          "sha256": "a9479c59d8796164fb694043359335bf6d83edeae8a04c465c8b500a144da59c",
           "rollback": "rollback-20261022175000_reward_durable_mutations.sql",
-          "rollbackSha256": "0ad295c0a4e864f3d9deb7140c7f00ba95d5fe465b901f912957117cfff5a238",
-          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse require actual superuser catalog/event-hook exclusion and refuse every enabled event hook; managed/provider-hook feasibility HOLD and actual native qualification UNRUN"
+          "rollbackSha256": "874fbd044657cfc2944ae607707478636ab2ed6f8868068a3814c6eed7e0a262",
+          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse refuse any enabled event hook other than the six Supabase platform hooks; empty inverse and reapply rehearsed as postgres on a restored production copy Oct 12"
         }
       ]
     },
@@ -2035,6 +2035,137 @@
           "rollback": "rollback-20261023144000_two_doors_funnel_events.sql",
           "rollbackSha256": "6ceadea4c953aa83515747292528500344256de1dbf12c2cd867331dd7061f43",
           "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
+        }
+      ]
+    },
+    {
+      "id": "ux-audit-2026-10-12",
+      "status": "October 12 UX audit: held and unqualified. The twelve original forward/inverse pairs and three agency pass-2 pairs are source-pinned only. Ordered SQL, concurrent admission, hosted Auth, rendered acceptance and production application UNRUN/held; no packet batch, deployment or migration application authority granted.",
+      "items": [
+        {
+          "file": "20261024121000_ux_trust_email_context.sql",
+          "sha256": "e0673cf06140798b537a2ee747113a5f98fc5f003f9042f9f61194e4b669cc37",
+          "rollback": "rollback-20261024121000_ux_trust_email_context.sql",
+          "rollbackSha256": "62286a3badbcaab65295ef07a84caa477cb4555f1e0b54aa52530a443226c1c0",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024121500_ux_trust_ui_ai_budget_reservations.sql",
+          "sha256": "c0f5c33f94e506a820ebb5a03b97d28a9a40ea857d3aceda91abd35c8a63d76e",
+          "rollback": "rollback-20261024121500_ux_trust_ui_ai_budget_reservations.sql",
+          "rollbackSha256": "dd22d8cad983f09a4a979cdb7544cde2d1a33c71e2aa1a7b683847d2871161da",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024122000_ux_owner_setup_ask.sql",
+          "sha256": "ffa68937b4221d3eb5a6ee309d0600a49776d0b73722ff2edd34f9c2ed212b73",
+          "rollback": "rollback-20261024122000_ux_owner_setup_ask.sql",
+          "rollbackSha256": "5e65fd20d346e16a8300c37d9b358621bfba1376661abd20cf949f45ed74a7fc",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024122300_ux_owner_agency_access.sql",
+          "sha256": "11dbaea524c1140b43227e9aa4cec33dcc8185af1915fcd7f0890bc37d6141ba",
+          "rollback": "rollback-20261024122300_ux_owner_agency_access.sql",
+          "rollbackSha256": "d114d90207ccc51c5e0cfaa354908169ddf18d5f586229cc037427ab7a5b4522",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024122400_ux_owner_export_history.sql",
+          "sha256": "7eb33619a96eba505d2646e7e7776873d3a838f30d8ad1532ddefc4f45f41dd3",
+          "rollback": "rollback-20261024122400_ux_owner_export_history.sql",
+          "rollbackSha256": "8e0b88ce5011ecc786c6b2d1d732d0c11d92ec6cba222e711d259fcc5aebb600",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024122500_ux_agency_qualification.sql",
+          "sha256": "878796d74f654b94fe07e76633af10f3c6923e64ce1a582b49cee6c327a89f9f",
+          "rollback": "rollback-20261024122500_ux_agency_qualification.sql",
+          "rollbackSha256": "1dc1b0b66e73a564456e7a02b354230b9497418cf9aef9b1dda1defd16203cad",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024123100_ux_agency_full_control_decisions.sql",
+          "sha256": "9c501f4304d463a065a88ec60f0a0f727d2d2242232aebf0082ed9d5d6f4c272",
+          "rollback": "rollback-20261024123100_ux_agency_full_control_decisions.sql",
+          "rollbackSha256": "7f4868e6a7824bb8f7783649c7563888034602cbd7d1d3f6fa2ae4f8ecc27b6e",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024123500_ux_chrome_recorded_actors.sql",
+          "sha256": "c89936835a45b79be068a23b32c3287a203382397af8cef3a0749e9ff7026558",
+          "rollback": "rollback-20261024123500_ux_chrome_recorded_actors.sql",
+          "rollbackSha256": "0e707d6c47792da32d00c4a0334fe7b58d9a58ebc986b331cd2193182bbce399",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024123600_ux_chrome_ask_receipt_identity.sql",
+          "sha256": "337ffa1e164cf412d8a63ca3602c23da4c86f6b7e5166814808ed2768f5314f1",
+          "rollback": "rollback-20261024123600_ux_chrome_ask_receipt_identity.sql",
+          "rollbackSha256": "44595dbcb9482bae39b40f9a2e4a0cb88a72a6a9c8e78b17ea19c1138208f933",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024124500_ux_visitor_booking_receipts.sql",
+          "sha256": "849d128603ec74dcda688b230b497654e8506219a57b4b6623aac300e06b57f2",
+          "rollback": "rollback-20261024124500_ux_visitor_booking_receipts.sql",
+          "rollbackSha256": "fceacf387634c2604d10f3e23a1c6e6366a00575ff30538a70d39bc493a153b8",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024124600_ux_visitor_payment_terms.sql",
+          "sha256": "3d09ec7ff7b4474ea07a1317a0af01e2a5c5700020783328f770ad4f6e9e6608",
+          "rollback": "rollback-20261024124600_ux_visitor_payment_terms.sql",
+          "rollbackSha256": "ab5bf12c76134f57f6ba5b18e3a3b8d9af21f4644bb315fa7bb5ce73d5600d10",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024124700_ux_integration_booking_actor.sql",
+          "sha256": "11edebac044d6bdcc6b7d9e89b347202d8e57b8feaa62320beddc5dc82e5637e",
+          "rollback": "rollback-20261024124700_ux_integration_booking_actor.sql",
+          "rollbackSha256": "0de7257632431559b93820c9ebe53b27babf42b8cd31dd2e43843423fda599d7",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132000_ux_agency_proposal_identity.sql",
+          "sha256": "3e380c523a17d766c8758841c46bad00036508ab2cd3fb2a918431de0fda9765",
+          "rollback": "rollback-20261024132000_ux_agency_proposal_identity.sql",
+          "rollbackSha256": "37a1ea03fddaeba9b8419ff2c5a5a903b454165265f4154a0cdb86a62ed691fa",
+          "rollbackStatus": "Prepared inverse only; exact catalog guard and pending-proposal refusal. Ordered disposable SQL, owner-revocation races, inverse/reapply and hosted Auth UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132100_ux_agency_native_pages.sql",
+          "sha256": "67ca0247566566e12308b376a3845d88ebf4217805d20a6937a5bbaa459785b3",
+          "rollback": "rollback-20261024132100_ux_agency_native_pages.sql",
+          "rollbackSha256": "acdd8dc8689b7fa4a35c86e050dc7e04806edb96c500bc097b842d51b17aa476",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, positive form/booking fixtures, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132400_ux_agency2_decision_recovery.sql",
+          "sha256": "5d447ea207d1acf90ed265fb2cb302c87725af3724378b7c47d32f1f22287286",
+          "rollback": "rollback-20261024132400_ux_agency2_decision_recovery.sql",
+          "rollbackSha256": "cf7c7d288c833d430196e523ddf5e50a858eef5f1cddd65b3cfa3dad454f4f00",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        }
+      ]
+    },
+    {
+      "id": "ux-audit-pass2-owner2-2026-10-12",
+      "status": "October 12 owner2 follow-up: held and unqualified. Checkout identity and issued payment terms are source-pinned only. Native SQL, concurrent admission, hosted Stripe/Auth, rendered acceptance and production application UNRUN/held; no packet batch or application authority granted.",
+      "items": [
+        {
+          "file": "20261024131000_ux_owner2_checkout.sql",
+          "sha256": "28b5d1c76a671a1049e16759c818b5be5962396d3ab7376bfd77ca0e9819f649",
+          "rollback": "rollback-20261024131000_ux_owner2_checkout.sql",
+          "rollbackSha256": "c87523d6dea2216c2e4f920642a51ef391e9e7cf09f46d2750e604aae2977047",
+          "rollbackStatus": "Prepared inverse only; disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024131100_ux_owner2_payment_terms.sql",
+          "sha256": "f08fe85bc548128d46652323110fb250e687b28689d6504d525fb2171012eea7",
+          "rollback": "rollback-20261024131100_ux_owner2_payment_terms.sql",
+          "rollbackSha256": "18286671bebe68b0562fc3e8c8c6d76d463eb6524ef419962cecb826aeca83cb",
+          "rollbackStatus": "Prepared inverse only; disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
         }
       ]
     },

@@ -76,7 +76,7 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
   let sent: SendEmailResult;
   try {
     sent = await dependencies.send({
-      audience: "customer", authorship: "business", businessName: claim.businessName, tenantId: claim.tenantId ?? undefined,
+      audience: "customer", authorship: "business", businessName: claim.businessName, workspaceId: input.workspaceId, tenantId: claim.tenantId ?? undefined,
       to: claim.recipient, subject: claim.subject,
       fromName: claim.businessName, fromAddress: `hello@${CLIENT_MAIL_DOMAIN}`,
       ...(claim.replyTo ? { replyTo: claim.replyTo } : {}),

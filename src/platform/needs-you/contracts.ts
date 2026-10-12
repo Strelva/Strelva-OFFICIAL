@@ -202,6 +202,8 @@ export const ownerDecisionSchema = z.object({
   operatorNote: z.string().nullable(),
   /** Requesting actor, when recorded by the source. Never inferred from branding. */
   actor: recordedActorSchema.nullable().optional().catch(null),
+  /** Deciding actor captured separately at decision time; never the proposing actor. */
+  decidedActor: recordedActorSchema.nullable().optional().catch(null),
   /** Support reviewer, separate from the requesting actor. */
   noteActor: recordedActorSchema.nullable().optional().catch(null),
   openedAt: isoSchema,
@@ -228,6 +230,8 @@ export type OwnerDecision = z.infer<typeof ownerDecisionSchema>;
 
 /** What an adapter proposes; the store turns it into an item. */
 export interface ProposedItem {
+  /** Source-owned action-time snapshot; absence stays unknown. */
+  actor?: RecordedActor | null;
   kind: ChangeKind;
   route: "strelva_reviews" | "owner_decides";
   systemId?: string | null;

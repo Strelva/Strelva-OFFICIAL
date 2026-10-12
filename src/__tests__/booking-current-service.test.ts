@@ -90,7 +90,7 @@ describe("booking changes follow the current service contract", () => {
     const offered = await nativeSlots(tenant, "consult", now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
     expect(offered.slots[0]).toMatchObject({ start: "2026-11-06T17:00:00.000Z", end: "2026-11-06T18:15:00.000Z" });
     const alternatives = await nextOpenTimes(booking, now);
-    expect(alternatives[0]).toBe("Fri, Nov 6 at 12:00 PM (America/New_York)");
+    expect(alternatives[0]).toBe("Fri, Nov 6 at 12:00 PM Eastern Time");
     expect(alternatives).toHaveLength(3);
   });
   it("removed services produce no new alternatives or reschedules and keep the original booking", async () => {

@@ -44,7 +44,12 @@ const mockHeadersGet = vi.fn((key: string): string | null => {
   return null;
 });
 
-// Drive request-context auth as an authorized super-admin so the handlers reach
+vi.mock("@/platform/infra/db/repositories", async importOriginal => {
+  const actual = await importOriginal<typeof import("@/platform/infra/db/repositories")>();
+  return { ...actual, getMembershipRole: async () => "owner", getTenantAgencySeat: async () => null };
+});
+
+// Drive request-context auth as an authorized owner who also holds support access so the handlers reach
 // their body-validation/logic under test. Pure helpers stay real via importOriginal.
 vi.mock("@/platform/infra/auth", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/platform/infra/auth")>();
@@ -340,20 +345,10 @@ describe("Admin access handoff route handlers", () => {
     expect(data.error).toBe("Invalid request body");
   });
 
-  it("POST /api/admin/tenants rejects malformed JSON with a client error", async () => {
+  it("POST /api/admin/tenants refuses platform client setup before parsing or writing", async () => {
     const { POST } = await import("@/app/api/admin/tenants/route");
-
-    const request = new Request("http://localhost/api/admin/tenants", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(400);
-
-    const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
+    const res = await POST(new Request("http://localhost/api/admin/tenants", { method: "POST", body: "{" }));
+    expect(res.status).toBe(410); expect(mockCreateTenant).not.toHaveBeenCalled();
   });
 
   it("PATCH /api/admin/tenants rejects malformed JSON with a client error", async () => {
@@ -372,38 +367,12 @@ describe("Admin access handoff route handlers", () => {
     expect(data.error).toBe("Invalid request body");
   });
 
-  it("POST /api/admin/tenants trims launch-critical tenant setup fields", async () => {
-    const { POST } = await import("@/app/api/admin/tenants/route");
-    mockCreateTenant.mockResolvedValue({ id: "gldf", siteName: "Great Lakes Dried Fruit" });
-
-    const request = new Request("http://localhost/api/admin/tenants", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        siteName: " Great Lakes Dried Fruit ",
-        ownerName: " Owner Name ",
-        ownerEmail: " owner@example.com ",
-        industry: " food-brand ",
-        template: " food-brand ",
-        subdomain: " gldf ",
-        features: ["commerce", 1, "newsletter"],
-      }),
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(201);
-    expect(mockCreateTenant).toHaveBeenCalledWith(
-      expect.objectContaining({
-        siteName: "Great Lakes Dried Fruit",
-        ownerName: "Owner Name",
-        ownerEmail: "owner@example.com",
-        industry: "food-brand",
-        template: "food-brand",
-        subdomain: "gldf",
-        features: ["commerce", "newsletter"],
-      }),
-    );
+  it.each(["personality", "businessRules", "autoPublish", "autoApproveThreshold", "reviewsConfig", "visibility", "siteName", "bookingUrl"])("refuses client settings in platform PATCH before storage: %s", async field => {
+    const { PATCH } = await import("@/app/api/admin/tenants/route");
+    const res = await PATCH(new Request("http://localhost/api/admin/tenants", { method: "PATCH", body: JSON.stringify({ id: "client", [field]: "changed", active: true }) }));
+    expect(res.status).toBe(403); expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
+
 });
 
 describe("v1 Public Content API Route Handlers", () => {
@@ -803,20 +772,14 @@ describe("Admin and settings write route handlers", () => {
     expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
 
-  it("POST /api/admin/drafts rejects malformed JSON with a client error", async () => {
+  it("POST /api/admin/drafts retires all writes, including malformed bodies", async () => {
     const { POST } = await import("@/app/api/admin/drafts/route");
 
-    const request = new Request("http://localhost/api/admin/drafts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(400);
+    const response = await POST();
+    expect(response.status).toBe(410);
 
     const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
+    expect(data.code).toBe("client_content_decision_required");
   });
 
   it("POST /api/rewards/members/:email/adjust rejects malformed JSON with a client error", async () => {

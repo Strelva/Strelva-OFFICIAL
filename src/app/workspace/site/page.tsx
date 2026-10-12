@@ -32,6 +32,7 @@ import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { SiteHistoryContent } from "@/components/dashboard/SiteHistoryContent";
 import Link from "next/link";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WebsiteEntry } from "@/experience/websites/WebsiteEntry";
 import { managedSiteNavigation, websiteEntryPath } from "@/experience/websites/site-navigation";
@@ -86,10 +87,10 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     isOperator: () => isSuperAdmin(),
   }, actor, workspaceId, systemId);
 
-  if (state.kind === "off") return <WorkspaceSiteMessage title="This isn't open for this business yet." body="Websites in the workspace open with Systems. The site, its content and its requests are unchanged." href={home} action="Back to Home" />;
-  if (state.kind === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/workspace" action="Open your workspace" />;
-  if (state.kind === "not_found") return <WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href={home} action="Back to Home" />;
-  if (state.kind === "error") return <WorkspaceSiteMessage title="The website didn't open." body="Strelva couldn't read this site's details just now. Nothing was changed. Try again in a moment." href={here} action="Try again" />;
+  if (state.kind === "off") return <WorkspaceSurfaceShell workspaceId={workspaceId}><WorkspaceSiteMessage title="This isn't open for this business yet." body="Websites in the workspace open with Systems. The site, its content and its requests are unchanged." href={home} action="Back to Home" /></WorkspaceSurfaceShell>;
+  if (state.kind === "permission") return <WorkspaceSurfaceShell workspaceId={workspaceId}><WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/workspace" action="Open your workspace" /></WorkspaceSurfaceShell>;
+  if (state.kind === "not_found") return <WorkspaceSurfaceShell workspaceId={workspaceId}><WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href={home} action="Back to Home" /></WorkspaceSurfaceShell>;
+  if (state.kind === "error") return <WorkspaceSurfaceShell workspaceId={workspaceId}><WorkspaceSiteMessage title="The website didn't open." body="Strelva couldn't read this site's details just now. Nothing was changed. Try again in a moment." href={here} action="Try again" /></WorkspaceSurfaceShell>;
 
   const { site, editing, operator } = state;
   const connectionTab = requestedTab === "store" || requestedTab === "members" ? requestedTab : null;
@@ -154,11 +155,11 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     panel = <WebsiteChangeRequests workspaceId={workspaceId} systemId={systemId} siteLabel={siteLabel} editing={editing} canAsk={!readOnly} canDecide={state.role === "owner"} operator={operator} />;
   }
 
-  return <WorkspaceSiteFrame workspaceId={workspaceId} systemId={systemId} workspaceName={state.workspaceName} siteLabel={siteLabel} tab={tab} tabs={visibleTabs}
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={state.workspaceName} systemsReleased><WorkspaceSiteFrame workspaceId={workspaceId} systemId={systemId} workspaceName={state.workspaceName} siteLabel={siteLabel} tab={tab} tabs={visibleTabs}
     tenantRoot={tenantRoot} tenantId={site.tenantId} askReleased={askReleased} readOnly={readOnly || !operator} liveUrl={domain ? `https://${domain}` : frame.siteUrl || undefined}
     site={frame} notice={notice}>
     {panel}
-  </WorkspaceSiteFrame>;
+  </WorkspaceSiteFrame></WorkspaceSurfaceShell>;
 }
 
 function WorkspaceSiteMessageInline({ title, body, href, action }: { title: string; body: string; href: string; action: string }) {

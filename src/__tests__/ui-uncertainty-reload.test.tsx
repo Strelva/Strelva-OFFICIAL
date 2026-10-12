@@ -65,7 +65,7 @@ it("reloads uncertain receipts without replaying the recorded decision", async (
     return new Response(JSON.stringify({ requests: [{ id: REQUEST, request: "Change the site", status: "requested", accepted: "pending", createdAt: "2026-10-09T00:00:00Z", updatedAt: "2026-10-09T00:00:00Z", receipts: [preview] }] }));
   });
   const node = await mount(createElement(WebsiteChangeRequests, { workspaceId: BUSINESS, systemId: SYSTEM, siteLabel: "Bakery", editing: "request", canAsk: false, canDecide: true, operator: false }), request as unknown as typeof fetch);
-  const approve = button(node, "Approve the preview")!; approve.focus();
+  const approve = button(node, "Make it live")!; approve.focus();
   await act(async () => approve.click());
   const recover = button(node, "Reload receipts"); expect(recover).toBeTruthy(); expect(document.activeElement).toBe(recover);
   await act(async () => recover!.click()); expect(reload).toHaveBeenCalledTimes(1);
@@ -81,7 +81,7 @@ it("locks an actual post-RPC page parse failure mapped to400 and exposes reload 
   expect(committed).toBe(true); expect(response.status).toBe(400);
   const request = vi.fn(async () => response), reload = reloadSpy();
   const node = await mount(pageElement(), request as unknown as typeof fetch);
-  const publish = button(node, "Publish page")!; publish.focus();
+  const publish = button(node, "Make it live")!; publish.focus();
   await act(async () => publish.click());
   expect(publish.disabled).toBe(true); expect(node.querySelector("input")?.readOnly).toBe(true);
   expect(node.querySelector('[role="alert"]')?.textContent).toContain("couldn't confirm");
@@ -131,11 +131,11 @@ it("keeps unknown publication locked and visible while a read-only site check co
   });
   const props = { workspaceId: BUSINESS, canManage: true, suggestedHandle: "bread", initial: { pagesEnabled: true, page: null, blocks: [{ id: REQUEST, label: "Bakery", url: "https://bakery.example", checkable: true, block: { hash: "abc", html: "<script></script>" } }] } };
   const node = await mount(createElement(ServerVisibility, props), request as unknown as typeof fetch);
-  await act(async () => button(node, "Publish page")!.click());
+  await act(async () => button(node, "Make it live")!.click());
   await act(async () => button(node, "Check Bakery")!.click());
   expect(node.textContent).toContain("matches the confirmed details");
   expect(node.querySelector('[role="alert"]')?.textContent).toContain("couldn't confirm");
-  expect(button(node, "Reload page")).toBeTruthy(); expect(button(node, "Publish page")?.disabled).toBe(true);
+  expect(button(node, "Reload page")).toBeTruthy(); expect(button(node, "Make it live")?.disabled).toBe(true);
   expect(request).toHaveBeenCalledTimes(2);
 });
 it("keeps an uncertain unpublish decision locked through a later submit", async () => {
@@ -152,11 +152,11 @@ it("does not attach an old page flight or its recovery focus to a newly selected
   const pending = new Promise<Response>((_resolve, reject) => { finish = () => reject(new TypeError("Reply lost")); });
   const request = vi.fn(async () => pending);
   const node = await mount(pageElement(), request as unknown as typeof fetch);
-  const publish = button(node, "Publish page")!; publish.focus();
+  const publish = button(node, "Make it live")!; publish.focus();
   await act(async () => publish.click());
   const next = createElement(ServerVisibility, { workspaceId: SYSTEM, canManage: true, suggestedHandle: "other", initial: { pagesEnabled: true, page: null, blocks: null } });
   await act(async () => roots[roots.length - 1]!.render(createElement(WorkspaceRequestContext.Provider, { value: request as unknown as typeof fetch }, next)));
-  const current = button(node, "Publish page")!; current.focus();
+  const current = button(node, "Make it live")!; current.focus();
   await act(async () => finish());
   expect(node.querySelector("input")?.value).toBe("other"); expect(current.disabled).toBe(false);
   expect(button(node, "Reload page")).toBeUndefined(); expect(document.activeElement).toBe(current);
@@ -191,9 +191,9 @@ it.each([false, true])("recovers a completed verification to its connected resul
 it.each(["https://app.strelva.com/b/bread", "https://app.strelva.com/biz/other", "https://foreign.example/biz/bread", "https://app.strelva.com/biz/bread?changed=1", "https://app.strelva.com/biz/bread#different"])("locks a schema-valid publication acknowledgement with the wrong URL %s", async url => {
   const request = vi.fn(async () => new Response(JSON.stringify({ page: { handle: "bread", published: true, url } })));
   const reload = reloadSpy(), node = await mount(pageElement(), request as unknown as typeof fetch);
-  await act(async () => button(node, "Publish page")!.click());
+  await act(async () => button(node, "Make it live")!.click());
   expect(button(node, "Reload page")).toBeTruthy();
-  expect(button(node, "Publish page")?.disabled).toBe(true);
+  expect(button(node, "Make it live")?.disabled).toBe(true);
   expect(node.querySelector('a[href="' + url + '"]')).toBeNull();
   await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   await act(async () => button(node, "Reload page")!.click());

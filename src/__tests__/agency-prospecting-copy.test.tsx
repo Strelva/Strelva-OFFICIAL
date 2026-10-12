@@ -28,7 +28,8 @@ describe("agency copy across public artifacts", () => {
     expect(html).toContain("Ask your web provider");
     expect(html).not.toContain("Ask Strelva"); expect(html).not.toContain("Ask Strelva Agency");
     expect(html).not.toContain("every issue in this report fixed");
-    expect(renderAuditReport(audit)).toContain("Ask Strelva Agency");
+    expect(renderAuditReport(audit)).toContain("Find an agency");
+    expect(renderAuditReport(audit)).not.toContain("Ask Strelva Agency");
     expect(renderAuditReport(audit)).toContain("Ask Strelva");
   });
   it("brands AI HTML and rendered result, retaining the platform credit and agency contact", () => {

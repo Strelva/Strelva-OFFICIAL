@@ -198,7 +198,7 @@ export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
       if (!at) return [];
       return call(db(), "read_system_version_source_revisions", {
         p_workspace_id: at.businessId, ...actorArgs(actor), p_system_id: at.systemId, p_number: null,
-      }, z.array(revisionSchema), "The source revisions could not be loaded.") as Promise<SourceRevision[]>;
+      }, z.array(revisionSchema), "The source Releases could not be loaded.") as Promise<SourceRevision[]>;
     },
     async insertRevision(actor, revision) {
       return call(db(), "publish_system_version_source_revision", { ...actorArgs(actor), p_revision: revision },

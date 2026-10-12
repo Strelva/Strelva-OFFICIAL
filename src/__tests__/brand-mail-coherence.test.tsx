@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "b2640000-0000-4000-8000-000000000010", tenantIds: [], ownerAuthorship: "agency", businessName: "The Mooney Firm", replyTo: "owner@mooney.example", timeZone: "America/New_York" }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -185,8 +186,10 @@ describe("entry branding", () => {
 describe("neutral owner navigation identity", () => {
   it("keeps the provided neutral identity instead of rendering the platform brand", () => {
     const html = renderToStaticMarkup(<StrelvaSidebar ownerBrand={unavailable} accountName="Owner" signedIn={false} />);
-    expect(html).toContain('aria-label="Agency identity unavailable navigation"');
-    expect(html).toContain('aria-label="Agency identity unavailable home"');
+    expect(html).toContain('aria-label="Workspace navigation"');
+    expect(html).toContain("Agency identity unavailable");
+    expect(html).toContain('aria-label="Workspace home"');
+    expect(html).toContain('aria-label="Strelva platform"');
     expect(html).not.toContain('aria-label="Strelva home"');
     expect(html).not.toContain('>Strelva</span>');
   });

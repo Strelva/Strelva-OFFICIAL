@@ -1,5 +1,29 @@
 # Strelva interface and Managed Websites context
 
+## October 12 UX integration preparation
+
+`ux/integrate` composes the ten audit lanes and their cross-lane wiring. Ask
+retains exact website creation actions; customer billing reads authorized usage
+and owner controls; shared mail carries business scope and verified identity;
+platform support cannot author or decide client content. Agency decisions keep
+proposing and deciding actors separate. Business website sharing uses its
+existing owner claim, and client launch status reads the received copy instead
+of inferring it from a published agency source.
+
+The original eleven audit migration pairs and the additive selected-agency
+booking-actor pair are held and unqualified. Ordered disposable SQL jobs include
+their fixtures and guarded inverse/reapply rehearsals. No migration, provider,
+production environment, release default or pricing choice changed. Capped AI
+work without a qualified provider billing ceiling remains paused.
+
+The [integration release record](docs/operations/ux-audit-integration-2026-10-12.md)
+owns activation and proof boundaries; the exact check results and continuation
+are in the audit's `fix/integrate.md` handoff. Native SQL, desktop/phone rendering,
+Auth and hosted delivery remain separate gates. The main checkout's canonical
+product ledger is revision 58; this worktree's older copy was not advanced.
+The handoff preserves an evidence delta for its existing writer. Changes remain
+uncommitted, with no production action authorized.
+
 ## October 9 premerge quality integration
 
 Jacob authorized merging the verified deletion and architecture cleanup into

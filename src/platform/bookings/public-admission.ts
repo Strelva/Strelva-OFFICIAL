@@ -9,13 +9,26 @@ import { nativeRpc, tokenHash } from "./native";
 import { bookingCustomerEmailAllowed } from "./updates";
 import { cleanSubjectText } from "@/platform/infra/email/text";
 import { bookingAppOrigin } from "./lifecycle-ports";
+import { formatVisitorTime } from "./public-admission-time";
 
 const requestSchema = z.object({ tenantId: z.string(), requestId: z.string(),
   visitor: z.object({ name: z.string(), email: z.string().email(), phone: z.string().optional(), message: z.string().optional(), intakeAnswers: z.record(z.string(), z.string()).optional() }),
   start_at: z.string().optional(), end_at: z.string().optional(),
+  timeZone: z.string().optional(),
   token_ciphertext: z.string(), state: z.string(), expires_at: z.string() });
 
-export const publicBookingAdmission: PublicBookingAdmission = {
+export interface BookingAdmissionPresentation {
+  presentation(input: { tenantId: string; requestId: string }): Promise<{ confirmationRequired: boolean; confirmationExpiresAt?: string; businessName?: string }>;
+}
+export const publicBookingAdmission: PublicBookingAdmission & BookingAdmissionPresentation = {
+  async presentation(input) {
+    const raw = await nativeRpc("read_public_booking_request", { p_tenant_id: input.tenantId, p_request_id: input.requestId });
+    if (raw == null) return { confirmationRequired: false };
+    const row = requestSchema.parse(raw);
+    const details = await nativeRpc("read_booking_business_details", { p_tenant_id: input.tenantId }) as { name?: string } | null;
+    const businessName = cleanSubjectText(details?.name || "");
+    return { confirmationRequired: row.state !== "placed", ...(row.state !== "placed" ? { confirmationExpiresAt: new Date(row.expires_at).toISOString() } : {}), ...(businessName ? { businessName } : {}) };
+  },
   async claim(input) {
     if (!await bookingCustomerEmailAllowed(input.binding.tenantId)) throw new PublicBookingError("unavailable", "Email confirmation is not available. Contact the business to book.");
     const token = randomBytes(32).toString("base64url");
@@ -38,7 +51,7 @@ export const publicBookingAdmission: PublicBookingAdmission = {
       authorship: "business", businessName: business, fromName: business, fromAddress: "bookings@mail.strelva.com", subject: `Confirm your booking request with ${business}`,
       idempotencyKey: `public-booking-confirm:${tokenHash(token)}`,
       options: { businessName: business, heading: `Confirm your booking request with ${business}`,
-        ...(row.start_at ? { rows: [{ label: "Requested time", value: new Date(row.start_at).toISOString() }] } : {}), paragraphs: ["Confirm within 15 minutes. Nothing is booked until you confirm your email."],
+        rows: [...(row.start_at ? [{ label: "Requested time", value: formatVisitorTime(row.start_at, row.timeZone) }] : []), { label: "Confirm by", value: formatVisitorTime(row.expires_at, row.timeZone) }], paragraphs: ["Check your email to confirm. Nothing is booked until you confirm your email. The business may then need to accept your request."],
         button: { label: "Review and confirm", url: `${bookingAppOrigin()}/booking-confirm/${token}` } } });
     if (result.status !== "accepted") throw new PublicBookingError("unavailable", "The confirmation email could not be sent. Contact the business to book.");
   },

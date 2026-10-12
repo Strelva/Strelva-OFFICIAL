@@ -6,8 +6,8 @@
  * POST) and passes the verified identity to the SQL boundary, which checks the
  * active super_admins row again.
  *
- * Draft decisions run the governed approve path as the operator, never as
- * the owner, and write audit_logs rows (@/lib/operator-decisions). Retries and
+ * Operators can route drafts to owner review, but cannot decide client content.
+ * Routing writes audit_logs rows (@/lib/operator-decisions). Retries and
  * quotes stay on the screens each row links to, through their governed paths.
  */
 import { revalidatePath } from "next/cache";
@@ -23,15 +23,14 @@ import { PostgresBusinessEffortStore, recordBusinessEffort } from "@/platform/bu
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { getEventRaw } from "@/lib/events";
-import { resolveEventAction, escalateEventToOwner } from "@/lib/event-actions";
+import { escalateEventToOwner } from "@/lib/event-actions";
 import { isPortfolioApprovable } from "../actions/portfolio-actions";
 import { auditOperatorDecision, operatorStillActive, verifiedOperator } from "@/lib/operator-decisions";
 
 export type QueueActionResult = { ok: boolean; message: string };
 
-/** Derive all source identities server-side. Owner calls are never approved
- * by an operator, and every effect uses the existing governed dispatcher under
- * the operator's own actor id, with an audit row before and after it. */
+/** Derive source identities server-side. Operators can route client drafts
+ * to owner review, with audit rows before and after the routing change. */
 export async function resolveQueueDraftsAction(input: { keys: string[]; action: "approve" | "skip" | "escalate" }): Promise<QueueActionResult & { results: { key: string; changed: boolean; reason?: string }[] }> {
   const results: { key: string; changed: boolean; reason?: string }[] = [];
   if (!operatorQueueReleaseEnabled()) return { ok: false, message: "Queue actions are not enabled.", results };
@@ -40,6 +39,7 @@ export async function resolveQueueDraftsAction(input: { keys: string[]; action: 
     if (!signedIn) throw new OperatorQueueAccessError();
     const actor: QueueActor = { userId: signedIn.userId, verifiedEmail: signedIn.verifiedEmail };
     if (!["approve", "skip", "escalate"].includes(input.action) || !Array.isArray(input.keys) || input.keys.length > 100) throw new OperatorQueueValidationError();
+    if (input.action !== "escalate") return { ok: false, message: "Client content decisions belong to the business owner or its authorized agency.", results };
     const find = await finder(actor);
     const auditAction = `queue.draft.${input.action}`;
     let revoked = false;
@@ -67,9 +67,7 @@ export async function resolveQueueDraftsAction(input: { keys: string[]; action: 
           results.push({ key, changed: false, reason: "The audit log is unavailable. Nothing was done." }); continue;
         }
         attempt = { tenantId, eventId };
-        const result = input.action === "escalate"
-          ? await escalateEventToOwner(tenantId, eventId)
-          : await resolveEventAction(tenantId, eventId, input.action === "approve" ? "approved" : "dismissed", signedIn.actorId);
+        const result = await escalateEventToOwner(tenantId, eventId);
         results.push({ key, ...result });
         await auditOperatorDecision({ operator: signedIn, tenantId, eventId, action: auditAction, phase: "result", detail: { ...detail, changed: result.changed, reason: result.reason ?? null } })
           .catch(() => console.error(`[admin/queue] audit result row failed for ${eventId}; its attempt row stands.`));

@@ -104,7 +104,7 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(container.textContent).toContain("Read-only access");
     expect(container.textContent).toContain("Commercial lease dispute, two parties");
     expect(button("Save new draft")).toBeUndefined();
-    expect(button("Publish")).toBeUndefined();
+    expect(button("Make it live")).toBeUndefined();
     expect(container.querySelector("form")).toBeNull();
   });
   it("limits the agency draft editor to checks and revisions and keeps save input clocks", async () => {
@@ -112,7 +112,7 @@ describe("standalone recipient and delegated application surfaces", () => {
     expect(container.textContent).toContain("Draft editing only");
     expect(button("Check proposed change")).toBeDefined();
     expect(button("Save new draft").disabled).toBe(true);
-    expect(button("Publish")).toBeUndefined();
+    expect(button("Make it live")).toBeUndefined();
     const name = container.querySelector<HTMLInputElement>('input[id][value="Mediation intake"]')!;
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(name, "Updated mediation intake"); name.dispatchEvent(new Event("input", { bubbles: true })); });
     expect(button("Save new draft").disabled).toBe(false);

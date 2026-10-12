@@ -10,5 +10,5 @@ import { StHead, StPage } from "@/components/ui/strelva/Kit";
 export default async function DigestsPage() {
   await authorizeAdminOperatorRead("admin.digests.read");
   const digests = await listPendingDigests();
-  return <StPage><StHead title={OPERATOR_DESTINATIONS.maintenance.label} meta="The upkeep each site needs this week. Approve to put proposed work in the owner’s workspace for review; dismiss to skip it." /><MaintenanceDigests initialDigests={digests} /></StPage>;
+  return <StPage><StHead title={OPERATOR_DESTINATIONS.maintenance.label} meta="Inspect the upkeep each site needs this week. The business owner decides what changes." /><MaintenanceDigests initialDigests={digests} /></StPage>;
 }
