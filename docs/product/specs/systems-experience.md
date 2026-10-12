@@ -18,7 +18,7 @@ an exact-item link into Needs you; the System page alone is not that link.
 **Internal tool** is the kind and **Internal tools** the collection, with each
 System opened by name. **Bookings**, **Saved check**, **Make real** and
 **History** are the shared words; Version means another context. Library and
-Ready-made systems share qualified reusable definitions, without client data
+Apps share qualified reusable definitions, without client data
 or grants; starters and managed services remain separately identified.
 Possibility stays a working alternative, never a bare suggestion or research
 Proposal. Recorded actors and agency/business brands follow the

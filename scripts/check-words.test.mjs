@@ -52,3 +52,10 @@ test("allows an internal prompt array entry without swallowing its preceding com
   assert.deepEqual(check('const prompt = [\n  "Plan only.",\n  // words-allow: Private app -- Internal planning schema, never screen copy.\n  "Infer a private app from the request.",\n];'), []);
   assert.equal(check('const prompt = [\n  "Plan only.",\n  // words-allow: Private app -- Internal planning schema, never screen copy.\n  "Infer a private app and Custom application.",\n];')[0].word, "Custom application");
 });
+
+test("Ready-made is retired; Apps names reusable Systems while Private app stays retired", () => {
+  assert.equal(check('const screen = <h2>Ready-made systems</h2>;')[0].word, "Ready-made");
+  assert.equal(check('const back = "Back to ready-made systems";')[0].word, "Ready-made");
+  assert.deepEqual(check('const screen = <h2>Apps from creators</h2>; const label = { title: "Apps" };'), []);
+  assert.equal(check('const title = "Private app";')[0].word, "Private app");
+});

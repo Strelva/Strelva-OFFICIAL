@@ -23,6 +23,6 @@ export const INQUIRY_SHELL_STATUS: InquiryShellStatus[] = [
   { name: "Why", href: "/preview/strelva/inquiries?view=why", detail: "A short cause-and-effect story with the broken step and a safe next action.", status: "ready" },
   { name: "Responsibility", href: "/preview/strelva/inquiries?view=responsibility", detail: "Scope, limits, budget, escalation, trust, pause, and action receipts.", status: "ready" },
   { name: "Connections", href: "/preview/strelva/inquiries?view=connections", detail: "Consent and access details work for current providers. General task-scoped connections are coming soon.", status: "coming_soon" },
-  { name: "Onboarding", href: "/preview/strelva/inquiries?view=onboarding", detail: "Website facts can be checked and corrected in place.", status: "ready" },
+  { name: "Check my website", href: "/preview/strelva/inquiries?view=onboarding", detail: "Website facts can be checked and corrected in place.", status: "ready" },
   { name: "Agency", href: "/preview/strelva/inquiries?audience=agency&view=attention", detail: "Attention and reusable inquiry patterns work. More work types and agency contribution are coming soon.", status: "coming_soon" },
 ];

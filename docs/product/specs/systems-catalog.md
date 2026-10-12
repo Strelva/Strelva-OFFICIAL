@@ -13,7 +13,7 @@
 **Internal tool** is the customer kind for native applications, custom
 applications and trackers. **Internal tools** is the collection; each System
 opens by its own name. `applications`, `app`, `internal_app` and
-`custom-applications` remain implementation identifiers. **Ready-made systems**
+`custom-applications` remain implementation identifiers. **Apps**
 includes the agency Library's qualified reusable definitions, without records,
 accounts, secrets or grants. Built-in starters and managed services remain
 separately identified and do not all descend from Library. Owners ask for a tool; makers

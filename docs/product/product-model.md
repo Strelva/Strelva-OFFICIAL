@@ -24,7 +24,7 @@ follow those decisions; older implementation checkpoints retain their dates.
 Business  ─ owns ─  Business record (name, hours, services, people, contacts)
    │                       ▲ read by every System, copied by none
    │
-   ├─ Systems ............ what the business has made
+   ├─ Systems ............ what the business made or brought in
    │    attymooney.com · Live          Consult booking · Draft
    │    each one has:
    │      Connections   what it reads, acts on, appears in
@@ -66,8 +66,8 @@ Owner decisions show read-only **Waiting on [business]**, with the owner's same
 title and a link to that exact Needs you item. The agency Queue neither consumes
 the platform-operator queue nor adds a platform-work bucket.
 
-**Library** is the agency's reusable sources and client Versions; qualified
-sources appear in business-facing **Ready-made systems**, alongside separately
+**Library** is the agency's own Apps and their client Versions; qualified
+Apps appear in business-facing **Apps**, alongside separately
 identified starters and services. Packaging shares definitions,
 never client records, accounts, credentials or grants. **Internal tool** is the
 kind, **Internal tools** the collection; open each System by its own name.

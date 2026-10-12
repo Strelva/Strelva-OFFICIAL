@@ -294,7 +294,7 @@ export function AgencyHome({
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your sources. Qualified revisions you share appear in your clients’ Ready-made systems." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
+    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your Apps. Qualified revisions you share appear in your clients’ Apps." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
   </section>;
 
   const creditSection = credits.length ? <section className="mt-12" aria-labelledby={`${id}-credits`}>
