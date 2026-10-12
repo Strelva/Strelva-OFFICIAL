@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { WorkspaceSitePreview } from "@/experience/websites/WorkspaceSitePreview";
 import { isSiteTab } from "@/platform/workspaces/site-places";
+import { SystemsCanonShell } from "@/experience/workspace/preview/SystemsCanonShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Website preview", robots: { index: false, follow: false } };
@@ -14,5 +15,8 @@ export default async function WorkspaceSitePreviewPage({ searchParams }: { searc
   const kind = params.kind === "request" ? "request" : "native";
   const role = params.role === "member" || params.role === "admin" || params.role === "operator" ? params.role : "owner";
   const state = params.state === "empty" || params.state === "error" || params.state === "permission" || params.state === "not_found" ? params.state : "ready";
-  return <WorkspaceSitePreview kind={kind} tab={isSiteTab(params.tab) ? params.tab : null} role={role} state={state} mode={params.mode === "dark" ? "dark" : "light"} />;
+  const mode = params.mode === "dark" ? "dark" : "light";
+  return <SystemsCanonShell businessName={kind === "native" ? "Great Lakes Dried Fruit" : "McClear's Pub"} systemName="Website" mode={mode} pins={[
+    { id: "website", kind: "website", title: kind === "native" ? "greatlakesdriedfruit.com" : "mclearsbuffalo.com", current: true, href: "/preview/strelva/workspace-site" },
+  ]}><WorkspaceSitePreview kind={kind} tab={isSiteTab(params.tab) ? params.tab : null} role={role} state={state} mode={mode} /></SystemsCanonShell>;
 }

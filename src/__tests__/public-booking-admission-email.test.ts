@@ -8,9 +8,17 @@ vi.mock("@/platform/bookings/updates", () => ({ bookingCustomerEmailAllowed: m.a
 vi.mock("@/platform/bookings/lifecycle-ports", () => ({ bookingAppOrigin: () => "https://app.example.test" }));
 import { publicBookingAdmission } from "@/platform/bookings/public-admission";
 const token = "s".repeat(43);
-const row = { tenantId: "fixture", requestId: "request-fixture", visitor: { name: "Dana", email: "dana@example.test" }, token_ciphertext: `enc:v1:${token}`, state: "held", start_at: "2099-11-06T12:00:00Z", end_at: "2099-11-06T13:00:00Z", expires_at: "2099-11-06T12:00:00Z" };
+const row = { tenantId: "fixture", requestId: "request-fixture", visitor: { name: "Dana", email: "dana@example.test" }, token_ciphertext: `enc:v1:${token}`, state: "held", timeZone: "America/New_York", start_at: "2099-11-06T12:00:00Z", end_at: "2099-11-06T13:00:00Z", expires_at: "2099-11-06T12:00:00Z" };
 beforeEach(() => { vi.clearAllMocks(); m.rpc.mockImplementation(async name => name === "read_booking_business_details" ? { name: "Lakeview Yoga" } : row); m.send.mockResolvedValue({ status: "accepted", providerMessageId: "fixture" }); m.allowed.mockResolvedValue(true); });
 describe("public booking confirmation email boundary", () => {
+  it("projects only the saved confirmation deadline and verified business identity", async () => {
+    const view = await publicBookingAdmission.presentation(row);
+    expect(view).toEqual({ confirmationRequired: true, confirmationExpiresAt: "2099-11-06T12:00:00.000Z", businessName: "Lakeview Yoga" });
+    expect(JSON.stringify(view)).not.toContain(token);
+    expect(JSON.stringify(view)).not.toContain(row.visitor.email);
+    m.rpc.mockImplementation(async name => name === "read_booking_business_details" ? null : { ...row, state: "placed" });
+    expect(await publicBookingAdmission.presentation(row)).toEqual({ confirmationRequired: false });
+  });
   it("holds the email when its business identity cannot be read", async () => {
     m.rpc.mockImplementation(async name => name === "read_booking_business_details" ? null : row);
     await expect(publicBookingAdmission.send(row)).rejects.toMatchObject({ status: 503 });
@@ -19,7 +27,7 @@ describe("public booking confirmation email boundary", () => {
   it("sends the private confirmation token only to the captured customer, with one stable send key", async () => {
     await publicBookingAdmission.send(row); await publicBookingAdmission.send(row);
     const [first, second] = m.send.mock.calls.map(c => c[0]);
-    expect(first).toMatchObject({ audience: "customer", tenantId: "fixture", to: "dana@example.test", fromAddress: "bookings@mail.strelva.com", fromName: "Lakeview Yoga", subject: "Confirm your booking request with Lakeview Yoga", authorship: "business", businessName: "Lakeview Yoga", options: { rows: [{ label: "Requested time", value: "2099-11-06T12:00:00.000Z" }], button: { url: `https://app.example.test/booking-confirm/${token}` } } });
+    expect(first).toMatchObject({ audience: "customer", tenantId: "fixture", to: "dana@example.test", fromAddress: "bookings@mail.strelva.com", fromName: "Lakeview Yoga", subject: "Confirm your booking request with Lakeview Yoga", authorship: "business", businessName: "Lakeview Yoga", options: { rows: [{ label: "Requested time", value: expect.stringContaining("7:00 AM Eastern Time") }, { label: "Confirm by", value: expect.stringContaining("7:00 AM Eastern Time") }], button: { url: `https://app.example.test/booking-confirm/${token}` } } });
     expect(first.idempotencyKey).toBe(second.idempotencyKey); expect(first.idempotencyKey).not.toContain(token);
   });
   it("refuses admission before storage or mail when customer email is disabled", async () => {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
 import { Field } from "@/app/admin/ui";
+import { StRows, StRow } from "@/components/ui/strelva/Kit";
 
 interface EditableTenant {
   id: string;
@@ -111,21 +112,12 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: form.id,
-          siteName: form.siteName,
-          ownerName: form.ownerName,
-          ownerEmail: form.ownerEmail || undefined,
-          ownerPhone: form.ownerPhone,
           referredBy: form.referredBy,
-          bookingProvider: form.bookingProvider,
-          bookingUrl: form.bookingUrl,
           productionDomain: form.productionDomain || undefined,
           adminDomain: form.adminDomain || undefined,
           active: form.active,
           features: form.features,
           siteUrl: form.siteUrl,
-          industry: form.industry,
-          personality: form.personality,
-          businessRules: form.businessRules,
         }),
       });
       const data = await res.json();
@@ -296,37 +288,19 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="rounded-2xl border border-glass-border bg-glass p-5 space-y-3">
         <h2 className="text-[14px] font-semibold tracking-[-0.01em] text-warm-white">Business info</h2>
-        <Field label="Site name" value={form.siteName} onChange={(v) => setForm({ ...form, siteName: v })} />
-        <Field label="Owner name" value={form.ownerName} onChange={(v) => setForm({ ...form, ownerName: v })} />
-        <Field label="Owner email" value={form.ownerEmail} onChange={(v) => setForm({ ...form, ownerEmail: v })} />
-        <Field label="Owner phone" value={form.ownerPhone} onChange={(v) => setForm({ ...form, ownerPhone: v })} />
         <Field label="Referred by" value={form.referredBy} onChange={(v) => setForm({ ...form, referredBy: v })} />
-        <Field label="Booking provider" value={form.bookingProvider} onChange={(v) => setForm({ ...form, bookingProvider: v })} placeholder="Vagaro, Calendly…" />
-        <Field label="Booking URL" value={form.bookingUrl} onChange={(v) => setForm({ ...form, bookingUrl: v })} placeholder="https://…" />
         <Field label="Production domain" value={form.productionDomain} onChange={(v) => setForm({ ...form, productionDomain: v })} />
         <Field label="Admin domain" value={form.adminDomain} onChange={(v) => setForm({ ...form, adminDomain: v })} />
         <Field label="Site URL" value={form.siteUrl} onChange={(v) => setForm({ ...form, siteUrl: v })} placeholder="https://client-site.com" hint="Used for audits + reports." />
-        <Field label="Industry" value={form.industry} onChange={(v) => setForm({ ...form, industry: v })} placeholder="HVAC, wellness, restaurant…" hint="Drives visibility probes + AI context." />
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs text-gray-faint">AI persona (how Strelva sounds for this client)</label>
-          <textarea
-            value={form.personality}
-            onChange={(e) => setForm({ ...form, personality: e.target.value })}
-            rows={2}
-            placeholder="Warm, concise, local."
-            className="w-full rounded-md border border-glass-border bg-gray-bg px-2.5 py-1.5 text-sm text-warm-white placeholder:text-gray-faint"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs text-gray-faint">Business rules (hard facts + guardrails the AI must follow)</label>
-          <textarea
-            value={form.businessRules}
-            onChange={(e) => setForm({ ...form, businessRules: e.target.value })}
-            rows={3}
-            placeholder="Never quote prices. Hours are 9–5 Mon–Fri. Always mention free estimates."
-            className="w-full rounded-md border border-glass-border bg-gray-bg px-2.5 py-1.5 text-sm text-warm-white placeholder:text-gray-faint"
-          />
-        </div>
+        <StRows label="Recorded business settings">
+          <StRow title="Business" detail={tenant.siteName} />
+          <StRow title="Owner" detail={[tenant.ownerName, tenant.ownerEmail, tenant.ownerPhone].filter(Boolean).join(" · ")} />
+          <StRow title="Bookings" detail={[tenant.bookingProvider, tenant.bookingUrl].filter(Boolean).join(" · ") || "Not recorded"} />
+          <StRow title="Industry" detail={tenant.industry || "Not recorded"} />
+          <StRow title="Voice guidance" detail={tenant.personality || "Not recorded"} />
+          <StRow title="Business rules" detail={tenant.businessRules || "Not recorded"} />
+        </StRows>
+        <p className="text-sm text-gray-muted">Client settings are read-only here. Change them through ordinary business or agency access.</p>
         <div className="space-y-1.5">
           <label className="flex items-center gap-2 text-sm text-gray-muted">
             <input

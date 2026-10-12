@@ -1,0 +1,8 @@
+/** Static, fictional comparison only. No scripts, forms, network assets or live data. */
+export function ownerConversationSiteFixture(showFees: boolean): string {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><title>Fictional Firm · Fees</title><style>
+    * { box-sizing: border-box; } body { margin: 0; background: #faf9f6; color: #302b27; font-family: system-ui, sans-serif; font-size: 16px; line-height: 1.5; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 24px; border-bottom: 1px solid #e7e2db; font-size: 14px; } header span { margin-left: auto; }
+    main { padding: 24px; } h1 { margin: 0 0 16px; font-size: 32px; line-height: 1.25; font-weight: 500; } p { margin: 0 0 16px; } dl { margin: 24px 0; } dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding-block: 12px; border-bottom: 1px solid #e7e2db; } dd { margin: 0; } small { display: block; color: #6e625b; font-size: 12px; }
+  </style></head><body><header><strong>Fictional Firm</strong><span>Mediation · Fees · Contact</span></header><main><h1>Mediation fees</h1><p>Choose a half-day or full-day session. We confirm availability and terms before you book.</p>${showFees ? '<dl><div><dt>Half-day session</dt><dd>$900</dd></div><div><dt>Full-day session</dt><dd>$1,800</dd></div></dl>' : '<p>Contact the firm to ask about session fees.</p>'}<small>Fictional website comparison. These example fees are not a Strelva price or a live offer.</small></main></body></html>`;
+}

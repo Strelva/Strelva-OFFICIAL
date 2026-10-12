@@ -71,3 +71,20 @@ describe("revenue", () => {
     expect(summary.currency).toBe("usd");
   });
 });
+
+it("support reads never backfill the build-payment index", async () => {
+  const redis = fakeRedisKeysPath(["reb:build-payment:s1", "reb:build-payment:index"], [P1]);
+  mockGetRedis.mockReturnValue(redis);
+  expect(await listBuildPayments(200, { readOnly: true, strict: true })).toEqual([P1]);
+  expect(redis.mget).toHaveBeenCalledWith("reb:build-payment:s1");
+  expect(redis.zadd).not.toHaveBeenCalled();
+});
+it("strict payment reads expose unavailable index and range instead of empty payments", async () => {
+  const redis = fakeRedisWithIndex(["s1"], [P1]); mockGetRedis.mockReturnValue(redis);
+  redis.zcard.mockRejectedValueOnce(new Error("index offline"));
+  await expect(listBuildPayments(200, { strict: true, readOnly: true })).rejects.toThrow("index offline");
+  redis.zrange.mockRejectedValueOnce(new Error("range offline"));
+  await expect(listBuildPayments(200, { strict: true, readOnly: true })).rejects.toThrow("range offline");
+  mockGetRedis.mockReturnValue(null);
+  await expect(listBuildPayments(200, { strict: true, readOnly: true })).rejects.toThrow("unavailable");
+});

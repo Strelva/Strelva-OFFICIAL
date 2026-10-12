@@ -1,4 +1,5 @@
 "use client";
+import { plainWorkspaceName, readOwnerBrand } from "./workspace-header";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 import { useEffect, useRef, useState, type RefObject, type ReactNode } from "react";
@@ -15,6 +16,10 @@ export { isRetiredView, pinnedApps, pinnedSystems, pinnedWebsites, placeForSecti
 interface Props {
   agencyNavigation?: AgencyNavigation;
   ownerBrand?: OwnerBrand;
+  /** Authorized workspace name, separate from the agency brand. */
+  workspaceName?: string;
+  /** Agency chrome can read its own authorized brand while viewing a client. */
+  brandWorkspaceId?: string;
   tenantId?: string;
   children: ReactNode;
   active?: StrelvaSection;
@@ -43,6 +48,8 @@ interface Props {
   startDisabled?: boolean;
   contentId?: string;
   rightRail?: ReactNode;
+  rightRailId?: string;
+  rightRailTitle?: string;
   rightRailOpen?: boolean;
   onCloseRightRail?: () => void;
   rightRailTriggerRef?: RefObject<HTMLButtonElement | null>;
@@ -62,18 +69,40 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
-  const brandScope = workspaceId ? `workspaceId=${encodeURIComponent(workspaceId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
-  const [loadedBrand, setLoadedBrand] = useState<{ scope: string; brand: OwnerBrand } | null>(null);
+export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspaceName, brandWorkspaceId, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailId = "managed-discussion", rightRailTitle = "Ask Strelva", rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, allClients, theme = "linen" }: Props) {
+  const navigationName = workspaceName || plainWorkspaceName(businessContext) || undefined;
+  const brandId = brandWorkspaceId || workspaceId;
+  const brandScope = brandId ? `workspaceId=${encodeURIComponent(brandId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
+  const presentationScope = `${appBase}|${brandScope || ""}`;
+  const [loadedBrand, setLoadedBrand] = useState<{ scope: string; brand: OwnerBrand | null } | null>(null);
   useEffect(() => {
     if (ownerBrand || !signedIn || !brandScope) return;
     const controller = new AbortController();
     fetch(`${appBase}/api/workspace/owner-brand?${brandScope}`, { signal: controller.signal, cache: "no-store" })
-      .then(async response => { if (!response.ok) return; const body = await response.json(); if (!controller.signal.aborted && body.brand) setLoadedBrand({ scope: brandScope, brand: body.brand }); })
-      .catch(() => {});
+      .then(async response => {
+        const body = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) setLoadedBrand({ scope: presentationScope, brand: readOwnerBrand(body?.brand) });
+      })
+      .catch(() => { if (!controller.signal.aborted) setLoadedBrand({ scope: presentationScope, brand: null }); });
     return () => controller.abort();
-  }, [ownerBrand, signedIn, brandScope, appBase]);
-  const presentationBrand = ownerBrand ?? (loadedBrand?.scope === brandScope ? loadedBrand.brand : undefined);
+  }, [ownerBrand, signedIn, brandScope, appBase, presentationScope]);
+  const presentationBrand = ownerBrand ?? (loadedBrand?.scope === presentationScope ? loadedBrand.brand ?? undefined : undefined);
+  const [leadAvailability, setLeadAvailability] = useState<{ scope: string; available: boolean } | null>(null);
+  const hasAgencyNavigation = Boolean(agencyNavigation);
+  const suppliedLeadAvailability = agencyNavigation?.leadsAvailable;
+  const leadScope = `${appBase}|${workspaceId || ""}|${accountDetail || accountName}|${signedIn}`;
+  useEffect(() => {
+    if (!hasAgencyNavigation || suppliedLeadAvailability !== undefined || !signedIn || !workspaceId) return;
+    const controller = new AbortController();
+    fetch(`${appBase}/api/agency/leads?agencyWorkspaceId=${encodeURIComponent(workspaceId)}&availability=1`, { signal: controller.signal, cache: "no-store" })
+      .then(async response => {
+        const value = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) setLeadAvailability({ scope: leadScope, available: value?.available === true && value.agencyWorkspaceId === workspaceId });
+      })
+      .catch(() => { if (!controller.signal.aborted) setLeadAvailability({ scope: leadScope, available: false }); });
+    return () => controller.abort();
+  }, [hasAgencyNavigation, suppliedLeadAvailability, appBase, workspaceId, signedIn, leadScope]);
+  const salesNavigation = agencyNavigation ? { ...agencyNavigation, leadsAvailable: signedIn && (agencyNavigation.leadsAvailable ?? (leadAvailability?.scope === leadScope && leadAvailability.available)) } : undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -103,10 +132,10 @@ export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, children,
 
   return <div data-dashboard data-workspace-theme={theme === "linen" ? "linen" : undefined} className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
-    <AppFrame className={styles.shell} navigationLabel="Strelva workspace navigation" navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={agencyNavigation} ownerBrand={presentationBrand} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
+    <AppFrame className={styles.shell} navigationLabel={`${navigationName || "Workspace"} navigation`} navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
+      navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={salesNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
-      notice={notice} rightRail={rightRail} rightRailId="managed-discussion" rightRailTitle="Ask Strelva" rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
+      notice={notice} rightRail={rightRail} rightRailId={rightRailId} rightRailTitle={rightRailTitle} rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>
     {searchItems ? <WorkspaceSearchDialog systemsReleased={systemsReleased} key={workspaceId || searchScopeName} storageKey={workspaceId && accountDetail ? `strelva:search-query:v1:${encodeURIComponent(accountDetail)}:${workspaceId}` : undefined} open={searchOpen} items={searchItems} scopeName={searchScopeName} onClose={() => setSearchOpen(false)} /> : null}
   </div>;

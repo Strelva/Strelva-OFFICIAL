@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isInspecting } from "@/platform/infra/inspect-mode";
 import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { getTenantConfig } from "@/lib/tenants";
 import { getRedis } from "@/platform/infra/redis";
@@ -362,17 +363,21 @@ export async function getTenantRole(tenant: string): Promise<ClientRole | "super
 
   const user = await getSessionUser();
   if (!user) return null;
-  if (user.email_confirmed_at && await isSuperAdminUser(user.id)) return "super_admin";
+  if (await isInspecting()) return "super_admin";
   const role = await getMembershipRole(user.id, tenant);
-  return role ? normalizeRole(role) : null;
+  if (role) return normalizeRole(role);
+  // Support can inspect a business. It never supplies a client writer role.
+  if (user.email_confirmed_at && await isSuperAdminUser(user.id)) return "super_admin";
+  return null;
 }
 
 export async function hasTenantPermission(
   tenant: string,
   permission: TenantPermission
 ): Promise<boolean> {
+  if (permission !== "tenant:read" && await isInspecting()) return false;
   const role = await getTenantRole(tenant);
-  if (role === "super_admin") return true;
+  if (role === "super_admin") return permission === "tenant:read";
   if (!role) return false;
   return roleHasPermission(role, permission);
 }
@@ -411,13 +416,18 @@ export async function requireTenantPermissions(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const requested = [...permissions];
+  if (requested.some(permission => permission !== "tenant:read") && await isInspecting()) {
+    return NextResponse.json({ error: "Support inspection is read-only. Leave inspection and open your ordinary agency or business workspace to make changes." }, { status: 403 });
+  }
   const role = await getTenantRole(tenant);
   if (!role) {
     return NextResponse.json({ error: "Forbidden: no access to this tenant" }, { status: 403 });
   }
   if (
-    role !== "super_admin" &&
-    [...permissions].some((permission) => !roleHasPermission(role, permission))
+    requested.some((permission) => role === "super_admin"
+      ? permission !== "tenant:read"
+      : !roleHasPermission(role, permission))
   ) {
     return NextResponse.json({ error: "Forbidden: insufficient permissions" }, { status: 403 });
   }

@@ -56,6 +56,27 @@ function fixture(overrides: Partial<Parameters<typeof createPublicBookingService
 }
 
 describe("public native booking adapter", () => {
+  it("carries the saved email requirement and deadline on submit and exact replay without placing a booking", async () => {
+    const admission = {
+      claim: vi.fn(async () => undefined), send: vi.fn(async () => undefined), consume: vi.fn(), placed: vi.fn(), cancel: vi.fn(),
+      verified: vi.fn(async () => false),
+      presentation: vi.fn(async () => ({ confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:55:00Z", businessName: "Northstar" })),
+    };
+    const { service, calendar, inquiries } = fixture({ admission });
+    const input = { tenantId: binding.tenantId, capabilityId: binding.capabilityId, capabilityVersion: binding.version, slotId: binding.slots[0]!.id, requestId: strongRequestId, visitor: { name: "Avery", email: "avery@example.test" } };
+    const result = await service.reserve(input);
+    expect(result).toMatchObject({ status: "pending", confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:55:00Z", businessName: "Northstar" });
+    expect(await service.reserve(input)).toEqual(result);
+    expect(calendar.reserve).not.toHaveBeenCalled();
+    expect(inquiries.capture).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain(input.visitor.email);
+  });
+  it("does not claim an email-confirmation state when the authoritative presentation read fails", async () => {
+    const admission = { claim: vi.fn(), send: vi.fn(), consume: vi.fn(), placed: vi.fn(), cancel: vi.fn(), verified: vi.fn(), presentation: vi.fn(async () => { throw new Error("read unavailable"); }) };
+    const { service, calendar } = fixture({ admission });
+    await expect(service.reserve({ tenantId: binding.tenantId, capabilityId: binding.capabilityId, capabilityVersion: binding.version, slotId: binding.slots[0]!.id, requestId: strongRequestId, visitor: { name: "Avery", email: "avery@example.test" } })).rejects.toThrow("read unavailable");
+    expect(calendar.reserve).not.toHaveBeenCalled();
+  });
   it("publishes bounded slots while keeping private work and actor ids server-side", async () => {
     const { service } = fixture();
     await expect(service.read({ tenantId: binding.tenantId, capabilityId: binding.capabilityId, range: { from: "2026-10-01T13:00:00+00:00", to: "2026-10-01T14:30:00+00:00" } })).resolves.toEqual({

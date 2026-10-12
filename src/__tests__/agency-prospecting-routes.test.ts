@@ -17,7 +17,7 @@ vi.mock("@/products/ai-visibility/server", async importOriginal => ({
 }));
 vi.mock("@/lib/access-request-delivery", () => ({ createDeliveryStatusToken: () => "token", getExistingLeadToken: mocks.getLeadToken, saveDeliveryLead: mocks.saveLead }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate, rateLimitKey: () => "test-ip" }));
-vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ get: mocks.redisGet, set: vi.fn() }) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ get: mocks.redisGet, set: vi.fn().mockResolvedValue("OK") }) }));
 vi.mock("@/lib/audit/checks", () => ({ runAudit: mocks.audit }));
 vi.mock("@/lib/audit-report-store", () => ({ saveAuditReport: mocks.saveReport }));
 vi.mock("@/lib/audit-report-email", () => ({ sendAuditReportEmail: mocks.email }));
@@ -26,6 +26,8 @@ vi.mock("@/lib/slack", () => ({ sendSlackNotification: mocks.slack }));
 import { POST as check } from "@/app/api/ai-visibility/route";
 import { POST as monitor } from "@/app/api/ai-visibility/[id]/monitor/route";
 import { POST as lead } from "@/app/api/audit/lead/route";
+import { POST as combinedCheck } from "@/app/api/audit/check/route";
+import { admitPublicAgencyCheck, withCombinedCheckAdmission } from "@/platform/agency-prospecting/check-admission";
 import { POST as scan } from "@/app/api/audit/scan/route";
 import { POST as exportAudit } from "@/app/api/audit/report/route";
 import { GET as prospects } from "@/app/api/workspace/prospects/route";
@@ -56,11 +58,35 @@ describe("agency public check attribution", () => {
     expect((mocks.rpc.mock.invocationCallOrder[2] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
     expect(mocks.saveResult.mock.calls[0]?.[0]?.agency?.workspaceId).toBe(agency.workspaceId);
   });
-  it("keeps flag-off public behavior and copy unchanged", async () => {
+  it("rejects a requested agency while gated off instead of silently dropping attribution", async () => {
     vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "0");
     const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
-    expect(await response.json()).toMatchObject({ topFix: "Ask Strelva to add schema." });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("agency check is not available yet") });
+    expect(mocks.score).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("keeps the explicitly unattributed check available while prospecting is off", async () => {
+    vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "0");
+    const response = await check(request("/api/ai-visibility", { business: "Acme" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty("agency");
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("rejects unavailable agency identity before scoring rather than substituting Strelva", async () => {
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, contact_url: agency.contactUrl }] : null, error: null }));
+    const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("identity could not be confirmed") });
+    expect(mocks.score).not.toHaveBeenCalled();
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).not.toContain("agency_prospect_admit");
+  });
+  it("rejects a mismatched profile instead of attributing the requested link to another agency", async () => {
+    mocks.rpc.mockResolvedValue({ data: [{ workspace_id: agency.workspaceId, slug: "another-agency", contact_url: agency.contactUrl }], error: null });
+    const response = await check(request("/api/ai-visibility?agency=northside", { business: "Acme" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("link could not be confirmed") });
+    expect(mocks.score).not.toHaveBeenCalled();
   });
   it("does not use an agency without explicit attribution", async () => {
     const response = await check(request("/api/ai-visibility", { business: "Acme" }));
@@ -77,7 +103,7 @@ describe("agency public check attribution", () => {
     expect(mocks.score).not.toHaveBeenCalled();
   });
   it("surfaces durable quota failure before expensive work", async () => {
-    mocks.rpc.mockImplementation(async (name: string) => name === "agency_prospect_admit" ? { data: null, error: { message: "agency_prospect_quota" } } : { data: [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl }], error: null });
+    mocks.rpc.mockImplementation(async (name: string) => name === "agency_prospect_admit" ? { data: null, error: { message: "agency_prospect_quota" } } : { data: name === "resolve_owner_brand" ? { agencyId: agency.workspaceId, name: agency.name, brand: null } : [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl }], error: null });
     expect((await check(request("/api/ai-visibility", { business: "Acme", agency: "northside" }))).status).toBe(429);
     expect(mocks.score).not.toHaveBeenCalled();
   });
@@ -116,7 +142,7 @@ describe("agency lead routing", () => {
   it("returns the retained report when agency reply routing becomes unavailable after capture", async () => {
     mocks.rpc.mockImplementation(async (name: string) => {
       if (name === "agency_prospecting_profile" && mocks.rpc.mock.calls.filter(([call]) => call === name).length > 1) return { data: null, error: { message: "Sender lookup unavailable" } };
-      return { data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : null, error: null };
+      return { data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : name === "resolve_owner_brand" ? { agencyId: agency.workspaceId, name: agency.name, brand: null } : null, error: null };
     });
     const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example", agency: "northside" }));
     expect(response.status).toBe(200);
@@ -163,4 +189,71 @@ describe("agency member read boundary", () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "agency_prospect_access" } });
     expect((await prospects(new Request(`https://app.strelva.com/api/workspace/prospects?workspace=${agency.workspaceId}`))).status).toBe(403);
   });
+});
+
+
+describe("combined public agency admission", () => {
+  it("charges one atomic admission before either scorer while preserving both contracts", async () => {
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 200, data: { agency } }, ai: { status: 200, data: { agency } } });
+    const admission = mocks.rpc.mock.calls.flatMap((call, index) => call[0] === "agency_prospect_admit" ? [index] : []);
+    expect(admission).toHaveLength(1);
+    const order = mocks.rpc.mock.invocationCallOrder[admission[0]!]!;
+    expect(order).toBeLessThan(mocks.audit.mock.invocationCallOrder[0]!);
+    expect(order).toBeLessThan(mocks.score.mock.invocationCallOrder[0]!);
+  });
+  it("holds both sections on quota refusal, with one refusal and no provider calls", async () => {
+    const normal = mocks.rpc.getMockImplementation()!;
+    mocks.rpc.mockImplementation((name: string, args: unknown) => name === "agency_prospect_admit"
+      ? Promise.resolve({ data: null, error: { message: "agency_prospect_quota" } }) : normal(name, args));
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 429 }, ai: { status: 429 } });
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(1);
+    expect(mocks.audit).not.toHaveBeenCalled(); expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("preserves a successful section after the other provider fails", async () => {
+    mocks.audit.mockRejectedValue(new Error("Site offline"));
+    const response = await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", agency: agency.slug }));
+    expect(await response.json()).toMatchObject({ website: { status: 500 }, ai: { status: 200 } });
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(1);
+  });
+  it("refuses a second resolved agency in the same concurrent check scope", async () => {
+    const outcomes = await withCombinedCheckAdmission(async () => Promise.allSettled([
+      admitPublicAgencyCheck(agency),
+      admitPublicAgencyCheck({ ...agency, workspaceId: "22222222-2222-4222-8222-222222222222" }),
+    ]));
+    expect(outcomes[0]?.status).toBe("fulfilled");
+    expect(outcomes[1]).toMatchObject({ status: "rejected", reason: { status: 503, message: "The agency identity changed during this check. Please try again." } });
+    const admissions = mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit");
+    expect(admissions).toHaveLength(1);
+    expect(admissions[0]?.[1]).toMatchObject({ p_workspace_id: agency.workspaceId });
+  });
+  it("never shares admission across independent checks or standalone routes", async () => {
+    const body = { business: "Acme", url: "acme.example", agency: agency.slug };
+    await Promise.all([combinedCheck(request("/api/audit/check", body)), combinedCheck(request("/api/audit/check", body))]);
+    await check(request("/api/ai-visibility", body));
+    expect(mocks.rpc.mock.calls.filter(call => call[0] === "agency_prospect_admit")).toHaveLength(3);
+  });
+  it.each(["category", "city", "source", "agency"])("rejects malformed %s before either child can consume quota or run", async field => {
+    expect((await combinedCheck(request("/api/audit/check", { business: "Acme", url: "acme.example", [field]: { bad: "shape" } }))).status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.rate).not.toHaveBeenCalled();
+    expect(mocks.score).not.toHaveBeenCalled(); expect(mocks.audit).not.toHaveBeenCalled();
+  });
+  it("rejects incomplete combined input before any read or quota admission", async () => {
+    expect((await combinedCheck(request("/api/audit/check", { url: "acme.example" }))).status).toBe(400);
+    expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.score).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("retained website check identity",()=>{
+ it("retains the requested name on a fresh website report",async()=>{
+  const response=await scan(request("/api/audit/scan",{url:"fixture.example",businessName:"Fictional Business"}));
+  expect(response.status).toBe(200);expect(await response.json()).toMatchObject({businessName:"Fictional Business"});expect(mocks.saveReport).toHaveBeenCalledWith(expect.objectContaining({businessName:"Fictional Business"}),expect.any(Object));
+ });
+ it("binds this check's name rather than reuse another business's URL-cache identity",async()=>{
+  mocks.redisGet.mockResolvedValue({url:"https://fixture.example/",scannedAt:"2026-10-07",overallScore:40,grade:"F",categories,businessName:"Other Business"});
+  const response=await scan(request("/api/audit/scan",{url:"fixture.example",businessName:"This Business"}));
+  expect(await response.json()).toMatchObject({businessName:"This Business"});expect(mocks.saveReport).toHaveBeenCalledWith(expect.objectContaining({businessName:"This Business"}),expect.any(Object));
+ });
 });

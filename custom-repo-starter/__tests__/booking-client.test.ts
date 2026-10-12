@@ -186,3 +186,20 @@ it("accepts gated authority metadata and sends optional phone without changing o
   await reserveBooking("https://app.example","northstar",schedule,schedule.slots[0]!,{name:"Dana",email:"dana@example.test",phone:" 716-555-0123 "});
   expect(JSON.parse(fetcher.mock.calls[0]![1].body).visitor.phone).toBe("716-555-0123");
 });
+
+
+describe("additive booking receipt guidance", () => {
+  it("accepts email confirmation metadata without changing legacy receipts", () => {
+    expect(isPublicBookingReceipt({ ...receipt, confirmationRequired: true, confirmationExpiresAt: "2026-10-01T12:15:00Z", businessName: "Northstar" })).toBe(true);
+    expect(isPublicBookingReceipt({ ...receipt, confirmationRequired: false })).toBe(true);
+  });
+  it.each([
+    { confirmationRequired: "true" },
+    { confirmationExpiresAt: "tomorrow" },
+    { confirmationExpiresAt: "2026-10-99T12:15:00Z" },
+    { businessName: " " },
+    { businessName: 5 },
+  ])("rejects malformed optional guidance %j", metadata => {
+    expect(isPublicBookingReceipt({ ...receipt, ...metadata })).toBe(false);
+  });
+});

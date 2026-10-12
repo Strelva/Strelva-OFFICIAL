@@ -11,7 +11,7 @@ const MANUAL_ROLLBACKS: Record<string, string> = {
 
 type ReleaseItem = { file: string; sha256: string; rollback?: string; rollbackKind?: string; rollbackSha256?: string };
 
-/** Offline coverage: new integrated migrations cannot silently miss the packet. */
+/** Offline coverage includes held, unqualified tails without assigning a packet batch. */
 export function verifyReleaseInventory(root: string): void {
   const directory = join(root, "supabase/migrations");
   const forwardFiles = readdirSync(directory).filter(file => /^\d{14}_.+\.sql$/.test(file)).sort();

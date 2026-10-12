@@ -1,3 +1,4 @@
+import { visitorTimeZoneLabel } from "./public-admission-time";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { bookingScopeFor, workspaceBookingScope } from "./booking-scope";
 import { resolveOwnerRecipient } from "@/platform/business-record";
@@ -39,7 +40,7 @@ export async function nextOpenTimes(booking: StoreBooking, now: Date, count = 3)
     const offered = await nativeSlots(bookingScopeFor(booking)!, booking.serviceRef, now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
     const day = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, weekday: "short", month: "short", day: "numeric" });
     const time = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, hour: "numeric", minute: "2-digit" });
-    return offered.slots.slice(0, count).map(slot => `${day.format(new Date(slot.start))} at ${time.format(new Date(slot.start))} (${offered.timeZone})`);
+    return offered.slots.slice(0, count).map(slot => `${day.format(new Date(slot.start))} at ${time.format(new Date(slot.start))} ${visitorTimeZoneLabel(slot.start, offered.timeZone)}`);
   } catch { return []; }
 }
 

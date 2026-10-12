@@ -32,6 +32,7 @@ import { createInMemoryPossibilityRepository } from "@/platform/possibilities";
 import { systemOriginId } from "@/platform/systems";
 import type { ExistingSystemsSnapshot, SystemListing } from "@/platform/systems/from-existing";
 import type { WorkspaceRole } from "@/platform/workspaces/types";
+import { createInMemoryAskHistory } from "@/platform/ask/history";
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const OTHER_WS = "22222222-2222-4222-8222-222222222222";
@@ -231,6 +232,7 @@ function harness(options: {
     loadTenantTools: async () => ({ tools: (options.tenantTools ?? {}) as never, siteName: "The Mooney Firm", gbpWriteAllowed: false, businessContext: "SERVICES: Wills, Trusts" }),
     googleWriteGranted: async () => false,
     inquiriesEnabled: () => false,
+    websiteCreationReleased: async () => false,
     needsYou: createTenantEventNeedsYouAdapter(),
     requests: {
       // The converted clients' recorded agency is Strelva Agency; a business
@@ -271,6 +273,82 @@ async function run(deps: AskTurnDeps, text: string, extra: Record<string, unknow
 }
 
 describe("startAskTurn", () => {
+  it("keeps the saved classifier Request recipient and actor in streaming and history", async () => {
+    const h = harness();
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    const savedActor = { kind: "person" as const, displayName: "Original Filer" };
+    h.deps.requests.file = async () => ({ id: "req-saved", status: "requested", agencyName: "Original Studio", actor: savedActor });
+    const result = await run(h.deps, "Rebuild my website");
+    const ask = result.result?.ask as { items: unknown[]; conversationId: string };
+    expect(ask.items).toContainEqual(expect.objectContaining({ toolId: "classifier", agencyName: "Original Studio", actor: savedActor }));
+    const conversation = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.at(-1)?.result?.items).toContainEqual(expect.objectContaining({ agencyName: "Original Studio", actor: savedActor }));
+  });
+  it("returns a working creation action tied to the exact saved owner's website ask", async () => {
+    const h = harness({ managedWebsites: [] });
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    h.deps.websiteCreationReleased = async () => true;
+    const result = await run(h.deps, "Build a new website with our opening hours");
+    const ask = result.result?.ask as { creationAction: { href: string; label: string }; conversationId: string };
+    expect(ask.creationAction.label).toBe("Prepare a website");
+    const href = new URL(ask.creationAction.href, "https://example.test");
+    expect(href.pathname).toBe("/workspace/business/new/website");
+    expect(href.searchParams.get("workspaceId")).toBe(WS);
+    const conversation = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.find(item => item.id === href.searchParams.get("messageId"))?.content).toBe("Build a new website with our opening hours");
+    expect(conversation.messages.at(-1)?.result?.creationAction).toEqual(ask.creationAction);
+    expect(h.filed).toHaveLength(0);
+    expect(h.modelCalls).toHaveLength(0);
+  });
+  it("routes a saved booking ask to native booking preparation, independently of website release", async () => {
+    const h = harness({ managedWebsites: [] });
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    h.deps.websiteCreationReleased = async () => false;
+    const result = await run(h.deps, "Add a booking page for consultations");
+    const ask = result.result?.ask as { creationAction: { kind: string; href: string; label: string }; conversationId: string };
+    expect(ask.creationAction).toMatchObject({ kind: "booking", label: "Prepare bookings" });
+    const href = new URL(ask.creationAction.href, "https://example.test");
+    expect(href.pathname).toBe("/workspace/business/new/booking");
+    const conversation = await history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.find(item => item.id === href.searchParams.get("messageId"))?.content).toBe("Add a booking page for consultations");
+    expect(result.text).not.toContain("Prepare a website");
+    expect(h.modelCalls).toHaveLength(0);
+  });
+  it("withholds booking preparation when its availability cannot be confirmed", async () => {
+    const h = harness({ managedWebsites: [] });
+    h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.bookingCreationReleased = async () => { throw new Error("unavailable"); };
+    const result = await run(h.deps, "Add a booking page");
+    expect(result.result?.ask).not.toHaveProperty("creationAction");
+    expect(result.text).toContain("Booking preparation isn't open");
+  });
+  it.each(["off", "unreadable", "stopped", "revoked", "member", "unsaved", "operator"])("withholds website creation on %s", async state => {
+    const h = harness({ managedWebsites: [], isOperator: state === "operator", role: state === "member" ? "member" : "owner" });
+    if (state !== "unsaved") h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.websiteCreationReleased = state === "unreadable" ? async () => { throw new Error("unavailable"); } : async () => state !== "off";
+    if (state === "stopped") h.deps.readExited = async () => true;
+    if (state === "revoked") {
+      let reads = 0;
+      h.deps.readMembership = async () => ++reads === 1 ? { role: "owner", access: "member", kind: "customer" } : null;
+    }
+    const result = await run(h.deps, "Build a new website");
+    expect(result.result?.ask).not.toHaveProperty("creationAction");
+    expect(h.filed).toHaveLength(0);
+  });
+  it("keeps an overlong ask intact in history without offering a truncated creation action", async () => {
+    const h = harness({ managedWebsites: [] });
+    const history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.history = history;
+    h.deps.websiteCreationReleased = async () => true;
+    const words = `Build a new website ${"with exact details ".repeat(180)}`;
+    const result = await run(h.deps, words);
+    expect(result.result?.ask).not.toHaveProperty("creationAction");
+    expect(result.text).toContain("up to 3,000 characters");
+    expect([...history.conversations.values()][0]?.messages[0]?.content).toBe(words);
+  });
   it("resolves the canonical stored app System and reaches the native tool instead of guessing its work-derived id", async () => {
     const canonicalId = "dddddddd-0000-4000-8000-000000000001";
     const native = vi.fn(async () => ({ workspaceId: WS, systemId: canonicalId, workId: NATIVE_WORK, designRevision: 0, versionId: null, rowRevision: null }));
@@ -321,7 +399,7 @@ describe("startAskTurn", () => {
     const h = harness({ managedWebsites: [] });
     const result = await run(h.deps, "Add a booking page");
     expect(h.filed).toHaveLength(0);
-    expect(result.text).toContain("Start");
+    expect(result.text).toContain("booking preparation couldn't be opened");
   });
 
   it("names the business's recorded agency, never Strelva, when it files (ADR 0015)", async () => {
@@ -336,7 +414,7 @@ describe("startAskTurn", () => {
     const h = harness({ agency: { kind: "none" } });
     const result = await run(h.deps, "Build a new website");
     expect(h.filed).toHaveLength(0);
-    expect(result.text).toContain("Start");
+    expect(result.text).toContain("Website creation isn't open");
     expect(result.text).toContain("bring in an agency from Help");
   });
 
@@ -488,10 +566,22 @@ describe("createServiceRequestAdapter (ADR 0015)", () => {
   const AGENCY = "00000000-0000-4000-8000-0000000000cc";
   const input = { workspaceId: WS, systemId: null, words: "Redo the site", outcome: "Redo the website", read: [], askedOnBehalf: null, topic: "managed.redo_website", idempotencyKey: "ask:t:1" };
   it("addresses the Request to the recorded agency as an ordinary agency provider", async () => {
-    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z" }));
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { agencyName: "North Studio" } }));
     const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "North Studio" }));
     await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "North Studio" });
     expect(execute).toHaveBeenCalledWith(actor, expect.objectContaining({ provider: { kind: "agency", agencyWorkspaceId: AGENCY } }));
+  });
+  it("keeps a saved Request's original recipient and actor when a filing is replayed", async () => {
+    const originalActor = { kind: "person", displayName: "Jo" };
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { agencyName: "Original Studio", actor: originalActor } }));
+    const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "New Studio" }));
+    await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "Original Studio", actor: originalActor });
+    expect(execute).toHaveBeenCalledWith(actor, expect.objectContaining({ context: expect.not.objectContaining({ agencyName: expect.anything(), actor: expect.anything() }) }));
+  });
+  it("keeps old or malformed saved attribution unknown instead of adopting today's agency", async () => {
+    const execute = vi.fn(async () => ({ id: "req-9", request: "Redo the site", status: "requested", providerAcceptance: { status: "pending" }, updatedAt: "2026-10-11T00:00:00Z", context: { actor: { kind: "agency" } } }));
+    const port = createServiceRequestAdapter({ execute, list: vi.fn() }, async () => ({ kind: "one", agencyWorkspaceId: AGENCY, name: "New Studio" }));
+    await expect(port.file(actor, input)).resolves.toEqual({ id: "req-9", status: "requested", agencyName: "" });
   });
   it("refuses before saving when there is no single recorded agency", async () => {
     const execute = vi.fn();

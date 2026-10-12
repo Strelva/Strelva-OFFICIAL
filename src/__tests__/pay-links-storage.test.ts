@@ -107,7 +107,7 @@ describe("listPayLinks", () => {
     expect(redis.mget).not.toHaveBeenCalled();
   });
 
-  it("loads each record, sorts newest-first, and prunes stale slugs", async () => {
+  it("loads each record, sorts newest-first, and leaves the index read-only", async () => {
     const older: PayLinkConfig = { ...config, slug: "older", createdAt: "2026-06-01T00:00:00.000Z" };
     const newer: PayLinkConfig = { ...config, slug: "newer", createdAt: "2026-06-09T00:00:00.000Z" };
     const redis = fakeRedis();
@@ -118,7 +118,7 @@ describe("listPayLinks", () => {
 
     const result = await listPayLinks();
     expect(result.map((c) => c.slug)).toEqual(["newer", "older"]);
-    expect(redis.srem).toHaveBeenCalledWith(PAY_LINK_INDEX_KEY, "ghost");
+    expect(redis.srem).not.toHaveBeenCalled();
   });
 
   it("does not call srem when no slugs are stale", async () => {

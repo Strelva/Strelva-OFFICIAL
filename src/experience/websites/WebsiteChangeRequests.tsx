@@ -177,9 +177,9 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
   }
 
   return <section ref={scope} aria-labelledby="site-changes-title"><StPage className={styles.wrap}>
-    <StHead titleId="site-changes-title" title={`Ask for a change to ${siteLabel}`} meta={editing === "request"
+    <StHead as="h2" titleId="site-changes-title" title={`Ask for a change to ${siteLabel}`} meta={editing === "request"
       ? "This site runs on its own code. Request a change from the selected agency and review its preview before approving publication."
-      : "Text and photos change in the editor. Request a new page, feature or design change from the selected agency, then review its preview."} />
+      : `Text and photos on ${siteLabel} change in the editor. Request a new page, feature or design change from the selected agency, then review its preview.`} />
 
     {canAsk ? <form className={styles.form} onSubmit={(event) => void ask(event)}>
       <label htmlFor="site-change-words">What should change?</label>
@@ -213,7 +213,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
               <StMono as="time" dateTime={receipt.recordedAt}>{when(receipt.recordedAt)}</StMono>
             </li>)}</ul> : <p className={styles.muted}>Asked {when(item.createdAt)}.</p>}
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
-              <StPill busy={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</StPill>
+              <StPill busy={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Make it live</StPill>
               <StPill variant="soft" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</StPill>
               <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current agency authority.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}

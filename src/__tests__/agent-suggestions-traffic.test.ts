@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Positive tool cases serve a converted business. Keep the real model helper's
+// admission, and supply only its trusted tenant-to-workspace lookup seam.
+const mockBillingWorkspace = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/release-flags/store", () => ({
+  releaseWorkspaceForTenant: mockBillingWorkspace,
+}));
+beforeEach(() => {
+  mockBillingWorkspace.mockResolvedValue("a0000000-0000-4000-8000-000000000001");
+});
+
 /**
  * Coverage for three chat-agent tools wired into the live chat in route.ts:
  *

@@ -33,7 +33,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         </StRows>
       </StSection>
       <StSection title="Client comparison" meta="open table, labeled records on phones">
-        <StTable label="Fictional clients" columns={[{ key: "client", label: "Client" }, { key: "health", label: "Health" }, { key: "revision", label: "Revision", mono: true }]} rows={[{ key: "harbor", cells: { client: "Harbor Dental", health: <StState kind="live">Latest checks passed</StState>, revision: "r12" } }, { key: "north", cells: { client: "North Coast Realty", health: <StState kind="down">Form failing</StState>, revision: "r11" } }]} />
+        <StTable label="Fictional clients" columns={[{ key: "client", label: "Client" }, { key: "health", label: "Health" }, { key: "revision", label: "Release", mono: true }]} rows={[{ key: "harbor", cells: { client: "Harbor Dental", health: <StState kind="live">Latest checks passed</StState>, revision: "Release 12" } }, { key: "north", cells: { client: "North Coast Realty", health: <StState kind="down">Form failing</StState>, revision: "Release 11" } }]} />
       </StSection>
       <StSection title="Steps" meta="Make real, item by item">
         <StSteps label="Making it real" steps={[{ title: "Session page built", state: "done", time: "0:12", detail: "Hidden from visitors until the last step." }, { title: "Rehearsing a request end to end", state: "active", time: "1:05" }, { title: "Your confirmation email", state: "pending", detail: "Needs your OK on the wording." }, { title: "Page accepted by provider", state: "unverified", detail: "Done, not yet confirmed. Strelva checks the page without publishing it again." }, { title: "Calendar read", state: "failed", detail: "Google stopped answering. Nothing is live." }]} />
@@ -41,7 +41,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="A change, and the yes">
         <StLedger path="attymooney.com/fees" count="2 lines" lines={[{ sign: "-", text: "Half-day: [2026 fee]" }, { sign: "+", text: "Half-day: [2027 fee]" }]} />
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <StHold aria-label="Publish the fictional fees change" label={accepted ? "Published" : "Hold to publish"} onAccept={() => setAccepted(true)} />
+          <StHold aria-label="Hold to make it live: fictional fees change" label={accepted ? "Published" : "Hold to make it live"} onAccept={() => setAccepted(true)} />
           <StTextButton>Not yet</StTextButton>
           {accepted ? <StToast onUndo={() => setAccepted(false)}>Published · attymooney.com/fees</StToast> : null}
         </div>

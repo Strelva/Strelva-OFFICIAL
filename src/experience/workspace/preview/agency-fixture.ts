@@ -130,7 +130,7 @@ function library(agencyWorkspaceId: string, now: number): AgencyLibrary {
   const version = (index: number, workspaceId: string, clientName: string, state: AgencyLibrary["sources"][number]["versions"][number]["state"], extra: Partial<AgencyLibrary["sources"][number]["versions"][number]> = {}) => ({
     versionId: `v-intake-${index}`, workspaceId, clientName, systemId: systemId(index, 9), systemName: "Inquiry intake",
     context: { kind: "agency_client" as const, label: clientName }, baselineRevision: state === "up_to_date" ? 4 : 3, currentRelease: 2,
-    state, conflicts: [], missingBindings: [], declinedReason: null, ...extra,
+    state, improvementRevision: state === "up_to_date" ? null : 4, localChanges: state === "conflicts" ? 1 : 0, conflicts: [], missingBindings: [], declinedReason: null, ...extra,
   });
   return {
     agencyWorkspaceId,
@@ -155,8 +155,8 @@ function library(agencyWorkspaceId: string, now: number): AgencyLibrary {
         systemId: hex("d4000000", 2), workspaceId: TWIN_TREES, name: "Twin Trees website", hidden: true,
         revisions: [{ number: 2, label: "Hours", summary: "Camillus got a new hours section with holiday closures.", publishedAt: at(2, now) }],
         versions: [
-          { ...version(1, TWIN_TREES, "Twin Trees", "up_to_date"), versionId: "v-twin-camillus", systemId: systemId(1, 1), systemName: "Twin Trees website", context: { kind: "location", label: "Camillus" }, baselineRevision: 2 },
-          { ...version(1, TWIN_TREES, "Twin Trees", "ready"), versionId: "v-twin-fayetteville", systemId: systemId(1, 2), systemName: "Twin Trees website", context: { kind: "location", label: "Fayetteville" }, baselineRevision: 1 },
+          { ...version(1, TWIN_TREES, "Twin Trees", "up_to_date"), versionId: "v-twin-camillus", systemId: systemId(1, 1), systemName: "Twin Trees website", context: { kind: "location", label: "Camillus" }, baselineRevision: 2, improvementRevision: null },
+          { ...version(1, TWIN_TREES, "Twin Trees", "ready"), versionId: "v-twin-fayetteville", systemId: systemId(1, 2), systemName: "Twin Trees website", context: { kind: "location", label: "Fayetteville" }, baselineRevision: 1, improvementRevision: 2 },
         ],
       },
     ],
@@ -172,11 +172,24 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
   // Dev StrictMode reads twice on mount; McClear’s loads from the first retry on.
   // Dev StrictMode reads twice on mount, so McClear's loads from the first Retry on.
   let clientReads = 0;
+  let brand = { displayName: "North Studio", accentColor: "#2563eb", replyTo: "hello@north.example", logo: null, credit: "runs_on_strelva" };
   return withAgencyTeamPreview(async (input, init) => {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
     const agencyWorkspaceId = url.searchParams.get("workspaceId") || "";
+
+    if (url.pathname === "/api/workspace/agency-brand") {
+      if (state === "loading") return new Promise<Response>(() => undefined);
+      if (state === "error") return json({ error: "Your brand could not be loaded." }, 503);
+      if (method === "PUT") {
+        if (state === "delegated") return json({ error: "Only the agency owner can change its brand." }, 403);
+        const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}");
+        if (!body.brand) return json({ error: "Brand details are incomplete." }, 400);
+        brand = body.brand;
+      } else if (method !== "GET") return json({ error: "Not in this preview." }, 405);
+      return json({ brand });
+    }
 
     if (url.pathname === "/api/workspace/provider-client-queue" && method === "GET") {
       if (state === "loading") return new Promise<Response>(() => undefined);

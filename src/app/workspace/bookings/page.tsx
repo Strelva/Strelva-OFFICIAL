@@ -5,6 +5,9 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readWorkspaceBookings, bookingSettingsEnabled, type BookingView } from "@/products/bookings/server";
 import { WorkspaceBookings, type WorkspaceBookingsState } from "@/experience/bookings/WorkspaceBookings";
+import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { listWorkspaces } from "@/platform/workspaces";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Bookings", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -35,5 +38,12 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       state = { kind: "error" };
     }
   }
-  return <WorkspaceBookings workspaceId={workspaceId} state={state} view={view} rulesEnabled={state.kind === "ready" && !state.bookings.readOnly && await bookingSettingsEnabled()} />;
+  const actor = { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() };
+  const [workspaces, systemsReleased] = await Promise.all([
+    listWorkspaces(actor).catch(() => []),
+    systemsReleasedFor(actor, workspaceId).catch(() => false),
+  ]);
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}>
+    <WorkspaceBookings workspaceId={workspaceId} state={state} view={view} rulesEnabled={state.kind === "ready" && !state.bookings.readOnly && await bookingSettingsEnabled()} />
+  </WorkspaceSurfaceShell>;
 }

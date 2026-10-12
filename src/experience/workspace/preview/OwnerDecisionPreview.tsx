@@ -28,7 +28,7 @@ function DecisionContent({ view }: { view: "decision" | "receipts" }) {
   const loaded = needs.state.status === "ready" ? needs.state : null;
   const ready = Boolean(loaded?.items.length);
   return <StrelvaShell title={view === "receipts" ? STRELVA_HANDLED_LABEL : "Session date scope"} active="requests" systemsReleased accountName="Fictional owner" appBase="/preview/strelva" signOut={<span>Local preview</span>}
-    businessContext={<span>Fictional mediation firm</span>}
+    workspaceName="Fictional mediation firm"
     notice={<p role="note" className={styles.fixtureNotice}>Fictional preview · decisions and Undo change this browser rehearsal only. No website, calendar, message or provider write.</p>}>
     <StPage>
       <StHead title={view === "receipts" ? STRELVA_HANDLED_LABEL : "Let attorneys request a session date"} crumb={{ label: "Requests", href: "/preview/strelva/owner-request" }} meta={view === "receipts" ? "Fictional receipts from the last 7 days, grouped by source." : "This is the proposed form attorneys would see on the fictional website."} />

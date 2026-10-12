@@ -465,7 +465,7 @@ test("keeps product discovery coherent and managed work scoped to authorized lin
   await refreshedOutcome("Inquiry work").getByRole("button", { name: "Start" }).click();
   await expect(refreshedMain.getByRole("heading", { name: "Inquiry work", exact: true })).toBeVisible();
   await refreshedMain.getByRole("button", { name: "Open Harbor Dental" }).click();
-  await expect(refreshedMain.getByRole("heading", { name: "What should Strelva handle?", exact: true })).toBeVisible();
+  await expect(refreshedMain.getByRole("heading", { name: "Inquiries", exact: true })).toBeVisible();
 
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=products`);
   const finalMain = page.getByRole("main");

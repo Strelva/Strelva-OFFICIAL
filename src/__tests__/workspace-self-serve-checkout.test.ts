@@ -4,8 +4,9 @@ import { subscriptionAllowanceFromStripeEvent } from "@/platform/work-economics/
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const OWNER = "22222222-2222-4222-8222-222222222222";
-const mocks = vi.hoisted(() => ({ create: vi.fn(), workspaces: vi.fn(), actor: vi.fn() }));
-vi.mock("@/lib/billing", () => ({ getStripe: () => ({ checkout: { sessions: { create: mocks.create } } }) }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), workspaces: vi.fn(), actor: vi.fn(), rpc: vi.fn() }));
+vi.mock("@/platform/infra/stripe", () => ({ getStripe: () => ({ checkout: { sessions: { create: mocks.create } } }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
@@ -18,7 +19,10 @@ const post = (body: unknown) => new Request("https://app.example.test/api/worksp
 describe("self-serve workspace plan (ADR 0015)", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
-    mocks.create.mockReset().mockResolvedValue({ url: "https://checkout.stripe.test/s/1" });
+    mocks.create.mockReset().mockImplementation(async args => ({ id: "cs_test_one", status: "open", mode: "subscription", client_reference_id: WS, metadata: args.metadata, url: "https://checkout.stripe.com/s/1", customer: null, subscription: null }));
+    mocks.rpc.mockReset().mockImplementation(async (name, args) => ({ error: null, data: name === "prepare_workspace_subscription_checkout" ? {
+      attempt: { id: "33333333-3333-4333-8333-333333333333", workspaceId: WS, payerUserId: OWNER, createdAt: new Date().toISOString(), state: "pending", sessionId: null, checkout: args.p_checkout }, customerIds: [], subscriptionIds: [],
+    } : { recorded: true, attemptId: args.p_attempt_id } }));
     mocks.actor.mockResolvedValue({ userId: OWNER, verifiedEmail: "owner@bakery.example.test" });
     mocks.workspaces.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "owner", name: "Bakery" }]);
   });
@@ -47,7 +51,7 @@ describe("self-serve workspace plan (ADR 0015)", () => {
     vi.stubEnv("STRELVA_SELF_SERVE_BILLING", "1"); vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x"); vi.stubEnv("STRELVA_WORKSPACE_PRICE_ID", "price_123");
     const ok = await POST(post({ workspaceId: WS }));
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toEqual({ checkoutUrl: "https://checkout.stripe.test/s/1" });
+    expect(await ok.json()).toEqual({ checkoutUrl: "https://checkout.stripe.com/s/1" });
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ mode: "subscription", line_items: [{ price: "price_123", quantity: 1 }], client_reference_id: WS,
       metadata: expect.objectContaining({ workspaceId: WS, payerId: OWNER, payerKind: "business" }) }), expect.any(Object));
     mocks.workspaces.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "admin", name: "Bakery" }]);

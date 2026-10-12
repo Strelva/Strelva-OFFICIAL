@@ -60,6 +60,7 @@ export async function POST(req: Request) {
   if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const result = await submitOwnerReviewReply(tenant, reviewId, reply, decider);
+  if (result.status === "platform_content_authority_retired") return NextResponse.json({ error: "Platform support cannot author client replies. Open the business workspace with ordinary agency or owner access." }, { status: 403 });
   if (result.status === "not_found") {
     return NextResponse.json({ error: "Review not found" }, { status: 404 });
   }

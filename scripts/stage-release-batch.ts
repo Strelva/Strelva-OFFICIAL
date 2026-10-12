@@ -40,7 +40,8 @@ export function stageReleaseBatch(options: { repoRoot: string; out: string; batc
   const files = [...prior, ...pending];
   const out = resolve(options.out);
   if (existsSync(out)) throw new Error("Output directory must be fresh; existing directories are never overwritten.");
-  // Check the whole pinned inventory, including future steps, before writes.
+  // Check the whole pinned inventory, including held unqualified tails such as
+  // two-doors and the UX audit. Registration does not grant them a packet batch.
   verifyReleaseInventory(repoRoot);
   for (const { file, sha256 } of files) {
     const bytes = readFileSync(join(repoRoot, "supabase/migrations", file));

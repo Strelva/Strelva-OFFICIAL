@@ -1,11 +1,11 @@
 .mooney { --visitor-canvas: #f8f7f4; --visitor-surface: #fff; --visitor-text: #2b2825; --visitor-muted: #6e625b; --visitor-line: #e7e1da; --visitor-accent: #634735; --visitor-on-accent: #fff; --visitor-inset: #f0ebe4; --visitor-button-radius: 8px; min-height: 100dvh; background: var(--visitor-canvas); color: var(--visitor-text); }
-.lakeview { --visitor-canvas: #f7f5ef; --visitor-surface: #fff; --visitor-text: #202d25; --visitor-muted: #596960; --visitor-line: #e6e2da; --visitor-accent: #2f5438; --visitor-on-accent: #fff; --visitor-inset: #efede6; --visitor-display: Georgia, serif; min-height: 100dvh; background: var(--visitor-canvas); color: var(--visitor-text); }
+.lakeview { --visitor-canvas: #f7f5ef; --visitor-surface: #fff; --visitor-text: #202d25; --visitor-muted: #596960; --visitor-line: #e6e2da; --visitor-accent: #2f5438; --visitor-on-accent: #fff; --visitor-inset: #efede6; min-height: 100dvh; background: var(--visitor-canvas); color: var(--visitor-text); }
 .header { height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 48px; gap: 24px; }
 .brand { font-size: 22px; font-weight: 600; font-family: var(--visitor-display, inherit); text-decoration: none; }
 .nav { display: flex; align-items: center; gap: 26px; font-size: 14px; }
 .nav a { text-decoration: none; }
 .nav a:focus-visible { outline: 2px solid var(--visitor-accent); outline-offset: 4px; }
-.request { display: grid; grid-template-columns: 300px 436px 240px; max-width: 976px; margin: 46px auto 0; background: var(--visitor-surface); border: 1px solid var(--visitor-line); border-radius: 16px; overflow: hidden; }
+.request { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, .8fr); max-width: 976px; margin: 46px auto 0; background: var(--visitor-surface); border: 1px solid var(--visitor-line); border-radius: 16px; overflow: hidden; }
 .request > section { padding: 24px; }
 .request > section + section { border-left: 1px solid var(--visitor-line); }
 .request h1 { margin: 16px 0 12px; font-size: 22px; font-weight: 500; line-height: 1.3; }
@@ -32,7 +32,7 @@
 .received dl { margin-top: 14px; text-align: left; }
 .received dd { text-align: left; }
 .instant { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 40px; padding: 24px 56px; }
-.instant h1 { font-family: Georgia, serif; font-size: 40px; margin: 0 0 20px; font-weight: 500; }
+.instant h1 { font-size: 40px; margin: 0 0 20px; font-weight: 500; }
 .dates { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 .classRows { background: var(--visitor-surface); border-radius: 12px; overflow: hidden; }
 .classRow { display: flex; align-items: center; gap: 18px; min-height: 67px; padding: 12px 18px; font-size: 14px; }
@@ -41,9 +41,11 @@
 .classRow small { display: block; margin-top: 2px; color: var(--visitor-muted); font-size: 13px; }
 .classRow > span { color: var(--visitor-muted); font-size: 13px; }
 .bookingForm { padding: 24px; background: var(--visitor-surface); border: 1px solid var(--visitor-line); border-radius: 16px; }
-.bookingForm h2 { font-family: Georgia, serif; font-size: 28px; font-weight: 500; margin: 0; }
+.bookingForm h2 { font-size: 28px; font-weight: 500; margin: 0; }
 .manage { max-width: 560px; min-height: calc(100dvh - 76px); margin: auto; padding: 24px 20px; display: flex; flex-direction: column; }
-.manage h1 { font-family: Georgia, serif; font-size: 32px; font-weight: 500; margin: 0 0 14px; }
+.manage h1 { font-size: 32px; font-weight: 500; margin: 0 0 14px; }
 .manageFooter { margin-top: auto; padding-top: 80px; }
-.disclosure { position: fixed; bottom: 2px; right: 8px; color: var(--visitor-muted); font-size: 10px; }
-@media(max-width: 767px) { .header { height: 76px; padding: 0 20px; } .brand { font-size: 19px; } .nav { display: none; } .request { display: flex; flex-direction: column; margin: 12px 20px 30px; } .request > section + section { border-left: 0; border-top: 1px solid var(--visitor-line); } .request > section { padding: 20px; } .calendar { gap: 2px; } .day { height: 40px; } .inquiry { margin-top: 24px; padding-bottom: 40px; } .inquiry h1 { font-size: 28px; } .fields, .matters { grid-template-columns: 1fr; } .received { margin-top: 50px; padding: 30px 22px; } .instant { display: flex; flex-direction: column; padding: 12px 20px 32px; gap: 24px; } .instant h1 { font-size: 32px; } .classRow { flex-wrap: wrap; gap: 10px; } .classRow > :first-child { flex-basis: 50%; } .manage { min-height: calc(100dvh - 76px); } }
+.disclosure { margin: 16px 20px; text-align: right; color: var(--visitor-muted); font-size: 10px; }
+@media(max-width: 767px) { .header { height: 76px; padding: 0 20px; } .brand { font-size: 19px; } .nav { display: none; } .request { display: flex; flex-direction: column; margin: 12px 20px 30px; } .request > section + section { border-left: 0; border-top: 1px solid var(--visitor-line); } .request > section { padding: 20px; } .calendar { gap: 2px; } .day { height: 44px; } .inquiry { margin-top: 24px; padding-bottom: 40px; } .inquiry h1 { font-size: 28px; } .fields, .matters { grid-template-columns: 1fr; } .received { margin-top: 50px; padding: 30px 22px; } .instant { display: flex; flex-direction: column; padding: 12px 20px 32px; gap: 24px; } .instant h1 { font-size: 32px; } .classRow { flex-wrap: wrap; gap: 10px; } .classRow > :first-child { flex-basis: 50%; } .manage { min-height: calc(100dvh - 76px); } }
+
+.request h1, .inquiry h1, .received h1, .instant h1, .manage h1 { font-family: var(--visitor-display, inherit); font-size: 28px; line-height: 1.25; letter-spacing: -.6px; }

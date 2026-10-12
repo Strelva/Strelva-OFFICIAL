@@ -5,17 +5,15 @@ import { detectStaleSections } from "./reports";
 import { suggestionAudience } from "./suggestions";
 import type { ContentSection, UnifiedEvent } from "./types";
 
-/** A client should only ever see owner-facing asks in "Needs you":
- *  - operator suggestion cards (our craft) are filtered out (Phase 1), and
- *  - Strelva-initiated drafts tagged `reviewAudience: "operator"` are approved by
- *    the operator first; they reach the client only if the operator escalates
- *    (which flips them to "owner"). Client-requested changes default to "owner".
- *  Events with no tag default to visible, so nothing legacy silently disappears. */
+/** Client "Needs you" contains ordinary owner decisions. Support reconciliation
+ * notices and legacy operator-tagged records stay hidden; an audience tag never
+ * grants platform staff approval or publishing authority. New client content
+ * drafts use the owner's queue. Untagged legacy events remain visible. */
 export function isClientVisibleEvent(e: UnifiedEvent): boolean {
   if (e.metadata?.reviewAudience === "operator") return false;
-  // A write the provider accepted but read-back could not confirm is Strelva's
-  // to reconcile, never the owner's decision (needs-you spec section 4). Older
-  // events carry no audience, so the type decides.
+  // An accepted write with unconfirmed read-back needs operational reconciliation,
+  // never another owner's approval (needs-you spec section 4). Older notices
+  // carry no audience, so the type decides.
   if (e.type === "change_verify_failed") return false;
   return e.type !== "suggestion" || suggestionAudience(e.title) === "owner";
 }

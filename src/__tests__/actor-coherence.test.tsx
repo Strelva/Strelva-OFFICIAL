@@ -47,17 +47,18 @@ describe("actor coherence across receipts and public previews", () => {
       businessName: "Harbor Dental", proposingActor: { kind: "person", displayName: "Alex" },
       agencyBrand: { agencyId: "north", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" },
     } } }));
-    expect(html).toContain("North Studio · Harbor Dental");
+    expect(html).toContain("<strong>Harbor Dental</strong>");
+    expect(html).toContain("North Studio");
     expect(html).toContain("Proposed by Alex");
     expect(html).toContain("Runs on Strelva");
     expect(html).toContain("disabled");
-    expect(html).toContain("Make real");
+    expect(html).toContain("Make it live");
   });
   it("does not invent a refresh or a platform actor on unavailable previews", () => {
     const changed = renderToStaticMarkup(createElement(PossibilityTry, { state: { kind: "changed" } }));
     expect(changed).not.toContain("is refreshing");
     const ready = renderToStaticMarkup(createElement(PossibilityTry, { state: { kind: "ready", view: { title: "Preview", intent: "", changes: [], introduces: [], takesSubmissions: false } } }));
-    expect(ready).toContain("Agency not recorded · Business not recorded");
+    expect(ready).toContain("Business identity unavailable");
     expect(ready).toContain("Actor not recorded");
   });
 });

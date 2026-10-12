@@ -156,7 +156,7 @@ export function customerStepLines(a: Activation): CustomerStepLine[] {
         break;
       case "blocked": state = "Waiting"; detail = plainReason(s.reason); break;
       case "failed": state = "Didn't happen"; detail = plainReason(s.reason); break;
-      case "unknown": state = "Not sure yet"; detail = "Strelva is checking."; break;
+      case "unknown": state = "Not sure yet"; detail = "Confirmation is pending."; break;
       case "restored":
       case "compensated": state = "Undone"; detail = plainReason(s.reason); break;
       case "running": state = "Not started"; detail = "Running now."; break;
@@ -185,8 +185,8 @@ export function customerActivationView(a: Activation, name: string): CustomerAct
   const headline =
     a.status === "made_real" ? (cutoverWaiting ? "Live at its Strelva address. Your domain is waiting on DNS." : "Live.")
       : a.status === "rolled_back" ? (a.steps.some((s) => s.kind === "effect" && s.effect === "accepted" && s.status !== "compensated") ? "Undo finished. Some outside effects remain." : "Undone.")
-        : a.rollbackStartedAt ? (checking ? "Undoing. Strelva is checking what already happened." : "Undoing.")
-          : a.status === "needs_attention" ? (landed ? "Partly live" : "Nothing changed yet. Strelva is on it.")
+        : a.rollbackStartedAt ? (checking ? "Undoing. Some earlier outcomes still need confirmation." : "Undoing.")
+          : a.status === "needs_attention" ? (landed ? "Partly live" : "Nothing changed yet. The outcome needs review.")
             : `Making ${name} live: ${done} of ${total} done`;
   return { status: a.status, headline, partlyLive, done, total, lines, checking };
 }

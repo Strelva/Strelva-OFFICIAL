@@ -33,6 +33,8 @@ export type ModelCallActorKind = (typeof MODEL_CALL_ACTOR_KINDS)[number];
 
 export interface ModelCallRow {
   calledAt: string;
+  /** Atomic budget hold for this exact provider request, retained on uncertainty. */
+  budgetReservationId?: string | null;
   purpose: ModelCallPurpose;
   workspaceId: string | null;
   systemId: string | null;
@@ -82,6 +84,7 @@ export async function recordMissingModelCallRows(count: number, reason: string):
 function rowPayload(row: ModelCallRow) {
   return {
     calledAt: row.calledAt,
+    budgetReservationId: row.budgetReservationId ?? null,
     purpose: row.purpose,
     workspaceId: row.workspaceId,
     systemId: row.systemId,

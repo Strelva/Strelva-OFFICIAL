@@ -4,6 +4,16 @@ export const AGENCY_LEVELS = ["prepare", "full_control"] as const;
 export type AgencyScope = typeof AGENCY_SCOPES[number];
 export type AgencyLevel = typeof AGENCY_LEVELS[number];
 
+/** Fingerprint of the exact owner, consent and immutable grant rows reviewed. */
+export type AgencyProposal = {
+  proposalId: string;
+  businessWorkspaceId: string;
+  businessName: string;
+  consent: string;
+  proposedAt: string;
+  scopes: Array<{ scope: AgencyScope; level: AgencyLevel }>;
+};
+
 export const AGENCY_SCOPE_LABELS: Record<AgencyScope, string> = {
   website: "Website",
   inquiries: "Inquiries",
@@ -25,4 +35,3 @@ export function agencyConsentText(agencyName: string, scopes: Array<{ scope: Age
   const parts = scopes.map(item => `${AGENCY_SCOPE_LABELS[item.scope]} (${AGENCY_LEVEL_LABELS[item.level].toLowerCase()})`);
   return `I bring in ${agencyName} for ${parts.join(", ")}. I keep payment decisions and my data, and I can end their access anytime.`.slice(0, 2000);
 }
-

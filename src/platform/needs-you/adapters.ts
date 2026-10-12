@@ -13,6 +13,7 @@ import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
  * yet; their asks stay on their own screens.
  */
 import { createHash } from "node:crypto";
+import { recordedActor } from "@/platform/presentation/actor";
 import type { UnifiedEvent } from "@/lib/types";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ServiceRequest } from "@/platform/service-requests/types";
@@ -147,6 +148,7 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   const inquiryPublication = event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
   const route = commitment || inquiryPublication ? "owner_decides" : observed;
   return {
+    actor: recordedActor(event.metadata?.actor),
     kind,
     route,
     title: event.title.slice(0, 200).trim() || "A change is waiting",

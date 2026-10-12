@@ -50,7 +50,7 @@ export function OwnerRequestPreview({ state, dark }: { state: OwnerRequestPrevie
   }, [state]);
   return <div data-workspace-theme="linen" data-workspace-mode={dark ? "dark" : "light"}>
     <WorkspaceRequestContext.Provider value={transport}>
-      <StrelvaShell title="Requests" active="requests" systemsReleased businessContext={<span>Fictional Workshop</span>} accountName="Fictional owner" signOut={<span>Local preview</span>}
+      <StrelvaShell title="Requests" active="requests" systemsReleased workspaceName="Fictional Workshop" accountName="Fictional owner" signOut={<span>Local preview</span>}
         notice={<p role="note" className="px-5 py-3 text-sm text-gray-muted">Local rehearsal · fictional request. No decision, publication or provider write is saved.</p>}
       ><DeliveryCommitmentPanel key={state} requestId={requestId}>{["ready", "proposed", "readonly"].includes(state) ? <OwnerRequestConversationPreview key={`conversation:${state}`} readOnly={state === "readonly"} /> : null}</DeliveryCommitmentPanel></StrelvaShell>
     </WorkspaceRequestContext.Provider>

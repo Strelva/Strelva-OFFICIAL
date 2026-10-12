@@ -1,10 +1,12 @@
 import { assertGoogleReviewArchiveCurrent } from "@/platform/infra/google-review-content";
 import { z } from "zod";
+import { ownerExportHistorySchema, type OwnerExportHistory } from "./history-contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";
 import { WorkspaceExportV3Error, type V3Rpc } from "./v3";
 
 export const exportBuildIdSchema = z.string().uuid();
+export const exportWorkspaceIdSchema = z.string().uuid();
 const statusSchema = z.object({ status: z.enum(["building", "ready", "failed", "expired", "stalled"]) });
 const partSchema = z.object({ body: z.string(), partCount: z.number().int().positive() });
 
@@ -12,6 +14,19 @@ function databaseRpc(): V3Rpc {
   const db = getSupabase() as unknown as { rpc: V3Rpc } | null;
   if (!db) throw new WorkspaceExportV3Error("unavailable", "Export is unavailable.");
   return (name, args) => db.rpc(name, args);
+}
+
+/** Only current, confirmed owners can discover retained archives for a business. */
+export async function readOwnerExportHistory(actor: WorkspaceActor, workspaceId: string, rpc = databaseRpc()): Promise<OwnerExportHistory> {
+  const id = exportWorkspaceIdSchema.parse(workspaceId);
+  const result = await rpc("list_workspace_export_owner_builds", { p_workspace_id: id, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
+  if (result.error?.message?.includes("workspace_export_denied")) throw new WorkspaceExportV3Error("denied", "Exports are unavailable to this owner.");
+  if (result.error) throw new WorkspaceExportV3Error("unavailable", "Export history could not be read. Try again.");
+  const rows = ownerExportHistorySchema.safeParse(result.data);
+  if (!rows.success || rows.data.some(row => row.workspaceId !== id || row.status === "ready" && !row.expiresAt)) {
+    throw new WorkspaceExportV3Error("unavailable", "Export history could not be confirmed. Try again.");
+  }
+  return rows.data;
 }
 
 /** A paused email pipeline does not prevent the verified business owner downloading. */

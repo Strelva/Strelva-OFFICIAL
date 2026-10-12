@@ -16,6 +16,7 @@ import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspa
 import { resolveAskTarget, type AskResolution, type ResolvedSite } from "./resolution";
 import type { TenantAskTools } from "./tenant-tools-adapter";
 import { askToolLabel, buildAskTools, type AskReceiptItem } from "./tools";
+import { websiteRebuildReleasedFor } from "@/platform/website-rebuild-release";
 
 /**
  * One Ask Strelva turn: resolve, classify, then (only when needed) run the
@@ -80,6 +81,10 @@ export interface AskTurnDeps {
   needsYouPath: string;
   /** Conversation history. Absent, or failing to save, the turn still runs and says it wasn't saved. */
   history?: AskHistoryPort;
+  /** Website creation is offered only when its actual release is available. */
+  websiteCreationReleased?(actor: WorkspaceActor, workspaceId: string): Promise<boolean>;
+  /** Booking preparation is separate from website generation. */
+  bookingCreationReleased?(actor: WorkspaceActor, workspaceId: string): Promise<boolean>;
 }
 
 /** How many stored messages go back to the model as context. */
@@ -154,6 +159,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
   const credentials = request.messages.some(message => containsAskCredentials(message.content));
   let conversationId: string | null = credentials ? null : request.conversationId ?? null;
   let saved = Boolean(deps.history) && !credentials;
+  let userMessageId: string | null = null;
   let modelMessages: ModelMessage[] = request.messages as ModelMessage[];
   if (deps.history && !credentials) {
     try {
@@ -169,6 +175,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         role: "user", content: lastUserText, askedOnBehalf: request.askedOnBehalf ?? null,
       });
       conversationId = appended.conversationId;
+      userMessageId = appended.messageId;
     } catch (error) {
       if (error instanceof AskConversationNotFoundError) return { kind: "refused", status: 404, error: error.message };
       if (error instanceof WorkspaceConflictError) return { kind: "refused", status: 409, error: error.message };
@@ -188,6 +195,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       };
       const items: AskReceiptItem[] = [];
       let resultKind: AskResultKind = "answer";
+      let creationAction: { kind: "website" | "booking"; label: string; href: string } | null = null;
       const onReceipt = (item: AskReceiptItem) => {
         items.push(item);
         if (item.kind !== "refusal") resultKind = item.kind;
@@ -237,7 +245,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
             workspaceId: request.workspaceId, systemId, words: lastUserText, outcome, read: [],
             askedOnBehalf: request.askedOnBehalf ?? null, topic, idempotencyKey: `ask:${deps.newTurnId()}:1`,
           });
-          onReceipt({ kind: "request", toolId: "classifier", status: "filed", ids: [filed.id], summary: outcome });
+          onReceipt({ kind: "request", toolId: "classifier", status: "filed", ids: [filed.id], agencyName: filed.agencyName, actor: filed.actor, summary: outcome });
           record({ status: "queued", message: `Request filed for ${filed.agencyName} (${filed.id}).` });
           return true;
         } catch (error) {
@@ -268,7 +276,24 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         }
         if (pre.kind === "offer_making") {
           const what = MANAGED_REQUEST_SUMMARY[pre.topic].toLowerCase();
-          say(`You can start ${what} from Start in your workspace. If you'd rather have it done for you, bring in an agency from Help.`);
+          const kind = pre.topic === "booking_page" ? "booking" : "website";
+          const releasedFor = kind === "booking" ? deps.bookingCreationReleased ?? (async () => true) : deps.websiteCreationReleased ?? websiteRebuildReleasedFor;
+          const [current, exited, released] = await Promise.all([
+            deps.readMembership(actor, request.workspaceId),
+            deps.readExited(actor, request.workspaceId).catch(() => true),
+            releasedFor(actor, request.workspaceId).catch(() => false),
+          ]);
+          if (!deps.isOperator && current?.access === "member" && current.kind === "customer"
+            && ["owner", "admin"].includes(current.role || "") && !exited && released && saved && conversationId && userMessageId && lastUserText.length <= 3000) {
+            creationAction = { kind, label: kind === "booking" ? "Prepare bookings" : "Prepare a website", href: `/workspace/business/new/${kind}?${new URLSearchParams({ workspaceId: request.workspaceId, conversationId, messageId: userMessageId })}` };
+            say(kind === "booking" ? "Start with booking availability, with your words carried forward. A visitor booking page also needs a configured service and its inquiry and calendar Connections. Nothing is booked from this ask." : `Prepare ${what} with your words already filled in. You review the draft before it goes live. If you'd rather have it done for you, bring in an agency from Help.`);
+          } else {
+            const subject = kind === "booking" ? "Booking preparation" : "Website creation";
+            say(lastUserText.length > 3000 ? `${subject} can carry an ask of up to 3,000 characters. Shorten this ask to continue; your full words stay in this conversation.`
+              : !released ? `${subject} isn't open for this business yet. Your words stay in this conversation. You can bring in an agency from Help.`
+              : !saved ? `Your words couldn't be saved, so ${subject.toLowerCase()} couldn't be opened with them. Try again when conversation history is available.`
+                : `${subject} is unavailable with your current access or business status. You can bring in an agency from Help.`);
+          }
           return;
         }
         if (target.kind === "choose_site") {
@@ -324,12 +349,12 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           try {
             await deps.history.append(actor, {
               workspaceId: request.workspaceId, conversationId, systemId: request.systemId ?? null, role: "assistant",
-              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId },
+              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId, ...(creationAction ? { creationAction } : {}) },
             });
           } catch { saved = false; }
         }
         try {
-          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved } })}\n`);
+          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved, ...(creationAction ? { creationAction } : {}) } })}\n`);
         } catch { /* client gone */ }
       }
     },

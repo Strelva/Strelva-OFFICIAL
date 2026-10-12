@@ -24,7 +24,7 @@ export function publishedPolicyRows(policies: PublishedPolicies = {}): Array<{ k
     age.guardianRequired === undefined ? undefined : age.guardianRequired ? "Guardian required." : "No guardian required.", age.summary]);
   const booking = policies.booking_rules?.value;
   if (booking) add("booking_rules", "Booking rules", [booking.summary,
-    booking.reservationRequired === undefined ? undefined : booking.reservationRequired ? "Reservation required." : "No reservation required.",
+    booking.reservationRequired === undefined ? undefined : booking.reservationRequired ? "Booking required." : "No booking required.",
     booking.advanceNoticeHours === undefined ? undefined : `Advance notice: ${booking.advanceNoticeHours} hours.`,
     booking.maximumAdvanceDays === undefined ? undefined : `Book up to ${booking.maximumAdvanceDays} days ahead.`]);
   const response = policies.response_time?.value;

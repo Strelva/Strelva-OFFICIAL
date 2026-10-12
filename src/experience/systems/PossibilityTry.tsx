@@ -57,9 +57,9 @@ export function PossibilityTry({ state, previewContent }: { state: PossibilityTr
   const { view } = state;
   return <Shell>
     <header className={styles.topBar}>
-      <div><strong>{view.agencyBrand?.agencyId ? view.agencyBrand.name : "Agency not recorded"} · {view.businessName || "Business not recorded"}</strong>{view.agencyBrand?.agencyId ? <OwnerBrandIdentity brand={view.agencyBrand} rail /> : null}<p>Proposed by {actorLabel(view.proposingActor)}</p></div>
+      <div><strong>{view.businessName || "Business identity unavailable"}</strong>{view.agencyBrand?.agencyId ? <OwnerBrandIdentity brand={view.agencyBrand} /> : null}<p>Proposed by {actorLabel(view.proposingActor)}</p></div>
       <div><strong>You’re trying a Possibility: {view.title}</strong><p>Not live. Test submissions go nowhere. Only people with this link can open it.</p></div>
-      <StPill variant="soft" disabled title="Use the separate approval link in your email to make this real.">Make real</StPill>
+      <StPill variant="soft" disabled title="Use the separate approval link in your email to make it live.">Make it live</StPill>
     </header>
     <StPage width={view.websiteDocument ? "wide" : "column"}>
       {previewContent ? null : <StHead title={view.title} meta={view.intent} />}
@@ -71,7 +71,7 @@ export function PossibilityTry({ state, previewContent }: { state: PossibilityTr
         {view.changes.map(line => <StRow key={line} title={line} />)}
         {view.introduces.map(line => <StRow key={`new-${line}`} kind="New System" title={line} />)}
       </StRows></StSection> : null}
-      <StNotice>Nothing here changes your live site, sends a message or books anything. The separate approval link in your email is where you can make real.</StNotice>
+      <StNotice>Nothing here changes your live site, sends a message or books anything. The separate approval link in your email is where you can make it live.</StNotice>
     </StPage>
   </Shell>;
 }

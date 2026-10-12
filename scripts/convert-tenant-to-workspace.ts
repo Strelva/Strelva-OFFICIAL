@@ -41,77 +41,10 @@
  * writes nothing. Same refusal rules as --apply.
  */
 import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
-import { getSupabase, type Row } from "../src/platform/infra/db/client";
-import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
-import { getStoredContent } from "../src/lib/storage/content-store";
-import { legacyGetBookings as getBookings } from "../src/platform/bookings/legacy-store";
-import { DEFAULT_BOOKING_CONFIG } from "../src/lib/booking";
-import { getRedisLeads as getLeads } from "../src/lib/leads";
-import { captureLegacyRedisConversionSettings } from "./tenant-conversion-legacy-source";
-import { billingMonthlyCents, resolveBillingType } from "../src/lib/billing-type";
-import { isGrandfathered } from "../src/lib/subscription";
-import { PROTECTED_TENANTS } from "../src/lib/deprovision";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { convertTenantToBusiness, previewTenantUnlink, readTenantWorkspaceLink, unlinkTenantFromBusiness } from "../src/platform/business-record";
-import { parseConversionArgs, runTenantConversion, runTenantRollback, type ConversionSources } from "./tenant-conversion";
-
-async function readTenant(slug: string) {
-  const db = getSupabase();
-  if (!db) return getTenantConfig(slug);
-  const { data, error } = await db.from("tenants").select("*").eq("id", slug).maybeSingle();
-  if (error) throw new Error(`Tenant read failed: ${error.message}`);
-  return data ? rowToTenant(data as Row<"tenants">) : undefined;
-}
-
-async function read(slug: string): Promise<ConversionSources> {
-  const tenant = await readTenant(slug);
-  if (!tenant) return { tenant, contact: null, settings: null, footer: null, services: null, bookingConfig: null, leads: [], bookings: [], billing: null, account: null };
-  const [contact, settings, footer, services, legacy, leads, bookings] = await Promise.all([
-    getStoredContent("contact", slug),
-    getStoredContent("settings", slug),
-    getStoredContent("footer", slug),
-    getStoredContent("services", slug),
-    captureLegacyRedisConversionSettings(slug),
-    getLeads(slug, 500),
-    getBookings(slug),
-  ]);
-  const {config,overrides,account}=legacy;
-  return {
-    tenant,
-    contact,
-    settings,
-    footer,
-    services: services?.services ?? null,
-    bookingConfig: {
-      timezone: config.timezone,
-      customised: JSON.stringify(config) !== JSON.stringify(DEFAULT_BOOKING_CONFIG),
-      overrides: overrides.length,
-    },
-    leads,
-    bookings,
-    billing: {
-      billingType: resolveBillingType(tenant),
-      subscriptionStatus: tenant.subscriptionStatus ?? null,
-      subscriptionPlan: tenant.subscriptionPlan ?? null,
-      monthlyCents: billingMonthlyCents(tenant),
-      hasStripeSubscription: Boolean(tenant.stripeSubscriptionId),
-      grandfathered: PROTECTED_TENANTS.has(slug) || isGrandfathered(slug),
-    },
-    account: account ? {
-      id: account.id,
-      name: account.name.slice(0, 120),
-      tenantIds: account.tenantIds.slice(0, 100),
-      multiSite: account.tenantIds.length > 1,
-      ...(account.subscription ? { subscription: {
-        status: account.subscription.status?.slice(0, 40) ?? null,
-        amountCents: account.subscription.amountCents ?? null,
-        currentPeriodEnd: account.subscription.currentPeriodEnd?.slice(0, 40) ?? null,
-        items: account.subscription.items.slice(0, 100).map((item) => ({
-          tenantId: item.tenantId.slice(0, 120), label: item.label.slice(0, 120), amountCents: Math.max(0, Math.round(item.amountCents)),
-        })),
-      } } : {}),
-    } : null,
-  };
-}
+import { parseConversionArgs, runTenantConversion, runTenantRollback } from "../src/server/tenant-conversion/engine";
+import { readConversionSources } from "../src/tenant-conversion-sources";
 
 async function main() {
   const options = parseConversionArgs(process.argv.slice(2));
@@ -126,7 +59,7 @@ async function main() {
     return;
   }
   const outcome = await runTenantConversion({ ...options, databaseUrl: process.env.SUPABASE_URL }, {
-    read,
+    read: readConversionSources,
     readLink: hasDb ? readTenantWorkspaceLink : null,
     convert: convertTenantToBusiness,
     log: options.json ? () => undefined : (line) => console.log(line),

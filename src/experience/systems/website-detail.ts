@@ -162,7 +162,7 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
         undo: "Restore this saved content as a draft for review.", restore: { section: row.section, versionId: row.id } };
     }),
     ...input.snapshots.map(row => ({ id: `snapshot:${row.id}`, source: "snapshot" as const, at: row.createdAt, actor: row.actor, by: actorLabel(row.actor),
-      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Ask Strelva to prepare this exact saved copy for review before restoring it." : null,
+      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Prepare this exact saved copy for review before restoring it." : null,
       ...(row.status === "available" && input.workspaceId ? { restore: { kind: "snapshot" as const, snapshotId: row.id } } : {}) })),
     ...input.documentRevisions.map(row => ({ id: `document:${row.revision}:${row.contentHash.slice(0, 12)}`, source: "document" as const, at: row.createdAt,
       actor: row.actor, by: actorLabel(row.actor),
@@ -171,12 +171,12 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
       ...(input.workspaceId && input.workId && row.revision < latestDocumentRevision ? { restore: { kind: "document" as const, workId: input.workId, targetRevision: row.revision, targetContentHash: row.contentHash } } : {}) })),
     ...input.linkedPublications.map(row => ({ id: `cutover:${row.revision}:${row.publishedAt}`, source: "document" as const, at: row.publishedAt, actor: row.actor, by: actorLabel(row.actor),
       title: `Replaced the site at ${row.tenantSlugAtPublication} with revision ${row.revision}`,
-      undo: Date.parse(row.fallbackUntil) > Date.now() ? `The old site is kept until ${row.fallbackUntil.slice(0, 10)}; Strelva can switch back until then.` : null })),
+      undo: Date.parse(row.fallbackUntil) > Date.now() ? `The old site is kept until ${row.fallbackUntil.slice(0, 10)}; an authorized publisher can switch back until then.` : null })),
     ...input.changeRequests.filter(row => row.kind === "custom_request" && row.status === "shipped").map(row => ({ id: `deploy:${row.requestId}`, source: "deploy" as const, at: row.resolvedAt ?? row.createdAt, actor: row.actor, by: actorLabel(row.actor),
-      title: row.title, undo: "Strelva can redeploy the previous version." })),
+      title: row.title, undo: "An authorized publisher can redeploy the previous version." })),
     ...(input.repoDeployments ?? []).map(row => ({ id: `deploy-receipt:${row.id}`, source: "deploy" as const, at: row.recordedAt, actor: row.actor, by: actorLabel(row.actor),
       title: row.readBack === "confirmed" ? `${row.title} · live and checked` : `${row.title} · deployed, not yet confirmed`,
-      undo: "Ask Strelva to prepare a redeploy of the previous commit for approval.",
+      undo: "Prepare a redeploy of the previous commit for approval.",
       deployment: { commitSha: row.commitSha, url: row.deploymentUrl, readBack: row.readBack } })),
   ]).slice(0, 50);
 

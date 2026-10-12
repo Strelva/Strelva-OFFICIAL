@@ -86,7 +86,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       : "No robots.txt file was found.",
     details: hasRobots
       ? undefined
-      : "A robots.txt is the note that tells search engines which pages they may read. Ask Strelva to add one so crawlers get clear guidance.",
+      : "A robots.txt is the note that tells search engines which pages they may read. Add one so crawlers get clear guidance.",
   });
 
   // -------------------------------------------------------------------------
@@ -103,7 +103,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       ? "Your site is currently blocking search engines from reading it at all."
       : "Search engines are allowed to read the site.",
     details: blocking.blocked
-      ? `A setting is telling search engines to skip your whole site, which keeps you out of results: ${blocking.patterns.join("; ")}. Ask Strelva to remove the blanket block so you can be found.`
+      ? `A setting is telling search engines to skip your whole site, which keeps you out of results: ${blocking.patterns.join("; ")}. Remove the blanket block so you can be found.`
       : undefined,
   });
 
@@ -120,7 +120,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       : "No XML sitemap was found.",
     details: hasSitemap
       ? undefined
-      : "A sitemap is the index you hand search engines so they find every page faster. Ask Strelva to add one.",
+      : "A sitemap is the index you hand search engines so they find every page faster. Add one.",
   });
 
   // -------------------------------------------------------------------------
@@ -148,7 +148,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
         : "The sitemap was found but does not look like valid XML with page entries.",
     details: sitemapValid || !hasSitemap
       ? undefined
-      : "The sitemap needs to list your page addresses in a format search engines can read. Ask Strelva to fix its format.",
+      : "The sitemap needs to list your page addresses in a format search engines can read. Fix its format.",
   });
 
   // -------------------------------------------------------------------------
@@ -165,7 +165,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       : "No canonical tag was found.",
     details: hasCanonical
       ? canonical
-      : "A canonical tag tells search engines which version of a page is the main one, so your ranking strength lands on one address instead of being split. Ask Strelva to add it.",
+      : "A canonical tag tells search engines which version of a page is the main one, so your ranking strength lands on one address instead of being split. Add it.",
   });
 
   // -------------------------------------------------------------------------
@@ -211,7 +211,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       : "No meta description was found.",
     details: hasMetaDesc
       ? undefined
-      : "The description is the sentence shown under your title in search results: free ad space. Ask Strelva to write one so you control that first impression.",
+      : "The description is the sentence shown under your title in search results: free ad space. Write one so you control that first impression.",
   });
 
   // -------------------------------------------------------------------------
@@ -229,7 +229,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
     details:
       h1Count > 0
         ? $("h1").first().text().trim().slice(0, 100)
-        : "The main heading tells search engines and AI what the page is about in one line. Ask Strelva to add a clear one.",
+        : "The main heading tells search engines and AI what the page is about in one line. Add a clear one.",
   });
   checks.push({
     name: "Single H1",
@@ -243,7 +243,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
           : `The page has ${h1Count} main headings. A page reads clearest with one.`,
     details:
       h1Count > 1
-        ? "Several top-level headings can blur what your page is mainly about. Ask Strelva to keep one main heading and make the others sub-headings."
+        ? "Several top-level headings can blur what your page is mainly about. Keep one main heading and make the others sub-headings."
         : undefined,
   });
 
@@ -265,7 +265,7 @@ export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boo
       ? "Your page may need JavaScript to run before its content appears."
       : "Your content is readable right in the page, the way search engines prefer.",
     details: jsRisk
-      ? "There is very little text in the page until scripts run, and search engines and AI may not wait for them. Ask Strelva to serve your key content directly in the page so it is always readable."
+      ? "There is very little text in the page until scripts run, and search engines and AI may not wait for them. Serve your key content directly in the page so it is always readable."
       : undefined,
   });
 

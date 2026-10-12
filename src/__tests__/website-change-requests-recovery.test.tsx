@@ -100,7 +100,7 @@ it("locks an unknown receipt effect until reload instead of inventing a retry ke
     return new Response(JSON.stringify({ requests: [{ ...saved(), receipts: [preview] }] }));
   });
   const { node } = await mount(request as unknown as typeof fetch);
-  const approve = [...node.querySelectorAll("button")].find(button => button.textContent === "Approve the preview")!;
+  const approve = [...node.querySelectorAll("button")].find(button => button.textContent === "Make it live")!;
   await act(async () => { approve.click(); approve.click(); });
   expect(approve.disabled).toBe(true);
   expect(node.querySelector('[role="alert"]')?.textContent).toContain("Reload the page to check its receipts before trying again.");
@@ -120,10 +120,10 @@ it.each([false, true])("accepts only the exact returned receipt target (wrong ta
     return new Response(JSON.stringify({ requests: [{ ...saved(), receipts: recorded ? [preview, approval] : [preview] }] }));
   });
   const { node } = await mount(request as unknown as typeof fetch);
-  await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Approve the preview")!.click());
+  await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Make it live")!.click());
   if (wrongTarget) {
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Reload the page");
-    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Approve the preview")?.disabled).toBe(true);
+    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Make it live")?.disabled).toBe(true);
     expect(request.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(1);
   } else {
     expect(node.textContent).toContain("Approved by the owner.");

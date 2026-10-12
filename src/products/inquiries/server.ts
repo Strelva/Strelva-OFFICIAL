@@ -1,3 +1,5 @@
+import { sessionTenantDecider } from "@/platform/infra/tenant-decisions";
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
 import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 import { addEvent, resolveEvent } from "@/lib/events";
 import { getLeads, leadReadSource, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
@@ -273,6 +275,9 @@ export class InquiryConcurrencyError extends Error {
 type SurfaceContext = {
   tenantId: string;
   businessId: string;
+  /** Workspace mapping resolved by the authorized route, never a tenant UUID guess. */
+  workspaceId?: string;
+  systemsReleased?: boolean;
   config: TenantConfig;
   audience?: "business" | "agency";
   repository?: InquiryRepository;
@@ -625,7 +630,9 @@ function stateForEngine(workspace: InquiryWorkspaceRead, businessId: string): In
 
 async function surfacePermissions(tenantId: string): Promise<InquirySurfaceSnapshot["permissions"]> {
   const role = await getTenantRole(tenantId).catch(() => null);
-  const can = (permission: TenantPermission): boolean => role === "super_admin" || (role !== null && roleHasPermission(role as ClientRole, permission));
+  const ordinary = role === "super_admin" ? await sessionTenantDecider(tenantId).catch(() => null) : null;
+  const hasOrdinaryAuthority = ordinary !== null && ordinary.kind !== "operator";
+  const can = (permission: TenantPermission): boolean => role === "super_admin" ? hasOrdinaryAuthority : role !== null && roleHasPermission(role as ClientRole, permission);
   return {
     canStart: can("content:write"),
     canEdit: can("content:write"),
@@ -676,9 +683,12 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   } catch { /* Leave connection availability explicit when its authority cannot be read. */ }
   return {
     revision: workspace.snapshot?.revision ?? null,
+    ...(input.workspaceId ? { releases: { systems: input.systemsReleased === true } } : {}),
+    servingAgency: await resolveTenantBrand(input.tenantId),
     business: {
       id: input.businessId,
       tenantId: input.tenantId,
+      ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
       name: businessName,
       domain: website,
       role: businessRole,

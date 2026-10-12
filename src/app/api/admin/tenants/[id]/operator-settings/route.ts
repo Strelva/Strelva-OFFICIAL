@@ -2,14 +2,11 @@ import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admis
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
-import { operatorPolicyWriter } from "@/lib/tenant-policy-writer";
-import { TenantSettingRefusedError } from "@/platform/needs-you/tenant-settings";
 import { logAuditEvent } from "@/lib/storage";
 import { getReportCadence, setReportCadence, type ReportCadence } from "@/lib/report-cadence";
-import { getReplyVoice, saveReplyVoice, type ReplyMode } from "@/lib/reviews/reply-voice";
+import { getReplyVoice, type ReplyMode } from "@/lib/reviews/reply-voice";
 import {
   getContentAutonomy,
-  saveContentAutonomySetting,
   type ContentAutonomy,
 } from "@/lib/content-autonomy";
 import {
@@ -19,20 +16,10 @@ import {
 } from "@/platform/infra/email/client-override";
 
 /**
- * Operator controls for the Redis-backed per-client settings that are otherwise
- * client-only, env-only, or unsettable:
- *
- *   • reportCadence    — weekly / monthly (when the report cron emails them)
- *   • replyMode        — off / approve / auto (the review-reply mode; only `mode`
- *                        is touched — guidance/templates are preserved)
- *   • contentAutonomy  — auto / approve (how much AI copy the owner lets ship)
- *   • clientEmail      — inherit / on / off (per-tenant client-email override)
- *
- * POST applies whichever keys are present, audit-logged. GET returns the current
- * values. Super-admin only. (The TenantConfig fields — autoApproveThreshold,
- * reviewsConfig, visibility — go through PATCH /api/admin/tenants instead.)
+ * Platform reporting cadence and email delivery controls. GET also exposes
+ * recorded reply/content policy for support inspection; POST refuses policy
+ * keys before applying any other fields. Client policy uses ordinary access.
  */
-
 const REPORT_CADENCES = new Set<ReportCadence>(["weekly", "monthly"]);
 const REPLY_MODES = new Set<ReplyMode>(["off", "approve", "auto"]);
 const CONTENT_AUTONOMIES = new Set<ContentAutonomy>(["auto", "approve"]);
@@ -89,6 +76,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     clientEmail?: unknown;
   };
 
+  if (replyMode !== undefined || contentAutonomy !== undefined) {
+    return NextResponse.json({ error: "Client automation policy requires ordinary business or agency access. Nothing changed." }, { status: 403 });
+  }
+
   // Validate every present key before applying any — a bad value is a 400, not a
   // partial write.
   if (reportCadence !== undefined && !REPORT_CADENCES.has(reportCadence as ReportCadence)) {
@@ -105,13 +96,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const applied: string[] = [];
-  try {
-    await applySettings(id, { reportCadence, replyMode, contentAutonomy, clientEmail }, applied);
-  } catch (error) {
-    // A Needs you policy refusal (below the floor) is an answer, not an outage.
-    if (!(error instanceof TenantSettingRefusedError)) throw error;
-    return NextResponse.json({ error: error.message, applied }, { status: 409 });
-  }
+  await applySettings(id, { reportCadence, clientEmail }, applied);
 
   if (applied.length > 0) {
     await logAuditEvent({
@@ -127,32 +112,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   return NextResponse.json(await readCurrent(id));
 }
 
-/**
- * Content autonomy and reply mode go through the Needs you bridge as
- * Strelva's layer for a business-linked site (Redis alone otherwise).
- */
+/** Only platform reporting and email controls can change here. */
 async function applySettings(
   id: string,
-  { reportCadence, replyMode, contentAutonomy, clientEmail }: { reportCadence?: unknown; replyMode?: unknown; contentAutonomy?: unknown; clientEmail?: unknown },
+  { reportCadence, clientEmail }: { reportCadence?: unknown; clientEmail?: unknown },
   applied: string[],
 ) {
   if (reportCadence !== undefined) {
     await setReportCadence(id, reportCadence as ReportCadence);
     applied.push("reportCadence");
-  }
-  if (replyMode !== undefined) {
-    // Only touch the mode — preserve the client's guidance + example templates.
-    const current = await getReplyVoice(id);
-    await saveReplyVoice(id, {
-      mode: replyMode as ReplyMode,
-      guidance: current.guidance,
-      templates: current.templates,
-    }, await operatorPolicyWriter());
-    applied.push("replyMode");
-  }
-  if (contentAutonomy !== undefined) {
-    await saveContentAutonomySetting(id, contentAutonomy as ContentAutonomy, await operatorPolicyWriter());
-    applied.push("contentAutonomy");
   }
   if (clientEmail !== undefined) {
     await setClientEmailOverride(id, clientEmail as ClientEmailOverride);

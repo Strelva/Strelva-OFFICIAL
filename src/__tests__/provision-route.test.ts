@@ -4,6 +4,7 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockProvisionTenant = vi.hoisted(() => vi.fn());
+const mockLeadWrite = vi.hoisted(() => vi.fn());
 
 vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
@@ -11,6 +12,7 @@ vi.mock("@/platform/infra/auth", () => ({
 }));
 vi.mock("@/lib/storage", () => ({ logAuditEvent: mockLogAuditEvent }));
 vi.mock("@/lib/provisioning", () => ({ provisionTenant: mockProvisionTenant }));
+vi.mock("@/lib/lead-workflow", () => ({ setLeadWorkflowStatus: mockLeadWrite }));
 
 import { POST } from "@/app/api/admin/provision/route";
 
@@ -50,6 +52,11 @@ beforeEach(() => {
 });
 
 describe("POST /api/admin/provision", () => {
+  it("does not convert an agency lead when a platform admin supplies its token", async () => {
+    const response = await POST(req({ ...valid, leadToken: "a".repeat(36) }));
+    expect(response.status).toBe(200);
+    expect(mockLeadWrite).not.toHaveBeenCalled();
+  });
   it("403s a non-super-admin", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
     const res = await POST(req(valid));

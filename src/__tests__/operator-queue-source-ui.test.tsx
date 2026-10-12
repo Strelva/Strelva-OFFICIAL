@@ -22,15 +22,16 @@ async function click(label: string) {
   expect(button).toBeDefined(); await act(async () => button!.click());
 }
 describe("queue source controls", () => {
-  it("reads and displays the requested scope before accepting the reviewed revision", async () => {
+  it("reads the request for support without accepting or declining agency work", async () => {
     render("service_request"); expect(container.textContent).not.toContain("Accept request"); expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.run).not.toHaveBeenCalled();
     await click("Review request"); expect(container.textContent).toContain("Keep existing forms"); expect(container.textContent).toContain("Scope and deadline still need agreement");
-    await click("Accept request"); expect(mocks.run).toHaveBeenCalledWith(expect.objectContaining({ key: "source:item", action: "accept_request", expectedRevision: 4 }));
-    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toContain("Accept request"); expect(container.textContent).not.toContain("Decline request"); expect(mocks.run).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
-  it("keeps the reviewed request on failure and presents the server reason", async () => {
-    render("service_request"); await click("Review request"); mocks.run.mockResolvedValue({ ok: false, message: "The request changed. Review it again." });
-    await click("Decline request"); expect(container.textContent).toContain("Keep existing forms"); expect(mocks.result).toHaveBeenCalledWith({ ok: false, message: "The request changed. Review it again." }); expect(mocks.refresh).not.toHaveBeenCalled();
+  it("closes support inspection without deciding the client's request", async () => {
+    render("service_request"); await click("Review request"); await click("Cancel");
+    expect(container.textContent).not.toContain("Keep existing forms"); expect(container.textContent).toContain("Review request");
+    expect(mocks.run).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
   });
   it("never offers acceptance when the request cannot be read", async () => {
     mocks.read.mockResolvedValue({ ok: false, message: "Request unavailable" }); render("service_request"); await click("Review request");

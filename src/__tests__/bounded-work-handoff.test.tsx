@@ -74,7 +74,7 @@ it.each([
   await act(async () => reviewTab!.click());
   expect(node.textContent?.includes("Edit proposed internal tool")).toBe(checks);
   expect([...node.querySelectorAll("button")].some(button => button.textContent === "Check proposed change")).toBe(checks);
-  const publishButton = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Publish");
+  const publishButton = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Make it live");
   expect(Boolean(publishButton)).toBe(publish);
   if (publishButton) expect(publishButton.disabled).toBe(true);
   if (!checks) expect(node.textContent).toContain("Ask your agency to run the checks before you publish.");

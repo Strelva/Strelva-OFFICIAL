@@ -55,7 +55,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: "The page does not say what language it is written in.",
       details:
-        "Setting the page language (for example, English) helps screen readers pronounce it correctly. Ask Strelva to set it.",
+        "Setting the page language (for example, English) helps screen readers pronounce it correctly. Set it.",
     });
   } else {
     record("pass");
@@ -79,7 +79,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: "The page has no title.",
       details:
-        "The title is what labels the browser tab and identifies the page to screen readers and search results. Ask Strelva to add a clear one.",
+        "The title is what labels the browser tab and identifies the page to screen readers and search results. Add a clear one.",
     });
   } else if (
     pageTitle.length < 10 ||
@@ -92,7 +92,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: "The page title is generic or too short.",
-      details: `Current title: "${pageTitle}". Ask Strelva to use a unique, descriptive title that says what the page is about.`,
+      details: `Current title: "${pageTitle}". Use a unique, descriptive title that says what the page is about.`,
     });
   } else {
     record("pass");
@@ -132,7 +132,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "fail",
       score: 0,
       message: `${missingAltExamples.length} image(s) have no text description.`,
-      details: `A short description lets screen readers and image search understand each photo. Ask Strelva to add one to these (or mark them decorative). Examples: ${missingAltExamples.join(", ")}.`,
+      details: `A short description lets screen readers and image search understand each photo. Add one to these (or mark them decorative). Examples: ${missingAltExamples.join(", ")}.`,
     });
   } else if (genericAltExamples.length > 0) {
     record("serious");
@@ -141,7 +141,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: `${genericAltExamples.length} image(s) have a placeholder description that says nothing.`,
-      details: `Descriptions like these add no meaning. Ask Strelva to replace them with a few words about what's actually in the image: ${genericAltExamples.join(", ")}.`,
+      details: `Descriptions like these add no meaning. Replace them with a few words about what's actually in the image: ${genericAltExamples.join(", ")}.`,
     });
   } else {
     // Only credit a pass when there were images to evaluate. A page with no
@@ -192,7 +192,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: `${emptyLinks} link(s) have no readable text.`,
       details:
-        "Screen-reader users can't tell where a blank link goes. Ask Strelva to give each one text that names its destination.",
+        "Screen-reader users can't tell where a blank link goes. Give each one text that names its destination.",
     });
   } else if (genericLinks > 0) {
     record("serious");
@@ -201,7 +201,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: `${genericLinks} link(s) use vague text like "click here".`,
-      details: `Vague links tell no one (or Google) where they lead. Ask Strelva to rename them to describe the destination. Examples found: ${genericLinkExamples.join(", ")}.`,
+      details: `Vague links tell no one (or Google) where they lead. Rename them to describe the destination. Examples found: ${genericLinkExamples.join(", ")}.`,
     });
   } else {
     record("pass");
@@ -247,7 +247,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: `${unlabeledFields} of ${totalFields} form field(s) have no label.`,
       details:
-        "A visible label tells every visitor, including screen-reader users, what to type in each field. Ask Strelva to label them so your form is easy to complete.",
+        "A visible label tells every visitor, including screen-reader users, what to type in each field. Label them so your form is easy to complete.",
     });
   } else {
     record("pass");
@@ -308,7 +308,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: "The heading order could be clearer.",
-      details: `The headings need tidying (${headingProblems.join("; ")}). Ask Strelva to use one main heading and step down in order so the page is easy to follow.`,
+      details: `The headings need tidying (${headingProblems.join("; ")}). Use one main heading and step down in order so the page is easy to follow.`,
     });
   }
 
@@ -334,11 +334,11 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 60,
       message: "The page's main content area isn't marked for assistive tools.",
       details: missingLandmarks.length
-        ? `Marking the primary content lets assistive tools jump straight to it. Ask Strelva to add it. Also missing: ${missingLandmarks
+        ? `Marking the primary content lets assistive tools jump straight to it. Add it. Also missing: ${missingLandmarks
             .map((l) => l.name)
             .filter((n) => n !== "main")
             .join(", ") || "none"}.`
-        : "Marking the primary content lets assistive tools jump straight to it. Ask Strelva to add it.",
+        : "Marking the primary content lets assistive tools jump straight to it. Add it.",
     });
   } else {
     record("pass");
@@ -386,7 +386,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 50,
       message: "The page has no skip-to-content link.",
       details:
-        "A 'Skip to main content' link lets keyboard users jump past the menu straight to the page. Ask Strelva to add one.",
+        "A 'Skip to main content' link lets keyboard users jump past the menu straight to the page. Add one.",
     });
   }
 
@@ -434,7 +434,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 0,
       message: `${namelessControls} button(s) or icon control(s) have no name a screen reader can read.`,
       details:
-        "Screen readers can't announce a button with no name, so those users can't use it. Ask Strelva to give each button and icon a clear label.",
+        "Screen readers can't announce a button with no name, so those users can't use it. Give each button and icon a clear label.",
     });
   } else {
     record("pass");
@@ -471,7 +471,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 50,
       message: `${iframesWithoutTitle} of ${totalIframes} embedded frame(s) (like a map or video) have no title.`,
       details:
-        "A short title lets screen readers describe each embedded map or video. Ask Strelva to add one to each.",
+        "A short title lets screen readers describe each embedded map or video. Add one to each.",
     });
   } else {
     record("pass");
@@ -514,7 +514,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       status: "warn",
       score: 50,
       message: `${invalidRoles} element(s) use an accessibility label that isn't recognized.`,
-      details: `Assistive tools ignore labels they don't recognize, so those elements go unannounced. Ask Strelva to correct values like: ${invalidRoleExamples.join(", ")}.`,
+      details: `Assistive tools ignore labels they don't recognize, so those elements go unannounced. Correct values like: ${invalidRoleExamples.join(", ")}.`,
     });
   } else {
     record("pass");
@@ -555,7 +555,7 @@ export function checkAccessibility(ctx: AuditContext): CategoryResult {
       score: 50,
       message: `${tablesWithoutHeaders} of ${totalDataTables} data table(s) have no header row.`,
       details:
-        "Header cells let screen-reader users follow which column and row a value belongs to. Ask Strelva to add them.",
+        "Header cells let screen-reader users follow which column and row a value belongs to. Add them.",
     });
   } else {
     record("pass");

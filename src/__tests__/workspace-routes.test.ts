@@ -54,6 +54,7 @@ beforeEach(() => {
   vi.unstubAllEnvs();
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+  vi.stubEnv("STRELVA_EXPORT_SCHEMA_3", "0");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.brandRpc.mockResolvedValue({ data: null, error: null });
   mocks.operator.mockResolvedValue(false);
@@ -326,7 +327,7 @@ describe("release-one private workspace routes", () => {
 
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
-    expect(customer.releases).toEqual({ systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
+    expect(customer.releases).toEqual({ exportSchema3: false, systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
     expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], canWrite: true, siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
 
     mocks.systems.mockClear();
@@ -354,7 +355,7 @@ describe("release-one private workspace routes", () => {
       vi.stubEnv("STRELVA_SYSTEMS_RELEASE", value);
       const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
       expect(customer.systems).toBeUndefined();
-      expect(customer.releases).toEqual({ systems: false, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
+      expect(customer.releases).toEqual({ exportSchema3: false, systems: false, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
       expect(customer.work).toEqual([expect.objectContaining({ id: work.id })]);
     }
     expect(mocks.systems).not.toHaveBeenCalled();
@@ -470,6 +471,22 @@ describe("release-one private workspace routes", () => {
       resultId: "scan_abc123",
     });
     expect(await response.json()).toMatchObject({ work: { id: workId }, alreadySaved: false });
+  });
+  it("carries a free check only into the explicitly selected manageable business", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    const response = await POST(request({ action: "save_business_check", workspaceId, resultId: "scan_abc123" }));
+    expect(response.status).toBe(200);
+    expect(mocks.savePublicResult).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId, resultId: "scan_abc123" });
+    expect((await response.json()).work.workspaceId).toBe(workspaceId);
+  });
+  it.each([
+    { ...workspace }, { ...workspace, kind: "customer", role: "member" },
+    { ...workspace, kind: "customer", access: "provider_seat" }, { ...workspace, kind: "customer", access: "delegated_read" },
+  ])("refuses an owner check import outside direct business management", async selected => {
+    mocks.list.mockResolvedValue([selected]);
+    expect((await POST(request({ action: "save_business_check", workspaceId, resultId: "scan_abc123" }))).status).toBe(403);
+    expect(mocks.savePublicResult).not.toHaveBeenCalled();
+    expect(mocks.saveAudit).not.toHaveBeenCalled();
   });
   it("keeps retained-result failures honest at the HTTP boundary", async () => {
     const unavailable = new Error("internal retained-result details");

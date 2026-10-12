@@ -333,8 +333,8 @@ ${categoryRows}
 
     <div class="cta">
       <p class="cta-title">${agencyName ? `Ask ${agencyName} about these fixes.` : "Fix these yourself, or have an agency do it."}</p>
-      <p class="cta-sub">${agency ? "Share this report with your web provider to discuss the fixes and agree the work." : "Start a free Strelva workspace to make these fixes yourself. Or ask Strelva Agency, the first agency on Strelva, to make them and keep them that way. You own your domain and content either way."}</p>
-      <a class="cta-link" href="${agency ? escapeHtml(agency.contactUrl) : "https://strelva.com/access-request?ref=audit-report"}">${agencyName ? `Contact ${agencyName}` : "Ask Strelva Agency"}</a>
+      <p class="cta-sub">${agency ? "Share this report with your web provider to discuss the fixes and agree the work." : "Start a free Strelva workspace to make these fixes yourself. Or find an agency to make them and keep them that way. You own your domain and content either way."}</p>
+      <a class="cta-link" href="${agency ? escapeHtml(agency.contactUrl) : "https://strelva.com/agencies?ref=audit-report"}">${agencyName ? `Contact ${agencyName}` : "Find an agency"}</a>
     </div>
 
     <footer>

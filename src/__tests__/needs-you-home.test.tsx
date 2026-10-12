@@ -182,10 +182,16 @@ describe("Needs you, October 6 shapes", () => {
     expect(decisionPresentation(item()).verb).toBe("Approve");
     expect(decisionPresentation(item()).amount).toBe("$150");
     expect(decisionPresentation(item()).shape).toBe("price");
-    expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Make it live", shape: "live", source: "Website", amount: null });
-    expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Post it", shape: "message", source: "Google" });
-    expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Confirm", source: "Bookings" });
+    expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Hold to make it live", shape: "live", source: "Website", amount: null });
+    expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Hold to make it live", shape: "message", source: "Google" });
+    expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Hold to confirm", source: "Bookings" });
     expect(decisionPresentation(item({ kind: "fact.inferred", sourceLifecycle: "connected_site_schema" }))).toMatchObject({ verb: "Acknowledge", source: "Website" });
+    for (const kind of ["system.change_live", "copy.routine", "copy.marketing", "structure", "google.photo"] as const) {
+      expect(decisionPresentation(item({ kind })).verb).toBe("Hold to make it live");
+    }
+    expect(decisionPresentation(item({ kind: "system.go_live", sourceLifecycle: "website_document", sourceId: "website:approve" })).verb).toBe("Approve this preview");
+    expect(decisionPresentation(item({ kind: "system.change_live", sourceLifecycle: "website_document", sourceId: "website:launch" })).verb).toBe("Hold to make it live");
+    expect(decisionPresentation(item({ kind: "customer.message" })).verb).toBe("Send");
     // A price only comes from the decision's own words.
     expect(decisionPresentation(item({ title: "Reply to Jordan", detail: "Happy to help." })).amount).toBeNull();
     expect(decisionCount(3)).toBe("Three decisions");
@@ -198,7 +204,7 @@ describe("Needs you, October 6 shapes", () => {
     expect(html).toContain("$150</p>");
     expect(html).toContain('data-shape="price"');
     expect(html).toContain('data-shape="live"');
-    expect(html).toContain('aria-label="Make it live: Put the booking page live"');
+    expect(html).toContain('aria-label="Hold to make it live: Put the booking page live"');
     expect(html).toContain('aria-label="Not yet: Put the booking page live"');
     expect(html).toContain("Approve: The reply sends. Not yet: Nothing sends.");
   });
@@ -238,4 +244,16 @@ describe("The Needs you place", () => {
     expect(html).not.toContain("view=needs-you");
     expect(html).toContain("id=\"business-start-title\"");
   });
+});
+
+it("offers scoped agency decisions only with explicit server capability, without granting owner Undo", () => {
+  const agency = ready({ role: "member", authority: "agency", canDecide: true });
+  const html = needs(agency);
+  expect(html).toContain("waiting on you");
+  expect(html).toContain('aria-label="Not yet:');
+  expect(html).not.toContain("Only the owner can decide");
+  expect(handled(agency)).not.toContain('aria-label="Undo:');
+  expect(needs(ready({ role: "member", authority: "agency" }))).not.toContain('aria-label="Not yet:');
+  expect(needs(ready({ role: "member", canDecide: true }))).not.toContain('aria-label="Not yet:');
+  expect(needs(ready({ role: "owner", canDecide: false }))).not.toContain('aria-label="Not yet:');
 });

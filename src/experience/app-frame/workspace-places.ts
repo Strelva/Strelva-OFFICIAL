@@ -19,12 +19,12 @@
  * October 6 (1.0): Needs you is its own place, the deck of decisions, shown
  * only while STRELVA_NEEDS_YOU_RELEASE is on; off, `view=needs-you` opens Home.
  * The rest of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list
- * is called "Apps", as before.
+ * is called "Files and results".
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
  */
-import { PLACE_LABELS, COLLECTION_LABELS } from "@/platform/presentation/place-labels";
+import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 
 export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
@@ -69,9 +69,9 @@ export function sectionFromView(view: string | null | undefined): StrelvaSection
   return view && DIRECT_VIEWS.has(view) ? view as StrelvaSection : "home";
 }
 
-/** The header title for a section. The app list is "Apps" until Systems are released. */
+/** One list destination and label in each release state, including page headers. */
 export function sectionTitle(section: StrelvaSection, systemsReleased = false): string {
-  return !systemsReleased && APP_VIEWS.has(section) ? COLLECTION_LABELS.applications : TITLES[section];
+  return APP_VIEWS.has(section) ? (systemsReleased ? PLACE_LABELS.systemsAndFiles : PLACE_LABELS.filesAndResults) : TITLES[section];
 }
 
 export function workspaceSectionHref(section: StrelvaSection, base = "", workspaceId?: string): string {

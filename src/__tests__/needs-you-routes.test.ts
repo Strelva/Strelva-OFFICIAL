@@ -16,8 +16,14 @@ const mocks = vi.hoisted(() => ({
   undo: vi.fn(),
   superAdmin: vi.fn(async () => false),
   seat: vi.fn(async (): Promise<unknown> => null),
+  agencyRead: vi.fn(),
+  agencyReview: vi.fn(),
+  agencyClaim: vi.fn(),
+  agencyReceipt: vi.fn(),
+  storeCapture: vi.fn(),
 }));
 vi.mock("@/products/agency-clients/server", () => ({ providerSeatBusiness: mocks.seat }));
+vi.mock("@/experience/workspace/agency/decision-server", () => ({ readAgencyDecisions: mocks.agencyRead, reviewAgencyDecisions: mocks.agencyReview, claimAgencyDecision: mocks.agencyClaim, readAgencyDecisionReceipt: mocks.agencyReceipt }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
@@ -27,7 +33,7 @@ vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
 vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: mocks.superAdmin }));
 vi.mock("@/experience/workspace/needs-you-server", () => ({
   needsYouReleaseEnabled: mocks.released,
-  needsYouService: () => ({ chase: mocks.chase, list: mocks.list, decide: mocks.decide }),
+  needsYouService: (store: unknown) => { mocks.storeCapture(store); return { chase: mocks.chase, list: mocks.list, decide: mocks.decide }; },
   needsYouStore: {},
   readStrelvaHandled: mocks.handled,
 }));
@@ -49,7 +55,7 @@ function jsonPost(url: string, body: unknown) {
   return new Request(url, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", origin: new URL(url).origin } });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   mocks.released.mockReturnValue(true);
   mocks.workspaceReleased.mockReturnValue(true);
@@ -59,6 +65,9 @@ beforeEach(() => {
   mocks.list.mockResolvedValue({ items: [], complete: true });
   mocks.handled.mockResolvedValue([]);
   mocks.superAdmin.mockResolvedValue(false);
+  const { WorkspaceAccessError } = await import("@/platform/workspaces/types");
+  mocks.agencyRead.mockRejectedValue(new WorkspaceAccessError());
+  mocks.agencyReview.mockRejectedValue(new WorkspaceAccessError());
 });
 
 describe("needs-you cron", () => {
@@ -147,14 +156,90 @@ describe("/api/workspace/needs-you", () => {
     const { POST } = await import("@/app/api/workspace/needs-you/route");
     const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
     mocks.workspaces.mockResolvedValue([]);
-    mocks.seat.mockResolvedValueOnce({ id: WS, kind: "customer", access: "provider_seat", name: "Mooney" });
+    mocks.agencyRead.mockResolvedValueOnce([{ id: ITEM, revisionHash: "a".repeat(64) }]);
     mocks.decide.mockResolvedValueOnce({ status: "done", item: { id: ITEM } });
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
     expect(mocks.decide).toHaveBeenCalledWith({ ...body, by: { kind: "agency", actor: ACTOR } });
     mocks.decide.mockClear();
-    mocks.seat.mockResolvedValueOnce(null);
+    const { WorkspaceAccessError } = await import("@/platform/workspaces/types");
+    mocks.agencyRead.mockRejectedValueOnce(new WorkspaceAccessError());
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(403);
     expect(mocks.decide).not.toHaveBeenCalled();
+  });
+
+  it("reads only scoped agency decisions without reading the owner's handled feed", async () => {
+    mocks.workspaces.mockResolvedValue([]);
+    mocks.agencyReview.mockResolvedValue({ items: [{ id: ITEM, revisionHash: "a".repeat(64) }], complete: true });
+    const { GET } = await import("@/app/api/workspace/needs-you/route");
+    const response = await GET(new Request(`https://app.example.test/api/workspace/needs-you?workspaceId=${WS}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ role: "member", authority: "agency", canDecide: true, items: [{ id: ITEM, revisionHash: "a".repeat(64) }], handled: [], handledAvailable: false });
+    expect(mocks.agencyReview).toHaveBeenCalledWith(ACTOR, WS, undefined);
+    expect(mocks.list).not.toHaveBeenCalled();
+    expect(mocks.handled).not.toHaveBeenCalled();
+  });
+
+  it("preserves agency authority with incidental business membership", async () => {
+    mocks.agencyReview.mockResolvedValue({ items: [], complete: true });
+    mocks.agencyRead.mockResolvedValue([{ id: ITEM }]);
+    mocks.decide.mockResolvedValue({ status: "done", item: { id: ITEM } });
+    const { GET, POST } = await import("@/app/api/workspace/needs-you/route");
+    const read = await GET(new Request(`https://app.example.test/api/workspace/needs-you?workspaceId=${WS}&asAgency=1`));
+    expect((await read.json()).authority).toBe("agency");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", { ...body, asAgency: true }))).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledWith({ ...body, by: { kind: "agency", actor: ACTOR } });
+  });
+
+  it("carries the selected agency through admission and the service claim port", async () => {
+    const agency = "c0000000-0000-4000-8000-000000000001";
+    mocks.agencyRead.mockResolvedValue([{ id: ITEM }]);
+    mocks.agencyReview.mockResolvedValue({ items: [], complete: true });
+    mocks.decide.mockResolvedValue({ status: "done", item: { id: ITEM } });
+    const { GET, POST } = await import("@/app/api/workspace/needs-you/route");
+    expect((await (await GET(new Request(`https://app.example.test/api/workspace/needs-you?workspaceId=${WS}&agencyWorkspaceId=${agency}`))).json()).agencyWorkspaceId).toBe(agency);
+    expect(mocks.agencyReview).toHaveBeenCalledWith(ACTOR, WS, agency);
+    const body = { workspaceId: WS, agencyWorkspaceId: agency, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    expect(mocks.agencyRead).toHaveBeenCalledWith(ACTOR, WS, agency);
+    const captured = mocks.storeCapture.mock.calls.at(-1)![0] as { claim(input: unknown): Promise<unknown> };
+    const command = { workspaceId: WS, itemId: ITEM, by: "agency", actor: ACTOR };
+    await captured.claim(command);
+    expect(mocks.agencyClaim).toHaveBeenCalledWith(command, agency);
+  });
+
+  it("refuses out-of-scope items before source reconciliation or content reads", async () => {
+    mocks.workspaces.mockResolvedValue([]);
+    mocks.agencyRead.mockResolvedValue([{ id: "another-decision" }]);
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    const response = await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ status: "forbidden" });
+    expect(mocks.decide).not.toHaveBeenCalled();
+  });
+
+  it("refuses an operator through the agency path too", async () => {
+    mocks.superAdmin.mockResolvedValue(true);
+    mocks.workspaces.mockResolvedValue([]);
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(403);
+    expect(mocks.agencyRead).not.toHaveBeenCalled();
+    expect(mocks.decide).not.toHaveBeenCalled();
+  });
+
+  it("uses ordinary exact agency authority when the same person also holds a support hat", async () => {
+    const agency = "c0000000-0000-4000-8000-000000000001";
+    mocks.superAdmin.mockResolvedValue(true);
+    mocks.workspaces.mockResolvedValue([]);
+    mocks.agencyRead.mockResolvedValue([{ id: ITEM }]);
+    mocks.decide.mockResolvedValue({ status: "done", item: { id: ITEM } });
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, agencyWorkspaceId: agency, asAgency: true, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    expect(mocks.agencyRead).toHaveBeenCalledWith(ACTOR, WS, agency);
+    expect(mocks.decide).toHaveBeenCalledWith({ workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve", by: { kind: "agency", actor: ACTOR } });
   });
 
   it("refuses a Strelva operator holding an admin seat: the owner decides (#530)", async () => {
@@ -207,5 +292,31 @@ describe("/api/workspace/needs-you/undo", () => {
     mocks.released.mockReturnValue(false);
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you/undo", { workspaceId: WS, receiptId: "record:12" }))).status).toBe(503);
     expect(mocks.undo).not.toHaveBeenCalled();
+  });
+});
+
+describe("agency exact receipt route", () => {
+  it("requires an exact agency, decision and revision without reading the owner's feed", async () => {
+    const agency = "c0000000-0000-4000-8000-000000000001";
+    mocks.agencyReceipt.mockResolvedValue({ id: ITEM, state: "approved", outcome: "done_unverified" });
+    const { GET } = await import("@/app/api/workspace/needs-you/route");
+    const query = new URLSearchParams({ workspaceId: WS, agencyWorkspaceId: agency, itemId: ITEM, revision: "a".repeat(64) });
+    const response = await GET(new Request(`https://app.example.test/api/workspace/needs-you?${query}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ authority: "agency", agencyWorkspaceId: agency, item: { outcome: "done_unverified" } });
+    expect(mocks.agencyReceipt).toHaveBeenCalledWith(ACTOR, WS, agency, ITEM, "a".repeat(64));
+    expect(mocks.handled).not.toHaveBeenCalled();
+    expect(mocks.list).not.toHaveBeenCalled();
+    query.delete("agencyWorkspaceId");
+    expect((await GET(new Request(`https://app.example.test/api/workspace/needs-you?${query}`))).status).toBe(400);
+  });
+  it("refuses current access loss and holds read failures", async () => {
+    const { WorkspaceAccessError, WorkspaceStoreError } = await import("@/platform/workspaces/types");
+    const { GET } = await import("@/app/api/workspace/needs-you/route");
+    const url = `https://app.example.test/api/workspace/needs-you?workspaceId=${WS}&agencyWorkspaceId=${ITEM}&itemId=${ITEM}&revision=${"a".repeat(64)}`;
+    mocks.agencyReceipt.mockRejectedValueOnce(new WorkspaceAccessError());
+    expect((await GET(new Request(url))).status).toBe(403);
+    mocks.agencyReceipt.mockRejectedValueOnce(new WorkspaceStoreError("unavailable"));
+    expect((await GET(new Request(url))).status).toBe(503);
   });
 });

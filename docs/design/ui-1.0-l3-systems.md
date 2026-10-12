@@ -188,7 +188,7 @@ the current working tree; no patch was applied:
    prohibition on claiming atomicity across providers. Actual partly-live effects,
    receipts and unavailable verification stay visible. An accepted outside change
    is not made retryable by a failed read-back. There is no fabricated rollback.
-2. Z4ysc's Make real control cannot be authorized by a preview-only signed Try
+2. Z4ysc's Make it live control cannot be authorized by a preview-only signed Try
    token. It is disabled and names the separate approval link. The local fixture
    cannot widen the real token's authority.
 3. irVxG proposes date coercion/skip/recipient choices that the real native CSV

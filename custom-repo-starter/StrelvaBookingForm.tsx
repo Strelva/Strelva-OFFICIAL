@@ -3,6 +3,7 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import {
   bookingRequestStorageKey,
+  bookingReceiptPresentation,
   cancelBooking,
   changeBooking,
   clearBookingRequestDraft,
@@ -96,10 +97,6 @@ function BookingLoader({ baseUrl, tenant, capabilityId, range, expectedVersion }
   );
 }
 
-function providerLabel(provider: PublicBookingSchedule["provider"]): string {
-  return provider === "outlook" ? "Outlook" : "Google Calendar";
-}
-
 /** Fixed renderer used by generated client sites and local representative proofs. */
 export function StrelvaBookingForm({
   schedule,
@@ -145,16 +142,19 @@ export function StrelvaBookingForm({
   const slots = alternatives?.nextSlots ?? schedule.slots;
   const slot = slots.find(value => value.id === slotId);
   const timeZone = native ? visitorTimeZone : alternatives?.timeZone ?? schedule.timeZone;
+  const visitorZoneLabel = native ? zoneName(schedule.slots[0]?.start ?? new Date().toISOString(), visitorTimeZone) : null;
   function showConflict(error: unknown) {
     if (error instanceof PublicBookingConflictError) { setAlternatives(error); setSlotId(error.nextSlots[0]?.id ?? ""); }
   }
-  const reservationLabel = receipt?.status === "confirmed"
-    ? native ? "The business confirmed this booking." : `${providerLabel(schedule.provider)} confirmed this booking.`
-    : receipt?.status === "cancelled"
-      ? "This booking is cancelled."
-      : receipt
-        ? native ? "If you received a confirmation email, confirm within 15 minutes. Your request is waiting for the business to confirm. This time is not confirmed yet." : "If you received a confirmation email, confirm within 15 minutes. We could not confirm this booking yet. Check the calendar before trying again."
-        : null;
+  const [receiptTime, setReceiptTime] = useState(Date.now);
+  useEffect(() => {
+    if (!receipt?.confirmationRequired || !receipt.confirmationExpiresAt || receipt.status === "cancelled") return;
+    const deadline = Date.parse(receipt.confirmationExpiresAt);
+    if (!Number.isFinite(deadline)) return;
+    const timer = setTimeout(() => setReceiptTime(Date.now()), Math.max(0, deadline - Date.now() + 1));
+    return () => clearTimeout(timer);
+  }, [receipt?.confirmationRequired, receipt?.confirmationExpiresAt, receipt?.status]);
+  const receiptPresentation = receipt ? bookingReceiptPresentation(receipt, native, Math.max(receiptTime, Date.now())) : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,7 +168,7 @@ export function StrelvaBookingForm({
       setEmail("");
       setPhone("");
       setMessage("");
-      setStatus({ kind: "success", text: testOnly ? "Test booking completed. Nobody was told, no calendar changed, and no real record was kept." : next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
+      setStatus({ kind: "success", text: testOnly ? "Test booking completed. Nobody was told, no calendar changed, and no real record was kept." : bookingReceiptPresentation(next, native).heading });
     } catch (error) {
       showConflict(error);
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not confirmed. Please try again." });
@@ -177,13 +177,13 @@ export function StrelvaBookingForm({
 
   async function change(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!receipt || receipt.status === "cancelled" || !slot || !onChange || pending) return;
+    if (!receipt || receipt.status !== "confirmed" || receipt.confirmationRequired || !slot || !onChange || pending) return;
     setPending(true);
     setStatus(null);
     try {
       const next = await onChange(receipt, slot);
       setReceipt(next);
-      setStatus({ kind: "success", text: next.status === "confirmed" ? "Your reservation was changed." : "Your change is awaiting confirmation." });
+      setStatus({ kind: "success", text: next.status === "confirmed" ? "Your booking was changed." : "Your change is awaiting confirmation." });
     } catch (error) {
       showConflict(error);
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not changed. Please try again." });
@@ -191,13 +191,13 @@ export function StrelvaBookingForm({
   }
 
   async function cancel() {
-    if (!receipt || receipt.status === "cancelled" || !onCancel || pending) return;
+    if (!receipt || receipt.status !== "confirmed" || receipt.confirmationRequired || !onCancel || pending) return;
     setPending(true);
     setStatus(null);
     try {
       const next = await onCancel(receipt);
       setReceipt(next);
-      setStatus({ kind: "success", text: "Your reservation was cancelled." });
+      setStatus({ kind: "success", text: bookingReceiptPresentation(next, native).heading });
     } catch (error) {
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not cancelled. Please try again." });
     } finally { setPending(false); }
@@ -210,7 +210,7 @@ export function StrelvaBookingForm({
     try {
       const next = await onReconcile(receipt);
       setReceipt(next);
-      setStatus({ kind: "success", text: next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : native ? "The business has not confirmed your request yet." : "The reservation is still awaiting confirmation. Check the calendar before trying again." });
+      setStatus({ kind: "success", text: bookingReceiptPresentation(next, native).heading });
     } catch (error) {
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "The booking status could not be checked. Please try again." });
     } finally { setReconciling(false); }
@@ -230,7 +230,7 @@ export function StrelvaBookingForm({
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
       <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`}</p>
-      {native && !testOnly ? <p>Times shown in {visitorTimeZone}.</p> : null}
+      {native && !testOnly ? <p>{visitorZoneLabel === "time zone unavailable" ? "Time zone unavailable." : `Times shown in ${visitorZoneLabel}.`}</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>
@@ -253,19 +253,21 @@ export function StrelvaBookingForm({
       </form>
       {receipt ? (
         <section aria-label="Booking receipt">
-          <h3>{receipt.title}</h3>
+          <h3>{receiptPresentation?.heading}</h3>
+          <p>{receipt.title}</p>
           <p>{formatSlot({ start: receipt.start, end: receipt.end }, native ? visitorTimeZone : receipt.timeZone)}</p>
-          <p role="status">{reservationLabel}</p>
+          <p role="status">{receiptPresentation?.detail}</p>
+          {receiptPresentation?.heading === "Check your email to confirm" ? <p>{receipt.confirmationExpiresAt ? `Confirm by ${formatTime(receipt.confirmationExpiresAt, native ? visitorTimeZone : receipt.timeZone)}.` : "Use the confirmation link before it expires."}</p> : null}
           {receipt.status !== "cancelled" ? (
             <>
-              {receipt.status === "pending" ? (
+              {receipt.confirmationRequired || receipt.status === "pending" ? (
                 onReconcile ? <button type="button" disabled={pending || reconciling} onClick={() => void reconcile()}>{reconciling ? "Checking…" : native ? "Check request status" : "Check booking status"}</button> : null
               ) : (
                 <>
-                  <form onSubmit={(event) => void change(event)} aria-label="Change reservation">
+                  <form onSubmit={(event) => void change(event)} aria-label="Change booking">
                     <button type="submit" disabled={pending || !onChange || !slot}>Change time</button>
                   </form>
-                  <button type="button" disabled={pending || !onCancel} onClick={() => void cancel()}>Cancel reservation</button>
+                  <button type="button" disabled={pending || !onCancel} onClick={() => void cancel()}>Cancel booking</button>
                 </>
               )}
             </>
@@ -279,9 +281,19 @@ export function StrelvaBookingForm({
 
 function formatSlot(slot: Pick<PublicBookingSlot, "start" | "end">, timeZone: string): string {
   try {
-    const formatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone });
-    return `${formatter.format(new Date(slot.start))}–${formatter.format(new Date(slot.end))}`;
+    const range = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone }).formatRange(new Date(slot.start), new Date(slot.end));
+    return `${range} ${zoneName(slot.start, timeZone)}`;
   } catch {
     return `${slot.start}–${slot.end}`;
   }
+}
+
+function formatTime(value: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: timeZone === "UTC" ? "short" : "longGeneric", timeZone }).format(new Date(value));
+}
+
+function zoneName(value: string, timeZone: string): string {
+  if (timeZone === "UTC") return "UTC";
+  try { return new Intl.DateTimeFormat(undefined, { timeZone, timeZoneName: "longGeneric" }).formatToParts(new Date(value)).find(part => part.type === "timeZoneName")!.value; }
+  catch { return "time zone unavailable"; }
 }

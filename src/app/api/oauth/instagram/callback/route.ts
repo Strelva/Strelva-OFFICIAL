@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_LONG_LIVED_URL = "https://graph.instagram.com/access_token";
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   }
   const tenantId = verifiedState.tenantId;
 
-  const accessDenied = await requireTenantAccess(tenantId);
+  const accessDenied = await requireTenantPermission(tenantId, "settings:write");
   if (accessDenied) {
     return NextResponse.redirect(`${appUrl}/dashboard/sources?error=access_denied`);
   }

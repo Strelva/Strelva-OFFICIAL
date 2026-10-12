@@ -31,7 +31,7 @@ export function OperatorDepthPreview({ surface, scenario = "ready" }: { surface:
   </StPage>;
   switch (surface) {
     case "audit": return <StPage width="wide"><StHead title={title} meta="Check each live site’s health, search readiness and what to fix first." /><SiteAuditsBoard initialRows={operatorDepthAudits(empty)} request={request} /><StSection title="Operator activity" meta="Newest first"><AuditList events={operatorDepthActivity(empty)} /></StSection></StPage>;
-    case "digests": return <StPage><StHead title={title} meta="The upkeep each site needs this week. Approve to put proposed work in the owner’s workspace for review; dismiss to skip it." /><StNotice>Retained legacy rehearsal. These local upkeep controls do not grant agency authority or approve an owner decision. Real client service uses the ordinary Strelva Agency workspace.</StNotice><MaintenanceDigests initialDigests={operatorDepthDigests(empty)} request={request} /></StPage>;
+    case "digests": return <StPage><StHead title={title} meta="Inspect the upkeep each site needs this week. The owner’s workspace holds their decisions." /><StNotice>Retained support inspection. Platform support cannot approve client upkeep. Client service requires ordinary agency or owner access.</StNotice><MaintenanceDigests initialDigests={operatorDepthDigests(empty)} request={request} /></StPage>;
     case "drafts": return <DraftsView drafts={operatorDepthDrafts(empty)} readOnly />;
     case "leads": return <LeadsView leads={operatorDepthLeads(empty)} initialWorkflow={empty ? {} : OPERATOR_DEPTH_LEAD_STATUS} readOnly />;
     case "needs-you": return <PolicyScreen load={operatorDepthPolicy(empty)} hrefFor={() => "?surface=needs-you&scenario=ready"} readOnly />;

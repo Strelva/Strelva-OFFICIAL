@@ -2,16 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import { StEmpty, StHead, StMono, StNotice, StPill, StRow, StRows, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
-import { PaymentLayout, PaymentSplit } from "@/experience/product/public-payment/PaymentLayout";
-import styles from "@/experience/product/public-payment/payment.module.css";
-import { paymentRequestSchema, type PaymentRequest } from "@/platform/connect/contracts";
+import { StSkeleton } from "@/components/ui/strelva/Kit";
+import { VisitorBookingShell } from "@/experience/bookings/VisitorBookingShell";
+import visitor from "@/experience/bookings/visitor.module.css";
+import styles from "./payment.module.css";
+import { hasPaymentTerms, paymentRefundTerms, publicPaymentRequestSchema, type PublicPaymentRequest } from "./public-payment";
 import { formatMoney } from "@/platform/connect/money-format";
 
-export default function BusinessPayment({ token, initialRequest }: { token: string; initialRequest?: PaymentRequest }) {
+export default function BusinessPayment({ token, initialRequest }: { token: string; initialRequest?: PublicPaymentRequest }) {
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
-  const [request, setRequest] = useState<PaymentRequest | null>(initialRequest ?? null);
+  const [request, setRequest] = useState<PublicPaymentRequest | null>(initialRequest ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(!initialRequest);
@@ -22,7 +23,7 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
     fetch(`/api/v1/payments?token=${encodeURIComponent(token)}`, { signal: controller.signal })
       .then(async response => {
         if (!response.ok) throw Error("This payment link is unavailable. Ask the business for a current link.");
-        setRequest(paymentRequestSchema.parse(await response.json()));
+        setRequest(publicPaymentRequestSchema.parse(await response.json()));
       })
       .catch(() => { if (!controller.signal.aborted) setError("Payment details could not be loaded. Ask the business for a current link."); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -30,6 +31,7 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
   }, [token, initialRequest]);
 
   async function pay() {
+    if (!request || request.status !== "unpaid" || !request.businessName?.trim() || !hasPaymentTerms(request) || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -54,24 +56,32 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
     }
   }
 
-  const businessName = request?.businessName;
+  const businessName = request?.businessName?.trim();
   const title = businessName ? request?.kind === "deposit" ? `Your booking deposit with ${businessName}` : `Your quote from ${businessName}` : "Payment request";
-  return <PaymentLayout brand={businessName}><PaymentSplit description={<>
-    <StHead title={title} meta="Review the agreed details before paying." />
-    {loading ? <div className={styles.state} role="status" aria-label="Loading payment details"><StSkeleton width="75%" /><StSkeleton width="50%" /><span>Loading payment details…</span></div> : null}
-    {request ? <>
-      {request.lines.length ? <StRows label="Payment details">{request.lines.map((line, index) => <StRow key={index} title={line.name} detail={<>Quantity <StMono>{line.quantity}</StMono></>} end={<StMono tone="text">{formatMoney(line.quantity * line.unitCents, request.currency)}</StMono>} />)}</StRows> : <StEmpty>No item details supplied. The business has not added item details to this request.</StEmpty>}
-      {request.acceptedTerms ? <p className={styles.term}>{request.acceptedTerms}</p> : null}
-    </> : null}
-  </>}>
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
-    {request ? <StSurface pad={false}><div className={styles.form}>
-      <h2 className={styles.formTitle}>{request.kind === "deposit" ? "Your deposit" : "Your payment"}</h2>
-      <span className={styles.amountValue}>{formatMoney(request.amountCents, request.currency)}</span>
-      {request.status === "paid" ? <StState kind="live">Payment received.</StState> : request.status === "expired" ? <StState kind="down">This payment link has expired.</StState> : request.status === "cancelled" ? <StState kind="draft">This request was cancelled.</StState> : <p className={styles.caption}>Valid until <StMono as="time" dateTime={request.expiresAt}>{new Date(request.expiresAt).toLocaleString()}</StMono>.</p>}
-      {!businessName ? <StNotice>The business identity is unavailable. Ask for a new payment link before paying.</StNotice> : null}
-      {request.status === "unpaid" && businessName ? <StPill size="lg" block busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</StPill> : null}
-      <p className={`${styles.caption} ${styles.security}`}><Lock size={12} aria-hidden="true" />Payment goes to {businessName || "the business named on this request"} through Stripe. The business handles refunds and cancellation terms.</p>
-    </div></StSurface> : !loading && !error ? <StEmpty>Payment details are unavailable. Ask the business for a current payment link.</StEmpty> : null}
-  </PaymentSplit></PaymentLayout>;
+  const termsAvailable = request ? hasPaymentTerms(request) : false;
+  const refundTerms = request ? paymentRefundTerms(request) : null;
+  return <VisitorBookingShell siteName={businessName} wide>
+    <div className={styles.split}>
+      <section className={styles.description} aria-label="Payment details">
+        <h1 className={visitor.title}>{title}</h1>
+        <p className={visitor.intro}>Review the agreed details before paying.</p>
+        {loading ? <div className={`${visitor.section} ${styles.state}`} role="status" aria-label="Loading payment details"><StSkeleton width="75%" /><StSkeleton width="50%" /><span>Loading payment details…</span></div> : null}
+        {request ? request.lines.length ? <dl className={`${visitor.summary} ${visitor.section}`}>{request.lines.map((line, index) => <div key={index} className={styles.line}><dt>{line.name}<span className={visitor.muted}>Quantity {line.quantity}</span></dt><dd>{formatMoney(line.quantity * line.unitCents, request.currency)}</dd></div>)}</dl> : <p className={visitor.notice}>No item details supplied. The business has not added item details to this request.</p> : null}
+      </section>
+      <div>
+        {error ? <p className={`${visitor.notice} ${visitor.error}`} role="alert">{error}</p> : null}
+        {request ? <section className={`${visitor.surface} ${styles.form}`} aria-label="Payment amount and terms">
+          <h2 className={visitor.label}>{request.kind === "deposit" ? "Your deposit" : "Your payment"}</h2>
+          <span className={styles.amountValue}>{formatMoney(request.amountCents, request.currency)}</span>
+          {request.acceptedTerms?.trim() ? <p className={styles.terms}>{request.acceptedTerms}</p> : null}
+          {refundTerms ? <p className={styles.terms}>{refundTerms}</p> : null}
+          {!termsAvailable ? <p className={visitor.notice}>Refund and cancellation terms are unavailable. Ask the business for a payment link with the agreed terms before paying.</p> : null}
+          {request.status === "paid" ? <p role="status">Payment received.</p> : request.status === "expired" ? <p>This payment link has expired.</p> : request.status === "cancelled" ? <p>This request was cancelled.</p> : <p className={visitor.note}>Valid until <time dateTime={request.expiresAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" }).format(new Date(request.expiresAt))}</time>.</p>}
+          {!businessName ? <p className={visitor.notice}>The business identity is unavailable. Ask for a new payment link before paying.</p> : null}
+          {request.status === "unpaid" && businessName && termsAvailable ? <button className={`${visitor.button} ${visitor.block}`} type="button" disabled={busy} aria-busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</button> : null}
+          <p className={`${visitor.note} ${styles.security}`}><Lock size={14} aria-hidden="true" />Payment goes to {businessName || "the business named on this request"} through Stripe. The business handles refunds and cancellation terms.</p>
+        </section> : !loading && !error ? <p className={visitor.notice}>Payment details are unavailable. Ask the business for a current payment link.</p> : null}
+      </div>
+    </div>
+  </VisitorBookingShell>;
 }

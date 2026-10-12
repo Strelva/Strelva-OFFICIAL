@@ -1,6 +1,6 @@
 import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { requireTenantAccess } from "@/platform/infra/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { loadChatMessages, saveChatMessages } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
+    const denied = await requireTenantPermission(tenant, "content:write");
     if (denied) return denied;
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;

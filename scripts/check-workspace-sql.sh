@@ -1806,3 +1806,7 @@ source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
 # DDL and no omitted upgrade assertions. Failure propagates under set -e.
 printf 'Rehearsing review retention against every actual historical forward migration.\n'
 STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF=1 bash "$repo_root/scripts/check-guarded-teardown-fresh.sh"
+
+# One command also owns every UX fixture and each lane inverse/race runner.
+# The fresh ordered cluster protects intentionally historical fixtures above.
+bash "$repo_root/scripts/check-ux-audit-sql.sh"

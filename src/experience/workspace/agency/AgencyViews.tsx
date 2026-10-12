@@ -4,6 +4,7 @@ import { HEALTH_LABEL } from "@/experience/systems/model";
 import { useState } from "react";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
 import { AgencyClientAvailability } from "./AgencyClientAvailability";
+import { AgencyClientDecisions } from "./AgencyClientDecisions";
 import { StBeacon, StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 import { agencyQueueOrder, type AgencyClientRow, type AgencyQueueItem, type AgencyTeamMember } from "../agency-clients";
 import { clientSystemLabel, lastReceiptLabel, needsYouLabel, openRequestsLabel, queueKindLabel, waitLabel, type AgencyClientsView } from "../agency-home";
@@ -32,6 +33,8 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
   retrying: ReadonlySet<number>; now: number; onOpen: (workspaceId: string) => void; onRetryPage: (pageIndex: number) => void;
   onMore: () => void; agencyWorkspaceId?: string; request?: typeof fetch; lastGoodReads?: ReadonlyMap<string, AgencyLastGoodRead>;
 }) {
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const reviewClient = clients.find(client => client.workspaceId === reviewing && client.status === "ready" && client.provider);
   if (!clients.length) return <StEmpty>No client businesses yet. A business appears here once it shares work with {agencyName}.</StEmpty>;
   return <div>
     <StTable label="Clients" columns={[{ key: "client", label: "Client" }, { key: "health", label: "Health" }, { key: "waiting", label: "Waiting on" }, { key: "requests", label: "Requests" }, { key: "receipt", label: "Last receipt" }]} rows={clients.map(client => {
@@ -41,13 +44,14 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
       return { key: client.workspaceId, cells: {
         client: <><StTextButton tone="text" onClick={() => onOpen(client.workspaceId)}>{client.name}</StTextButton>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<small className="block text-xs font-normal text-gray-muted">{read.systems.length ? read.systems.map(clientSystemLabel).join(" · ") : client.reach === "agency" ? "No shared Systems yet" : "No Systems yet"}</small>
           {client.agentBookings ? <StTextButton href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`}>Booked through assistants · {client.name}</StTextButton> : null}
-          {!unavailable && client.provider ? <ClientAdditionalControls workspaceId={client.workspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} /> : null}</>,
+          {!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</>,
         health: unavailable ? <><StState kind="need">{client.name} could not be loaded.</StState><small className="block text-xs">{lastGood ? `Showing the last good read from ${new Date(lastGood.readAt).toLocaleString()}.` : "No last good read is available in this visit."}</small><StPill variant="soft" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</StPill></> : health(client),
         waiting: unavailable && !lastGood ? "Unknown" : needsYouLabel(read, now),
-        requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} ready` : ""}</>,
+        requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} to review` : ""}{read.improvementsStatus === "unavailable" ? ` · ${read.improvementsWaiting ? "Some improvements unavailable" : "Improvements unavailable"}` : ""}</>,
         receipt: unavailable && !lastGood ? "Unknown" : lastReceiptLabel(read.lastReceiptAt, now),
       } };
     })} />
+    {reviewClient && agencyWorkspaceId ? <div className="py-6"><StTextButton onClick={() => setReviewing(null)}>Close decisions</StTextButton><AgencyClientDecisions key={`${agencyWorkspaceId}:${reviewClient.workspaceId}`} workspaceId={reviewClient.workspaceId} agencyWorkspaceId={agencyWorkspaceId} clientName={reviewClient.name} request={request} /></div> : null}
     <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>{clients.length < total ? `Showing ${clients.length} of ${total} clients` : `${total} ${total === 1 ? "client" : "clients"}`}</StMono>{hasMore ? <StPill variant="soft" busy={loadingMore} onClick={onMore}>Show more clients</StPill> : null}</div>
     {moreError ? <StNotice tone="critical">More clients could not be loaded. Access has not changed. Try again.</StNotice> : null}
   </div>;

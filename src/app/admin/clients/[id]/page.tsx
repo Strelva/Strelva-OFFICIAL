@@ -1,4 +1,5 @@
 import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
+import { tenantAgencyWorkspace } from "@/experience/operator/agency-entry";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -50,6 +51,8 @@ import { BusinessEffortForSite } from "../../work/BusinessEffort";
 import { loadBusinessEffort } from "../../work/effort-data";
 import { StHead, StPage, StSection, StTextButton, StState, StRows, StRow } from "@/components/ui/strelva/Kit";
 import styles from "@/experience/operations/operator-client.module.css";
+
+import { createClientReadHealth, domainEvidenceIssue, scanEvidenceIssue } from "./client-read-health";
 
 export const dynamic = "force-dynamic";
 
@@ -112,36 +115,45 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
+  const readHealth = createClientReadHealth();
+
   // loadBusinessEffort never throws; it reports disabled/denied/unavailable states.
   const effortLoad = loadBusinessEffort();
-  const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(() => null);
+  const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(readHealth.fallback("Domain health", null));
   const ownerInvitationsLoad = loadOwnerInvitations(id);
   const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
-      getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
-      getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
-      listDrafts(id).catch(() => ({} as Record<string, boolean>)),
-      getActivity(id).catch(() => []),
-      getScanSummary(id).catch(() => null),
-      listTenantDomainClaims(id).catch(() => []),
-      getScanHistory(id).catch(() => []),
-      getLatestSnapshots(id, 2).catch(() => []),
-      getReviews(id).catch(() => []),
-      getTenantCrm(id).catch(() => null),
-      getTenantAtRisk(id).catch(() => noRisk),
-      getDailyMetrics(id, 14).catch(() => []),
-      getSuggestions(id).catch(() => []),
-      getVercelProjectStatus(`${id}-site`).catch(() => null),
-      getGoal(id).catch(() => null),
-      getAccountForTenant(id).catch(() => null),
-      getReportCadence(id).catch(() => "monthly" as const),
-      getReplyVoice(id).catch(() => ({ mode: "approve" as const, guidance: "", templates: [], updatedAt: null })),
-      getContentAutonomy(id).catch(() => "approve" as const),
-      getClientEmailOverride(id).catch(() => "inherit" as const),
-      getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(() => null),
+      getClickCounts("page-view", id).catch(readHealth.fallback("Page visits", { thisWeek: 0, total: 0 })),
+      getClickCounts("booking-click", id).catch(readHealth.fallback("Booking clicks", { thisWeek: 0, total: 0 })),
+      listDrafts(id).catch(readHealth.fallback("Content drafts", {} as Record<string, boolean>)),
+      getActivity(id).catch(readHealth.fallback("Activity", [])),
+      getScanSummary(id, { requireStore: true }).catch(readHealth.fallback("Site scan", null)),
+      listTenantDomainClaims(id).catch(readHealth.fallback("Domain claims", [])),
+      getScanHistory(id, { requireStore: true }).catch(readHealth.fallback("Scan history", [])),
+      getLatestSnapshots(id, 2).catch(readHealth.fallback("Visibility", [])),
+      getReviews(id).catch(readHealth.fallback("Reviews", [])),
+      getTenantCrm(id).catch(readHealth.fallback("Notes and CRM", null)),
+      getTenantAtRisk(id).catch(readHealth.fallback("Subscription risk", noRisk)),
+      getDailyMetrics(id, 14).catch(readHealth.fallback("Daily metrics", [])),
+      getSuggestions(id).catch(readHealth.fallback("Opportunities", [])),
+      getVercelProjectStatus(`${id}-site`).catch(readHealth.fallback("Deployment status", null)),
+      getGoal(id).catch(readHealth.fallback("Goal", null)),
+      getAccountForTenant(id).catch(readHealth.fallback("Account", null)),
+      getReportCadence(id).catch(readHealth.fallback("Report cadence", "monthly" as const)),
+      getReplyVoice(id).catch(readHealth.fallback("Reply voice", { mode: "approve" as const, guidance: "", templates: [], updatedAt: null })),
+      getContentAutonomy(id).catch(readHealth.fallback("Content controls", "approve" as const)),
+      getClientEmailOverride(id).catch(readHealth.fallback("Email controls", "inherit" as const)),
+      getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(readHealth.fallback("Inquiries", null)),
     ]);
   const effort = await effortLoad;
   const ownerInvitations = await ownerInvitationsLoad;
+  const domainView = await domainViewLoad;
+  if (effort.state === "unavailable") readHealth.unavailable("Human effort");
+  if (ownerInvitations?.kind === "unavailable") readHealth.unavailable("Owner invitations");
+  if (!domainView) readHealth.unavailable("Domain health");
+  if (!clientLeads || clientLeads.postgres === "unavailable" || clientLeads.redis === "unavailable"
+    || (clientLeads.postgres !== "ok" && clientLeads.redis !== "ok")) readHealth.unavailable("Inquiries");
+  if (!vercelStatus?.ok) readHealth.unavailable("Deployment status");
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
 
@@ -153,7 +165,7 @@ export default async function ClientDetailPage({
 
   // Fuse the panels' self-verdicts into ONE ranked "next action for this client".
   // Priority: churn > launch-blocked > failing site health > reviews waiting.
-  // Each signal is fail-soft — a missing one just drops out of the ranking.
+  // Known actions retain their priority; unavailable evidence is appended below.
   // Capture the actual failing checks (their names), not just a count — the
   // banner enumerates them so "before go-live" is actionable, not a mystery.
   let launchFailItems: string[] = [];
@@ -162,16 +174,20 @@ export default async function ClientDetailPage({
       .filter((r) => r.status === "fail")
       .map((r) => r.name);
   } catch {
+    readHealth.unavailable("Launch readiness");
     launchFailItems = [];
   }
   const launchFails = launchFailItems.length;
   const grade = lastScan?.grade ?? null;
   const needsReply = reviewIntel.needsResponse.length;
+  const scanIssue = readHealth.hasUnavailable("Site scan") ? null : scanEvidenceIssue(lastScan);
+  const evidenceDetail = [readHealth.detail(), scanIssue, domainEvidenceIssue(domainView)].filter(Boolean).join(" ");
 
   // A brand-new client has no traffic/activity/drafts yet, so leading the top row
   // with weekly-engagement KPIs shows four zeros. For a fresh client, lead with
   // the things that ARE knowable + relevant (health, reviews, setup, plan).
   const isFreshClient =
+    !["Page visits", "Activity", "Content drafts"].some(readHealth.hasUnavailable) &&
     pageViews.total === 0 && activity.length === 0 && Object.keys(drafts).length === 0;
   const planPulse =
     tenant.subscriptionStatus === "active"
@@ -203,22 +219,29 @@ export default async function ClientDetailPage({
       tone: "amber",
       message: `${needsReply} review${needsReply === 1 ? "" : "s"} waiting on a reply.`,
     };
+  } else if (evidenceDetail) {
+    verdict = { tone: "amber", message: "Health not confirmed. Some evidence is unavailable or out of date." };
   } else {
     verdict = { tone: "emerald", message: "Healthy. Nothing needs you." };
   }
+  if (evidenceDetail) verdict.detail = [verdict.detail, evidenceDetail].filter(Boolean).join(" · ");
   const publicUrl = getTenantPublicUrl(tenant);
   const dashboardUrl = getTenantDashboardFallbackUrl(tenant);
 
-  const inspectHref = `/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`;
+  const inspectHref = new URL(`/api/admin/inspect?on=1&to=${encodeURIComponent(new URL(dashboardUrl).pathname)}`, dashboardUrl).toString();
+  const agencyWorkspace = await tenantAgencyWorkspace(tenant.id);
+  const agencyWorkHref = agencyWorkspace
+    ? new URL(`/api/admin/inspect?on=0&to=${encodeURIComponent("/workspace?workspaceId=" + agencyWorkspace)}`, dashboardUrl).toString()
+    : "/admin/actions";
   return (
     <StPage>
-      <StHead crumb={{ label: OPERATOR_DESTINATIONS.sites.label, href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active site" : "Archived site"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={dashboardUrl}>Open workspace</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton></>} />
+      <StHead crumb={{ label: OPERATOR_DESTINATIONS.sites.label, href: "/admin/clients" }} title={getTenantSiteName(tenant.id, tenant)} meta={<>{tenant.ownerName || "Owner not recorded"} · {tenant.active ? "Active site" : "Archived site"}{account && account.tenantIds.length > 1 ? ` · ${account.name} · ${account.tenantIds.length} sites` : ""}</>} actions={<><StTextButton href={inspectHref}>Open workspace (read-only)</StTextButton><StTextButton href={inspectHref}>Inspect</StTextButton><StTextButton href={publicUrl}>Site</StTextButton><StTextButton href={`/admin/convert?slug=${encodeURIComponent(tenant.id)}`}>Conversion dry run</StTextButton></>} />
       <div className={styles.columns}>
         <ReleaseFlagsPanel tenantId={tenant.id} globalOwnerEmailPaused={emailSendingPaused()} />
         <aside className={styles.aside}>
           <StSection title="Owner"><StRows><StRow title={tenant.ownerName || "Owner not recorded"} detail={tenant.ownerEmail || "Owner email not recorded"} /></StRows></StSection>
           {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
-          <StSection title="On behalf of the owner"><p>Client work uses the business or its agency’s ordinary permissions. Every request names who asked.</p><StTextButton href={dashboardUrl}>Open their workspace</StTextButton></StSection>
+          <StSection title="Client work"><p>Client work uses ordinary agency permissions. Platform support inspection is read-only.</p><StTextButton href={agencyWorkHref}>{agencyWorkspace ? "Open client through your agency seat" : "Check ordinary agency access"}</StTextButton></StSection>
           <StState kind={verdict.tone === "red" ? "down" : verdict.tone === "amber" ? "need" : "live"}>{verdict.message}</StState>
           {verdict.detail && <p>{verdict.detail}</p>}
         </aside>
@@ -237,17 +260,17 @@ export default async function ClientDetailPage({
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
         {isFreshClient ? (
           <>
-            <Pulse label="Site health" value={grade ?? "—"} sub={lastScan ? `${lastScan.overallScore}/100` : "not scanned yet"} />
-            <Pulse label="Reviews" value={reviews.length} sub={reviews.length === 1 ? "review" : "reviews"} />
-            <Pulse label="Setup" value={launchFails === 0 ? "Ready" : `${launchFails} left`} sub="to launch" />
+            <Pulse label="Site health" value={readHealth.hasUnavailable("Site scan") ? "Unavailable" : grade ?? "—"} sub={readHealth.hasUnavailable("Site scan") ? "could not be read" : lastScan ? `${lastScan.overallScore}/100${scanIssue ? " · unverified" : ""}` : "not scanned yet"} />
+            <Pulse label="Reviews" value={readHealth.hasUnavailable("Reviews") ? "Unavailable" : reviews.length} sub={readHealth.hasUnavailable("Reviews") ? "could not be read" : reviews.length === 1 ? "review" : "reviews"} />
+            <Pulse label="Setup" value={readHealth.hasUnavailable("Launch readiness") ? "Unavailable" : launchFails === 0 ? "Ready" : `${launchFails} left`} sub="to launch" />
             <Pulse label="Plan" value={planPulse} sub="billing" />
           </>
         ) : (
           <>
-            <Pulse label="Visits / wk" value={pageViews.thisWeek} sub={`${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
-            <Pulse label="Booking clicks / wk" value={bookingClicks.thisWeek} sub={`${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
-            <Pulse label="Content drafts" value={Object.keys(drafts).length} sub="awaiting review" />
-            <Pulse label="Last activity" value={ago(activity[0]?.time ?? null)} />
+            <Pulse label="Visits / wk" value={readHealth.hasUnavailable("Page visits") ? "Unavailable" : pageViews.thisWeek} sub={readHealth.hasUnavailable("Page visits") ? "could not be read" : `${pageViews.total} total`} series={dailyMetrics.map((m) => m.pageViews)} />
+            <Pulse label="Booking clicks / wk" value={readHealth.hasUnavailable("Booking clicks") ? "Unavailable" : bookingClicks.thisWeek} sub={readHealth.hasUnavailable("Booking clicks") ? "could not be read" : `${bookingClicks.total} total`} series={dailyMetrics.map((m) => m.bookingClicks)} />
+            <Pulse label="Content drafts" value={readHealth.hasUnavailable("Content drafts") ? "Unavailable" : Object.keys(drafts).length} sub="awaiting review" />
+            <Pulse label="Last activity" value={readHealth.hasUnavailable("Activity") ? "Unavailable" : ago(activity[0]?.time ?? null)} />
           </>
         )}
       </div>
@@ -336,7 +359,7 @@ export default async function ClientDetailPage({
             visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
-        <DomainView load={await domainViewLoad} />
+        <DomainView load={domainView} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
         <DeploymentStatus status={deployStatus} tenantId={tenant.id} />

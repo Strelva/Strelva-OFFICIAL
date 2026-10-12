@@ -144,7 +144,7 @@ function checkHttps(ctx: AuditContext): CheckResult {
       : "Your site does not load securely over HTTPS.",
     details: isHttps
       ? undefined
-      : "The secure padlock is what earns visitor trust and helps you rank. Ask Strelva to turn on HTTPS and send every visitor to the secure version.",
+      : "The secure padlock is what earns visitor trust and helps you rank. Turn on HTTPS and send every visitor to the secure version.",
   };
 }
 
@@ -188,7 +188,7 @@ function checkSecurityHeaders(ctx: AuditContext): CheckResult {
     details:
       missing.length === 0
         ? undefined
-        : `Missing headers: ${missing.join(", ")}. Ask Strelva to add these. They harden the site behind the scenes with no visible change.`,
+        : `Missing headers: ${missing.join(", ")}. Add these. They harden the site behind the scenes with no visible change.`,
   };
 }
 
@@ -260,7 +260,7 @@ function checkMixedContent(ctx: AuditContext): CheckResult {
       score: 0,
       message: `${active.length} file(s) on this secure page still load over an insecure connection (scripts, styles, or embeds).`,
       details:
-        "Browsers block these insecure files, which can break the page. Ask Strelva to switch them to the secure (HTTPS) version: " +
+        "Browsers block these insecure files, which can break the page. Switch them to the secure (HTTPS) version: " +
         active.slice(0, 5).join(", ") +
         (active.length > 5 ? ", ..." : "") +
         ".",
@@ -273,7 +273,7 @@ function checkMixedContent(ctx: AuditContext): CheckResult {
     score: 50,
     message: `${passive.length} image or media file(s) on this secure page still load over an insecure connection.`,
     details:
-      "These weaken the secure padlock and may not load. Ask Strelva to switch them to the secure (HTTPS) version: " +
+      "These weaken the secure padlock and may not load. Switch them to the secure (HTTPS) version: " +
       passive.slice(0, 5).join(", ") +
       (passive.length > 5 ? ", ..." : "") +
       ".",
@@ -370,7 +370,7 @@ function checkFormSecurity(ctx: AuditContext): CheckResult {
     message,
     details:
       insecure > 0
-        ? "Ask Strelva to make sure every form sends its data over the secure (HTTPS) connection so customer details stay protected."
+        ? "Make sure every form sends its data over the secure (HTTPS) connection so customer details stay protected."
         : undefined,
   };
 }

@@ -3,6 +3,31 @@ import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { readVersionActor } from "@/platform/system-versions/supabase-store";
 import { recordedActor, type RecordedActor } from "./actor";
+import { readBusinessProviderIdentity, readServiceRequestProviders } from "@/platform/service-requests/provider-options";
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+
+/**
+ * Capture who serves this automatic action, independently of its reader.
+ * A successful empty relationship read proves the direct door. An unreadable
+ * relationship or ambiguous scoped agencies never falls back to the platform.
+ * Pass the exact acting agency when an action/session has already bound it.
+ */
+export async function captureAutomationActor(actor: WorkspaceActor, workspaceId: string, actingAgencyId?: string): Promise<RecordedActor | null> {
+  try {
+    const [provider, agencies] = await Promise.all([
+      readBusinessProviderIdentity(actor, workspaceId),
+      readServiceRequestProviders(actor, workspaceId),
+    ]);
+    const ids = new Set(agencies.map(agency => agency.agencyWorkspaceId));
+    if (provider) ids.add(provider.agencyWorkspaceId);
+    if (!ids.size) return actingAgencyId ? null : { kind: "platform" };
+    const agencyId = actingAgencyId ?? (ids.size === 1 ? [...ids][0] : undefined);
+    if (!agencyId || !ids.has(agencyId)) return null;
+    const brand = await resolveOwnerBrand(agencyId);
+    if (brand.agencyId !== agencyId) return null;
+    return recordedActor({ kind: "agency", agencyId, displayName: brand.name });
+  } catch { return null; }
+}
 
 /** Resolve the recorded principal, never the person viewing its History. */
 export async function personActor(userId: string): Promise<RecordedActor | null> {

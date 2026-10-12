@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/platform/agency-brand/server", () => ({
   resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
@@ -59,7 +60,7 @@ describe("sendEmail client-audience tenant override", () => {
     mockGetClientEmailOverride.mockResolvedValue("on");
     expect(await clientTo("armed-tenant")).toBe(true);
     expect(send).toHaveBeenCalledTimes(1);
-    expect(mockGetClientEmailOverride).toHaveBeenCalledWith("armed-tenant");
+    expect(mockGetClientEmailOverride).toHaveBeenCalledWith("armed-tenant", { failClosed: true });
   });
 
   it("override 'off' blocks even when the global client switch is on", async () => {
@@ -91,7 +92,7 @@ describe("sendEmail client-audience tenant override", () => {
     expect(mockGetClientEmailOverride).not.toHaveBeenCalled();
   });
 
-  it("operator + prospect are unaffected by a client override (default on, no override read)", async () => {
+  it("operator alerts remain independent; tenant-scoped prospects obey exclusions", async () => {
     // Even with a client override that would block, operator/prospect send.
     mockGetClientEmailOverride.mockResolvedValue("off");
     const operator = await sendEmail({
@@ -111,8 +112,8 @@ describe("sendEmail client-audience tenant override", () => {
       text: "x",
     });
     expect(operator).toBe(true);
-    expect(prospect).toBe(true);
-    expect(mockGetClientEmailOverride).not.toHaveBeenCalled();
-    expect(send).toHaveBeenCalledTimes(2);
+    expect(prospect).toBe(false);
+    expect(mockGetClientEmailOverride).toHaveBeenCalledWith("some-tenant", { failClosed: true });
+    expect(send).toHaveBeenCalledTimes(1);
   });
 });

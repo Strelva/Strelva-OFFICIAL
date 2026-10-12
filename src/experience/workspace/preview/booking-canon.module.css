@@ -24,12 +24,8 @@
   .alternatives { font-size: 13px; }
 }
 .preview { color: var(--st-text); background: var(--st-canvas); font-family: var(--font-workspace, system-ui), sans-serif; }
-.composerPosition { position: fixed; bottom: 30px; left: 264px; right: 0; z-index: 20; pointer-events: none; }
-.composerPosition > * { pointer-events: auto; }
 .mobileTabs { display: none; }
-@media (max-width: 1023px) { .composerPosition { left: 0; } }
 @media (max-width: 700px) {
-  .composerPosition { bottom: 80px; }
   .mobileTabs { display: flex; justify-content: space-around; position: fixed; bottom: 0; left: 0; right: 0; background: var(--st-surface); padding: 12px 8px; border-top: 1px solid var(--st-line); z-index: 30; font-size: 12px; }
   .mobileTabs a { color: var(--st-text-3); text-decoration: none; padding: 8px; }
   .mobileTabs a[aria-current] { color: var(--st-text); font-weight: 600; }

@@ -46,9 +46,9 @@ const library: AgencyLibrary = {
     systemId: uuid("53000000", 1), workspaceId: AGENCY, name: "Inquiry intake", hidden: false,
     revisions: [{ number: 4, label: "Follow-up", summary: "Follow up after one business day.", publishedAt: "2026-10-04T12:00:00.000Z" }],
     versions: [
-      { versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", systemId: uuid("52000000", 1), systemName: "Inquiry intake", context: { kind: "agency_client", label: "Lake Bakery" }, baselineRevision: 3, currentRelease: 1, state: "ready", conflicts: [], missingBindings: [], declinedReason: null },
-      { versionId: "conflict", workspaceId: uuid("c0000000", 2), clientName: "The Mooney Firm", systemId: uuid("52000000", 2), systemName: "Inquiry intake", context: { kind: "agency_client", label: "The Mooney Firm" }, baselineRevision: 3, currentRelease: 1, state: "conflicts", conflicts: [{ path: "followUp.message", local: "We'll call you within one business day", upstream: "Someone will reply by the end of the next business day." }], missingBindings: [], declinedReason: null },
-      { versionId: "missing", workspaceId: uuid("c0000000", 3), clientName: "Elmwood PT", systemId: uuid("52000000", 3), systemName: "Inquiry intake", context: { kind: "agency_client", label: "Elmwood PT" }, baselineRevision: 3, currentRelease: 1, state: "missing_accounts", conflicts: [], missingBindings: ["google_calendar"], declinedReason: null },
+      { versionId: "ready-1", workspaceId: uuid("c0000000", 1), clientName: "Lake Bakery", systemId: uuid("52000000", 1), systemName: "Inquiry intake", context: { kind: "agency_client", label: "Lake Bakery" }, baselineRevision: 3, improvementRevision: 4, currentRelease: 1, state: "ready", conflicts: [], missingBindings: [], declinedReason: null },
+      { versionId: "conflict", workspaceId: uuid("c0000000", 2), clientName: "The Mooney Firm", systemId: uuid("52000000", 2), systemName: "Inquiry intake", context: { kind: "agency_client", label: "The Mooney Firm" }, baselineRevision: 3, improvementRevision: 4, currentRelease: 1, state: "conflicts", conflicts: [{ path: "followUp.message", local: "We'll call you within one business day", upstream: "Someone will reply by the end of the next business day." }], missingBindings: [], declinedReason: null },
+      { versionId: "missing", workspaceId: uuid("c0000000", 3), clientName: "Elmwood PT", systemId: uuid("52000000", 3), systemName: "Inquiry intake", context: { kind: "agency_client", label: "Elmwood PT" }, baselineRevision: 3, improvementRevision: 4, currentRelease: 1, state: "missing_accounts", conflicts: [], missingBindings: ["google_calendar"], declinedReason: null },
     ],
   }],
 };
@@ -79,6 +79,19 @@ function router(handlers: { clients?: () => Response | Promise<Response>; librar
     return Response.json({ requests: [], applications: [], websites: [] });
   });
 }
+
+it("names unavailable offer reads while preserving known requests and offers", async () => {
+  const { AgencyClientList } = await import("@/experience/workspace/agency/AgencyViews");
+  const host = document.createElement("div"); document.body.appendChild(host);
+  const root = createRoot(host); roots.push(root);
+  await act(async () => root.render(createElement(AgencyClientList, {
+    clients: [{ ...row(1, { openRequests: 2, improvementsWaiting: 1, improvementsStatus: "unavailable" }), pageIndex: 0 }],
+    total: 1, agencyName: "Harbor Agency", hasMore: false, loadingMore: false, moreError: false, retrying: new Set<number>(), now: Date.now(),
+    onOpen: () => undefined, onRetryPage: () => undefined, onMore: () => undefined,
+  })));
+  expect(host.textContent).toContain("2 open requests · 1 improvement to review · Some improvements unavailable");
+  expect(host.textContent).not.toContain("1 improvement ready");
+});
 
 describe("agency home on the batched read", () => {
   it("shows health independently of lifecycle and names incomplete Queue sources", async () => {
@@ -209,7 +222,7 @@ describe("agency home on the batched read", () => {
     const { node } = await render(request);
     await act(async () => { button(node, "Library").click(); }); await settle();
     expect(node.textContent).toContain("Inquiry Versions");
-    expect(node.textContent).toContain("Source revision 2 · this Version’s release 7");
+    expect(node.textContent).toContain("Source Release 2 · this Version’s Release 7");
     expect(node.textContent).toContain("choice about local changes");
     expect(node.querySelector('a[href="/business/lake-bakery?view=patterns"]')?.textContent).toContain("Lake Bakery");
     expect(node.textContent).not.toContain("No sources yet");

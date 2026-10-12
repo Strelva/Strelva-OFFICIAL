@@ -42,6 +42,9 @@ export interface PublicBookingReceipt {
   start: string;
   end: string;
   timeZone: string;
+  confirmationRequired?: boolean;
+  confirmationExpiresAt?: string;
+  businessName?: string;
 }
 
 export interface PublicBookingVisitor {
@@ -183,13 +186,24 @@ export function isPublicBookingSchedule(value: unknown): value is PublicBookingS
 
 /** Validate a safe receipt returned after the provider readback decision. */
 export function isPublicBookingReceipt(value: unknown): value is PublicBookingReceipt {
-  if (!isRecord(value) || !exactKeys(value, ["schemaVersion", "reservationId", "managementToken", "capabilityId", "version", "provider", "status", "title", "start", "end", "timeZone"]) || value.schemaVersion !== 1 || typeof value.reservationId !== "string" || !TOKEN.test(value.reservationId) ||
+  if (!isRecord(value) || !exactKeys(value, ["schemaVersion", "reservationId", "managementToken", "capabilityId", "version", "provider", "status", "title", "start", "end", "timeZone", "confirmationRequired", "confirmationExpiresAt", "businessName"]) || value.schemaVersion !== 1 || typeof value.reservationId !== "string" || !TOKEN.test(value.reservationId) ||
     typeof value.managementToken !== "string" || !TOKEN.test(value.managementToken) || typeof value.capabilityId !== "string" ||
     !Number.isSafeInteger(value.version) || Number(value.version) < 1 || !isProvider(value.provider) ||
     !["confirmed", "pending", "cancelled"].includes(String(value.status)) || typeof value.title !== "string" ||
     typeof value.start !== "string" || !ISO.test(value.start) || typeof value.end !== "string" || !ISO.test(value.end) ||
     Date.parse(value.end) <= Date.parse(value.start) || typeof value.timeZone !== "string" || !value.timeZone) return false;
-  return true;
+  return (value.confirmationRequired === undefined || typeof value.confirmationRequired === "boolean") &&
+    (value.confirmationExpiresAt === undefined || (typeof value.confirmationExpiresAt === "string" && ISO.test(value.confirmationExpiresAt) && Number.isFinite(Date.parse(value.confirmationExpiresAt)))) &&
+    (value.businessName === undefined || (typeof value.businessName === "string" && Boolean(value.businessName.trim()) && value.businessName.length <= 160));
+}
+
+export function bookingReceiptPresentation(receipt: PublicBookingReceipt, businessAuthority: boolean, now = Date.now()): { heading: string; detail: string } {
+  if (receipt.status === "cancelled") return { heading: "Cancelled", detail: "This booking is cancelled." };
+  if (receipt.confirmationRequired && receipt.confirmationExpiresAt && Date.parse(receipt.confirmationExpiresAt) <= now) return { heading: "Confirmation time expired", detail: `Contact ${receipt.businessName ?? "the business"} to request a new time.` };
+  if (receipt.confirmationRequired) return { heading: "Check your email to confirm", detail: "Open the confirmation email and use its link to confirm your request. This time is not confirmed yet." };
+  if (receipt.status === "confirmed") return { heading: "Confirmed", detail: "You can change the time or cancel below." };
+  if (businessAuthority) return { heading: `Waiting on ${receipt.businessName ?? "the business"}`, detail: "Your request is waiting for the business to confirm. This time is not confirmed yet. Check request status below." };
+  return { heading: "Outcome not confirmed", detail: "We could not confirm this booking yet. Check the calendar before trying again." };
 }
 
 function visitorBody(visitor: PublicBookingVisitor): PublicBookingVisitor {

@@ -235,87 +235,20 @@ describe("getPortfolioActions", () => {
   });
 });
 
-describe("bulkResolvePortfolioActions", () => {
-  it("routes every item through resolveEventAction with the governed 'approved' action", async () => {
-    mockResolveEventAction.mockResolvedValue({ changed: true });
-
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "a1" },
-      { tenantId: "bolt", eventId: "b1" },
-    ], operator);
-
-    expect(mockResolveEventAction).toHaveBeenCalledTimes(2);
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved", operator.actorId);
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved", operator.actorId);
-    expect(results.every((r) => r.changed)).toBe(true);
-  });
-
-  it("reports honest partial failure — a failed external write stays pending", async () => {
-    mockResolveEventAction.mockImplementation(async (_t: string, eventId: string) => {
-      if (eventId === "ok") return { changed: true };
-      if (eventId === "fail") return { changed: false, reason: "gbp_post_failed" };
-      throw new Error("boom");
-    });
-
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "ok" },
-      { tenantId: "acme", eventId: "fail" },
-      { tenantId: "acme", eventId: "throws" },
-    ], operator);
-
-    expect(results).toEqual([
-      { tenantId: "acme", eventId: "ok", changed: true, reason: undefined },
-      { tenantId: "acme", eventId: "fail", changed: false, reason: "gbp_post_failed" },
-      { tenantId: "acme", eventId: "throws", changed: false, reason: "boom" },
+describe("retired platform bulk approval", () => {
+  it("leaves every valid client draft pending without content effects", async () => {
+    expect(await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }, { tenantId: "bolt", eventId: "b1" }], operator)).toEqual([
+      { tenantId: "acme", eventId: "a1", changed: false, reason: "platform_content_authority_retired" },
+      { tenantId: "bolt", eventId: "b1", changed: false, reason: "platform_content_authority_retired" },
     ]);
-    // A throwing item never aborts the rest of the batch.
-    expect(mockResolveEventAction).toHaveBeenCalledTimes(3);
-  });
-
-  it("writes an audit row before and after each approval, naming the operator", async () => {
-    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "gbp_post_failed" });
-    await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }], operator);
-    const row = (phase: string, extra: Record<string, unknown> = {}) => ({
-      tenant: "acme",
-      actor: { userId: operator.userId, email: operator.verifiedEmail, type: "super_admin", isSuperAdmin: true },
-      action: "portfolio.draft.approve",
-      targetType: "event",
-      targetId: "a1",
-      metadata: { phase, actor: operator.actorId, decision: "approved", eventType: "content_update", eventKind: null, ...extra },
-    });
-    expect(mockAudit).toHaveBeenNthCalledWith(1, row("attempt"));
-    expect(mockAudit).toHaveBeenNthCalledWith(2, row("result", { changed: false, reason: "gbp_post_failed" }));
-    expect(mockAudit.mock.invocationCallOrder[0]!).toBeLessThan(mockResolveEventAction.mock.invocationCallOrder[0]!);
-  });
-
-  it("refuses a draft routed to the owner, and anything this queue can't approve (#516)", async () => {
-    mockGetEventRaw.mockImplementation(async (id: string) => id === "owned"
-      ? evt({ id, tenantId: "acme", metadata: { reviewAudience: "owner", escalatedByOperator: true } })
-      : evt({ id, tenantId: "acme", type: "change_request" }));
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "owned" },
-      { tenantId: "acme", eventId: "request" },
-    ], operator);
-    expect(results.map((r) => r.reason)).toEqual(["owner_decides", "not_operator_decidable"]);
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(mockAudit).not.toHaveBeenCalled();
   });
-
-  it("refuses an event from another tenant than the one submitted", async () => {
-    const results = await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "b1" }], operator);
-    expect(results[0]).toMatchObject({ changed: false, reason: "wrong_tenant" });
-    expect(mockResolveEventAction).not.toHaveBeenCalled();
-  });
-
-  it("approves nothing without an audit row or after the operator is revoked", async () => {
-    mockAudit.mockRejectedValueOnce(new Error("audit down"));
-    mockSuperAdmin.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "a1" },
-      { tenantId: "acme", eventId: "a2" },
-      { tenantId: "acme", eventId: "a3" },
-    ], operator);
-    expect(results.map((r) => r.reason)).toEqual(["audit_unavailable", "operator_access_changed", "operator_access_changed"]);
+  it("preserves tenant binding and active operator admission", async () => {
+    expect(await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "b1" }], operator)).toEqual([{ tenantId: "acme", eventId: "b1", changed: false, reason: "wrong_tenant" }]);
+    mockSuperAdmin.mockResolvedValue(false);
+    const result = await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }, { tenantId: "acme", eventId: "a2" }], operator);
+    expect(result.map(item => item.reason)).toEqual(["operator_access_changed", "operator_access_changed"]);
     expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 });

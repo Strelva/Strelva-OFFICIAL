@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 import { NextRequest } from "next/server";
-import { PayLinkConflictError, type PayLinkConfig } from "@/lib/pay-links";
+import { type PayLinkConfig } from "@/lib/pay-links";
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetCurrentUserEmail = vi.hoisted(() => vi.fn());
@@ -98,79 +98,20 @@ function payReq(slug: string, body: unknown) {
 }
 
 describe("POST /api/admin/pay-links", () => {
-  it("mints a fixed-amount build link and persists it", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-      }),
-    );
-
-    expect(res.status).toBe(200);
-    const payload = await res.json();
-    expect(payload).toMatchObject({ success: true, slug: "acme-coffee", payUrl: "/pay/acme-coffee" });
-    expect(mockSavePayLink).toHaveBeenCalledTimes(1);
-    const [saved] = mockSavePayLink.mock.calls[0] as [PayLinkConfig];
-    expect(saved).toMatchObject({
-      slug: "acme-coffee",
-      door: "build",
-      amountCents: 200_000,
-      createdBy: "jacob@strelva.com",
-    });
-  });
-
-  it("rejects a non-super-admin with 403", async () => {
+  it("requires platform support even for the compatibility refusal", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
     const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(adminReq({ slug: "x", clientName: "X", door: "build", tenantId: "x", amountCents: 200_000 }));
-    expect(res.status).toBe(403);
+    expect((await POST(adminReq({}))).status).toBe(403);
+  });
+  it.each(["0", "1"])("never sells client work under platform authority with billing flag %s", async flag => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", flag);
+    const { POST } = await import("@/app/api/admin/pay-links/route");
+    const res = await POST(adminReq({ slug: "acme", clientName: "Acme", amountCents: 200000, overwrite: true }));
+    expect(res.status).toBe(410);
+    expect(await res.json()).toMatchObject({ agencyPath: "/api/agency/payment-links" });
     expect(mockSavePayLink).not.toHaveBeenCalled();
-  });
-
-  it("rejects a malformed payload with 400", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(adminReq({ slug: "acme", clientName: "Acme", door: "donation", tenantId: "acme", amountCents: 200_000 }));
-    expect(res.status).toBe(400);
-    expect(mockSavePayLink).not.toHaveBeenCalled();
-  });
-
-  it("refuses to overwrite an existing slug with 409 unless overwrite is passed", async () => {
-    mockSavePayLink.mockRejectedValueOnce(new PayLinkConflictError("acme-coffee"));
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-      }),
-    );
-    expect(res.status).toBe(409);
-    // Default save call passes overwrite:false.
-    const [, opts] = mockSavePayLink.mock.calls[0] as [PayLinkConfig, { overwrite?: boolean }];
-    expect(opts).toEqual({ overwrite: false });
-  });
-
-  it("passes overwrite:true through to savePayLink when requested", async () => {
-    const { POST } = await import("@/app/api/admin/pay-links/route");
-    const res = await POST(
-      adminReq({
-        slug: "acme-coffee",
-        clientName: "Acme Coffee",
-        door: "build",
-        tenantId: "acme",
-        amountCents: 200_000,
-        overwrite: true,
-      }),
-    );
-    expect(res.status).toBe(200);
-    const [, opts] = mockSavePayLink.mock.calls[0] as [PayLinkConfig, { overwrite?: boolean }];
-    expect(opts).toEqual({ overwrite: true });
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 });
 
@@ -238,36 +179,12 @@ describe("GET /api/admin/pay-links", () => {
 });
 
 describe("DELETE /api/admin/pay-links", () => {
-  function delReq(slug?: string) {
-    const url = slug
-      ? `http://localhost/api/admin/pay-links?slug=${encodeURIComponent(slug)}`
-      : "http://localhost/api/admin/pay-links";
-    return new NextRequest(url, { method: "DELETE" });
-  }
-
-  it("rejects a non-super-admin with 403", async () => {
+  it("requires support and refuses changes to agency service invoices", async () => {
+    const { DELETE } = await import("@/app/api/admin/pay-links/route");
+    expect((await DELETE(new Request("http://localhost/api/admin/pay-links?slug=acme", { method: "DELETE" }))).status).toBe(410);
+    expect(mockDeletePayLink).not.toHaveBeenCalled(); expect(mockLogAuditEvent).not.toHaveBeenCalled();
     mockIsSuperAdmin.mockResolvedValue(false);
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq("acme-coffee"));
-    expect(res.status).toBe(403);
-    expect(mockDeletePayLink).not.toHaveBeenCalled();
-  });
-
-  it("400s without a slug", async () => {
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq());
-    expect(res.status).toBe(400);
-    expect(mockDeletePayLink).not.toHaveBeenCalled();
-  });
-
-  it("revokes a slug and audits it", async () => {
-    const { DELETE } = await import("@/app/api/admin/pay-links/route");
-    const res = await DELETE(delReq("acme-coffee"));
-    expect(res.status).toBe(200);
-    expect(mockDeletePayLink).toHaveBeenCalledWith("acme-coffee");
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
-    const body = await res.json();
-    expect(body).toMatchObject({ ok: true, removed: true });
+    expect((await DELETE(new Request("http://localhost/api/admin/pay-links", { method: "DELETE" }))).status).toBe(403);
   });
 });
 
@@ -405,4 +322,29 @@ describe("POST /api/pay/[slug]", () => {
     expect(res.status).toBe(429);
     expect(mockGetPayLink).not.toHaveBeenCalled();
   });
+});
+
+it("refuses expired checkout before parsing payment input or calling Stripe", async () => {
+  mockGetPayLink.mockResolvedValue({ slug: "expired", clientName: "Acme", door: "build", amountCents: 50000, createdAt: "2026-10-12", revokedAt: "2026-10-12", revokedBy: "agency-owner" });
+  const { POST } = await import("@/app/api/pay/[slug]/route");
+  const response = await POST(new NextRequest("https://app.example.test/api/pay/expired", { method: "POST", body: "invalid json" }), { params: Promise.resolve({ slug: "expired" }) });
+  expect(response.status).toBe(410); expect((await response.json()).error).toContain("expired"); expect(mockCheckoutCreate).not.toHaveBeenCalled();
+});
+it("keeps support GET read-only and operator-audited", async () => {
+  const { GET, POST, DELETE } = await import("@/app/api/admin/pay-links/route");
+  const { authorizeAdminOperatorRead } = await import("@/platform/operator-read-audit/admission");
+  expect((await GET()).status).toBe(200);
+  expect(mockListBuildPayments).toHaveBeenCalledWith(200, { readOnly: true, strict: true });
+  expect(authorizeAdminOperatorRead).toHaveBeenCalledWith("admin.pay-links.read");
+  expect((await POST(new Request("https://example.test"))).status).toBe(410);
+  expect((await DELETE(new Request("https://example.test"))).status).toBe(410);
+  expect(mockSavePayLink).not.toHaveBeenCalled(); expect(mockDeletePayLink).not.toHaveBeenCalled();
+});
+
+it("an existing unowned link still starts the identical one-off Stripe checkout", async () => {
+  mockGetPayLink.mockResolvedValue({ slug: "legacy", clientName: "Coffee", door: "build", tenantId: "coffee", amountCents: 50000, createdAt: "2026-07-01", createdBy: "old@example.test" });
+  const { POST } = await import("@/app/api/pay/[slug]/route");
+  const response = await POST(payReq("legacy", {}), { params: Promise.resolve({ slug: "legacy" }) });
+  expect(response.status).toBe(200);
+  expect(mockCheckoutCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: "payment", client_reference_id: "coffee", metadata: { paySlug: "legacy", door: "build", paymentPurpose: "build_payment", selectedAmountCents: "50000", tenantId: "coffee" } }));
 });

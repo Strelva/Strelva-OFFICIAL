@@ -23,6 +23,14 @@ function links() { setReleaseFlagsDb({ rpc: async () => ({ data: [{ tenantId: "f
 afterEach(() => { setReleaseFlagsDb(null); setBookingStoreDb(undefined); vi.restoreAllMocks(); });
 
 describe("owner booking evidence", () => {
+  it("shows the captured selected agency in history instead of its execution role", async () => {
+    links();
+    const evidence: OwnerBookingEvidence = { ...EVIDENCE, bookings: [{ ...EVIDENCE.bookings[0]!, history: [{ kind: "change", actor: "member", actorSnapshot: { kind: "agency", displayName: "Original Studio", agencyId: "cf000000-0000-4000-8000-000000000004" }, from: "requested", to: "confirmed", reason: "Agency approved", at: "2026-11-01T13:00:00Z" }] }] };
+    const result = await readWorkspaceBookings(ACTOR, WS, { view: "day", date: "2026-11-06" }, deps({ evidence: async () => evidence }));
+    const html = renderToStaticMarkup(createElement(WorkspaceBookings, { workspaceId: WS, view: "day", state: { kind: "ready", bookings: result } }));
+    expect(html).toContain("Original Studio · Runs on Strelva");
+    expect(html).not.toContain("Agency approved · Member");
+  });
   it("shows captured intake answers with current labels and retains removed question answers", async () => {
     links();
     const id = "cf000000-0000-4000-8000-000000000030";

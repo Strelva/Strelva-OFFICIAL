@@ -1,3 +1,4 @@
+import { readVisitorPresentationTime } from "@/products/scheduling/server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { InquiryBookingChoice } from "@/experience/bookings/InquiryBookingChoice";
@@ -12,5 +13,5 @@ export default async function InquiryBookingPage({ params, searchParams }: { par
   let choice: Awaited<ReturnType<typeof loadInquiryBookingChoice>> = null;
   let unavailable = false;
   try { choice = await loadInquiryBookingChoice(token); } catch { unavailable = true; }
-  return <InquiryBookingChoice businessName={choice?.businessName} choice={choice} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} />;
+  return <InquiryBookingChoice now={await readVisitorPresentationTime()} businessName={choice?.businessName} choice={choice} unavailable={unavailable} actionUrl={`/inquiry-booking/${encodeURIComponent(token)}/action`} error={typeof query.error === "string" ? query.error : undefined} />;
 }

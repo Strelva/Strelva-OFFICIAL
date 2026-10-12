@@ -1,9 +1,10 @@
 /* Ask Strelva follows the canon's calm conversation column. */
-.ask { display: flex; width: 100%; max-width: 776px; min-height: calc(100dvh - 112px); flex-direction: column; gap: 28px; margin-inline: auto; padding: 40px 48px 144px; color: var(--st-text); }
+.ask { box-sizing: border-box; display: flex; width: 100%; max-width: 776px; min-height: calc(100dvh - 112px); flex: 0 0 auto; flex-direction: column; gap: 28px; margin-inline: auto; padding: 40px 48px 0; color: var(--st-text); }
 .ask[data-compact] { max-width: none; min-height: 0; height: 100%; padding: 16px; gap: 16px; }
-.log { display: flex; flex: 1; min-height: 280px; flex-direction: column; gap: 28px; }
-.ask[data-compact] .log { max-height: 60vh; overflow-y: auto; }
-.message { display: flex; align-items: flex-start; gap: 14px; }
+.ask > * { flex-shrink: 0; }
+.log { display: flex; flex: 1 0 auto; min-height: 280px; flex-direction: column; gap: 28px; }
+.ask[data-compact] .log { flex: 1 1 auto; min-height: 0; max-height: 60vh; overflow-y: auto; }
+.message { display: flex; flex-shrink: 0; align-items: flex-start; gap: 14px; }
 .messageBody { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 12px; }
 .message[data-role="user"] { margin-left: auto; max-width: 92%; padding: 10px 16px; border-radius: var(--st-r-md); background: var(--st-inset); }
 .mark { width: 20px; height: 24px; flex: 0 0 20px; }
@@ -13,8 +14,6 @@
 .refusalActions { display: flex; flex-wrap: wrap; gap: 20px; }
 .note { margin: 0; color: var(--st-text-3); font-size: 12px; line-height: 20px; }
 .history { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
-.history summary { width: fit-content; cursor: pointer; padding-block: 6px; }
-.history summary:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 4px; }
-.history > :not(summary) { margin-top: 12px; }
+.history > div > * { margin-top: 12px; }
 .ask[data-compact] .history { display: none; }
-@media (max-width: 767px) { .ask { min-height: calc(100dvh - 100px); gap: 24px; padding: 24px 20px 160px; } .ask[data-compact] { padding: 16px; } .message { gap: 10px; } .message[data-role="user"] { max-width: 96%; } }
+@media (max-width: 767px) { .ask { min-height: calc(100dvh - 100px); gap: 24px; padding: 24px 20px 0; } .ask[data-compact] { padding: 16px; } .message { gap: 10px; } .message[data-role="user"] { max-width: 96%; } }

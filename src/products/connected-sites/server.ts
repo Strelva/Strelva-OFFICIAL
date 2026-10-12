@@ -21,7 +21,7 @@ import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   BEACON_EVENT_KINDS, PLATFORMS, SITE_KEY_PATTERN, VERIFICATION_META_NAME, beaconBatchSchema, businessJsonLd, contactFromFields,
-  defaultAllowedOrigins, normalizeOrigin, publicFactsFromConfirmedRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
+  defaultAllowedOrigins, mountedFormContactError, normalizeOrigin, publicFactsFromConfirmedRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
   type ConnectedInquiry, type ConnectedSite, type PublicContext, type ResolvedConnectedSite,
 } from "./contracts";
 import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
@@ -181,6 +181,10 @@ export async function submitPublicInquiry(publicKey: string, site: ResolvedConne
   if (input.capture === "site-form" && !site.captureForms) throw new ConnectedSiteInputError("This site does not send its own forms to Strelva.");
   const trap = input._hp || (input.capture === "strelva-form" ? input.fields.website || input.fields.company : "");
   if (trap && !connectedInquiryRecordsEnabled()) return { status: "ignored" };
+  if (!trap && input.capture === "strelva-form") {
+    const contactError = mountedFormContactError(input.fields);
+    if (contactError) throw new ConnectedSiteInputError(contactError);
+  }
   const contact = contactFromFields(input.fields);
   if (!trap && !contact.email && !contact.phone && !contact.message) throw new ConnectedSiteInputError("Add an email, phone number or message.");
   const capturedAt = new Date(deps.now ?? Date.now()).toISOString();

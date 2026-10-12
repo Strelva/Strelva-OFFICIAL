@@ -66,7 +66,7 @@ function project(raw: unknown, deps: InquiryBookingDependencies): InquiryBooking
   const token = signInquiryBookingOffer(offer.id, offer.expiresAt, deps.secret());
   const chooseUrl = `/inquiry-booking/${token}`;
   return { serviceId: offer.serviceId, services: offer.services, serviceName: offer.serviceName, timeZone: offer.timeZone, chooseUrl, expiresAt: offer.expiresAt,
-    slots: offer.slots.map((s, index) => ({ ...s, chooseUrl: `${chooseUrl}?slot=${index}`, label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: offer.timeZone, timeZoneName: "short" }).format(new Date(s.start)) })) };
+    slots: offer.slots.map((s, index) => ({ ...s, chooseUrl: `${chooseUrl}?slot=${index}`, label: new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: offer.timeZone, timeZoneName: "longGeneric" }).format(new Date(s.start)) })) };
 }
 function nextDate(date: string, days: number): string { const d = new Date(`${date}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + days); return d.toISOString().slice(0, 10); }
 /** Next actual bookable times from the record, held bookings and the existing calendar busy seam. */

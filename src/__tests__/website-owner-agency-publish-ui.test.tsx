@@ -69,7 +69,7 @@ describe("owner consent at website approval", () => {
     expect(container.textContent).toContain("No agency publication authority is shown here.");
     expect(container.textContent).toContain("Domain changes require separate permission.");
     expect(container.textContent).not.toContain("Strelva will handle");
-    expect(container.textContent).not.toContain("Publish approved website");
+    expect(container.textContent).not.toContain("Hold to make it live");
   });
   it("hides consent for a provider and disables it in read-only owner views", async () => {
     const record = ownerRecord(); record.agencyPublishPermission = null;

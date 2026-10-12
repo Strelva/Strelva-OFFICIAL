@@ -2,8 +2,9 @@
 
 import { ArrowRight, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { AgencyBrandEditor } from "./AgencyBrandEditor";
-import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { AgencyQualification } from "./AgencyQualification";
+import type { QualificationState } from "./qualification-model";
+import { StHead, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { TextInput } from "@/components/ui/TextInput";
 import type { AgencyEffect, AgencyOnboarding as Onboarding, AgencyOnboardingStep, AgencySummary } from "@/platform/workspaces/agency-onboarding";
 
@@ -154,16 +155,12 @@ const STEP_TITLES: Record<AgencyOnboardingStep["id"], string> = {
   profile: "Agency profile", team: "Invite your team", verification: "Verification", first_client: "Add your first client",
 };
 
-/** Reads existing effect verification. The criteria and self-service process are not yet decided. */
-export function AgencyVerification({ onboarding }: { onboarding: Pick<Onboarding, "agency" | "effects"> }) {
-  const complete = onboarding.effects.length === 4 && onboarding.effects.every(effect => effect.verified);
+/** Qualification is effect-scoped; evidence never grants client authority. */
+export function AgencyVerification({ onboarding, fictionalQualification }: { onboarding: Pick<Onboarding, "agency" | "effects">; fictionalQualification?: QualificationState }) {
   return <>
-    <StHead title={complete ? `${onboarding.agency.name} is verified for every effect` : `Publishing for clients needs verification`} meta={`Agency owners and admins can build, preview and rehearse in their agency. For a client, open Build for a client and choose a business where you also have current owner or admin authoring access. Assigned staff open Clients to review permitted Systems and prepare only drafts the client has separately authorized. Strelva records verification separately for publishing, Google, email and payments.`} beacon={complete ? "live" : "need"} />
-    <StSection title="What your agency can do">
-      <StRows>{onboarding.effects.map(effect => <StRow key={effect.effect} title={AGENCY_EFFECT_COPY[effect.effect].name} detail={AGENCY_EFFECT_COPY[effect.effect].unlocks} end={<StState kind={effect.verified ? "live" : "draft"}>{effect.verified ? "Verified" : "Not verified"}</StState>} />)}</StRows>
-      {!onboarding.effects.length ? <StEmpty>No verification records could be read. Outside changes stay locked.</StEmpty> : null}
-    </StSection>
-    <StNotice>Every agency goes through the same check, Strelva’s own included. There is nothing to submit here yet. Strelva records each effect when it is verified. Clients still approve what reaches the outside world.</StNotice>
+    <StHead title="Get verified for client work" meta="Choose an effect, submit evidence, then follow the operator’s review here." />
+    <StNotice>Verification unlocks an effect for your agency. Client access, owner decisions and release gates still apply. Every agency follows this path, including Strelva Agency.</StNotice>
+    <AgencyQualification workspaceId={onboarding.agency.id} fictionalQualification={fictionalQualification} />
   </>;
 }
 
@@ -173,7 +170,7 @@ function Checklist({ onboarding, workspaceHref, addClient }: { onboarding: Onboa
   return <>
     <StHead title={agency.name} meta={`${done} of ${onboarding.steps.length} setup steps done · ${onboarding.verifiedEffects} of ${onboarding.effects.length} effects verified`} />
     <StSection title="Agency profile">
-      {agency.role === "owner" ? <AgencyBrandEditor workspaceId={agency.id} /> : null}
+      {agency.role === "owner" ? <StTextButton href={`${workspaceHref}&agencyView=team#agency-brand`}>Edit agency brand</StTextButton> : null}
       <p className="text-sm text-gray-muted">{agency.name} is your agency’s name on Strelva. Your agency’s brand appears on owners’ emails, reports and workspace.</p>
     </StSection>
     <StSection title={STEP_TITLES.team}>

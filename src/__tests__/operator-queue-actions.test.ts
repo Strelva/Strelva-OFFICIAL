@@ -29,7 +29,7 @@ function item(over: Partial<QueueItem> = {}): QueueItem {
 }
 const close = { commandId: entryId, key: "draft_review:event:first", state: "done" as const, reason: "Approved and confirmed", minutes: { entryId, minutes: 6 } };
 beforeEach(() => {
-  vi.clearAllMocks(); vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "1"); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+  vi.resetAllMocks(); vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "1"); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   mocks.admin.mockResolvedValue(true); mocks.actor.mockResolvedValue(actor); mocks.read.mockResolvedValue({ items: [item()], parked: [] });
   mocks.mark.mockResolvedValue({}); mocks.effort.mockResolvedValue({});
   mocks.event.mockImplementation(async (id: string) => ({ id, tenantId: "alpha", status: "pending" })); mocks.resolve.mockResolvedValue({ changed: true });
@@ -39,75 +39,71 @@ afterEach(() => vi.unstubAllEnvs());
 describe("queue decisions and human minutes", () => {
   it("runs no draft action with the rollout flag off", async () => {
     vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0");
-    expect(await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).toMatchObject({ ok: false, results: [] });
+    expect(await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).toMatchObject({ ok: false, results: [] });
     expect(mocks.admin).not.toHaveBeenCalled(); expect(mocks.resolve).not.toHaveBeenCalled();
   });
   it("rechecks operator authority without trusting the admin layout", async () => {
     mocks.admin.mockResolvedValue(false);
-    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).ok).toBe(false);
+    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).ok).toBe(false);
     expect((await closeQueueItemAction(close)).ok).toBe(false);
     expect(mocks.actor).not.toHaveBeenCalled(); expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.mark).not.toHaveBeenCalled();
   });
   it("deduplicates and derives tenant/source identity, and reports partial bulk failure", async () => {
     const second = item({ key: "draft_review:event:second", sourceRef: "event:second" });
     mocks.read.mockResolvedValue({ items: [item(), second], parked: [] });
-    mocks.resolve.mockResolvedValueOnce({ changed: true }).mockResolvedValueOnce({ changed: false, reason: "provider rejected" });
-    expect(await resolveQueueDraftsAction({ keys: [close.key, close.key, second.key], action: "approve" })).toMatchObject({ ok: false,
-      results: [{ key: close.key, changed: true }, { key: second.key, changed: false, reason: "provider rejected" }] });
-    expect(mocks.resolve).toHaveBeenNthCalledWith(1, "alpha", "first", "approved", `operator:${actor.userId}`); expect(mocks.resolve).toHaveBeenCalledTimes(2);
+    mocks.escalate.mockResolvedValueOnce({ changed: true }).mockResolvedValueOnce({ changed: false, reason: "owner review unavailable" });
+    expect(await resolveQueueDraftsAction({ keys: [close.key, close.key, second.key], action: "escalate" })).toMatchObject({ ok: false,
+      results: [{ key: close.key, changed: true }, { key: second.key, changed: false, reason: "owner review unavailable" }] });
+    expect(mocks.escalate).toHaveBeenNthCalledWith(1, "alpha", "first"); expect(mocks.escalate).toHaveBeenCalledTimes(2);
   });
   it("refuses owner's calls, cross-tenant sources and changed owner-review drafts", async () => {
-    const run = () => resolveQueueDraftsAction({ keys: [close.key], action: "approve" });
+    const run = () => resolveQueueDraftsAction({ keys: [close.key], action: "escalate" });
     mocks.read.mockResolvedValue({ items: [item({ move: "owner" })], parked: [] }); expect((await run()).ok).toBe(false);
     mocks.read.mockResolvedValue({ items: [item()], parked: [] }); mocks.event.mockResolvedValue({ tenantId: "other" }); expect((await run()).ok).toBe(false);
     mocks.event.mockResolvedValue({ tenantId: "alpha", metadata: { reviewAudience: "owner" } }); expect((await run()).ok).toBe(false);
     expect(mocks.resolve).not.toHaveBeenCalled();
   });
-  it("approves as the signed-in operator and writes an audit row before and after the effect", async () => {
+  it("routes to owner review and writes an audit row before and after routing", async () => {
     mocks.event.mockResolvedValue({ id: "first", tenantId: "alpha", status: "pending", type: "review", metadata: { kind: "review_reply_draft" } });
-    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).ok).toBe(true);
-    expect(mocks.resolve).toHaveBeenCalledWith("alpha", "first", "approved", `operator:${actor.userId}`);
-    expect(mocks.resolve.mock.calls[0]?.[3]).not.toBe("user");
-    const operatorActor = { userId: actor.userId, email: actor.verifiedEmail, type: "super_admin", isSuperAdmin: true };
-    expect(mocks.audit).toHaveBeenNthCalledWith(1, { tenant: "alpha", actor: operatorActor, action: "queue.draft.approve", targetType: "event", targetId: "first",
-      metadata: { phase: "attempt", actor: `operator:${actor.userId}`, queueKey: close.key, eventType: "review", eventKind: "review_reply_draft" } });
-    expect(mocks.audit).toHaveBeenNthCalledWith(2, expect.objectContaining({ tenant: "alpha", actor: operatorActor, action: "queue.draft.approve", targetId: "first",
-      metadata: expect.objectContaining({ phase: "result", actor: `operator:${actor.userId}`, changed: true, reason: null }) }));
-    expect(mocks.audit.mock.invocationCallOrder[0]!).toBeLessThan(mocks.resolve.mock.invocationCallOrder[0]!);
-    expect(mocks.resolve.mock.invocationCallOrder[0]!).toBeLessThan(mocks.audit.mock.invocationCallOrder[1]!);
-  });
-  it("audits skips and escalations too", async () => {
-    await resolveQueueDraftsAction({ keys: [close.key], action: "skip" });
-    expect(mocks.resolve).toHaveBeenCalledWith("alpha", "first", "dismissed", `operator:${actor.userId}`);
-    await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" });
+    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).ok).toBe(true);
     expect(mocks.escalate).toHaveBeenCalledWith("alpha", "first");
-    expect(mocks.audit.mock.calls.map(([row]) => [row.action, row.metadata.phase])).toEqual([
-      ["queue.draft.skip", "attempt"], ["queue.draft.skip", "result"], ["queue.draft.escalate", "attempt"], ["queue.draft.escalate", "result"],
-    ]);
+    expect(mocks.resolve).not.toHaveBeenCalled();
+    const operatorActor = { userId: actor.userId, email: actor.verifiedEmail, type: "super_admin", isSuperAdmin: true };
+    expect(mocks.audit).toHaveBeenNthCalledWith(1, { tenant: "alpha", actor: operatorActor, action: "queue.draft.escalate", targetType: "event", targetId: "first",
+      metadata: { phase: "attempt", actor: `operator:${actor.userId}`, queueKey: close.key, eventType: "review", eventKind: "review_reply_draft" } });
+    expect(mocks.audit).toHaveBeenNthCalledWith(2, expect.objectContaining({ tenant: "alpha", actor: operatorActor, action: "queue.draft.escalate", targetId: "first",
+      metadata: expect.objectContaining({ phase: "result", actor: `operator:${actor.userId}`, changed: true, reason: null }) }));
+    expect(mocks.audit.mock.invocationCallOrder[0]!).toBeLessThan(mocks.escalate.mock.invocationCallOrder[0]!);
+    expect(mocks.escalate.mock.invocationCallOrder[0]!).toBeLessThan(mocks.audit.mock.invocationCallOrder[1]!);
+  });
+  it.each(["approve", "skip"] as const)("refuses operator %s without reading or mutating a draft", async action => {
+    expect((await resolveQueueDraftsAction({ keys: [close.key], action })).ok).toBe(false);
+    expect(mocks.read).not.toHaveBeenCalled(); expect(mocks.resolve).not.toHaveBeenCalled();
+    expect(mocks.escalate).not.toHaveBeenCalled(); expect(mocks.audit).not.toHaveBeenCalled();
   });
   it("does nothing when the audit row cannot be written", async () => {
     mocks.audit.mockRejectedValue(new Error("audit down"));
-    expect(await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).toMatchObject({ ok: false,
+    expect(await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).toMatchObject({ ok: false,
       results: [{ key: close.key, changed: false, reason: "The audit log is unavailable. Nothing was done." }] });
     expect(mocks.resolve).not.toHaveBeenCalled();
   });
   it("records an audit result when the effect throws", async () => {
-    mocks.resolve.mockRejectedValue(new Error("boom"));
-    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).ok).toBe(false);
-    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ action: "queue.draft.approve", metadata: expect.objectContaining({ phase: "result", changed: false, reason: "error" }) }));
+    mocks.escalate.mockRejectedValue(new Error("boom"));
+    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).ok).toBe(false);
+    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ action: "queue.draft.escalate", metadata: expect.objectContaining({ phase: "result", changed: false, reason: "error" }) }));
   });
   it("stops the batch when operator access is revoked mid-way", async () => {
     const second = item({ key: "draft_review:event:second", sourceRef: "event:second" });
     mocks.read.mockResolvedValue({ items: [item(), second], parked: [] });
     // Start of batch, before item one, then revoked before item two.
     mocks.admin.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
-    expect(await resolveQueueDraftsAction({ keys: [close.key, second.key], action: "approve" })).toMatchObject({ ok: false,
+    expect(await resolveQueueDraftsAction({ keys: [close.key, second.key], action: "escalate" })).toMatchObject({ ok: false,
       results: [{ key: close.key, changed: true }, { key: second.key, changed: false, reason: "Your operator access changed. Nothing more was done." }] });
-    expect(mocks.resolve).toHaveBeenCalledTimes(1);
+    expect(mocks.escalate).toHaveBeenCalledTimes(1);
   });
   it("refuses a session whose user id cannot be an operator actor", async () => {
     mocks.actor.mockResolvedValue({ userId: "not-a-uuid", verifiedEmail: "operator@example.test" });
-    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "approve" })).ok).toBe(false);
+    expect((await resolveQueueDraftsAction({ keys: [close.key], action: "escalate" })).ok).toBe(false);
     expect(mocks.resolve).not.toHaveBeenCalled(); expect(mocks.audit).not.toHaveBeenCalled();
   });
   it("closes with server-derived business/System attribution and logs minutes once", async () => {

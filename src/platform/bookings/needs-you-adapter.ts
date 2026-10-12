@@ -22,6 +22,8 @@ export const BOOKING_REQUEST_LIFECYCLE = "booking_request" as const;
 export interface BookingRequestPorts {
   requests(workspaceId: string): Promise<StoreBooking[]>;
   decide(workspaceId: string, bookingId: string, decision: "approve" | "not_yet", actor: "owner" | "member"): Promise<{ status: "decided" | "already_decided"; booking: StoreBooking }>;
+  /** Execute only the exact claimed agency decision; SQL owns its recorded identity. */
+  decideAgency?(workspaceId: string, bookingId: string, decision: "approve" | "not_yet", decisionId: string): Promise<{ status: "decided" | "already_decided"; booking: StoreBooking }>;
   /** Keeps the legacy booking row in step (rollback needs both stores). Best effort. */
   afterDecision?(booking: StoreBooking): Promise<void>;
   /** One booking of this business with why it last changed (null for another business's). */
@@ -102,7 +104,11 @@ export function bookingRequestAdapter(ports: BookingRequestPorts): SourceAdapter
       const effective = by.kind === "expiry" ? "not_yet" : decision;
       try {
         // Owner only at 1.0.0: the item is not decidable by admins (adminMayDecide false).
-        const result = await ports.decide(ctx.workspaceId, item.sourceId, effective, "owner");
+        const agencyDecision = item.decidedByKind === "agency_session";
+        if (agencyDecision && !ports.decideAgency) return { outcome: "failed", reason: "agency_booking_identity_unavailable" };
+        const result = agencyDecision
+          ? await ports.decideAgency!(ctx.workspaceId, item.sourceId, effective, item.id)
+          : await ports.decide(ctx.workspaceId, item.sourceId, effective, "owner");
         if (result.status === "already_decided") return { outcome: "done", reason: "already_resolved", receiptRef: `booking:${item.sourceId}` };
         await ports.afterDecision?.(result.booking).catch(() => undefined);
         return {

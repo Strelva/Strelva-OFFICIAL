@@ -60,10 +60,12 @@ function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, requ
   }
   const declaration = listing.revision.declaration, supported = listing.revision.definition.kind === "internal_app";
   return <article className="space-y-4 rounded-2xl border border-gray-border p-5">
-    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Source revision {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
-    <PackageDeclaration declaration={declaration} />
-
-    <p className="text-xs text-gray-muted">This exact revision passed automated checks and human review. Your release still requires a separate decision.</p>
+    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Release {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
+    <details>
+      <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Connections, permissions and review details</summary>
+      <PackageDeclaration declaration={declaration} />
+      <p className="mt-3 text-xs text-gray-muted">This exact release passed automated checks and human review. Your live release still requires a separate decision.</p>
+    </details>
     {!supported && listing.revision.definition.kind !== "bundle" ? <p className="text-sm text-gray-muted">An install adapter for this package is still being prepared.</p> : null}
     {listing.revision.definition.kind === "bundle" ? <BundlePackageInstall key={`${workspaceId}:${listing.revision.source.revisionId}`} workspaceId={workspaceId} listing={listing} canInstall={canInstall} request={request} /> : null}
     {supported && !receipt ? <><TextInput label="Name in your business" value={name} maxLength={160} disabled={!canInstall || busy || Boolean(pending.current)} onChange={event => setName(event.target.value)} /><Button type="button" size="sm" disabled={!canInstall || busy || !name.trim()} loading={busy} onClick={() => void install()}>{pending.current ? "Retry adding this draft" : "Add internal tool draft"}</Button></> : null}

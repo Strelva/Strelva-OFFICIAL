@@ -38,7 +38,7 @@ describe("publishing paper compositions preserve the commands", () => {
     const node = await mount(<ContentWorkspace workspaceId={workspaceId} systemId="exact-system" kind="newsletter" initial={data} request={request} />);
     expect(node.textContent).toContain("The reviewed words.");
     expect(node.textContent).toContain("no subscriber receives email");
-    await act(async () => button(node, "Hold to approve").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+    await act(async () => button(node, "Hold to make it live").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
     expect(request).toHaveBeenCalledWith("/api/workspace/publishing/content", expect.objectContaining({ method: "POST", body: JSON.stringify({ workspaceId, systemId: "exact-system", action: "approve", eventId: "exact-draft" }) }));
     expect(node.textContent).toContain("Issue approved. Check its receipt below for sending status.");
     expect(node.textContent).not.toContain("Delivered successfully");
@@ -47,7 +47,7 @@ describe("publishing paper compositions preserve the commands", () => {
   it("keeps the exact newsletter words on refusal and blocks another approval until reload", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ error: "Your account cannot approve." }, { status: 403 }));
     const node = await mount(<ContentWorkspace workspaceId={workspaceId} systemId="exact-system" kind="newsletter" initial={initial()} request={request} />);
-    await act(async () => button(node, "Hold to approve").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+    await act(async () => button(node, "Hold to make it live").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Your account cannot approve.");
     expect(node.textContent).toContain("The reviewed words.");
     expect(node.querySelector("button[aria-describedby]" )).toBeNull();
@@ -56,13 +56,13 @@ describe("publishing paper compositions preserve the commands", () => {
 
   it("read-only newsletter hides approval and compose, rather than inventing authority", () => {
     const html = renderToStaticMarkup(<ContentWorkspace workspaceId={workspaceId} systemId="s" kind="newsletter" initial={initial()} readOnly />);
-    expect(html).toContain("Publishing is read only"); expect(html).not.toContain("Hold to approve"); expect(html).not.toContain("Compose an issue");
+    expect(html).toContain("Publishing is read only"); expect(html).not.toContain("Hold to make it live"); expect(html).not.toContain("Compose an issue");
   });
 
-  it("not this month retains the existing not_yet command", async () => {
+  it("not yet retains the existing not_yet command", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json(initial()));
     const node = await mount(<ContentWorkspace workspaceId={workspaceId} systemId="s" kind="newsletter" initial={initial()} request={request} />);
-    await click(node, "Not this month");
+    await click(node, "Not yet");
     expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ workspaceId, systemId: "s", action: "not_yet", eventId: "exact-draft" });
   });
 
