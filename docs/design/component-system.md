@@ -2156,3 +2156,21 @@ also refuses write permissions for an ordinary owner until inspection ends.
 Local unit/DOM contracts cover separation and refusals. The audit brief forbids
 a dev server, browser and build in this lane; desktop/phone, real Auth and provider
 proof remain coordinator acceptance work.
+
+### October 12 · owner flow follow-up (owner2)
+
+[SystemPage](../../src/experience/systems/SystemPage.tsx) carries the exact
+plan's server-qualified execution availability through its existing pill:
+**Make it live** for live execution, **Rehearse this change** for an isolated
+rebuild, and disabled **Live unavailable** when no execution is released.
+Rehearsal says that live Systems stay unchanged; unreadable availability cannot
+become a live action. Permission, stale-plan and uncertain-outcome recovery
+remain separate holds.
+
+[WorkspaceBusinessSettings](../../src/experience/workspace/WorkspaceBusinessSettings.tsx)
+uses the server's schema-3 flag to label its export as **Export workspace
+archive** or **Export available workspace snapshot**. The saved-message booking
+entry composes existing native scheduling controls and explicitly distinguishes
+availability preparation from publishing a visitor page. Local component and
+contract tests cover the transitions; current desktop/mobile rendering remains
+unrun under the audit's no-server/no-Playwright stop point.

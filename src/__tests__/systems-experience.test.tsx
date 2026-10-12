@@ -33,7 +33,7 @@ const mooney = projection({
     entry(INTAKE_SYSTEM, "internal_app", "Mediation intake", { savedWorkId: "intake" }),
   ],
   connections: [{ id: "c1", sourceId: INBOX, kind: "appear", targetSystemId: SITE, targetLabel: "The Mooney Firm", state: "connected", purpose: "Inquiry form on the site" }],
-  possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
+  possibilities: [{ executionAvailability: "rehearsal", id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
 });
 
 describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
@@ -198,7 +198,7 @@ describe("Make real and the System page", () => {
     health: { state: "unknown", summary: "Nothing has checked this yet." },
     surface: { kind: "website", domain: "attymooney.com", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", previewLabel: "attymooney.com, as visitors see it now", manageHref: "/dashboard" },
     operatedBy: "Strelva Agency", connections: [], versions: [],
-    possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
+    possibilities: [{ executionAvailability: "rehearsal", id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
   };
   const render = (overrides: Partial<Parameters<typeof SystemPage>[0]> = {}) => renderToStaticMarkup(createElement(SystemPage, {
     system: site, systems: [site], workspaceId: BUSINESS, readOnly: false, canMakeReal: true, sources: [], systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined, ...overrides,
@@ -213,7 +213,7 @@ describe("Make real and the System page", () => {
     const html = render();
     expect(html).toContain("<h1");
     expect(html).toContain('title="attymooney.com as visitors see it"');
-    for (const heading of ["Possibilities", "Make it live", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
+    for (const heading of ["Possibilities", "Rehearse this change", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
     expect(html).toContain("Live");
     expect(html).toContain("Unknown. Nothing has checked this yet.");
     expect(html).not.toContain("Not checked here yet");
@@ -302,7 +302,7 @@ describe("Make real and the System page", () => {
   it("gives a non-owner a visible permission state on Make real", () => {
     const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
     expect(html).toContain("Only an owner of this business can make a possibility real.");
-    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Make it live/)).not.toBeNull();
+    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Rehearse this change/)).not.toBeNull();
   });
 
   it("explains a missing System without leaking another business", () => {

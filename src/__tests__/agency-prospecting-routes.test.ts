@@ -244,3 +244,16 @@ describe("combined public agency admission", () => {
     expect(mocks.rpc).not.toHaveBeenCalled(); expect(mocks.score).not.toHaveBeenCalled();
   });
 });
+
+
+describe("retained website check identity",()=>{
+ it("retains the requested name on a fresh website report",async()=>{
+  const response=await scan(request("/api/audit/scan",{url:"fixture.example",businessName:"Fictional Business"}));
+  expect(response.status).toBe(200);expect(await response.json()).toMatchObject({businessName:"Fictional Business"});expect(mocks.saveReport).toHaveBeenCalledWith(expect.objectContaining({businessName:"Fictional Business"}),expect.any(Object));
+ });
+ it("binds this check's name rather than reuse another business's URL-cache identity",async()=>{
+  mocks.redisGet.mockResolvedValue({url:"https://fixture.example/",scannedAt:"2026-10-07",overallScore:40,grade:"F",categories,businessName:"Other Business"});
+  const response=await scan(request("/api/audit/scan",{url:"fixture.example",businessName:"This Business"}));
+  expect(await response.json()).toMatchObject({businessName:"This Business"});expect(mocks.saveReport).toHaveBeenCalledWith(expect.objectContaining({businessName:"This Business"}),expect.any(Object));
+ });
+});

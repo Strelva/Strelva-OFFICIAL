@@ -1,5 +1,6 @@
 import { getAiVisibilityResult, parseAiVisibilityAssessmentPayload } from "@/products/ai-visibility/server";
 import { getPublicWebsiteAudit } from "@/products/website-audit/server";
+import { topFixes } from "@/lib/audit/impact";
 
 function checkAsk(summary: string, url: string | undefined, id: string): string {
   const source = `\n${url ? `Website: ${url}\n` : ""}Saved check: ${id}`;
@@ -16,9 +17,9 @@ export async function readSetupCheck(id: string): Promise<{ businessName: string
   if (/^audit_[a-f0-9]{32}$/.test(id)) {
     const result = await getPublicWebsiteAudit(id);
     if (!result) return null;
-    const checks = result.categories.flatMap(category => category.checks).filter(check => check.status !== "pass");
-    const first = checks.find(check => check.priority === "high") ?? checks[0];
-    return { businessName: "", request: checkAsk(`Start with this website fix: ${first ? `${first.name}. ${first.message}` : "Review the saved website check and choose the next improvement."}`, result.url, id) };
+    const first = topFixes(result.categories, 1)[0];
+    const businessName = result.businessName?.slice(0, 120) || "";
+    return { businessName, request: checkAsk(`Start with this website fix${businessName ? ` for ${businessName}` : ""}: ${first ? `${first.name}. ${first.message}` : "Review the saved website check and choose the next improvement."}`, result.url, id) };
   }
   return null;
 }

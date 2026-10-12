@@ -32,7 +32,7 @@ export interface AskTurnResult {
   systemId: string | null;
   conversationId: string | null;
   saved: boolean;
-  creationAction?: { kind: "website"; label: string; href: string };
+  creationAction?: { kind: "website" | "booking"; label: string; href: string };
 }
 
 export interface AskMessageView {
@@ -65,14 +65,15 @@ function text(value: unknown, max = 600): string {
 function readCreationAction(raw: unknown): AskTurnResult["creationAction"] {
   if (!raw || typeof raw !== "object") return undefined;
   const value = raw as Record<string, unknown>;
-  if (value.kind !== "website" || typeof value.label !== "string" || !value.label.trim() || value.label.length > 120 || typeof value.href !== "string") return undefined;
-  if (!value.href.startsWith("/workspace/business/new/website?") || value.href.includes("\\") || /[\s#]/.test(value.href)) return undefined;
+  if ((value.kind !== "website" && value.kind !== "booking") || typeof value.label !== "string" || !value.label.trim() || value.label.length > 120 || typeof value.href !== "string") return undefined;
+  const path = `/workspace/business/new/${value.kind}`;
+  if (!value.href.startsWith(`${path}?`) || value.href.includes("\\") || /[\s#]/.test(value.href)) return undefined;
   const url = new URL(value.href, "https://strelva.invalid");
-  if (url.pathname !== "/workspace/business/new/website") return undefined;
+  if (url.pathname !== path) return undefined;
   const keys = ["workspaceId", "conversationId", "messageId"];
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if ([...url.searchParams.keys()].some(key => !keys.includes(key)) || keys.some(key => url.searchParams.getAll(key).length !== 1 || !uuid.test(url.searchParams.get(key) ?? ""))) return undefined;
-  return { kind: "website", label: value.label.trim(), href: value.href };
+  return { kind: value.kind, label: value.label.trim(), href: value.href };
 }
 
 /** Reads the `ask` block of a streamed result, or a stored message's result. Anything malformed reads as no result. */

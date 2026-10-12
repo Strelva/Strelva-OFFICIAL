@@ -81,7 +81,7 @@ describe("connect.js", () => {
     const link = form.querySelector<HTMLAnchorElement>('[aria-label="Appointment times"] a')!;
     expect(link.textContent).toBe("Friday 9 AM");
     expect(link.href).toBe("https://app.strelva.test/inquiry-booking/encoded.signature?slot=0");
-    expect(form.textContent).toContain("business must confirm");
+    expect(form.textContent).toContain("check your email to confirm");
     page.fetch.mockImplementation(async () => ({ ok: true, status: 201, json: async () => ({ ok: true, bookingOffer: { serviceName: "Consultation", slots: [{ label: "Bad link", chooseUrl: "https://other.test/path" }] } }) }));
     form.querySelector<HTMLInputElement>('input[name="name"]')!.value = "Dana";
     form.querySelector<HTMLInputElement>('input[name="email"]')!.value = "dana@example.test";
@@ -355,5 +355,19 @@ describe("connect.js", () => {
     page.win.dispatchEvent(new page.win.Event("pagehide"));
     expect(beaconEvents(page)).toHaveLength(1);
     expect(page.fetch.mock.calls.filter((c: unknown[]) => String(c[0]).endsWith("/context"))).toHaveLength(1);
+  });
+});
+
+
+describe("connected booking offer receipt", () => {
+  it("explains time choice, email confirmation and business acceptance", async () => {
+    const page = load(`<div data-strelva-form></div>`); await tick();
+    page.fetch.mockResolvedValueOnce({ ok: true, status: 201, json: async () => ({ bookingOffer: { serviceName: "Consultation", slots: [{ label: "Tuesday at 10", chooseUrl: "/inquiry-booking/abc.def?slot=0" }] } }) });
+    const form = page.win.document.querySelector("form")!;
+    form.querySelector<HTMLInputElement>('[name="email"]')!.value = "visitor@example.test";
+    form.querySelector<HTMLTextAreaElement>('[name="message"]')!.value = "Consultation please";
+    form.requestSubmit(); await tick();
+    expect(page.win.document.body.textContent).toContain("Choose a time, then check your email to confirm. The business may then need to accept your request.");
+    expect(page.win.document.querySelector<HTMLAnchorElement>('a[href*="inquiry-booking"]')?.href).toContain("/inquiry-booking/abc.def?slot=0");
   });
 });

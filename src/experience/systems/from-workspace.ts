@@ -240,6 +240,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   // A Possibility is business-level: show it from every System it would change.
   for (const possibility of ready?.possibilities ?? []) {
     const view: SystemPossibility = {
+      executionAvailability: possibility.executionAvailability ?? "unavailable",
       id: possibility.id, title: possibility.title, summary: possibility.summary, status: possibility.status,
       affects: possibility.affects.filter(id => byId.has(id)),
       ...(possibility.introduces ? { introduces: possibility.introduces } : {}),

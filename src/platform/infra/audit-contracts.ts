@@ -34,6 +34,8 @@ export interface CategoryResult {
 export type LetterGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface AuditResult {
+  /** Name supplied for this retained check; URL cache entries are identity-neutral. */
+  businessName?: string;
   agency?: AgencyAttribution;
   url: string;
   scannedAt: string;

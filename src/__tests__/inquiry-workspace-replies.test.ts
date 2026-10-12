@@ -13,6 +13,16 @@ function deps(patch: Partial<WorkspaceReplyDependencies> = {}): WorkspaceReplyDe
 }
 afterEach(() => vi.unstubAllEnvs());
 describe("owner workspace replies", () => {
+  it("passes the SQL-authorized business scope for a native reply with no tenant", async () => {
+    const d = deps({ rpc: vi.fn(async name => name.startsWith("claim") ? { ...claim, tenantId: null } : { status: "accepted" as const }) });
+    expect((await replyFromWorkspace(actor, input, d)).status).toBe("delivered");
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: input.workspaceId, tenantId: undefined, authorship: "business", businessName: claim.businessName }));
+  });
+  it("never passes a scope to transport after SQL refuses the reply", async () => {
+    const d = deps({ rpc: vi.fn(async () => { throw new WorkspaceAccessError(); }) });
+    await expect(replyFromWorkspace(actor, input, d)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(d.send).not.toHaveBeenCalled();
+  });
   it("requires explicit flags; flags off do no storage or transport work", async () => {
     vi.stubEnv("DUAL_WRITE_PG", "1");
     expect(workspaceInquiryRepliesEnabled({})).toBe(false);

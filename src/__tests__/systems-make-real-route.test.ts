@@ -8,8 +8,10 @@ const deps = vi.hoisted(() => ({
   makeReal: vi.fn(),
   limited: vi.fn(),
   throughNeedsYou: vi.fn(),
+  funnel: vi.fn(async () => undefined),
 }));
 
+vi.mock("@/platform/infra/funnel", () => ({ recordFunnelEvent: deps.funnel }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
@@ -35,6 +37,7 @@ const RESULT = { isolated: true, status: "in_progress", headline: "In progress: 
 describe("POST /api/workspace/systems/make-real", () => {
   beforeEach(() => {
     deps.user = { id: "11111111-1111-4111-8111-111111111111", email: "Sheri@Example.test", email_confirmed_at: "2026-10-01" };
+    deps.funnel.mockClear();
     deps.workspaces.mockReset().mockResolvedValue([{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", access: "member", role: "owner" }]);
     deps.work.mockReset().mockResolvedValue([]);
     deps.exit.mockReset().mockResolvedValue({ state: null });
@@ -48,6 +51,11 @@ describe("POST /api/workspace/systems/make-real", () => {
 
   afterEach(() => { vi.unstubAllEnvs(); setReleaseFlagsDb(null); });
 
+  it("does not record first live when a plan is not ready to start", async () => {
+    path.makeRealPath.mockResolvedValue({ kind: "live", result: { live: true, status: "not_ready", headline: "Not ready", activationId: null } });
+    expect((await call()).status).toBe(200);
+    expect(deps.funnel).not.toHaveBeenCalled();
+  });
   it("answers 503 for a business an operator set off, and runs where its workspace row is on under env workspace", async () => {
     setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: { systems: { state: "off", revision: 1, changedAt: "2026-10-06T00:00:00Z" } }, testers: [] }, error: null }) });
     expect((await call()).status).toBe(503);
@@ -130,6 +138,15 @@ describe("POST /api/workspace/systems/make-real", () => {
       deps.throughNeedsYou.mockReset().mockResolvedValue({ status: "done", result: RESULT, reason: null, receiptRef: null });
     });
 
+    it("runs an explicit rehearsal only in the isolated runner, without deciding Needs you", async () => {
+      const response = await call({ workspaceId: BUSINESS, possibilityId: "website-rebuild:w", executionMode: "rehearsal" });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ result: RESULT });
+      expect(deps.makeReal).toHaveBeenCalledTimes(1);
+      expect(deps.throughNeedsYou).not.toHaveBeenCalled();
+      expect(deps.funnel).not.toHaveBeenCalled();
+      expect(path.makeRealPath).toHaveBeenCalledWith(expect.anything(), BUSINESS, "website-rebuild:w", expect.anything(), "rehearsal");
+    });
     it("decides the plan's Needs you item and returns Make real's result", async () => {
       const response = await call();
       expect(response.status).toBe(200);

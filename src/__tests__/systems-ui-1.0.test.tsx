@@ -56,7 +56,7 @@ describe("Systems 1.0 presentation boundaries", () => {
     const request = vi.fn<typeof fetch>();
     const system: SystemView = { id: "internal", name: "Team intake", detail: "", kind: "app", lifecycle: "draft", health: { state: "unknown", summary: "No checks yet." },
       surface: { kind: "work", workId: "intake", productId: "unknown" }, connections: [], versions: [], possibilities: [
-        { id: "old", title: "Shorter intake", summary: "Remove a question", status: "ready", staleReason: "The intake changed.", affects: ["internal"], openHref: "/workspace?work=intake" },
+        { executionAvailability: "live", id: "old", title: "Shorter intake", summary: "Remove a question", status: "ready", staleReason: "The intake changed.", affects: ["internal"], openHref: "/workspace?work=intake" },
       ] };
     const node = await render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(SystemPage, {
       system, systems: [system], workspaceId: "business", readOnly: false, canMakeReal: true, sources: [], systemHref: id => `/systems/${id}`, onHome: () => {}, onAsk: () => {},
