@@ -2232,3 +2232,26 @@ pills and text buttons retain their existing focus and phone contracts.
 SQL rechecks the proposing owner's current verified identity and owner
 membership at acceptance. Local DOM/API contracts are separate from disposable
 Postgres, authenticated browser and production proof.
+### October 12 · operator evidence and release receipts (ops2)
+
+[ClientsCrm](../../src/app/admin/clients/ClientsCrm.tsx) carries unavailable reads
+and missing/stale site scans beside the business identity, on mobile as well as
+desktop. An incomplete verdict is **Unverified**, enters Needs attention and
+never enters Live. Retained grades carry the scan time and historical label.
+Known subscription risk remains visible above uncertainty.
+
+[UptimeBoard](../../src/app/admin/uptime/UptimeBoard.tsx) distinguishes no readable
+snapshot from a successful empty check. Stored timestamps use the domain-monitor
+heartbeat allowance; stale or invalid times label responses as last checks and
+withhold current live styling. Freshness is reevaluated every minute. Run again
+is explicit and failed refreshes preserve prior evidence and its qualification.
+Certificate lifetime, form delivery and thirty-day uptime remain unmeasured.
+
+[ReleaseFlagsPanel](../../src/app/admin/clients/[id]/ReleaseFlagsPanel.tsx) keeps
+the accepted mutation receipt separate from current flag/history readback. An
+accepted change with unavailable readback clears the submitted reason, preserves
+the previous view and holds further writes until **Refresh flags** succeeds.
+Unknown transport results also require refresh; ordinary conflict/validation
+refusals preserve correction. The recovery performs GET only. Existing St*
+primitives and styling remain in use. Unit evidence is local; rendered desktop/
+mobile verification is deferred under the audit’s explicit browser stop point.

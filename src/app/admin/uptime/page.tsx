@@ -1,21 +1,15 @@
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
-import { scanPortfolioDomains } from "@/lib/domain-monitor";
 import { UptimeBoard } from "./UptimeBoard";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Admin uptime board — the operator's at-a-glance view of every client domain's
- * health (up / down / parked / expiring). Reads the latest stored scan (written
- * by the domain-monitor cron every 30 min); falls back to a live scan the first
- * time, before the cron has run or when Redis is unavailable (dev).
- */
+/** Stored monitor evidence is qualified in the board; Run again explicitly refreshes it. */
 export default async function UptimePage() {
   await authorizeAdminOperatorRead("admin.uptime.read");
-  const stored = await getDomainHealth();
-  const results = stored?.results ?? (await scanPortfolioDomains());
-  const scannedAt = stored?.scannedAt ?? new Date().toISOString();
+  const stored = await getDomainHealth().catch(() => null);
+  const results = stored?.results ?? [];
+  const scannedAt = stored?.scannedAt ?? null;
 
-  return <UptimeBoard initialResults={results} initialScannedAt={scannedAt} />;
+  return <UptimeBoard initialResults={results} initialScannedAt={scannedAt} initialAvailable={Boolean(stored)} />;
 }

@@ -29,7 +29,7 @@ describe("operator site checks", () => {
     act(() => root.render(createElement(UptimeBoard, { initialResults: operatorCheckFixture(), initialScannedAt: OPERATOR_TIME, request })));
     await click("Run again");
     expect(request).toHaveBeenCalledWith("/api/admin/domain-monitor/scan", { method: "POST" });
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Previous checks are still shown");
+    expect(container.textContent).toContain("Previous checks are still shown");
     expect(container.querySelectorAll("tbody tr")).toHaveLength(5);
   });
   it("shows empty without claiming sites are healthy", () => {
@@ -72,5 +72,92 @@ describe("release switch changes", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(reason.value).toBe("All owner pages checked");
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("Release revision changed");
+  });
+});
+
+describe("monitor evidence qualification", () => {
+  it("distinguishes unreadable evidence from a successful empty scan", () => {
+    act(() => root.render(createElement(UptimeBoard, { initialResults: [], initialScannedAt: null, initialAvailable: false })));
+    expect(container.textContent).toContain("Checks unavailable");
+    expect(container.textContent).not.toContain("0 failing");
+    expect(container.textContent).not.toContain("No active client sites");
+  });
+  it("labels old Up evidence as a last check and keeps it after a failed refresh", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("Scan unavailable"));
+    act(() => root.render(createElement(UptimeBoard, { initialResults: operatorCheckFixture(), initialScannedAt: "2020-01-01T00:00:00Z", request })));
+    expect(container.textContent).toContain("Checks are stale");
+    expect(container.textContent).toContain("Last check: Up");
+    await click("Run again");
+    expect(container.textContent).toContain("Checks are stale");
+    expect(container.textContent).toContain("Previous checks are still shown");
+  });
+  it.each([null, "invalid", "2999-01-01T00:00:00Z"])("qualifies an unverified monitor time: %s", initialScannedAt => {
+    act(() => root.render(createElement(UptimeBoard, { initialResults: operatorCheckFixture(), initialScannedAt })));
+    expect(container.textContent).toContain("Check time is unverified");
+    expect(container.textContent).toContain("Last check: Up");
+  });
+  it("recovers unreadable evidence only after a successful explicit scan", async () => {
+    const request = vi.fn().mockResolvedValue(Response.json({ results: operatorCheckFixture(), scannedAt: new Date().toISOString() }));
+    act(() => root.render(createElement(UptimeBoard, { initialResults: [], initialScannedAt: null, initialAvailable: false, request })));
+    await click("Run again");
+    expect(container.textContent).not.toContain("Checks unavailable");
+    expect(container.textContent).not.toContain("Last check: Up");
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(5);
+  });
+});
+
+describe("accepted release change with unavailable readback", () => {
+  async function mount(request: typeof fetch) {
+    const { ReleaseFlagsPanel } = await import("@/app/admin/clients/[id]/ReleaseFlagsPanel");
+    const { operatorReleaseFixture } = await import("@/experience/workspace/preview/operator-fixture");
+    act(() => root.render(createElement(ReleaseFlagsPanel, { tenantId: "mooney", initialState: operatorReleaseFixture(), request })));
+  }
+  async function reason(value: string) {
+    const input = container.querySelector('input[id="release-reason-mooney"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    return input;
+  }
+  const toggle = () => container.querySelector('button[role="switch"][aria-label="Owner sign-in"]') as HTMLButtonElement;
+  it("retains acceptance, withholds another POST, and refreshes through GET", async () => {
+    const { operatorReleaseFixture } = await import("@/experience/workspace/preview/operator-fixture");
+    const latest = operatorReleaseFixture();
+    if (latest.linked) latest.flags = latest.flags.map(flag => flag.flag === "owner_entry" ? { ...flag, row: "off", effective: "off", revision: flag.revision + 1 } : flag);
+    const request = vi.fn().mockResolvedValueOnce(Response.json({ mutation: { status: "accepted" }, readback: { status: "unavailable" }, notice: "The change was accepted. Current flags and history couldn't be read." }))
+      .mockResolvedValueOnce(Response.json(latest));
+    await mount(request);
+    const input = await reason("Release reviewed");
+    await act(async () => toggle().click());
+    expect(container.textContent).toContain("The change was accepted");
+    expect(input.value).toBe("");
+    expect(toggle().getAttribute("aria-checked")).toBe("true");
+    await reason("Another change");
+    expect(toggle().disabled).toBe(true);
+    await act(async () => toggle().click());
+    expect(request).toHaveBeenCalledTimes(1);
+    await click("Refresh flags");
+    expect(request.mock.calls[1]).toEqual(["/api/admin/tenants/mooney/release-flags", { cache: "no-store" }]);
+    expect(toggle().getAttribute("aria-checked")).toBe("false");
+    expect(toggle().disabled).toBe(false);
+    expect(container.textContent).toContain("Current flags and history were refreshed");
+  });
+  it("retains acceptance across failed refresh instead of repeating the mutation", async () => {
+    const request = vi.fn().mockResolvedValueOnce(Response.json({ mutation: { status: "accepted" }, readback: { status: "unavailable" }, notice: "The change was accepted." }))
+      .mockResolvedValueOnce(Response.json({ error: "Current flags unavailable" }, { status: 503 }));
+    await mount(request); await reason("Release reviewed");
+    await act(async () => toggle().click());
+    await click("Refresh flags");
+    expect(container.textContent).toContain("The change was accepted");
+    expect(container.textContent).toContain("Current flags unavailable");
+    expect(request.mock.calls.filter(([, init]) => init.method === "POST")).toHaveLength(1);
+    expect(container.textContent).not.toContain("Nothing was changed");
+  });
+  it("holds an unknown transport outcome until a current read succeeds", async () => {
+    const request = vi.fn().mockRejectedValue(new Error("Connection interrupted"));
+    await mount(request); await reason("Release reviewed");
+    await act(async () => toggle().click());
+    expect(toggle().disabled).toBe(true);
+    expect(container.textContent).toContain("Refresh current flags");
+    expect(container.textContent).not.toContain("change was accepted");
+    expect(container.textContent).not.toContain("Nothing was changed");
   });
 });
