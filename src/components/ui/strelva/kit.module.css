@@ -428,6 +428,14 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 /* Touch has no keyboard shortcut to show. */
 @media (pointer: coarse) { .holdKeys { display: none; } }
 
+/* Click and assistive activation use an explicit second confirmation. */
+.holdConfirmation { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.holdConfirmation > span { color: var(--st-text); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) {
+  .holdFill { transform: none; transition: none; opacity: 0; }
+  .hold[data-holding="true"] .holdFill { opacity: 1; }
+}
+
 /* ---------- Toast ---------- */
 .toast {
   display: inline-flex;

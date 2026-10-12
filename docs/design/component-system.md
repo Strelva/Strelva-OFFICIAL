@@ -92,6 +92,14 @@ hint, so publication controls retain one stable accessible name. External
 on disabled access or focus loss; its shortcut cancels an in-flight hold and
 ignores key repeat. Bounded DOM tests cover these acceptance/focus contracts.
 
+October 12 trust-ui adds click and assistive activation to `StHold`: a plain
+click opens an explicit confirmation with Cancel, using the current acceptance
+callback and the same disabled gate. Completed holds consume their follow-up
+click once. Reduced motion keeps the 800ms hold and shows a static active fill.
+Local DOM checks cover click, cancellation, revoked access, completed holds and
+keyboard acceptance; rendered desktop/mobile and assistive-device proof remains
+pending the post-merge pass (the audit brief prohibits local app/Playwright runs).
+
 The L2 website lane recomposes the website System iframe, request/rebuild review,
 retained draft history, connected-site verification and visitor-form controls on
 the kit. `PhotoLibrary` retains Image, PhotoDetail and its existing media API;

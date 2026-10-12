@@ -97,6 +97,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const [handoffToken, setHandoffToken] = useState<string | null>(null);
   const [handoffLoading, setHandoffLoading] = useState(false);
   const [signInRequired, setSignInRequired] = useState(false);
+  const [accessFailure, setAccessFailure] = useState<403 | 404 | null>(null);
   const [publicSaveResultId, setPublicSaveResultId] = useState<string | null>(null);
   const [publicSaveSaving, setPublicSaveSaving] = useState(false);
   const [publicSaveError, setPublicSaveError] = useState("");
@@ -135,6 +136,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     activeWorkspaceRef.current = null;
     setLoading(true);
     setSignInRequired(false);
+    setAccessFailure(null);
     if (!preserveNotice) setNotice(null);
     if (!preserveSelection) setSelectedWorkId(null);
     try {
@@ -158,6 +160,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       const supplementalFailure = preserveSelection && !accessRefused;
       if (!supplementalFailure) setSnapshot(null);
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
+      if (cause instanceof WorkspaceRequestError && (cause.status === 403 || cause.status === 404)) setAccessFailure(cause.status);
       const message = cause instanceof Error ? cause.message : "We couldn’t load this workspace.";
       setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message, ...(supplementalFailure && selectedId ? { refreshWorkspaceId: selectedId } : {}) });
     } finally {
@@ -490,14 +493,18 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   if (!snapshot) {
     return (
       <WorkspaceFrame>
-        <StrelvaShell signedIn={false} signInHref={signInHref} title="Your Strelva">
+        <StrelvaShell signedIn={Boolean(accessFailure)} signInHref={signInHref} title="Your Strelva">
         <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center text-center">
           {signInRequired ? <LockKeyhole className="h-7 w-7 text-accent-text" strokeWidth={1.5} /> : <CircleAlert className="h-7 w-7 text-critical" strokeWidth={1.5} />}
-          <h1 className="mt-5 font-display text-[28px] font-medium text-warm-black">{signInRequired ? "Sign in to open your private work." : "Your workspace didn’t open."}</h1>
+          <h1 className="mt-5 font-display text-[28px] font-medium text-warm-black">{signInRequired ? "Sign in to open your private work." : accessFailure === 403 ? "This account can’t open this workspace." : accessFailure === 404 ? "This workspace is no longer available." : "Your workspace didn’t open."}</h1>
           <p role="alert" className="mt-2 text-[14px] leading-relaxed text-gray-muted">{notice?.message}</p>
           {signInRequired ? (
             <Link href={signInHref} className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85">Sign in <ArrowRight className="h-4 w-4" /></Link>
-          ) : <Button className="mt-6" onClick={() => void loadWorkspace()}>Try again</Button>}
+          ) : accessFailure ? <>
+            <p className="mt-4 text-[14px] leading-relaxed text-gray-muted">{accessFailure === 403 ? "Ask a workspace owner to invite the email address you use for this account, or choose a workspace you can access." : "The link may be out of date. Choose another workspace or ask its owner for a current link."}</p>
+            <Link href={`${appBase}/workspace/account`} className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent">Choose another workspace <ArrowRight className="h-4 w-4" /></Link>
+            <Link href={`${appBase}/workspace/account`} className="mt-4 text-[14px] underline">Check your account and email</Link>
+          </> : <Button className="mt-6" onClick={() => void loadWorkspace()}>Try again</Button>}
         </div>
         </StrelvaShell>
       </WorkspaceFrame>

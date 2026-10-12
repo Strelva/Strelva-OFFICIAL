@@ -251,17 +251,24 @@ const HOLD_MS = strelvaDuration.hold * 1000;
 /**
  * For consequential yeses (publish, confirm a booking, leave). Press and hold
  * with pointer, Space or Enter; Command/Ctrl + Enter while focused accepts at
- * once. Reduced motion keeps the hold, without the moving fill.
+ * once. A click opens a separate confirmation using the same callback and
+ * disabled gate. Reduced motion keeps the duration with a static indicator.
  */
 export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
   const [progress, setProgress] = useState(0);
   const [holding, setHolding] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
   const done = useRef(false);
   const accept = useRef(onAccept);
   const blocked = useRef(disabled);
   const hintId = useId();
+  const button = useRef<HTMLButtonElement>(null);
+  const cancelled = useRef(false);
+  useLayoutEffect(() => {
+    if (!confirming && cancelled.current) { cancelled.current = false; button.current?.focus(); }
+  }, [confirming]);
 
   const stop = useCallback(() => {
     if (frame.current) cancelAnimationFrame(frame.current);
@@ -272,7 +279,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
   }, []);
 
   const begin = useCallback(() => {
-    if (disabled || frame.current) return;
+    if (disabled || confirming || frame.current) return;
     done.current = false;
     start.current = performance.now();
     setHolding(true);
@@ -284,14 +291,36 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
       frame.current = requestAnimationFrame(tick);
     };
     frame.current = requestAnimationFrame(tick);
-  }, [disabled, stop]);
+  }, [disabled, confirming, stop]);
 
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
   useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
+  useEffect(() => {
+    if (disabled) {
+      if (frame.current) cancelAnimationFrame(frame.current);
+      frame.current = null;
+      start.current = null;
+    }
+  }, [disabled]);
+  if (disabled && (confirming || holding || progress !== 0)) {
+    setConfirming(false); setHolding(false); setProgress(0);
+  }
+  const action = label.replace(/^Hold to /i, "");
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
+  if (confirming && !disabled) return <span className={styles.holdConfirmation} role="group" aria-label={`Confirm: ${ariaLabel ?? action}`}>
+    <span role="status">Confirm {action.charAt(0).toLowerCase() + action.slice(1)}?</span>
+    <StPill autoFocus aria-label={`Confirm: ${ariaLabel ?? action}`} onClick={() => {
+      if (blocked.current || done.current) return;
+      done.current = true;
+      setConfirming(false);
+      accept.current();
+    }}>{action}</StPill>
+    <StTextButton onClick={() => { done.current = false; cancelled.current = true; setConfirming(false); }}>Cancel</StTextButton>
+  </span>;
+
+  return <button ref={button} type="button" className={styles.hold} data-block={block || undefined} data-holding={holding || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
     style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
-    onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
+    onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
     onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
     onBlur={stop}
     onKeyDown={event => {
@@ -299,10 +328,16 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
       if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); begin(); }
     }}
     onKeyUp={event => { if (event.key === " " || event.key === "Enter") stop(); }}
-    onClick={event => event.preventDefault()}>
+    onClick={event => {
+      event.preventDefault();
+      if (blocked.current) return;
+      if (done.current) { done.current = false; return; }
+      stop();
+      setConfirming(true);
+    }}>
     <span className={styles.holdFill} aria-hidden="true" />
     <span className={styles.holdLabel}>{label}</span>
-    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
+    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold, or click to review a confirmation. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
   </button>;
 }
 

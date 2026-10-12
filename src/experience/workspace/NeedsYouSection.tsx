@@ -140,10 +140,11 @@ interface HandledProps {
 export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback, title = STRELVA_HANDLED_LABEL, headingId = "home-handled" }: HandledProps) {
   if (state.status === "disabled") return null;
   const canUndo = state.status === "ready" && state.role !== "member";
+  const undoUnconfirmed = Object.values(notices).some(notice => notice.text.includes("Outcome not confirmed"));
   return <StSection title={title} meta="Last 7 days" id={headingId}>
     {state.status === "loading" ? <div className={styles.loading}><p role="status">Checking recent changes…</p><StSkeleton width="72%" /></div>
-      : state.status === "error" ? <StNotice tone="critical">This week’s changes could not be loaded.</StNotice>
-      : !state.handledAvailable ? <StNotice tone="critical">This week’s changes could not be loaded. Nothing about it changed.</StNotice>
+      : state.status === "error" ? <StNotice tone="critical">{undoUnconfirmed ? "Outcome not confirmed. This week’s changes could not be loaded. Check again before trying Undo." : "This week’s changes could not be loaded."}</StNotice>
+      : !state.handledAvailable ? <StNotice tone="critical">{undoUnconfirmed ? "Outcome not confirmed. This week’s changes could not be loaded. Check again before trying Undo." : "This week’s changes could not be loaded. Check again before trying Undo."}</StNotice>
       : state.handled.length ? <StRows label="Recorded changes in the last 7 days">{state.handled.map(receipt => {
         const notice = notices[receipt.id];
         const actor = actorPresentation(receipt.actor);
