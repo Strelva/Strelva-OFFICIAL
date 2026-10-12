@@ -111,12 +111,12 @@ describe("queue source actions", () => {
     expect(mocks.refresh).toHaveBeenCalledWith("alpha", "alpha.test"); mocks.refresh.mockResolvedValue({ ok: false }); expect((await run("check_domain")).ok).toBe(false);
     mocks.queue.mockResolvedValue({ items: [item("domain_alert")] }); expect((await run("check_domain")).ok).toBe(true); expect(mocks.domains).toHaveBeenCalledOnce();
   });
-  it("reads scope before deciding and requires the reviewed revision and same business/provider", async () => {
-    mocks.queue.mockResolvedValue({ items: [item("service_request", requestId)] }); expect((await readQueueServiceRequestAction("queue:item")).ok).toBe(true);
-    expect((await run("accept_request", 2)).ok).toBe(false); expect(mocks.execute).not.toHaveBeenCalled();
-    expect((await run("accept_request", 3)).ok).toBe(true); expect(mocks.execute).toHaveBeenCalledWith(actor, expect.objectContaining({ action: "respond", requestId, expectedRevision: 3, decision: "accepted", idempotencyKey: commandId }));
-    expect((await run("decline_request", 3)).ok).toBe(true);
-    mocks.request.mockResolvedValue({ businessId: "other", provider: { kind: "strelva" } }); expect((await run("accept_request", 3)).ok).toBe(false);
+  it("keeps support inspection but refuses agency acceptance and decline under operator authority", async () => {
+    mocks.queue.mockResolvedValue({ items: [item("service_request", requestId)] });
+    expect((await readQueueServiceRequestAction("queue:item")).ok).toBe(true);
+    expect((await run("accept_request", 3)).ok).toBe(false);
+    expect((await run("decline_request", 3)).ok).toBe(false);
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("advances triage/quote through the governed dispatcher with permission and subscription gates", async () => {
     mocks.queue.mockResolvedValue({ items: [item("change_request", "event:change")] }); expect((await run("triage")).ok).toBe(true);

@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "b2640000-0000-4000-8000-000000000010", tenantIds: [], ownerAuthorship: "agency", businessName: "The Mooney Firm", replyTo: "owner@mooney.example", timeZone: "America/New_York" }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

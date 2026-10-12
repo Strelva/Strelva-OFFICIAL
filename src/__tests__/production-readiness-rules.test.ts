@@ -379,7 +379,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
     expect(tenantSettings).toContain("readJsonObject(req)");
     expect(tenantSettings).toContain("Invalid request body");
-    for (const source of [adminDrafts, rewardsAdjust]) {
+    expect(adminDrafts).toContain("client_content_decision_required");
+    for (const source of [rewardsAdjust]) {
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }

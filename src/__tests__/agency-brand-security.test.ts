@@ -1,3 +1,4 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: [], ownerAuthorship: "agency", businessName: "Fixture business", replyTo: "owner@example.test", timeZone: "America/New_York" }) }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), tenant: vi.fn(), send: vi.fn(), from: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mock.rpc, from: mock.from }) }));

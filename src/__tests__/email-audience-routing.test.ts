@@ -1,3 +1,5 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: ["gldf", "fixture"], ownerAuthorship: "platform", businessName: "Good Life Daily Foods", replyTo: "owner@gldf.example", timeZone: "America/New_York" }) }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const send = vi.hoisted(() => vi.fn());
@@ -29,6 +31,7 @@ afterEach(() => vi.unstubAllEnvs());
 async function deliver(audience: EmailAudience) {
   return sendEmail({
     audience,
+    ...(audience === "customer" ? { tenantId: "fixture" } : {}),
     authorship: "platform",
     to: "person@example.com",
     subject: "Subject",

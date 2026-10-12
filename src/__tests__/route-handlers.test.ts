@@ -803,20 +803,14 @@ describe("Admin and settings write route handlers", () => {
     expect(mockUpdateTenant).not.toHaveBeenCalled();
   });
 
-  it("POST /api/admin/drafts rejects malformed JSON with a client error", async () => {
+  it("POST /api/admin/drafts retires all writes, including malformed bodies", async () => {
     const { POST } = await import("@/app/api/admin/drafts/route");
 
-    const request = new Request("http://localhost/api/admin/drafts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(400);
+    const response = await POST();
+    expect(response.status).toBe(410);
 
     const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
+    expect(data.code).toBe("client_content_decision_required");
   });
 
   it("POST /api/rewards/members/:email/adjust rejects malformed JSON with a client error", async () => {

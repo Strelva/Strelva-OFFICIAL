@@ -7,7 +7,7 @@ function fixture() {
   let available = true;
   const store = { list: vi.fn(async () => [batch.issueId]), claim: vi.fn(async () => { if (!available) return null; available = false; return batch; }), begin: vi.fn(async () => ["a@example.test"]), finish: vi.fn(async () => {}) } satisfies NewsletterSenderStore;
   const send = vi.fn(async (_input: SendBatchInput) => ({ status: "accepted" as const, count: 1, providerMessageIds: ["provider-1"], acceptedAt: "2026-10-07T00:00:00Z" }));
-  return { store, send, enabled: () => true, released: async () => true, suppression: async () => null };
+  return { store, send, enabled: () => true, released: async () => true, suppression: async () => null, identity: async () => ({ workspaceId: batch.workspaceId, tenantIds: [batch.tenantId], ownerAuthorship: "platform" as const, businessName: "Lakeview Yoga", replyTo: "hello@lakeview.example", timeZone: "America/New_York" }) };
 }
 beforeEach(() => { vi.stubEnv("APPROVE_LINK_SECRET", "local-test-secret"); });
 afterEach(() => vi.unstubAllEnvs());
@@ -87,4 +87,16 @@ it("rejects failed or malformed storage results before sending", async () => {
   const store = newsletterSenderStore({ rpc: async () => ({ data: null, error: { message: "failed" } }) });
   await expect(store.list()).rejects.toThrow("could not be confirmed");
   await expect(newsletterSenderStore({ rpc: async () => ({ data: {}, error: null }) }).claim(batch.issueId)).rejects.toThrow();
+});
+
+it.each([null, { workspaceId: batch.workspaceId, tenantIds: [batch.tenantId], ownerAuthorship: "platform" as const, businessName: "Lakeview Yoga", replyTo: null, timeZone: null }])("holds missing business reply identity before crossing the sending marker", async identity => {
+  const f = fixture(); await sendApprovedNewsletterIssues({ ...f, identity: async () => identity });
+  expect(f.store.begin).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
+  expect(f.store.finish).toHaveBeenCalledWith(batch, { status: "gated", detail: "not sent: business reply identity unavailable" });
+});
+it("uses business identity in the envelope and newsletter content", async () => {
+  const f = fixture(); await sendApprovedNewsletterIssues(f);
+  const input = f.send.mock.calls[0]![0];
+  expect(input).toMatchObject({ fromName: "Lakeview Yoga", replyTo: "hello@lakeview.example", workspaceId: batch.workspaceId });
+  expect(input.messages[0]!.html).toContain("Lakeview Yoga"); expect(input.messages[0]!.text).toContain("Lakeview Yoga");
 });

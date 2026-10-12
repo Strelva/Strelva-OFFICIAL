@@ -89,10 +89,10 @@ describe("getClientEmailOverride / setClientEmailOverride", () => {
     expect(await getClientEmailOverride(TENANT)).toBe("off");
   });
 
-  it("defaults to 'inherit' without Redis (can't fabricate an 'on')", async () => {
+  it("defaults to 'off' without Redis (can't lose an exclusion)", async () => {
     mockGetRedis.mockReturnValue(null);
     const { getClientEmailOverride } = await import("@/platform/infra/email/client-override");
-    expect(await getClientEmailOverride(TENANT)).toBe("inherit");
+    expect(await getClientEmailOverride(TENANT)).toBe("off");
   });
 });
 

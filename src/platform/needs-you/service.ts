@@ -275,11 +275,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const open = { label: "Open", url: `${deps.appOrigin.replace(/\/+$/, "")}${row.openHref ?? `/workspace?workspaceId=${encodeURIComponent(row.workspaceId)}`}` };
     if (row.signInRequired || adapterFor(row.sourceLifecycle)?.ownerLinkApprovalRequiresSignIn) return { title: row.title, detail: row.detail ?? undefined, note: "This one needs you signed in. Open it to decide.", open };
     const claims = (action: WorkspaceApproveLinkClaims["action"]) => ({ workspaceId: row.workspaceId, itemId: row.id, action, recipient, revision: row.revisionHash });
+    const approveLabel = row.sourceLifecycle === "booking_request" ? "Confirm booking" : "Make it live";
     return {
       title: row.title,
       detail: row.detail ?? undefined,
-      note: `Approve: ${actorCopy(row.approveEffect, row.actor)} Not yet: ${actorCopy(row.notYetEffect, row.actor)}`,
-      approve: { label: "Approve", url: buildWorkspaceApproveUrl(deps.appOrigin, claims("approve")) },
+      note: `${approveLabel}: ${actorCopy(row.approveEffect, row.actor)} Not yet: ${actorCopy(row.notYetEffect, row.actor)}`,
+      approve: { label: approveLabel, url: buildWorkspaceApproveUrl(deps.appOrigin, claims("approve")) },
       notYet: { label: "Not yet", url: buildWorkspaceApproveUrl(deps.appOrigin, claims("not-yet")) },
       open,
     };
@@ -293,7 +294,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       heading,
       paragraphs: [kind === "reminder"
         ? `These are still open for ${business}. Nothing happens until you decide, and each one lapses after 14 days with nothing changed.`
-        : `Only you can make ${count === 1 ? "this call" : "these calls"} for ${business}. Tap Approve or Not yet; you'll confirm on the next page.`],
+        : `Only you can make ${count === 1 ? "this call" : "these calls"} for ${business}. Open the decision or choose Not yet; you'll confirm on the next page.`],
       decisions: rows.map(row => links(row, recipient)),
       footerNote: `for ${business}`,
       manageUrl: `${deps.appOrigin.replace(/\/+$/, "")}/workspace?workspaceId=${encodeURIComponent(rows[0]!.workspaceId)}`,

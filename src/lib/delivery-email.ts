@@ -149,6 +149,8 @@ export async function sendBookingConfirmation(params: {
 
     const sent = await sendEmail({
       audience: "customer",
+      tenantId: params.tenantId,
+      fromAddress: "bookings@mail.strelva.com",
       authorship: "business",
       businessName: business,
       fromName,
@@ -740,7 +742,7 @@ function buildReviewNeedsReplyEmailOptions(params: {
   };
 
   if (params.approveUrl && params.draftedReply) {
-    opts.button = { label: "Approve & post this reply", url: params.approveUrl };
+    opts.button = { label: "Make it live", url: params.approveUrl };
     if (params.notYetUrl) opts.secondaryButton = { label: "Not yet", url: params.notYetUrl };
   } else {
     opts.button = { label: "Reply in your workspace", url: params.reviewsUrl };

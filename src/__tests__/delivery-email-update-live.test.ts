@@ -1,3 +1,5 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/platform/agency-brand/server", () => ({
   resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
@@ -75,13 +77,11 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
   });
 });
 
-describe("sendUpdateLiveEmail callers honor the per-client email setting", () => {
-  it("the operator draft approval passes the tenant, so reb:client-email:{tenant} applies", async () => {
-    const { readFileSync } = await import("node:fs");
-    const { join } = await import("node:path");
+describe("retired operator content approval", () => {
+  it("contains no content write or owner-live notification after an operator decision", async () => {
+    const { readFileSync } = await import("node:fs"); const { join } = await import("node:path");
     const source = readFileSync(join(process.cwd(), "src/app/api/admin/drafts/route.ts"), "utf8");
-    const calls = source.split("sendUpdateLiveEmail(").slice(1);
-    expect(calls.length).toBeGreaterThan(0);
-    for (const call of calls) expect(call.slice(0, call.indexOf("});"))).toMatch(/\btenantId: tenant\b/);
+    expect(source).toContain("client_content_decision_required");
+    expect(source).not.toContain("setContent"); expect(source).not.toContain("sendUpdateLiveEmail");
   });
 });

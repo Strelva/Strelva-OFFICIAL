@@ -9,7 +9,7 @@ beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("EMAIL_SENDING_ENABLED", "true
 afterEach(() => vi.unstubAllEnvs());
 it("keeps an unreadable tenant override gated even with global sending on", async () => {
   redis.mockReturnValue({ get: async () => { throw new Error("outage"); } });
-  expect(await getClientEmailOverride("fixture")).toBe("inherit");
+  expect(await getClientEmailOverride("fixture")).toBe("off");
   expect(await getClientEmailOverride("fixture", { failClosed: true })).toBe("off");
   expect(await sendBatchWithReceipt({ audience: "customer", tenantId: "fixture", requireClientGate: true, fromName: "Newsletter", fromAddress: "newsletter@mail.strelva.com", messages: [{ to: "a@example.test", subject: "s", html: "h", text: "t" }] })).toMatchObject({ status: "suppressed", reason: "not sent: gated" });
   expect(provider).not.toHaveBeenCalled();

@@ -118,7 +118,7 @@ You can READ the whole business. Pick the right tool:
 - list_drafts — AI drafts waiting on review.
 - refresh_portfolio — rebuild the cached data when it looks stale (low-risk; runs without confirmation).
 
-For consequential actions — minting or revoking a pay link, assigning a user, sending an invite, approving/rejecting a draft, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_pay_link, propose_revoke_pay_link, propose_assign_user, propose_send_invite, propose_approve_draft, propose_reject_draft, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
+For consequential actions — minting or revoking a pay link, assigning a user, sending an invite, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_pay_link, propose_revoke_pay_link, propose_assign_user, propose_send_invite, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Client content authoring and approval belongs to the business owner or its authorized agency through ordinary permissions. Platform support cannot propose approval or rejection of client drafts. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
 
 Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Dollar amounts: pay links are quoted in whole dollars.`;
 
@@ -328,36 +328,6 @@ export async function POST(req: Request) {
           action: "assign_user",
           summary: `Assign ${p.email} to ${p.tenant} as ${p.role ?? "owner"}`,
           params: { email: p.email, tenant: p.tenant, role: p.role ?? "owner" },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
-    propose_approve_draft: tool({
-      description:
-        "Propose approving a pending AI draft for a tenant section (publishes it live). Returns a confirmation card; does NOT approve.",
-      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "approve_draft",
-          summary: `Approve & publish the ${p.section} draft for ${p.tenant}`,
-          params: { tenant: p.tenant, section: p.section, action: "approve" },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
-    propose_reject_draft: tool({
-      description:
-        "Propose rejecting a pending AI draft for a tenant section (discards it). Returns a confirmation card; does NOT reject.",
-      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "reject_draft",
-          summary: `Reject the ${p.section} draft for ${p.tenant}`,
-          params: { tenant: p.tenant, section: p.section, action: "reject" },
         };
         proposals.push(proposal);
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };

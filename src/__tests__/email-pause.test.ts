@@ -1,3 +1,5 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/platform/agency-brand/server", () => ({

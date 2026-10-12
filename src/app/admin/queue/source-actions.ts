@@ -38,6 +38,7 @@ export async function readQueueServiceRequestAction(key: string): Promise<{ ok: 
  * Checks are read-only toward providers; retries copy data, never notify anyone. */
 export async function runQueueSourceAction(input: { key: string; action: QueueSourceAction; commandId: string; expectedRevision?: number }): Promise<QueueActionResult> {
   if (!operatorQueueReleaseEnabled()) return { ok: false, message: "Queue actions are not enabled." };
+  if (input.action === "accept_request" || input.action === "decline_request") return { ok: false, message: "The serving agency handles this request through its ordinary client permissions. Platform support cannot accept or decline client work." };
   try {
     const { actor, item } = await source(input.key);
     const tenantId = item.business.kind === "strelva" ? null : item.business.tenantId;
@@ -107,13 +108,6 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       const { POST } = await import("@/app/api/admin/domain-monitor/scan/route");
       if (!(await POST()).ok) throw new Error("The domain scan could not be confirmed.");
       message = "Portfolio domain checks saved. No DNS changes made.";
-    } else if ((input.action === "accept_request" || input.action === "decline_request") && item.kind === "service_request" && item.business.kind === "workspace") {
-      const service = new ServiceRequestService(PostgresServiceRequestStore);
-      const request = await service.read(actor, item.sourceRef);
-      if (request.businessId !== item.business.workspaceId || request.provider.kind !== "strelva" || request.status !== "requested" || request.providerAcceptance.status !== "pending" || request.revision !== input.expectedRevision) throw new Error("The request changed. Review it again before deciding.");
-      await service.execute(actor, { action: "respond", requestId: request.id, expectedRevision: input.expectedRevision,
-        decision: input.action === "accept_request" ? "accepted" : "declined", idempotencyKey: input.commandId });
-      message = input.action === "accept_request" ? "Strelva accepted the request. Scope and deadline still need agreement." : "Strelva declined the request.";
     } else if ((input.action === "triage" || input.action === "quote") && item.kind === "change_request" && tenantId && item.sourceRef.startsWith("event:")) {
       const { getEventRaw } = await import("@/lib/events");
       const { decideTenantEventAsOperator, verifiedOperator } = await import("@/lib/operator-decisions");
