@@ -22,6 +22,7 @@ import {
   setWorkspaceReleaseFlag,
   setWorkspaceReleaseTester,
   type ReleaseFlagChange,
+  type WorkspaceReleaseFlags,
 } from "@/platform/release-flags/store";
 import { pagesBlockingOwnerEntry, type DashboardPageUse } from "./dispositions";
 import type { OperatorAuditContext } from "@/platform/workspaces/operator-approvals";
@@ -105,14 +106,13 @@ export type ReleaseFlagCommand =
   | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number }
   | { kind: "tester"; email: string; present: boolean; reason: string };
 
-export async function applyTenantReleaseCommand(actor: WorkspaceActor, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand, auditContext: OperatorAuditContext = { source: "web" }): Promise<void> {
+export async function applyTenantReleaseCommand(actor: WorkspaceActor, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand, auditContext: OperatorAuditContext = { source: "web" }): Promise<WorkspaceReleaseFlags> {
   const operatorEmail = actor.verifiedEmail;
   const link = await readTenantWorkspaceLink(operatorEmail, tenantId);
   if (!link.link) throw new ReleaseFlagValidationError("workspace_release_unlinked", "This client isn't converted to a business workspace yet.");
   const workspaceId = link.link.workspaceId;
   if (command.kind === "tester") {
-    await setWorkspaceReleaseTester({ operatorEmail, workspaceId, testerEmail: command.email, present: command.present, reason: command.reason });
-    return;
+    return setWorkspaceReleaseTester({ operatorEmail, workspaceId, testerEmail: command.email, present: command.present, reason: command.reason });
   }
   const reason = command.reason.trim();
   if (isMakeRealLiveFlag(command.flag) && (command.state === "on" || command.state === "operators")) {
@@ -132,5 +132,5 @@ export async function applyTenantReleaseCommand(actor: WorkspaceActor, tenantId:
       }
     }
   }
-  await setWorkspaceReleaseFlag({ actor, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision, auditContext });
+  return setWorkspaceReleaseFlag({ actor, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision, auditContext });
 }

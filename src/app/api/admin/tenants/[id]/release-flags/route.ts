@@ -1,7 +1,7 @@
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getActorContext, getAuthenticatedOperatorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
+import { getAuthenticatedOperatorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getProducts } from "@/lib/products";
@@ -52,7 +52,7 @@ function failure(error: unknown) {
   if (error instanceof ReleaseFlagValidationError) return NextResponse.json({ error: error.message, code: error.code }, { status: 400, headers: noStore });
   if (error instanceof z.ZodError) return NextResponse.json({ error: "Check the request. A reason of 3 to 480 characters is required." }, { status: 400, headers: noStore });
   console.error("[release-flags] operator route failed", error);
-  return NextResponse.json({ error: "The release flags couldn't be read or changed. Nothing was changed." }, { status: 503, headers: noStore });
+  return NextResponse.json({ error: "The release flag result couldn't be confirmed. Refresh the current flags before attempting another change." }, { status: 503, headers: noStore });
 }
 
 async function operator() {
@@ -78,21 +78,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const operatorContext = await getAuthenticatedOperatorContext();
   if (!operatorContext) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: noStore });
   const email = operatorContext.email;
-  const { id } = await params;
-  const tenantFacts = await facts(id);
-  if (!tenantFacts) return NextResponse.json({ error: "Tenant not found" }, { status: 404, headers: noStore });
   try {
+    const { id } = await params;
+    const tenantFacts = await facts(id);
+    if (!tenantFacts) return NextResponse.json({ error: "Tenant not found" }, { status: 404, headers: noStore });
     const body = command.parse(await request.json().catch(() => null));
-    await applyTenantReleaseCommand(operatorContext.actor, id, tenantFacts, body);
+    const accepted = await applyTenantReleaseCommand(operatorContext.actor, id, tenantFacts, body);
+    // This receipt comes from the accepted RPC, independent of subsequent reads.
+    const mutation = { status: "accepted" as const, workspaceId: accepted.workspaceId, command: body };
     await logAuditEvent({
       tenant: id,
       action: "tenant.release-flag",
       targetType: "tenant",
       targetId: id,
-      actor: await getActorContext(id),
+      actor: { userId: operatorContext.actor.userId, email, type: "super_admin", isSuperAdmin: true },
       metadata: body.kind === "flag" ? { flag: body.flag, state: body.state, reason: body.reason } : { tester: body.email, present: body.present, reason: body.reason },
     }).catch(() => {});
-    return NextResponse.json(await readTenantReleaseState(email, id, tenantFacts), { headers: noStore });
+    try {
+      const state = await readTenantReleaseState(email, id, tenantFacts);
+      return NextResponse.json({ ...state, mutation, readback: { status: "available" } }, { headers: noStore });
+    } catch {
+      return NextResponse.json({ mutation, readback: { status: "unavailable" }, notice: "The change was accepted. Current flags and history couldn't be read. Refresh the flags before making another change." }, { headers: noStore });
+    }
   } catch (error) {
     return failure(error);
   }

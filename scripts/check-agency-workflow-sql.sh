@@ -13,6 +13,8 @@ owner_runtime_successor="$repo_root/supabase/migrations/20261018131000_owner_dec
 owner_link_forward="$repo_root/supabase/migrations/20261015120000_owner_link_provider_identity.sql"
 owner_link_rollback="$repo_root/supabase/migrations/rollback-20261015120000_owner_link_provider_identity.sql"
 actor_boundary_forward="$repo_root/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql"
+owner_claim_successor="$repo_root/supabase/migrations/20261023142000_two_doors_bring_in_an_agency.sql"
+owner_boundary_rehearsed=false
 owner_runtime_installed=false
 if [[ -f "$owner_runtime_successor" ]]; then
   successor_digest="$(shasum -a 256 "$owner_runtime_successor")"
@@ -29,6 +31,41 @@ psql_args=(--host="$cluster_socket" --port="$cluster_port" --username="$(id -un)
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 migration_count=0
 owner_link_fingerprint_query="select target,md5(pg_get_functiondef(target::regprocedure)) from unnest(array['public.strelva_owner_decision_link_session(uuid,uuid,text,text,text)','public.assert_owner_decision_link(uuid,uuid,uuid,text,text)','public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)']) target order by target"
+owner_boundary_query="select md5(pg_get_functiondef('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)'::regprocedure))"
+# Rehearse at the wrapper's installation boundary, before later successors.
+# Dropped/recreated two-doors functions receive new OIDs; compare their complete
+# definitions/owners/ACLs here, then retain the exact final OID catalog below.
+owner_boundary_catalog_query="select p.oid::regprocedure::text,p.proowner,coalesce(p.proacl,acldefault('f',p.proowner))::text,md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f' order by p.oid::regprocedure::text"
+rehearse_owner_operator_boundary() {
+  psql "${psql_args[@]}" -Atc "$owner_boundary_catalog_query" >"$cluster_root/owner-boundary-current-before.catalog"
+  if [[ -f "$owner_claim_successor" ]]; then
+    # The predecessor must still refuse while the two-doors wrapper is current.
+    if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql" >"$cluster_root/owner-boundary-refusal.log" 2>&1; then
+      printf 'Owner operator boundary rollback overwrote its two-doors successor.\n' >&2; exit 1
+    fi
+    if ! grep -Fq 'rollback_wrong_order_or_function_drift: owner_decision_operator_refusal' "$cluster_root/owner-boundary-refusal.log"; then
+      cat "$cluster_root/owner-boundary-refusal.log" >&2; exit 1
+    fi
+    psql "${psql_args[@]}" -Atc "$owner_boundary_catalog_query" >"$cluster_root/owner-boundary-refused.catalog"
+    cmp "$cluster_root/owner-boundary-current-before.catalog" "$cluster_root/owner-boundary-refused.catalog"
+    # Keep the successor's populated grant/decision refusal intact. No CASCADE,
+    # row deletion, or bypass: its inverse must succeed before the older one.
+    psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261023142000_two_doors_bring_in_an_agency.sql" >/dev/null
+  fi
+  psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-after.hash"
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql" >/dev/null
+  psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-rollback.hash"
+  cmp "$cluster_root/owner-boundary-before.hash" "$cluster_root/owner-boundary-rollback.hash"
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql" >/dev/null
+  psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-reapplied.hash"
+  cmp "$cluster_root/owner-boundary-after.hash" "$cluster_root/owner-boundary-reapplied.hash"
+  psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
+  if [[ -f "$owner_claim_successor" ]]; then
+    psql "${psql_args[@]}" --file="$owner_claim_successor" >/dev/null
+  fi
+  psql "${psql_args[@]}" -Atc "$owner_boundary_catalog_query" >"$cluster_root/owner-boundary-current-reapplied.catalog"
+  cmp "$cluster_root/owner-boundary-current-before.catalog" "$cluster_root/owner-boundary-current-reapplied.catalog"
+}
 while IFS= read -r migration; do
   [[ "$(basename "$migration")" == 2026102412* ]] && continue
   if [[ "$(basename "$migration")" == "20261015120000_owner_link_provider_identity.sql" ]]; then
@@ -44,6 +81,10 @@ while IFS= read -r migration; do
   fi
   migration_count=$((migration_count + 1))
   if [[ "$migration" == "$owner_runtime_successor" ]]; then owner_runtime_installed=true; fi
+  if [[ "$migration" == "$owner_claim_successor" ]]; then
+    rehearse_owner_operator_boundary
+    owner_boundary_rehearsed=true
+  fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 function_catalog_query="select p.oid::regprocedure::text,p.oid,p.proowner,coalesce(p.proacl,acldefault('f',p.proowner))::text,md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f' order by p.oid::regprocedure::text"
 psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/final-functions-before.catalog"
@@ -116,14 +157,8 @@ if [[ -f "$actor_boundary_forward" ]]; then
   [[ "$boundary_holds" == t ]] || { printf 'Actor-RPC service boundary missing or drifted.\n' >&2; exit 1; }
   psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql" >/dev/null
 fi
-owner_boundary_query="select md5(pg_get_functiondef('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)'::regprocedure))"
-psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-after.hash"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql" >/dev/null
-psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-rollback.hash"
-cmp "$cluster_root/owner-boundary-before.hash" "$cluster_root/owner-boundary-rollback.hash"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql" >/dev/null
-psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-reapplied.hash"
-cmp "$cluster_root/owner-boundary-after.hash" "$cluster_root/owner-boundary-reapplied.hash"
+# A checkout without the two-doors wrapper still proves the historical inverse.
+if [[ "$owner_boundary_rehearsed" != true ]]; then rehearse_owner_operator_boundary; fi
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/final-functions-after.catalog"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql" >/dev/null
