@@ -73,7 +73,7 @@ export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, tran
     </StSection>
     <StSection title="Your listing" meta="Businesses bring in agencies from one list, in name order. Strelva Agency is listed the same way.">
       <StInput label="What your agency does" hint="One line, shown next to your name." maxLength={280} value={summary} onChange={event => setSummary(event.target.value)} />
-      <StToggle label={`List ${agencyName}`} checked={listed} disabled={busy === "listing" || (!listed && !summary.trim())} reason={!summary.trim() ? "Add one line first." : undefined} onChange={next => void saveListing(next)} />
+      <div className="flex items-center gap-3"><StToggle label={`List ${agencyName}`} checked={listed} disabled={busy === "listing" || (!listed && !summary.trim())} reason={!summary.trim() ? "Add one line first." : undefined} onChange={next => void saveListing(next)} /><span className="text-sm">{listed ? `${agencyName} is listed` : `List ${agencyName}`}</span></div>
     </StSection>
     {message ? <p role="status">{message}</p> : null}
   </>;

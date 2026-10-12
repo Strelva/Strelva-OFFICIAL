@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { StEmpty, StNotice, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { StEmpty, StLabel, StNotice, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import {
   AGENCY_LEVEL_HELP, AGENCY_LEVEL_LABELS, AGENCY_SCOPE_LABELS, AGENCY_SCOPES, agencyConsentText,
   type AgencyLevel, type AgencyScope,
@@ -70,6 +70,7 @@ export function BringInAgency({ workspaceId, canManage, transport = fetch }: { w
 
   return <StSection title="Want it done for you? Bring in an agency." meta="Choose an agency and what it can do. It accepts before anything changes. You keep payment, your data and the choice to end their access.">
     {state.loading ? <><p role="status">Loading agencies…</p><StSkeleton label="Loading agencies" /></> : state.error ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Try again</StTextButton>}>{state.error}</StNotice> : <>
+      {state.agencies.length ? <StLabel>Your agencies</StLabel> : null}
       {state.agencies.length ? <StRows label="Your agencies">{state.agencies.map(agency => {
         const waiting = agency.scopes.some(item => item.status === "proposed");
         return <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.scopes.length ? scopeSummary(agency.scopes) : "Works on this business"}
@@ -77,19 +78,24 @@ export function BringInAgency({ workspaceId, canManage, transport = fetch }: { w
           end={canManage ? <StTextButton disabled={busy} onClick={() => void send("DELETE", { agencyWorkspaceId: agency.agencyWorkspaceId }, `${agency.name} no longer has access. Your data stays here.`)}>End access</StTextButton> : undefined} />;
       })}</StRows> : null}
       {!canManage ? <p>Only an owner can bring in or end an agency.</p> : choosing ? <StSurface label={`Bring in ${choosing.name}`}>
-        <p><strong>{choosing.name}</strong> · {choosing.summary}</p>
-        {AGENCY_SCOPES.map(scope => <div key={scope}>
-          <p>{AGENCY_SCOPE_LABELS[scope]}</p>
+        <p className="mb-4"><strong>{choosing.name}</strong> · {choosing.summary}</p>
+        <div className="grid gap-3">{AGENCY_SCOPES.map(scope => <div key={scope} className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-medium">{AGENCY_SCOPE_LABELS[scope]}</p>
           <StSegmented label={`${AGENCY_SCOPE_LABELS[scope]} for ${choosing.name}`} value={levels[scope]} options={LEVEL_OPTIONS}
             disabledValues={takenFullControl.has(scope) ? ["full_control"] : []} disabledReason="Another agency already has full control here."
             onChange={value => setLevels(current => ({ ...current, [scope]: value }))} />
-        </div>)}
-        {selected.map(item => item.level).includes("full_control") ? <p>{AGENCY_LEVEL_HELP.full_control}</p> : selected.length ? <p>{AGENCY_LEVEL_HELP.prepare}</p> : null}
-        {selected.length ? <p>{agencyConsentText(choosing.name, selected)}</p> : null}
-        <StPill disabled={busy || !selected.length} busy={busy} onClick={() => void send("POST", { agencyWorkspaceId: choosing.agencyWorkspaceId, scopes: selected }, `Sent to ${choosing.name}. Nothing changes until they accept.`)}>Send to {choosing.name}</StPill>
-        <StTextButton disabled={busy} onClick={() => setChoosing(null)}>Cancel</StTextButton>
-      </StSurface> : available.length ? <StRows label="Agencies you can bring in">{available.map(agency => <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.summary}
-          onClick={() => { setChoosing(agency); setMessage(""); }} value="Choose" />)}</StRows>
+        </div>)}</div>
+        <div className="mt-5 grid gap-2 text-sm text-gray-muted">
+          {selected.some(item => item.level === "prepare") ? <p><strong className="text-warm-black">{AGENCY_LEVEL_LABELS.prepare}:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
+          {selected.some(item => item.level === "full_control") ? <p><strong className="text-warm-black">{AGENCY_LEVEL_LABELS.full_control}:</strong> {AGENCY_LEVEL_HELP.full_control}</p> : null}
+          {selected.length ? <p>{agencyConsentText(choosing.name, selected)}</p> : <p>Choose at least one area.</p>}
+        </div>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <StPill disabled={busy || !selected.length} busy={busy} onClick={() => void send("POST", { agencyWorkspaceId: choosing.agencyWorkspaceId, scopes: selected }, `Sent to ${choosing.name}. Nothing changes until they accept.`)}>Send to {choosing.name}</StPill>
+          <StTextButton disabled={busy} onClick={() => setChoosing(null)}>Cancel</StTextButton>
+        </div>
+      </StSurface> : available.length ? <><StLabel>Agencies you can bring in</StLabel><StRows label="Agencies you can bring in">{available.map(agency => <StRow key={agency.agencyWorkspaceId} title={agency.name} detail={agency.summary}
+          onClick={() => { setChoosing(agency); setMessage(""); }} value="Choose" />)}</StRows></>
         : <StEmpty>No other agencies are listed yet.</StEmpty>}
     </>}
     {message ? <p role="status">{message}</p> : null}
