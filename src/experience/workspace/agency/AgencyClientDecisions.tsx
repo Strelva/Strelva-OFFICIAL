@@ -43,6 +43,8 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
   const [state, setState] = useState<State>({ status: "loading" });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [recordedOutcome, setRecordedOutcome] = useState<OwnerDecision | null>(null);
+  const pendingOutcome = useRef<OwnerDecision | null>(null);
   const locked = useRef(false);
   const sequence = useRef(0);
   const mounted = useRef(false);
@@ -51,6 +53,19 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
     const read = ++sequence.current;
     setState({ status: "loading" });
     try {
+      if (pendingOutcome.current) {
+        const exact = pendingOutcome.current;
+        const receiptResponse = await request(`/api/workspace/needs-you?${new URLSearchParams({ workspaceId, agencyWorkspaceId, asAgency: "1", itemId: exact.id, revision: exact.revisionHash })}`, { cache: "no-store", credentials: "same-origin" });
+        if (read !== sequence.current || !mounted.current) return;
+        if (receiptResponse.status === 401 || receiptResponse.status === 403 || receiptResponse.status === 404) { setState({ status: "permission" }); return; }
+        if (!receiptResponse.ok) throw new Error("outcome unavailable");
+        const receipt = z.object({ authority: z.literal("agency"), agencyWorkspaceId: z.string().uuid(), item: ownerDecisionSchema }).parse(await receiptResponse.json());
+        if (receipt.agencyWorkspaceId !== agencyWorkspaceId || receipt.item.workspaceId !== workspaceId || receipt.item.id !== exact.id || receipt.item.revisionHash !== exact.revisionHash) throw new Error("outcome scope");
+        if (read !== sequence.current || !mounted.current) return;
+        setRecordedOutcome(receipt.item);
+        setNotice(null);
+        pendingOutcome.current = null;
+      }
       const response = await request(`/api/workspace/needs-you?${new URLSearchParams({ workspaceId, asAgency: "1", agencyWorkspaceId })}`, { cache: "no-store", credentials: "same-origin" });
       if (read !== sequence.current || !mounted.current) return;
       if (response.status === 401 || response.status === 403 || response.status === 404) { setState({ status: "permission" }); return; }
@@ -77,6 +92,7 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
     locked.current = true;
     setBusy(true);
     setNotice(null);
+    setRecordedOutcome(null);
     try {
       const response = await request("/api/workspace/needs-you", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspaceId, agencyWorkspaceId, itemId: item.id, revision: item.revisionHash, decision, asAgency: true }) });
@@ -84,6 +100,7 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
       if (!outcomes[body.status]) throw new Error("unconfirmed");
       if (mounted.current) setNotice(decision === "not_yet" && body.status === "done" ? "Not yet. Nothing changed." : outcomes[body.status]!);
     } catch {
+      pendingOutcome.current = item;
       if (mounted.current) setNotice("Outcome not confirmed. Checking the current decision before you can try again.");
     } finally {
       // Any lost or malformed response is reconciled before controls return.
@@ -93,8 +110,19 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
     }
   }
   return <StSection title={`Decisions for ${clientName}`} action={<StTextButton disabled={busy} onClick={() => void load()}>Refresh decisions</StTextButton>}>
-    <p className="text-sm text-gray-muted">Your agency decides within Full-control areas. Payer, exit, access and private business details stay with the owner.</p>
+    <p className="text-sm text-gray-muted">Your agency decides within supported Full-control areas. Website, domain and Possibility execution still require the business owner’s review. Payer, exit, access and private business details stay with the owner.</p>
     {notice ? <p role="status">{notice}</p> : null}
+    {recordedOutcome ? <StNotice>
+      <p>{recordedOutcome.title}: {recordedOutcome.state === "open" ? "No decision is recorded. Review the current changes before trying again."
+        : recordedOutcome.state === "approved" || recordedOutcome.state === "declined"
+          ? recordedOutcome.outcome === null ? "The decision is recorded. Its outcome is still pending; do not submit it again."
+            : recordedOutcome.outcome === "done_unverified" ? "The action was accepted. Confirmation is still pending."
+              : recordedOutcome.outcome === "failed" ? "The decision is recorded, but the work could not finish." : recordedOutcome.state === "declined" ? "Not yet was recorded." : "Done."
+          : "This review is no longer open."}</p>
+      {recordedOutcome.decidedActor ? <p>{actorLabel(recordedOutcome.decidedActor)}</p> : null}
+      {recordedOutcome.outcomeReason ? <p>{recordedOutcome.outcomeReason}</p> : null}
+      <StTextButton disabled={busy || state.status === "loading"} onClick={() => { pendingOutcome.current = recordedOutcome; void load(); }}>Check recorded outcome</StTextButton>
+    </StNotice> : null}
     {state.status === "loading" ? <p role="status">Checking your current decision access…</p>
       : state.status === "permission" ? <StNotice>Your agency cannot open decisions for this client. Check the client assignment with your agency owner or return to Clients.</StNotice>
       : state.status === "disabled" ? <StNotice>Client decisions are currently unavailable. Nothing was approved by opening this panel.</StNotice>

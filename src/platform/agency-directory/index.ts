@@ -9,7 +9,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
  * module only shapes calls and results.
  */
 export * from "./contract";
-import { AGENCY_LEVELS, AGENCY_SCOPES, agencyConsentText } from "./contract";
+import { AGENCY_LEVELS, AGENCY_SCOPES, agencyConsentText, type AgencyProposal } from "./contract";
 
 const uuid = z.string().uuid();
 const directorySchema = z.array(z.object({ agencyWorkspaceId: uuid, name: z.string().min(1), summary: z.string() }).strict());
@@ -18,12 +18,12 @@ const businessAgenciesSchema = z.array(z.object({
   scopes: z.array(z.object({ scope: z.enum(AGENCY_SCOPES), level: z.enum(AGENCY_LEVELS), status: z.enum(["proposed", "active"]) }).strict()),
 }).strict());
 const proposalsSchema = z.array(z.object({
+  proposalId: z.string().regex(/^[a-f0-9]{64}$/),
   businessWorkspaceId: uuid, businessName: z.string().min(1), consent: z.string(), proposedAt: z.string(),
   scopes: z.array(z.object({ scope: z.enum(AGENCY_SCOPES), level: z.enum(AGENCY_LEVELS) }).strict()),
 }).strict());
 export type DirectoryAgency = z.infer<typeof directorySchema>[number];
 export type BusinessAgency = z.infer<typeof businessAgenciesSchema>[number];
-export type AgencyProposal = z.infer<typeof proposalsSchema>[number];
 
 export const bringInAgencyInputSchema = z.object({
   agencyWorkspaceId: uuid,
@@ -41,6 +41,8 @@ async function call(name: string, args: Record<string, unknown>): Promise<unknow
     if (/agency_scope_taken/.test(message)) throw new WorkspaceConflictError("Another agency already has full control of one of those areas. Choose Prepare, or end their access first.");
     if (/agency_not_listed/.test(message)) throw new WorkspaceConflictError("That agency isn't listed. Choose one from the list.");
     if (/agency_proposal_not_found/.test(message)) throw new WorkspaceConflictError("There's nothing waiting from this business. It may have been withdrawn.");
+    if (/agency_proposal_stale|agency_proposal_identity_required/.test(message)) throw new WorkspaceConflictError("This request changed. Refresh requests and review the current access before responding.");
+    if (/agency_proposal_owner_required/.test(message)) throw new WorkspaceConflictError("The owner who requested this access no longer has authority. Ask the current owner to send a new request.");
     if (/agency_scopes_invalid|agency_consent_required|agency_directory_summary_invalid/.test(message)) throw new WorkspaceConflictError("Check the areas and try again. Nothing changed.");
     if (/workspace_exit_future_work_blocked/.test(message)) throw new WorkspaceConflictError("This business has left Strelva. Nothing changed.");
     if (/denied|owner_required|permission/.test(message)) throw new WorkspaceAccessError();
@@ -76,9 +78,10 @@ export async function endAgencyForBusiness(actor: WorkspaceActor, businessId: st
 export async function readAgencyProposals(actor: WorkspaceActor, agencyId: string): Promise<AgencyProposal[]> {
   return parse(proposalsSchema, await call("read_agency_proposals", { ...who(actor), p_agency_id: uuid.parse(agencyId) }));
 }
-export async function respondToAgencyProposal(actor: WorkspaceActor, agencyId: string, businessId: string, accept: boolean): Promise<"accepted" | "declined"> {
+export async function respondToAgencyProposal(actor: WorkspaceActor, agencyId: string, businessId: string, accept: boolean, proposalId: string): Promise<"accepted" | "declined"> {
   const result = parse(z.object({ status: z.enum(["accepted", "declined"]) }).strict(), await call("respond_to_agency_proposal", {
-    ...who(actor), p_agency_id: uuid.parse(agencyId), p_business_id: uuid.parse(businessId), p_accept: accept }));
+    ...who(actor), p_agency_id: uuid.parse(agencyId), p_business_id: uuid.parse(businessId), p_accept: accept,
+    p_proposal_id: z.string().regex(/^[a-f0-9]{64}$/).parse(proposalId) }));
   return result.status;
 }
 export async function setAgencyDirectoryListing(actor: WorkspaceActor, agencyId: string, raw: unknown): Promise<{ listed: boolean }> {

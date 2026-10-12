@@ -5,7 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { needsYouReleaseEnabled, needsYouService, needsYouStore, readStrelvaHandled } from "@/experience/workspace/needs-you-server";
-import { claimAgencyDecision, readAgencyDecisions, reviewAgencyDecisions } from "@/experience/workspace/agency/decision-server";
+import { claimAgencyDecision, readAgencyDecisions, readAgencyDecisionReceipt, reviewAgencyDecisions } from "@/experience/workspace/agency/decision-server";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +36,13 @@ export async function GET(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
     const workspaceId = workspaceIdSchema.parse(new URL(request.url).searchParams.get("workspaceId"));
     const agencyWorkspaceId = workspaceIdSchema.optional().parse(new URL(request.url).searchParams.get("agencyWorkspaceId") ?? undefined);
+    const itemId = new URL(request.url).searchParams.get("itemId");
+    if (itemId !== null) {
+      const revision = z.string().regex(/^[0-9a-f]{64}$/).parse(new URL(request.url).searchParams.get("revision"));
+      const selectedAgency = workspaceIdSchema.parse(agencyWorkspaceId);
+      const item = await readAgencyDecisionReceipt(actor, workspaceId, selectedAgency, workspaceIdSchema.parse(itemId), revision);
+      return workspaceJson({ authority: "agency", agencyWorkspaceId: selectedAgency, item });
+    }
     const workspace = await memberWorkspace(actor, workspaceId);
     if (!workspace || agencyWorkspaceId || new URL(request.url).searchParams.get("asAgency") === "1") {
       const needs = await reviewAgencyDecisions(actor, workspaceId, agencyWorkspaceId);
@@ -71,9 +78,9 @@ export async function POST(request: Request) {
     const workspace = body.asAgency || body.agencyWorkspaceId ? null : await memberWorkspace(actor, body.workspaceId);
     // ADR 0015: an agency with full control of an item's scope decides it as
     // the agency. Its staff hold a seat, not a membership; SQL checks the grant.
-    // Every item here is the owner's. A Strelva operator holding another seat
-    // on the business never decides one (#530); claim_owner_decision refuses it too.
-    if (workspace?.role !== "owner" && (await isSuperAdminUser(actor.userId))) {
+    // An explicit agency selection uses ordinary current scope, even when the
+    // person also holds a support role. Support authority grants no decision.
+    if (!body.agencyWorkspaceId && workspace?.role !== "owner" && (await isSuperAdminUser(actor.userId))) {
       return workspaceJson({ status: "forbidden", error: "The owner decides this. Nothing changed." }, 403);
     }
     if (!workspace) {

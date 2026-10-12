@@ -5,6 +5,11 @@ import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "
 import { needsYouService } from "../needs-you-server";
 import { NeedsYouRefusedError, type NeedsYouStore } from "@/platform/needs-you/repository";
 
+/** These source resolvers still require a business-owner claim for execution. */
+export function agencyDecisionExecutionSupported(item: Pick<OwnerDecision, "sourceLifecycle">): boolean {
+  return item.sourceLifecycle !== "website_document" && item.sourceLifecycle !== "website_domain" && item.sourceLifecycle !== "make_real";
+}
+
 type Db = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> };
 
 /** No source sync under an agency identity: read only the decisions its current grant covers. */
@@ -23,7 +28,7 @@ export async function readAgencyDecisions(actor: WorkspaceActor, workspaceId: st
   if (!checked.success || checked.data.some(item => item.workspaceId !== workspaceId || item.route !== "owner_decides" || item.state !== "open")) {
     throw new WorkspaceStoreError("Client decisions could not be confirmed for this business.");
   }
-  return checked.data;
+  return checked.data.filter(agencyDecisionExecutionSupported);
 }
 
 /** The same source-owned complete review used by the owner; unreadable reviews remain disabled. */
@@ -56,4 +61,23 @@ export async function claimAgencyDecision(input: Parameters<NeedsYouStore["claim
     throw new WorkspaceStoreError("The agency decision could not be confirmed.");
   }
   return result.data;
+}
+
+/** Exact outcome only: this never exposes the owner's full change feed. SQL checks current assignment and every captured scope. */
+export async function readAgencyDecisionReceipt(actor: WorkspaceActor, workspaceId: string, agencyWorkspaceId: string, itemId: string, revision: string, client?: Db) {
+  const db = client ?? getSupabase() as unknown as Db | null;
+  if (!db) throw new WorkspaceStoreError("The decision outcome could not be checked.");
+  const { data, error } = await db.rpc("read_agency_decision_receipt", {
+    p_workspace_id: workspaceId, p_agency_workspace_id: agencyWorkspaceId, p_decision_id: itemId, p_revision_hash: revision,
+    p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
+  });
+  if (error) {
+    if (error.message.includes("owner_decision_access_denied")) throw new WorkspaceAccessError();
+    throw new WorkspaceStoreError("The decision outcome could not be checked.");
+  }
+  const item = ownerDecisionSchema.safeParse(data);
+  if (!item.success || item.data.workspaceId !== workspaceId || item.data.id !== itemId || item.data.revisionHash !== revision || item.data.route !== "owner_decides") {
+    throw new WorkspaceStoreError("The decision outcome could not be confirmed for this review.");
+  }
+  return item.data;
 }

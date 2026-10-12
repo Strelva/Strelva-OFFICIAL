@@ -49,6 +49,14 @@ audit brief prohibits browser/build runs until the lanes merge.
 `pnpm check:words` is required by ADR 0014; this amendment makes no claim that
 it or the rendered coherence changes have passed in this worktree.
 
+October 12 follow-up: Agency Clients and Queue consume the Library's exact
+qualified Version comparison. Counts read **improvements to review** because
+conflicts and missing accounts still require work; Queue names those states
+and links to the client's exact System. Declined, adopted and unqualified
+releases are absent. Failed comparisons preserve known offers and display
+**Improvements unavailable** alongside an incomplete Queue. Source/unit proof
+is separate from the still-pending desktop/mobile rendered acceptance.
+
 ## Strelva 1.0 kit, October 9, 2026 (local)
 
 `src/components/ui/strelva/Kit.tsx` with `kit.module.css`, on the paper tokens
@@ -2062,6 +2070,16 @@ authoring. Exact existing drafts need their separate client authorization.
 No writer or eligibility grant is widened by this presentation correction.
 Local fixtures and unit tests do not qualify hosted authority or email delivery.
 
+AG2 adds Form page and Booking page choices to AgencyAuthoring. AgencyNativePage
+uses the kit's fields, review surface, notices and Send to business action. A
+staffed agency needs active website plus inquiry/booking scope; this path adds
+one page to an unchanged published native website with its own current native
+connection. Internal tool authoring keeps its existing eligibility. Review is
+local; Send persists a website candidate and durable command receipt in one
+transaction. Retried sends retain their exact command; no publication or email
+is implied. Businesses without a qualified native site/connection see the
+missing prerequisite. Desktop/phone rendered acceptance remains outstanding.
+
 ### October 12 · agency brand fields
 
 AgencyBrandEditor composes the existing `StTextField` with native `color` and
@@ -2124,3 +2142,44 @@ beside the amount and hold the pay action when required terms are absent.
 Visitor and deposit fixtures compose the same shell. Local component and
 contract tests cover those states; browser, SQL execution, provider delivery
 and production proof remain outstanding under the audit's disk stop point.
+
+### October 12 · agency exact decision recovery (AG3, AG7)
+
+`AgencyClientDecisions` reconciles a lost or malformed command response by
+reading that exact business, agency, decision and reviewed revision. A current
+open review, recorded claim still executing, completed action, pending
+confirmation and failed action remain distinct. Unreadable or revoked receipt
+access keeps approval unavailable; a Refresh never repeats the command.
+Recorded outcomes retain the deciding actor and offer Check recorded outcome.
+The same person may hold a platform support role and an ordinary agency seat;
+explicit agency selection still requires every current staff/seat/grant check.
+Website, domain and Possibility source execution stays with the owner until
+those resolvers consume an exact agency claim. The agency reader and SQL claim
+predicate both withhold them. Component/route tests are local DOM and transport
+evidence; SQL, authenticated desktop/mobile rendering and provider delivery
+remain unproven under the audit's stop point.
+
+### October 12 · add-client claim recovery (AG6)
+
+[AgencyAddClient](../../src/experience/workspace/agency/AgencyAddClient.tsx)
+retains its last successful client rows when a read fails, labels their claim
+status as stale and keeps Refresh present in loading, empty and failed states.
+A current scoped client read precedes owner-link issuance. Lost or malformed
+claim responses hold issuance until Refresh owner claim succeeds; a discovered
+pending claim names its recipient and requires a separate **Replace pending
+owner link** action. Owner acceptance, ended seats and unreadable claims stop
+replacement. Recovery reads never replay writes. Local DOM tests cover these
+states; desktop/phone rendering, authenticated delivery and production remain
+unqualified under the audit stop point.
+
+### October 12 · exact agency access review (AG4)
+
+`AgencyProposals` carries the server's immutable proposal fingerprint through
+Accept and Decline. A replaced proposal requires **Refresh requests** and a new
+review of its current consent and scope levels. An unconfirmed response retains
+the row and disables responses until a successful read; a malformed success
+never claims the business became a client. The same kit row, section action,
+pills and text buttons retain their existing focus and phone contracts.
+SQL rechecks the proposing owner's current verified identity and owner
+membership at acceptance. Local DOM/API contracts are separate from disposable
+Postgres, authenticated browser and production proof.

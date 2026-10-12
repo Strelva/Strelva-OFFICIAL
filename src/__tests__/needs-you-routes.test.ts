@@ -19,10 +19,11 @@ const mocks = vi.hoisted(() => ({
   agencyRead: vi.fn(),
   agencyReview: vi.fn(),
   agencyClaim: vi.fn(),
+  agencyReceipt: vi.fn(),
   storeCapture: vi.fn(),
 }));
 vi.mock("@/products/agency-clients/server", () => ({ providerSeatBusiness: mocks.seat }));
-vi.mock("@/experience/workspace/agency/decision-server", () => ({ readAgencyDecisions: mocks.agencyRead, reviewAgencyDecisions: mocks.agencyReview, claimAgencyDecision: mocks.agencyClaim }));
+vi.mock("@/experience/workspace/agency/decision-server", () => ({ readAgencyDecisions: mocks.agencyRead, reviewAgencyDecisions: mocks.agencyReview, claimAgencyDecision: mocks.agencyClaim, readAgencyDecisionReceipt: mocks.agencyReceipt }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
@@ -228,6 +229,19 @@ describe("/api/workspace/needs-you", () => {
     expect(mocks.decide).not.toHaveBeenCalled();
   });
 
+  it("uses ordinary exact agency authority when the same person also holds a support hat", async () => {
+    const agency = "c0000000-0000-4000-8000-000000000001";
+    mocks.superAdmin.mockResolvedValue(true);
+    mocks.workspaces.mockResolvedValue([]);
+    mocks.agencyRead.mockResolvedValue([{ id: ITEM }]);
+    mocks.decide.mockResolvedValue({ status: "done", item: { id: ITEM } });
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, agencyWorkspaceId: agency, asAgency: true, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    expect(mocks.agencyRead).toHaveBeenCalledWith(ACTOR, WS, agency);
+    expect(mocks.decide).toHaveBeenCalledWith({ workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve", by: { kind: "agency", actor: ACTOR } });
+  });
+
   it("refuses a Strelva operator holding an admin seat: the owner decides (#530)", async () => {
     const { POST } = await import("@/app/api/workspace/needs-you/route");
     const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
@@ -278,5 +292,31 @@ describe("/api/workspace/needs-you/undo", () => {
     mocks.released.mockReturnValue(false);
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you/undo", { workspaceId: WS, receiptId: "record:12" }))).status).toBe(503);
     expect(mocks.undo).not.toHaveBeenCalled();
+  });
+});
+
+describe("agency exact receipt route", () => {
+  it("requires an exact agency, decision and revision without reading the owner's feed", async () => {
+    const agency = "c0000000-0000-4000-8000-000000000001";
+    mocks.agencyReceipt.mockResolvedValue({ id: ITEM, state: "approved", outcome: "done_unverified" });
+    const { GET } = await import("@/app/api/workspace/needs-you/route");
+    const query = new URLSearchParams({ workspaceId: WS, agencyWorkspaceId: agency, itemId: ITEM, revision: "a".repeat(64) });
+    const response = await GET(new Request(`https://app.example.test/api/workspace/needs-you?${query}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ authority: "agency", agencyWorkspaceId: agency, item: { outcome: "done_unverified" } });
+    expect(mocks.agencyReceipt).toHaveBeenCalledWith(ACTOR, WS, agency, ITEM, "a".repeat(64));
+    expect(mocks.handled).not.toHaveBeenCalled();
+    expect(mocks.list).not.toHaveBeenCalled();
+    query.delete("agencyWorkspaceId");
+    expect((await GET(new Request(`https://app.example.test/api/workspace/needs-you?${query}`))).status).toBe(400);
+  });
+  it("refuses current access loss and holds read failures", async () => {
+    const { WorkspaceAccessError, WorkspaceStoreError } = await import("@/platform/workspaces/types");
+    const { GET } = await import("@/app/api/workspace/needs-you/route");
+    const url = `https://app.example.test/api/workspace/needs-you?workspaceId=${WS}&agencyWorkspaceId=${ITEM}&itemId=${ITEM}&revision=${"a".repeat(64)}`;
+    mocks.agencyReceipt.mockRejectedValueOnce(new WorkspaceAccessError());
+    expect((await GET(new Request(url))).status).toBe(403);
+    mocks.agencyReceipt.mockRejectedValueOnce(new WorkspaceStoreError("unavailable"));
+    expect((await GET(new Request(url))).status).toBe(503);
   });
 });

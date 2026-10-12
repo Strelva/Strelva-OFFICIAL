@@ -550,6 +550,7 @@ export async function makeRealForWorkspace(deps: LiveSystemsDeps, possibilityId:
 
 /** A Ready plan as Needs you sees it: one owner decision per plan. */
 export interface ReadyMakeRealPlan {
+  actor?: import("@/platform/presentation/actor").RecordedActor;
   possibilityId: string;
   candidateRevision: number;
   /** Covers every effect, change, connection and introduced System of this candidate. */
@@ -583,6 +584,7 @@ export async function readyMakeRealPlans(deps: LiveSystemsDeps): Promise<ReadyMa
         introducesSystem: p.introduces.length > 0,
         systemId: item.site.system.id,
         sourceRebuild: item.candidate.workId,
+        ...(item.candidate.actor ? { actor: item.candidate.actor } : {}),
       };
     });
 }

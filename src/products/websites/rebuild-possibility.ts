@@ -1,4 +1,5 @@
 import { websiteRebuildSchema, type WebsiteRebuild } from "./rebuild-contracts";
+import { actorLabel, type RecordedActor } from "@/platform/presentation/actor";
 
 /**
  * What a saved website rebuild offers as a Possibility of the site it
@@ -30,6 +31,7 @@ export interface WebsiteRebuildCandidate {
    * selected business owner's connector authority and retains that actor's
    * native proposal history; it does not use an agency draft grant. */
   origin: "rebuild" | "agency_draft" | "agent_draft";
+  actor?: RecordedActor;
 }
 
 const PUBLISH_KINDS = new Set(["rebuild_published", "publish_reconciled"]);
@@ -91,12 +93,13 @@ export function websiteRebuildCandidate(work: { id: string; productId: string; r
     summary: draftOrigin === "agent_draft"
       ? "A change prepared by your connected agent. Review the facts and approve it before publishing. The live site is unchanged."
       : draftOrigin === "agency_draft"
-      ? "A change your agency prepared under its website draft grant. The live site is unchanged until it is approved and published."
+      ? rebuild.agencyPageOrigin ? `A page prepared by ${actorLabel(rebuild.agencyPageOrigin)}. The live site is unchanged until it is approved and published.` : "A change your agency prepared under its website draft grant. The live site is unchanged until it is approved and published."
       : "The same business, pages and facts, rebuilt on Strelva's website system.",
     evidence: evidence(rebuild),
     previewHref: rebuild.candidate?.previewHref ?? null,
     candidateRevision: rebuild.candidate?.revision ?? null,
     candidateContentHash: rebuild.candidate?.contentHash ?? null,
     origin: draftOrigin ?? "rebuild",
+    ...(draftOrigin === "agency_draft" && rebuild.agencyPageOrigin ? { actor: rebuild.agencyPageOrigin } : {}),
   };
 }

@@ -47,7 +47,7 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
           {!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</>,
         health: unavailable ? <><StState kind="need">{client.name} could not be loaded.</StState><small className="block text-xs">{lastGood ? `Showing the last good read from ${new Date(lastGood.readAt).toLocaleString()}.` : "No last good read is available in this visit."}</small><StPill variant="soft" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</StPill></> : health(client),
         waiting: unavailable && !lastGood ? "Unknown" : needsYouLabel(read, now),
-        requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} ready` : ""}</>,
+        requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} to review` : ""}{read.improvementsStatus === "unavailable" ? ` · ${read.improvementsWaiting ? "Some improvements unavailable" : "Improvements unavailable"}` : ""}</>,
         receipt: unavailable && !lastGood ? "Unknown" : lastReceiptLabel(read.lastReceiptAt, now),
       } };
     })} />

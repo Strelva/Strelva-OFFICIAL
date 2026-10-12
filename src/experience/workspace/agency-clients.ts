@@ -53,6 +53,8 @@ export const agencyClientRowSchema = z.object({
   needsYou: z.object({ count: z.number().int().min(0), oldestAt: iso.nullable() }).strict(),
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
+  /** Qualified comparison availability, independent of the client/service read. */
+  improvementsStatus: z.enum(["ready", "unavailable"]).optional(),
   lastReceiptAt: iso.nullable(),
   agentBookings: z.boolean().optional(),
 }).strict();

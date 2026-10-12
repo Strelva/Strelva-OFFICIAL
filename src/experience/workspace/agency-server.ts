@@ -19,6 +19,7 @@ import { inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleas
 import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 import { addAgencyOperatorOverview } from "./agency/operator-overview";
+import { projectAgencyLibraryOffers } from "./agency/library-offers";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
 import type { VersionLineage } from "@/platform/system-versions";
@@ -68,7 +69,22 @@ export async function readAgencyClientsPage(
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
   const page = { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
     ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
-  return addAgencyOperatorOverview(actor, page);
+  // The SQL overview predates qualification and comparison. Never expose its
+  // revision-only counts/rows as offers; the Library owns this projection.
+  let library: AgencyLibrary | null = null;
+  const visible = new Map(page.clients.filter(client => client.status === "ready")
+    .map(client => [client.workspaceId, new Set(client.systems.map(system => system.id))]));
+  if ([...visible.values()].some(systems => systems.size > 0)) {
+    try {
+      library = await readQualifiedLibrarySources(actor, agencyWorkspaceId, db,
+        item => visible.get(item.workspaceId)?.has(item.systemId) === true);
+    } catch {
+      // Known service rows survive, but no unqualified offer is substituted.
+    }
+  } else {
+    library = { agencyWorkspaceId, sources: [] };
+  }
+  return addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library));
 }
 
 const sourcesSchema = z.object({
@@ -101,14 +117,17 @@ export async function readAgencyVersionSources(actor: WorkspaceActor, agencyWork
   return parsed.data.sources;
 }
 
-export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()): Promise<AgencyLibrary> {
+/** Shared qualified comparisons for Library and the paged Queue/Clients read. */
+async function readQualifiedLibrarySources(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb,
+  includeVersion: (item: z.infer<typeof sourcesSchema>["sources"][number]["versions"][number]) => boolean = () => true,
+): Promise<AgencyLibrary> {
   const sources = await readAgencyVersionSources(actor, agencyWorkspaceId, db);
   const { versions, actor: pending } = services(actor, db);
   const versionActor: VersionActor = await pending;
   const result: AgencyLibrary = { agencyWorkspaceId, sources: [] };
   for (const source of sources) {
     const rows: AgencyLibraryVersion[] = [];
-    for (const item of source.versions) {
+    for (const item of source.versions.filter(includeVersion)) {
       try {
         const view = await versions.readVersion(versionActor, item.versionId);
         const base = {
@@ -142,6 +161,11 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
       versions: rows,
     });
   }
+  return result;
+}
+
+export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()): Promise<AgencyLibrary> {
+  const result = await readQualifiedLibrarySources(actor, agencyWorkspaceId, db);
   if (inquiryReleaseMayBeOn() && await inquiryReleaseEnabledForWorkspace(agencyWorkspaceId, { userId: actor.userId, operator: false, tester: false })) {
     try {
       // Source access is the agency's own current links; target access is the
