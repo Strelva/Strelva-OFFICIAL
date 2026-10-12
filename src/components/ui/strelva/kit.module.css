@@ -532,8 +532,8 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
    measured height is reserved once rather than adding a second blank tail. */
 :global([data-st-composer-clearance]) {
   box-sizing: border-box;
-  padding-bottom: var(--st-composer-clearance);
-  scroll-padding-bottom: var(--st-composer-clearance);
+  padding-bottom: var(--st-composer-clearance, 0px);
+  scroll-padding-bottom: var(--st-composer-clearance, 0px);
 }
 
 /* Object with an adjacent explanation, never a dashboard card grid. */
