@@ -1,29 +1,22 @@
 begin;
 set local lock_timeout='3s';
--- Conservative catalog/event-trigger exclusion requires the actual superuser.
--- Refuse managed roles rather than allowing a same-session DDL hook past review.
-do $$begin if not (select rolsuper from pg_roles where rolname=current_user) then raise exception 'rewards_inverse_catalog_lock_unavailable';end if;end $$;
+-- Hosted Supabase has no superuser and keeps its own event hooks enabled, so
+-- catalog locks are unavailable; the hook check below admits only those hooks.
 -- Exclude every native command BEFORE inspecting empty receipts. Legacy writers
 -- also finish before these relation locks; recheck population only while held.
 select pg_advisory_xact_lock(hashtextextended('reward-native-writer',1750));
 lock table public.tenant_client_records in access exclusive mode;
 lock table public.tenant_reward_mutations in access exclusive mode;
--- Ordinary ALTER FUNCTION and GRANT use catalog tuple updates without the
--- same object lock as OWNER TO. Pin all reviewed object metadata through drops.
-lock table pg_catalog.pg_proc,pg_catalog.pg_class,pg_catalog.pg_attribute,
- pg_catalog.pg_trigger,pg_catalog.pg_constraint,pg_catalog.pg_index,
- pg_catalog.pg_policy,pg_catalog.pg_inherits,pg_catalog.pg_rewrite
- in share row exclusive mode;
--- These catalog writers are excluded before the first trigger-capable DDL.
--- Relation locks cannot stop an enabled event trigger in this same session.
--- Disabled triggers cannot be enabled while pg_event_trigger remains locked.
-lock table pg_catalog.pg_event_trigger,pg_catalog.pg_authid,
- pg_catalog.pg_auth_members,pg_catalog.pg_namespace,pg_catalog.pg_default_acl
- in share row exclusive mode;
 do $reward_no_event_hooks$
 begin
- if not (select rolsuper from pg_roles where rolname=current_user) then raise exception 'rewards_catalog_authority_changed';end if;
- if exists(select 1 from pg_event_trigger where evtenabled<>'D') then raise exception 'rewards_unreviewed_event_trigger';end if;
+ -- Hosted Supabase keeps six platform hooks enabled (PostgREST schema reload,
+ -- extension grants). Admit exactly those, by name, function and owner; refuse any other.
+ if exists(select 1 from pg_event_trigger e join pg_proc p on p.oid=e.evtfoid join pg_namespace n on n.oid=p.pronamespace
+   where e.evtenabled<>'D' and ((e.evtname,n.nspname,p.proname) not in
+   (('issue_graphql_placeholder','extensions','set_graphql_placeholder'),('issue_pg_cron_access','extensions','grant_pg_cron_access'),
+    ('issue_pg_graphql_access','extensions','grant_pg_graphql_access'),('issue_pg_net_access','extensions','grant_pg_net_access'),
+    ('pgrst_ddl_watch','extensions','pgrst_ddl_watch'),('pgrst_drop_watch','extensions','pgrst_drop_watch'))
+   or pg_get_userbyid(e.evtowner)<>'supabase_admin')) then raise exception 'rewards_unreviewed_event_trigger';end if;
 end $reward_no_event_hooks$;
 -- BEGIN EXACT REWARDS CATALOG GUARD
 -- A grant to an unknown role, inherited default grant or grant option aborts
