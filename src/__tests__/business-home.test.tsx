@@ -172,12 +172,12 @@ describe("business home", () => {
     // The greeting and composer lead, as before Systems; no business header or Systems list.
     expect(html).toContain("id=\"business-start-title\"");
     expect(html.indexOf("Ask Strelva for anything your business needs")).toBeLessThan(html.indexOf("Needs you"));
-    for (const gone of ["id=\"home-systems\"", "Systems", "All systems and files", "Files and results", "live ·", "Nothing is running yet.", "Internal tool, Live"]) expect(html).not.toContain(gone);
+    for (const gone of ["id=\"home-systems\"", "Systems", "All systems and files", "Files and results</h2>", "live ·", "Nothing is running yet.", "Internal tool, Live"]) expect(html).not.toContain(gone);
     // Every saved result, the managed website and apps are where they were.
     expect(html).toContain("2 saved results");
     expect(html).toContain("1 connected website");
     expect(html).toContain(">Recent<");
-    expect(html).toContain("All files and results (2)");
+    expect(html).toContain("Files and results (2)");
     expect(html).toContain("Open Mediation intake");
     expect(html).toContain("Open AI check");
     expect(html).toContain("aria-label=\"Website and apps\"");

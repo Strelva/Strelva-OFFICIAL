@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { StEmpty, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { actorLabel } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import type { AgencyClientHomeState } from "./useAgencyClientHome";
 import { clientDecisionHref } from "@/platform/workspaces/location";
@@ -25,7 +26,7 @@ export function AgencyClientDecisionStatus({ state, businessName, workspaceId, s
 }
 export function AgencyClientChanges({ state, workspaceId, onRetry }: { state: AgencyClientHomeState; workspaceId: string; onRetry: () => void }) {
   return <StSection title={STRELVA_HANDLED_LABEL} meta="Shared Systems · last 7 days">
-    {state.status === "loading" ? <StSkeleton label="Checking shared changes" /> : state.status === "error" ? <StNotice>Shared changes could not be checked. <StTextButton onClick={onRetry}>Check again</StTextButton></StNotice> : state.status === "ready" ? state.data.changes.length ? <StRows>{state.data.changes.map(item => <StRow key={item.id} title={item.title} detail="Actor not recorded" href={`/workspace?view=system&system=${item.systemId}&workspaceId=${workspaceId}`} end={<StMono as="time" dateTime={item.at}>{new Date(item.at).toLocaleDateString()}</StMono>} />)}</StRows> : <StEmpty>No changes to shared Systems in the last 7 days.</StEmpty> : null}
+    {state.status === "loading" ? <StSkeleton label="Checking shared changes" /> : state.status === "error" ? <StNotice>Shared changes could not be checked. <StTextButton onClick={onRetry}>Check again</StTextButton></StNotice> : state.status === "ready" ? state.data.changes.length ? <StRows>{state.data.changes.map(item => <StRow key={item.id} title={item.title} detail={actorLabel(item.actor)} href={`/workspace?view=system&system=${item.systemId}&workspaceId=${workspaceId}`} end={<StMono as="time" dateTime={item.at}>{new Date(item.at).toLocaleDateString()}</StMono>} />)}</StRows> : <StEmpty>No changes to shared Systems in the last 7 days.</StEmpty> : null}
   </StSection>;
 }
 

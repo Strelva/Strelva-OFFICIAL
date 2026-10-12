@@ -5,6 +5,7 @@ import { actorLabel } from "@/platform/presentation/actor";
 import { useEffect, useRef, useState } from "react";
 import { Menu, LockKeyhole } from "lucide-react";
 import { AppFrame } from "@/experience/app-frame/AppFrame";
+import { PREVIEW_STRELVA_AGENCY_BRAND } from "./chrome-fixture";
 import { StrelvaSidebar } from "@/experience/app-frame/StrelvaSidebar";
 import { StComposerBar, StComposerDock, StEmpty, StHead, StHold, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 import styles from "./website-canon.module.css";
@@ -80,7 +81,7 @@ export function WebsiteCanonPreview({ initialView, state = "ready", mode = "ligh
 
   return <div data-workspace-theme="linen" data-workspace-mode={mode} className={styles.root}>
     <AppFrame showNavigationToggle={false} navigationOpen={navigationOpen} onCloseNavigation={() => setNavigationOpen(false)} navigationTriggerRef={menuRef}
-      navigation={<StrelvaSidebar accountName="Sheri" accountDetail="Fictional preview" signOut={null} systemsReleased appBase="/preview/strelva" mobileOpen={navigationOpen} onCloseMobile={() => setNavigationOpen(false)} businessContext={<StLabel>The Mooney Firm</StLabel>} pinned={[
+      navigation={<StrelvaSidebar ownerBrand={PREVIEW_STRELVA_AGENCY_BRAND} accountName="Sheri" accountDetail="Fictional preview" signOut={null} systemsReleased appBase="/preview/strelva" mobileOpen={navigationOpen} onCloseMobile={() => setNavigationOpen(false)} workspaceName="The Mooney Firm" pinned={[
         { id: "website", title: "attymooney.com", kind: "website", href: href("review"), current: view !== "pause" },
         { id: "sessions", title: "Mediation sessions", kind: "bookings", href: href("pause"), current: view === "pause" },
       ]} />}

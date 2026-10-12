@@ -25,7 +25,7 @@ const domain: WebsiteDomainView = { hostname: "lakeview.example.test", status: "
 ] };
 
 function Frame({ children, mode }: { children: ReactNode; mode: "light" | "dark" }) {
-  return <div data-workspace-mode={mode}><StrelvaShell active="system" systemsReleased signedIn={false} accountName="Preview" businessContext={<span>Lakeview preview</span>} pinned={[{ kind: "website", title: site.siteHost, href: "/preview/strelva/website-connect", id: site.systemId, current: true }]}
+  return <div data-workspace-mode={mode}><StrelvaShell active="system" systemsReleased signedIn signOut={null} accountName="Preview" workspaceName="Lakeview preview" pinned={[{ kind: "website", title: site.siteHost, href: "/preview/strelva/website-connect", id: site.systemId, current: true }]}
     notice={<span>Fictional interface fixture · no live verification, publication or DNS changes</span>}>{children}</StrelvaShell></div>;
 }
 

@@ -1,6 +1,7 @@
 import { askBusinessFactInputSchema, type AskWorkspaceDraftPort } from "./workspace-drafts";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
+import type { RecordedActor } from "@/platform/presentation/actor";
 import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types";
 import { authorizeAskTool, type AskAuthoritySnapshot } from "./authority";
 import { ASK_TOOL_CATALOG, type AskChangeKind, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
@@ -28,6 +29,8 @@ export interface AskReceiptItem {
   /** Ids of what was created (events, Requests, Possibilities). */
   ids: string[];
   summary: string;
+  actor?: RecordedActor | null;
+  agencyName?: string | null;
   needsYou?: AskNeedsYouRouting;
 }
 
@@ -235,7 +238,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
                 throw error;
               });
             if (filed instanceof AskAgencyRequiredError) return { success: false, error: filed.message, agentResultStatus: "failed" };
-            ctx.onReceipt({ kind: "request", toolId: "draft_system_change", status: "filed", ids: [filed.id], summary: "Native app work requested at Asked." });
+            ctx.onReceipt({ kind: "request", toolId: "draft_system_change", status: "filed", ids: [filed.id], agencyName: filed.agencyName, actor: filed.actor, summary: "Native app work requested at Asked." });
             return { success: true, requestId: filed.id, agentResultStatus: "queued", nextStep: "Filed at Asked. Scope and timing still need agreement; nothing went live." };
           }
           nativeReadRequired = true;
@@ -360,7 +363,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             read: input.alreadyRead ?? [], askedOnBehalf: ctx.askedOnBehalf, topic: input.topic,
             idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
           });
-          ctx.onReceipt({ kind: "request", toolId: "create_request", status: "filed", ids: [filed.id], summary: input.outcome.slice(0, 300) });
+          ctx.onReceipt({ kind: "request", toolId: "create_request", status: "filed", ids: [filed.id], agencyName: filed.agencyName, actor: filed.actor, summary: input.outcome.slice(0, 300) });
           return { success: true, requestId: filed.id, agentResultStatus: "queued", message: `Filed for ${filed.agencyName} at Asked. Scope and timing get agreed next; nothing is accepted yet.` };
         } catch (error) {
           ctx.onReceipt({ kind: "request", toolId: "create_request", status: "failed", ids: [], summary: "Could not file the Request." });
@@ -418,7 +421,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
                 outcome: input.intent, read: [error.message], askedOnBehalf: ctx.askedOnBehalf, topic: input.title,
                 idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
               });
-              ctx.onReceipt({ kind: "request", toolId: "open_possibility", status: "filed", ids: [filed.id], summary: input.intent.slice(0, 300) });
+              ctx.onReceipt({ kind: "request", toolId: "open_possibility", status: "filed", ids: [filed.id], agencyName: filed.agencyName, actor: filed.actor, summary: input.intent.slice(0, 300) });
               return { success: true, requestId: filed.id, agentResultStatus: "queued", message: `This needs work beyond the supported working page-set candidate. Filed your original ask for ${filed.agencyName} at Asked. Scope and timing still need agreement; no working flow or live change is claimed.` };
             } catch { /* Report the failed filing below. */ }
           }

@@ -61,5 +61,11 @@ export default async function TryPreview({ searchParams }: { searchParams: Promi
     const prepared = await prepareSitePatch({ document: published, ops: existingWebsitePageOperations(published, candidate), forceReview: true });
     fixture.view = { title: "An alternative for River Practice", intent: "A fictional native website alternative. Copy still needs owner review before Make real.", changes: ["The existing website with proposed consulting copy"], introduces: [], takesSubmissions: false, websiteDocument: prepared.document };
   }
+  if (fixture.kind === "ready") fixture.view = {
+    ...fixture.view,
+    businessName: state && state !== "ready" ? "River Practice" : "The Mooney Firm",
+    proposingActor: { kind: "agency", displayName: "North Studio" },
+    agencyBrand: { agencyId: "22222222-2222-4222-8222-222222222222", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" },
+  };
   return <PossibilityTry state={fixture} />;
 }
