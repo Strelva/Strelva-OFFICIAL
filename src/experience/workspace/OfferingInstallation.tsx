@@ -390,7 +390,7 @@ export function OfferingInstallView({
       <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "provider_requested"} onChange={() => { setOperator("provider_requested"); setProviderName(""); }} /><span>Request an agency</span></label>
       {operator === "provider_requested" ? <div className={styles.nestedFields}>
         <label><span>Requested agency</span><select required value={agencyWorkspaceId} onChange={event => { setAgencyWorkspaceId(event.target.value); setProviderName(agencyChoices.providers.find(item => item.agencyWorkspaceId === event.target.value)?.name ?? ""); }}><option value="">Choose an agency</option>{agencyChoices.providers.map(item => <option key={item.agencyWorkspaceId} value={item.agencyWorkspaceId}>{item.name}</option>)}</select></label>
-        {agencyChoices.loading ? <p role="status">Loading agency choices…</p> : agencyChoices.error ? <p role="alert">{agencyChoices.error}</p> : !agencyChoices.providers.length ? <p>Choose an agency in business access before requesting work.</p> : null}
+        {agencyChoices.loading ? <p role="status">Loading agency choices…</p> : agencyChoices.error ? <p role="alert">{agencyChoices.error}</p> : !agencyChoices.providers.length ? <p>Bring in an agency from Help before requesting work.</p> : null}
         <label><span>Request note (optional)</span><textarea maxLength={500} value={requestNote} onChange={event => setRequestNote(event.target.value)} /></label>
         <p className={styles.blocked}>This records your request. It does not confirm the agency accepted the work.</p>
       </div> : null}

@@ -26,9 +26,9 @@ describe("agency copy across public artifacts", () => {
     expect(html).toContain("Prepared by Northside &amp; Web on Strelva.");
     expect(html).toContain("https://north.example/contact?from=check&amp;kind=fix");
     expect(html).toContain("Ask your web provider");
-    expect(html).not.toContain("Ask Strelva"); expect(html).not.toContain("Let Strelva handle it");
+    expect(html).not.toContain("Ask Strelva"); expect(html).not.toContain("Ask Strelva Agency");
     expect(html).not.toContain("every issue in this report fixed");
-    expect(renderAuditReport(audit)).toContain("Let Strelva handle it");
+    expect(renderAuditReport(audit)).toContain("Ask Strelva Agency");
     expect(renderAuditReport(audit)).toContain("Ask Strelva");
   });
   it("brands AI HTML and rendered result, retaining the platform credit and agency contact", () => {

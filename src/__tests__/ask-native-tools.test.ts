@@ -13,7 +13,7 @@ function harness() {
   const ctx: AskToolsContext = { workspaceId, systemId, tenantId: null, actor: { userId: workId, verifiedEmail: "owner@example.test" }, role: "owner",
     origin: "owner_interpreted", askedOnBehalf: null, lastUserText: "Rename our app to Requests", turnId: workId, tenantTools: null,
     authority: { read: vi.fn<AskToolsContext["authority"]["read"]>(async () => ({ role: "owner", exited: false, site: null, googleWriteGranted: false, inquiriesEnabled: false })) },
-    nativeSystems, needsYou: { submit: vi.fn() }, requests: { file: vi.fn<AskToolsContext["requests"]["file"]>(async () => ({ id: workId, status: "requested" })), list: vi.fn() },
+    nativeSystems, needsYou: { submit: vi.fn() }, requests: { agency: vi.fn(), file: vi.fn<AskToolsContext["requests"]["file"]>(async () => ({ id: workId, status: "requested", agencyName: "North Studio" })), list: vi.fn() },
     possibilities: { open: vi.fn(), list: vi.fn() }, onReceipt: vi.fn() };
   const tools = buildAskTools(ctx);
   async function execute(name: "read_system" | "draft_system_change", value: unknown) {

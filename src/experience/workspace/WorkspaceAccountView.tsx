@@ -57,7 +57,7 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
           </StSection>
           {releaseOpen && emailConfirmed && payerInbox ? <StSection title="Payer requests"><p>Review financial responsibility addressed to this verified account. Accepting does not grant access to a business or its saved work.</p>{payerInbox}</StSection> : null}
           <StSection title="Managed websites">
-            <StRows><StRow title="Your websites are part of your Strelva work" detail="Each site keeps its own people, settings, and agreed service." end={<StTextButton href={managedHref} tone="accent">Open managed websites</StTextButton>} /></StRows>
+            <StRows><StRow title="Your websites are part of your Strelva work" detail="Each site keeps its own people and settings." end={<StTextButton href={managedHref} tone="accent">Open managed websites</StTextButton>} /></StRows>
           </StSection>
           <StSection title="Billing"><StEmpty>Manage website billing from that site’s settings. New paid product plans are not available here yet; your existing service agreement still applies.</StEmpty></StSection>
         </StPage>

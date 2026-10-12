@@ -54,10 +54,10 @@ describe("shared app frame accessibility contract", () => {
       signOut: createElement("button", { type: "button" }, "Sign out"),
       children: createElement("p", null, "Workspace"),
     };
-    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "All apps and files".
+    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "All files and results".
     // The Customers page is retired in both states (October 6); its old address opens Home.
     const before = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
-    expect(before).toContain("All apps and files");
+    expect(before).toContain("All files and results");
     expect(before).not.toContain(">Customers<");
     expect(before).not.toContain('href="/workspace?view=customers"');
     expect(before).not.toContain("All systems and files");

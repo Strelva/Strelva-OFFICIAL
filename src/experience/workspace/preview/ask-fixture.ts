@@ -34,7 +34,7 @@ function scripted(text: string, workspaceId: string, systemId: string | null, sa
     return ["I can't approve anything from the conversation. Approve it in Needs you, or from the link in your email, so the approval stays tied to that exact change.", result({ kind: "refusal", items: [{ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: "approval_in_chat" }] })];
   }
   if (/booking|private events|new page/.test(words)) {
-    return ["__TOOL__Checking your Requests...\n", "Strelva runs your site, so I filed this for Strelva: ", "\"A private events page\". It's at Asked. ", "Strelva will agree scope and timing with you next. Nothing on your site changed.",
+    return ["__TOOL__Checking your Requests...\n", "Strelva Agency works on this business, so I filed this for Strelva Agency: ", "\"A private events page\". It's at Asked. ", "Strelva Agency will agree scope and timing with you next. Nothing on your site changed.",
       result({ kind: "request", items: [{ kind: "request", toolId: "create_request", status: "filed", ids: ["c7a1e0b2-0000-4000-8000-000000000009"], summary: "A private events page on the site" }] })];
   }
   if (/top|hero|holiday|change|add/.test(words)) {

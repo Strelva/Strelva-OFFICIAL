@@ -74,8 +74,11 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ email: "owner@example.com" }),
     }));
 
-    expect(html).toContain("Workspace access is invite-only");
-    expect(html).toContain("Request your build");
+    expect(html).toContain("New accounts open soon");
+    // The closed door points at the free check; Strelva Agency is one labeled choice (ADR 0015).
+    expect(html).toContain('href="/audit"');
+    expect(html).toContain("Want it done for you? Ask Strelva Agency");
+    expect(html).not.toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });
 
@@ -156,7 +159,7 @@ describe("auth access pages", () => {
     expect(signIn).toContain("&quot;next&quot;:&quot;/workspace&quot;");
     expect(signIn).not.toContain("AI Visibility");
     expect(signUp).toContain("Create your account");
-    expect(signUp).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+    expect(signUp).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
     expect(signUp).toContain("Already have an account? Sign in");
   });
 
@@ -193,7 +196,7 @@ describe("auth access pages", () => {
     const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
     expect(html).not.toContain("Who is this for?");
     expect(html).toContain("Create your account");
-    expect(html).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+    expect(html).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
   });
 
   it("preserves a supported public-result destination through general signup", async () => {
@@ -331,7 +334,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ next: "https://evil.example/private" }),
     }));
 
-    expect(html).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+    expect(html).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
     expect(html).not.toContain("evil.example");
   });
 });

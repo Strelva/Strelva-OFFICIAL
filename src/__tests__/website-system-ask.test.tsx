@@ -56,7 +56,7 @@ describe("Ask for a change on a managed website files a Request", () => {
     const body = JSON.parse(String((filed as unknown as [string, RequestInit])[1].body));
     expect(body).toMatchObject({ action: "ask", workspaceId: BUSINESS, systemId: SITE, request: "New office hours in the footer" });
     expect(body.idempotencyKey).toMatch(/^site-change:/);
-    expect(node.querySelector("[role=status]")?.textContent).toContain("Filed for Strelva. It's at Asked");
+    expect(node.querySelector("[role=status]")?.textContent).toContain("Filed for your agency. It's at Asked");
     expect(node.querySelector("textarea")!.value).toBe("");
     expect(onAsk).not.toHaveBeenCalled();
     expect(request.mock.calls.filter(([url]) => String(url).startsWith("/api/workspace/systems/website")).length).toBe(2);

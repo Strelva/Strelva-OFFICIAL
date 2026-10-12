@@ -152,7 +152,7 @@ describe("POST /api/workspace/systems/make-real", () => {
       deps.throughNeedsYou.mockResolvedValue({ status: "failed", result: null, reason: "make_real_refused: live changed" });
       const response = await call();
       expect(response.status).toBe(409);
-      expect(await response.json()).toMatchObject({ error: "Make real could not start. Nothing changed. Strelva is on it." });
+      expect(await response.json()).toMatchObject({ error: "Make real could not start. Nothing changed. Try again in a moment." });
     });
 
     it("still refuses a non-owner before reaching Needs you", async () => {

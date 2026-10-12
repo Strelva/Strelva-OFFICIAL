@@ -40,7 +40,7 @@ export function WorkspaceReviewsView({ workspaceId, state, publishing = false }:
   const data = state.kind === "ready" ? state.data : null;
   return <PublishingPage workspaceId={workspaceId} title="Reviews" meta="What customers said about you, with your replies. Strelva drafts a reply for each new review." state={state} errorTitle="Reviews couldn't load" errorBody="Nothing changed on your listing. Reload the page to try again.">
     {data?.denied.length ? <StNotice>Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
-    {data && !data.sites.length && !data.denied.length ? <StEmpty>No site is connected to this business yet. Reviews show here once Strelva runs a site and its Google listing for this business.</StEmpty> : null}
+    {data && !data.sites.length && !data.denied.length ? <StEmpty>No site is connected to this business yet. Reviews show here once a site and its Google listing are connected.</StEmpty> : null}
     {data?.sites.map(site => {
       const summary = reviewSummary(site.reviews);
       const url = buildGoogleReviewLink(site.googlePlaceId);

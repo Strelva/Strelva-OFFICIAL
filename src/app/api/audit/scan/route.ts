@@ -11,10 +11,13 @@ import { findingsFromCategories, stripFabricatedEstimates } from "@/lib/lead-aud
 import type { AuditResult } from "@/lib/audit/types";
 
 import { saveAuditReport } from "@/lib/audit-report-store";
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 
 async function retainedResponse(raw: AuditResult, agency?: AgencyAttribution) {
   const result = attributedAudit(raw, agency);
   const reportId = await saveAuditReport(result, { name: "", email: "", url: result.url });
+  // Funnel (ADR 0015): a check ran, from the direct door or an agency prospecting.
+  if (reportId) void recordFunnelEvent("check_run", `audit_${reportId}`, { agencyWorkspaceId: agency?.workspaceId ?? null });
   return NextResponse.json({ ...result, ...(agency ? { findings: findingsFromCategories(result.categories) } : {}), ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
 }
 

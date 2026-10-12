@@ -44,11 +44,11 @@ describe("template creation and recovery", () => {
   });
   it("offers a Request when only Strelva may build the tool, and creates nothing", async () => {
     const onRequest = vi.fn();
-    const request = vi.fn(async () => new Response(JSON.stringify({ error: "Ask Strelva to build this.", code: "make_systems_required" }), { status: 403 })) as unknown as typeof fetch;
+    const request = vi.fn(async () => new Response(JSON.stringify({ error: "Ask for this to be built.", code: "make_systems_required" }), { status: 403 })) as unknown as typeof fetch;
     const node = await render(request, { onRequest });
     await act(async () => button(node, "Create internal tool").click());
     expect(request).toHaveBeenCalledTimes(1);
-    expect(node.textContent).toContain("Ask Strelva to build this.");
+    expect(node.textContent).toContain("Ask for this to be built.");
     expect(node.querySelector('[role="alert"]')).toBeNull();
     expect(node.textContent).not.toContain("Your private tool is ready");
     await act(async () => button(node, "Ask Strelva to build this").click());

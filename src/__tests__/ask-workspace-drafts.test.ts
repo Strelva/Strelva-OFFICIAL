@@ -16,7 +16,7 @@ function context(): AskToolsContext {
   return { workspaceId: WS, systemId: null, tenantId: "fictional", actor, role: "owner", origin: "owner_interpreted", askedOnBehalf: null,
     lastUserText: "Change our phone", turnId: ID, tenantTools: null,
     authority: { read: vi.fn(async () => ({ role: "owner", exited: false, site: { state: "linked", tenantActive: true }, googleWriteGranted: false, inquiriesEnabled: true })) },
-    requests: { file: vi.fn(), list: vi.fn() }, possibilities: { open: vi.fn(), list: vi.fn() }, needsYou: { submit: vi.fn(async () => route) },
+    requests: { agency: vi.fn(), file: vi.fn(), list: vi.fn() }, possibilities: { open: vi.fn(), list: vi.fn() }, needsYou: { submit: vi.fn(async () => route) },
     workspaceDrafts: { businessFact: vi.fn(async () => ({ draftId: ID, routing: route })), inquiryReply: vi.fn(async () => ({ eventIds: ["event-one"] })), readBusiness: vi.fn(async () => ({ revision: 3, facts: {}, services: [], people: [] })) },
     onReceipt: vi.fn(),
   } as AskToolsContext;

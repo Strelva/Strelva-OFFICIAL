@@ -1,3 +1,4 @@
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
 import { attributedAiVisibility } from "@/products/ai-visibility/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -74,6 +75,8 @@ export async function POST(request: NextRequest) {
     const shareUrl = stored
       ? new URL(`/ai-visibility/${stored.id}`, request.url).toString()
       : null;
+    // Funnel (ADR 0015): a check ran, from the direct door or an agency prospecting.
+    if (stored?.id) void recordFunnelEvent("check_run", stored.id, { agencyWorkspaceId: agency?.workspaceId ?? null });
     return NextResponse.json({ ...result, scanId: stored?.id ?? null, shareUrl });
   } catch (err) {
     if (err instanceof AgencyProspectingError) return NextResponse.json({ error: err.message }, { status: err.status });

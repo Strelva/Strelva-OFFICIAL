@@ -42,7 +42,7 @@ function harness(history: AskHistoryPort | undefined, reply: string | null = "Yo
     googleWriteGranted: async () => false,
     inquiriesEnabled: () => false,
     needsYou: createTenantEventNeedsYouAdapter(),
-    requests: { file: async () => ({ id: "req-1", status: "requested" }), list: async () => [] },
+    requests: { agency: async () => ({ kind: "none" }), file: async () => ({ id: "req-1", status: "requested", agencyName: "North Studio" }), list: async () => [] },
     possibilities: createPossibilityAdapter(createInMemoryPossibilityRepository(), { durable: false, newId: () => "poss-1", now: () => at }),
     async stream(input, consume) {
       modelCalls.push({ messages: input.messages });

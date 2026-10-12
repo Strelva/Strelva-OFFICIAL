@@ -208,7 +208,7 @@ async function pendingWorkspaceSwitchSurvives(page: Page, section: "work" | "set
   await expect.poll(() => releaseTarget.length).toBeGreaterThan(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("link", { name: section === "settings" ? "Business details" : "All apps and files", exact: true })
+    .getByRole("link", { name: section === "settings" ? "Business details" : "All files and results", exact: true })
     .click();
 
   targetReady = true;
@@ -267,7 +267,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
   await page.getByText("More ready-made systems and services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Ready-made systems", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
@@ -529,7 +529,7 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What changed", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Recent work", exact: true }).getByRole("link", { name: "Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
   await page.getByText("More ready-made systems and services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Ready-made systems", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
@@ -868,7 +868,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
   await page.getByText("More ready-made systems and services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Ready-made systems", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
@@ -1030,7 +1030,7 @@ test("recovers the same assessment after a lost response and reload", async ({ p
     return fulfill(route,{work:work()});
   });
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Ready-made", exact: true }).click();
   await page.getByText("More ready-made systems and services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Ready-made systems", exact: true })).toBeVisible();
   await page.getByRole("button",{name:"AI Visibility: Start", exact:true}).click();

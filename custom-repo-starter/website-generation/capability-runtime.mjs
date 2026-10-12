@@ -268,7 +268,7 @@ function mountBooking(root, config, api) {
     const native = schedule.bookingAuthority === "business";
     const visitorTimeZone = native ? new Intl.DateTimeFormat().resolvedOptions().timeZone : schedule.timeZone;
     const wrapper = element("section", undefined, { "aria-label": schedule.name });
-    wrapper.append(element("h2", schedule.name), element("p", native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${schedule.provider === "outlook" ? "Outlook" : "Google Calendar"} will confirm the reservation.`));
+    wrapper.append(element("h2", schedule.name), element("p", native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`));
     if (native) wrapper.append(element("p", `Times shown in ${visitorTimeZone}.`));
     const form = element("form", undefined, { "aria-label": "Reserve a time" });
     const slotSelect = element("select", undefined, { id: "strelva-booking-slot", name: "slot" });
@@ -305,7 +305,7 @@ function mountBooking(root, config, api) {
     const updateReceipt = () => {
       receiptRoot.replaceChildren();
       if (!receipt) return;
-      receiptRoot.append(element("h3", receipt.title), element("p", slotLabel(receipt, native ? visitorTimeZone : receipt.timeZone)), element("p", receipt.status === "confirmed" ? native ? "The business confirmed this booking." : `${currentSchedule.provider === "outlook" ? "Outlook" : "Google Calendar"} confirmed this reservation.` : receipt.status === "cancelled" ? "This reservation is cancelled." : native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this reservation yet. Check the calendar before trying again.", { role: "status" }));
+      receiptRoot.append(element("h3", receipt.title), element("p", slotLabel(receipt, native ? visitorTimeZone : receipt.timeZone)), element("p", receipt.status === "confirmed" ? native ? "The business confirmed this booking." : `${currentSchedule.provider === "outlook" ? "Outlook" : "Google Calendar"} confirmed this booking.` : receipt.status === "cancelled" ? "This booking is cancelled." : native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this booking yet. Check the calendar before trying again.", { role: "status" }));
       if (receipt.status === "cancelled") return;
       if (receipt.status === "pending") {
         const check = element("button", native ? "Check request status" : "Check booking status", { type: "button" });

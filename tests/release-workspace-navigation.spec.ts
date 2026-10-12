@@ -39,7 +39,7 @@ test("touch navigation keeps 44px targets and 320px reflow", async ({ browser },
   expect((await menu.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   await menu.click();
   const nav = page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
-  for (const name of ["Home", "Requests", "Running", "Business details", "All apps and files"]) {
+  for (const name of ["Home", "Requests", "Running", "Business details", "All files and results"]) {
     const box = await nav.getByRole("link", { name, exact: true }).boundingBox();
     expect(box!.height, name).toBeGreaterThanOrEqual(44);
   }

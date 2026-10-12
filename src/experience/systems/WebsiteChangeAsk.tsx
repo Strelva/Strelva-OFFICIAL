@@ -64,7 +64,7 @@ export function WebsiteChangeAsk({ workspaceId, systemId, siteName, onFiled, onC
       attempt.current = null;
       setUnconfirmed(false);
       setWords("");
-      setNotice({ tone: "status", text: "Filed for Strelva. It's at Asked; Strelva agrees scope and timing with you next. Nothing on the site changed." });
+      setNotice({ tone: "status", text: "Filed for your agency. It's at Asked; they agree scope and timing with you next. Nothing on the site changed." });
       onFiled(filed.data.requestId);
     } catch {
       setUnconfirmed(true);

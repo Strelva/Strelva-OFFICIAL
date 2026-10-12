@@ -23,6 +23,22 @@ first. This page is the full list of what the launch contains.
 [What Strelva becomes at 1.0.0](./product-model.md) is the product model behind
 it, area by area.
 
+## October 11 (later): two doors
+
+[ADR 0015](../../../docs/adr/0015-two-doors-self-serve-and-agencies.md): 1.0.0
+has two doors into one product. **Use it yourself:** a new business signs up,
+lands on business creation, makes its own Systems, approves and makes them
+real, pays for its own plan, and leaves, with no human service. **Run it for
+others:** agencies use the three zooms below. A business gets work done for it
+only through **Bring in an agency**: a list (Strelva Agency is listed like any
+agency), per-area Prepare or Full control, accepted by the agency first, one
+Full-control agency per area. Requests go to the business's recorded agency,
+never to Strelva by default. Usage pauses at the payer's cap. Prices and caps
+are Jacob's; the structure is in the
+[pricing model](../../../docs/research/two-doors-pricing-model-2026-10-11.md).
+Implementation: branch `two-doors/1.0-20261011` (migrations 20261023140000–
+20261023144000, held and unapplied).
+
 ## October 11: one model at three zooms
 
 [ADR 0014](../../../docs/adr/0014-one-model-at-three-zooms.md) selects agency

@@ -306,7 +306,7 @@ a production step. These are the ones that change more than one spec:
 | Twin Trees | Ask the owner: one business with two locations (default), or two (`--separate-business`) | agency-and-versions, money-and-data |
 | Existing clients' terms | Kept; the flat plan is for new businesses | money-and-data |
 | When to set the price | After 30 days of measured agency delivery minutes on converted clients | money-and-data |
-| Can owners build Systems | No at 1.0.0; they file a Request | systems-catalog, ADR 0011 |
+| Can owners build Systems | Yes at 1.0.0: owners and admins make their own business's Systems; members ask (ADR 0015, Oct 11, reverses the earlier "No") | systems-catalog, ADR 0015 |
 | Google listing as its own System | Yes, with blog inside the website | publishing |
 | Approving a record change also approves its Google write | Needs Jacob's yes; narrows the AGENTS.md rule | publishing, needs-you |
 

@@ -131,13 +131,13 @@ describe("business home", () => {
     expect(main).toContain("Unknown");
   });
 
-  it("tells an empty business that Strelva builds its systems, without a build-it-yourself prompt", () => {
+  it("tells an empty business it can ask or bring in an agency (ADR 0015)", () => {
     const html = renderToStaticMarkup(createElement(BusinessHome, {
       snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systems: [], files: [], systemsReleased: true,
     }));
     expect(html).toContain("Nothing is running yet.");
-    expect(html).toContain("once Strelva builds them");
+    expect(html).toContain("Ask for what you need below, or bring in an agency from Help");
     expect(html).not.toContain("Get or build");
   });
 
@@ -177,7 +177,7 @@ describe("business home", () => {
     expect(html).toContain("2 saved results");
     expect(html).toContain("1 connected website");
     expect(html).toContain(">Recent<");
-    expect(html).toContain("All apps and files (2)");
+    expect(html).toContain("All files and results (2)");
     expect(html).toContain("Open Mediation intake");
     expect(html).toContain("Open AI check");
     expect(html).toContain("aria-label=\"Website and apps\"");

@@ -190,7 +190,7 @@ export function WorkspaceBookings({ workspaceId, state, view, rulesEnabled = fal
             {ready!.sites.length === 0 ? (
               <StEmpty>
                 <h2 className="text-lg font-medium">{ready!.native ? "Your Bookings System is not set up yet" : "No booking site is connected to this business yet"}</h2>
-                <p className="mt-2 text-sm leading-6 text-gray-muted">{ready!.native ? "Ask Strelva to prepare bookings for this business through a Request. A website is optional." : "Bookings show here once Strelva runs a site that takes them for this business."}</p>
+                <p className="mt-2 text-sm leading-6 text-gray-muted">{ready!.native ? "Set up bookings for this business yourself, or ask your agency. A website is optional." : "Bookings show here once a site that takes them is connected."}</p>
               </StEmpty>
             ) : ready!.sites.map((site) => <SiteSection key={site.tenantId} site={site} bookings={ready!} workspaceId={workspaceId} many={ready!.sites.length > 1} rulesEnabled={rulesEnabled} />)}
           </>

@@ -6,8 +6,11 @@ import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 const mocks = vi.hoisted(() => ({
   rpc: vi.fn(), score: vi.fn(), saveResult: vi.fn(), getResult: vi.fn(), saveLead: vi.fn(), getLeadToken: vi.fn(),
   rate: vi.fn(), redisGet: vi.fn(), audit: vi.fn(), saveReport: vi.fn(), email: vi.fn(), slack: vi.fn(), session: vi.fn(),
+  funnel: vi.fn(async () => undefined),
 }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+// Funnel measurement is its own module (ADR 0015); these tests watch attribution reads only.
+vi.mock("@/platform/infra/funnel", () => ({ recordFunnelEvent: mocks.funnel }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/products/ai-visibility/server", async importOriginal => ({
   ...await importOriginal<object>(), scoreAiVisibility: mocks.score, saveAiVisibilityResult: mocks.saveResult, getAiVisibilityResult: mocks.getResult,

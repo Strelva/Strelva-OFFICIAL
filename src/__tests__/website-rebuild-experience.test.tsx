@@ -141,6 +141,15 @@ describe("website rebuild review", () => {
     expect(button("Publish approved website").disabled).toBe(true);
     expect(button("Choose forms").disabled).toBe(true);
   });
+  const visibleDomainInput = () => [...container.querySelectorAll<HTMLInputElement>('input[placeholder="your-business.com"]')].some(input => !input.closest("[hidden]"));
+  it("lets a self-serve owner connect a domain to the published site, and keeps it hidden without publish authority (ADR 0015)", async () => {
+    const record = fixtureRebuild(); record.status = "published"; record.approved = true; record.candidate!.facts = {}; record.publishedUrl = "https://bakery.example.test";
+    await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true, canPublish: true }));
+    expect(visibleDomainInput()).toBe(true);
+    await act(async () => root!.unmount()); container.remove();
+    await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true }));
+    expect(visibleDomainInput()).toBe(false);
+  });
   it("stops new creation while rebuild release is off and opens native intake when enabled", async () => {
     await mount(createElement(WebsiteExperience, { workspaceId: fixtureRebuild().workspaceId }));
     expect(container.textContent).toContain("Website creation is unavailable");

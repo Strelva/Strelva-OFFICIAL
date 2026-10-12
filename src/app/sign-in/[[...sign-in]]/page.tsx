@@ -16,7 +16,7 @@ import { WorkspaceSignIn } from "@/experience/workspace/WorkspaceSignIn";
 
 export const metadata: Metadata = {
   title: "Sign in to your Strelva work",
-  description: "Sign in to Strelva to continue your work or open your managed website.",
+  description: "Sign in to run your business on Strelva, yourself or with your agency.",
 };
 
 export const dynamic = "force-dynamic";

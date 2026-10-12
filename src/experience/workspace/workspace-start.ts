@@ -370,7 +370,7 @@ function requestsWebsiteService(request: string): boolean {
   if (requestsSelfService(request)) return false;
   if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
   const agencyFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
-  return agencyFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+  return agencyFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\b(?:strelva|an? agency)\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
 }
 
 function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
@@ -381,9 +381,9 @@ function websiteServicePlan(request: string, context: WorkspaceStartContext): Wo
   return {
     ...plan,
     deliveryMode: "service",
-    title: "Have Strelva build your website",
+    title: "Have an agency build your website",
     summary: "Keep your brief together for a website delivery request. You do not need to build the website yourself.",
-    nextAction: "Review the request with Strelva. Scope, price and the delivery deadline require separate acceptance.",
+    nextAction: "Choose an agency and review the request with them. Scope, price and the delivery deadline require separate acceptance.",
     status: reason ? "blocked" : "help",
     reason,
     canContinue: !reason,

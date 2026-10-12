@@ -185,7 +185,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     itemId: string;
     revision: string;
     decision: Decision;
-    by: { kind: "owner_link"; recipient: string } | { kind: "session"; actor: WorkspaceActor };
+    /** `agency`: a staffed member of the agency with full control of this item's scope (ADR 0015); SQL decides. */
+    by: { kind: "owner_link"; recipient: string } | { kind: "session"; actor: WorkspaceActor } | { kind: "agency"; actor: WorkspaceActor };
   }): Promise<DecideResult> {
     const item = await deps.store.read(input.workspaceId, input.itemId);
     if (!item) return { status: "not_found", item: null };
@@ -195,7 +196,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const adapter = adapterFor(item.sourceLifecycle);
     if (!adapter) return { status: "failed", item };
 
-    let memberActor: WorkspaceActor | null = input.by.kind === "session" ? input.by.actor : null;
+    let memberActor: WorkspaceActor | null = input.by.kind === "session" || input.by.kind === "agency" ? input.by.actor : null;
     let linkService: ServiceSession | null = null;
     if (input.by.kind === "owner_link") {
       // A link never performs access, money or exit.
@@ -239,7 +240,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         itemId: item.id,
         revision: input.revision,
         decision: input.decision,
-        by: input.by.kind === "owner_link" ? "owner_link" : "session",
+        by: input.by.kind === "owner_link" ? "owner_link" : input.by.kind === "agency" ? "agency" : "session",
         ...(input.by.kind === "owner_link" ? { recipient: input.by.recipient } : { actor: input.by.actor }),
       });
     } catch (error) {

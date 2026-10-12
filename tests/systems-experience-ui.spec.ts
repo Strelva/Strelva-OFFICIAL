@@ -177,7 +177,7 @@ test("with Systems off, Home is the pre-Systems workspace and System links open 
   await expect(navigation.getByRole("region", { name: "Website and apps", exact: true })).toBeVisible();
   // The Customers page is retired in both states (October 6).
   await expect(navigation.getByRole("link", { name: "Customers", exact: true })).toHaveCount(0);
-  await expect(navigation.getByRole("link", { name: "All apps and files", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "All files and results", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Make real|Compare/ })).toHaveCount(0);
 
   // A System deep link opens Home instead of a System page.

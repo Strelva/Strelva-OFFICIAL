@@ -19,8 +19,8 @@ const workspaceId = "workspace-a";
 const AUTHORITY: Record<string, MakeSystemsAuthority> = {
   operator: "provider",
   agency: "agency",
-  owner: "member",
-  admin: "member",
+  owner: "owner",
+  admin: "owner",
   member: "member",
 };
 
@@ -75,12 +75,19 @@ describe("make_systems for internal tools", () => {
     expect(created).toEqual([{ via: "createSystem", by: "operator" }, { via: "createSystem", by: "agency" }]);
   });
 
-  it.each([owner, admin, member])("tells %s.userId to ask Strelva and creates nothing", async (actor) => {
+  it.each([owner, admin])("lets the business's own %s.userId make its tools (ADR 0015)", async (actor) => {
+    const { store, created } = makerStore();
+    const made = await createApplicationService(store).create(actor, workspaceId, spec(actor.userId));
+    expect(made.createdBy).toBe(actor.userId);
+    expect(created).toEqual([{ via: "createSystem", by: actor.userId }]);
+  });
+
+  it.each([member])("tells %s.userId to ask an owner, admin or agency and creates nothing", async (actor) => {
     const { store, created } = makerStore();
     const service = createApplicationService(store);
     const attempt = service.create(actor, workspaceId, spec(actor.userId));
     await expect(attempt).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
-    await expect(service.create(actor, workspaceId, spec(actor.userId))).rejects.toThrow("Ask your agency, or find one.");
+    await expect(service.create(actor, workspaceId, spec(actor.userId))).rejects.toThrow("Ask an owner or admin of this business, or its agency.");
     expect(created).toEqual([]);
   });
 
@@ -95,16 +102,16 @@ describe("make_systems for internal tools", () => {
     const { store } = makerStore();
     const service = createApplicationService(store);
     const app = await service.create(operator, workspaceId, spec(operator.userId));
-    await expect(service.revise(owner, app.id, { expectedDesignRevision: 0, spec: { ...spec(operator.userId), title: "Owner edit" } }))
+    await expect(service.revise(member, app.id, { expectedDesignRevision: 0, spec: { ...spec(operator.userId), title: "Member edit" } }))
       .rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
-    await expect(service.rehearse(admin, app.id, { expectedDesignRevision: 0 })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
-    await expect(service.command(owner, app.id, { kind: "retire", expectedRevision: 0 })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
+    await expect(service.rehearse(member, app.id, { expectedDesignRevision: 0 })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
+    await expect(service.command(member, app.id, { kind: "retire", expectedRevision: 0 })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
 
     await service.rehearse(operator, app.id, { expectedDesignRevision: 0 });
     await service.publish(operator, app.id, { expectedCandidateRevision: 0, expectedReleaseVersion: null });
     const approved = await service.publish(owner, app.id, { expectedCandidateRevision: 0, expectedReleaseVersion: 1 });
     expect(approved.payload).toMatchObject({ release: { version: 2, publishedBy: owner.userId }, candidate: { designRevision: 0, spec: { maintenanceOwner: operator.userId } } });
-    await expect(service.revise(owner, app.id, { expectedDesignRevision: 0, spec: { ...spec(operator.userId), title: "Still no owner design grant" } })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
+    await expect(service.revise(member, app.id, { expectedDesignRevision: 0, spec: { ...spec(operator.userId), title: "Still no member design grant" } })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
 
     const runtime = await service.submit(member, app.id, { expectedReleaseVersion: 2, expectedRecordsRevision: 0, record: { id: "r1", values: { name: "Acme Co" } } });
     expect(runtime.records).toEqual([{ id: "r1", values: { name: "Acme Co" } }]);
@@ -120,7 +127,7 @@ describe("make_systems for internal tools", () => {
       } as never,
     });
     const input = { title: "Built app", files: { "build.mjs": "console.log('x')" }, budget: { maxAuthorizedCents: 500, estimateCents: 100 } };
-    await expect(service.create(owner, workspaceId, input)).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
+    await expect(service.create(member, workspaceId, input)).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
     expect(created).toEqual([]);
   });
 });

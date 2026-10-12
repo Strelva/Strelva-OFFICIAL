@@ -242,6 +242,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261020090013": "split_recovery_payouts",
   "20261020090014": "invoice_money_evidence",
   "20261020090015": "sandbox_build_attempts",
+  "20261023142000": "agency_scope_grants",
+  "20261023144000": "funnel_events",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

@@ -61,15 +61,18 @@ export async function POST(request: Request) {
     const body = decideInput.parse(await readWorkspaceBody(request, 2_000));
     if (await isRateLimitedWindowedAsync(`workspace:needs-you:${actor.userId}`, 30, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     const workspace = await memberWorkspace(actor, body.workspaceId);
-    if (!workspace) return workspaceJson({ error: "This business is unavailable to your account." }, 403);
+    // ADR 0015: an agency with full control of an item's scope decides it as
+    // the agency. Its staff hold a seat, not a membership; SQL checks the grant.
+    const seat = workspace ? null : await import("@/products/agency-clients/server").then(module => module.providerSeatBusiness(actor, body.workspaceId)).catch(() => null);
+    if (!workspace && !seat) return workspaceJson({ error: "This business is unavailable to your account." }, 403);
     // Every item here is the owner's. A Strelva operator holding another seat
     // on the business never decides one (#530); claim_owner_decision refuses it too.
-    if (workspace.role !== "owner" && (await isSuperAdminUser(actor.userId))) {
+    if (workspace && workspace.role !== "owner" && (await isSuperAdminUser(actor.userId))) {
       return workspaceJson({ status: "forbidden", error: "The owner decides this. Nothing changed." }, 403);
     }
     // Confirmed business facts carry on to native websites (#509).
     const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
-    const result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({ ...body, by: { kind: "session", actor } });
+    const result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({ ...body, by: workspace ? { kind: "session", actor } : { kind: "agency", actor } });
 
     const status = result.status === "forbidden" || result.status === "not_owner" ? 403
       : result.status === "not_found" ? 404

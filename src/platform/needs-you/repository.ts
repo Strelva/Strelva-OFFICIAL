@@ -103,7 +103,7 @@ export interface NeedsYouStore {
   withdraw(workspaceId: string, itemId: string, reason: string): Promise<OwnerDecision>;
   read(workspaceId: string, itemId: string): Promise<OwnerDecision | null>;
   list(actor: WorkspaceActor, workspaceId: string, includeClosed: boolean): Promise<OwnerDecision[]>;
-  claim(input: { workspaceId: string; itemId: string; revision: string; decision: Decision; by: "owner_link" | "session" | "operator"; actor?: WorkspaceActor; recipient?: string }): Promise<ClaimResult>;
+  claim(input: { workspaceId: string; itemId: string; revision: string; decision: Decision; by: "owner_link" | "session" | "operator" | "agency"; actor?: WorkspaceActor; recipient?: string }): Promise<ClaimResult>;
   expire(workspaceId: string, itemId: string): Promise<OwnerDecision>;
   finish(workspaceId: string, itemId: string, outcome: "done" | "done_unverified" | "failed", reason: string | null, receiptRef: string | null): Promise<OwnerDecision>;
   recordDelivery(workspaceId: string, itemId: string, kind: "urgent" | "digest" | "reminder_1" | "reminder_2", status: "sent" | "suppressed" | "bounced" | "failed", recipient: string | null, providerMessageId: string | null, reason: string | null): Promise<OwnerDecision>;

@@ -159,6 +159,9 @@ describe("paper mail uses recorded actors independently of sender identity", () 
       expect(body).toContain("Actor not recorded · saved a reply");
       expect(body).not.toContain("Strelva handled");
     }
+    // Each receipt is its own line, never run together into one paragraph.
+    expect(renderPaperEmailHtml(mail)).not.toMatch(/Runs on Strelva\s+Strelva · checked/);
+    expect(mail.blocks.filter(block => block.kind === "paragraph" && /· (updated the website|checked the platform|saved a reply)/.test(block.text))).toHaveLength(3);
   });
 });
 

@@ -149,7 +149,7 @@ export interface AskRequestInput {
   words: string;
   /** What Strelva understood the outcome to be. */
   outcome: string;
-  /** What Strelva already read, for the operator. */
+  /** What Strelva already read, for the agency. */
   read: string[];
   askedOnBehalf: AskedOnBehalf | null;
   topic: string;
@@ -159,10 +159,29 @@ export interface AskRequestInput {
 export interface AskFiledRequest {
   id: string;
   status: "requested";
+  /** The agency the Request went to, by its display name. */
+  agencyName: string;
 }
 
-/** Files a Request to Strelva at Asked. Never claims the work is accepted. */
+/** The business's recorded agency, if any (ADR 0015: never a default). */
+export type AskAgency =
+  | { kind: "none" }
+  | { kind: "one"; agencyWorkspaceId: string; name: string }
+  | { kind: "several"; names: string[] };
+
+/** A Request needs exactly one recorded agency; the message says what to do next. */
+export class AskAgencyRequiredError extends Error {
+  constructor(readonly agency: Exclude<AskAgency, { kind: "one" }>) {
+    super(agency.kind === "none"
+      ? "This business has no agency yet. Make it yourself from Start, or bring in an agency from Help. Nothing was sent."
+      : "This business has more than one agency. Choose who should do this in Requests. Nothing was sent.");
+    this.name = "AskAgencyRequiredError";
+  }
+}
+
+/** Files a Request at Asked to the business's recorded agency. Never claims the work is accepted. */
 export interface AskRequestPort {
+  agency(actor: WorkspaceActor, workspaceId: string): Promise<AskAgency>;
   file(actor: WorkspaceActor, input: AskRequestInput): Promise<AskFiledRequest>;
   list(actor: WorkspaceActor, workspaceId: string): Promise<Array<{ id: string; request: string; status: string; accepted: string; updatedAt: string }>>;
 }
@@ -175,13 +194,25 @@ export interface ServiceRequestLike {
   updatedAt: string;
 }
 
-/** Adapter over src/platform/service-requests (provider `strelva`). */
+/** Pick the agency a Request goes to: the provider of record, else the only agency. */
+export function askAgencyFromOptions(options: Array<{ agencyWorkspaceId: string; name: string; providerOfRecord: boolean }>): AskAgency {
+  const ofRecord = options.filter(option => option.providerOfRecord);
+  const qualified = ofRecord.length ? ofRecord : options;
+  if (!qualified.length) return { kind: "none" };
+  if (qualified.length > 1) return { kind: "several", names: qualified.map(option => option.name) };
+  return { kind: "one", agencyWorkspaceId: qualified[0]!.agencyWorkspaceId, name: qualified[0]!.name };
+}
+
+/** Adapter over src/platform/service-requests, addressed to the business's recorded agency. */
 export function createServiceRequestAdapter(service: {
   execute(actor: WorkspaceActor, raw: unknown): Promise<ServiceRequestLike>;
   list(actor: WorkspaceActor, query: { businessId: string }): Promise<ServiceRequestLike[]>;
-}): AskRequestPort {
+}, readAgency: (actor: WorkspaceActor, workspaceId: string) => Promise<AskAgency>): AskRequestPort {
   return {
+    agency: readAgency,
     async file(actor, input) {
+      const agency = await readAgency(actor, input.workspaceId);
+      if (agency.kind !== "one") throw new AskAgencyRequiredError(agency);
       const saved = await service.execute(actor, {
         action: "save",
         businessId: input.workspaceId,
@@ -195,10 +226,10 @@ export function createServiceRequestAdapter(service: {
           alreadyRead: input.read.slice(0, 20),
         },
         scope: [input.topic.slice(0, 120)],
-        provider: { kind: "strelva" },
+        provider: { kind: "agency", agencyWorkspaceId: agency.agencyWorkspaceId },
         idempotencyKey: input.idempotencyKey,
       });
-      return { id: saved.id, status: "requested" };
+      return { id: saved.id, status: "requested", agencyName: agency.name };
     },
     async list(actor, workspaceId) {
       const rows = await service.list(actor, { businessId: workspaceId });

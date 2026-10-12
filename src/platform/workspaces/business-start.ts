@@ -10,6 +10,9 @@ export function businessStartHref(product: BusinessStartProduct): string {
   return `/workspace/business/new?start=${product}`;
 }
 
+/** Where "I run a business" lands after sign-up: create the business first (ADR 0015). */
+export const BUSINESS_SIGNUP_PATH = "/workspace/business/new";
+
 /** An agency request must not send its customer into the website generator. */
 export function businessStartView(product: BusinessStartProduct): Exclude<BusinessStartProduct, "website"> {
   return product === "website" ? "help" : product;
@@ -17,7 +20,7 @@ export function businessStartView(product: BusinessStartProduct): Exclude<Busine
 
 /** Static intent only. User-written briefs and credentials never travel in this URL. */
 export function businessStartAsk(product: BusinessStartProduct): string {
-  return product === "website" ? "Have Strelva build a website for my business." : "";
+  return product === "website" ? "Have an agency build a website for my business." : "";
 }
 
 /** @deprecated Use businessStartAsk. Existing launch tooling may keep this name. */
