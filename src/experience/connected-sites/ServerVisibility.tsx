@@ -121,7 +121,7 @@ function ServerVisibilityContent({ workspaceId, canManage, initial, suggestedHan
         <TextInput label="Page address" helperText="3 to 48 lowercase letters, numbers and hyphens." value={handle} readOnly={busy !== null || pageUnconfirmed} spellCheck={false} autoCapitalize="none" maxLength={48}
           onChange={event => { if (!pageFlight.current && !pageNeedsReload.current) { setHandle(event.target.value); setPageError(""); } }} />
         <div className="flex flex-wrap gap-3">
-          <StPill type="submit" busy={busy === "page"} disabled={busy !== null || pageUnconfirmed}>{page?.published ? "Save address" : "Publish page"}</StPill>
+          <StPill type="submit" busy={busy === "page"} disabled={busy !== null || pageUnconfirmed}>{page?.published ? "Save address" : "Make it live"}</StPill>
           {page?.published ? <StTextButton disabled={busy !== null || pageUnconfirmed} onClick={event => void savePage(event, false)}>Unpublish</StTextButton> : null}
         </div>
       </form></StSurface> : page?.published ? null : <p className={styles.body}>An owner or admin of this business publishes its page.</p>}

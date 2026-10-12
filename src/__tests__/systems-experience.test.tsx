@@ -213,7 +213,7 @@ describe("Make real and the System page", () => {
     const html = render();
     expect(html).toContain("<h1");
     expect(html).toContain('title="attymooney.com as visitors see it"');
-    for (const heading of ["Possibilities", "Make real", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
+    for (const heading of ["Possibilities", "Make it live", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
     expect(html).toContain("Live");
     expect(html).toContain("Unknown. Nothing has checked this yet.");
     expect(html).not.toContain("Not checked here yet");
@@ -302,7 +302,7 @@ describe("Make real and the System page", () => {
   it("gives a non-owner a visible permission state on Make real", () => {
     const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
     expect(html).toContain("Only an owner of this business can make a possibility real.");
-    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Make real/)).not.toBeNull();
+    expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Make it live/)).not.toBeNull();
   });
 
   it("explains a missing System without leaking another business", () => {

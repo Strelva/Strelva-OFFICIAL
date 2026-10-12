@@ -16,7 +16,7 @@ export function DocumentHistoryFixture({ state }: { state: string }) {
     const receipts: DocumentReceipt[] = [];
     if (state !== "empty") for (let revision = 1; revision <= (state.startsWith("history-") || state === "off" ? 45 : 4); revision += 1) {
       document = changeDocument(document, { kind: "edit", expectedRevision: revision - 1, title: document.title,
-        text: `${["First revision", "Replaced the fee table", "Fixed party numbering in section 2", "Added the confidentiality clause from the Erie County form"][(revision - 1) % 4]}.\nPrivate mediation agreement, revision ${revision}.` }, revision === 3 ? "preview-agency" : "preview-owner");
+        text: `${["First revision", "Replaced the fee table", "Fixed party numbering in section 2", "Added the confidentiality clause from the Erie County form"][(revision - 1) % 4]}.\nPrivate mediation agreement, Release ${revision}.` }, revision === 3 ? "preview-agency" : "preview-owner");
       const receipt = document.history.at(-1)!;
       receipt.at = ["2026-07-02T12:00:00Z", "2026-08-14T12:00:00Z", "2026-09-22T12:00:00Z", "2026-10-03T12:00:00Z"][(revision - 1) % 4]!;
       receipts.push(receipt);

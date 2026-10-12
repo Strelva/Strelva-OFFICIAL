@@ -25,7 +25,7 @@ async function render(request: typeof fetch, readOnly = false) {
   await act(async () => root.render(page(request, readOnly)));
   return node;
 }
-function makeRealButtons(node: HTMLElement) { return [...node.querySelectorAll<HTMLButtonElement>("button")].filter(button => /Make real|Making real/.test(button.textContent || "")); }
+function makeRealButtons(node: HTMLElement) { return [...node.querySelectorAll<HTMLButtonElement>("button")].filter(button => /Make it live|Making it live/.test(button.textContent || "")); }
 function expectRecovery(node: HTMLElement) {
   expect(makeRealButtons(node).every(button => button.disabled)).toBe(true);
   expect([...node.querySelectorAll("a")].find(link => link.textContent === "Reload this System")?.getAttribute("href")).toBe(`/systems/${systemId}`);

@@ -60,7 +60,7 @@ function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, requ
   }
   const declaration = listing.revision.declaration, supported = listing.revision.definition.kind === "internal_app";
   return <article className="space-y-4 rounded-2xl border border-gray-border p-5">
-    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Source revision {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
+    <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Release {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
     <PackageDeclaration declaration={declaration} />
 
     <p className="text-xs text-gray-muted">This exact revision passed automated checks and human review. Your release still requires a separate decision.</p>

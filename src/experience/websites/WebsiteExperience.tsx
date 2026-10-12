@@ -165,9 +165,9 @@ function ArtifactPreview({ artifact }: { artifact: NonNullable<Website["candidat
 }
 
 function HistoryList({ history }: { history: readonly Website["history"][number][] }) {
-  if (!history.length) return <StEmpty>No earlier revisions are recorded yet.</StEmpty>;
-  return <StRows label="Website revision history">{history.slice().reverse().map(entry =>
-    <StRow key={`${entry.revision}:${entry.kind}:${entry.at}`} title={`Revision ${entry.revision} · ${historyLabel(entry.kind)}`} detail={entry.note} end={<StMono as="time" dateTime={entry.at}>{formatDate(entry.at)}</StMono>} />
+  if (!history.length) return <StEmpty>No earlier releases are recorded yet.</StEmpty>;
+  return <StRows label="Website release history">{history.slice().reverse().map(entry =>
+    <StRow key={`${entry.revision}:${entry.kind}:${entry.at}`} title={`Release ${entry.revision} · ${historyLabel(entry.kind)}`} detail={entry.note} end={<StMono as="time" dateTime={entry.at}>{formatDate(entry.at)}</StMono>} />
   )}</StRows>;
 }
 
@@ -363,7 +363,7 @@ function WebsiteSession({
 
           {website!.candidate ? (
             <section className={styles.previewSection} aria-labelledby="website-preview-heading">
-              <div className={styles.sectionHeading}><h2 id="website-preview-heading">Generated website preview</h2><span>Work revision {website!.revision} · saved {formatDate(record.updatedAt)}</span></div>
+              <div className={styles.sectionHeading}><h2 id="website-preview-heading">Generated website preview</h2><span>Work Release {website!.revision} · saved {formatDate(record.updatedAt)}</span></div>
               <ArtifactPreview artifact={website!.candidate} />
             </section>
           ) : <p className={styles.srStatus} role="status">A generated site preview is not available yet. Your saved brief remains available for recovery.</p>}

@@ -168,7 +168,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
         <p className="m-0 text-sm leading-relaxed text-gray-muted">The client reviews and publishes your draft. Saving here does not change the live website.</p>
         <StPill busy={saving} disabled={!parsed} onClick={() => void prepareAndRun()}>{saving ? "Saving assigned draft…" : "Prepare and save draft"}</StPill>
         {message ? <StNotice tone="critical">{message}</StNotice> : null}
-        {receipt ? <><StToast>Saved {receipt.section} draft{receipt.revision === null ? "" : ` revision ${receipt.revision}`}</StToast><p className="m-0 text-sm text-gray-muted">Your draft is saved and ready for the client to review.</p>{customerWebsiteHref ? <StTextButton href={customerWebsiteHref}>Review and publish in client website editor</StTextButton> : null}</> : null}
+        {receipt ? <><StToast>Saved {receipt.section} draft{receipt.revision === null ? "" : ` Release ${receipt.revision}`}</StToast><p className="m-0 text-sm text-gray-muted">Your draft is saved and ready for the client to review.</p>{customerWebsiteHref ? <StTextButton href={customerWebsiteHref}>Review and publish in client website editor</StTextButton> : null}</> : null}
       </StSection> : null}
     </StPage>
   </main>;

@@ -392,7 +392,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
         <span className={styles.possibilityActions}>
           {onCompare && possibility.previewSrc ? <StPill variant="soft" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</StPill> : null}
           {possibility.openHref ? <StPillLink variant="soft" href={`${appBase}${possibility.openHref}`}>{possibility.tryHref ? "Try it as a visitor" : "Open"}</StPillLink> : null}
-          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? STATE_LABELS.makingReal : STATE_LABELS.makeReal}</StPill>
+          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making it live…" : "Make it live"}</StPill>
         </span>
         {comparingId === possibility.id && possibility.previewSrc && system.surface.kind !== "website" ? <PossibilityComparison title={possibility.title}
           live={<StEmpty>The current System is open above. A visitor preview has not been recorded.</StEmpty>}

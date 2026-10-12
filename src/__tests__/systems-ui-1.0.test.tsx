@@ -45,7 +45,7 @@ describe("Systems 1.0 presentation boundaries", () => {
     const node = await render(createElement(PossibilityTry, { state: { kind: "ready", view: {
       title: "Shorter intake", intent: "Try the shorter form", changes: ["The intake form"], introduces: [], takesSubmissions: true,
     } } }));
-    const approve = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Make real");
+    const approve = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => /^(Make real|Make it live)$/.test(button.textContent ?? ""));
     expect(approve?.disabled).toBe(true);
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.textContent).toContain("Test submission, nobody was told");
@@ -61,7 +61,7 @@ describe("Systems 1.0 presentation boundaries", () => {
     const node = await render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(SystemPage, {
       system, systems: [system], workspaceId: "business", readOnly: false, canMakeReal: true, sources: [], systemHref: id => `/systems/${id}`, onHome: () => {}, onAsk: () => {},
     })));
-    const approve = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Make real");
+    const approve = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Make it live");
     expect(approve?.disabled).toBe(true);
     await act(async () => approve?.click());
     expect(request).not.toHaveBeenCalled();

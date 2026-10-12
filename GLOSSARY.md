@@ -3,7 +3,7 @@
 This is the single authority for words in product copy, docs and the internal
 model. The [product ontology](./docs/architecture/product-ontology.md) owns
 structure and governance rules; both CONTEXT.md files point here for language.
-These definitions apply Jacob's decisions of October 9–11, 2026, including
+These definitions apply Jacob's decisions of October 9–12, 2026, including
 [ADR 0014](../docs/adr/0014-one-model-at-three-zooms.md) and
 [ADR 0015](../docs/adr/0015-two-doors-self-serve-and-agencies.md).
 
@@ -45,10 +45,31 @@ and compare. A suggestion alone is not a Possibility. Make real turns it on.
 Proposal remains an Underneath research response, never an on-screen synonym.
 _Avoid_: idea, recommendation, research proposal, experiment (as synonyms)
 
-**Make real** _(label open)_:
+**Make real** _(concept, never a button label)_:
 Turn a Possibility on under the same authority and approvals as any other change.
 The result says what happened, including when only part of it became real.
 _Avoid_: activate everything, automatic approval, guaranteed success
+
+**Make it live**:
+The button for an owner approval that authorizes a live change. A press-and-hold
+control says **Hold to make it live**. The result records what landed, what is
+waiting and what could not be confirmed; the label promises no automatic success.
+An approval that only saves a private preview keeps its preview-specific wording.
+Other acts keep their own verbs: **Hold to confirm** for a booking, **Send to
+[business]** for agency work sent to owner review, **Not yet**, and **Undo**.
+_Avoid_: Make real, Make it real, Hold to publish, Approve and publish
+(as live-approval button labels)
+
+**Release / Releases**:
+A numbered revision on owner and agency screens: **Release 12**. A local change
+reads **Release 12 + 1 local change**; a draft reads **Release 13 draft**.
+Releases may label the collection. Internal revision IDs and contracts stay as
+they are; a Release is not a Version adapted to another business or context.
+_Avoid_: r12, r12+1, Package r13, Source revisions (on screen)
+
+**Time this month**:
+The agency's usage column for the current month's recorded time.
+_Avoid_: Minutes · Oct (as the column label)
 
 **Version** _(label open)_:
 The same System adapted to another context, such as a location, client or

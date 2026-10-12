@@ -355,10 +355,10 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
               onClick={() => onApprove(event.id)}
               disabled={disabled}
               className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-on-positive flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
-              title="Make live"
+              title="Make it live"
             >
               <Check className="w-4 h-4" strokeWidth={2} />
-              Make live
+              Make it live
             </button>
             <button
               onClick={() => onDismiss(event.id)}

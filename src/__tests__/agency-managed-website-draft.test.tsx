@@ -115,7 +115,7 @@ describe("managed website agency draft authority", () => {
     });
     expect(requests[2]?.body).toEqual({ action: "run", assignmentId });
     expect(requests[2]?.body).not.toHaveProperty("input");
-    expect(container.textContent).toContain("Saved hero draft revision 1");
+    expect(container.textContent).toContain("Saved hero draft Release 1");
     expect(container.textContent).toContain("The client reviews and publishes your draft");
     expect(container.querySelector<HTMLAnchorElement>('a[href="/client/website-draft-a/dashboard/site"]')).toBeTruthy();
     act(() => root.unmount());

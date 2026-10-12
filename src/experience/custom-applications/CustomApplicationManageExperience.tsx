@@ -145,8 +145,8 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
       </header>
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Internal tool state">
         <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Status</p><p className="mt-2 text-sm font-medium">{application.status}</p></div>
-        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Candidate</p><p className="mt-2 text-sm font-medium">v{application.candidate.version} · revision {application.candidate.revision}</p></div>
-        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Live release</p><p className="mt-2 text-sm font-medium">{releaseVersion ? `v${releaseVersion}` : "Not released"}</p></div>
+        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Candidate</p><p className="mt-2 text-sm font-medium">Release {application.candidate.version} draft · saved change {application.candidate.revision}</p></div>
+        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Live release</p><p className="mt-2 text-sm font-medium">{releaseVersion ? `Release ${releaseVersion}` : "Not released"}</p></div>
       </section>
       {!readOnly && !application.budget && application.status !== "retired" ? <section className="space-y-5 rounded-2xl border border-terra/30 bg-terra/5 p-5 sm:p-7" aria-labelledby="custom-budget-heading">
         <div><h2 id="custom-budget-heading" className="font-display text-2xl font-medium">Finish local build authorization</h2><p className="mt-2 text-sm leading-6 text-gray-fg">This draft is saved, but its local budget admission did not finish. Retry here to continue the same work without creating a duplicate internal tool.</p></div>
@@ -223,8 +223,8 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
         <div className="flex flex-wrap gap-3">
           {!readOnly ? <>
             <Button type="button" variant="secondary" disabled={busy || !canReview} onClick={() => void action("review", { expectedCandidateRevision: application.candidate.revision, artifactDigest: artifact!.artifactDigest, checks: checks.map(check => ({ ...check, passed: true as const })) })}>Record review checks</Button>
-            <Button type="button" disabled={busy || !canRelease} onClick={() => void action("release", { expectedCandidateRevision: application.candidate.revision, expectedReleaseVersion: application.currentReleaseVersion })}>Release candidate</Button>
-            {rollbackVersions.map(release => <Button key={release.version} type="button" variant="secondary" disabled={busy} onClick={() => void action("rollback", { expectedReleaseVersion: application.currentReleaseVersion, version: release.version })}>Rollback to v{release.version}</Button>)}
+            <Button type="button" disabled={busy || !canRelease} onClick={() => void action("release", { expectedCandidateRevision: application.candidate.revision, expectedReleaseVersion: application.currentReleaseVersion })}>Make it live</Button>
+            {rollbackVersions.map(release => <Button key={release.version} type="button" variant="secondary" disabled={busy} onClick={() => void action("rollback", { expectedReleaseVersion: application.currentReleaseVersion, version: release.version })}>Undo to Release {release.version}</Button>)}
           </> : null}
         </div>
         {notice ? <p role="status" className="rounded-xl border border-sage/30 bg-sage/5 p-3 text-sm text-sage-dark">{notice}</p> : null}

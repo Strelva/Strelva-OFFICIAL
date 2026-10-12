@@ -131,14 +131,14 @@ describe("website rebuild review", () => {
   it("shows owner publication separately from operator domain authority on managed native work", async () => {
     const record = fixtureRebuild(); record.status = "approved"; record.approved = true; record.candidate!.facts = {};
     await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true }));
-    expect(button("Publish approved website")).toBeUndefined();
+    expect(button("Hold to make it live")).toBeUndefined();
     expect(button("Choose forms")).toBeUndefined();
     await act(async () => root!.render(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true, canPublish: true })));
-    expect(button("Publish approved website").disabled).toBe(false);
+    expect(button("Hold to make it live").disabled).toBe(false);
     expect(button("Choose forms").disabled).toBe(false);
     expect(container.querySelector('input[placeholder="your-business.com"]')).toBeNull();
     await act(async () => root!.render(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, managed: true, canPublish: true, readOnly: true })));
-    expect(button("Publish approved website").disabled).toBe(true);
+    expect(button("Hold to make it live").disabled).toBe(true);
     expect(button("Choose forms").disabled).toBe(true);
   });
   const visibleDomainInput = () => [...container.querySelectorAll<HTMLInputElement>('input[placeholder="your-business.com"]')].some(input => !input.closest("[hidden]"));
