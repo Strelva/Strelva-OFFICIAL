@@ -4,6 +4,12 @@ Status: direction confirmed by Jacob on September 11 and clarified through Octob
 2026. Local implementation of the topology below is authorized. This records
 product intent, not implemented capability or production release approval.
 
+> October 4, 2026: the customer model is now Systems, Connections,
+> Possibilities and Versions ([CONTEXT.md](../../CONTEXT.md#product-model)).
+> Where this brief names offerings, installations or products as what the
+> customer navigates, that model wins. Acceptance requirements below still
+> apply.
+
 ## October 1 managed-client default and website clarity
 
 Jacob accepted managed delivery as the default for managed clients. Creation

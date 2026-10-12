@@ -12,7 +12,7 @@
  * the scan on the tenant detail page.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 /** `reb:` persistent-data prefix per AGENTS.md (wire/persistent prefixes unchanged). */
 const SCAN_PREFIX = "reb:scan:";

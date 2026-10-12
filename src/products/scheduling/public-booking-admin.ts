@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { assertWorkspaceMember } from "@/platform/workspaces/repository";
 import { publicBookingProviderSchema } from "./public-booking";
 
 const grantInputSchema = z.object({
@@ -81,4 +82,20 @@ export async function revokePublicWebsiteBookingGrant(actor: WorkspaceActor, inp
     p_reason: reason,
   });
   return resultData(result);
+}
+
+const receiptSchema = z.object({ id: z.string().uuid(), business_workspace_id: z.string().uuid(), work_id: z.string().uuid(), calendar_request_id: z.string().min(1), tenant_id_at_reservation: z.string().min(1), title: z.string(), start_at: z.string().datetime({ offset: true }), status: z.enum(["pending", "confirmed", "cancelled"]), updated_at: z.string() });
+/** Secret-free member read. Never decrypts management tokens or contacts providers. */
+export async function readWorkspacePublicBookingReceipts(actor: WorkspaceActor, workspaceId: string, range: { from: string; to: string }) {
+  await assertWorkspaceMember(actor, workspaceId);
+  const bounds = z.object({ from: z.string().datetime({ offset: true }), to: z.string().datetime({ offset: true }) }).parse(range);
+  const db = getSupabase();
+  if (!db) throw new WorkspaceStoreError("Public booking storage is unavailable.");
+  const { data, error } = await db.from("public_website_bookings")
+    .select("id,business_workspace_id,work_id,calendar_request_id,tenant_id_at_reservation,title,start_at,status,updated_at")
+    .eq("business_workspace_id", z.string().uuid().parse(workspaceId)).gte("start_at", bounds.from).lt("start_at", bounds.to).order("updated_at", { ascending: true }).limit(1001);
+  if (error) throw new WorkspaceStoreError("Public booking receipts could not be read.");
+  const rows = z.array(receiptSchema).parse(data);
+  if (rows.some(row => row.business_workspace_id !== workspaceId)) throw new WorkspaceStoreError("Public booking receipt scope changed.");
+  return { truncated: rows.length > 1000, rows: rows.slice(0, 1000).map(row => ({ id: row.id, workId: row.work_id, requestId: row.calendar_request_id, tenantId: row.tenant_id_at_reservation, title: row.title, start: row.start_at, status: row.status })) };
 }

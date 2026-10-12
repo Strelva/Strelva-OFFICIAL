@@ -5,8 +5,12 @@ import { getConnection } from "@/lib/connections";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
 import { getEvents } from "@/lib/events";
 import { ReviewsPanel, type PreDraft } from "@/components/dashboard/ReviewsPanel";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 
 export default async function ReviewsPage() {
+  // Moved to /workspace/reviews where owner entry is on; covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/reviews");
   const { tenant } = await requireDashboardView();
 
   // Degrade to the empty state on a transient backend error rather than

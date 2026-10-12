@@ -1,7 +1,11 @@
+import { bookingServicePoliciesEnabled, servicePolicy } from "@/platform/bookings/service-policy";
+import { bookingReadSource } from "@/platform/bookings/flags";
+import { readBookingContext } from "@/platform/bookings/store";
 import { NextResponse } from "next/server";
-import { getAvailableSlots, getContent } from "@/lib/storage";
+import { getContent } from "@/lib/storage";
+import { getAvailableSlots } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 export async function GET(request: Request) {
   if (await isRateLimitedAsync(rateLimitKey(request, "booking-availability"), 60)) {
@@ -34,6 +38,12 @@ export async function GET(request: Request) {
     }
 
     const slots = await getAvailableSlots(date, serviceId, tenant);
+    if (bookingServicePoliciesEnabled() && await bookingReadSource() === "postgres") {
+      const context=await readBookingContext(tenant);
+      if (!context) throw new Error("Booking context unavailable");
+      const policy=servicePolicy(context,serviceId);
+      return NextResponse.json({date,serviceId,slots,intake:policy.intake,mode:policy.mode});
+    }
     return NextResponse.json({ date, serviceId, slots });
   } catch {
     return NextResponse.json({ error: "Failed to get availability" }, { status: 500 });

@@ -4,7 +4,7 @@ import {
   eventToInsert,
   mailToInsert,
   buildPaymentToInsert,
-} from "@/lib/db/dual-write";
+} from "@/platform/infra/db/dual-write";
 import type { UnifiedEvent } from "@/lib/types";
 import type { MailRecord } from "@/lib/storage/mail-log";
 

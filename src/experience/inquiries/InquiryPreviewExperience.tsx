@@ -14,5 +14,5 @@ export function InquiryPreviewExperience({ adapter, audience = "business", scena
     () => adapter || createPreviewInquiryAdapter(audience, scenario),
     [adapter, audience, scenario],
   );
-  return <InquiryExperience {...props} audience={audience} scenario={scenario} adapter={previewAdapter} />;
+  return <InquiryExperience systemsReleased {...props} audience={audience} scenario={scenario} adapter={previewAdapter} />;
 }

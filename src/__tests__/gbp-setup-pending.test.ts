@@ -20,7 +20,7 @@ vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "
 
 const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     get: (...args: Parameters<typeof mockRedisGet>) => mockRedisGet(...args),
     set: vi.fn(() => Promise.resolve("OK")),

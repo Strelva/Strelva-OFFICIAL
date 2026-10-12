@@ -241,11 +241,11 @@ test("review fixture connects a prepared request result, owner use, employee use
 
   const firstReview = page.locator("details").filter({ hasText: "Review changes" });
   await expect(firstReview).toBeVisible();
-  await expect(firstReview.getByText("This is the first proposed version. Review it before publishing.", { exact: true })).toBeVisible();
+  await expect(firstReview.getByText("This is the first proposed draft. Review it before publishing.", { exact: true })).toBeVisible();
   await firstReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
-  await expect(firstReview.getByText("Checks for proposed version 1", { exact: true })).toBeVisible();
+  await expect(firstReview.getByText("Checks for draft 1", { exact: true })).toBeVisible();
   await firstReview.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+  await expect(page.getByText(/Release 1 is live/)).toBeVisible();
 
   await page.getByLabel("Equipment needed", { exact: true }).fill("Pipe inspection camera");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
@@ -273,7 +273,7 @@ test("review fixture connects a prepared request result, owner use, employee use
   await secondReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(secondReview.getByText("Passed: Existing records fit this version", { exact: true })).toBeVisible();
   await secondReview.getByRole("button", { name: "Publish", exact: true }).click();
-  await expect(page.getByText(/Version 2 is live/)).toBeVisible();
+  await expect(page.getByText(/Release 2 is live/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("application-review-fixture.png"), fullPage: true });
 
   await page.goto(`/apps/${workId}`);
@@ -303,7 +303,7 @@ test("review fixture connects a prepared request result, owner use, employee use
   await expect(page.getByText("Replacement pipe cutter", { exact: true })).toBeVisible();
 
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
-  await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+  await expect(page.getByText(/Release 1 is live/)).toBeVisible();
   await page.getByRole("button", { name: "Revoke link", exact: true }).click();
   await expect(page.getByText("Access revoked for employee@example.com", { exact: true })).toBeVisible();
 

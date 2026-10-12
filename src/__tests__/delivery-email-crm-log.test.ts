@@ -1,4 +1,11 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 // CRM comms auto-log: when a client email ACTUALLY sends, it accrues into the
 // tenant's CRM activity timeline. Invariants:
@@ -53,6 +60,23 @@ describe("delivery-email CRM comms auto-log", () => {
     expect(addActivityMock).toHaveBeenCalledWith("rohlax", {
       kind: "email",
       summary: "Sent: welcome email",
+      author: "Actor not recorded",
+    });
+  });
+
+  it("records platform billing as Strelva even when the tenant's agency has a different brand", async () => {
+    process.env.EMAIL_SENDING_ENABLED = "true";
+    const { sendPaymentPastDueEmail } = await import("@/lib/delivery-email");
+
+    expect(await sendPaymentPastDueEmail({
+      email: "chelsea@example.com",
+      businessName: "Rohlax Wellness",
+      dashboardUrl: "https://admin.rohlax.com/dashboard",
+      tenantId: "rohlax",
+    })).toBe(true);
+    expect(addActivityMock).toHaveBeenCalledExactlyOnceWith("rohlax", {
+      kind: "email",
+      summary: "Sent: payment-past-due email",
       author: "Strelva",
     });
   });
@@ -73,7 +97,7 @@ describe("delivery-email CRM comms auto-log", () => {
     expect(addActivityMock).not.toHaveBeenCalled();
   });
 
-  it("does NOT log when no tenantId is provided (opt-in)", async () => {
+  it("holds mail without a verified tenant or agency, and does not log it", async () => {
     process.env.EMAIL_SENDING_ENABLED = "true";
     const { sendSiteLiveEmail } = await import("@/lib/delivery-email");
 
@@ -84,8 +108,8 @@ describe("delivery-email CRM comms auto-log", () => {
       dashboardUrl: "https://admin.rohlax.com/dashboard",
     });
 
-    expect(ok).toBe(true);
-    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(ok).toBe(false);
+    expect(sendMock).not.toHaveBeenCalled();
     expect(addActivityMock).not.toHaveBeenCalled();
   });
 

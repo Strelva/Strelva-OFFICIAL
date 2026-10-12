@@ -2,7 +2,8 @@
 import { act, createElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { DeliveryCommitmentPanel } from "@/experience/operations/DeliveryCommitmentPanel";
+import { DeliveryCommitmentPanel, requestProgress } from "@/experience/operations/DeliveryCommitmentPanel";
+import type { ServiceRequest } from "@/platform/service-requests/types";
 import { ServiceDeliveryQueue } from "@/experience/operations/ServiceDeliveryQueue";
 import { BusinessSetupPanel } from "@/experience/workspace/BusinessSetupPanel";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
@@ -15,14 +16,41 @@ function response(body:unknown,status=200){return new Response(JSON.stringify(bo
 const transport:typeof fetch=(input,init)=>new Promise(resolve=>calls.push({url:String(input),init,resolve}));
 async function render(node:ReactNode){await act(async()=>root.render(createElement(WorkspaceRequestContext.Provider,{value:transport},node)));}
 async function resolve(index:number,body:unknown,status=200){await act(async()=>calls[index]!.resolve(response(body,status)));}
-function button(text:string){return [...container.querySelectorAll<HTMLButtonElement>("button")].find(item=>item.textContent===text)!;}
+function button(text:string){return [...container.querySelectorAll<HTMLButtonElement>("button")].find(item=>item.textContent===text || item.getAttribute("aria-label")===text)!;}
 beforeEach(()=>{vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true);sessionStorage.clear();calls=[];container=document.createElement("div");document.body.appendChild(container);root=createRoot(container);});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();sessionStorage.clear();vi.unstubAllGlobals();});
 describe("agency and native entry interfaces",()=>{
+ it("keeps an unsent draft before Asked",()=>{
+  const steps=requestProgress({...saved,status:"draft",deliveryCommitment:null} as ServiceRequest);
+  expect(steps[0]).toMatchObject({state:"pending",detail:"Draft request. It has not been asked yet."});
+  expect(steps[0]!.time).toBeUndefined();
+ });
+ it("keeps a proposed scope before the agreed and in-progress stages",()=>{
+  const steps=requestProgress(saved as ServiceRequest);
+  expect(steps.map(step=>step.title)).toEqual(["Asked","Scope and date agreed","In progress","Ready for review","Done"]);
+  expect(steps.map(step=>step.state)).toEqual(["done","active","pending","pending","pending"]);
+  expect(steps[1]!.time).toBeUndefined();
+ });
+ it("marks agreed work only from its retained acceptance and start dates",()=>{
+  const request={...saved,deliveryCommitment:{...saved.deliveryCommitment,status:"running",customerAcceptedAt:"2026-09-22T12:00:00Z",startedAt:"2026-09-22T12:00:00Z",dueAt:"2026-09-23T12:00:00Z"}} as ServiceRequest;
+  const steps=requestProgress(request);
+  expect(steps.map(step=>step.state)).toEqual(["done","done","active","pending","pending"]);
+  expect(steps[1]!.time).toBeTruthy();
+  expect(steps[1]!.detail).toContain("Original deadline:");
+ });
+ it("closes a request without inventing agreement or a start date",()=>{
+  const steps=requestProgress({...saved,status:"withdrawn"} as ServiceRequest);
+  expect(steps[1]!.state).toBe("pending");expect(steps[2]!.time).toBeUndefined();
+  expect(steps[4]).toMatchObject({title:"Closed",state:"done"});
+ });
+
  it("retains and replays exactly one unconfirmed delivery decision across remounts",async()=>{
   await render(createElement(DeliveryCommitmentPanel,{requestId}));await resolve(0,inspection());
-  expect(container.textContent).toContain("Quote 42");expect(button("Propose 24-hour delivery")).toBeUndefined();
+  expect(container.textContent).toContain("Quote 42");expect(container.querySelector('dl')?.textContent).toContain("website_delivery");expect(button("Propose 24-hour delivery")).toBeUndefined();
   await act(async()=>button("Accept scope and start 24-hour delivery").click());
+  expect(calls).toHaveLength(1);
+  await act(async()=>button("Cancel").click());
+  await act(async()=>button("Accept scope and start 24-hour delivery").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",metaKey:true,bubbles:true})));
   const command=JSON.parse(String(calls[1]!.init?.body));expect(command).toMatchObject({requestId,expectedRevision:3,change:{kind:"agree"}});
   await resolve(1,{error:{message:"Response lost"}},503);
   expect(container.textContent).toContain("previous command is not confirmed");
@@ -56,14 +84,14 @@ describe("agency and native entry interfaces",()=>{
   expect(container.querySelector('a[href^="/sign-in"]')?.getAttribute("href")).toBe(`/sign-in?next=${encodeURIComponent(`/workspace/delivery?businessId=${businessId}`)}`);
  });
  it("requires an explicit business name before any setup mutation",async()=>{
-  await render(createElement(BusinessSetupPanel,{initialRequest:saved.request}));await resolve(0,{actorId,businesses:[]});
-  expect(button("Save business and request").disabled).toBe(true);expect(calls).toHaveLength(1);
+  await render(createElement(BusinessSetupPanel,{initialRequest:saved.request}));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});
+  expect(button("Save business and ask").disabled).toBe(true);expect(calls).toHaveLength(1);
   expect(container.textContent).toContain("No website purchase is required");
  });
  it("recovers a pending atomic business request without making a second one",async()=>{
   const command={destination:{kind:"new",name:"Juniper"},initialRequest:saved.request,idempotencyKey:businessId};
   sessionStorage.setItem(`strelva:business-entry:${actorId}`,JSON.stringify(command));
-  await render(createElement(BusinessSetupPanel,{startProduct:"applications"}));await resolve(0,{actorId,businesses:[]});
+  await render(createElement(BusinessSetupPanel,{startProduct:"applications"}));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});
   expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("Juniper");
   await act(async()=>container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
   expect(JSON.parse(String(calls[1]!.init?.body))).toEqual(command);await resolve(1,{error:"Uncertain"},503);
@@ -71,6 +99,6 @@ describe("agency and native entry interfaces",()=>{
  });
  it("does not load another actor's retained business setup",async()=>{
   sessionStorage.setItem(`strelva:business-entry:${businessId}`,JSON.stringify({destination:{kind:"new",name:"Other business"},initialRequest:saved.request,idempotencyKey:businessId}));
-  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry safely")).toBeUndefined();
+  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,actorEmail:"owner@example.test",businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry safely")).toBeUndefined();
  });
 });

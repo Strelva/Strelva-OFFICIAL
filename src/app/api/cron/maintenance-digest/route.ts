@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { mapPool } from "@/lib/concurrency";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { getActiveTenants } from "@/lib/tenants";
 import {

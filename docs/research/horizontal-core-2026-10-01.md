@@ -8,6 +8,9 @@ Research, October 1, 2026. Four parallel investigations:
 
 This is research, not a decision. Production state is unchanged.
 
+> October 4, 2026: the business record is the shared context under the
+> selected Systems model ([CONTEXT.md](../../CONTEXT.md#product-model)).
+
 ## The answer in one line
 
 **The core is one business record plus the rules for changing it, open to any

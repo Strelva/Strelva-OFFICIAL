@@ -1,3 +1,14 @@
+import { z } from "zod";
+
+/** Identity recorded for an action, independent of runtime and presentation. */
+export const recordedActorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("platform") }),
+  z.object({ kind: z.literal("agency"), displayName: z.string().trim().min(1), agencyId: z.string().uuid().optional(), userId: z.string().uuid().optional() }),
+  z.object({ kind: z.literal("person"), displayName: z.string().trim().min(1) }),
+  z.object({ kind: z.literal("operator"), displayName: z.string().trim().min(1).optional() }),
+]);
+export type RecordedActor = z.infer<typeof recordedActorSchema>;
+
 export type WorkspaceKind = "personal" | "agency" | "customer";
 export type WorkspaceRole = "owner" | "admin" | "member";
 
@@ -6,6 +17,8 @@ export interface WorkspaceActor {
   verifiedEmail: string;
 }
 
+/** The per-user cap in `create_owned_workspace` (five workspaces created by one person). */
+export const WORKSPACE_LIMIT_MESSAGE = "You have reached the limit of five workspaces for one account.";
 export const WORKSPACE_EXIT_STOPPED_MESSAGE = "New work is stopped for this workspace. Existing records remain available for review.";
 export const WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE = "Resources are stopped for this workspace. Existing records remain available for review.";
 
@@ -17,7 +30,7 @@ export interface Workspace {
   createdAt: string;
   updatedAt: string;
   role?: WorkspaceRole;
-  access: "member" | "delegated_read";
+  access: "member" | "delegated_read" | "provider_seat";
 }
 
 export interface SavedWork {
@@ -104,6 +117,22 @@ export class WorkspaceAccessError extends Error {
   constructor(message = "Workspace access denied") {
     super(message);
     this.name = "WorkspaceAccessError";
+  }
+}
+
+/** Shown to owners, admins and members who try to make or change an internal tool. */
+export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask an owner or admin of this business, or its agency.";
+
+/**
+ * Only the business's acting provider (an agency's seat and staff row) or a
+ * delegated agency makes Systems (`make_systems`). Everyone else files a Request instead. Extends the
+ * access error so every existing 403 path still applies.
+ */
+export class WorkspaceMakeSystemsError extends WorkspaceAccessError {
+  readonly code = "make_systems_required" as const;
+  constructor(message = MAKE_SYSTEMS_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "WorkspaceMakeSystemsError";
   }
 }
 

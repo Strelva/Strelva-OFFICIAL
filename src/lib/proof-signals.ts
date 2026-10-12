@@ -16,7 +16,7 @@
  * task in .claude/plans/remaining.yml end-to-end. Do not re-implement.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export type AgentCallSource = "jacob" | "owner";
 

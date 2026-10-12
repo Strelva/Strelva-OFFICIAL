@@ -1,4 +1,5 @@
-import { getSupabase } from "@/lib/db/client";
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   WorkspaceAccessError,
   WorkspaceConflictError,
@@ -6,6 +7,7 @@ import {
   WORKSPACE_EXIT_STOPPED_MESSAGE,
   type WorkspaceActor,
 } from "./types";
+import { assertCanMakeSystems } from "./repository";
 
 type DbRow = Record<string, unknown>;
 type DbError = { code?: string; message?: string } | null;
@@ -63,7 +65,7 @@ function asNumber(value: unknown): number | null {
 
 function dbError(error: DbError): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
-  if (detail.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+  if (detail.includes("workspace_access_denied") || detail.includes("workspace_membership_required") || detail.includes("workspace_make_systems_required")) throw new WorkspaceAccessError();
   if (detail.includes("workspace_exit_future_work_blocked")) {
     throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   }
@@ -130,10 +132,13 @@ function rpcArgs(input: PersistWorkPlanOutputInput): Record<string, unknown> {
 export async function persistWorkPlanOutput(input: PersistWorkPlanOutputInput): Promise<PersistedWorkPlanOutput> {
   const client = getSupabase();
   if (!client) throw new WorkspaceStoreError("Workspace storage is not configured");
+  // A plan that makes an internal tool is the Make path: operator or
+  // delegated agency only. Other outputs (documents, trackers) are unchanged.
+  if (input.nativeProductId === "applications") await assertCanMakeSystems(input.actor, input.workspaceId);
   const rpc = client as unknown as {
     rpc(name: string, args: Record<string, unknown>): Promise<{ data: DbRow[] | null; error: DbError }>;
   };
-  const { data, error } = await rpc.rpc("execute_work_plan_output", {
+  const { data, error } = await rpc.rpc(await systemsReleasedFor(input.actor, input.workspaceId) ? "execute_system_work_plan_output" : "execute_work_plan_output", {
     ...rpcArgs(input),
     p_native_product_id: input.nativeProductId,
     p_native_resource_kind: input.nativeResourceKind,
@@ -154,7 +159,7 @@ export async function readWorkPlanOutput(input: PlanOutputKey): Promise<Persiste
   const rpc = client as unknown as {
     rpc(name: string, args: Record<string, unknown>): Promise<{ data: DbRow[] | null; error: DbError }>;
   };
-  const { data, error } = await rpc.rpc("read_work_plan_output", keyArgs(input));
+  const { data, error } = await rpc.rpc(await systemsReleasedFor(input.actor, input.workspaceId) ? "read_system_work_plan_output" : "read_work_plan_output", keyArgs(input));
   if (error) dbError(error);
   if (!data?.[0]) return null;
   return mapRow({ ...data[0], replayed: true });
@@ -171,7 +176,7 @@ export async function listWorkPlanOutputs(input: {
   const rpc = client as unknown as {
     rpc(name: string, args: Record<string, unknown>): Promise<{ data: DbRow[] | null; error: DbError }>;
   };
-  const { data, error } = await rpc.rpc("list_work_plan_outputs", {
+  const { data, error } = await rpc.rpc(await systemsReleasedFor(input.actor, input.workspaceId) ? "list_system_work_plan_outputs" : "list_work_plan_outputs", {
     p_plan_work_id: input.planWorkId,
     p_workspace_id: input.workspaceId,
     p_user_id: input.actor.userId,

@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import {
   createSiteSnapshot,
@@ -11,7 +12,7 @@ import {
   getActorContext,
   requireTenantAccess,
   requireTenantPermission,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 
@@ -19,6 +20,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const snapshots = await getSiteSnapshots(tenant, 12);
   return NextResponse.json({ snapshots });

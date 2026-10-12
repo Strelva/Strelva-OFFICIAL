@@ -3,17 +3,17 @@
  *
  * Generates an AI-drafted reply for a single review so the owner can copy it
  * into Google. Auth-gated like the other dashboard review routes (verifyAuth +
- * requireTenantAccess). Reuses the battle-tested `draftReviewReply` helper,
+ * content:write permission). Reuses the battle-tested `draftReviewReply` helper,
  * which lints against Google's rejection filter and falls back to a
  * deterministic template when the model is unavailable — so this never
- * hard-fails. Returns the drafted string for the panel to show in an editable
+ * hard-fails after authority is established. Returns the drafted string for the panel to show in an editable
  * textarea; it does NOT publish anything.
  *
  * Body: { author: string, rating: number, text?: string }
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { draftReviewReply, buildDeterministicReply } from "@/lib/review-replies";
@@ -37,11 +37,16 @@ export async function POST(req: Request) {
       ? Math.min(5, Math.max(1, Math.round(Number(body.rating))))
       : 5;
 
+  let tenant: string;
   try {
-    const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
+    tenant = await getTenantFromHeaders();
+    const denied = await requireTenantPermission(tenant, "content:write");
     if (denied) return denied;
+  } catch {
+    return NextResponse.json({ error: "Client authoring access could not be confirmed. Nothing was drafted." }, { status: 503 });
+  }
 
+  try {
     if (!body) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }

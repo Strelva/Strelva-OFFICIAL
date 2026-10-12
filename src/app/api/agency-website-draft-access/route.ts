@@ -1,5 +1,7 @@
+import { readAgencyWebsiteContext } from "@/platform/offerings/agency-website-context";
 import { z } from "zod";
-import { websiteRebuildReleaseEnabled, readAgencyWebsiteDocument, patchAgencyWebsiteDocument, previewAgencyWebsiteDocument } from "@/products/websites/index";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn, readAgencyWebsiteDocument, patchAgencyWebsiteDocument, previewAgencyWebsiteDocument } from "@/products/websites/index";
 import { WEBSITE_PREVIEW_CSP } from "@/lib/website-preview-policy";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
@@ -38,15 +40,19 @@ export async function GET(request: Request) {
       return workspaceJson({ websites: await service().list(actor, uuid.parse(agencyWorkspaceId)) });
     }
     const bindingId = uuid.parse(query.get("bindingId"));
+    if (query.get("context") === "1") return workspaceJson({ context: await readAgencyWebsiteContext(actor, bindingId, query.get("deliveryId")) });
     if(query.get("document")==="preview"){
-      if(!websiteRebuildReleaseEnabled())return workspaceJson({error:"Website rebuilds are not enabled."},503);
+      if(!websiteRebuildReleaseMayBeOn())return workspaceJson({error:"Website rebuilds are not enabled."},503);
       const result=await previewAgencyWebsiteDocument(actor,bindingId,{workId:query.get("websiteWorkId"),section:query.get("section"),revision:query.get("revision"),contentHash:query.get("contentHash"),page:query.get("page")??"/"});
       return new Response(result.html,{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"private, no-store","X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer","X-Robots-Tag":"noindex, nofollow, noarchive","Content-Security-Policy":WEBSITE_PREVIEW_CSP,"X-Website-Content-Hash":result.contentHash}});
     }
-    if (query.get("document") === "1" && !websiteRebuildReleaseEnabled()) return workspaceJson({ grant: null, website: null, section: null, sections: [], previewHtml: null, previewHref: null, notEnabled: true });
+    const notEnabled = () => workspaceJson({ grant: null, website: null, section: null, sections: [], previewHtml: null, previewHref: null, notEnabled: true });
+    if (query.get("document") === "1" && !websiteRebuildReleaseMayBeOn()) return notEnabled();
     const grant = await service().read(actor, bindingId);
     if (query.get("document") === "1") {
       if (!grant) return workspaceJson({ grant: null, website: null, section: null, sections: [], previewHtml: null, previewHref: null });
+      // Per client site under `workspace`: the client's business row decides.
+      if (!(await websiteRebuildReleaseEnabledForTenant(grant.tenantId, await releaseViewerFor(actor)))) return notEnabled();
       const websiteWorkId=query.get("websiteWorkId"); const section=query.get("section");
       return workspaceJson({ grant, ...await readAgencyWebsiteDocument(actor,bindingId,{ ...(websiteWorkId ? {workId:uuid.parse(websiteWorkId)} : {}), ...(section ? {section} : {}) }) });
     }
@@ -69,12 +75,12 @@ export async function POST(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to change website delivery." }, 401);
     const raw=await readWorkspaceBody(request,150_000);
     if(raw && typeof raw === "object" && "action" in raw && raw.action === "prepare_document") {
-      if (!websiteRebuildReleaseEnabled()) return workspaceJson({ error: "Website rebuilds are not enabled." }, 503);
+      if (!websiteRebuildReleaseMayBeOn()) return workspaceJson({ error: "Website rebuilds are not enabled." }, 503);
       const {action:_action,...input}=raw;
       return workspaceJson(await patchAgencyWebsiteDocument(actor,input),201);
     }
     const input = z.discriminatedUnion("action", [
-      z.object({ action: z.literal("grant"), deliveryId: uuid, bindingId: uuid }).strict(),
+      z.object({ action: z.literal("grant"), deliveryId: uuid, bindingId: uuid, agencyWorkspaceId: uuid.optional(), operatorUserId: uuid.optional() }).strict(),
       z.object({ action: z.literal("revoke"), grantId: uuid }).strict(),
       z.object({
         action: z.literal("prepare"), assignmentId: uuid, bindingId: uuid,
@@ -83,7 +89,11 @@ export async function POST(request: Request) {
       }).strict(),
     ]).parse(raw);
     const access = service();
-    if (input.action === "grant") return workspaceJson({ grant: await access.grant(actor, input.deliveryId, input.bindingId) }, 201);
+    if (input.action === "grant") {
+      if (Boolean(input.agencyWorkspaceId) !== Boolean(input.operatorUserId)) return workspaceJson({ error: "Confirm both the assigned agency and person before allowing draft access." }, 400);
+      const expected = input.agencyWorkspaceId && input.operatorUserId ? { agencyWorkspaceId: input.agencyWorkspaceId, operatorUserId: input.operatorUserId } : undefined;
+      return workspaceJson({ grant: await access.grant(actor, input.deliveryId, input.bindingId, expected) }, 201);
+    }
     if (input.action === "revoke") return workspaceJson({ grant: await access.revoke(actor, input.grantId) });
     return workspaceJson({ preparation: await access.prepare(actor, input.assignmentId, input.bindingId, input.section, input.data, input.expectedRevision, input.expectedHash) }, 201);
   } catch (error) {

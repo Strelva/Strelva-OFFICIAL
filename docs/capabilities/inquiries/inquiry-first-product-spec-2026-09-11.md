@@ -1,5 +1,8 @@
 # Strelva inquiry-first product specification
 
+
+**Current implementation, wave 6 round 5 (October 7):** see [wave 6 local verification](./inquiry-wave6-verification-2026-10-07.md) for every retained IF-01–28 criterion and adopted C1–16 delta, exact local gates, failure history and rollout boundaries. The October delta supersedes the old customer builder/frame and partner-agency surfaces. Earlier status rows are historical evidence, not the current completion percentage. No production action is authorized.
+
 Selected 2026-09-11. Status: canonical specification for the local migration.
 This document authorizes local implementation and verification. It does not
 authorize a production migration, deployment, live message, provider write,
@@ -336,6 +339,15 @@ same validation and receipt path.
   read-back adds verification-failure evidence and cannot reopen the write.
 - Notification delivery is separate from provider acceptance and verification.
   Suppressed, bounced, deferred, and delivered are different outcomes.
+- There is at most one inquiry message per inquiry and message purpose. Once
+  the provider accepts it, no later report (deferred, bounced, suppressed,
+  failed) allows another send attempt, and the owner is never invited to
+  prepare one. A receipt is recorded only for the exact message that was sent.
+  Open: whether a corrected message may ever be sent after a bounce.
+- An inquiry can receive governed messages only while it is current: still
+  open, its capability has live intent (`live` or `live_unverified`), and its
+  captured version is the live one. Approval, follow-up, and intake share this
+  rule.
 - Follow-up scheduling checks the current inquiry state, current capability
   version, pause state, responsibility, recipient eligibility, and delivery
   evidence before acting.

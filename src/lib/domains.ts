@@ -1,13 +1,17 @@
-import { getRedis } from "./redis";
+import { isPlatformDomain } from "@/platform/infra/brand";
+import { getRedis } from "@/platform/infra/redis";
 import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
 import type { SiteConfig } from "./tenant/models";
 import { getAllTenants, getTenantConfig, invalidateDomainMapCache, isActiveTenant, updateTenant } from "./tenants";
 import { normalizeTenantDomain } from "./tenant-urls";
+// Outside-write receipts (src/platform/operator-queue) through the port
+// src/lib declares (Strelva Reborn section 7).
+import { workspacePorts } from "./workspace-ports";
 
 const CLAIMS_REDIS_KEY = "reb:domain-claims";
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i;
-const RESERVED_SUFFIXES = [".localhost", ".vercel.app", ".strelva.com"];
-const RESERVED_DOMAINS = new Set(["localhost", "strelva.com", "www.strelva.com"]);
+const RESERVED_SUFFIXES = [".localhost", ".vercel.app"];
+const RESERVED_DOMAINS = new Set(["localhost"]);
 
 type VercelDomainResponse = {
   name?: string;
@@ -59,7 +63,7 @@ export function isValidDomain(domain: string): boolean {
   const normalized = normalizeCustomDomain(domain);
   if (!normalized) return false;
   if (!DOMAIN_REGEX.test(normalized)) return false;
-  if (RESERVED_DOMAINS.has(normalized)) return false;
+  if (RESERVED_DOMAINS.has(normalized) || isPlatformDomain(normalized)) return false;
   return !RESERVED_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
 }
 
@@ -180,29 +184,36 @@ async function deleteRedisClaim(domain: string): Promise<void> {
  * Postgres `domain_claims` rows are removed separately by the caller.
  */
 export async function clearTenantDomainClaims(
-  tenant: TenantConfig,
+  tenant: Pick<TenantConfig, "id">,
   apply = true
 ): Promise<string[]> {
   const redis = getRedis();
-  if (!redis) return [];
-  try {
-    const claims = await getRedisClaims();
-    const cleared: string[] = [];
-    for (const { domain } of domainsFromTenant(tenant)) {
-      const key = claimKey(domain);
-      if (key in claims) {
-        cleared.push(domain);
-        if (apply) delete claims[key];
-      }
-    }
-    if (apply && cleared.length) {
-      await redis.set(CLAIMS_REDIS_KEY, claims);
-      invalidateDomainMapCache();
-    }
-    return cleared;
-  } catch {
-    return [];
+  if (!redis) throw new Error("tenant_domain_cleanup_unavailable");
+  if (!apply) {
+    // This destructive caller cannot use getRedisClaims' display fallback:
+    // a failed read is not evidence that the shared map was empty.
+    const claims = await redis.get<Record<string, DomainClaim>>(CLAIMS_REDIS_KEY);
+    return Object.entries(claims ?? {}).filter(([, claim]) => claim.tenantId === tenant.id).map(([domain]) => domain);
   }
+  // Compare ownership and change the shared map in one Redis operation. A
+  // stale tenant config cannot remove another site's claim or lose its write.
+  const cleared = await redis.eval<string[]>(`
+    local raw = redis.call('GET', KEYS[1])
+    if not raw then return {} end
+    local claims = cjson.decode(raw)
+    local removed = {}
+    for domain, claim in pairs(claims) do
+      if type(claim) == 'table' and claim.tenantId == ARGV[1] then
+        claims[domain] = nil
+        table.insert(removed, domain)
+      end
+    end
+    if #removed > 0 then redis.call('SET', KEYS[1], cjson.encode(claims)) end
+    return removed
+  `, [CLAIMS_REDIS_KEY], [tenant.id]);
+  if (!Array.isArray(cleared)) throw new Error("tenant_domain_cleanup_unconfirmed");
+  invalidateDomainMapCache();
+  return cleared;
 }
 
 async function addDomainToVercel(domain: string, reconcileBeforeWrite = false, beforeWrite?: () => Promise<void>): Promise<Partial<DomainClaim>> {
@@ -262,6 +273,27 @@ async function addDomainToVercel(domain: string, reconcileBeforeWrite = false, b
       [item.type, item.domain, item.value || item.reason].filter(Boolean).join(" ")
     ),
   };
+}
+
+/**
+ * Read-back for a domain add: one GET of the project binding. Never a write,
+ * and never followed by a retry of the add.
+ */
+async function readBackVercelDomain(domain: string): Promise<{ result: "matched" | "differs" | "failed"; detail: string }> {
+  const projectId = getVercelProjectId();
+  if (!hasVercelDomainApi() || !projectId) return { result: "failed", detail: "Vercel is not configured, so the binding could not be read back." };
+  try {
+    const response = await fetch(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}${getVercelTeamQuery()}`, {
+      headers: { Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}` }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return { result: "failed", detail: `Vercel answered ${response.status} on read-back.` };
+    const data = await response.json().catch(() => ({})) as VercelDomainResponse;
+    return data.name === domain
+      ? { result: "matched", detail: "The domain is bound to the project in Vercel." }
+      : { result: "differs", detail: "Vercel returned a different binding." };
+  } catch {
+    return { result: "failed", detail: "The Vercel binding could not be read back." };
+  }
 }
 
 async function inspectVercelDomain(domain: string): Promise<Partial<DomainClaim>> {
@@ -361,7 +393,7 @@ export async function addCustomDomain(
   tenantId: string,
   domain: string,
   role: DomainClaimRole = "additional",
-  options: { reconcileProviderBeforeWrite?: boolean; authorizeWrite?: () => Promise<void> } = {}
+  options: { reconcileProviderBeforeWrite?: boolean; authorizeWrite?: () => Promise<void>; actor?: string } = {}
 ): Promise<DomainResult> {
   const normalized = normalizeCustomDomain(domain);
   if (!normalized || !isValidDomain(normalized)) {
@@ -403,6 +435,20 @@ export async function addCustomDomain(
     await saveRedisClaim(unknown); invalidateDomainMapCache();
     await options.authorizeWrite?.();
   } : undefined);
+  // One receipt per Vercel add that reached the provider. Without Vercel
+  // configured nothing left Strelva, so there is nothing to record.
+  if (vercelState.vercelProjectId || vercelState.status === "error") {
+    const acceptance = vercelState.status === "error"
+      ? (vercelState.registrationAttempt === "unknown" ? "unknown" as const : "rejected" as const)
+      : "accepted" as const;
+    const receipts = await workspacePorts().outsideWriteReceipts();
+    await receipts.recordDomainAdd({
+      tenantId, domain: normalized, role, at: createdAt, actor: options.actor ?? "strelva",
+      acceptance, detail: vercelState.error ?? null, providerRef: vercelState.vercelProjectId ?? null,
+      ...(acceptance === "accepted" ? { readback: await readBackVercelDomain(normalized) } : {}),
+    });
+  }
+
   const claim: DomainClaim = {
     domain: normalized,
     tenantId,
@@ -462,7 +508,12 @@ export async function refreshDomainClaim(tenantId: string, domain: string, optio
   return { ok: true, tenant: updated, claim };
 }
 
-export async function removeCustomDomain(tenantId: string, domain: string): Promise<
+/**
+ * Removes Strelva's claim only. No Vercel call is made: Strelva never removes
+ * a Vercel domain. The receipt reads the tenant back to confirm the claim is
+ * gone, and says plainly that there is no undo.
+ */
+export async function removeCustomDomain(tenantId: string, domain: string, options: { actor?: string } = {}): Promise<
   | { ok: true; tenant: TenantConfig }
   | { ok: false; status: 404 | 422; error: string }
 > {
@@ -489,5 +540,20 @@ export async function removeCustomDomain(tenantId: string, domain: string): Prom
 
   await deleteRedisClaim(normalized);
   invalidateDomainMapCache();
+  const prior = (tenant.domainClaims ?? []).find((claim) => claimKey(claim.domain) === claimKey(normalized));
+  const readBack = await getTenantConfig(tenantId).catch(() => null);
+  const stillClaimed = readBack
+    ? (readBack.customDomains ?? []).some((item) => claimKey(normalizeCustomDomain(item) ?? item) === claimKey(normalized))
+    : null;
+  const receipts = await workspacePorts().outsideWriteReceipts();
+  await receipts.recordDomainClaimRemoval({
+    tenantId, domain: normalized, actor: options.actor ?? "strelva", at: nowIso(),
+    before: prior ? { role: prior.role, status: prior.status } : null,
+    readback: stillClaimed === null
+      ? { result: "failed", detail: "The tenant could not be read back." }
+      : stillClaimed
+        ? { result: "differs", detail: "The domain is still listed on the tenant." }
+        : { result: "matched", detail: "Strelva's claim is gone. The domain was not touched in Vercel." },
+  });
   return { ok: true, tenant: updated };
 }

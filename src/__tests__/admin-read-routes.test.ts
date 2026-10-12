@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined) }));
 
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetPortfolioSummary = vi.hoisted(() => vi.fn());
@@ -8,7 +9,7 @@ const mockBuildOpsReport = vi.hoisted(() => vi.fn());
 const mockGetAuditLog = vi.hoisted(() => vi.fn());
 const mockGetAllAuditEvents = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 vi.mock("@/lib/portfolio", () => ({
   getPortfolioSummary: mockGetPortfolioSummary,
   buildPortfolioSnapshot: mockBuildPortfolioSnapshot,

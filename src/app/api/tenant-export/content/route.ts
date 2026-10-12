@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getContent, getPageConfig, SECTION_TO_TYPE } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import type { ContentSection } from "@/lib/types";
@@ -27,6 +28,7 @@ export async function GET() {
   // should not be able to download the full content export.
   const blocked = await requireTenantPermission(tenant, "billing:manage");
   if (blocked) return blocked;
+  await authorizeTenantOperatorRead(tenant, ["billing:manage"]);
 
   const [tenantConfig, pageConfig, entries] = await Promise.all([
     getTenantConfig(tenant),

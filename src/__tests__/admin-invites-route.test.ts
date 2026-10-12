@@ -1,4 +1,11 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 const mockAssignUserToTenant = vi.hoisted(() => vi.fn());
 const mockCreateInvite = vi.hoisted(() => vi.fn());
@@ -11,7 +18,7 @@ const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   CLIENT_ROLES: ["viewer", "editor", "admin", "owner"],
   assignUserToTenant: mockAssignUserToTenant,
   getCurrentUserEmail: mockGetCurrentUserEmail,
@@ -104,7 +111,7 @@ describe("admin invites route", () => {
       "production",
     );
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"North Studio" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "You're invited to manage A&B alert(\"x\")",
       html: expect.stringContaining("A&amp;B alert(&quot;x&quot;)"),
@@ -115,7 +122,7 @@ describe("admin invites route", () => {
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
       html: expect.stringContaining("owner@example.com"),
       text: expect.stringContaining(
-        "Use owner@example.com when signing up so your dashboard access connects automatically.",
+        "Use owner@example.com when signing up so your workspace access connects automatically.",
       ),
     }));
     expect(mockGetActorContext).toHaveBeenCalledWith("gldf");

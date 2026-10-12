@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import {
   OfferingAccessError,
   OfferingConflictError,

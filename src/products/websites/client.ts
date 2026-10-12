@@ -20,6 +20,7 @@ export {
 export * from "./rebuild-contracts";
 export * from "./rebuild-audit-contracts";
 export * from "./site-document-schema";
+export { SiteDocumentTry } from "./SiteDocumentTry";
 export type { WebsiteMonthlyReport } from "./site-report";
 export type {
   ApproveWebsiteInput,
@@ -70,3 +71,16 @@ export function websitePreviewIsCurrent(website: import("./contracts").Website):
 }
 
 export { AGENCY_DOCUMENT_NODE_SECTIONS, AGENCY_DOCUMENT_SECTIONS } from "./agency-document-contracts";
+
+// Repo-change Requests on a managed website: shapes, stages and the filing command (browser-safe).
+export { SITE_CHANGE_SCOPE, SITE_CHANGE_STAGE_LABEL, recordSiteChangeSchema, siteChangeReceiptSchema, siteChangeRequestCommand, siteChangeRequestSchema, siteChangeStage, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest, type SiteChangeStage } from "./site-change-model";
+export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-editing";
+
+export { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest, type WebsiteCutoverUndoReceipt } from "./recovery-contracts";
+export { parseWebsiteReportView, type WebsiteReportView } from "./report-view";
+
+export { legacyArchiveSummarySchema, type LegacyArchiveSummary } from "./legacy-archive-contracts";
+export { normalizeWebsiteRebuildUrl } from "./rebuild-url";
+
+export { bareHostname } from "./rebuild-possibility";
+export type { SiteResults, WorkspaceResults } from "./linked-results";

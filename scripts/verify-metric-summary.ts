@@ -8,7 +8,7 @@
  *
  * Run: npx tsx --env-file=.env.local scripts/verify-metric-summary.ts
  */
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 
 async function main() {
   const db = getSupabase();

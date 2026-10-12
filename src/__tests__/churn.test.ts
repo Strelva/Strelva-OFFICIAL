@@ -6,7 +6,7 @@ const mockGetAllTenants = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetEffectiveSubscriptionStatus = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/storage", () => ({
   getActivity: (...args: unknown[]) => mockGetActivity(...args),
 }));

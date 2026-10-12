@@ -1,7 +1,9 @@
+import { resolveAgencyAttribution, admitAgencyCheck, captureAgencyProspect, agencyReplyTo, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { attributedAudit } from "@/lib/audit/attribution";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { getRedis } from "@/lib/redis";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { getRedis } from "@/platform/infra/redis";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import type { AuditResult } from "@/lib/audit/types";
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let body: { name?: string; email?: string; url?: string };
+  let body: { name?: string; email?: string; url?: string; agency?: string };
   try {
     body = await request.json();
   } catch {
@@ -68,33 +70,48 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
+    if (agency) await admitAgencyCheck(agency);
     const categories = stripFabricatedEstimates(await runAudit(url));
     const overallScore = computeOverallScore(categories);
     const grade = scoreToGrade(overallScore);
-    const result: AuditResult = {
+    const result: AuditResult = attributedAudit({
       url,
       scannedAt: new Date().toISOString(),
       overallScore,
       grade,
       categories,
-    };
+    }, agency);
 
     const lead = { name, email, url };
     const reportId = await saveAuditReport(result, lead);
-    const reportUrl = reportId ? `${PUBLIC_SITE_URL}/audit/report/${reportId}` : null;
+    if (agency && !reportId) return NextResponse.json({ error: "Report storage is temporarily unavailable." }, { status: 503 });
+    const reportUrl = reportId ? (agency
+      ? new URL(`/audit/report/${reportId}`, request.url).href
+      : `${PUBLIC_SITE_URL}/audit/report/${reportId}`) : null;
+    if (agency) await captureAgencyProspect({ agency, source: "audit", resultId: reportId!, name, email,
+      url, business: name, score: overallScore, grade });
 
     // Operator notification (fire-and-forget; a Slack blip never fails the lead).
     const host = url.replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-    void sendSlackNotification({
+    if (!agency) void sendSlackNotification({
       text: `New audit lead\n*${name}* <${email}>\n${host} — grade ${grade} (${overallScore}/100)${reportUrl ? `\nReport: ${reportUrl}` : ""}`,
     });
 
     // Prospect email — real send only when client email is switched on.
-    const emailed = reportUrl
-      ? await sendAuditReportEmail({ lead, result, reportUrl })
-      : false;
+    let emailed = false;
+    if (reportUrl) {
+      try {
+        const replyTo = agency ? await agencyReplyTo(agency) : undefined;
+        emailed = await sendAuditReportEmail({ lead, result, reportUrl, ...(agency ? { replyTo } : {}) });
+      } catch {
+        // The prospect/report already committed. A sender lookup failure must
+        // not invite another lead submission or route replies to Strelva.
+      }
+    }
 
     return NextResponse.json({
+      ...(agency ? { agency } : {}),
       reportId,
       reportUrl,
       url,
@@ -106,6 +123,7 @@ export async function POST(request: NextRequest) {
       emailed,
     });
   } catch (err) {
+    if (err instanceof AgencyProspectingError) return NextResponse.json({ error: err.message }, { status: err.status });
     Sentry.captureException(err, { tags: { feature: "audit-lead" }, extra: { url } });
     return NextResponse.json({ error: "The audit failed to run. Please try again." }, { status: 500 });
   }

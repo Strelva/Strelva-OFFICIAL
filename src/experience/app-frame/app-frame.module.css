@@ -13,7 +13,7 @@
   flex: 0 0 var(--app-navigation-width, 276px);
   min-width: 0;
   overflow: visible;
-  transition: width 180ms ease, flex-basis 180ms ease;
+  transition: width var(--motion-base) var(--ease-settle), flex-basis var(--motion-base) var(--ease-settle);
 }
 
 .frame[data-navigation-collapsed="true"] .navigation {
@@ -62,7 +62,7 @@
   flex: 0 0 36px;
   border-radius: 8px;
   color: var(--gray-muted);
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .navigationToggle {
@@ -172,6 +172,9 @@
     height: 0;
     flex-basis: 0;
     overflow: visible;
+    /* A desktop rail must release its width immediately at this breakpoint.
+       Animating its collapse leaves the narrow main partly offscreen. */
+    transition: none;
   }
 
   .frame[data-navigation-collapsed="true"] .navigation {
@@ -228,10 +231,30 @@
   }
 }
 
+@media (pointer: coarse) {
+  .navigationToggle,
+  .closeButton {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .navigation,
   .navigationToggle,
   .closeButton {
     transition: none;
   }
+}
+
+/* October 9, 2026: in the paper workspace the frame shows the shell's dot
+   paper through, and the header carries no rule or fill. */
+:global([data-workspace-theme="linen"]) .frame {
+  background: transparent;
+}
+
+:global([data-workspace-theme="linen"]) .header {
+  border-bottom: 0;
+  background: transparent;
 }

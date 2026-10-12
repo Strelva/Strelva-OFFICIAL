@@ -40,7 +40,6 @@ type LifecycleEmailType = "welcome" | "site-live" | "review-request";
 const LIFECYCLE_EMAILS: { type: LifecycleEmailType; label: string }[] = [
   { type: "welcome", label: "Send welcome" },
   { type: "site-live", label: "Send site-live" },
-  { type: "review-request", label: "Send review request" },
 ];
 
 /** Maps each lifecycle type to the summary string logged by delivery-email.ts. */
@@ -302,7 +301,7 @@ export function ClientCrmSections({
               }
             }}
             placeholder="+ tag"
-            className="w-24 rounded-full bg-gray-bg border border-glass-border px-2 py-0.5 text-[11px] text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 focus:w-32 transition-all"
+            className="w-24 rounded-full bg-gray-bg border border-glass-border px-2 py-0.5 text-[11px] text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50 focus:w-32 transition-[width,border-color] duration-(--motion-base)"
           />
         </div>
       </section>
@@ -407,7 +406,8 @@ export function ClientCrmSections({
               }
             }}
             placeholder="Log a touchpoint… (↵ to save)"
-            className="flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+            aria-label="Touchpoint"
+            className="min-w-0 flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
           />
           <button
             onClick={logActivity}

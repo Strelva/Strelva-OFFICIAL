@@ -4,30 +4,13 @@
  * same checks server-side without an HTTP round-trip.
  */
 
-import { getRedis } from "./redis";
-import { getSupabase } from "./db/client";
+import type { ServiceCheck, HealthReport } from "@/platform/infra/health-contracts";
+export type { ServiceStatus, ServiceCheck, HealthReport } from "@/platform/infra/health-contracts";
+import { getRedis } from "@/platform/infra/redis";
+import { getSupabase } from "@/platform/infra/db/client";
 import { version as productVersion } from "../../package.json";
 
 const TIMEOUT_MS = 3_000;
-
-export type ServiceStatus = "ok" | "not configured" | "error";
-
-export interface ServiceCheck {
-  status: ServiceStatus;
-  responseMs: number;
-}
-
-export interface HealthReport {
-  status: "healthy" | "degraded" | "down";
-  version: string;
-  timestamp: string;
-  checks: {
-    redis: ServiceCheck;
-    supabase: ServiceCheck;
-    stripe: ServiceCheck;
-    gemini: ServiceCheck;
-  };
-}
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([

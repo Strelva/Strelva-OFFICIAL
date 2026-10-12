@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceStoreError } from "@/platform/workspaces/types";
 import { admitAndRunDueStandingResponsibility, workspaceResponsibilityCommands } from "./server";
 import { readWorkspaceInvestigation, runWorkspaceInvestigation } from "@/products/investigations/server";

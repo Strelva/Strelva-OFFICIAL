@@ -9,7 +9,7 @@
  */
 
 import { addEvent, getEvents } from "../events";
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { UnifiedEvent } from "../types";
 import type { SerpResult } from "./serp";
 import type { AiAnswerResult } from "./ai-answers";

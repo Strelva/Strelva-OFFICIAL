@@ -62,8 +62,6 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
     items.push({ severity: "high", kind: "ops", message: `${m.revalidationFailures} revalidation failure(s)`, href: "/admin/ops" });
   if (m.failedAiWrites > 0)
     items.push({ severity: "medium", kind: "ops", message: `${m.failedAiWrites} failed AI write(s)`, href: "/admin/ops" });
-  if (m.staleSmsApprovals > 0)
-    items.push({ severity: "medium", kind: "ops", message: `${m.staleSmsApprovals} stale SMS approval(s)`, href: "/admin/ops" });
   if (m.tenantDomainDrift.length > 0)
     items.push({ severity: "medium", kind: "ops", message: `${m.tenantDomainDrift.length} tenant domain drift`, href: "/admin/ops" });
 

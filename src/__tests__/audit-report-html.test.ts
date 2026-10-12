@@ -80,9 +80,9 @@ describe("renderAuditReport", () => {
     expect(html).toContain("Security");
   });
 
-  it("includes the Strelva CTA pointing to the access request", () => {
-    expect(html).toContain("We can do all of this for you");
-    expect(html).toContain("/access-request");
+  it("offers the neutral agency directory from the direct report", () => {
+    expect(html).toContain("Fix these yourself, or have an agency do it");
+    expect(html).toContain("/agencies");
   });
 
   it("escapes the audited URL and is print-friendly", () => {

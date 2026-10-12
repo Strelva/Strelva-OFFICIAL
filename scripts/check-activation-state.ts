@@ -7,8 +7,8 @@
  *
  * Run: npx tsx --env-file=.env.local scripts/check-activation-state.ts
  */
-import { getSupabase } from "../src/lib/db/client";
-import { getRedis } from "../src/lib/redis";
+import { getSupabase } from "../src/platform/infra/db/client";
+import { getRedis } from "../src/platform/infra/redis";
 
 async function main() {
   const db = getSupabase();

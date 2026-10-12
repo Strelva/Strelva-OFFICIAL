@@ -1,0 +1,6 @@
+.columns { display: grid; grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); gap: 32px; align-items: start; }
+.aside { display: flex; flex-direction: column; gap: 24px; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.aside p { margin: 0; }
+.fold { color: var(--st-text-2); font-size: 14px; }
+.fold summary { padding: 12px 0; cursor: pointer; }
+@media(max-width: 767px) { .columns { grid-template-columns: minmax(0, 1fr); } }

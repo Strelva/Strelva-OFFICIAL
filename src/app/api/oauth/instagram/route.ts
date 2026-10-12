@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { createOAuthState } from "@/lib/oauth-state";
 import { requireActiveSubscription } from "@/lib/subscription";

@@ -1,0 +1,6 @@
+.historyLayout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, .57fr); gap: 36px; align-items: start; }
+.history { margin: 0; padding: 0; list-style: none; }
+.historyRow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; padding: 16px 0; border-top: 1px solid var(--st-line); font-size: 14px; line-height: 22px; }
+.historyRow:last-child { border-bottom: 1px solid var(--st-line); }
+.context { display: flex; flex-direction: column; gap: 28px; }
+@media (max-width: 767px) { .historyLayout { grid-template-columns: minmax(0, 1fr); gap: 28px; } .historyRow { grid-template-columns: 32px minmax(0, 1fr); } .historyRow > :last-child { grid-column: 2; } }

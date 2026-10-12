@@ -55,7 +55,7 @@ function focusableIndex(items: TabItem[], activeValue: string, selectedValue: st
 }
 
 function tabClasses(variant: TabVariant, selected: boolean) {
-  const base = "flex min-h-10 items-center justify-center gap-1.5 text-sm font-medium tracking-[-0.01em] outline-none transition-[background-color,color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-accent-text/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
+  const base = "flex min-h-10 items-center justify-center gap-1.5 text-sm font-medium tracking-[-0.01em] outline-none transition-[background-color,color,box-shadow] focus-visible:ring-2 focus-visible:ring-accent-text/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
   if (variant === "pill") {
     return cn(
       base,

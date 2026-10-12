@@ -1,8 +1,14 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { captureActionActor } from "@/platform/presentation/actor-server";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getWork, saveWork } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { changeDocument, createDocument, documentCommandSchema, documentSchema } from "./engine";
+import { changeDocument, createDocument, documentCommandSchema, documentReceiptSchema, documentSchema, type DocumentHistoryPage } from "./engine";
+
+/** Full-history retrieval is opt-in; existing document envelopes stay unchanged. */
+export function documentHistoryEnabled(): boolean {
+  return process.env.STRELVA_DOCUMENT_HISTORY_RELEASE === "1";
+}
 
 type LoadedWorkspaceDocument = {
   workId: string;
@@ -24,6 +30,31 @@ export async function readWorkspaceDocument(actor: WorkspaceActor, workId: strin
   return saved;
 }
 
+/** Reuse the document's exact read grant, including shared and assigned work. */
+export async function readWorkspaceDocumentHistory(actor: WorkspaceActor, workId: string, beforeRevision?: number): Promise<DocumentHistoryPage> {
+  if (!documentHistoryEnabled()) throw new WorkspaceStoreError("Document history is not enabled.");
+  const before = z.number().int().positive().max(2147483647).optional().parse(beforeRevision);
+  const saved = await loadWorkspaceDocument(actor, workId);
+  const db = getSupabase();
+  if (!db) throw new WorkspaceStoreError("Document history is unavailable.");
+  // Keyset pagination stays bounded even after thousands of edits. Bind both
+  // identities, and pin this read to the revision just authorized by getWork.
+  const { data, error } = await db.from("document_revisions").select("revision, receipt")
+    .eq("work_id", saved.workId).eq("workspace_id", saved.workspaceId)
+    .lt("revision", Math.min(before ?? saved.document.revision + 1, saved.document.revision + 1))
+    .order("revision", { ascending: false }).limit(21);
+  if (error || !data) throw new WorkspaceStoreError("Document history could not be read.");
+  const rows = z.array(z.object({ revision: z.number().int().positive(), receipt: documentReceiptSchema })).max(21).safeParse(data);
+  if (!rows.success || rows.data.some(row => row.revision !== row.receipt.revision)) {
+    throw new WorkspaceStoreError("Document history could not be read.");
+  }
+  const receipts = rows.data.slice(0, 20).map(row => row.receipt);
+  return {
+    workId: saved.workId, workspaceId: saved.workspaceId, receipts,
+    nextBeforeRevision: rows.data.length > 20 ? receipts.at(-1)!.revision : null,
+  };
+}
+
 export async function saveWorkspaceDocument(actor: WorkspaceActor, workspaceId: string, input: unknown) {
   const document = createDocument(input, actor.userId);
   const work = await saveWork(actor, z.string().uuid().parse(workspaceId), { productId: "documents", resourceKind: "document", title: document.title, payload: document });
@@ -37,7 +68,7 @@ export async function editWorkspaceDocument(actor: WorkspaceActor, workId: strin
     throw new WorkspaceConflictError("Private onboarding attachments are immutable. Supply a replacement from the onboarding case.");
   }
   const command = documentCommandSchema.parse(raw);
-  const document = changeDocument(saved.document, command, actor.userId);
+  const document = changeDocument(saved.document, command, actor.userId, await captureActionActor(actor, saved.workspaceId));
   const db = getSupabase();
   if (!db) throw new WorkspaceStoreError("Document storage is unavailable.");
   const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<{ payload: unknown }> | null; error: { message: string } | null }> };

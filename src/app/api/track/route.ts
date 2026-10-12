@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { trackClick } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 
 const ALLOWED_EVENTS = new Set([

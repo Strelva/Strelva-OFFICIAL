@@ -16,7 +16,7 @@
  * subscription reasons are still computed from tenant data.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getActivity } from "./storage";
 import { getAllTenants, getTenantConfig, isActiveTenant } from "./tenants";
 import { getEffectiveSubscriptionStatus } from "./subscription";

@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Operator agent — the portfolio-level AI the founders chat with in Mission
  * Control to run the business. Modeled on src/app/api/agent/route.ts (the
@@ -12,11 +13,11 @@
  * mutation on its own.
  */
 
-import { streamText, tool, stepCountIs } from "ai";
+import { tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
-import { isSuperAdmin } from "@/lib/auth";
-import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
+import { isSuperAdmin } from "@/platform/infra/auth";
+import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import {
   buildPortfolioSnapshot,
   getPortfolioSummary,
@@ -117,9 +118,9 @@ You can READ the whole business. Pick the right tool:
 - list_drafts — AI drafts waiting on review.
 - refresh_portfolio — rebuild the cached data when it looks stale (low-risk; runs without confirmation).
 
-For consequential actions — minting or revoking a pay link, assigning a user, sending an invite, approving/rejecting a draft, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_pay_link, propose_revoke_pay_link, propose_assign_user, propose_send_invite, propose_approve_draft, propose_reject_draft, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
+For consequential actions — assigning a user, sending an invite, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_assign_user, propose_send_invite, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Client content authoring and approval belongs to the business owner or its authorized agency through ordinary permissions. Platform support cannot propose approval or rejection of client drafts. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
 
-Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Dollar amounts: pay links are quoted in whole dollars.`;
+Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Agency service sales and client publishing require ordinary agency access.`;
 
 export async function POST(req: Request) {
   if (!(await isSuperAdmin())) {
@@ -128,6 +129,8 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const body = (await req.json().catch(() => null)) as { messages?: unknown } | null;
   if (!body || !isIncomingMessages(body.messages)) {
@@ -158,7 +161,7 @@ export async function POST(req: Request) {
     }),
     read_ops: tool({
       description:
-        "Read live operational health: webhook failures, revalidation failures, stale SMS approvals, pending event queues, failed AI writes, and tenant domain drift.",
+        "Read live operational health: webhook failures, revalidation failures, pending event queues, failed AI writes, and tenant domain drift.",
       inputSchema: z.object({}),
       execute: async () => await buildOpsReport(),
     }),
@@ -284,33 +287,6 @@ export async function POST(req: Request) {
       inputSchema: z.object({}),
       execute: async () => await buildRevenueSummary(),
     }),
-    propose_pay_link: tool({
-      description:
-        "Propose minting a per-client pay link. Returns a confirmation card; it does NOT create the link. amountDollars is whole dollars.",
-      inputSchema: z.object({
-        slug: z.string().describe("URL slug, e.g. acme-coffee"),
-        clientName: z.string(),
-        door: z.enum(["build", "managed_start"]),
-        leadSlug: z.string(),
-        amountDollars: z.number().positive(),
-      }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "mint_pay_link",
-          summary: `Mint a $${p.amountDollars.toLocaleString()} ${p.door} pay link for ${p.clientName} (/pay/${p.slug})`,
-          params: {
-            slug: p.slug,
-            clientName: p.clientName,
-            door: p.door,
-            leadSlug: p.leadSlug,
-            amountCents: Math.round(p.amountDollars * 100),
-          },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
     propose_assign_user: tool({
       description:
         "Propose assigning a user (by email) to a tenant with a role. Returns a confirmation card; it does NOT assign.",
@@ -330,42 +306,11 @@ export async function POST(req: Request) {
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
       },
     }),
-    propose_approve_draft: tool({
-      description:
-        "Propose approving a pending AI draft for a tenant section (publishes it live). Returns a confirmation card; does NOT approve.",
-      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "approve_draft",
-          summary: `Approve & publish the ${p.section} draft for ${p.tenant}`,
-          params: { tenant: p.tenant, section: p.section, action: "approve" },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
-    propose_reject_draft: tool({
-      description:
-        "Propose rejecting a pending AI draft for a tenant section (discards it). Returns a confirmation card; does NOT reject.",
-      inputSchema: z.object({ tenant: z.string(), section: z.string() }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "reject_draft",
-          summary: `Reject the ${p.section} draft for ${p.tenant}`,
-          params: { tenant: p.tenant, section: p.section, action: "reject" },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
     propose_update_tenant: tool({
       description:
-        "Propose a tenant config change (e.g. owner email, subscription status, active). Returns a confirmation card; does NOT apply. Only include the fields to change.",
+        "Propose a platform account configuration change (subscription status or active). Returns a confirmation card; does NOT apply. Only include the fields to change.",
       inputSchema: z.object({
         tenantId: z.string(),
-        ownerEmail: z.string().email().optional(),
         subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]).optional(),
         active: z.boolean().optional(),
       }),
@@ -401,45 +346,10 @@ export async function POST(req: Request) {
         return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
       },
     }),
-    propose_revoke_pay_link: tool({
-      description:
-        "Propose revoking (deleting) a pay link by slug — the /pay/{slug} URL stops working. Returns a confirmation card; does NOT revoke.",
-      inputSchema: z.object({ slug: z.string() }),
-      execute: async ({ slug }) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "revoke_pay_link",
-          summary: `Revoke pay link /pay/${slug}`,
-          params: { slug },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
-    propose_send_invite: tool({
-      description:
-        "Propose sending an owner/admin invite to an email for a tenant (works whether or not they already have an account). Returns a confirmation card; does NOT send.",
-      inputSchema: z.object({
-        email: z.string().email(),
-        tenant: z.string(),
-        role: z.enum(["owner", "admin", "editor", "viewer"]).optional(),
-      }),
-      execute: async (p) => {
-        const proposal: Proposal = {
-          id: nextProposalId(),
-          action: "send_invite",
-          summary: `Send a ${p.role ?? "owner"} invite to ${p.email} for ${p.tenant}`,
-          params: { email: p.email, tenant: p.tenant, role: p.role ?? "owner" },
-        };
-        proposals.push(proposal);
-        return { requiresConfirmation: true, proposalId: proposal.id, summary: proposal.summary };
-      },
-    }),
+
   };
 
   const encoder = new TextEncoder();
-  const primaryModel = getPrimaryModel();
-  const fallbackModel = getFallbackModel();
 
   const readable = new ReadableStream({
     async start(controller) {
@@ -447,14 +357,7 @@ export async function POST(req: Request) {
       // when retrying is still safe (no partial output sent to the client).
       let emittedToClient = false;
 
-      const runModel = async (model: typeof primaryModel.model): Promise<void> => {
-        const result = streamText({
-          model,
-          system: SYSTEM_PROMPT,
-          messages,
-          tools,
-          stopWhen: stepCountIs(8),
-        });
+      const consume = async (result: ModelTextStream): Promise<void> => {
         for await (const part of result.fullStream) {
           if (part.type === "error") {
             throw part.error;
@@ -507,18 +410,15 @@ export async function POST(req: Request) {
       };
 
       try {
-        try {
-          await runModel(primaryModel.model);
-        } catch (primaryErr) {
-          // Retry on the fallback model only when it's safe (nothing streamed yet)
-          // and the failure looks transient (outage / rate limit / 5xx).
-          if (fallbackModel && !emittedToClient && isTransientModelError(primaryErr)) {
-            console.warn("[operator-agent] Primary model failed, trying fallback:", primaryErr instanceof Error ? primaryErr.message : primaryErr);
-            await runModel(fallbackModel.model);
-          } else {
-            throw primaryErr;
-          }
-        }
+        // Primary then fallback through the one model-call helper: the
+        // fallback runs only when nothing has streamed yet and the failure
+        // looks transient (outage / rate limit / 5xx). One cost row per call.
+        await streamModelText(
+          { purpose: "operator", actorKind: "operator" },
+          { system: SYSTEM_PROMPT, messages, tools, stopWhen: stepCountIs(8) },
+          (result) => consume(result),
+          { emitted: () => emittedToClient },
+        );
       } catch (err) {
         console.error("[operator-agent] turn failed:", err);
         if (!emittedToClient) {

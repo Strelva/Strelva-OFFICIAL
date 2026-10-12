@@ -26,8 +26,11 @@ src/app          routes and API handlers (thin)
 src/experience   UI for a capability or the shared frame (app-frame, workspace)
 src/products     one folder per capability: contracts, server, domain logic
 src/platform     shared layers every capability builds on
-src/server       server-only wiring (executable capability definitions)
-src/lib          tenant-model implementations awaiting extraction
+  infra/         shared infrastructure both models use: db, redis, auth, email,
+                 crypto, rate-limit, logger, ai-models, safe-fetch, model calls
+src/server       server-only product wiring, live sources and compatibility adapters
+src/lib          tenant-model implementations awaiting extraction; may import
+                 src/platform/infra, never another workspace layer
 src/proxy.ts     request gating
 ```
 
@@ -39,6 +42,7 @@ src/proxy.ts     request gating
 | Layer | What it does |
 | --- | --- |
 | `workspaces/` | Workspaces, memberships, `saved_product_work`, handoffs, invitations, actor resolution |
+| `business-record/` | One shared record per customer business: typed facts with provenance, services, people, deduplicated contacts, revision history with undo, and the tenant -> workspace conversion (`tenant_workspace_links`). Local only; migration `20261002120000` not applied to production |
 | `capabilities/` | Executable capability contracts, qualification, registry factory |
 | `products/` | Descriptive catalog and the workspace executable list. Grants no access |
 | `bounded-work/` | Revisioned payload store shared by apps, scheduling, checks, websites |
@@ -62,6 +66,8 @@ src/proxy.ts     request gating
 | [persistence-boundaries](./persistence-boundaries.md) | Which store is authoritative for what; Redis exceptions; retention |
 | [auth-tenancy](./auth-tenancy.md) | Supabase Auth, routing, memberships, tenant checks |
 | [product-ontology](./product-ontology.md) | Domain vocabulary and maturity words (read by `ontology-contracts.test.ts`) |
+| [GLOSSARY](../../GLOSSARY.md) | Workspace terms the ontology does not define |
+| [deepening-2026-10-05](./deepening-2026-10-05/README.md) | Nine proposed deep modules for the workspace and inquiry code, with defects found and fixed |
 | [custom-repo-delivery-model](./custom-repo-delivery-model.md) | Client-repo topology and the versioned storefront contract |
 | [client-repo-build-standard](./client-repo-build-standard.md) | How client repos consume `/api/v1` |
 | [feature-management](./feature-management.md) | Tenant feature registry and core lock |

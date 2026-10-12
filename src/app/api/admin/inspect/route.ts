@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { INSPECT_COOKIE } from "@/lib/inspect-mode";
 
 /**

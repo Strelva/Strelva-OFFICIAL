@@ -3,7 +3,7 @@ import { businessEntryInputSchema } from "@/platform/workspaces/business-entry-c
 import { enterCustomerBusiness } from "@/platform/workspaces/business-entry";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), available: true }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => mocks.available ? { rpc: mocks.rpc } : null }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => mocks.available ? { rpc: mocks.rpc } : null }));
 const actor = { userId: "b9100000-0000-4000-8000-000000000001", verifiedEmail: "Owner@Example.test" };
 const id = "b9100000-0000-4000-8000-000000000002";
 const input = { destination: {kind:"new",name:"Juniper"}, initialRequest:"Have Strelva build our website.", idempotencyKey:"b9100000-0000-4000-8000-000000000003" };

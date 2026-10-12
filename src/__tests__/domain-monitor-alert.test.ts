@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const sendEmailMock = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/email/send", () => ({ sendEmail: sendEmailMock }));
+vi.mock("@/platform/infra/email/send", () => ({ sendEmail: sendEmailMock }));
 
 import { sendDomainAlertEmail } from "@/products/domain-monitor/server";
 

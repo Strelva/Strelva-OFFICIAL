@@ -6,7 +6,7 @@ test.describe("inquiry migration browser journey", () => {
   test("edits the actual form, rehearses and inspects the published after view", async ({ page }) => {
     await page.goto("/preview/strelva/inquiries");
     await page.getByRole("button", { name: "New", exact: true }).click();
-    await page.getByLabel("What should Strelva handle?").fill("Collect seller inquiries and route them to Maria, with a follow-up if nobody replies.");
+    await page.getByLabel("What should your inquiry form do?").fill("Collect seller inquiries and route them to Maria, with a follow-up if nobody replies.");
     await page.getByRole("button", { name: "Shape this request" }).click();
     await expect(page.getByRole("button", { name: "Go with this shape" })).toBeEnabled();
     await page.getByRole("button", { name: "Go with this shape" }).click();
@@ -15,24 +15,28 @@ test.describe("inquiry migration browser journey", () => {
     await page.getByRole("button", { name: "Review rehearsal" }).click();
     await page.getByRole("button", { name: "Run rehearsal", exact: true }).click();
     await expect(page.getByRole("heading", { name: "8 of 8 checks passed" })).toBeVisible();
-    await page.getByRole("button", { name: "Make live", exact: true }).click();
+    await page.getByRole("button", { name: "Make it live", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Tell us about your home", exact: true })).toBeVisible();
     await expect(page.getByText("Read back exact definition from isolated fixture memory; no live website was changed.", { exact: true })).toBeVisible();
     await page.locator("main").evaluate((element) => { element.scrollTop = 0; });
     await page.screenshot({ path: "output/inquiry-receipt-desktop-verified.png", fullPage: true });
-    await page.getByRole("link", { name: "Work", exact: true }).click();
+    await page.getByRole("button", { name: "Recent changes", exact: true }).click();
     await page.getByRole("button", { name: "Review rehearsal" }).click();
     await page.getByRole("button", { name: "Send test inquiry", exact: true }).click();
     await expect(page.getByRole("main")).toContainText("Rehearsal customer");
     await expect(page.getByText("The customer submitted the inquiry form.", { exact: true }).first()).toBeVisible();
   });
 
-  test("business home keeps four ordered sections and a narrow sidebar", async ({ page }) => {
+  test("business home keeps four ordered sections and shared workspace navigation", async ({ page }) => {
     await page.goto("/preview/strelva/inquiries");
     await expect(page.getByText("Nothing here is real.", { exact: true })).toBeVisible();
     const headings = await page.locator("main h2").allTextContents();
-    expect(headings).toEqual(["Needs you", "Strelva is handling", "What changed", "What's live"]);
-    const navigation = page.getByRole("navigation", { name: "Inquiry work" });
+    expect(headings).toEqual(["Needs you", "Running", "What changed", "What's live"]);
+    const sidebar = page.getByRole("complementary", { name: "Buffalo Realty navigation", exact: true });
+    await expect(sidebar.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Home", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Requests", exact: true })).toBeVisible();
+    await expect(sidebar.getByRole("link", { name: "Running", exact: true })).toBeVisible();
+    const navigation = page.getByRole("navigation", { name: "Inquiries", exact: true });
     await expect(navigation.getByRole("button", { name: "New", exact: true })).toBeVisible();
     await expect(navigation.getByRole("button", { name: "Search", exact: true })).toBeVisible();
     await expect(navigation.getByText(/CRM|Marketing|Automations/)).toHaveCount(0);
@@ -41,9 +45,11 @@ test.describe("inquiry migration browser journey", () => {
   test("mobile menu closes into a full-width usable request form", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/preview/strelva/inquiries");
-    await page.getByRole("button", { name: "Open inquiry navigation" }).click();
-    await page.getByRole("button", { name: "New", exact: true }).click();
-    const input = page.getByLabel("What should Strelva handle?");
+    await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Buffalo Realty navigation", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close navigation", exact: true }).click();
+    await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "New", exact: true }).click();
+    const input = page.getByLabel("What should your inquiry form do?");
     await expect(input).toBeVisible();
     await input.fill("Collect buyer inquiries and route them to Maria.");
     await expect(page.getByRole("button", { name: "Shape this request" })).toBeEnabled();
@@ -55,9 +61,9 @@ test.describe("inquiry migration browser journey", () => {
 
   test("read-only and unavailable states do not enable mutations or show fake customers", async ({ page }) => {
     await page.goto("/preview/strelva/inquiries?scenario=read-only&view=new");
-    await expect(page.getByLabel("What should Strelva handle?")).toBeDisabled();
+    await expect(page.getByLabel("What should your inquiry form do?")).toBeDisabled();
     await page.goto("/preview/strelva/inquiries?scenario=unavailable");
     await expect(page.getByRole("main")).toContainText(/unavailable|could not be loaded/i);
-    await expect(page.getByRole("button", { name: "Make live", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Make it live", exact: true })).toHaveCount(0);
   });
 });

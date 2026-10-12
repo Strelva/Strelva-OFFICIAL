@@ -1,0 +1,51 @@
+{
+  "tenant": {
+    "id": "gldf",
+    "stableId": "c0ffee00-0000-4000-8000-0000000000a1",
+    "siteName": "Great Lakes Dried Fruit",
+    "ownerName": "Pat Example",
+    "ownerEmail": "Owner@Example.com",
+    "ownerPhone": "(716) 555-0100",
+    "siteUrl": "https://example.com",
+    "productionDomain": "example.com",
+    "bookingUrl": "https://example.com/book",
+    "businessHours": {
+      "timezone": "America/New_York",
+      "schedule": [
+        { "day": 0, "open": "09:00", "close": "17:00", "closed": true },
+        { "day": 2, "open": "12:00", "close": "18:00", "closed": false },
+        { "day": 1, "open": "10:00", "close": "16:00", "closed": false }
+      ],
+      "holidays": [{ "date": "2026-12-25", "label": "Christmas" }]
+    },
+    "visibility": { "towns": ["Buffalo, NY", "Amherst, NY", "Buffalo, NY"] }
+  },
+  "contact": {
+    "email": "hello@example.com",
+    "phone": "716-555-0199",
+    "address": "123 Example St, Buffalo, NY 14201",
+    "instagramUrl": "https://instagram.com/example",
+    "facebookUrl": "",
+    "googleMapsUrl": "https://www.google.com/maps/place/example"
+  },
+  "settings": { "siteDescription": "Dried fruit and nuts, packed in Western New York." },
+  "footer": { "socialLinks": [{ "label": "TikTok", "href": "https://www.tiktok.com/@example" }, { "label": "Instagram", "href": "https://instagram.com/example" }] },
+  "services": [
+    { "id": "svc-tasting", "name": "Tasting visit", "description": "Try the range in the shop.", "duration": "30 min", "price": "Free", "comingSoon": false },
+    { "id": "svc-wholesale", "name": "Wholesale consult", "duration": "", "price": "", "comingSoon": true },
+    { "id": "svc-empty", "name": "   " }
+  ],
+  "leads": [
+    { "id": "l1", "name": "Jordan Sample", "email": "Jordan@Example.org", "fields": { "phone": "716 555 0111" }, "createdAt": "2026-08-01T14:00:00.000Z" },
+    { "id": "l2", "name": "Jordan S", "email": "jordan@example.org", "createdAt": "2026-09-01T14:00:00.000Z" },
+    { "id": "l3", "name": "Casey Phone", "fields": { "phone": "+1 (716) 555-0122" }, "createdAt": "2026-09-10T09:30:00.000Z" },
+    { "id": "l4", "name": "No Contact Details", "createdAt": "2026-09-11T09:30:00.000Z" }
+  ],
+  "bookings": [
+    { "id": "b1", "clientName": "Casey Phone", "clientEmail": "casey@example.net", "clientPhone": "716-555-0122", "createdAt": "2026-09-12T10:00:00.000Z" },
+    { "id": "b2", "clientName": "Riley Booker", "clientEmail": "riley@example.net", "clientPhone": "", "createdAt": "2026-07-04T10:00:00.000Z" }
+  ],
+  "billing": { "billingType": "tier", "subscriptionStatus": "active", "subscriptionPlan": null, "monthlyCents": 19900, "hasStripeSubscription": false, "grandfathered": true },
+  "account": null,
+  "defaultTimezone": "America/New_York"
+}

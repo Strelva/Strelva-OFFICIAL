@@ -47,7 +47,7 @@ describe("AI Visibility workspace UI entry", () => {
         onCreated: () => undefined,
       }),
     );
-    expect(html).toContain("See what AI can understand about this business.");
+    expect(html).toContain("Ask Gemini about your business");
     expect(html).toContain("Run assessment");
     expect(html).toContain("Saved only after completion");
   });
@@ -92,6 +92,25 @@ describe("AI Visibility workspace UI entry", () => {
     expect(html).toContain("This saved work cannot be displayed here.");
     expect(html).toContain("This product view is not available yet.");
     expect(html).not.toContain("Harbor Dental");
+  });
+
+  it("names the measured grade and score for assistive technology", () => {
+    const html = renderToStaticMarkup(createElement(AiVisibilityAssessmentResult, { work }));
+    expect(html).toContain('role="img" aria-label="Grade B, 82 out of 100"');
+  });
+
+  it("labels partial evidence and never exposes an unmeasured grade", () => {
+    const partial = renderToStaticMarkup(createElement(AiVisibilityAssessmentResult, {
+      work: { ...work, payload: { ...result, measurementStatus: "partial" } },
+    }));
+    expect(partial).toContain('aria-label="Grade B, 82 out of 100, partial measurement"');
+    expect(partial).toContain("Measured.");
+    const unavailable = renderToStaticMarkup(createElement(AiVisibilityAssessmentResult, {
+      work: { ...work, payload: { ...result, measurementStatus: "unavailable", readinessMeasured: false } },
+    }));
+    expect(unavailable).toContain("Not measured");
+    expect(unavailable).toContain("<span>Not measured</span>");
+    expect(unavailable).not.toContain('aria-label="Grade');
   });
 
   it("strips unknown saved input before a work record reaches the browser", () => {

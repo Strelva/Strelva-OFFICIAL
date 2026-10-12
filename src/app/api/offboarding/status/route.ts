@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getOffboardingSnapshot } from "@/lib/offboarding";
 
 export async function GET() {
@@ -11,6 +12,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantPermission(tenant, "billing:manage");
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant, ["billing:manage"]);
     return NextResponse.json(await getOffboardingSnapshot(tenant));
   } catch (error) {
     console.error("[offboarding/status GET]", error);

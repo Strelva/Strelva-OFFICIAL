@@ -1,40 +1,23 @@
-import { getContent, getSectionTimestamps } from "@/lib/storage";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { getTenantSiteName } from "@/lib/tenant-display";
-import { getTemplateForTenant } from "@/components/templates/registry";
-import { defaults } from "@/lib/defaults";
-import { safeFetch } from "@/lib/utils";
-import { buildSectionData } from "@/lib/buildSectionData";
+import { loadSiteEditorData } from "@/lib/website-page-data";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
-import type { ContentSection } from "@/lib/types";
 
+/** Website editor. The same editor opens in the workspace website (/workspace/site). */
 export default async function SitePage() {
+  // Moved to the workspace website when owner entry is on: the layout redirects a full load; this covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/site");
+
   const { tenant } = await requireDashboardView();
-
-  const siteModel = await getTemplateForTenant(tenant);
-
-  const sectionEntries = await Promise.all(
-    siteModel.contentSections.map(async (section) => {
-      const data = await safeFetch(
-        () => getContent(section as ContentSection, tenant),
-        (defaults as Record<string, unknown>)[section] || {},
-      );
-      return [section, data] as const;
-    }),
-  );
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sections: Record<string, any> = Object.fromEntries(sectionEntries);
-  const timestamps = await safeFetch(() => getSectionTimestamps(tenant), {});
-
-  const sectionData = buildSectionData(sections, timestamps);
-  const settings = sections.settings || {};
+  const { siteName, ownerName, sectionData, timestamps } = await loadSiteEditorData(tenant);
 
   return (
     <div className="flex h-full flex-col">
       <div className="min-h-0 flex-1">
         <ContentWorkspace
-          siteName={settings.siteName && settings.siteName !== "Your Business" ? settings.siteName : getTenantSiteName(tenant, undefined)}
-          ownerName={settings.ownerName || "there"}
+          siteName={siteName}
+          ownerName={ownerName}
           sectionData={sectionData}
           timestamps={timestamps}
         />

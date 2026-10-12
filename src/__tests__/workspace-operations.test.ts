@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), preflight: vi.fn(), get: vi.fn() }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/workspaces/repository", () => ({ assertCanSaveWork: mocks.preflight, getWork: mocks.get }));
 import { runWorkspaceOperation, WorkspaceOperationPendingError, operationRequest } from "@/platform/workspaces/operations";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";

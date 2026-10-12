@@ -34,7 +34,7 @@ const fakeRedis = {
   smembers: async (k: string) => Array.from(sets.get(k) ?? []),
 };
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => fakeRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => fakeRedis }));
 
 import {
   createAccount,
@@ -79,6 +79,18 @@ describe("accounts store", () => {
     fresh = await getAccount(acct.id);
     expect(fresh?.tenantIds).toEqual(["cocard-anderson"]);
     expect(await getAccountForTenant("vermont-unlimited")).toBeNull();
+  });
+  it("teardown reads the actual shared Redis grouping even when normal reads use Postgres, retaining other sites and subscription fields", async () => {
+    const account = await createAccount({ name: "Shared cleanup", tenantIds: ["deleted-site", "retained-site"] });
+    const prior = await setAccountSubscription(account.id, { status: "active", items: [{ tenantId: "retained-site", label: "Retained", amountCents: 1234 }] });
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_READ", "account_grouping");
+    try {
+      const result = await unlinkTenant(account.id, "deleted-site", { readRedisForCleanup: true });
+      expect(result?.tenantIds).toEqual(["retained-site"]);
+      expect(result?.subscription).toEqual(prior?.subscription);
+      expect(store.get("account-of:retained-site")).toBe(account.id);
+      expect(store.has("account-of:deleted-site")).toBe(false);
+    } finally { vi.unstubAllEnvs(); }
   });
 
   it("a site belongs to at most one account — linking repoints it", async () => {

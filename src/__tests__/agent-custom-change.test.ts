@@ -1,5 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Positive tool cases serve a converted business. Keep the real model helper's
+// admission, and supply only its trusted tenant-to-workspace lookup seam.
+const mockBillingWorkspace = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/release-flags/store", () => ({
+  releaseWorkspaceForTenant: mockBillingWorkspace,
+}));
+beforeEach(() => {
+  mockBillingWorkspace.mockResolvedValue("a0000000-0000-4000-8000-000000000001");
+});
+
 /**
  * Finding #2 coverage: the agent's request_custom_change tool must create the
  * SAME pending change_request event the dashboard route creates, so the chat
@@ -54,7 +64,7 @@ vi.mock("ai", () => ({
   },
 }));
 
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: { id: "primary" }, label: "primary" }),
   getFallbackModel: () => null,
   isTransientModelError: () => false,
@@ -64,14 +74,14 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("test-tenant"),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: () => Promise.resolve(null),
   requireTenantPermission: () => Promise.resolve(null),
   getAuthUserId: () => Promise.resolve("user_test"),
   isSuperAdmin: () => Promise.resolve(false),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: () => Promise.resolve(false),
 }));
 
@@ -119,7 +129,7 @@ vi.mock("@/lib/capabilities", () => ({
   sanitizePromptValue: (v: unknown) => (typeof v === "string" ? v : ""),
 }));
 
-vi.mock("@/lib/dev-access", () => ({
+vi.mock("@/platform/infra/dev-access", () => ({
   isDevAccessBypassEnabled: () => false,
 }));
 

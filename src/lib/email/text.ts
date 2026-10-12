@@ -1,12 +1,3 @@
-/**
- * Normalize user-provided text before it is placed in an email subject or
- * notification label. HTML is treated as text and control whitespace is
- * collapsed so email content cannot change its intended layout.
- */
-export function cleanSubjectText(value: string): string {
-  return value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[\r\n\t]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// Moved to src/platform/infra/email/text.ts (Strelva Reborn section 7). This re-export keeps old
+// imports working; new code imports @/platform/infra/email/text directly.
+export * from "@/platform/infra/email/text";

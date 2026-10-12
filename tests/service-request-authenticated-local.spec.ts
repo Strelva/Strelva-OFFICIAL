@@ -36,7 +36,8 @@ test("persists, reopens, and reviews a service request through local Auth and Po
     await customerPage.goto(`/workspace?workspaceId=${encodeURIComponent(businessId)}&view=help`, { waitUntil: "domcontentloaded" });
     await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
     const provider = customerPage.getByLabel("Who should review this?", { exact: true });
-    await expect(provider.locator("option")).toHaveText(["Strelva", agencyName]);
+    await expect(provider.locator("option")).toHaveText(["Choose an agency", agencyName]);
+    await expect(customerPage.getByRole("button", { name: "Save request", exact: true })).toBeDisabled();
     await provider.selectOption({ label: agencyName });
     await customerPage.getByLabel("What are you trying to do?", { exact: true }).fill("Prepare a private request flow.");
 
@@ -51,7 +52,7 @@ test("persists, reopens, and reviews a service request through local Auth and Po
     expect(first.scope).toEqual(["help_request"]);
     await expect(customerPage.getByText(/Saved for review\./)).toBeVisible();
 
-    const savedRow = customerPage.locator("ul button").filter({ hasText: "Pending provider review" }).first();
+    const savedRow = customerPage.locator("ul button").filter({ hasText: "Pending agency review" }).first();
     await expect(savedRow).toContainText(agencyName);
     await savedRow.click();
     await customerPage.getByLabel("What are you trying to do?", { exact: true }).fill("Revise the private request flow.");
@@ -92,7 +93,7 @@ test("persists, reopens, and reviews a service request through local Auth and Po
     await expect(agencyPage.getByText("Clarify the private request flow.", { exact: true })).toBeVisible();
     await agencyPage.getByRole("button", { name: "Accept for review", exact: true }).click();
     await expect(agencyPage.getByText("Accepted for review. No installation, price, authority, or execution was created.", { exact: true })).toBeVisible();
-    await expect(agencyPage.getByText("No pre-installation service requests are waiting for provider review.", { exact: true })).toBeVisible();
+    await expect(agencyPage.getByText("No pre-installation service requests are waiting for agency review.", { exact: true })).toBeVisible();
 
     await customerPage.reload({ waitUntil: "domcontentloaded" });
     await expect(customerPage.locator("ul button").first()).toContainText("Accepted for review");

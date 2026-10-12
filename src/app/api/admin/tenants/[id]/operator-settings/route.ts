@@ -1,35 +1,25 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
 import { getReportCadence, setReportCadence, type ReportCadence } from "@/lib/report-cadence";
-import { getReplyVoice, saveReplyVoice, type ReplyMode } from "@/lib/reviews/reply-voice";
+import { getReplyVoice, type ReplyMode } from "@/lib/reviews/reply-voice";
 import {
   getContentAutonomy,
-  saveContentAutonomy,
   type ContentAutonomy,
 } from "@/lib/content-autonomy";
 import {
   getClientEmailOverride,
   setClientEmailOverride,
   type ClientEmailOverride,
-} from "@/lib/client-email-override";
+} from "@/platform/infra/email/client-override";
 
 /**
- * Operator controls for the Redis-backed per-client settings that are otherwise
- * client-only, env-only, or unsettable:
- *
- *   • reportCadence    — weekly / monthly (when the report cron emails them)
- *   • replyMode        — off / approve / auto (the review-reply mode; only `mode`
- *                        is touched — guidance/templates are preserved)
- *   • contentAutonomy  — auto / approve (how much AI copy the owner lets ship)
- *   • clientEmail      — inherit / on / off (per-tenant client-email override)
- *
- * POST applies whichever keys are present, audit-logged. GET returns the current
- * values. Super-admin only. (The TenantConfig fields — autoApproveThreshold,
- * reviewsConfig, visibility — go through PATCH /api/admin/tenants instead.)
+ * Platform reporting cadence and email delivery controls. GET also exposes
+ * recorded reply/content policy for support inspection; POST refuses policy
+ * keys before applying any other fields. Client policy uses ordinary access.
  */
-
 const REPORT_CADENCES = new Set<ReportCadence>(["weekly", "monthly"]);
 const REPLY_MODES = new Set<ReplyMode>(["off", "approve", "auto"]);
 const CONTENT_AUTONOMIES = new Set<ContentAutonomy>(["auto", "approve"]);
@@ -56,6 +46,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.tenant-controls.read");
   const { id } = await params;
   if (!(await getTenantConfig(id))) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
@@ -85,6 +76,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     clientEmail?: unknown;
   };
 
+  if (replyMode !== undefined || contentAutonomy !== undefined) {
+    return NextResponse.json({ error: "Client automation policy requires ordinary business or agency access. Nothing changed." }, { status: 403 });
+  }
+
   // Validate every present key before applying any — a bad value is a 400, not a
   // partial write.
   if (reportCadence !== undefined && !REPORT_CADENCES.has(reportCadence as ReportCadence)) {
@@ -101,28 +96,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const applied: string[] = [];
-  if (reportCadence !== undefined) {
-    await setReportCadence(id, reportCadence as ReportCadence);
-    applied.push("reportCadence");
-  }
-  if (replyMode !== undefined) {
-    // Only touch the mode — preserve the client's guidance + example templates.
-    const current = await getReplyVoice(id);
-    await saveReplyVoice(id, {
-      mode: replyMode as ReplyMode,
-      guidance: current.guidance,
-      templates: current.templates,
-    });
-    applied.push("replyMode");
-  }
-  if (contentAutonomy !== undefined) {
-    await saveContentAutonomy(id, contentAutonomy as ContentAutonomy);
-    applied.push("contentAutonomy");
-  }
-  if (clientEmail !== undefined) {
-    await setClientEmailOverride(id, clientEmail as ClientEmailOverride);
-    applied.push("clientEmail");
-  }
+  await applySettings(id, { reportCadence, clientEmail }, applied);
 
   if (applied.length > 0) {
     await logAuditEvent({
@@ -136,4 +110,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   return NextResponse.json(await readCurrent(id));
+}
+
+/** Only platform reporting and email controls can change here. */
+async function applySettings(
+  id: string,
+  { reportCadence, clientEmail }: { reportCadence?: unknown; clientEmail?: unknown },
+  applied: string[],
+) {
+  if (reportCadence !== undefined) {
+    await setReportCadence(id, reportCadence as ReportCadence);
+    applied.push("reportCadence");
+  }
+  if (clientEmail !== undefined) {
+    await setClientEmailOverride(id, clientEmail as ClientEmailOverride);
+    applied.push("clientEmail");
+  }
 }

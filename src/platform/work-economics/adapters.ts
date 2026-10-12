@@ -1,4 +1,4 @@
-import { getAuthUserId, hasTenantAccess } from "@/lib/auth";
+import { getAuthUserId, hasTenantAccess } from "@/platform/infra/auth";
 import {
   getWork,
   listWorkspaces,

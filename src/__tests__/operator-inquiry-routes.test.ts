@@ -1,0 +1,23 @@
+import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
+const m=vi.hoisted(()=>({admin:vi.fn(),actor:vi.fn(),limited:vi.fn(),decide:vi.fn(),repair:vi.fn()}));
+vi.mock("@/platform/infra/auth",()=>({isSuperAdmin:m.admin}));
+vi.mock("@/platform/infra/rate-limit",()=>({isRateLimitedWindowedAsync:m.limited}));
+vi.mock("@/platform/operator-queue",()=>({decideOperatorHeldInquiry:m.decide}));
+vi.mock("@/products/connected-sites/server",()=>({repairConnectedInquiryOwnerNotice:m.repair}));
+vi.mock("@/platform/workspaces/http",async original=>({...await original<typeof import("@/platform/workspaces/http")>(),workspaceHttpActor:m.actor}));
+import {POST as held} from "@/app/api/admin/client-leads/held/route";
+import {POST as connected} from "@/app/api/admin/client-leads/connected-owner-notice/route";
+import {InquiryRecordsError} from "@/platform/infra/inquiry-records";
+import {WorkspaceAccessError} from "@/platform/workspaces/types";
+const rowId="ca500000-0000-4000-8000-000000000020",actor={userId:"ca500000-0000-4000-8000-000000000001",verifiedEmail:"review-op@example.test"};
+function request(body:unknown,headers:Record<string,string>={}){return new Request("https://app.strelva.test/api/admin/client-leads/held",{method:"POST",headers:{origin:"https://app.strelva.test","content-type":"application/json",...headers},body:JSON.stringify(body)});}
+beforeEach(()=>{for(const mock of Object.values(m))mock.mockReset();m.admin.mockResolvedValue(true);m.actor.mockResolvedValue(actor);m.limited.mockResolvedValue(false);m.decide.mockResolvedValue({status:"decided",state:"released"});m.repair.mockResolvedValue({status:"accepted"});vi.stubEnv("STRELVA_INQUIRY_RECORDS","1");vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES","1");vi.stubEnv("DUAL_WRITE_PG","1");});
+afterEach(()=>vi.unstubAllEnvs());
+describe("operator inquiry HTTP boundaries",()=>{
+ it("changes a held record as the verified operator and returns a private receipt",async()=>{const res=await held(request({rowId,decision:"release"}));expect(res.status).toBe(200);expect(res.headers.get("cache-control")).toBe("private, no-store");expect(await res.json()).toEqual({status:"decided",state:"released"});expect(m.decide).toHaveBeenCalledWith(actor,rowId,"release");});
+ it("makes no call with flags off",async()=>{vi.stubEnv("STRELVA_INQUIRY_RECORDS","0");expect((await held(request({rowId,decision:"release"}))).status).toBe(503);expect((await connected(request({rowId}))).status).toBe(503);expect(m.decide).not.toHaveBeenCalled();expect(m.repair).not.toHaveBeenCalled();});
+ it("refuses ordinary workspace owners/admins, revoked actors and missing confirmed sessions",async()=>{m.admin.mockResolvedValue(false);expect((await held(request({rowId,decision:"release"}))).status).toBe(403);expect((await connected(request({rowId}))).status).toBe(403);m.admin.mockResolvedValue(true);m.actor.mockResolvedValue(null);expect((await held(request({rowId,decision:"release"}))).status).toBe(401);expect(m.decide).not.toHaveBeenCalled();expect(m.repair).not.toHaveBeenCalled();});
+ it("rejects cross-origin, invalid, oversized and rate-limited writes",async()=>{expect((await held(request({rowId,decision:"release"},{origin:"https://evil.test"}))).status).toBe(403);expect((await held(request({rowId,decision:"delete"}))).status).toBe(400);expect((await held(request({rowId,decision:"release",workspaceId:"injected"}))).status).toBe(400);expect((await held(request({rowId,decision:"release"},{"content-length":"3000"}))).status).toBe(413);m.limited.mockResolvedValue(true);expect((await held(request({rowId,decision:"release"}))).status).toBe(429);expect(m.decide).not.toHaveBeenCalled();});
+ it("maps storage refusal and unavailable writes without claiming success",async()=>{m.decide.mockRejectedValueOnce(new WorkspaceAccessError());expect((await held(request({rowId,decision:"release"}))).status).toBe(403);m.decide.mockRejectedValueOnce(new InquiryRecordsError("not_found"));expect((await held(request({rowId,decision:"release"}))).status).toBe(404);m.decide.mockRejectedValueOnce(new InquiryRecordsError("not_held"));expect((await held(request({rowId,decision:"release"}))).status).toBe(409);m.decide.mockRejectedValueOnce(new InquiryRecordsError("timeout"));expect((await held(request({rowId,decision:"release"}))).status).toBe(503);});
+ it("allows explicit connected repair without granting a customer reply",async()=>{expect((await connected(request({rowId}))).status).toBe(200);expect(m.repair).toHaveBeenCalledWith(actor,rowId);expect(m.decide).not.toHaveBeenCalled();m.limited.mockResolvedValue(true);expect((await connected(request({rowId}))).status).toBe(429);});
+});

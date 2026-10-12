@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   find: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/work-economics/service", () => ({
   executeJobEconomicsCommand: mocks.command,

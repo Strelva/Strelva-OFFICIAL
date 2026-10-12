@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accountReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 describe("template selection through sign-in", () => {
   it("retains the selected template and business without carrying draft contents", () => {

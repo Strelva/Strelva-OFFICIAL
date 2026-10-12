@@ -1,4 +1,6 @@
-import { getRedis } from "./redis";
+import type { MaintenanceDigestItem, MaintenanceDigest } from "@/platform/infra/maintenance-contracts";
+export type { MaintenanceItemType, MaintenanceDigestItem, DigestStatus, MaintenanceDigest } from "@/platform/infra/maintenance-contracts";
+import { getRedis } from "@/platform/infra/redis";
 import { getSectionTimestamps } from "./storage";
 import { detectStaleSections } from "./reports";
 import { getScanSummary } from "./scan-store";
@@ -13,30 +15,6 @@ import { getTenantSiteName } from "./tenant-display";
  * suggestion that flows to the owner's dashboard and the AI acts on. Deterministic
  * (no AI call to build), so the digest is reliable and free to generate.
  */
-
-export type MaintenanceItemType = "content" | "health";
-
-export interface MaintenanceDigestItem {
-  id: string;
-  type: MaintenanceItemType;
-  title: string;
-  detail: string;
-  /** A chat prompt the AI can run to do the work, once approved. */
-  action: string;
-}
-
-export type DigestStatus = "pending" | "approved" | "dismissed";
-
-export interface MaintenanceDigest {
-  tenant: string;
-  siteName: string;
-  weekOf: string;
-  items: MaintenanceDigestItem[];
-  status: DigestStatus;
-  createdAt: string;
-  decidedAt?: string;
-  decidedBy?: string;
-}
 
 const SECTIONS = ["hero", "services", "story", "testimonials", "events", "providers", "contact", "faq"];
 const WEAK_CATEGORY_SCORE = 70;

@@ -1,0 +1,5 @@
+.fixtureNotice { margin:0; padding:12px 20px; color:var(--st-text-3); font-size:13px; line-height:20px; }
+.proposedForm { display:flex; flex-direction:column; align-items:stretch; gap:16px; max-width:390px; margin:24px auto; }
+.proposedForm h2 { margin:0; color:var(--st-text); font-size:16px; font-weight:600; line-height:24px; }
+.proposedForm p { margin:0; color:var(--st-text-2); font-size:13px; line-height:20px; }
+@media(max-width:767px) { .proposedForm { margin:4px 0; gap:14px; } }

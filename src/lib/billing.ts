@@ -1,37 +1,12 @@
-import Stripe from "stripe";
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
+import { workspacePorts } from "./workspace-ports";
 import type { TenantConfig } from "./types";
 import type { CommercialPlanKey } from "./types";
 
-/**
- * Single source of truth for the Stripe API version used across all billing
- * routes. Import and pass to every `new Stripe(key, { apiVersion })` call so
- * a version bump is a one-line change here, not a 7-file search.
- */
-export const STRIPE_API_VERSION = "2026-03-25.dahlia" as Stripe.LatestApiVersion;
-
-export class BillingConfigurationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "BillingConfigurationError";
-  }
-}
-
-/**
- * Construct a Stripe client. Throws a BillingConfigurationError (not the `!`
- * assertion's TypeError) when STRIPE_SECRET_KEY is absent, so callers that
- * forget to guard get a legible error rather than a confusing null-deref crash.
- */
-export function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new BillingConfigurationError(
-      "Stripe not configured. Set STRIPE_SECRET_KEY.",
-    );
-  }
-  return new Stripe(key, { apiVersion: STRIPE_API_VERSION });
-}
+import { BillingConfigurationError, getStripe } from "@/platform/infra/stripe";
+export { BillingConfigurationError, getStripe, STRIPE_API_VERSION } from "@/platform/infra/stripe";
 
 export interface TenantSubscriptionCheckoutInput {
   tenant: TenantConfig;
@@ -82,15 +57,18 @@ export async function createTenantSubscriptionCheckout(
     await updateTenant(tenant.id, { stripeCustomerId: customerId });
   }
 
+  // A converted business also gets workspaceId (STRELVA_BUSINESS_BILLING,
+  // off by default). Additive: tenantId always stays.
+  const businessMetadata = await (await workspacePorts().businessBilling()).businessBillingCheckoutMetadata(tenant.id);
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     client_reference_id: tenant.id,
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     success_url:
-      input.successUrl || getTenantDashboardUrl(tenant, "/dashboard?checkout=success"),
+      input.successUrl || await ownerNoticeUrl(tenant, "/dashboard?checkout=success", getTenantDashboardUrl(tenant, "/dashboard?checkout=success")),
     cancel_url:
-      input.cancelUrl || getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled"),
+      input.cancelUrl || await ownerNoticeUrl(tenant, "/dashboard/settings?checkout=cancelled", getTenantDashboardUrl(tenant, "/dashboard/settings?checkout=cancelled")),
     metadata: {
       tenantId: tenant.id,
       ...(input.planKey ? { planKey: input.planKey } : {}),
@@ -98,6 +76,7 @@ export async function createTenantSubscriptionCheckout(
         ? { planMonthlyCents: String(input.planMonthlyCents) }
         : {}),
       planCurrency: input.planCurrency ?? "usd",
+      ...businessMetadata,
     },
     subscription_data: {
       metadata: {
@@ -107,6 +86,7 @@ export async function createTenantSubscriptionCheckout(
           ? { planMonthlyCents: String(input.planMonthlyCents) }
           : {}),
         planCurrency: input.planCurrency ?? "usd",
+        ...businessMetadata,
       },
     },
   });

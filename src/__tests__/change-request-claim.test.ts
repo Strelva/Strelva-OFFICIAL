@@ -41,13 +41,13 @@ vi.mock("@/lib/events", () => ({
   addEvent: mockAddEvent,
   getOpenChangeRequest: mockGetOpenChangeRequest,
 }));
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({ set: mockRedisSet, del: mockRedisDel }),
 }));
 vi.mock("@/lib/tenant", () => ({
   requireTenantFromHeaders: mockRequireTenantFromHeaders,
 }));
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: mockRequireTenantAccess,
   requireTenantPermission: mockRequireTenantPermission,
   verifyAuth: mockVerifyAuth,

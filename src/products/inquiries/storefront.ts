@@ -1,10 +1,11 @@
 import type { InquiryCapabilityState } from "./contracts";
+import { hasInquiryIntakeIntent } from "./currentness";
 import { isPublicInquiryForm, type PublicInquiryForm } from "../../../custom-repo-starter/inquiry-client";
 
 /** Public projection deliberately excludes routing destinations, policies, and records. */
 export function projectPublishedInquiry(capability: InquiryCapabilityState): PublicInquiryForm | null {
   const definition = capability.live;
-  if (!definition || !["live", "live_unverified"].includes(capability.status)) return null;
+  if (!definition || !hasInquiryIntakeIntent(capability.status)) return null;
   if (definition.businessId !== capability.businessId || definition.id !== capability.id) return null;
   const projection: PublicInquiryForm = {
     schemaVersion: 1,

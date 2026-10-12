@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import {
@@ -9,7 +10,7 @@ import {
   setPageConfig,
 } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
     const url = new URL(request.url);
     const isDraft = url.searchParams.get("draft") === "true";
     const config = isDraft

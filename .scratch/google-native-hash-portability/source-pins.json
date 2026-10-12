@@ -1,0 +1,14 @@
+[
+  {
+    "signature": "public.native_google_owner_lifecycle(uuid,text,uuid,text,jsonb)",
+    "priorSourceSha256": "b40291687687d8491e39bfee5bcb5c5b21a0d6dc1e603727f3adea2cfd6ed09f",
+    "appliedSourceSha256": "597f3ffe25448bf40f2c82ba47828b8949ca7145920025b9e154dba5bd024bd2",
+    "calls": 2
+  },
+  {
+    "signature": "public.verify_native_google_inverse_intent(uuid,uuid,text,jsonb,uuid,uuid,text)",
+    "priorSourceSha256": "6ef12d0b620ce788ea8c194617cf3150f21615d1a7e1707ade0752bf3567ad59",
+    "appliedSourceSha256": "e586808f9cb63173a97ae54cdead6da5e0752617b2fa509389d1de0500e6e3a3",
+    "calls": 1
+  }
+]

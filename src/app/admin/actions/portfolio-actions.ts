@@ -1,21 +1,7 @@
-/**
- * Portfolio actions — the operator's single "clear the whole portfolio" surface.
- *
- * Aggregates every pending approval/draft across ALL clients into one queue,
- * grouped by client, so one operator managing many sites sees "12 items across
- * 4 clients waiting for you" instead of opening each dashboard. Bulk-approve
- * resolves each item through the SAME governed spine as the client dashboard
- * (`resolveEventAction`) — never a shortcut that bypasses approval — so an
- * external write that fails leaves its item pending and is reported honestly.
- *
- * Pure of auth/HTTP: the page reads `getPortfolioActions`, the server action
- * gates super-admin then calls `bulkResolvePortfolioActions`. A transient read
- * failure keeps the overview usable, but is carried as an explicit incomplete
- * source so an empty result can never masquerade as a verified clear queue.
- */
+/** Pending client drafts for audited support inspection. Owner and agency decisions require ordinary workspace permissions. */
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getEvents } from "@/lib/events";
-import { resolveEventAction } from "@/lib/event-actions";
+import { decideTenantEventAsOperator, type VerifiedOperator } from "@/lib/operator-decisions";
 import type { UnifiedEvent } from "@/lib/types";
 
 export interface PortfolioActionItem {
@@ -208,21 +194,27 @@ export interface PortfolioResolveResult {
   reason?: string;
 }
 
-/**
- * Approve a batch of items, each through `resolveEventAction` — the governed
- * path that performs the external write (post to Google, publish reply, apply
- * content) BEFORE flipping the event to resolved. Honest partial failure: a
- * write that fails comes back `changed:false` with the underlying reason and the
- * item stays pending, never silently marked done. Sequential so concurrent
- * external writes don't stampede an integration; the batch is a handful of items.
- */
+/** Retained compatibility call; every operator content approval is refused by the shared authority boundary. */
 export async function bulkResolvePortfolioActions(
   items: PortfolioResolveInput[],
+  operator: VerifiedOperator,
 ): Promise<PortfolioResolveResult[]> {
   const results: PortfolioResolveResult[] = [];
+  let revoked = false;
   for (const item of items) {
+    if (revoked) {
+      results.push({ tenantId: item.tenantId, eventId: item.eventId, changed: false, reason: "operator_access_changed" });
+      continue;
+    }
     try {
-      const res = await resolveEventAction(item.tenantId, item.eventId, "approved");
+      const res = await decideTenantEventAsOperator(operator, {
+        tenantId: item.tenantId,
+        eventId: item.eventId,
+        action: "approved",
+        auditAction: "portfolio.draft.approve",
+        accept: isPortfolioApprovable,
+      });
+      if (res.reason === "operator_access_changed") revoked = true;
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,
@@ -230,7 +222,7 @@ export async function bulkResolvePortfolioActions(
         reason: res.reason,
       });
     } catch (err) {
-      // A single item throwing must not abort the rest of the batch.
+      // A failed admission read must not abort the rest of the inspection.
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,

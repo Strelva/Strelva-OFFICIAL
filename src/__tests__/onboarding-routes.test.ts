@@ -15,7 +15,7 @@ const onboarding = vi.hoisted(() => ({
   acceptOnboardingRequirement: vi.fn(),
   uploadOnboardingFile: vi.fn(),
 }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: () => state.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => state.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => state.release }));
 vi.mock("@/products/onboarding/server", () => onboarding);
 

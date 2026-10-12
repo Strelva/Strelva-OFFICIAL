@@ -1,0 +1,1073 @@
+{
+  "date": "2026-10-07",
+  "browser": "installedPlaywright Chromium, America/Los_Angeles",
+  "transport": "Entirelysynthetic in-browser fetchreplacement; nooriginalfetchfallback; CSPblocksoutsideconnections",
+  "authority": "modeon supplies bookingAuthoritybusiness, modeoff omitsit. These simulatepayloadbranches; serverflagtestsownedbypublicprotocol.",
+  "calendarProof": "Confirmedsynthetic receipt has no providerverification metadata. Businesswordingdoesnotclaimcalendardelivery; noactualproviderchecked.",
+  "captures": [
+    {
+      "state": "intake",
+      "mode": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "phone": null,
+        "phoneSent": false,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "conflict",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThat time is no longer available. The next available times are shown above. Choose a time and try again.",
+        "phone": "716-555-0118",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "pending",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nYour request is waiting for the business to confirm. This time is not confirmed yet.\n\nCheck request status",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Check request status",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "pending-readback-confirmed",
+      "mode": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "phone": null,
+        "phoneSent": false,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "visitor-intake-390.png"
+      }
+    },
+    {
+      "state": "conflict",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThat time is no longer available. The next available times are shown above. Choose a time and try again.",
+        "phone": "716-555-0118",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "visitor-conflict-390.png"
+      }
+    },
+    {
+      "state": "pending",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nYour request is waiting for the business to confirm. This time is not confirmed yet.\n\nCheck request status",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Check request status",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "pending-readback-confirmed",
+      "mode": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "off",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. Outlook will confirm the reservation.\n\nAvailable time\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\n\nOutlook confirmed this reservation.\n\nChange timeCancel reservation",
+        "phone": null,
+        "phoneSent": false,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "off",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "off",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "intake",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nWhat would you like to discuss?\nCompany (optional)\nReserve time\n\nYour time is reserved.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "strelva-booking-intake-goal",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "strelva-booking-intake-company",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Change time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Cancel reservation",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "conflict",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThat time is no longer available. The next available times are shown above. Choose a time and try again.",
+        "phone": "716-555-0118",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "pending",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "browserTimeZone": "America/Los_Angeles",
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nYour request is waiting for the business to confirm. This time is not confirmed yet.\n\nCheck request status",
+        "phone": "",
+        "phoneSent": true,
+        "requests": [
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+            "method": "GET",
+            "mode": "on",
+            "intercepted": true
+          },
+          {
+            "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+            "method": "POST",
+            "mode": "on",
+            "intercepted": true
+          }
+        ],
+        "controls": [
+          {
+            "tag": "SELECT",
+            "name": "slot",
+            "height": 44,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "name",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "email",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "TEXTAREA",
+            "name": "message",
+            "height": 112,
+            "disabled": false
+          },
+          {
+            "tag": "INPUT",
+            "name": "phone",
+            "height": 49.96875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Reserve time",
+            "height": 51.1875,
+            "disabled": false
+          },
+          {
+            "tag": "BUTTON",
+            "name": "Check request status",
+            "height": 51.1875,
+            "disabled": false
+          }
+        ]
+      },
+      "focus": {
+        "name": "phone",
+        "outline": "rgb(90, 38, 12) solid 3px"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "pending-readback-confirmed",
+      "mode": "on",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "APPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/Los_Angeles.\n\nAvailable time\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\nNov 6, 2026, 8:00 AM–Nov 6, 2026, 8:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 7:00 AM–Nov 5, 2026, 7:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation"
+      },
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    }
+  ]
+}

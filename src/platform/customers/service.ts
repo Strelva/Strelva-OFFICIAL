@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { decodeCustomerCursor, encodeCustomerCursor } from "./cursor";
 import {
   CustomerAccessError,
@@ -141,7 +142,7 @@ function hasCursorAfter(summary: CustomerSummary, cursor: { lastName: string; la
 }
 
 function trustedApplicationHosts(): Set<string> {
-  const hosts = new Set(["app.strelva.com"]);
+  const hosts = new Set([new URL(CONTROL_PLANE_URL).hostname]);
   for (const candidate of [process.env.NEXT_PUBLIC_APP_URL, process.env.CONTROL_PLANE_API_URL]) {
     if (!candidate) continue;
     try {
@@ -167,7 +168,7 @@ function allowedHref(
     const localHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
     if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
       if (trust === "native") return undefined;
-      const internal = new URL(trimmed, "https://app.strelva.com");
+      const internal = new URL(trimmed, CONTROL_PLANE_URL);
       if (
         internal.username ||
         internal.password ||

@@ -21,8 +21,8 @@ vi.mock("@/lib/tenants", () => ({
 }));
 vi.mock("@/lib/orders", () => ({ getOrders: mockGetOrders }));
 vi.mock("@/lib/delivery-email", () => ({ sendReviewRequestEmail: mockSend }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

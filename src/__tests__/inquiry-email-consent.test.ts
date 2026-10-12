@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const overrides = vi.hoisted(() => ({ get: vi.fn() }));
-vi.mock("@/lib/client-email-override", () => ({ getClientEmailOverride: overrides.get }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: overrides.get }));
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { applyInquiryEmailConsent, inquiryEmailReadiness, projectInquiryEmailConnection } from "@/products/inquiries/email-consent";
 

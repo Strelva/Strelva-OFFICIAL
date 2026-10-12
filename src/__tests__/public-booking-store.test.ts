@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({ client: null as unknown as object | null, rows: [] as Record<string, unknown>[] }));
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.client }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.client }));
 
 import { postgresPublicBookingTokenStore } from "@/products/scheduling/public-booking-store";
 

@@ -13,12 +13,12 @@ const mockMarkInviteClaimed = vi.fn();
 const mockGetTenantConfig = vi.fn();
 const mockGetRedis = vi.fn();
 
-vi.mock("../lib/db/server-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({
   isSupabaseAuthConfigured: () => true,
   getSessionUser: () => mockGetSessionUser(),
 }));
 
-vi.mock("../lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   getMembershipRole: (...a: unknown[]) => mockGetMembershipRole(...a),
   listTenantOwnerIds: (...a: unknown[]) => mockListTenantOwnerIds(...a),
   isSuperAdminUser: (...a: unknown[]) => mockIsSuperAdminUser(...a),
@@ -31,7 +31,7 @@ vi.mock("../lib/db/repositories", () => ({
 vi.mock("../lib/tenants", () => ({
   getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a),
 }));
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => mockGetRedis(),
 }));
 
@@ -55,27 +55,27 @@ describe("auth — Supabase path", () => {
   });
 
   it("grants access from a membership row", async () => {
-    const { hasTenantAccess, getTenantRole } = await import("../lib/auth");
+    const { hasTenantAccess, getTenantRole } = await import("@/platform/infra/auth");
     mockGetMembershipRole.mockResolvedValue("viewer");
     expect(await hasTenantAccess("gldf")).toBe(true);
     expect(await getTenantRole("gldf")).toBe("viewer");
   });
 
   it("denies access with no membership and not super-admin", async () => {
-    const { hasTenantAccess, getTenantRole } = await import("../lib/auth");
+    const { hasTenantAccess, getTenantRole } = await import("@/platform/infra/auth");
     expect(await hasTenantAccess("gldf")).toBe(false);
     expect(await getTenantRole("gldf")).toBe(null);
   });
 
   it("super-admin sees every tenant", async () => {
-    const { hasTenantAccess, getTenantRole } = await import("../lib/auth");
+    const { hasTenantAccess, getTenantRole } = await import("@/platform/infra/auth");
     mockIsSuperAdminUser.mockResolvedValue(true);
     expect(await hasTenantAccess("gldf")).toBe(true);
     expect(await getTenantRole("gldf")).toBe("super_admin");
   });
 
   it("verified-email gate: unconfirmed email is never super-admin", async () => {
-    const { isSuperAdmin } = await import("../lib/auth");
+    const { isSuperAdmin } = await import("@/platform/infra/auth");
     mockGetSessionUser.mockResolvedValue(UNVERIFIED);
     mockIsSuperAdminUser.mockResolvedValue(true); // would pass if the gate were missing
     expect(await isSuperAdmin()).toBe(false);
@@ -83,14 +83,14 @@ describe("auth — Supabase path", () => {
   });
 
   it("assigns a membership (promotion)", async () => {
-    const { assignUserToTenant } = await import("../lib/auth");
+    const { assignUserToTenant } = await import("@/platform/infra/auth");
     const ok = await assignUserToTenant("u-1", "gldf", "owner");
     expect(ok).toBe(true);
     expect(mockUpsertMembership).toHaveBeenCalledWith({ user_id: "u-1", tenant_id: "gldf", role: "owner" });
   });
 
   it("last-owner guard: refuses to demote the sole owner", async () => {
-    const { assignUserToTenant, LastOwnerError } = await import("../lib/auth");
+    const { assignUserToTenant, LastOwnerError } = await import("@/platform/infra/auth");
     mockGetMembershipRole.mockResolvedValue("owner");
     mockListTenantOwnerIds.mockResolvedValue(["u-123"]); // only owner
     await expect(assignUserToTenant("u-123", "gldf", "viewer")).rejects.toBeInstanceOf(LastOwnerError);
@@ -98,7 +98,7 @@ describe("auth — Supabase path", () => {
   });
 
   it("last-owner guard: allows demotion when another owner exists", async () => {
-    const { assignUserToTenant } = await import("../lib/auth");
+    const { assignUserToTenant } = await import("@/platform/infra/auth");
     mockGetMembershipRole.mockResolvedValue("owner");
     mockListTenantOwnerIds.mockResolvedValue(["u-123", "u-999"]);
     const ok = await assignUserToTenant("u-123", "gldf", "viewer");
@@ -107,14 +107,14 @@ describe("auth — Supabase path", () => {
   });
 
   it("invite claim: verified-email gate blocks unconfirmed emails", async () => {
-    const { claimPendingInviteForCurrentUser } = await import("../lib/auth");
+    const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
     mockGetSessionUser.mockResolvedValue(UNVERIFIED);
     expect(await claimPendingInviteForCurrentUser()).toBe(null);
     expect(mockGetPendingInvite).not.toHaveBeenCalled();
   });
 
   it("invite claim: assigns membership then marks the invite claimed", async () => {
-    const { claimPendingInviteForCurrentUser } = await import("../lib/auth");
+    const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
     mockGetPendingInvite.mockResolvedValue({ tenant_id: "gldf", role: "editor" });
     const grant = await claimPendingInviteForCurrentUser();
     expect(grant).toEqual({ email: "owner@example.com", tenant: "gldf", role: "editor" });

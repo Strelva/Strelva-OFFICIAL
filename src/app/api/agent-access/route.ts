@@ -1,4 +1,4 @@
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listAgentAccess, manageAgentAccess } from "@/platform/agent-access";
 import { agentAccessFailure, boundedJson, privateJson } from "@/platform/agent-access/http";

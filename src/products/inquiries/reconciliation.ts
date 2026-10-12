@@ -6,7 +6,7 @@
  * fields remain in the lead record and are reread when a repair is processed.
  */
 
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getLeadById, getLeads, type LeadRecord } from "@/lib/leads";
 import type { InquiryTimelineEventType } from "./contracts";
 import type { InquiryRepository, InquiryWorkspaceSnapshot } from "./repository";
@@ -14,6 +14,7 @@ import { getInquiryRepository } from "./repository";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
 import type {
   InquiryDeliveryAction,
+  InquiryDeliveryCheckpoint,
   InquiryDeliveryProviderOutcome,
   InquiryDeliveryStore,
 } from "./delivery-types";
@@ -500,13 +501,45 @@ function looksLikeInquiryReplyAddress(value: string): boolean {
 export type InquiryProviderEventResult =
   | { status: "recorded" | "duplicate" | "ignored" | "unmatched" | "unavailable"; tenantId?: string; inquiryId?: string; action?: InquiryDeliveryAction; reason?: string };
 
+/** Writes the message receipt a delivered message is owed, at most once. */
+export type InquiryMessageReceiptWriter = (input: {
+  tenantId: string;
+  checkpoint: InquiryDeliveryCheckpoint;
+}) => Promise<"persisted" | "not_owed" | "refused" | "unavailable">;
+
+const defaultMessageReceiptWriter: InquiryMessageReceiptWriter = async (input) => {
+  const { persistDeliveredInquiryMessageReceipt } = await import("./delivery-approval-service");
+  return persistDeliveredInquiryMessageReceipt(input);
+};
+
+/**
+ * A delivered report can arrive after the approval resolved with no receipt
+ * (the message was unconfirmed or deferred then). Write the owed receipt now.
+ * Only a persistence failure keeps the provider event retryable.
+ */
+async function messageReceiptAvailable(
+  writer: InquiryMessageReceiptWriter,
+  tenantId: string,
+  checkpoint: InquiryDeliveryCheckpoint,
+): Promise<boolean> {
+  if (checkpoint.status !== "delivered") return true;
+  try {
+    return (await writer({ tenantId, checkpoint })) !== "unavailable";
+  } catch {
+    return false;
+  }
+}
+
 /** Apply one already authenticated provider event to delivery evidence. */
 export async function reconcileInquiryProviderEvent(input: {
   event: unknown;
   eventId: string;
   store?: InquiryDeliveryStore;
   getLead?: (tenantId: string, inquiryId: string) => Promise<LeadRecord | null>;
+  /** Test/host seam for the message receipt owed after a delivered report. */
+  persistMessageReceipt?: InquiryMessageReceiptWriter;
 }): Promise<InquiryProviderEventResult> {
+  const receiptWriter = input.persistMessageReceipt ?? defaultMessageReceiptWriter;
   const payload = input.event && typeof input.event === "object" ? input.event as ProviderEventPayload : null;
   const type = safeProviderString(payload?.type, 80);
   const data = payload?.data && typeof payload.data === "object" ? payload.data : null;
@@ -635,8 +668,24 @@ export async function reconcileInquiryProviderEvent(input: {
   if (claim.status === "processing") return { status: "unavailable", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action, reason: "provider_outcome_processing" };
   try {
     if (checkpoint.providerEventId === eventId) {
-      // Repair a timeline write interrupted after the checkpoint. The current
-      // claim token proves the prior lease expired before this repair began.
+      // A prior Redis outcome is not proof of the selected native checkpoint.
+      // Confirm/repair it before timeline, dedupe completion or webhook ACK.
+      await store.markProviderOutcome({ tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action,
+        providerMessageId, providerEventId: eventId, outcome, at: outcomeAt, reason: providerReason(type, data) });
+      if (target.action === "owner_notification" && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+        const { copyInquiryEvent } = await import("@/platform/infra/inquiry-records");
+        const copied = await copyInquiryEvent({ tenantId: target.tenantId, inquiryId: target.inquiryId.replace(/_notice_repair_[a-f0-9]{32}$/, ""), kind: "delivery", actor: "system",
+          detail: { ownerNotice: true, action: target.action, status: checkpoint.status, reason: providerReason(type, data),
+            acceptedAt: checkpoint.acceptedAt ?? null, providerMessageId }, dedupeKey: `owner-notice-provider:${eventId}` });
+        if (copied === "failed") throw new Error("owner_notice_receipt_unavailable");
+      }
+      // Repair a timeline or receipt write interrupted after the checkpoint.
+      // The current claim token proves the prior lease expired before this
+      // repair began.
+      if (!(await messageReceiptAvailable(receiptWriter, target.tenantId, checkpoint))) {
+        await store.releaseProviderEvent?.({ tenantId: target.tenantId, providerEventId: eventId, claimToken: claim.token }).catch(() => {});
+        return { status: "unavailable", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action, reason: "message_receipt_unavailable" };
+      }
       await store.appendTimeline({
         tenantId: target.tenantId,
         inquiryId: target.inquiryId,
@@ -652,7 +701,7 @@ export async function reconcileInquiryProviderEvent(input: {
       await store.completeProviderEvent?.({ tenantId: target.tenantId, providerEventId: eventId, claimToken: claim.token });
       return { status: "duplicate", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action };
     }
-    await store.markProviderOutcome({
+    const updated = await store.markProviderOutcome({
       tenantId: target.tenantId,
       inquiryId: target.inquiryId,
       action: target.action,
@@ -663,6 +712,19 @@ export async function reconcileInquiryProviderEvent(input: {
       reason: providerReason(type, data),
       evidence: [`Resend event ${eventId} reported ${type}.`],
     });
+    if (target.action === "owner_notification" && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+      const { copyInquiryEvent } = await import("@/platform/infra/inquiry-records");
+      const copied = await copyInquiryEvent({ tenantId: target.tenantId, inquiryId: target.inquiryId.replace(/_notice_repair_[a-f0-9]{32}$/, ""), kind: "delivery", actor: "system",
+        detail: { ownerNotice: true, action: target.action, status: updated.status, reason: providerReason(type, data),
+          acceptedAt: updated.acceptedAt ?? null, providerMessageId }, dedupeKey: `owner-notice-provider:${eventId}` });
+      if (copied === "failed") throw new Error("owner_notice_receipt_unavailable");
+    }
+    // Before the timeline, so a retry after a receipt failure takes the
+    // repair branch above and appends the timeline entry only once.
+    if (!(await messageReceiptAvailable(receiptWriter, target.tenantId, updated))) {
+      await store.releaseProviderEvent?.({ tenantId: target.tenantId, providerEventId: eventId, claimToken: claim.token }).catch(() => {});
+      return { status: "unavailable", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action, reason: "message_receipt_unavailable" };
+    }
     const timelineType: InquiryTimelineEventType = outcome === "bounced" ? "notification_bounced" : outcome === "delivered" ? "notification_accepted" : "status_changed";
     await store.appendTimeline({
       tenantId: target.tenantId,

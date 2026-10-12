@@ -1,0 +1,9 @@
+.header, .mapping { display: grid; grid-template-columns: minmax(100px, .65fr) minmax(180px, 1.1fr) minmax(210px, 1fr) minmax(180px, 1.1fr); gap: 24px; align-items: center; width: 100%; }
+.header { color: var(--st-text-3); font-size: 13px; padding-bottom: 24px; }
+.sample { color: var(--st-text-2); font-size: 13px; font-weight: 400; overflow-wrap: anywhere; }
+.issue { color: var(--st-need); font-size: 13px; font-weight: 400; }
+.correction { display: grid; grid-template-columns: 100px minmax(160px, 1fr) minmax(200px, 1fr); align-items: center; gap: 24px; width: 100%; }
+.finish { display: flex; align-items: end; justify-content: space-between; gap: 24px; }
+.recipient { min-width: 220px; display: flex; flex-direction: column; gap: 8px; color: var(--st-text-3); font-size: 13px; }
+.actions { display: flex; align-items: center; gap: 16px; }
+@media (max-width: 767px) { .header { display: none; } .mapping, .correction { grid-template-columns: minmax(0, 1fr); gap: 12px; } .finish { align-items: stretch; flex-direction: column; gap: 24px; } .actions { align-items: start; flex-direction: column; } }

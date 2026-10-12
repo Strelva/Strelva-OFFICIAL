@@ -1,5 +1,6 @@
 /** Read-only public-source spike. No model calls, media uploads or publish.
  * pnpm exec tsx scripts/website-rebuild-spike.ts [https://attymooney.com] */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";

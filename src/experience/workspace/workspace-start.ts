@@ -36,6 +36,11 @@ export interface WorkspaceStartContext {
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   /** Discovery can be partially unavailable even when saved work is readable. */
   managedWorkUnavailable?: boolean;
+  /**
+   * The workspace has an accepted managed service relationship. When omitted it
+   * is inferred from a connected managed website plus managed availability.
+   */
+  managedRelationship?: boolean;
   /** Layout supplies the callbacks that are actually mounted in this route. */
   native?: Partial<Record<WorkspaceStartRoute, boolean>>;
 }
@@ -66,6 +71,8 @@ export interface WorkspaceStartPlan {
   helpRequest?: string;
   /** A provider request opens review, never a self-service generator or delivery promise. */
   deliveryMode?: "service";
+  /** Offered second on a managed service request, only where the owner can make Systems. */
+  selfServiceRoute?: "websites";
   /** Native routes found in the request, in the order they were mentioned. */
   matchedRoutes?: readonly Exclude<WorkspaceStartRoute, "help">[];
   needsSelection?: "business" | "site";
@@ -96,15 +103,15 @@ export interface WorkspaceStartInput {
 
 export function workspaceStartContinueLabel(plan: WorkspaceStartPlan): string {
   if (plan.route === "inquiries") return plan.needsSelection === "business" ? "Choose a business" : "Open inquiry work";
-  if (plan.route === "tracker") return "Open your tracker";
+  if (plan.route === "tracker") return "Open your internal tool";
   if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
   if (plan.route === "websites") return "Create your website";
   if (plan.route === "document") return "Open your document";
   if (plan.route === "onboarding") return "Organize onboarding";
-  if (plan.route === "applications") return "Prepare application";
-  if (plan.route === "scheduling") return "Open scheduling";
-  if (plan.route === "investigations") return "Open ongoing checks";
-  if (plan.route === "operations") return "Open ongoing work";
+  if (plan.route === "applications") return "Prepare internal tool";
+  if (plan.route === "scheduling") return "Open Bookings";
+  if (plan.route === "investigations") return "Open saved checks";
+  if (plan.route === "operations") return "Open request";
   return "Continue to business assessment";
 }
 
@@ -124,10 +131,10 @@ const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["ass
 const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome; nextAction: string }> = {
   onboarding: { title: "Onboarding requirements", summary: "Keep requirements, private documents and their review status together.", outcome: "Capability", nextAction: "Open onboarding, define the requirements, and review supplied documents before accepting them." },
   websites: { title: "Your website", summary: "Turn your business description into a saved website draft that you can preview and change.", outcome: "Capability", nextAction: "Create a draft, review it, then choose when to prepare it for launch." },
-  applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the application." },
-  scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open scheduling and review the permitted times before reserving one." },
-  investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open ongoing checks and choose the two saved sources to compare." },
-  operations: { title: "Delegated work", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility", nextAction: "Open ongoing work and review the responsibility before it starts." },
+  applications: { title: "A private internal tool", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the internal tool." },
+  scheduling: { title: "Bookings", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open Bookings and review the permitted times before reserving one." },
+  investigations: { title: "Saved check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open saved checks and choose the two saved sources to compare." },
+  operations: { title: "Request", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility", nextAction: "Open the request and review its scope before it starts." },
   assessment: {
     title: "A business assessment",
     summary: "This looks like a read-only business assessment that you can save and return to.",
@@ -135,10 +142,10 @@ const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; 
     nextAction: "Start the assessment and review its evidence before saving it.",
   },
   tracker: {
-    title: "A working tracker",
-    summary: "This looks like a CSV-to-tracker setup with the field mapping visible before anything is saved.",
+    title: "An internal tool from a spreadsheet",
+    summary: "This looks like a spreadsheet import with the field mapping visible before anything is saved.",
     outcome: "Capability",
-    nextAction: "Open the tracker flow and review the field mapping before saving it.",
+    nextAction: "Import the spreadsheet and review the field mapping before saving it.",
   },
   inquiries: {
     title: "An inquiry workflow",
@@ -184,7 +191,7 @@ const SIGNALS: readonly Signal[] = [
 
 const ROUTE_ORDER = ["onboarding", "websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
 
-function normalizeRequest(value: string): string {
+function normalizeAsk(value: string): string {
   // Preserve the person's wording, punctuation and line breaks for the native
   // or model-backed flow. Matching operates on whitespace-insensitive regexes.
   return value.trim();
@@ -255,7 +262,7 @@ function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string):
     return [
       { id: "source-file", label: "Source CSV", detail: "Keep the original file and row references available during import.", outcome: "Capability" },
       { id: "field-mapping", label: "Proposed field mapping", detail: "Review names, types, duplicate headers, and import warnings before saving.", outcome: "Capability" },
-      { id: "saved-tracker", label: "Saved tracker", detail: "Create a filterable tracker with its import history in this workspace.", outcome: "Capability" },
+      { id: "saved-tracker", label: "Saved internal tool", detail: "Create a filterable internal tool with its import history in this workspace.", outcome: "Capability" },
     ];
   }
 
@@ -305,7 +312,7 @@ function emptyPlan(): WorkspaceStartPlan {
     request: "",
     context: undefined,
     title: "Start with the result you want.",
-    summary: "Describe an assessment, tracker, inquiry workflow, website delivery, document, onboarding requirements, application, schedule, ongoing check, or delegated work.",
+    summary: "Describe an assessment, internal tool, inquiries, website, document, onboarding requirements, Bookings, saved check, or request.",
     parts: [],
     matchedRoutes: [],
     selectedPartIds: [],
@@ -315,7 +322,7 @@ function emptyPlan(): WorkspaceStartPlan {
 }
 
 function helpPlan(request: string, context: WorkspaceStartContext, routes: readonly Exclude<WorkspaceStartRoute, "help">[] = []): WorkspaceStartPlan {
-  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace you own before preparing a plan." : undefined;
+  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace where you can start work before preparing a plan." : undefined;
   const multiOutcome = routes.length > 1;
   return {
     kind: "help",
@@ -323,27 +330,47 @@ function helpPlan(request: string, context: WorkspaceStartContext, routes: reado
     route: "help",
     request,
     context,
-    title: multiOutcome ? "A plan that keeps the whole request" : "Let’s narrow that down together.",
+    title: multiOutcome ? "A plan that keeps the whole ask" : "Let’s narrow that down together.",
     summary: multiOutcome
-      ? "We’ll prepare one plan for the full request. You can review it before work starts."
-      : "This request does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
+      ? "We’ll prepare one plan for the full ask. You can review it before work starts."
+      : "This ask does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
     parts: [],
     ...(reason ? { reason } : {}),
     helpRequest: request,
     matchedRoutes: [...routes],
     selectedPartIds: [],
-    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this request down.",
+    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this ask down.",
     canContinue: !reason,
   };
+}
+
+function requestsSelfService(request: string): boolean {
+  return /\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request);
+}
+
+function hasManagedRelationship(context: WorkspaceStartContext): boolean {
+  if (context.managedRelationship !== undefined) return context.managedRelationship;
+  return Boolean(context.managedSites?.length) && productFor(context, "website")?.availability === "managed";
+}
+
+/**
+ * New website work in a managed workspace: a new site or page, or a redo of the
+ * existing one. Ordinary edits to the connected site stay on the change flow.
+ */
+function requestsManagedWebsiteWork(request: string): boolean {
+  if (/\b(?:new|another)\s+(?:website|web site|site|landing page|page)\b/i.test(request)) return true;
+  if (/\b(?:redo|rebuild|redesign|remake|replace|start over)\b[^.!?;\n]{0,40}\b(?:website|web site|site)\b/i.test(request)) return true;
+  if (/\badd\b[^.!?;\n]{0,40}\bpages?\b/i.test(request)) return true;
+  return matchedRoutes(request).includes("websites");
 }
 
 function requestsWebsiteService(request: string): boolean {
   if (!/\b(?:website|web site|landing page)\b/i.test(request)) return false;
   // Negated or explicitly self-service requests stay on the existing planning path.
-  if (/\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request)) return false;
+  if (requestsSelfService(request)) return false;
   if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
-  const providerFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
-  return providerFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+  const agencyFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
+  return agencyFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\b(?:strelva|an? agency)\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
 }
 
 function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
@@ -354,17 +381,18 @@ function websiteServicePlan(request: string, context: WorkspaceStartContext): Wo
   return {
     ...plan,
     deliveryMode: "service",
-    title: "Have Strelva build your website",
+    title: "Have an agency build your website",
     summary: "Keep your brief together for a website delivery request. You do not need to build the website yourself.",
-    nextAction: "Review the request with Strelva. Scope, price and the delivery deadline require separate acceptance.",
+    nextAction: "Choose an agency and review the request with them. Scope, price and the delivery deadline require separate acceptance.",
     status: reason ? "blocked" : "help",
     reason,
     canContinue: !reason,
+    ...(!context.readOnly && supportedFlowMounted(context, "websites") && hasAvailableProduct(context, "websites") ? { selfServiceRoute: "websites" as const } : {}),
   };
 }
 
 function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): string | undefined {
-  if (context.readOnly) return "This workspace is read-only. Switch to a workspace you own before starting new work.";
+  if (context.readOnly) return "This workspace is read-only. Switch to a workspace where you can start work before starting new work.";
   if (!supportedFlowMounted(context, route)) return "This flow is not available in the current workspace. Nothing has been started.";
   if (!hasAvailableProduct(context, route)) {
     if (route === "website") return "Website work is available here only for a connected managed website.";
@@ -377,16 +405,35 @@ function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceS
 }
 
 export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput, suppliedContext: WorkspaceStartContext = {}): WorkspaceStartPlan {
-  const request = normalizeRequest(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
+  const request = normalizeAsk(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
   if (requestsWebsiteService(request)) return websiteServicePlan(request, context);
+  // The accepted managed relationship chooses the default: no special wording
+  // such as "hire Strelva" is needed (audit 2026-10-05, finding 7).
+  if (hasManagedRelationship(context) && !requestsSelfService(request) && requestsManagedWebsiteWork(request)) return websiteServicePlan(request, context);
 
   const routes = matchedRoutes(request);
   if (routes.length > 1) return helpPlan(request, context, routes);
   const route = routes[0] || classify(request);
   if (!route) return helpPlan(request, context);
+  return routePlan(request, context, route);
+}
 
+/**
+ * "Make it yourself instead": the second choice on a managed website request.
+ * Returns the self-service website plan for the same request, or null where
+ * the plan offered no self-service route (read-only, flow not mounted, or the
+ * product is not available). Nothing has been sent either way.
+ */
+export function selfServiceWorkspaceStartPlan(plan: WorkspaceStartPlan): WorkspaceStartPlan | null {
+  if (plan.deliveryMode !== "service" || plan.selfServiceRoute !== "websites") return null;
+  const context = plan.context || {};
+  const next = routePlan(plan.request, context, plan.selfServiceRoute);
+  return next.status === "ready" ? next : null;
+}
+
+function routePlan(request: string, context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): WorkspaceStartPlan {
   const copy = ROUTE_COPY[route];
   const parts = partsFor(route, request);
   const reason = blockedReason(context, route);

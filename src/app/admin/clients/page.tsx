@@ -1,6 +1,9 @@
+import { OPERATOR_DESTINATIONS } from "@/experience/operator/destinations";
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 
 import { getActivity, listDrafts } from "@/lib/storage";
@@ -11,10 +14,13 @@ import { getAtRiskTenants, type AtRiskSignal } from "@/lib/churn";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
 import { getTenantLaunchReadinessResults } from "@/lib/production-readiness-rules";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
+import { readClientBusinessCount } from "../client-businesses";
 import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { billingLabel, billingMonthlyCents, isBillingConfigured, resolveBillingType } from "@/lib/billing-type";
+import { createClientReadHealth, scanEvidenceIssue } from "./[id]/client-read-health";
+import { StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 
 /** The client's public domain (bare host), from productionDomain or siteUrl; null for
  *  a tenant not yet on its own domain (a *.strelva.com / *.vercel.app placeholder). */
@@ -22,7 +28,7 @@ function clientDomain(t: { productionDomain?: string; siteUrl?: string }): strin
   const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
   if (!raw) return null;
   const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  if (!host || isPlatformDomain(host) || host.endsWith(".vercel.app")) return null;
   return host;
 }
 
@@ -33,37 +39,47 @@ export default async function AdminClientsPage() {
   // super-admin, but mirror the guard here so this page never renders client
   // data for a non-admin even if the layout chain changes.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
-  const tenants = await getAllTenants();
+  const [tenants, clientBusinessCount] = await Promise.all([getAllTenants(), readClientBusinessCount()]);
 
-  // Per-client signals: health grade, launch status, at-risk.
+  const portfolioHealth = createClientReadHealth();
+
+  // Per-site signals: health grade, launch status, at-risk.
   const [atRiskSignals, rows] = await Promise.all([
-    getAtRiskTenants().catch((): AtRiskSignal[] => []),
+    getAtRiskTenants().catch(portfolioHealth.fallback("Subscription risk", [] as AtRiskSignal[])),
     Promise.all(
       tenants.map(async (t) => {
+        const health = createClientReadHealth();
         const [activity, drafts, threads, weeklyBrief, effectiveSubscriptionStatus, scan] = await Promise.all([
-          getActivity(t.id).catch(() => []),
-          listDrafts(t.id).catch(() => ({} as Record<string, boolean>)),
-          listThreads(t.id).catch(() => []),
-          getWeeklyBrief(t.id).catch(() => null),
-          getEffectiveSubscriptionStatus(t.id).catch(() => t.subscriptionStatus ?? "none"),
-          getScanSummary(t.id).catch(() => null),
+          getActivity(t.id).catch(health.fallback("Activity", [])),
+          listDrafts(t.id).catch(health.fallback("Content drafts", {})),
+          listThreads(t.id).catch(health.fallback("Conversations", [])),
+          getWeeklyBrief(t.id).catch(health.fallback("Weekly brief", null)),
+          getEffectiveSubscriptionStatus(t.id).catch(health.fallback("Subscription status", t.subscriptionStatus ?? "none")),
+          getScanSummary(t.id, { requireStore: true }).catch(health.fallback("Site scan", null)),
         ]);
-        const launchReadiness = buildTenantLaunchReadiness({
-          tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
-          infrastructure: getTenantLaunchReadinessResults(t),
-          activity,
-          threadCount: threads.length,
-          hasOwnerMessage: tenantHasOwnerMessage(threads),
-          draftCount: Object.keys(drafts).length,
-          hasWeeklyBrief: Boolean(weeklyBrief),
-        });
+        let launchReadiness = null;
+        try {
+          launchReadiness = buildTenantLaunchReadiness({
+            tenant: { ...t, subscriptionStatus: effectiveSubscriptionStatus },
+            infrastructure: getTenantLaunchReadinessResults(t),
+            activity,
+            threadCount: threads.length,
+            hasOwnerMessage: tenantHasOwnerMessage(threads),
+            draftCount: Object.keys(drafts).length,
+            hasWeeklyBrief: Boolean(weeklyBrief),
+          });
+        } catch { health.unavailable("Launch readiness"); }
+        const scanIssue = scanEvidenceIssue(scan);
         return {
           id: t.id,
           lastActivity: activity[0]?.time ?? null,
           seoGrade: scan?.grade ?? null,
-          launchScore: launchReadiness.score,
-          launchStatus: launchReadiness.status,
+          launchStatus: health.detail() ? null : launchReadiness?.status ?? null,
+          evidenceIssue: [health.detail(), scanIssue].filter(Boolean).join(" ") || null,
+          scanIssue,
+          scannedAt: scan?.scannedAt ?? null,
         };
       })
     ),
@@ -87,6 +103,9 @@ export default async function AdminClientsPage() {
       atRiskReason: atRiskById.get(t.id)?.reasons[0] ?? null,
       seoGrade: row?.seoGrade ?? null,
       launchStatus: row?.launchStatus ?? null,
+      evidenceIssue: [portfolioHealth.detail(), row?.evidenceIssue].filter(Boolean).join(" ") || null,
+      scanIssue: row?.scanIssue ?? null,
+      scannedAt: row?.scannedAt ?? null,
       billingLabel: billingLabel(t),
       billingConfigured: isBillingConfigured(t),
     };
@@ -117,11 +136,11 @@ export default async function AdminClientsPage() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-display text-[26px] font-medium tracking-[-0.02em] text-warm-white sm:text-[30px]">
-            Clients
+            {OPERATOR_DESTINATIONS.sites.label}
           </h1>
           <p className="mt-1.5 text-[13px] text-gray-muted">
-            One list for every business you manage a site for <span className="text-gray-faint">·</span>{" "}
-            <b className="font-semibold text-warm-white">{activeCount} active</b>
+            Site-level support records; client businesses can have several sites <span className="text-gray-faint">·</span>{" "}
+            <b className="font-semibold text-warm-white">{activeCount} active sites</b> · {clientBusinessCount === null ? "Client business count unavailable" : `${clientBusinessCount} client businesses`}
           </p>
           <p className="mt-1 flex items-baseline gap-2">
             <span className="text-[20px] font-semibold tabular-nums tracking-[-0.02em] text-warm-white">
@@ -133,16 +152,18 @@ export default async function AdminClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <StTextButton href="/admin/convert">Conversion dry run</StTextButton>
           <ScanAllButton />
           <Link
             href="/admin/onboard"
             className="inline-flex items-center gap-1.5 rounded-[9px] bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent transition hover:brightness-105"
           >
-            New client
+            Add a Strelva Agency client
           </Link>
         </div>
       </div>
 
+      {portfolioHealth.detail() && <StNotice tone="critical">{portfolioHealth.detail()}</StNotice>}
       <ClientsCrm clients={clients} />
     </div>
   );

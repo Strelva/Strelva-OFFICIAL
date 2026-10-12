@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ get: vi.fn(), run: vi.fn(), rate: vi.fn() }));
 vi.mock("@/lib/audit-report-store", () => ({ getAuditReport: mocks.get }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/platform/workspaces", () => ({ runWorkspaceOperation: mocks.run }));
 import { savePublicWebsiteAudit } from "@/products/website-audit/server";
 import { presentWorkspaceWork } from "@/experience/workspace/result";

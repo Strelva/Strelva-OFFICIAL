@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   getPublicResult: vi.fn(),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/score", () => ({ scoreAiVisibility: mocks.score }));
 vi.mock("@/products/ai-visibility/results", () => ({ getAiVisibilityResult: mocks.getPublicResult }));
 vi.mock("@/platform/workspaces", async (importOriginal) => {

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { mapBudgetExecution } from "./repository";
 import type { BudgetExecution, BudgetExecutionEvidenceContext } from "./runtime";
 import { settleWorkAllowanceExecution } from "./allowances-service";

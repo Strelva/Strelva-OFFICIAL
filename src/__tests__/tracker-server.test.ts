@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ getWork: vi.fn(), saveWork: vi.fn(), assertCanSaveWork: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/platform/workspaces/repository", () => mocks);
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 import { createTrackerFromImport } from "@/products/tracker/engine";
 import { editSavedTracker, previewTracker, recordTrackerExperiment, saveNewTracker } from "@/products/tracker/server";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";

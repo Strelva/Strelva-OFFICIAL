@@ -7,7 +7,7 @@ const mockGetAccessToken = vi.hoisted(() => vi.fn());
 const mockGetGoogleScopeGrants = vi.hoisted(() => vi.fn());
 const mockGetGoogleAccessToken = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({
   getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a),
 }));

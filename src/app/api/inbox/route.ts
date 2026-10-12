@@ -1,7 +1,8 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getInboxItems, markInboxRead, markAllInboxRead } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(request: Request) {
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const url = new URL(request.url);
     const type = url.searchParams.get("type") || undefined;
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
+    const denied = await requireTenantPermission(tenant, "content:write");
     if (denied) return denied;
 
     const body = await readJsonObject(request);

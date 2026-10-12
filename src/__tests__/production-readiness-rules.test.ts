@@ -283,15 +283,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const inviteEmail = readFileSync(path.join(process.cwd(), "src/lib/invite-email.ts"), "utf8");
 
     expect(invite).toContain("createInvite(email");
-    expect(invite).toContain("buildInviteEmailHtml");
-    expect(invite).toContain("buildInviteEmailText");
+    expect(invite).toContain("inviteEmailOptions");
     expect(invite).toContain("sanitizeEmailSubjectText");
-    expect(invite).toContain("text: buildInviteEmailText");
+    expect(invite).toContain("options: inviteEmailOptions");
     expect(invite).toContain("getInviteSignUpUrl");
     expect(invite).toContain("url.searchParams.set(\"email\", email)");
     expect(invite).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
-    expect(invite).toContain("buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })");
-    expect(invite).toContain("buildInviteEmailText({ email, siteName: tenantConfig.siteName, signUpUrl })");
+    expect(invite).toContain("inviteEmailOptions({ email, siteName: tenantConfig.siteName, signUpUrl })");
     // escapeHtml stays exported (weekly-report cron imports it); the two invite
     // builders now render through the shared email design system, which
     // auto-escapes the content they pass in. Dynamic values are still sanitized
@@ -303,7 +301,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(inviteEmail).toContain("sanitizeEmailSubjectText(params.siteName)");
     expect(inviteEmail).toContain("replace(/<[^>]*>/g");
     expect(inviteEmail).toContain("replace(/[\\r\\n\\t]+/g");
-    expect(inviteEmail).toContain('heading: "Your dashboard is ready"');
+    expect(inviteEmail).toContain('heading: "Your workspace is ready"');
     expect(inviteEmail).toContain('label: "Set up your login"');
     // The operator can invite the owner from the client detail page's editor.
     expect(tenantEditor).toContain("resendOwnerInvite");
@@ -316,20 +314,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(operatorConsole).toContain('send_invite: { endpoint: "/api/admin/invites", method: "POST" }');
   });
 
-  it("normalizes admin tenant setup request bodies", () => {
+  it("holds legacy operator setup and client-settings writes while preserving platform config validation", () => {
     const source = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/route.ts"), "utf8");
-
+    expect(source).toContain("Create client workspaces through ordinary agency access");
+    expect(source).toContain("const clientFields");
     expect(source).toContain("readJsonObject(req)");
     expect(source).toContain("Invalid request body");
-    expect(source).toContain("cleanString(rawSiteName)");
-    expect(source).toContain("cleanString(rawOwnerName)");
-    expect(source).toContain("cleanString(rawOwnerEmail)");
-    expect(source).toContain("cleanString(rawSubdomain)");
-    expect(source).toContain("cleanFeatures(features)");
-    // Features are validated against the feature registry (was the inline TENANT_FEATURES set).
-    expect(source).toContain("cleanTenantFeatureIds");
-    expect(source).toContain("normalizeTenantDomain(productionDomain)");
-    expect(source).toContain("normalizeTenantDomain(adminDomain)");
+    expect(source).toContain("applyFeatureChange(currentTenant.features");
+    expect(source).toContain("normalizeTrackPublicKey(rawTrackingPublicKey)");
   });
 
   it("rejects malformed content and page-config write bodies", () => {
@@ -381,7 +373,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
     expect(tenantSettings).toContain("readJsonObject(req)");
     expect(tenantSettings).toContain("Invalid request body");
-    for (const source of [adminDrafts, rewardsAdjust]) {
+    expect(adminDrafts).toContain("client_content_decision_required");
+    for (const source of [rewardsAdjust]) {
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }
@@ -608,8 +601,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(packageData.packageManager).toMatch(/^pnpm@10\./);
     expect(packageData.pnpm?.overrides?.["fast-uri"]).toBe("3.1.8");
     expect(lockfile).toContain("  fast-uri: 3.1.8");
-    expect(releaseGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
-    expect(launchGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
+    expect(releaseGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
+    expect(launchGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");
     // CI gates the dependency audit at HIGH+ (high advisories are patched via
     // pnpm overrides). Plain `pnpm audit` fails on any transitive moderate/low

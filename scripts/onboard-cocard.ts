@@ -7,9 +7,10 @@
  * client, leaving the encrypted secret columns untouched.
  *   npx tsx --env-file=.env.prod scripts/onboard-cocard.ts --apply
  */
-import { getSupabase } from "../src/lib/db/client";
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
+import { getSupabase } from "../src/platform/infra/db/client";
 import { setAnalyticsConfig, getAnalyticsConfig, deriveScDomain } from "../src/lib/analytics";
-import { getRedis } from "../src/lib/redis";
+import { getRedis } from "../src/platform/infra/redis";
 
 const ID = "cocard-anderson";
 const DOMAIN = "cocardanderson.com";

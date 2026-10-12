@@ -1,8 +1,9 @@
 import { z } from "zod";
+import { captureActionActor } from "@/platform/presentation/actor-server";
 import { baseSchema } from "./contracts";
 export { baseSchema } from "./contracts";
-import { getSupabase } from "@/lib/db/client";
-import { assertWorkspaceMember, getWork, saveWork } from "@/platform/workspaces/repository";
+import { getSupabase } from "@/platform/infra/db/client";
+import { assertWorkspaceMember, getWork, makeSystemsAuthority, saveSystemWork, saveWork, type MakeSystemsAuthority } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type SaveWorkInput, type WorkspaceActor } from "@/platform/workspaces/types";
 
 /** Persistence port. Direct membership is rechecked at each mutation, including after provider reads. */
@@ -11,10 +12,26 @@ export interface BoundedStore {
   read(actor: WorkspaceActor, workId: string): Promise<SavedWork | null>;
   create(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SavedWork>;
   update(actor: WorkspaceActor, work: SavedWork, expectedRevision: number, payload: unknown): Promise<SavedWork>;
+  /** make_systems resolution. Absent only on focused in-memory test stores. */
+  makeSystems?(actor: WorkspaceActor, workspaceId: string): Promise<MakeSystemsAuthority>;
+  /** Maker create path (operator or delegated agency, no direct membership needed). */
+  createSystem?(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SavedWork>;
 }
 export const boundedStore: BoundedStore = {
-  member: assertWorkspaceMember, read: getWork, create: saveWork,
+  member: assertWorkspaceMember, read: getWork,
+  async create(actor, workspaceId, input) {
+    return saveWork(actor, workspaceId, await attributedInput(actor, workspaceId, input));
+  },
+  // Wrapped so modules that mock the workspace repository without these
+  // exports still load; the lookup happens only when a tool is made.
+  makeSystems: (actor, workspaceId) => makeSystemsAuthority(actor, workspaceId),
+  createSystem: async (actor, workspaceId, input) => saveSystemWork(actor, workspaceId, await attributedInput(actor, workspaceId, input)),
   async update(actor, work, expectedRevision, payload) {
+    const parsed = baseSchema.safeParse(payload);
+    if (parsed.success && parsed.data.history.at(-1)?.actorId === actor.userId && parsed.data.history.at(-1)?.revision === expectedRevision + 1) {
+      const identity = await captureActionActor(actor, work.workspaceId);
+      payload = { ...(payload as Record<string, unknown>), history: parsed.data.history.map(item => item.revision === expectedRevision + 1 ? { ...item, actor: identity } : item) };
+    }
     const db = getSupabase();
     if (!db) throw new WorkspaceStoreError("Work storage is unavailable.");
     const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<Record<string, unknown>> | null; error: { message: string } | null }> };
@@ -37,4 +54,9 @@ export async function readBounded<T>(store: BoundedStore, actor: WorkspaceActor,
   const work = await store.read(actor, workId);
   if (!work || work.productId !== productId) throw new WorkspaceAccessError();
   return { ...work, payload: schema.parse(work.payload) };
+}
+
+async function attributedInput(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SaveWorkInput> {
+  if (input.productId !== "applications" || !input.payload || typeof input.payload !== "object") return input;
+  return { ...input, payload: { ...input.payload, maintenanceActor: await captureActionActor(actor, workspaceId) } };
 }

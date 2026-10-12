@@ -9,6 +9,7 @@
  *   2. Otherwise, read dev-content-{tenantId}.json from the project root.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { existsSync, readFileSync } from "node:fs";
 import type { ContentMap } from "../src/lib/types";
 import { defaultFaq, defaultShop, defaultProducts, defaultTheme, defaultRewardsConfig, defaultNavigation, defaultFooter } from "../src/lib/defaults";

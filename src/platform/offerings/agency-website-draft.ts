@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getEffectiveSubscriptionStatus, isWithinPastDueGrace } from "@/lib/subscription";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sectionSchemas } from "@/lib/schemas";
@@ -195,9 +195,11 @@ async function validateSection(tenantId: string, value: string, data?: unknown):
   return name;
 }
 
+export interface AgencyWebsitePermissionIdentity { agencyWorkspaceId: string; operatorUserId: string }
+
 export interface AgencyManagedWebsiteDraftAccessService {
   read(actor: WorkspaceActor, bindingId: string): Promise<AgencyManagedWebsiteDraftGrant | null>;
-  grant(actor: WorkspaceActor, deliveryId: string, bindingId: string): Promise<AgencyManagedWebsiteDraftGrant>;
+  grant(actor: WorkspaceActor, deliveryId: string, bindingId: string, expected?: AgencyWebsitePermissionIdentity): Promise<AgencyManagedWebsiteDraftGrant>;
   revoke(actor: WorkspaceActor, grantId: string): Promise<AgencyManagedWebsiteDraftGrant>;
   list(actor: WorkspaceActor, agencyWorkspaceId: string): Promise<AgencyManagedWebsiteDraftWork[]>;
   state(actor: WorkspaceActor, bindingId: string, sectionName: string): Promise<AgencyWebsiteDraftState>;
@@ -211,12 +213,13 @@ export const postgresAgencyManagedWebsiteDraftAccess: AgencyManagedWebsiteDraftA
     const values = rows(await rpc("read_agency_managed_website_draft_edit", { ...identity(actor), p_binding_id: uuid.parse(bindingId) }));
     return values[0] ? parseGrant(values[0]) : null;
   },
-  async grant(actor, deliveryId, bindingId) {
+  async grant(actor, deliveryId, bindingId, expected) {
     const tenantId = await websiteTenant(actor, bindingId);
     const subscriptionExemption = await assertAgencyWebsiteDraftSubscription(tenantId);
-    return parseGrant(row(await rpc("grant_agency_managed_website_draft_edit_server", {
+    return parseGrant(row(await rpc(expected ? "grant_named_agency_website_draft_edit_server" : "grant_agency_managed_website_draft_edit_server", {
       ...identity(actor), p_delivery_id: uuid.parse(deliveryId), p_binding_id: uuid.parse(bindingId),
       p_subscription_exemption: subscriptionExemption,
+      ...(expected ? { p_agency_workspace_id: uuid.parse(expected.agencyWorkspaceId), p_operator_user_id: uuid.parse(expected.operatorUserId) } : {}),
     })));
   },
   async revoke(actor, grantId) {
@@ -268,7 +271,7 @@ export function createAgencyManagedWebsiteDraftAccessService(
 ) {
   return {
     read(actor: WorkspaceActor, bindingId: string) { return service.read(actor, uuid.parse(bindingId)); },
-    grant(actor: WorkspaceActor, deliveryId: string, bindingId: string) { return service.grant(actor, uuid.parse(deliveryId), uuid.parse(bindingId)); },
+    grant(actor: WorkspaceActor, deliveryId: string, bindingId: string, expected?: AgencyWebsitePermissionIdentity) { return service.grant(actor, uuid.parse(deliveryId), uuid.parse(bindingId), expected); },
     revoke(actor: WorkspaceActor, grantId: string) { return service.revoke(actor, uuid.parse(grantId)); },
     list(actor: WorkspaceActor, agencyWorkspaceId: string) { return service.list(actor, uuid.parse(agencyWorkspaceId)); },
     state(actor: WorkspaceActor, bindingId: string, sectionName: string) { return service.state(actor, uuid.parse(bindingId), section.parse(sectionName)); },

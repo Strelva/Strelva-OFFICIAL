@@ -10,7 +10,7 @@
  * the receiving repo verifies it.
  */
 
-import { isSafeFetchUrl } from "./safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 
 export interface CustomChangeRequestInput {
   url: string;

@@ -1,0 +1,68 @@
+{
+  "base": "844fb5f59a7296274ead84082fc05e0e3628a637",
+  "preparedOnly": true,
+  "nativeLease": false,
+  "rootSourceReview": "6abc03dedb50798a6c8728249cee37ae7019d395 accepted; new ownership helper review pending",
+  "existingMigrationFilesCompared": 587,
+  "existingMigrationBytesChanged": 0,
+  "newForward": "20261022182000_booking_settings_atomic_patch.sql",
+  "rootOwnsFinalInventory": "prospective355, not frozen by lane",
+  "files": [
+    {
+      "path": "scripts/lib/booking-owned-cluster.mjs",
+      "sha256": "8f1e0075a8340e059ab02b46785f509c724213c1b6db7150bb03809d5c407f2f"
+    },
+    {
+      "path": "scripts/sql/booking-owned-cluster.sh",
+      "sha256": "6dafd1db8e348fb3d717052cbab10ab229aa21a6c3aa34a048faa309b8caa862"
+    },
+    {
+      "path": "scripts/sql/booking-settings-atomicity.sh",
+      "sha256": "034557e3a9240040808d597eb9abfa105ad5c03060205db719da086a15352d8d"
+    },
+    {
+      "path": "scripts/sql/booking-settings-forward-identity.sh",
+      "sha256": "ec7468a1d435cdc21a7a07d4a66ca738cca55dfcc28d0a9e4163a3d1f0dafb48"
+    },
+    {
+      "path": "scripts/sql/booking-settings-inverse-identity.sh",
+      "sha256": "8dd6548a0e2549d8c7df514f296cace62fe661adcb61c6e6e446ee0abf1abea7"
+    },
+    {
+      "path": "scripts/tests/booking-owned-cluster.node-test.mjs",
+      "sha256": "316717e40137df9c0b76b57b7d67b1bb3006b036555dfe2773c080c369409d82"
+    },
+    {
+      "path": "scripts/tests/booking-settings-atomic-guard.node-test.mjs",
+      "sha256": "2325f8855484d1cea8158be0ed9205451c4ec2fa6698df3d6e66768692e3a4b2"
+    },
+    {
+      "path": "src/__tests__/booking-config-cutover.test.ts",
+      "sha256": "4eeb612d69161de8b3e571379d70505efbfaa3b32d316b19ab9012d0628c91b5"
+    },
+    {
+      "path": "src/platform/bookings/legacy-store.ts",
+      "sha256": "17354877e37cf5dac3bd768d7454f46e491fd51dd1e22b324735986f9112f8ef"
+    },
+    {
+      "path": "src/platform/bookings/store.ts",
+      "sha256": "2dfb38a4f127f37a607c2336ca8e5f5605876358f1f45b1fb00b93c979fceae9"
+    },
+    {
+      "path": "src/platform/bookings/tenant.ts",
+      "sha256": "068d882e766de122dd790c3e02f5fbff4ae526aed201772712abe3f7bb6bb01a"
+    },
+    {
+      "path": "supabase/migrations/20261022182000_booking_settings_atomic_patch.sql",
+      "sha256": "6497dd7346ce3f9e9e77409b5fc933871ac931dc266e792dd4806ffcf0b07ce6"
+    },
+    {
+      "path": "supabase/migrations/rollback-20261022182000_booking_settings_atomic_patch.sql",
+      "sha256": "cf5cc60da8923e2256e30f82d5aa080d1134c76083050c8e3c3ee053b9240c65"
+    },
+    {
+      "path": "tests/booking-settings-atomic-patch-schema.sql",
+      "sha256": "8189c8ec6a2caaa0d3fa360b8abfd20013b94a59b01fdbf22fe640ec39597845"
+    }
+  ]
+}

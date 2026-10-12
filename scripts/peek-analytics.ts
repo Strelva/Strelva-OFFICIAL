@@ -4,6 +4,7 @@
  * see whether data actually flows. Needs the prod GOOGLE_SEARCH_CONSOLE_KEY.
  *   npx tsx --env-file=.env.prod scripts/peek-analytics.ts
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { readFileSync } from "node:fs";
 
 // The service-account key is multi-quote JSON; `--env-file` truncates it at the

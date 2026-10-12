@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const store = vi.hoisted(() => new Map<string, unknown>());
 const redisState = vi.hoisted(() => ({ throwOnGet: false }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     get: async (k: string) => {
       if (redisState.throwOnGet) throw new Error("redis blip");
@@ -43,7 +43,7 @@ import {
   setBookingConfig,
   getDateOverrides,
   setDateOverrides,
-} from "@/lib/storage/booking-store";
+} from "@/platform/bookings/legacy-store";
 import type { DateOverride } from "@/lib/types";
 import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 

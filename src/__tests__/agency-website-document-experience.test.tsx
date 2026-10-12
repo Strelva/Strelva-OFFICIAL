@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
+import { act, createElement, isValidElement } from "react";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgencyWebsiteDocumentDraftExperience, agencyDocumentTransport, AgencyDocumentTransportError, type AgencyDocumentTransport } from "@/experience/agency-website/AgencyWebsiteDocumentDraftExperience";
@@ -7,6 +8,9 @@ import AgencyManagedWebsiteDraftPage from "@/app/agency-websites/[bindingId]/pag
 import { AgencyManagedWebsiteDraftExperience } from "@/experience/agency-website/AgencyManagedWebsiteDraftExperience";
 import { agencyDocumentFixture } from "@/experience/agency-website/agency-document-fixture";
 
+const pageIdentity = vi.hoisted(() => ({ context: vi.fn() }));
+vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: async () => ({ userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "maya@example.test" }) }));
+vi.mock("@/platform/offerings/agency-website-context", () => ({ readAgencyWebsiteContext: pageIdentity.context }));
 let root: Root | undefined;
 let container: HTMLDivElement;
 const bindingId = "11111111-1111-4111-8111-111111111111";
@@ -27,25 +31,25 @@ describe("agency v2 document drafts", () => {
     expect(container.textContent).not.toContain("Connect domain");
     await change(container.querySelector("textarea")!,"[Agency's proposed services]");
     await act(async()=>container.querySelector<HTMLButtonElement>('[aria-label="Move service-one down"]')!.click());
-    await act(async()=>button("Save draft for customer review").click());
+    await act(async()=>button("Save draft for client review").click());
     expect(save).toHaveBeenCalledWith(bindingId,initial.website,"services",[
       {op:"replace",path:"/nodes/services/props",value:{...initial.website!.rebuild.candidate!.document.nodes.services!.props,title:"[Agency's proposed services]"}},
       {op:"replace",path:"/nodes/services/children",value:["service-two","service-one"]},
     ]);
-    expect(container.textContent).toContain("The customer can now review it");
+    expect(container.textContent).toContain("The client can now review it");
   });
   it.each(["agency-expired","agency-revoked","agency-no-permission"])("withholds editing for %s",async scenario=>{
     const initial=agencyDocumentFixture(scenario); const save=vi.fn();
     await mount({read:async()=>initial,save});
     expect(container.querySelectorAll("textarea")).toHaveLength(0);
-    expect(button("Save draft for customer review")).toBeUndefined();
+    expect(button("Save draft for client review")).toBeUndefined();
     expect(save).not.toHaveBeenCalled();
   });
   it("preserves edits after stale revision failure and reloads revoked permission",async()=>{
     const initial=agencyDocumentFixture();let reads=0;
     await mount({read:async()=>++reads===1?initial:agencyDocumentFixture("agency-revoked"),save:async()=>{throw new Error("This website changed. Reload before preparing a draft.");}});
     await change(container.querySelector("textarea")!,"[Keep this unsaved proposal]");
-    await act(async()=>button("Save draft for customer review").click());
+    await act(async()=>button("Save draft for client review").click());
     expect(container.querySelector("textarea")!.value).toBe("[Keep this unsaved proposal]");
     expect(container.querySelector('[role="alert"]')!.textContent).toContain("Your unsaved edits are preserved");
     await act(async()=>button("Reload saved document and permission").click());
@@ -69,7 +73,7 @@ describe("agency v2 document drafts", () => {
     await act(async()=>container.querySelector("iframe")!.dispatchEvent(new Event("load")));
     expect(container.textContent).toContain("The private preview is unavailable");
     await act(async()=>button("Reload preview and permission").click());
-    expect(container.textContent).toContain("Grant expired");expect(button("Save draft for customer review")).toBeUndefined();
+    expect(container.textContent).toContain("Grant expired");expect(button("Save draft for client review")).toBeUndefined();
   });
   it.each(["read","save"] as const)("handles a followed sign-in redirect during %s as lost permission",async method=>{
     const response=new Response("<!doctype html><h1>Sign in</h1>",{status:200,headers:{"Content-Type":"text/html"}});
@@ -98,8 +102,8 @@ describe("agency v2 document drafts", () => {
     }));
     await mount({read:async()=>initial,save:agencyDocumentTransport.save});
     await change(container.querySelector("textarea")!,"[Preserve my proposed edit]");
-    await act(async()=>button("Save draft for customer review").click());
-    expect(button("Save draft for customer review")).toBeUndefined();
+    await act(async()=>button("Save draft for client review").click());
+    expect(button("Save draft for client review")).toBeUndefined();
     expect(container.textContent).toContain("Your unsaved edits are preserved");
     expect(container.textContent).toContain("Reloading replaces them with the saved document");
     expect(initial.website!.rebuild.candidate!.document.nodes.services!.props).toMatchObject({title:"Practice areas"});
@@ -121,16 +125,20 @@ describe("agency v2 document drafts", () => {
   it("bypasses document discovery and preserves the legacy surface when the release is disabled",async()=>{
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE","1"); vi.stubEnv("STRELVA_WEBSITE_REBUILD_RELEASE","0");
     const fetchMock=vi.fn();vi.stubGlobal("fetch",fetchMock);
+    pageIdentity.context.mockResolvedValue({ businessWorkspaceId: bindingId, businessName: "Harbor Dental", agencyName: "North Studio", websiteName: "Harbor website", personName: "maya@example.test" });
     const element=await AgencyManagedWebsiteDraftPage({params:Promise.resolve({bindingId})});
-    expect(element.type).toBe(AgencyManagedWebsiteDraftExperience);
+    expect(element.type).toBe(StrelvaShell);
+    expect(element.props.businessContext).toBe("North Studio → Harbor Dental → Harbor website");
+    const children = element.props.children as React.ReactElement[];
+    expect(isValidElement(children[1]) && children[1].type).toBe(AgencyManagedWebsiteDraftExperience);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("explains the owner limitation for governance-blocked navigation scopes",async()=>{
     const initial=agencyDocumentFixture();initial.section="navigation";initial.sections=["navigation"];
     await mount({read:async()=>initial,save:vi.fn()});
-    expect(container.textContent).toContain("Navigation and footer changes need the customer or Strelva");
+    expect(container.textContent).toContain("Navigation and footer changes need the client or Strelva");
     expect(container.querySelector("textarea")).toBeNull();
-    expect(button("Save draft for customer review")).toBeUndefined();
+    expect(button("Save draft for client review")).toBeUndefined();
   });
   it("keeps the legacy section editor when the binding has no v2 document",async()=>{
     const initial=agencyDocumentFixture();

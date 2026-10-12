@@ -1,0 +1,7 @@
+.nav { display: none; }
+@media (max-width: 767px) {
+  .nav { box-sizing: border-box; position: fixed; inset: auto 0 0; z-index: 30; display: flex; height: calc(var(--st-phone-navigation-height, 64px) + var(--st-workspace-safe-area, 0px)); padding: 4px 8px calc(8px + var(--st-workspace-safe-area, 0px)); background: var(--st-surface); border-top: 1px solid var(--st-line); }
+  .nav button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 48px; border: 0; background: transparent; color: var(--st-text-2); font: inherit; font-size: 12px; cursor: pointer; }
+  .nav button[aria-current="page"] { color: var(--st-text); font-weight: 600; }
+  .nav button:focus-visible { outline: 2px solid var(--st-accent); outline-offset: -2px; border-radius: 8px; }
+}

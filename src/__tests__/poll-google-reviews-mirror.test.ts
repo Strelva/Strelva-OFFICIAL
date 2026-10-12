@@ -30,13 +30,13 @@ vi.mock("@/lib/connections", () => ({
 }));
 vi.mock("@/lib/events", () => ({ addEvent: mockAddEvent }));
 vi.mock("@/lib/reviews", () => ({ addReview: mockAddReview }));
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/review-replies", () => ({
   draftReviewReply: mockDraftReviewReply,
   storeRecentReply: mockStoreRecentReply,
 }));
-vi.mock("@/lib/monitoring", () => ({ alert: mockAlert }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
+vi.mock("@/platform/infra/monitoring", () => ({ alert: mockAlert }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
 vi.mock("@/lib/concurrency", () => ({
   // Deterministic sequential runner in place of the real pool.
   mapPool: async <T,>(items: T[], _n: number, fn: (item: T) => Promise<unknown>) => {
@@ -127,5 +127,18 @@ describe("poll-google-reviews mirror-failure cursor", () => {
     // r2 mirrored cleanly -> stays seen. r1 failed -> excluded so it retries.
     expect(persistedIds).toContain("r2");
     expect(persistedIds).not.toContain("r1");
+  });
+});
+
+describe("poll-google-reviews account path", () => {
+  it("does not double the accounts/ prefix stored in google-meta", async () => {
+    mockGetRedis.mockReturnValue({
+      get: vi.fn(async (key: string) => (key === "google-meta:t1" ? { accountId: "accounts/111", locationId: "333" } : null)),
+      set: vi.fn().mockResolvedValue(undefined),
+    });
+    await GET(authenticatedCronRequest());
+    const urls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([url]) => String(url));
+    expect(urls).toContain("https://mybusiness.googleapis.com/v4/accounts/111/locations/333/reviews");
+    expect(urls.some((url) => url.includes("accounts/accounts/"))).toBe(false);
   });
 });

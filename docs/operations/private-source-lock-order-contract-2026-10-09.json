@@ -1,0 +1,29 @@
+{
+  "status": "prepared-source-only",
+  "native": "UNRUN",
+  "fullReleaseQualified": false,
+  "predecessorEvidenceCommit": "8e5ffe715fb7decb6cb390777fc7d7a440a37483",
+  "frozen1740Commit": "ae3c626f33638bcbba2f6f4f6f77b39169b254c2",
+  "canonicalOwnerEditsApplied": false,
+  "prospectiveForwardCountBeforeOtherSelections": 349,
+  "originalControlledRaces": 12,
+  "supplementalControlledRaces": 20,
+  "files": [
+    {
+      "file": "20261022174500_private_source_exit_lock_order.sql",
+      "sha256": "3f39f293bedb1929ed5fd8cf098f85b8366ddcc2156b1f20a1cdfacc73540bed",
+      "bodies": {
+        "system_version_assert_source_manager": "c5102a2adad96ab31f2313ddfcc4eceb",
+        "register_neutral_creator_listing": "1a08f3d5253b3d50037b9bce52fbd916"
+      }
+    },
+    {
+      "file": "rollback-20261022174500_private_source_exit_lock_order.sql",
+      "sha256": "e3fa48993194ddfcca7d0844fdbbb018f25994e504b073ccb2890a154617dd3d",
+      "bodies": {
+        "system_version_assert_source_manager": "b1899c36f203a3d07230a31a6d5a299f",
+        "register_neutral_creator_listing": "65070ed346aaff39df0c08a56c1afe2f"
+      }
+    }
+  ]
+}

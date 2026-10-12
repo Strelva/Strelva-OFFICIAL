@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { runDeprovision } from "@/lib/deprovision";
+import { runDeprovision, readDeprovisionCleanup, isValidDeprovisionTenantId } from "@/lib/deprovision";
+
+/** Recover the durable receipt after a lost response or process interruption. */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!(await isSuperAdmin())) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { id } = await params;
+  if (!isValidDeprovisionTenantId(id)) return NextResponse.json({ error: "Invalid tenant id." }, { status: 400 });
+  try {
+    return NextResponse.json({ tenantId: id, cleanup: await readDeprovisionCleanup(id) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch {
+    return NextResponse.json({ error: "Cleanup receipt unavailable. Do not reuse this slug." }, { status: 503 });
+  }
+}
 
 /**
  * POST /api/admin/tenants/[id]/deprovision
@@ -39,10 +51,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const { id } = await params;
+  if (!isValidDeprovisionTenantId(id)) return NextResponse.json({ error: "Invalid tenant id." }, { status: 400 });
   const tenant = await getTenantConfig(id);
-  if (!tenant) {
-    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
-  }
 
   let body: unknown;
   try {
@@ -52,6 +62,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const rawBody = (body ?? {}) as Record<string, unknown>;
+  const retryCleanup = rawBody.action === "retry-cleanup";
+  if (!tenant && !retryCleanup) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  if (retryCleanup && (typeof rawBody.cleanupReceiptId !== "string" || !/^[a-f0-9-]{36}$/i.test(rawBody.cleanupReceiptId))) {
+    return NextResponse.json({ error: "Supply the exact cleanup receipt id." }, { status: 400 });
+  }
 
   // --- Branch: rotate-secret ---
   if (rawBody.action === "rotate-secret") {
@@ -82,35 +97,41 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const result = await runDeprovision({
     tenantId: id,
-    tenant,
+    tenant: tenant ?? null,
     dryRun: false,
     force: false,
     keepVercel: false,
+    ...(retryCleanup ? { cleanupReceiptId: rawBody.cleanupReceiptId as string } : {}),
   });
 
-  if (!result.ok) {
+  if (!result.ok && result.refusalReason) {
     return NextResponse.json(
-      { error: result.refusalDetail ?? result.refusalReason ?? "Deprovision refused." },
+      { error: result.refusalDetail ?? result.refusalReason, ...result },
       { status: 403 },
     );
   }
 
   await logAuditEvent({
     tenant: id,
-    action: "tenant.deprovision",
+    action: retryCleanup ? "tenant.cleanup.retry" : "tenant.deprovision",
     targetType: "tenant",
     targetId: id,
     actor: await getActorContext(id),
     metadata: {
       pgRowTotal: result.pgRowTotal,
+      databaseDeleted: result.databaseDeleted,
+      cleanupReceiptId: result.cleanup?.id,
+      cleanupComplete: result.cleanup?.complete,
       tablesAffected: (result.summary.postgres ?? []).map((a) => a.target),
     },
   }).catch(() => {});
 
   return NextResponse.json({
-    ok: true,
+    ok: result.ok,
     tenantId: id,
     pgRowTotal: result.pgRowTotal,
     summary: result.summary,
-  });
+    databaseDeleted: result.databaseDeleted,
+    cleanup: result.cleanup,
+  }, { status: result.ok ? 200 : 202 });
 }

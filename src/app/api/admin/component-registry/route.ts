@@ -1,5 +1,6 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
 import { customComponentCapabilitySchema } from "@/lib/schemas";
@@ -16,6 +17,7 @@ export async function GET(req: Request) {
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.component-registry.read");
 
   const tenant = cleanTenant(new URL(req.url).searchParams.get("tenant"));
   if (!tenant) {

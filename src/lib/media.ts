@@ -1,13 +1,4 @@
-export interface MediaAsset {
-  id: string;
-  url: string;
-  filename: string;
-  width: number;
-  height: number;
-  size: number;
-  lqip?: string;
-  createdAt: string;
-}
+export type { MediaAsset } from "@/platform/infra/media/contracts";
 
 /**
  * Format bytes into a human-readable string.

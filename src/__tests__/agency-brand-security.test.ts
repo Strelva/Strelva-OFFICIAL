@@ -1,0 +1,117 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async () => ({ workspaceId: "cc000000-0000-4000-8000-000000000003", tenantIds: [], ownerAuthorship: "agency", businessName: "Fixture business", replyTo: "owner@example.test", timeZone: "America/New_York" }) }));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const mock = vi.hoisted(() => ({ rpc: vi.fn(), tenant: vi.fn(), send: vi.fn(), from: vi.fn() }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mock.rpc, from: mock.from }) }));
+vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: mock.tenant }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
+vi.mock("resend", () => ({ Resend: class { emails = { send: mock.send }; } }));
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
+import { resolveOwnerBrand, resolveTenantBrand, validateBrand, AGENCY_IDENTITY_UNAVAILABLE } from "@/platform/agency-brand/server";
+import { agencyReplyTo, resolveAgencyAttribution } from "@/platform/agency-prospecting/server";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+const id = "b2640000-0000-4000-8000-000000000020";
+const input = { displayName: "North, Web", accentColor: "#447a4f", replyTo: "member@north.example", logo: null, credit: "runs_on_strelva" as const };
+const row = { agencyId: id, name: "North", brand: input, emailAllowed: true, replyTo: input.replyTo };
+const agency = { workspaceId: id, slug: "north", name: "North", contactUrl: "https://north.example", brand: { logoUrl: null, accentColor: null } };
+const profile = [{ workspace_id: id, slug: "north", name: "North", contact_url: agency.contactUrl, contact_email: "profile@north.example" }];
+const message = { audience: "client" as const, workspaceId: id, to: "owner@example.test", subject: "Decision", options: { heading: "Strelva needs you" } };
+function payload() { return mock.send.mock.calls.at(-1)![0]; }
+beforeEach(() => {
+  vi.resetAllMocks(); vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("RESEND_API_KEY", "fixture"); vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "1"); vi.stubEnv("REPLY_TO_EMAIL", "hello@strelva.com");
+  mock.send.mockResolvedValue({ data: { id: "sent" }, error: null });
+  mock.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? profile : row, error: null }));
+});
+afterEach(() => vi.unstubAllEnvs());
+describe("agency brand review regressions", () => {
+  it("normalizes legacy owner identity as well as the sender", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: null, name: "Ｎorth\u202e\u200b Web" }, error: null });
+    expect(await resolveOwnerBrand(id)).toMatchObject({ name: "North Web", agencyId: id });
+  });
+  it("keeps malformed stored branding neutral", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: { ...input, accentColor: "invalid" } }, error: null });
+    await expect(resolveOwnerBrand(id)).resolves.toEqual(AGENCY_IDENTITY_UNAVAILABLE);
+  });
+  it("keeps a failed house-agency designation lookup neutral", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, name: "Strelva", brand: null }, error: null });
+    mock.from.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: async () => { throw new Error("offline"); } }) }) });
+    await expect(resolveOwnerBrand(id)).resolves.toEqual(AGENCY_IDENTITY_UNAVAILABLE);
+  });
+  it("names the house agency only after verifying its designation", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, name: "Strelva", brand: null }, error: null });
+    mock.from.mockReturnValue({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { workspace_id: id }, error: null }) }) }) });
+    expect(await resolveOwnerBrand(id)).toMatchObject({ name: "Strelva Agency", agencyId: id });
+  });
+
+  it.each(["Google Business Support", "Strelva Support", "Microsoft", "Apple Support", "Meta Support", "Facebook", "Instagram", "Yelp", "Stripe", "PayPal", "Square", "Amazon", "owner@example.test", "https://north.example", "www.north.example", "north.example", "Ｇｏｏｇｌｅ Support"])("rejects impersonating/address/URL name %s at save", displayName => {
+    expect(() => validateBrand({ ...input, displayName })).toThrow();
+  });
+  it("normalizes compatibility text and strips invisible direction controls at save", () => {
+    expect(validateBrand({ ...input, displayName: "Ｎorth\u202e\u2066\u200e\u200f\u200b\u200c\u200d\ufeff Web" }).displayName).toBe("North Web");
+    expect(validateBrand({ ...input, displayName: "Pineapple Metaphor" }).displayName).toBe("Pineapple Metaphor");
+  });
+  it("quotes comma/quote/backslash names and adds the platform disclosure", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: { ...input, displayName: 'North, "Web" \\ Studio' } }, error: null });
+    await sendEmailWithReceipt(message);
+    expect(payload().from).toBe('"North, \\"Web\\" \\\\ Studio" <hello@updates.strelva.com>');
+  });
+  it.each(["Strelva Support", "Google Business Support", "owner@example.test", "https://north.example"])("holds legacy unsafe name %s at send", displayName => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: null, name: displayName }, error: null });
+    return sendEmailWithReceipt(message).then(result => { expect(result).toMatchObject({ status: "suppressed", reason: "agency_identity_unavailable" }); expect(mock.send).not.toHaveBeenCalled(); });
+  });
+  it("does not treat replacement tokens in agency names as replacement instructions", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: { ...input, displayName: "North $& $' Web" } }, error: null });
+    await sendEmailWithReceipt(message);
+    expect(payload().text).toContain("North $& $' Web");
+    expect(payload().text).toContain("Strelva needs you");
+  });
+  it("rechecks email verification for cached brands and ignores agency headers when revoked", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, emailAllowed: false }, error: null });
+    await sendEmailWithReceipt({ ...message, replyTo: "stale@north.example", fromName: "Cached Agency", options: { ...message.options, brand: { ...STRELVA_BRAND, agencyId: id, name: "Cached Agency", replyTo: input.replyTo } } });
+    expect(mock.rpc).toHaveBeenCalledWith("resolve_owner_brand", { p_workspace_id: id });
+    expect(mock.send).not.toHaveBeenCalled();
+  });
+  it("does not restore a cached agency after its business provider seat has ended", async () => {
+    const businessId = "b2640000-0000-4000-8000-000000000010";
+    mock.rpc.mockImplementation(async (_name: string, args: { p_workspace_id: string }) => ({ data: args.p_workspace_id === businessId ? null : row, error: null }));
+    await sendEmailWithReceipt({ ...message, workspaceId: businessId, options: { ...message.options, brand: { ...STRELVA_BRAND, agencyId: id, name: "Cached Agency", replyTo: input.replyTo } } });
+    expect(mock.send).not.toHaveBeenCalled();
+
+  });
+  it("normalizes a legacy workspace name again at send", async () => {
+    mock.rpc.mockResolvedValue({ data: { ...row, brand: null, name: "Ｎorth\u202e\u200b Web" }, error: null });
+    await sendEmailWithReceipt(message);
+    expect(payload().from).toBe('"North Web" <hello@updates.strelva.com>');
+  });
+  it("holds the send when a cached brand lookup fails", async () => {
+    mock.rpc.mockRejectedValue(new Error("offline"));
+    await sendEmailWithReceipt({ ...message, options: { ...message.options, brand: { ...STRELVA_BRAND, agencyId: id, name: "Cached Agency", replyTo: input.replyTo } } });
+    expect(mock.send).not.toHaveBeenCalled();
+
+  });
+  it("does not use a stale brand reply-to or caller address after membership revocation", async () => {
+    mock.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? profile : { ...row, replyTo: null }, error: null }));
+    await sendEmailWithReceipt({ ...message, replyTo: "owner@example.test" });
+    expect(payload().replyTo).toBe("hello@strelva.com");
+    await expect(agencyReplyTo(agency)).rejects.toMatchObject({ status: 503 });
+  });
+  it.each(["missing column", "thrown lookup"])("falls back across owner, tenant, prospect and send on %s", async failure => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mock.rpc.mockImplementation(async (name: string) => {
+      if (name === "agency_prospecting_profile") return { data: profile, error: null };
+      if (failure === "thrown lookup") throw new Error("connection dropped");
+      return { data: null, error: { message: 'column w.agency_brand does not exist' } };
+    });
+    mock.tenant.mockResolvedValue(id);
+    expect(await resolveOwnerBrand(id)).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
+    expect(await resolveTenantBrand("tenant")).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
+    await expect(resolveAgencyAttribution("north")).rejects.toMatchObject({ status: 503 });
+    await expect(agencyReplyTo(agency)).rejects.toMatchObject({ status: 503 });
+    await expect(sendEmailWithReceipt(message)).resolves.toMatchObject({ status: "suppressed", reason: "agency_identity_unavailable" });
+    expect(mock.send).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalled(); warn.mockRestore();
+  });
+  it("falls back when tenant-to-workspace lookup throws", async () => {
+    mock.tenant.mockRejectedValue(new Error("offline"));
+    expect(await resolveTenantBrand("tenant")).toEqual(AGENCY_IDENTITY_UNAVAILABLE);
+  });
+});

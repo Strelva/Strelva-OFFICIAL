@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceDb } from "@/platform/workspaces/schema";
 import { getWork, saveWork, assertCanSaveWork, assertWorkspaceMember, listWork } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";

@@ -14,7 +14,7 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: vi.fn(() => Promise.resolve(mocks.tenantConfig)),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => null),
 }));
 

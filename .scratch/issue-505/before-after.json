@@ -1,0 +1,33 @@
+{
+  "loggedZero": {
+    "before": {
+      "month": "2026-09",
+      "totalMinutes": 60,
+      "businessesWithEffort": 2,
+      "medianMinutesPerActiveBusiness": 30
+    },
+    "after": {
+      "month": "2026-09",
+      "businessCount": 3,
+      "loggedBusinessCount": 3,
+      "unloggedBusinessCount": 0,
+      "businessesWithEffort": 2,
+      "loggedMinutes": 60,
+      "totalMinutes": 60,
+      "medianMinutesPerBusiness": 20,
+      "averageMinutesPerBusiness": 20
+    }
+  },
+  "missingLog": {
+    "before": {
+      "month": "2026-09",
+      "minutes": 0
+    },
+    "after": {
+      "month": "2026-09",
+      "minutes": null,
+      "coverage": "not_logged",
+      "entryCount": 0
+    }
+  }
+}

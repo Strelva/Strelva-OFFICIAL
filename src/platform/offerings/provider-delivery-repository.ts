@@ -1,14 +1,14 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { OfferingAccessError, OfferingConflictError, OfferingNotFoundError, OfferingStoreError, type OfferingActor } from "./types";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
-import { providerDeliverySchema, type ProviderDelivery, type ProviderDeliveryStore } from "./provider-delivery";
+import { agencyDeliverySchema, type AgencyDelivery, type AgencyDeliveryStore } from "./provider-delivery";
 
 type Failure = { message?: string; code?: string } | null;
 type Client = { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: Failure }> };
 
 function client(): Client {
   const value = getSupabase();
-  if (!value) throw new OfferingStoreError("Provider delivery storage is unavailable.");
+  if (!value) throw new OfferingStoreError("Agency delivery storage is unavailable.");
   return value as unknown as Client;
 }
 
@@ -21,15 +21,15 @@ function fail(error: Failure): void {
   const message = `${error.code ?? ""} ${error.message ?? ""}`;
   if (message.includes("provider_delivery_denied")) throw new OfferingAccessError();
   if (message.includes("workspace_exit_future_work_blocked")) throw new OfferingConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
-  if (message.includes("provider_delivery_not_found")) throw new OfferingNotFoundError("The provider delivery request was not found.");
-  if (message.includes("provider_delivery_") || error.code === "23505") throw new OfferingConflictError("The provider delivery request changed. Reload before continuing.");
-  throw new OfferingStoreError("The provider delivery change could not be confirmed.");
+  if (message.includes("provider_delivery_not_found")) throw new OfferingNotFoundError("The agency delivery request was not found.");
+  if (message.includes("provider_delivery_") || error.code === "23505") throw new OfferingConflictError("The agency delivery request changed. Reload before continuing.");
+  throw new OfferingStoreError("The agency delivery change could not be confirmed.");
 }
 
-function map(raw: unknown): ProviderDelivery {
+function map(raw: unknown): AgencyDelivery {
   const row = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | undefined;
-  if (!row) throw new OfferingStoreError("The provider delivery request was not returned.");
-  return providerDeliverySchema.parse({
+  if (!row) throw new OfferingStoreError("The agency delivery request was not returned.");
+  return agencyDeliverySchema.parse({
     id: row.id, businessId: row.business_workspace_id, installationId: row.installation_id,
     assignmentId: row.assignment_id, status: row.status, customerDecision: row.customer_decision,
     revision: row.revision, scope: row.scope, requestedBy: row.requested_by, requestedAt: row.requested_at,
@@ -46,8 +46,11 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
   return data;
 }
 
-export const postgresProviderDeliveries: ProviderDeliveryStore = {
+export const postgresAgencyDeliveries: AgencyDeliveryStore = {
   async list(actor, businessId) {
+    // This reader also serves assigned agency operators. The customer-wide
+    // finite job snapshot deliberately denies them; use the native scoped
+    // delivery boundary regardless of that customer projection's release.
     const raw = await rpc("read_provider_deliveries", { ...identity(actor), p_business_id: businessId, p_delivery_id: null });
     return Array.isArray(raw) ? raw.map(map) : [];
   },
@@ -71,3 +74,6 @@ export const postgresProviderDeliveries: ProviderDeliveryStore = {
       p_expected_revision: expectedRevision, p_decision: decision, p_note: note }));
   },
 };
+
+/** @deprecated Use postgresAgencyDeliveries. */
+export const postgresProviderDeliveries = postgresAgencyDeliveries;

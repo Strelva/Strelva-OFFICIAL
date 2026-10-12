@@ -11,10 +11,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { saveConnection } from "@/lib/connections";
-import { getRedis } from "@/lib/redis";
+import { z } from "zod";
+import { beginGoogleTenantOperation, googleLocationIdFromName, recordAuthorizedGoogleConnection } from "@/lib/google-access";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { getActorContext, verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts";
@@ -67,6 +67,7 @@ async function fetchLocations(accessToken: string, accountName: string): Promise
 }
 
 export async function GET(req: Request) {
+  if (process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") return NextResponse.json({ error: "Use the native workspace Google connection in this admission mode." }, { status: 503 });
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -111,8 +112,8 @@ export async function GET(req: Request) {
   }
   const tenantId = verifiedState.tenantId;
 
-  // Confirm the session user still has access to the tenant embedded in the state.
-  const accessDenied = await requireTenantAccess(tenantId);
+  // Viewing this tenant does not authorize replacing its Google credentials.
+  const accessDenied = await requireTenantPermission(tenantId, "settings:write");
   if (accessDenied) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Access denied")}`
@@ -132,6 +133,16 @@ export async function GET(req: Request) {
 
   // Exchange code for tokens
   try {
+    const context = await getActorContext(tenantId);
+    const identity = z.object({ userId: z.string().uuid(), verifiedEmail: z.string().trim().email().transform(value => value.toLowerCase()) })
+      .safeParse({ userId: context.userId, verifiedEmail: context.email });
+    if (!identity.success || !["user", "super_admin"].includes(context.type)) {
+      return NextResponse.redirect(`${connectionsUrl}?error=${encodeURIComponent("Access denied")}`);
+    }
+    const actor = identity.data;
+    // The guarded snapshot pins the current tenant/link/binding before external
+    // reads. Commit rechecks settings authority and those pins under SQL locks.
+    const operation = await beginGoogleTenantOperation(tenantId, actor);
     const tokenRes = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -145,8 +156,7 @@ export async function GET(req: Request) {
     });
 
     if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      console.error("Google token exchange failed:", errBody);
+      console.error("Google token exchange was refused.");
       return NextResponse.redirect(
         `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Google account")}`
       );
@@ -163,14 +173,16 @@ export async function GET(req: Request) {
     const accounts = await fetchAccounts(tokens.access_token);
     let accountId: string | undefined;
     let locationId: string | undefined;
+    let locationTitle: string | undefined;
 
     if (accounts.length > 0) {
       accountId = accounts[0]!.name; // e.g., "accounts/123"
       const locations = await fetchLocations(tokens.access_token, accountId);
       if (locations.length > 0) {
         // Extract location ID from full name "accounts/123/locations/456"
-        const parts = locations[0]!.name.split("/locations/");
-        locationId = parts[1];
+        // v1 returns "locations/456"; older responses "accounts/123/locations/456".
+        locationId = googleLocationIdFromName(locations[0]!.name);
+        locationTitle = locations[0]!.title;
       }
     }
 
@@ -179,33 +191,22 @@ export async function GET(req: Request) {
       ? tokens.scope.split(" ").filter(Boolean)
       : undefined;
 
-    // Save connection
-    await saveConnection({
-      provider: "google",
+    // Credentials, metadata and any linked binding commit together under current
+    // settings authority. Redis can only cache the confirmed durable result.
+    await recordAuthorizedGoogleConnection({
       tenantId,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt,
-      status: "connected",
-      lastSyncedAt: new Date().toISOString(),
       scopes,
-    });
-
-    // Store account/location metadata for review polling
-    if (accountId || locationId) {
-      const redis = getRedis();
-      if (redis) {
-        await redis.set(
-          `google-meta:${tenantId}`,
-          { accountId, locationId },
-          { ex: 60 * 60 * 24 * 365 }
-        );
-      }
-    }
+      accountId,
+      locationId,
+      locationTitle,
+    }, actor, operation);
 
     return NextResponse.redirect(`${connectionsUrl}?success=true`);
-  } catch (err) {
-    console.error("OAuth callback error:", err);
+  } catch {
+    console.error("Google OAuth connection could not be committed.");
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Google account")}`
     );

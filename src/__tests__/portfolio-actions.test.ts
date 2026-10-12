@@ -8,6 +8,7 @@ import type { UnifiedEvent } from "@/lib/types";
 
 const mockGetAllTenants = vi.fn();
 const mockGetEvents = vi.fn();
+const mockGetEventRaw = vi.fn();
 const mockResolveEventAction = vi.fn();
 
 vi.mock("@/lib/tenants", () => ({
@@ -16,10 +17,22 @@ vi.mock("@/lib/tenants", () => ({
 }));
 vi.mock("@/lib/events", () => ({
   getEvents: (...a: unknown[]) => mockGetEvents(...a),
+  getEventRaw: (...a: unknown[]) => mockGetEventRaw(...a),
 }));
 vi.mock("@/lib/event-actions", () => ({
   resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a),
+  operatorActorId: (id: string) => `operator:${id}`,
 }));
+// The real operator decision (src/lib/operator-decisions.ts) runs; only the
+// session, the super_admins read and the audit write are stubbed.
+const mockSuperAdmin = vi.fn();
+const mockSession = vi.fn();
+const mockAudit = vi.fn();
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: () => mockSuperAdmin(), getAuthUserId: vi.fn() }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => mockSession() }));
+vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: vi.fn() }));
+vi.mock("@/lib/storage", () => ({ logAuditEvent: (...a: unknown[]) => mockAudit(...a) }));
+const operator = { userId: "10000000-0000-4000-8000-0000000000aa", verifiedEmail: "operator@example.test", actorId: "operator:10000000-0000-4000-8000-0000000000aa" };
 
 import {
   getPortfolioActions,
@@ -45,6 +58,11 @@ function evt(over: Partial<UnifiedEvent>): UnifiedEvent {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSuperAdmin.mockResolvedValue(true);
+  mockSession.mockResolvedValue({ id: operator.userId, email: operator.verifiedEmail, email_confirmed_at: "2026-10-01T00:00:00.000Z" });
+  mockAudit.mockResolvedValue(undefined);
+  // Each pending draft lives in the tenant its eventId names: "b…" in bolt, else acme.
+  mockGetEventRaw.mockImplementation(async (id: string) => evt({ id, tenantId: id.startsWith("b") ? "bolt" : "acme" }));
 });
 
 describe("isPortfolioApprovable", () => {
@@ -217,40 +235,20 @@ describe("getPortfolioActions", () => {
   });
 });
 
-describe("bulkResolvePortfolioActions", () => {
-  it("routes every item through resolveEventAction with the governed 'approved' action", async () => {
-    mockResolveEventAction.mockResolvedValue({ changed: true });
-
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "a1" },
-      { tenantId: "bolt", eventId: "b1" },
+describe("retired platform bulk approval", () => {
+  it("leaves every valid client draft pending without content effects", async () => {
+    expect(await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }, { tenantId: "bolt", eventId: "b1" }], operator)).toEqual([
+      { tenantId: "acme", eventId: "a1", changed: false, reason: "platform_content_authority_retired" },
+      { tenantId: "bolt", eventId: "b1", changed: false, reason: "platform_content_authority_retired" },
     ]);
-
-    expect(mockResolveEventAction).toHaveBeenCalledTimes(2);
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved");
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved");
-    expect(results.every((r) => r.changed)).toBe(true);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    expect(mockAudit).not.toHaveBeenCalled();
   });
-
-  it("reports honest partial failure — a failed external write stays pending", async () => {
-    mockResolveEventAction.mockImplementation(async (_t: string, eventId: string) => {
-      if (eventId === "ok") return { changed: true };
-      if (eventId === "fail") return { changed: false, reason: "gbp_post_failed" };
-      throw new Error("boom");
-    });
-
-    const results = await bulkResolvePortfolioActions([
-      { tenantId: "acme", eventId: "ok" },
-      { tenantId: "acme", eventId: "fail" },
-      { tenantId: "acme", eventId: "throws" },
-    ]);
-
-    expect(results).toEqual([
-      { tenantId: "acme", eventId: "ok", changed: true, reason: undefined },
-      { tenantId: "acme", eventId: "fail", changed: false, reason: "gbp_post_failed" },
-      { tenantId: "acme", eventId: "throws", changed: false, reason: "boom" },
-    ]);
-    // A throwing item never aborts the rest of the batch.
-    expect(mockResolveEventAction).toHaveBeenCalledTimes(3);
+  it("preserves tenant binding and active operator admission", async () => {
+    expect(await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "b1" }], operator)).toEqual([{ tenantId: "acme", eventId: "b1", changed: false, reason: "wrong_tenant" }]);
+    mockSuperAdmin.mockResolvedValue(false);
+    const result = await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }, { tenantId: "acme", eventId: "a2" }], operator);
+    expect(result.map(item => item.reason)).toEqual(["operator_access_changed", "operator_access_changed"]);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 });

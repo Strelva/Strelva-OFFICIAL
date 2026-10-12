@@ -1,3 +1,4 @@
+import { captureAgencyProspect, AgencyProspectingError } from "@/platform/agency-prospecting/server";
 import { NextResponse } from "next/server";
 import { getAiVisibilityResult } from "@/products/ai-visibility/server";
 import {
@@ -5,7 +6,7 @@ import {
   getExistingLeadToken,
   saveDeliveryLead,
 } from "@/lib/access-request-delivery";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -29,6 +30,18 @@ export async function POST(
   const email = String(body.email ?? "").trim().toLowerCase().slice(0, 160);
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+  }
+
+  if (stored.result.agency) {
+    try {
+      await captureAgencyProspect({ agency: stored.result.agency, source: "monitor", resultId: stored.id,
+        name: "", email, url: stored.result.url ?? null, business: stored.result.business,
+        score: stored.result.score, grade: stored.result.grade });
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      const status = error instanceof AgencyProspectingError ? error.status : 503;
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Signup is unavailable." }, { status });
+    }
   }
 
   // Existing prospects already have an operator-visible lifecycle; do not

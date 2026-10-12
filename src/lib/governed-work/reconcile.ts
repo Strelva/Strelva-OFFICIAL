@@ -13,7 +13,7 @@
  * the cron alerts on it. Redis stays authoritative; this only ever ADDS/updates PG.
  */
 import { getEventsRaw } from "../events";
-import { listAllTenants } from "../db/repositories";
+import { listAllTenants } from "@/platform/infra/db/repositories";
 import { isGovernedScopeEvent } from "./read";
 import { changeRequestNewProposal, governedEventToProposalAnyStatus } from "./shadow";
 import { getProposal, insertProposal, updateProposalState } from "./repository";

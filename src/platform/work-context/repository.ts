@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type SavedWork } from "@/platform/workspaces/types";
 import type { WorkAuthority, WorkAuthoritySnapshot, WorkSource } from "./authority";

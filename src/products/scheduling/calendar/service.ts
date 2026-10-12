@@ -1,5 +1,6 @@
+import { SCHEDULE_PAUSED_MESSAGE } from "../lifecycle";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { advance, boundedStore, readBounded, type BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { calendarAvailabilityQuerySchema, calendarProviderSchema, calendarReminderPolicySchema, reservationSchema, scheduleCommandSchema, scheduleSchema } from "../contracts";
@@ -8,6 +9,7 @@ import { createFixtureCalendarAdapter } from "./fixture";
 import type { CalendarEvent } from "./contracts";
 import {
   getWorkspaceCalendarConnection,
+  markWorkspaceCalendarConnectionError,
   readCalendarEventReceipt,
   saveCalendarEventReceipt,
   type CalendarEventReceipt,
@@ -73,7 +75,17 @@ export async function readWorkspaceProviderAvailability(actor: WorkspaceActor, w
   connectionReady(bound);
   const input = calendarAvailabilityQuerySchema.parse({ calendarId: bound.calendarId, start: query.start, end: query.end, timeZone: query.timeZone || bound.timeZone });
   const adapter = environmentAdapter(provider);
-  return { provider, timeZone: input.timeZone, ...(await adapter.availability(bound, input)) };
+  try {
+    return { provider, timeZone: input.timeZone, ...(await adapter.availability(bound, input)) };
+  } catch (error) {
+    if (error instanceof CalendarProviderError && error.code === "unauthorized") {
+      // Record authentication failure against only the connection we actually read.
+      // A newly reconnected calendar must not be marked bad by an older request.
+      await markWorkspaceCalendarConnectionError(actor, workspaceId, provider,
+        "Calendar authorization was rejected. Reconnect the calendar.", bound.updatedAt).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 function parseProvider(value: unknown): "outlook" | "google" {
@@ -394,6 +406,8 @@ export function createCalendarSchedulingService(store: BoundedStore = boundedSto
     const current = reservation(work, requestId);
     const provider = parseProvider(input.provider);
     assertReservationProvider(current, provider);
+    // A paused schedule takes no new times; the appointment itself stays.
+    if (work.payload.pause) throw new WorkspaceConflictError(SCHEDULE_PAUSED_MESSAGE);
     if (current.status === "reserved") {
       const command = scheduleCommandSchema.parse({ kind: "reschedule", expectedRevision: input.expectedRevision, requestId, start: input.start, end: input.end });
       await assertProviderWriteAllowed(work.workspaceId);

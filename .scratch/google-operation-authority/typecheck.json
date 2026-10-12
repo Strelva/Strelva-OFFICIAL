@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "../../src/lib/google-access.ts",
+    "../../src/lib/google-resources.ts",
+    "../../src/lib/workspace-ports.ts",
+    "../../src/platform/account-bindings/store.ts",
+    "../../src/platform/infra/tenant-publishing.ts",
+    "../../src/products/publishing/reconnect.ts",
+    "../../src/app/api/oauth/google/callback/route.ts",
+    "../../src/app/api/connections/google/resources/route.ts",
+    "../../src/__tests__/google-operation-commit-order.test.ts",
+    "../../src/__tests__/google-oauth-callback-authority.test.ts",
+    "../../src/__tests__/google-resource-operation-authority.test.ts",
+    "../../src/__tests__/google-resources-route-authority.test.ts",
+    "../../src/__tests__/google-operation-rpc.test.ts"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../.next"
+  ]
+}

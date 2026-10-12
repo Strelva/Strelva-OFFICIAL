@@ -5,7 +5,7 @@ import { workspaceHttpActor, workspaceJson } from "@/platform/workspaces/http";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readWebsite, renderWebsiteCandidate, exportWebsiteCandidate, WebsiteCandidateMismatchError } from "@/products/websites/server";
 import { getWork } from "@/platform/workspaces/repository";
-import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { websiteRebuildReleaseMayBeOn, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { readWebsiteRebuild } from "@/products/websites/index";
 import { renderRebuildPreview, exportRebuildCandidate } from "@/products/websites/index";
 import { safeSitePathSchema } from "@/products/websites/index";
@@ -18,9 +18,9 @@ export async function websiteCandidateResponse(request: Request, params: Promise
   try {
     const workId = z.string().uuid().parse((await params).workId);
     const query = new URL(request.url).searchParams;
-    const savedWork = websiteRebuildReleaseEnabled() ? await getWork(actor,workId) : null;
+    const savedWork = websiteRebuildReleaseMayBeOn() ? await getWork(actor,workId) : null;
     if (savedWork?.productId === "websites" && savedWork.payload && typeof savedWork.payload === "object" && (savedWork.payload as {version?:unknown}).version === 2) {
-      if (!websiteRebuildReleaseEnabled()) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
+      if (!(await websiteRebuildReleasedFor(actor,savedWork.workspaceId))) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
       const selection = z.object({ revision: z.coerce.number().int().positive(), contentHash: z.string().regex(/^[a-f0-9]{64}$/), page: z.union([safeSitePathSchema,z.string().max(160).regex(/^[a-zA-Z0-9_-]+$/)]).optional() }).parse({ revision: query.get("revision"), contentHash: query.get("contentHash"), page: query.get("page") ?? undefined });
       const record = await readWebsiteRebuild(actor,workId);
       const headers: Record<string,string> = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow", "X-Website-Content-Hash": selection.contentHash };

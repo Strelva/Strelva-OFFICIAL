@@ -51,11 +51,11 @@ export function PortfolioAnalytics({ rows }: { rows: PortfolioRow[] }) {
         <div className="flex flex-col items-center justify-center rounded-xl border border-glass-border bg-surface-base/40 px-6 py-10 text-center">
           <p className="text-[14px] font-medium text-warm-white">No site trackers reporting yet</p>
           <p className="mt-1.5 max-w-md text-[12.5px] leading-relaxed text-gray-muted">
-            Install the site tracker in each client repo and their visitor and click
+            Install the site tracker in each site repo and their visitor and click
             numbers start flowing here. Nothing is broken — there&apos;s just no data to show yet.
           </p>
           <span className="mt-3 text-[11.5px] text-gray-faint">
-            {rows.length} client{rows.length !== 1 ? "s" : ""} · tracker not installed
+            {rows.length} site{rows.length !== 1 ? "s" : ""} · tracker not installed
           </span>
         </div>
       </Panel>

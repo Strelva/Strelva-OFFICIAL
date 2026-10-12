@@ -4,7 +4,7 @@ import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { clearRequestDrafts } from "./request-draft";
-import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 interface Props {
   className?: string;

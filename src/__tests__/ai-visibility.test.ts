@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // HTTP is mocked below. Resolve its public test hosts without a real DNS lookup.
-vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "93.184.216.34", family: 4 })) } }));
+const mockLookup = vi.hoisted(() => vi.fn());
+vi.mock("node:dns", () => ({ promises: { lookup: mockLookup } }));
 
 /**
  * AI Visibility Score tests.
@@ -30,6 +31,7 @@ vi.mock("@/lib/pinned-public-text", () => ({
 }));
 
 import { probeStatusLine, renderAiVisibilityHtml, scoreAiVisibility, slugify, type AiVisibilityResult, type Signal } from "../products/ai-visibility/server";
+import { PUBLIC_URL_VALIDATION_TIMEOUT_MS } from "@/lib/public-url-safety";
 
 /** Minimal HTML page that fails most readiness signals -> low grade. */
 const WEAK_HTML = "<html><head><title>Hi</title></head><body><p>Welcome</p></body></html>";
@@ -42,6 +44,8 @@ const ORIGINAL_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
 beforeEach(() => {
   mockFetch.mockReset();
+  mockLookup.mockReset();
+  mockLookup.mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
   // Default: site fetch returns weak HTML, robots.txt 404s.
   mockFetch.mockImplementation((input: string | URL) => {
     const u = String(input);
@@ -51,6 +55,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   if (ORIGINAL_KEY === undefined) delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   else process.env.GOOGLE_GENERATIVE_AI_API_KEY = ORIGINAL_KEY;
   vi.restoreAllMocks();
@@ -89,6 +94,33 @@ describe("scoreAiVisibility — honest verdict language", () => {
     expect(result.verdict).toMatch(/couldn't measure/i);
     expect(result.verdict).toMatch(/no visibility grade was produced/i);
     expect(result.topFix).toMatch(/reachable public website/i);
+  });
+
+  it("does not start site fetches when DNS validation times out", async () => {
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    vi.useFakeTimers();
+    let resolveLookup!: (answers: Array<{ address: string; family: number }>) => void;
+    mockLookup.mockReturnValue(new Promise((resolve) => { resolveLookup = resolve; }));
+
+    const pending = scoreAiVisibility({ business: "Acme Plumbing", url: "example.com" });
+    await vi.advanceTimersByTimeAsync(PUBLIC_URL_VALIDATION_TIMEOUT_MS);
+    const result = await pending;
+
+    expect(result.measurementStatus).toBe("unavailable");
+    expect(mockFetch).not.toHaveBeenCalled();
+    resolveLookup([{ address: "93.184.216.34", family: 4 }]);
+    await Promise.resolve();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("keeps private DNS targets from reaching the text fetcher", async () => {
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    mockLookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
+
+    const result = await scoreAiVisibility({ business: "Acme Plumbing", url: "internal.example" });
+
+    expect(result.measurementStatus).toBe("unavailable");
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
-import { readWorkspaceDocument, saveWorkspaceDocument, editWorkspaceDocument } from "@/products/documents/server";
+import { readWorkspaceDocument, saveWorkspaceDocument, editWorkspaceDocument, documentHistoryEnabled } from "@/products/documents/server";
 
 export const dynamic = "force-dynamic";
-const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
 async function actor() {
   const user = await getSessionUser();
   return user?.email && user.email_confirmed_at ? { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() } : null;
@@ -14,7 +14,7 @@ async function actor() {
 function failed(error: unknown) {
   if (error instanceof WorkspaceAccessError) return json({ error: "This document is unavailable to your account." }, 403);
   if (error instanceof WorkspaceConflictError) return json({ error: "This document changed or cannot accept this change. Reload it before continuing." }, 409);
-  if (error instanceof z.ZodError) return json({ error: "Check the document title and text. Documents support up to 50,000 characters and 200 revisions." }, 400);
+  if (error instanceof z.ZodError) return json({ error: "Check the document title and text. Documents support up to 50,000 characters." }, 400);
   return json({ error: "Document storage is unavailable. Your change has not been confirmed." }, 503);
 }
 export async function GET(request: Request) {
@@ -22,7 +22,8 @@ export async function GET(request: Request) {
   try {
     const current = await actor();
     if (!current) return json({ error: "Sign in to open your document." }, 401);
-    return json(await readWorkspaceDocument(current, new URL(request.url).searchParams.get("workId") ?? ""));
+    const saved = await readWorkspaceDocument(current, new URL(request.url).searchParams.get("workId") ?? "");
+    return json(documentHistoryEnabled() ? { ...saved, historyEnabled: true } : saved);
   } catch (error) { return failed(error); }
 }
 export async function POST(request: Request) {
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("create"), workspaceId: z.string().uuid(), input: z.unknown() }).strict(),
       z.object({ action: z.literal("command"), workId: z.string().uuid(), command: z.unknown() }).strict(),
     ]).parse(body);
-    return json(input.action === "create" ? await saveWorkspaceDocument(current, input.workspaceId, input.input) : await editWorkspaceDocument(current, input.workId, input.command));
+    const saved = input.action === "create" ? await saveWorkspaceDocument(current, input.workspaceId, input.input) : await editWorkspaceDocument(current, input.workId, input.command);
+    return json(documentHistoryEnabled() ? { ...saved, historyEnabled: true } : saved);
   } catch (error) { return failed(error); }
 }

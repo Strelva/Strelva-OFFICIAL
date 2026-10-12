@@ -14,7 +14,8 @@
  * Reads raw tenant columns (no decryption / SECRETS_ENC_KEY needed); writes only
  * the analytics:cfg Redis blob via setAnalyticsConfig.
  */
-import { getSupabase } from "../src/lib/db/client";
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
+import { getSupabase } from "../src/platform/infra/db/client";
 import { setAnalyticsConfig, getAnalyticsConfig, deriveScDomain } from "../src/lib/analytics";
 
 const SERVICE_ACCOUNT = "strelva-reporting@strelva.iam.gserviceaccount.com";

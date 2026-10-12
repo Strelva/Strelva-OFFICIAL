@@ -27,6 +27,7 @@
  *     "top services" maps to real names.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { existsSync, readFileSync } from "node:fs";
 
 // Load .env.local / .env the same way seed-tenant.ts does, before any storage

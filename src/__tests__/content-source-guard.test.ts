@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { contentSourceIsPostgres } from "@/lib/db/source-flags";
+import { contentSourceIsPostgres } from "@/platform/infra/db/source-flags";
 
 const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
 const ORIGINAL_CONTENT_SOURCE = process.env.CONTENT_SOURCE;

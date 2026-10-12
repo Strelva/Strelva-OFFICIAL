@@ -4,8 +4,8 @@ import { describe, it, expect } from "vitest";
 
 /**
  * Guards the deprovision table sweep against schema drift: every public table
- * that carries a tenant_id MUST be in TENANT_SCOPED_TABLES in src/lib/deprovision.ts,
- * or a deprovisioned client's rows in a new table would be silently orphaned.
+ * that carries a tenant_id MUST have an explicit teardown owner in the lib.
+ * Historical routing hints are not authority to sweep business-owned evidence.
  *
  * We read the lib file as text (rather than importing it) to avoid running any
  * top-level side effects. The script (scripts/deprovision-tenant.ts) delegates
@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
  */
 describe("deprovision-tenant table coverage", () => {
   const root = process.cwd();
-  const types = readFileSync(join(root, "src/lib/db/database.types.ts"), "utf8");
+  const types = readFileSync(join(root, "src/platform/infra/db/database.types.ts"), "utf8");
   const deprovisionLib = readFileSync(join(root, "src/lib/deprovision.ts"), "utf8");
 
   // Tenant-scoped tables = every `Tables` entry whose Row block contains tenant_id.
@@ -32,8 +32,39 @@ describe("deprovision-tenant table coverage", () => {
     expect(tenantTables.length).toBeGreaterThan(20);
   });
 
-  it("sweeps every tenant_id table (plus the tenants row itself)", () => {
-    const missing = tenantTables.filter((t) => !new RegExp(`"${t}"`).test(deprovisionLib));
+  it("classifies every tenant_id table by its teardown owner", () => {
+    const owners = ["TENANT_SCOPED_TABLES", "WORKSPACE_OWNED_TENANT_TABLES", "CASCADED_TENANT_TABLES",
+      "TENANT_TABLES_SWEEP_UNDECIDED", "TENANT_TABLES_RETAINED_AS_RECEIPTS",
+      "TENANT_CLEANUP_RECEIPT_TABLES", "RPC_OWNED_TENANT_EVIDENCE_TABLES"];
+    const declarations = [...deprovisionLib.matchAll(/export const ([A-Z_]+) = \[([^\]]*)\]/g)];
+    const classified = declarations.filter(match => owners.includes(match[1]!))
+      .flatMap(match => [...match[2]!.matchAll(/"([a-z_]+)"/g)].map(table => table[1]!));
+    expect(new Set(classified).size).toBe(classified.length);
+    for (const table of ["connected_inquiry_owner_notices", "operator_google_write_attempts", "workspace_newsletter_issues"]) {
+      expect(classified).toContain(table);
+    }
+    const missing = tenantTables.filter(t => !classified.includes(t));
     expect(missing, `src/lib/deprovision.ts is missing tenant_id tables: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("lists the tables whose sweep is undecided, outside the sweep, and lets that list only shrink", () => {
+    const swept = deprovisionLib.slice(deprovisionLib.indexOf("TENANT_SCOPED_TABLES = ["), deprovisionLib.indexOf("] as const;"));
+    const undecided = /TENANT_TABLES_SWEEP_UNDECIDED = \[([^\]]*)\]/.exec(deprovisionLib)?.[1] ?? "";
+    const listed = [...undecided.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]!);
+    const known = ["agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
+      "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots"];
+    expect(listed.every((t) => known.includes(t)), "a table was added to the undecided list; sweep it or decide instead").toBe(true);
+    for (const table of listed) {
+      expect(tenantTables).toContain(table);
+      expect(swept).not.toContain(`"${table}"`);
+    }
+  });
+
+  it("keeps workspace-owned tables out of the sweep", () => {
+    const swept = deprovisionLib.slice(deprovisionLib.indexOf("TENANT_SCOPED_TABLES = ["), deprovisionLib.indexOf("] as const;"));
+    for (const table of ["website_document_publications", "website_hosted_tenant_reservations", "workspace_newsletter_issues"]) {
+      expect(swept).not.toContain(`"${table}"`);
+      expect(deprovisionLib).toMatch(new RegExp(`WORKSPACE_OWNED_TENANT_TABLES = \\[[^\\]]*"${table}"`));
+    }
   });
 });

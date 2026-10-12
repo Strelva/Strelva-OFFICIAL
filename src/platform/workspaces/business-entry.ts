@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { businessEntryInputSchema, businessEntryResultSchema } from "./business-entry-contract";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
 
@@ -10,7 +10,7 @@ export async function enterCustomerBusiness(actor: WorkspaceActor, raw: unknown)
   if (!db) throw new WorkspaceStoreError("Business storage is unavailable.");
   const name = input.destination.kind === "new" ? input.destination.name : null;
   const workspaceId = input.destination.kind === "existing" ? input.destination.workspaceId : null;
-  const digest = createHash("sha256").update(JSON.stringify([actor.userId, name, workspaceId, input.initialRequest])).digest("hex");
+  const digest = createHash("sha256").update(JSON.stringify([actor.userId, name, workspaceId, input.initialRequest, ...(input.sourceCheckId ? [input.sourceCheckId] : [])])).digest("hex");
   const client = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: { message?: string } | null }> };
   const result = await client.rpc("enter_customer_business", {
     p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),

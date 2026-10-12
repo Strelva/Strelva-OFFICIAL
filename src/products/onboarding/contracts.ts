@@ -109,6 +109,7 @@ export const onboardingCaseSchema = z.object({
   status: onboardingCaseStatusSchema,
   assignee: onboardingAssigneeSchema.nullable(),
   requirements: z.array(onboardingRequirementSchema).min(1).max(50),
+  /** Latest entries only; every entry is kept in `onboarding_revisions`. Older payloads may hold up to 500. */
   history: z.array(onboardingHistoryEntrySchema).max(500),
   createdBy: id,
   createdAt: z.string().datetime(),
@@ -154,3 +155,11 @@ export interface OnboardingAttachableDocument {
   revision: number;
   updatedAt: string;
 }
+export { MAX_ONBOARDING_FILE_BYTES, MAX_ONBOARDING_UPLOAD_REQUEST_BYTES } from "./limits";
+
+/**
+ * The case payload keeps the latest entries for its History card.
+ * `update_onboarding_work` appends every entry to `onboarding_revisions`, so a
+ * case takes any number of changes.
+ */
+export const ONBOARDING_RECENT_HISTORY = 50;

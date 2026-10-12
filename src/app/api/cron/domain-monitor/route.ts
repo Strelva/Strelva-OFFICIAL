@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { scanPortfolioDomains, summarizeDomainAlerts } from "@/lib/domain-monitor";
 import {
@@ -8,7 +8,7 @@ import {
   setAlertSignature,
 } from "@/lib/domain-monitor-store";
 import { sendDomainAlertEmail } from "@/products/domain-monitor/server";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL } from "@/platform/infra/brand";
 
 export const maxDuration = 300;
 

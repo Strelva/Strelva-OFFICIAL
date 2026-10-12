@@ -161,80 +161,12 @@ describe("scanPortfolioOpportunities", () => {
   });
 });
 
-describe("draftOpportunityForClients — governed, lands PENDING not published", () => {
-  it("drafts review replies as a pending review_reply_draft (never auto-published)", async () => {
-    mockGetTenantConfig.mockResolvedValue({ id: "acme", siteName: "Acme Co" });
-    mockGetReviews.mockResolvedValue([
-      review({ id: "r1", externalId: "g_r1", reply: "" }),
+describe("retired platform portfolio authorship", () => {
+  it.each(["unreplied_reviews", "stale_sites", "low_health"] as const)("holds %s without client reads, model calls or writes", async kind => {
+    expect(await draftOpportunityForClients(kind, ["acme", "bolt"])).toEqual([
+      { tenantId: "acme", drafted: false, reason: "platform_content_authority_retired" },
+      { tenantId: "bolt", drafted: false, reason: "platform_content_authority_retired" },
     ]);
-
-    const results = await draftOpportunityForClients("unreplied_reviews", ["acme"]);
-
-    expect(results).toEqual([{ tenantId: "acme", drafted: true }]);
-    expect(mockDraftReviewReply).toHaveBeenCalledTimes(1);
-    // The event is queued PENDING with the governed review_reply_draft kind.
-    expect(mockAddEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tenantId: "acme",
-        type: "review",
-        status: "pending",
-        metadata: expect.objectContaining({ kind: "review_reply_draft", reviewId: "g_r1" }),
-      }),
-    );
-  });
-
-  it("is idempotent — skips a review that already has a pending draft", async () => {
-    mockGetTenantConfig.mockResolvedValue({ id: "acme", siteName: "Acme Co" });
-    mockGetReviews.mockResolvedValue([review({ id: "r1", externalId: "g_r1", reply: "" })]);
-    mockGetEvents.mockResolvedValue([
-      { type: "review", status: "pending", metadata: { kind: "review_reply_draft", reviewId: "g_r1" } },
-    ]);
-
-    const results = await draftOpportunityForClients("unreplied_reviews", ["acme"]);
-
-    expect(results).toEqual([{ tenantId: "acme", drafted: false, reason: "already_drafted" }]);
-    expect(mockDraftReviewReply).not.toHaveBeenCalled();
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("routes stale/health through the governed generateProactiveSuggestions path", async () => {
-    const results = await draftOpportunityForClients("stale_sites", ["acme", "bolt"]);
-    expect(results).toEqual([
-      { tenantId: "acme", drafted: true },
-      { tenantId: "bolt", drafted: true },
-    ]);
-    expect(mockGenerateProactive).toHaveBeenNthCalledWith(1, "acme");
-    expect(mockGenerateProactive).toHaveBeenNthCalledWith(2, "bolt");
-    // Nothing is published — only the governed generator is invoked.
-    expect(mockDraftReviewReply).not.toHaveBeenCalled();
-  });
-
-  it("reports a client that produced 0 drafts as skipped, not drafted (no phantom)", async () => {
-    // A stale client with no content engine and no unreplied review: the governed
-    // generator queues nothing, so the pass must report it honestly as
-    // nothing_to_draft — never a phantom "drafted for N clients".
-    mockGenerateProactive.mockImplementation(async (id: string) => (id === "acme" ? 1 : 0));
-
-    const results = await draftOpportunityForClients("stale_sites", ["acme", "bolt"]);
-
-    expect(results).toEqual([
-      { tenantId: "acme", drafted: true },
-      { tenantId: "bolt", drafted: false, reason: "nothing_to_draft" },
-    ]);
-  });
-
-  it("reports honest partial failure — one client throwing never aborts the rest", async () => {
-    mockGenerateProactive.mockImplementation(async (id: string) => {
-      if (id === "bolt") throw new Error("boom");
-      return 1;
-    });
-
-    const results = await draftOpportunityForClients("low_health", ["acme", "bolt", "cove"]);
-
-    expect(results).toEqual([
-      { tenantId: "acme", drafted: true },
-      { tenantId: "bolt", drafted: false, reason: "boom" },
-      { tenantId: "cove", drafted: true },
-    ]);
+    for (const call of [mockGetTenantConfig, mockGetReviews, mockGenerateProactive, mockDraftReviewReply, mockAddEvent, mockGetEvents, mockStoreRecentReply]) expect(call).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,14 @@
+.library { display: flex; min-width: 0; height: 100%; overflow: auto; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.description { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.photoGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 24px 20px; }
+.photoItem { display: flex; min-width: 0; flex-direction: column; gap: 8px; font-size: 14px; line-height: 20px; }
+.photoItem > span { overflow-wrap: anywhere; }
+.photo { position: relative; width: 100%; aspect-ratio: 1.4; overflow: hidden; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); cursor: pointer; }
+.photo:hover, .selected { border-color: var(--st-accent); }
+.photo:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.brandFields { display: grid; gap: 24px; }
+.mediaRow { display: flex; align-items: center; gap: 16px; }
+.mediaLogo { width: 48px; height: 48px; object-fit: contain; border-radius: var(--st-r-sm); background: var(--st-inset); }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+@media (max-width: 767px) { .photoGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 16px; } }

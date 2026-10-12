@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 const boundary = vi.hoisted(() => ({ database: null as unknown }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 import { saveNewTracker, editSavedTracker, readSavedTracker } from "@/products/tracker/server";
 const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "owner@example.com" };
 const assigneeId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -21,6 +21,13 @@ function databaseBoundary() {
     return query;
   }
   return { from, async rpc(name: string, args: Row) {
+      // Mirrors public.save_workspace_work: membership is re-checked inside the write.
+      if (name === "save_workspace_work") {
+        const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        if (!member) return { data: null, error: { message: "workspace_membership_required" } };
+        const saved = await from("saved_product_work").insert({ workspace_id: args.p_workspace_id, product_id: args.p_product_id, resource_kind: args.p_resource_kind, title: args.p_title, payload: args.p_payload, input: args.p_input, source_work_id: args.p_source_work_id, created_by: args.p_user_id }).select().single();
+        return { data: saved.data ? [saved.data] : null, error: saved.error };
+      }
     if (name !== "update_tracker_work") throw new Error(`Unexpected RPC ${name}`);
     const work = tables.saved_product_work!.find(row => row.id === args.p_work_id)!;
     work.payload = structuredClone(args.p_payload); return { data: [structuredClone(work)], error: null };

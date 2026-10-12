@@ -66,6 +66,36 @@ export interface LeadPayload {
   email?: string;
   message?: string;
   source: string;
+  /** Optional attribution (additive in the v1 contract): where the form was. */
+  page?: string;
+  referrer?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+}
+
+const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"] as const;
+
+/**
+ * The page path, referrer and utm_* tags of the current visit, for the
+ * owner's monthly "where inquiries came from". Empty outside a browser.
+ */
+export function readVisitAttribution(
+  location: { pathname: string; search: string } | null = typeof window === "undefined" ? null : window.location,
+  referrer: string = typeof document === "undefined" ? "" : document.referrer,
+): Partial<LeadPayload> {
+  if (!location) return {};
+  const out: Partial<LeadPayload> = {};
+  if (location.pathname) out.page = location.pathname.slice(0, 500);
+  if (referrer) out.referrer = referrer.slice(0, 500);
+  const params = new URLSearchParams(location.search);
+  for (const key of UTM_KEYS) {
+    const value = params.get(key)?.trim();
+    if (value) out[key] = value.slice(0, 200);
+  }
+  return out;
 }
 
 export type LeadSubmitResult = { ok: true } | { ok: false; error: string };
@@ -110,7 +140,7 @@ export async function submitLead(
     const tenant = opts?.tenant !== undefined ? opts.tenant : getTenant();
     if (!baseUrl || !tenant) return { ok: false, error: errorMessage };
 
-    const payload = buildLeadPayload(values, opts?.source ?? "contact-form");
+    const payload = { ...readVisitAttribution(), ...buildLeadPayload(values, opts?.source ?? "contact-form") };
     const url = `${baseUrl}/api/${CONTRACT_VERSION}/leads/${tenant}`;
     const res = await fetch(url, {
       method: "POST",

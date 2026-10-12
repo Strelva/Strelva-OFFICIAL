@@ -3,6 +3,7 @@ import type { AuditResult } from "@/lib/audit/types";
 const text = z.string().max(20000);
 const score = z.number().min(0).max(100);
 export const websiteAuditSchema = z.object({
+  businessName: z.string().trim().min(1).max(120).optional(),
   url: z.string().url().max(2048).refine(value => /^https?:\/\//i.test(value)),
   scannedAt: z.string().datetime(), overallScore: score, grade: z.enum(["A", "B", "C", "D", "F"]),
   categories: z.array(z.object({

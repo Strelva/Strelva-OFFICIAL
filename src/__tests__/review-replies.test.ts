@@ -35,7 +35,7 @@ const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
 const mockRedisSet = vi.fn(() => Promise.resolve("OK"));
 const mockRedisZadd = vi.fn(() => Promise.resolve(1));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     lrange: (...args: Parameters<typeof mockLrange>) => mockLrange(...args),
     lpush: (...args: Parameters<typeof mockLpush>) => mockLpush(...args),
@@ -46,6 +46,9 @@ vi.mock("@/lib/redis", () => ({
     zadd: (...args: Parameters<typeof mockRedisZadd>) => mockRedisZadd(...args),
   }),
 }));
+
+const mockTenantWorkspace = vi.hoisted(() => vi.fn(async () => "a0000000-0000-4000-8000-000000000001"));
+vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: mockTenantWorkspace }));
 
 // Gemini
 const mockGenerateText = vi.fn(() => Promise.resolve({ text: "" }));
@@ -261,8 +264,17 @@ describe("draftReviewReply", () => {
   const tenant = { id: "t1", siteName: "Acme Plumbing" };
 
   beforeEach(() => {
+    mockTenantWorkspace.mockResolvedValue("a0000000-0000-4000-8000-000000000001");
     vi.clearAllMocks();
     mockLrange.mockResolvedValue([]);
+  });
+
+  it("uses a deterministic reply without a charged model attempt when workspace resolution fails", async () => {
+    mockTenantWorkspace.mockRejectedValueOnce(new Error("scope unavailable"));
+    const { draftReviewReply } = await import("@/lib/review-replies");
+    const result = await draftReviewReply(review, tenant);
+    expect(result).toBe(buildDeterministicReply(review.reviewerName, review.rating));
+    expect(mockGenerateText).not.toHaveBeenCalled();
   });
 
   it("returns the first clean Gemini draft", async () => {

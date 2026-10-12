@@ -27,7 +27,7 @@ const mockRedis = {
   zadd: vi.fn(async () => 1),
 };
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => mockRedis,
 }));
 
@@ -103,7 +103,7 @@ describe("updateEvent lock", () => {
 
   it("returns {event:null,changed:false} when redis is unavailable", async () => {
     // Force getRedis() to return null for this case only.
-    const redisModule = await import("../lib/redis");
+    const redisModule = await import("@/platform/infra/redis");
     const spy = vi.spyOn(redisModule, "getRedis").mockReturnValueOnce(null);
 
     const result = await updateEvent("evt_missing", (e) => e);

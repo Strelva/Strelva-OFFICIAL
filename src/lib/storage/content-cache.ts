@@ -20,7 +20,7 @@
  * after the TTL repopulates.
  */
 
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { ContentMap, ContentSection, SitePageConfig } from "../types";
 
 const CONTENT_TTL_SECONDS = 300; // 5 minutes — covers Studio-direct edits

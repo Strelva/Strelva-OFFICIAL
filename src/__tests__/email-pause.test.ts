@@ -1,4 +1,12 @@
+vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => tenantId ? ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) : null }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/platform/agency-brand/server", () => ({
+  resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
+  resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
+}));
 
 // Assert the global email kill-switch: when EMAIL_SENDING_ENABLED is not
 // "true", no outbound email is sent. The prod default (unset) is paused.
@@ -33,7 +41,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
   });
 
   it("reports paused when the flag is not exactly 'true'", async () => {
-    const { emailSendingEnabled, emailSendingPaused } = await import("@/lib/email-enabled");
+    const { emailSendingEnabled, emailSendingPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "false", "1", "yes", "TRUE"]) {
       if (v === undefined) delete process.env.EMAIL_SENDING_ENABLED;
       else process.env.EMAIL_SENDING_ENABLED = v;
@@ -51,6 +59,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
     const ok = await sendUpdateLiveEmail({
       email: "chelsea@example.com",
       siteName: "Rohlax Wellness",
+      tenantId: "rohlax",
       whatChanged: "hours",
       siteUrl: "https://rohlax.example.com",
     });
@@ -64,6 +73,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
     const ok = await sendUpdateLiveEmail({
       email: "chelsea@example.com",
       siteName: "Rohlax Wellness",
+      tenantId: "rohlax",
       whatChanged: "hours",
       siteUrl: "https://rohlax.example.com",
     });
@@ -91,7 +101,7 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
   });
 
   it("operatorEmailsEnabled defaults TRUE and only OPERATOR_EMAILS_ENABLED='false' disables it", async () => {
-    const { operatorEmailsEnabled, operatorEmailsPaused } = await import("@/lib/email-enabled");
+    const { operatorEmailsEnabled, operatorEmailsPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "true", "TRUE", "1", "no"]) {
       if (v === undefined) delete process.env.OPERATOR_EMAILS_ENABLED;
       else process.env.OPERATOR_EMAILS_ENABLED = v;
@@ -209,7 +219,7 @@ describe("prospect email switch (PROSPECT_EMAILS_ENABLED)", () => {
   });
 
   it("prospectEmailsEnabled defaults TRUE and only PROSPECT_EMAILS_ENABLED='false' disables it", async () => {
-    const { prospectEmailsEnabled, prospectEmailsPaused } = await import("@/lib/email-enabled");
+    const { prospectEmailsEnabled, prospectEmailsPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "true", "TRUE", "1", "no"]) {
       if (v === undefined) delete process.env.PROSPECT_EMAILS_ENABLED;
       else process.env.PROSPECT_EMAILS_ENABLED = v;

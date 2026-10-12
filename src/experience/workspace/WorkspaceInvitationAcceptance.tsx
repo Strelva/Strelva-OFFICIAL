@@ -1,12 +1,11 @@
 "use client";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
-import { Check, Loader2, LockKeyhole } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { StEntry, StHead, StRows, StRow, StMono, StState, StPill, StPillLink, StTextButton, StNotice, StSkeleton } from "@/components/ui/strelva/Kit";
 
-type Preview = { workspaceId: string; workspaceName: string; recipientEmail: string; role: "owner" | "admin" | "member"; status: "pending" | "accepted" | "revoked" | "expired"; expiresAt: string };
+type Preview = { brand?: OwnerBrand; workspaceId: string; workspaceName: string; recipientEmail: string; role: "owner" | "admin" | "member"; status: "pending" | "accepted" | "revoked" | "expired"; expiresAt: string };
 type Accepted = { workspaceId: string; workspaceName: string; invitedRole: Preview["role"]; appliedRole: Preview["role"]; alreadyAccepted: boolean };
 
 export function WorkspaceInvitationAcceptance({ token }: { token: string }) {
@@ -51,17 +50,14 @@ export function WorkspaceInvitationAcceptance({ token }: { token: string }) {
     }
   }
 
-  return (
-    <main className="min-h-dvh bg-canvas px-6 py-12 text-warm-black md:px-8 lg:px-12">
-      <div className="mx-auto flex min-h-[calc(100dvh-96px)] max-w-[720px] items-center">
-        <Card padding="lg" className="w-full">
-          {loading ? <p className="flex items-center gap-3 text-sm text-gray-muted"><Loader2 className="size-5 motion-safe:animate-spin" aria-hidden="true" />Checking invitation</p>
-            : accepted ? <div><div className="flex size-12 items-center justify-center rounded-full bg-positive/15 text-positive"><Check className="size-6" aria-hidden="true" /></div><p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-positive">Access confirmed</p><h1 className="mt-3 font-display text-[40px] font-medium leading-tight">You joined {accepted.workspaceName}.</h1><p className="mt-4 text-base leading-6 text-gray-muted">Your role is {accepted.appliedRole}. {accepted.appliedRole !== accepted.invitedRole ? "Your existing higher role was kept." : accepted.alreadyAccepted ? "This invitation was already accepted; no duplicate membership was created." : "The workspace is now available to your account."}</p><a href={`/workspace?workspaceId=${encodeURIComponent(accepted.workspaceId)}`} className="mt-8 inline-flex min-h-12 items-center rounded-xl bg-accent px-4 text-sm font-medium text-on-accent hover:bg-accent/85">Open workspace</a></div>
-              : preview ? <div><LockKeyhole className="size-7 text-accent-text" aria-hidden="true" /><p className="mt-6 text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Workspace invitation</p><h1 className="mt-3 font-display text-[40px] font-medium leading-tight">Join {preview.workspaceName}</h1><dl className="mt-8 grid gap-4 border-y border-gray-border py-6 sm:grid-cols-2"><div><dt className="text-xs text-gray-muted">Invited account</dt><dd className="mt-1 text-sm font-medium">{preview.recipientEmail}</dd></div><div><dt className="text-xs text-gray-muted">Role</dt><dd className="mt-1 text-sm font-medium capitalize">{preview.role}</dd></div><div><dt className="text-xs text-gray-muted">Status</dt><dd className="mt-1 text-sm font-medium capitalize">{preview.status}</dd></div><div><dt className="text-xs text-gray-muted">Expires</dt><dd className="mt-1 text-sm font-medium">{new Date(preview.expiresAt).toLocaleString()}</dd></div></dl>{preview.status === "pending" ? <><p className="mt-6 text-sm leading-6 text-gray-muted">Accepting grants this verified account access to the workspace. The link does not grant access by itself.</p><div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap"><Button size="lg" loading={submitting} onClick={() => void accept()}>Accept invitation</Button><a href={`/sign-in?next=${encodeURIComponent(target)}`} className="inline-flex min-h-12 items-center justify-center rounded-xl border border-gray-border px-4 text-sm font-medium hover:bg-gray-bg">Sign in with invited account</a><a href={`/sign-up?next=${encodeURIComponent(target)}`} className="inline-flex min-h-12 items-center justify-center rounded-xl px-4 text-sm font-medium text-gray-muted underline-offset-4 hover:underline">Create invited account</a></div></> : <p className="mt-6 text-sm text-gray-muted">{preview.status === "revoked" ? "The workspace owner revoked this invitation." : preview.status === "expired" ? "This invitation expired. Ask the workspace owner for a new link." : "This invitation has already been accepted."}</p>}</div>
-                : <div><LockKeyhole className="size-7 text-critical" aria-hidden="true" /><h1 className="mt-6 font-display text-[36px] font-medium">Invitation unavailable</h1></div>}
-          {error ? <p role="alert" className="mt-6 rounded-xl border border-critical/30 px-4 py-3 text-sm text-critical">{error}</p> : null}
-        </Card>
-      </div>
-    </main>
-  );
+  return <StEntry brand={preview?.brand || "Agency identity unavailable"} helpHref="/workspace?view=help">
+    {loading ? <StSkeleton label="Checking invitation" />
+      : accepted ? <><StHead title={`You joined ${accepted.workspaceName}`} /><StState kind="live">Access confirmed</StState><p className="text-sm text-gray-muted">Your role is {accepted.appliedRole}. {accepted.appliedRole !== accepted.invitedRole ? "Your existing higher role was kept." : accepted.alreadyAccepted ? "This invitation was already accepted; no duplicate membership was created." : "The workspace is now available to your account."}</p><StPillLink href={`/workspace?workspaceId=${encodeURIComponent(accepted.workspaceId)}`}>Open workspace</StPillLink></>
+        : preview ? <><StHead title={`${preview.workspaceName} invited you`} meta="The business controls who can open its workspace." /><StRows><StRow kind="Invited account" title={<StMono tone="text">{preview.recipientEmail}</StMono>} detail={`${preview.role} access · expires ${new Date(preview.expiresAt).toLocaleString()}`} end={<StState kind={preview.status === "pending" ? "need" : "draft"}>{preview.status}</StState>} /></StRows>
+          {preview.status === "pending" ? <><p className="text-sm text-gray-muted">Accepting grants this verified account access to the workspace. The link does not grant access by itself.</p><StPill busy={submitting} block onClick={() => void accept()}>Continue as {preview.recipientEmail}</StPill><StTextButton href={`/sign-in?next=${encodeURIComponent(target)}`} tone="accent">Sign in with invited account</StTextButton><StTextButton href={`/sign-up?next=${encodeURIComponent(target)}`}>Create invited account</StTextButton><StTextButton href="/account">Not now</StTextButton></>
+            : <StNotice>{preview.status === "revoked" ? "The workspace owner revoked this invitation." : preview.status === "expired" ? "This invitation expired. Ask the workspace owner for a new link." : "This invitation has already been accepted."}</StNotice>}
+        </> : <StHead title="Invitation unavailable" />}
+    {preview || accepted ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  </StEntry>;
 }

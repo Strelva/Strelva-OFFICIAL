@@ -21,7 +21,7 @@ const mockRedis = {
   zremrangebyscore: vi.fn(async (_key: string, _min: number, _max: number) => 0),
 };
 
-vi.mock("../lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 
 import { addEvent, getEvents } from "../lib/events";
 

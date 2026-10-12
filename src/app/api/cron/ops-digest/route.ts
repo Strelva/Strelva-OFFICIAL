@@ -15,13 +15,13 @@
  */
 
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAtRiskTenants } from "@/lib/churn";
 import { getAllTenants } from "@/lib/tenants";
 import { sendOpsDigestEmail } from "@/lib/delivery-email";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL } from "@/platform/infra/brand";
 
 export const maxDuration = 300;
 

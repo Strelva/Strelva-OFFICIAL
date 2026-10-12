@@ -68,7 +68,7 @@ describe("workspace business settings destinations", () => {
       accountHref: "/workspace/account",
     }));
     expect(markup).toContain("Business information");
-    expect(markup).toContain("People and access");
+    expect(markup).toContain("People &amp; access");
     expect(markup).toContain("Work");
     expect(markup).toContain("Usage and limits");
     expect(markup).not.toContain(">Connections<");
@@ -129,5 +129,14 @@ describe("workspace business settings destinations", () => {
       onCommand: async () => null,
     }));
     expect(retry).toContain("Retry the same assignment after checking the current state.");
+  });
+});
+
+
+describe("export label matches available data", () => {
+  it.each([false, true])("schema-3 archive available: %s", exportSchema3 => {
+    const html = renderToStaticMarkup(createElement(WorkspaceBusinessSettings, { workspace: { id: "business-id", kind: "customer", access: "member", name: "Juniper" }, sites: [], siteAssignmentState: "known", accountHref: "/workspace/account", exportSchema3 }));
+    expect(html).toContain(exportSchema3 ? "Export workspace archive" : "Export available workspace snapshot");
+    expect(html).not.toContain("Export all workspace data");
   });
 });

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { InquiryPreviewExperience } from "@/experience/inquiries/InquiryPreviewExperience";
+import { InquiryServerExperience } from "@/experience/inquiries/InquiryServerExperience";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const metadata = {
 export default async function InquiryPreviewPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const params = await searchParams;
+  if (params.bridge === "1") return <InquiryServerExperience tenantId="fixture-inquiry" basePath="/preview/strelva/inquiries?bridge=1" />;
   const audience = params.audience === "agency" ? "agency" : "business";
   return <InquiryPreviewExperience audience={audience} scenario={params.scenario || params.state} initialView={parsePreviewView(params.view)} initialRequestId={params.request || null} initialInquiryId={params.inquiry || null} basePath="/preview/strelva/inquiries" />;
 }

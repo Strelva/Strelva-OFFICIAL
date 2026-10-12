@@ -1,6 +1,6 @@
 import type { BudgetExecution } from "./runtime";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   JOB_ECONOMICS_POLICY,
   JobEconomicsAccessError,

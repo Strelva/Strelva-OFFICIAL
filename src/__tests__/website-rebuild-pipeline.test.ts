@@ -1,12 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
-import { crawlWebsite, robotsAllows, normalizeRebuildUrl, sameCrawlDomain, type PageFetcher } from "@/products/websites/rebuild-crawl";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { modelAdmissionRpc, modelAdmissionWorkspaceId } from "./support/model-admission";
+import { ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
+import { crawlWebsite, robotsAllows, normalizeRebuildUrl, sameCrawlDomain, WebsiteCrawlError, type PageFetcher } from "@/products/websites/rebuild-crawl";
 import { runWebsiteRebuild, WebsiteRebuildStageError, validateWrittenContent, writeSourceContent, extractBusinessFacts, createAiRebuildWriter, websiteRebuildInputSchema } from "@/products/websites/rebuild-pipeline";
 import { rebuildInputSchema } from "@/products/websites/rebuild-contracts";
 import { composeRebuildSite, verifyRebuildSite, JevComposer, ModelComposer } from "@/products/websites/rebuild-composer";
 import { unresolvedSiteFacts, siteDocumentSchema } from "@/products/websites/site-document";
-const modelMocks = vi.hoisted(() => ({ generate: vi.fn() }));
+const modelMocks = vi.hoisted(() => ({ generate: vi.fn(), rpc: vi.fn() }));
 vi.mock("ai", () => ({ generateObject: modelMocks.generate }));
-vi.mock("@/lib/ai-models", () => ({ getPrimaryModel: () => ({ model: "primary", label: "primary" }), getFallbackModel: () => ({ model: "fallback", label: "fallback" }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: modelMocks.rpc }) }));
+vi.mock("@/platform/infra/ai-models", () => ({ getPrimaryModel: () => ({ model: "primary", label: "primary" }), getFallbackModel: () => ({ model: "fallback", label: "fallback" }) }));
+beforeEach(() => {
+  vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "1");
+  modelMocks.generate.mockReset();
+  modelMocks.rpc.mockReset().mockImplementation(modelAdmissionRpc);
+});
+afterEach(() => vi.unstubAllEnvs());
 
 const home = `<!doctype html><html><head><title>The Mooney Firm | Buffalo</title><script type="application/ld+json">{"@type":"LegalService","name":"The Mooney Firm","telephone":"716-555-0100"}</script></head><body><header><a href="/">Home</a><a href="/practice/estate-planning">Estate planning</a><a href="/about">About</a><a href="/private">Private</a></header><main><h1>The Mooney Firm</h1><p>Personal counsel for your next chapter.</p><p>We help families prepare wills and trusts.</p><p>Our attorney has 20 years of experience.</p><a href="tel:716-555-0100">Call us</a><blockquote>They took time to explain every step.</blockquote></main></body></html>`;
 const about = `<html><head><title>About | The Mooney Firm</title></head><body><main><h1>About the firm</h1><p>Meet with us to discuss your plans and questions.</p></main></body></html>`;
@@ -78,8 +87,28 @@ describe("website rebuild pipeline", () => {
     const facts = extractBusinessFacts({ businessName: "Firm", description: "We help families prepare wills and trusts." }); const baseline = writeSourceContent(facts);
     modelMocks.generate.mockReset().mockRejectedValueOnce(new Error("Primary unavailable")).mockResolvedValueOnce({ object: { pages: baseline.pages } });
     const admitted: string[] = []; const admit = async <T,>(label: string, call: () => Promise<T>): Promise<T> => { admitted.push(label); return call(); };
-    const writer = createAiRebuildWriter({ admit }); expect(modelMocks.generate).not.toHaveBeenCalled();
+    const writer = createAiRebuildWriter({ admit, context: { workspaceId: modelAdmissionWorkspaceId } }); expect(modelMocks.generate).not.toHaveBeenCalled();
     expect(await writer(facts, baseline)).toEqual({ pages: baseline.pages }); expect(admitted).toEqual(["primary", "fallback"]); expect(modelMocks.generate).toHaveBeenCalledTimes(2);
+    expect(modelMocks.rpc.mock.calls.filter(([name]) => name === "business_ai_budget")).toEqual([
+      ["business_ai_budget", { p_workspace_id: modelAdmissionWorkspaceId }],
+      ["business_ai_budget", { p_workspace_id: modelAdmissionWorkspaceId }],
+    ]);
+    expect(modelMocks.generate.mock.calls.map(([options]) => options.maxRetries)).toEqual([0, 0]);
+  });
+  it.each(["missing workspace", "unavailable budget"])("does not call or fall back when the writer has %s", async state => {
+    const facts = extractBusinessFacts({ businessName: "Firm", description: "We help families prepare wills and trusts." });
+    const baseline = writeSourceContent(facts);
+    const admissionCalls = vi.fn<(label: string) => void>();
+    const admit = async <T,>(label: string, call: () => Promise<T>): Promise<T> => {
+      admissionCalls(label);
+      return call();
+    };
+    if (state === "unavailable budget") modelMocks.rpc.mockResolvedValue({ data: null, error: null });
+    else vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "0");
+    const writer = createAiRebuildWriter({ admit, ...(state === "unavailable budget" ? { context: { workspaceId: modelAdmissionWorkspaceId } } : {}) });
+    await expect(writer(facts, baseline)).rejects.toBeInstanceOf(ModelBudgetUnavailableError);
+    expect(modelMocks.generate).not.toHaveBeenCalled();
+    expect(admissionCalls).toHaveBeenCalledTimes(state === "unavailable budget" ? 1 : 0);
   });
   it("times out Jev and uses the rule composer", async () => {
     vi.useFakeTimers();
@@ -110,6 +139,15 @@ describe("website rebuild pipeline", () => {
 });
 
 describe("bounded safe website crawl", () => {
+  it.each([
+    ["https://", "Enter a valid public website address."],
+    ["file:///etc/passwd", "Enter a public HTTP or HTTPS website address."],
+    ["https://user:secret@example.com", "Enter a public HTTP or HTTPS website address without credentials or a custom port."],
+    ["https://example.com:8443", "Enter a public HTTP or HTTPS website address without credentials or a custom port."],
+  ])("retains crawl error identity, unsafe_url code and message for %s", (url, message) => {
+    expect(() => normalizeRebuildUrl(url)).toThrow(WebsiteCrawlError);
+    expect(() => normalizeRebuildUrl(url)).toThrow(expect.objectContaining({ name: "WebsiteCrawlError", code: "unsafe_url", message }));
+  });
   it("normalizes URL input and rejects non-http and credentials", () => {
     expect(normalizeRebuildUrl("example.com/a#section")).toBe("https://example.com/a");
     expect(() => normalizeRebuildUrl("https://user:secret@example.com")).toThrow();

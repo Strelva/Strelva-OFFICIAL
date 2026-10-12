@@ -5,7 +5,7 @@ test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit develop
 async function startInquiry(page: Page) {
   await page.goto("/preview/strelva/inquiries");
   await page.getByRole("button", { name: "New", exact: true }).click();
-  await page.getByLabel("What should Strelva handle?").fill("Collect seller inquiries and route them to Maria, with a follow-up if nobody replies.");
+  await page.getByLabel("What should your inquiry form do?").fill("Collect seller inquiries and route them to Maria, with a follow-up if nobody replies.");
   await page.getByRole("button", { name: "Shape this request" }).click();
   await page.getByRole("button", { name: "Go with this shape" }).click();
 }
@@ -26,8 +26,8 @@ test.describe("inquiry control surfaces", () => {
     await expect(page.getByText(/If nobody replies within 2 hours/).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Plan", exact: true }).click();
-    await page.getByRole("link", { name: "Work", exact: true }).click();
-    await page.getByRole("link", { name: "Home", exact: true }).click();
+    await page.getByRole("button", { name: "Recent changes", exact: true }).click();
+    await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "Inquiries", exact: true }).click();
     await page.getByRole("button", { name: "Read the responsibility", exact: true }).click();
     await page.getByLabel("Responsibility title").fill("Handle seller inquiries carefully");
     await page.getByLabel("Scope").fill("Route seller inquiries and prepare a bounded follow-up during approved hours.");
@@ -45,8 +45,8 @@ test.describe("inquiry control surfaces", () => {
     await page.getByRole("button", { name: "Go to rehearsal", exact: true }).click();
     await page.getByRole("button", { name: "Run rehearsal", exact: true }).click();
     await expect(page.getByRole("heading", { name: "8 of 8 checks passed", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Make live", exact: true }).click();
-    await page.getByRole("link", { name: "Work", exact: true }).click();
+    await page.getByRole("button", { name: "Make it live", exact: true }).click();
+    await page.getByRole("button", { name: "Recent changes", exact: true }).click();
     await page.getByRole("button", { name: "Review rehearsal", exact: true }).click();
     await page.getByRole("button", { name: "Send test inquiry", exact: true }).click();
 

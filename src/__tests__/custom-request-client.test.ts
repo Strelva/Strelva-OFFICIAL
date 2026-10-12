@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const safe = vi.hoisted(() => ({ allow: true }));
-vi.mock("../lib/safe-fetch", () => ({
+vi.mock("@/platform/infra/safe-fetch", () => ({
   isSafeFetchUrl: () => safe.allow,
 }));
 

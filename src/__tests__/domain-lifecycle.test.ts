@@ -3,7 +3,7 @@ import type { TenantConfig } from "../lib/types";
 
 let tenants: TenantConfig[] = [];
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => null),
 }));
 

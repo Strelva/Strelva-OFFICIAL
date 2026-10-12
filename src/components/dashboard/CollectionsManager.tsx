@@ -8,7 +8,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ImageIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { ImageIcon, Plus, Trash2 } from "lucide-react";
+import { StEmpty, StHead, StHold, StMono, StNotice, StPage, StPill, StRow, StRows, StSegmented, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import styles from "./website-library.module.css";
 import { useDashboardOptional } from "./DashboardContext";
 import { AssetPickerModal } from "./AssetPickerModal";
 
@@ -248,52 +250,13 @@ export function CollectionsManager({
     await load(type);
   }
 
-  return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6">
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-warm-black">{TYPE_LABEL[type]}</h1>
-        <div className="flex items-center gap-3">
-          {savedAction && (
-            <span
-              role="status"
-              className="inline-flex items-center rounded-full border border-positive/30 bg-positive/10 px-2.5 py-1 text-[11px] font-medium text-positive"
-            >
-              {savedAction === "published" ? "Published" : "Saved"}
-            </span>
-          )}
-          {!readOnly && (
-            <button
-              onClick={() => {
-                setFieldErrors({});
-                setError(null);
-                setEditing({ data: emptyData(type) });
-              }}
-              className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent"
-            >
-              <Plus className="h-4 w-4" /> New {TYPE_LABEL[type].replace(/s$/, "")}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {types.length > 1 && (
-        <div className="mb-4 flex gap-2">
-          {types.map((t) => (
-            <button
-              key={t}
-              onClick={() => { setType(t); setEditing(null); setFieldErrors({}); setError(null); }}
-              className={`rounded-md px-3 py-1.5 text-sm ${t === type ? "bg-warm-black text-warm-white" : "border border-gray-border text-warm-black"}`}
-            >
-              {TYPE_LABEL[t]}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {error && <p className="mb-3 text-sm text-critical">{error}</p>}
-
-      {editing ? (
-        <div className="rounded-lg border border-gray-border p-4">
+  return <StPage>
+      <StHead title={type === "blog" ? "Articles" : TYPE_LABEL[type]} meta="Content on your website. Open an entry to edit it or prepare a draft." actions={!readOnly ? <StPill variant={editing ? "soft" : "primary"} onClick={() => { setFieldErrors({}); setError(null); setEditing({ data: emptyData(type) }); }}><Plus size={16} aria-hidden="true" />New {TYPE_LABEL[type].replace(/s$/, "")}</StPill> : undefined} />
+      {savedAction ? <span role="status"><StState kind="live">{savedAction === "published" ? "Published" : "Saved"}</StState></span> : null}
+      {readOnly ? <StNotice>You can read these entries. Only an owner or admin can save, publish or delete them.</StNotice> : null}
+      {types.length > 1 ? <StSegmented value={type} label="Content type" options={types.map(value => ({ value, label: TYPE_LABEL[value] }))} onChange={value => { setType(value); setEditing(null); setFieldErrors({}); setError(null); }} /> : null}
+      {error ? <StNotice tone="critical">{error}</StNotice> : null}
+      {editing ? <StSurface label="Website content entry"><div className={styles.brandFields}>
           {FIELDS[type].map((f) => (
             <label key={f.name} className="mb-3 block text-sm">
               <span className="mb-1 block font-medium text-warm-black">
@@ -322,55 +285,18 @@ export function CollectionsManager({
               )}
             </label>
           ))}
-          <div className="mt-4 flex gap-2">
-            {!readOnly && (
-              <>
-                <button disabled={saving} onClick={() => save("published")} className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent disabled:opacity-60">
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish"}
-                </button>
-                <button disabled={saving} onClick={() => save("draft")} className="rounded-md border border-gray-border px-3 py-1.5 text-sm text-warm-black disabled:opacity-60">
-                  Save draft
-                </button>
-              </>
-            )}
-            <button onClick={() => { setEditing(null); setFieldErrors({}); setError(null); }} className="rounded-md px-3 py-1.5 text-sm text-gray-muted">
-              Cancel
-            </button>
+          <div className={styles.actions}>
+            {!readOnly ? <><StHold disabled={saving} label={saving ? "Saving…" : "Hold to make it live"} onAccept={() => void save("published")} /><StPill variant="soft" disabled={saving} onClick={() => void save("draft")}>Save draft</StPill></> : null}
+            <StTextButton onClick={() => { setEditing(null); setFieldErrors({}); setError(null); }}>Cancel</StTextButton>
           </div>
-        </div>
-      ) : loading ? (
-        <div className="flex items-center gap-2 py-10 text-sm text-gray-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-        </div>
-      ) : entries.length === 0 ? (
-        <p className="py-10 text-sm text-gray-muted">No {TYPE_LABEL[type].toLowerCase()} entries yet.</p>
-      ) : (
-        <ul className="divide-y divide-gray-border rounded-lg border border-gray-border">
-          {entries.map((e) => (
-            <li key={e.slug} className="flex items-center justify-between gap-3 p-3">
-              <button className="min-w-0 flex-1 text-left" onClick={() => { setFieldErrors({}); setError(null); setEditing({ slug: e.slug, data: e.data }); }}>
-                <span className="block truncate text-sm font-medium text-warm-black">
-                  {String(e.data.title ?? e.data.name ?? e.slug)}
-                </span>
-                <span className="text-xs text-gray-muted">{e.status}</span>
-              </button>
-              {!readOnly && (
-                <button onClick={() => remove(e.slug)} aria-label="Delete" className="text-gray-muted hover:text-critical">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+        </div></StSurface> : loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading entries"><StSkeleton /><StSkeleton width="70%" /></section> : entries.length === 0 ? <StEmpty>No {TYPE_LABEL[type].toLowerCase()} entries yet.</StEmpty> : <StRows label={TYPE_LABEL[type]}>{entries.map(entry => <StRow key={entry.slug} title={<StTextButton onClick={() => { setFieldErrors({}); setError(null); setEditing({ slug: entry.slug, data: entry.data }); }}>{String(entry.data.title ?? entry.data.name ?? entry.slug)}</StTextButton>} detail={<StState kind={entry.status === "published" ? "live" : "draft"}>{entry.status === "published" ? "Published" : "Draft"}</StState>} end={<>{entry.updatedAt ? <StMono as="time" dateTime={entry.updatedAt}>{new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono> : null}{!readOnly ? <StTextButton tone="danger" onClick={() => void remove(entry.slug)} aria-label="Delete"><Trash2 size={16} aria-hidden="true" /></StTextButton> : null}</>} />)}</StRows>}
 
       <AssetPickerModal
         open={pickingField !== null}
         onClose={() => setPickingField(null)}
         onSelect={onPickImage}
       />
-    </div>
-  );
+    </StPage>;
 }
 
 function FieldInput({
@@ -393,27 +319,20 @@ function FieldInput({
 
   // "Choose from your photos" — so an owner inserts an uploaded image URL instead
   // of pasting one. Shared by the single-URL image fields and the image list.
-  const pickButton = onPickImage && !readOnly && (
-    <button
-      type="button"
-      onClick={onPickImage}
-      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-border px-2.5 py-1.5 text-[12px] font-medium text-warm-black transition-colors hover:border-accent/40"
-    >
-      <ImageIcon className="h-3.5 w-3.5" strokeWidth={1.6} /> Choose from your photos
-    </button>
-  );
+  const pickButton = onPickImage && !readOnly && <StTextButton onClick={onPickImage}><ImageIcon size={16} aria-hidden="true" />Choose from your photos</StTextButton>;
 
   if (field.kind === "textarea") {
-    return <textarea rows={6} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
+    return <textarea disabled={readOnly} rows={6} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
   }
   if (field.kind === "number") {
-    return <input type="number" className={base} value={Number(value ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />;
+    return <input disabled={readOnly} type="number" className={base} value={Number(value ?? 0)} onChange={(e) => onChange(Number(e.target.value))} />;
   }
   if (field.kind === "bool") {
     // Aligned label + checkbox row, consistent with the rest of the form.
     return (
       <span className="inline-flex items-center gap-2">
         <input
+          disabled={readOnly}
           type="checkbox"
           checked={Boolean(value)}
           onChange={(e) => onChange(e.target.checked)}
@@ -428,6 +347,7 @@ function FieldInput({
     return (
       <>
         <input
+          disabled={readOnly}
           className={base}
           value={arr.join(", ")}
           onChange={(e) => onChange(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
@@ -438,7 +358,7 @@ function FieldInput({
   }
   return (
     <>
-      <input type={field.kind === "url" ? "url" : "text"} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
+      <input disabled={readOnly} type={field.kind === "url" ? "url" : "text"} className={base} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
       {pickButton}
     </>
   );

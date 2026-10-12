@@ -2,11 +2,11 @@
  * Admin audit logging - append-only trail for Scaffold super-admin actions.
  */
 
-import type { ActorContext } from "../auth";
+import type { ActorContext } from "@/platform/infra/auth";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { insertAuditLog, listAuditLogs, listAllAuditLogs } from "../db/repositories";
-import type { Row, Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { insertAuditLog, listAuditLogs, listAllAuditLogs } from "@/platform/infra/db/repositories";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

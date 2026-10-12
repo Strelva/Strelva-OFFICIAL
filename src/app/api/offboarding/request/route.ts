@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { logActivity } from "@/lib/storage";
 import { addEvent } from "@/lib/events";
 import { getTenantConfig } from "@/lib/tenants";

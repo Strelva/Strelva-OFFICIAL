@@ -1,0 +1,282 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import {
+  isLocalDatabaseUrl, parseConversionArgs, runTenantConversion, runTenantRollback,
+  type ConversionDeps, type ConversionSources, type RollbackDeps,
+} from "../../scripts/tenant-conversion";
+import { planTenantUnlink, type ConversionReceipt, type TenantUnlinkPreview, type TenantUnlinkReceipt } from "@/platform/business-record";
+import type { TenantConfig } from "@/lib/types";
+
+const fixture = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-source.json"), "utf8"));
+const agencyRouteArgs = [
+  "--agency=77777777-7777-4777-8777-777777777777",
+  "--agency-staff=staff@agency.example.test",
+  "--agency-basis=existing_contract",
+];
+const conversionArgs = (...args: string[]) => ["gldf", ...agencyRouteArgs, ...args];
+const receipt: ConversionReceipt = {
+  kind: "tenant_conversion", version: 1, tenantId: "gldf", tenantStableId: fixture.tenant.stableId, tenantActive: true,
+  workspaceId: "44444444-4444-4444-8444-444444444444", workspaceName: "Great Lakes Dried Fruit", joinedExistingWorkspace: false,
+  operatorId: "55555555-5555-4555-8555-555555555555", operatorRole: "none", operatorMembershipCreated: false,
+  providerRoute: {
+    agencyWorkspaceId: "77777777-7777-4777-8777-777777777777", selectionBasis: "existing_contract", source: "tenant_conversion",
+    providerId: "88888888-8888-4888-8888-888888888888", providerCreatedByConversion: true,
+    seatId: "99999999-9999-4999-8999-999999999999", seatGrantedByKind: "conversion",
+    staff: [{ staffId: "66666666-6666-4666-8666-666666666666", userId: "55555555-5555-4555-8555-555555555556", email: "staff@agency.example.test", createdByConversion: true }],
+    providerToEndId: null, providerToEndWorkspaceId: null,
+    routedAt: "2026-10-02T12:00:00Z",
+  },
+  billing: null, account: null, sequence: 1, revision: 1, changeCount: 14,
+  counts: { facts: 9, services: 2, people: 1, contacts: 3, contactsCreated: 3, contactsMerged: 2, contactsUnchanged: 0 },
+  convertedAt: "2026-10-02T12:00:00Z", replayed: false, alreadyConverted: false,
+};
+
+function sources(overrides: Partial<ConversionSources> = {}): ConversionSources {
+  return {
+    tenant: { ...fixture.tenant, active: true, industry: "food", createdAt: "2026-01-01T00:00:00Z", template: "food-brand", subdomain: "gldf" } as TenantConfig,
+    contact: fixture.contact, settings: fixture.settings, footer: fixture.footer, services: fixture.services,
+    bookingConfig: { timezone: "America/New_York", customised: false, overrides: 0 },
+    leads: fixture.leads, bookings: fixture.bookings, billing: fixture.billing, account: null,
+    ...overrides,
+  };
+}
+
+function deps(overrides: Partial<ConversionDeps> = {}) {
+  const lines: string[] = [];
+  const convert = vi.fn(async () => receipt);
+  const base: ConversionDeps = { read: async () => sources(), readLink: null, convert, log: (line) => lines.push(line), ...overrides };
+  return { deps: base, convert: base.convert as typeof convert, lines };
+}
+
+describe("tenant conversion script", () => {
+  it("defaults to a dry run that prints the plan and writes nothing", async () => {
+    const { deps: d, convert, lines } = deps();
+    const options = parseConversionArgs(conversionArgs());
+    const outcome = await runTenantConversion({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d);
+    expect(options.apply).toBe(false);
+    expect(outcome.mode).toBe("dry-run");
+    expect(outcome.receipt).toBeNull();
+    expect(convert).not.toHaveBeenCalled();
+    expect(lines.join("\n")).toContain("phone: \"716-555-0199\"");
+    expect(lines.join("\n")).toContain("GRANDFATHERED");
+    expect(lines.join("\n")).toContain("agency=77777777-7777-4777-8777-777777777777 source=tenant_conversion basis=existing_contract");
+    expect(lines.join("\n")).toContain("operator client membership: none");
+    expect(lines.at(-1)).toBe("Dry run: nothing was written.");
+  });
+
+  it("refuses --apply against a non-local database without Jacob's yes", async () => {
+    const { deps: d, convert } = deps();
+    const options = parseConversionArgs(conversionArgs("--apply", "--operator-email=operator@strelva.example.test"));
+    await expect(runTenantConversion({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantConversion({ ...options, databaseUrl: undefined }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantConversion({ ...parseConversionArgs(conversionArgs("--apply")), databaseUrl: "http://127.0.0.1:54321" }, d)).rejects.toThrow(/operator-email/);
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it("requires an explicit agency, named staff and selection basis", async () => {
+    const { deps: d, convert } = deps();
+    expect(() => parseConversionArgs(["gldf"])).toThrow(/no default agency/);
+    await expect(runTenantConversion({ ...parseConversionArgs(conversionArgs()), agencyWorkspaceId: undefined }, d)).rejects.toThrow(/agency workspace UUID/);
+    expect(convert).not.toHaveBeenCalled();
+  });
+
+  it("applies once against a loopback database with the exact planned command", async () => {
+    const { deps: d, convert } = deps();
+    const options = parseConversionArgs(conversionArgs("--apply", "--operator-email=operator@strelva.example.test"));
+    const outcome = await runTenantConversion({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
+    expect(convert).toHaveBeenCalledTimes(1);
+    const committed = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-import.json"), "utf8"));
+    expect(convert.mock.calls[0]).toEqual(["operator@strelva.example.test", {
+      ...committed.payload,
+      agencyWorkspaceId: "77777777-7777-4777-8777-777777777777",
+      agencyStaffEmails: ["staff@agency.example.test"],
+      agencySelectionBasis: "existing_contract",
+    }, { commandId: outcome.plan.commandId, digest: outcome.plan.digest }]);
+    expect(outcome.receipt?.workspaceId).toBe(receipt.workspaceId);
+  });
+
+  it("points a multi-site account's next site at the business its sibling already joined", async () => {
+    const readLink = vi.fn(async (_email: string, tenantId: string) => ({
+      tenantId, tenantStableId: fixture.tenant.stableId, siteName: tenantId,
+      link: tenantId === "sister-site" ? { workspaceId: "66666666-6666-4666-8666-666666666666", linkedBy: receipt.operatorId, linkedAt: "2026-10-02T12:00:00Z", receipt: {} } : null,
+    }));
+    const { deps: d, lines } = deps({
+      read: async () => sources({ account: { id: "acct-1", name: "Twin Trees", tenantIds: ["gldf", "sister-site"], multiSite: true } }),
+      readLink,
+    });
+    const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--operator-email=operator@strelva.example.test")), databaseUrl: "http://localhost:54321" }, d);
+    expect(outcome.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
+    expect(outcome.plan.payload.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
+    expect(lines.join("\n")).toContain("MULTI-SITE");
+    expect(outcome.plan.payload.separateBusiness).toBeUndefined();
+    expect(lines.join("\n")).toContain("pass --separate-business");
+  });
+
+  describe("--separate-business", () => {
+    const sister = "66666666-6666-4666-8666-666666666666";
+    const twin = { id: "acct-1", name: "Twin Trees", tenantIds: ["gldf", "sister-site"], multiSite: true };
+    const readLink = () => vi.fn(async (_email: string, tenantId: string) => ({
+      tenantId, tenantStableId: fixture.tenant.stableId, siteName: tenantId,
+      link: tenantId === "sister-site" ? { workspaceId: sister, linkedBy: receipt.operatorId, linkedAt: "2026-10-02T12:00:00Z", receipt: {} } : null,
+    }));
+
+    it("parses the flag, defaults it off, and refuses it on a rollback", () => {
+      expect(parseConversionArgs(conversionArgs()).separateBusiness).toBe(false);
+      expect(parseConversionArgs(conversionArgs("--separate-business")).separateBusiness).toBe(true);
+      expect(parseConversionArgs(conversionArgs("--separate-business", "--apply", "--operator-email=o@strelva.example.test")).apply).toBe(true);
+      expect(() => parseConversionArgs(["gldf", "--separate-business", "--rollback"])).toThrow(/not a rollback/);
+      expect(() => parseConversionArgs(["gldf", "--separate-businesses"])).toThrow(/Unknown flag/);
+    });
+
+    it("dry run: does not join the sibling's business and says why", async () => {
+      const { deps: d, convert, lines } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
+      const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--separate-business", "--operator-email=operator@strelva.example.test")), databaseUrl: "http://localhost:54321" }, d);
+      expect(outcome.targetWorkspaceId).toBeNull();
+      expect(outcome.plan.payload.targetWorkspaceId).toBeUndefined();
+      expect(outcome.plan.payload.separateBusiness).toBe(true);
+      // Named for the site, not the shared account.
+      expect(outcome.plan.payload.workspaceName).toBe(fixture.tenant.siteName);
+      const text = lines.join("\n");
+      expect(text).toContain("--separate-business: this site becomes its own business");
+      expect(text).toContain(`sister-site -> ${sister} (not joined: --separate-business)`);
+      expect(text).toContain("would create a separate customer business");
+      expect(convert).not.toHaveBeenCalled();
+    });
+
+    it("apply passes the flag through in the exact planned payload", async () => {
+      const { deps: d, convert } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
+      const outcome = await runTenantConversion({
+        ...parseConversionArgs(conversionArgs("--separate-business", "--apply", "--operator-email=operator@strelva.example.test")), databaseUrl: "http://127.0.0.1:54321",
+      }, d);
+      expect(convert).toHaveBeenCalledTimes(1);
+      const [, payload, plan] = convert.mock.calls[0] as unknown as [string, { separateBusiness?: boolean; targetWorkspaceId?: string }, { commandId: string; digest: string }];
+      expect(payload.separateBusiness).toBe(true);
+      expect(payload.targetWorkspaceId).toBeUndefined();
+      expect(plan).toEqual({ commandId: outcome.plan.commandId, digest: outcome.plan.digest });
+    });
+
+    it("gives a separate business a different command than the default join", async () => {
+      const run = async (argv: string[]) => runTenantConversion({ ...parseConversionArgs([...argv, ...agencyRouteArgs]), databaseUrl: "http://localhost:54321" },
+        deps({ read: async () => sources({ account: twin }), readLink: readLink() }).deps);
+      const joined = await run(["gldf", "--operator-email=operator@strelva.example.test"]);
+      const separate = await run(["gldf", "--separate-business", "--operator-email=operator@strelva.example.test"]);
+      expect(separate.plan.digest).not.toBe(joined.plan.digest);
+      expect(separate.plan.commandId).not.toBe(joined.plan.commandId);
+    });
+
+    it("is ignored on a single-site tenant, leaving the default payload byte-identical", async () => {
+      const { deps: d, lines } = deps();
+      const outcome = await runTenantConversion({ ...parseConversionArgs(conversionArgs("--separate-business")), databaseUrl: "http://localhost:54321" }, d);
+      const committed = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-import.json"), "utf8"));
+      expect(outcome.plan.payload).toEqual({ ...committed.payload, agencyWorkspaceId: "77777777-7777-4777-8777-777777777777",
+        agencyStaffEmails: ["staff@agency.example.test"], agencySelectionBasis: "existing_contract" });
+      expect(lines.join("\n")).toContain("--separate-business: ignored");
+    });
+  });
+
+  it("recognizes only loopback hosts as local and rejects unknown flags", () => {
+    expect(isLocalDatabaseUrl("http://127.0.0.1:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("http://localhost:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("http://[::1]:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("https://abcdefghijklmnopqrst.supabase.co")).toBe(false);
+    expect(isLocalDatabaseUrl("http://127.0.0.1.attacker.example")).toBe(false);
+    expect(isLocalDatabaseUrl(undefined)).toBe(false);
+    expect(() => parseConversionArgs(["gldf", "--yes"])).toThrow(/Unknown flag/);
+    expect(() => parseConversionArgs(["gldf", "--apply", "--dry-run"])).toThrow();
+  });
+});
+
+const linkedPreview: TenantUnlinkPreview = {
+  tenantId: "gldf", tenantStableId: fixture.tenant.stableId,
+  plan: {
+    linkId: "77777777-7777-4777-8777-777777777777", tenantStableId: fixture.tenant.stableId,
+    workspaceId: receipt.workspaceId, workspaceName: "Great Lakes Dried Fruit", linkedAt: "2026-10-02T12:00:00Z", importSequence: 1,
+    deleteWorkspace: false, workspaceKeptBecause: ["other_members", "record_has_other_data"],
+    entities: { removed: 14, restored: 0, kept: 1, alreadyReverted: 0 },
+    kept: [{ entity: "fact", id: "phone", reason: "changed_after_import" }],
+    leadsDetached: 3, systemsAdoptedFromTenant: 0,
+  },
+  lastUnlink: null,
+};
+const unlinkReceipt: TenantUnlinkReceipt = {
+  kind: "tenant_unlink", version: 1, tenantId: "gldf", tenantStableId: fixture.tenant.stableId,
+  workspaceId: receipt.workspaceId, workspaceName: "Great Lakes Dried Fruit", linkId: linkedPreview.plan!.linkId,
+  linkedAt: "2026-10-02T12:00:00Z", importSequence: 1, operatorId: receipt.operatorId,
+  workspaceDeleted: false, workspaceKeptBecause: ["other_members", "record_has_other_data"],
+  entities: { removed: 14, restored: 0, kept: 1, alreadyReverted: 0 }, kept: linkedPreview.plan!.kept,
+  leadsDetached: 3, systemsAdoptedFromTenant: 0, sequence: 3, revision: 3, conversionReceipt: { ...receipt },
+  unlinkedAt: "2026-10-05T12:00:00Z", replayed: false, alreadyUnlinked: false,
+};
+
+function rollbackDeps(overrides: Partial<RollbackDeps> = {}) {
+  const lines: string[] = [];
+  const preview = vi.fn(async () => linkedPreview);
+  const unlink = vi.fn(async () => unlinkReceipt);
+  const base: RollbackDeps = { preview, unlink, log: (line) => lines.push(line), ...overrides };
+  return { deps: base, preview: base.preview as typeof preview, unlink: base.unlink as typeof unlink, lines };
+}
+
+describe("tenant conversion rollback", () => {
+  it("parses --rollback and defaults it to a dry run", () => {
+    const options = parseConversionArgs(["gldf", "--rollback", "--operator-email=operator@strelva.example.test"]);
+    expect(options).toMatchObject({ slug: "gldf", rollback: true, apply: false });
+    expect(parseConversionArgs(conversionArgs()).rollback).toBe(false);
+  });
+
+  it("previews without writing and prints what it would remove, keep and detach", async () => {
+    const { deps: d, preview, unlink, lines } = rollbackDeps();
+    const options = parseConversionArgs(["gldf", "--rollback", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d);
+    expect(outcome.mode).toBe("dry-run");
+    expect(outcome.receipt).toBeNull();
+    expect(preview).toHaveBeenCalledWith("operator@strelva.example.test", "gldf");
+    expect(unlink).not.toHaveBeenCalled();
+    const text = lines.join("\n");
+    expect(text).toContain("would remove 14 imported item(s)");
+    expect(text).toContain("keep fact phone: changed_after_import");
+    expect(text).toContain("would detach 3 lead(s)");
+    expect(text).toContain("keep it (other_members, record_has_other_data)");
+    expect(text).toContain("database: NOT local");
+    expect(lines.at(-1)).toBe("Dry run: nothing was written.");
+  });
+
+  it("refuses --apply against a non-local database and needs an operator and a database", async () => {
+    const { deps: d, preview, unlink } = rollbackDeps();
+    const apply = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    await expect(runTenantRollback({ ...apply, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantRollback({ ...apply, databaseUrl: undefined }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantRollback({ ...parseConversionArgs(["gldf", "--rollback"]), databaseUrl: "http://127.0.0.1:54321" }, d)).rejects.toThrow(/operator-email/);
+    await expect(runTenantRollback({ ...apply, databaseUrl: "http://127.0.0.1:54321" }, { ...d, preview: null })).rejects.toThrow(/needs a database/);
+    expect(preview).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("applies once against a loopback database with the command bound to the previewed link", async () => {
+    const { deps: d, unlink, lines } = rollbackDeps();
+    const options = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
+    const expected = planTenantUnlink({ tenantId: "gldf", tenantStableId: fixture.tenant.stableId, workspaceId: receipt.workspaceId, linkedAt: "2026-10-02T12:00:00Z" });
+    expect(unlink).toHaveBeenCalledTimes(1);
+    expect(unlink.mock.calls[0]).toEqual(["operator@strelva.example.test", expected]);
+    expect(outcome.receipt?.workspaceDeleted).toBe(false);
+    expect(lines.at(-1)).toContain("Unlinked: business 44444444-4444-4444-8444-444444444444 kept (other_members, record_has_other_data)");
+
+    const again = await runTenantRollback({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
+    expect(unlink.mock.calls[1]).toEqual(unlink.mock.calls[0]);
+    expect(again.command).toEqual(outcome.command);
+  });
+
+  it("does nothing for a tenant that is not linked", async () => {
+    const { deps: d, unlink, lines } = rollbackDeps({
+      preview: async () => ({ tenantId: "gldf", tenantStableId: fixture.tenant.stableId, plan: null, lastUnlink: unlinkReceipt }),
+    });
+    const options = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "http://localhost:54321" }, d);
+    expect(outcome.receipt).toBeNull();
+    expect(outcome.command).toBeNull();
+    expect(unlink).not.toHaveBeenCalled();
+    expect(lines.join("\n")).toContain(`last unlinked from ${receipt.workspaceId}`);
+    expect(lines.at(-1)).toBe("Nothing to roll back. Nothing was written.");
+  });
+});

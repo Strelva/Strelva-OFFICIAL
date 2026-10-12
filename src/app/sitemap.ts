@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL, sitePageUrl } from "@/platform/infra/brand";
 import { getHostedSite } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";
@@ -7,7 +7,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const hosted = await getHostedSite();
   if (hosted) {
     if (hosted.preview) return [];
-    return hosted.document.pages.map(page => ({ url: new URL(page.path, hosted.origin).toString(), changeFrequency: page.path === "/" ? "weekly" : "monthly", priority: page.path === "/" ? 1 : .8 }));
+    return hosted.document.pages.map(page => ({ url: sitePageUrl(page.path, hosted.origin), changeFrequency: page.path === "/" ? "weekly" : "monthly", priority: page.path === "/" ? 1 : .8 }));
   }
   const base = process.env.NEXT_PUBLIC_SITE_URL || MARKETING_URL;
 

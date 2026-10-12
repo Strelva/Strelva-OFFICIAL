@@ -250,8 +250,8 @@ export function TrackerExperimentForm({ workId, expectedRevision, readOnly = fal
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "The experiment could not be recorded.");
       setMessage(result?.evidence?.kind === "candidate_comparison" || result?.evidence?.version === 2
-        ? "Comparison recorded in My work. Evidence remains experimental and is not a verified customer savings claim."
-        : "Experiment recorded in My work. These are reported observations, not verified customer savings.");
+        ? "Comparison recorded in My work. Evidence remains experimental and is not a verified business savings claim."
+        : "Experiment recorded in My work. These are reported observations, not verified business savings.");
     } catch (error) {
       setFailed(true);
       if (error instanceof z.ZodError) {

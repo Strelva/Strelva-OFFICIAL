@@ -8,15 +8,18 @@
  * sign-in.
  */
 
-import { useState } from "react";
-import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { StField, StHead, StMono, StPill, StPillLink, StTextButton, StNotice } from "@/components/ui/strelva/Kit";
+import { useState, type ReactNode } from "react";
+import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 export function SupabaseSignIn({
   next = "/account",
   prefillEmail = "",
+  heading,
 }: {
   next?: string;
   prefillEmail?: string;
+  heading?: ReactNode;
 }) {
   const [email, setEmail] = useState(prefillEmail);
   const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">("idle");
@@ -32,26 +35,22 @@ export function SupabaseSignIn({
     if (!supabase) return fail("Sign-in is not configured.");
     setStatus("google");
     setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: redirectTo() },
-    });
-    if (error) fail(error.message);
-    // on success the browser is redirected to Google.
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
+      if (error) fail(error.message);
+    } catch { fail("Sign-in is temporarily unavailable. Try again."); }
   }
 
-  async function sendMagicLink(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendMagicLink(event?: React.FormEvent) {
+    event?.preventDefault();
     const supabase = createBrowserSupabase();
     if (!supabase) return fail("Sign-in is not configured.");
-    setStatus("sending");
-    setError(null);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo() },
-    });
-    if (error) fail(error.message);
-    else setStatus("sent");
+    setStatus("sending"); setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo() } });
+      if (error) fail(error.message);
+      else setStatus("sent");
+    } catch { fail("The sign-in link could not be sent. Try again."); }
   }
 
   function fail(message: string) {
@@ -59,53 +58,21 @@ export function SupabaseSignIn({
     setStatus("error");
   }
 
-  if (status === "sent") {
-    return (
-      <div className="text-[15px] leading-[1.7] text-m-text-2">
-        <p className="font-medium text-m-text">Check your email.</p>
-        <p className="mt-2">
-          We sent a sign-in link to <strong>{email}</strong>. Open it on this device to continue.
-        </p>
-      </div>
-    );
-  }
+  if (status === "sent") return <div className="flex flex-col gap-5">
+    <StHead title="Check your email" meta="We sent a sign-in link to" />
+    <StMono tone="text">{email}</StMono>
+    <p className="text-sm text-gray-muted">Open it on this device to continue.</p>
+    <div className="flex flex-wrap gap-3"><StPillLink href="https://mail.google.com" variant="soft">Open Gmail</StPillLink><StPillLink href="https://outlook.live.com/mail" variant="soft">Open Outlook</StPillLink></div>
+    <div className="flex flex-wrap gap-5"><StTextButton tone="accent" onClick={() => void sendMagicLink()}>Send again</StTextButton><StTextButton tone="accent" onClick={() => { setEmail(""); setStatus("idle"); }}>Use a different email</StTextButton></div>
+  </div>;
 
-  return (
-    <div className="flex flex-col gap-4">
-      <button
-        type="button"
-        onClick={signInWithGoogle}
-        disabled={status === "google"}
-        className="marketing-button-primary h-11 w-full justify-center px-5 text-[14px] disabled:opacity-60"
-      >
-        {status === "google" ? "Redirecting…" : "Continue with Google"}
-      </button>
-
-      <div className="flex items-center gap-3 text-[12px] text-m-text-3">
-        <span className="h-px flex-1 bg-m-rule" />
-        or
-        <span className="h-px flex-1 bg-m-rule" />
-      </div>
-
-      <form onSubmit={sendMagicLink} className="flex flex-col gap-3">
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@business.com"
-          className="h-11 rounded-[12px] border border-m-rule bg-m-paper px-4 text-[14px] text-m-text outline-none focus:border-m-accent"
-        />
-        <button
-          type="submit"
-          disabled={status === "sending"}
-          className="marketing-button-secondary h-11 w-full justify-center px-5 text-[14px] disabled:opacity-60"
-        >
-          {status === "sending" ? "Sending…" : "Email me a sign-in link"}
-        </button>
-      </form>
-
-      {error && <p className="text-[13px] text-[color:var(--m-danger,#d33)]">{error}</p>}
-    </div>
-  );
+  return <div className="flex flex-col gap-5">
+    {heading}
+    <form onSubmit={sendMagicLink} className="flex flex-col gap-5">
+      <StField label="Email"><input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@business.com" disabled={status === "sending" || status === "google"} /></StField>
+      <StPill type="submit" block busy={status === "sending"} disabled={status === "google"}>Email me a sign-in link</StPill>
+    </form>
+    <StPill variant="soft" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</StPill>
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  </div>;
 }

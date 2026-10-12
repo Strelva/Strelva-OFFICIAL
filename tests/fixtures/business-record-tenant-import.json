@@ -1,0 +1,177 @@
+{
+  "commandId": "7c51194c-11fe-4889-a29d-1de0bcd51eac",
+  "digest": "49a6439e6eef0e53c5459b6a017d0651bc41fb999b787d88c9ebbf597f0434a2",
+  "payload": {
+    "tenantId": "gldf",
+    "tenantStableId": "c0ffee00-0000-4000-8000-0000000000a1",
+    "workspaceName": "Great Lakes Dried Fruit",
+    "billing": {
+      "billingType": "tier",
+      "subscriptionStatus": "active",
+      "subscriptionPlan": null,
+      "monthlyCents": 19900,
+      "hasStripeSubscription": false,
+      "grandfathered": true
+    },
+    "account": null,
+    "patch": {
+      "facts": {
+        "display_name": {
+          "value": "Great Lakes Dried Fruit",
+          "verified": false
+        },
+        "phone": {
+          "value": "716-555-0199",
+          "verified": false
+        },
+        "email": {
+          "value": "hello@example.com",
+          "verified": false
+        },
+        "address": {
+          "value": {
+            "formatted": "123 Example St, Buffalo, NY 14201"
+          },
+          "verified": false
+        },
+        "description": {
+          "value": "Dried fruit and nuts, packed in Western New York.",
+          "verified": false
+        },
+        "service_area": {
+          "value": [
+            "Buffalo, NY",
+            "Amherst, NY"
+          ],
+          "verified": false
+        },
+        "owner_recipient": {
+          "value": {
+            "email": "owner@example.com",
+            "name": "Pat Example"
+          },
+          "verified": false
+        },
+        "links": {
+          "value": [
+            {
+              "kind": "website",
+              "url": "https://example.com/"
+            },
+            {
+              "kind": "booking",
+              "url": "https://example.com/book"
+            },
+            {
+              "kind": "instagram",
+              "url": "https://instagram.com/example"
+            },
+            {
+              "kind": "google_maps",
+              "url": "https://www.google.com/maps/place/example"
+            },
+            {
+              "kind": "tiktok",
+              "url": "https://www.tiktok.com/@example",
+              "label": "TikTok"
+            }
+          ],
+          "verified": false
+        },
+        "hours": {
+          "value": {
+            "timezone": "America/New_York",
+            "weekly": [
+              {
+                "day": 1,
+                "opens": "10:00",
+                "closes": "16:00"
+              },
+              {
+                "day": 2,
+                "opens": "12:00",
+                "closes": "18:00"
+              }
+            ],
+            "overrides": [
+              {
+                "date": "2026-12-25",
+                "closed": true,
+                "label": "Christmas"
+              }
+            ]
+          },
+          "verified": false
+        }
+      },
+      "services": [
+        {
+          "op": "upsert",
+          "name": "Tasting visit",
+          "description": "Try the range in the shop.",
+          "durationMinutes": 30,
+          "priceText": "Free",
+          "active": true,
+          "position": 0,
+          "externalRef": "svc-tasting"
+        },
+        {
+          "op": "upsert",
+          "name": "Wholesale consult",
+          "description": null,
+          "durationMinutes": null,
+          "priceText": null,
+          "active": false,
+          "position": 1,
+          "externalRef": "svc-wholesale"
+        }
+      ],
+      "people": [
+        {
+          "op": "upsert",
+          "name": "Pat Example",
+          "roleTitle": "Owner",
+          "email": "owner@example.com",
+          "phone": "(716) 555-0100"
+        }
+      ]
+    },
+    "contacts": [
+      {
+        "name": "Riley Booker",
+        "email": "riley@example.net",
+        "phone": null,
+        "source": "booking",
+        "seenAt": "2026-07-04T10:00:00.000Z"
+      },
+      {
+        "name": "Jordan Sample",
+        "email": "jordan@example.org",
+        "phone": "716 555 0111",
+        "source": "inquiry",
+        "seenAt": "2026-08-01T14:00:00.000Z"
+      },
+      {
+        "name": "Jordan S",
+        "email": "jordan@example.org",
+        "phone": null,
+        "source": "inquiry",
+        "seenAt": "2026-09-01T14:00:00.000Z"
+      },
+      {
+        "name": "Casey Phone",
+        "email": null,
+        "phone": "+1 (716) 555-0122",
+        "source": "inquiry",
+        "seenAt": "2026-09-10T09:30:00.000Z"
+      },
+      {
+        "name": "Casey Phone",
+        "email": "casey@example.net",
+        "phone": "716-555-0122",
+        "source": "booking",
+        "seenAt": "2026-09-12T10:00:00.000Z"
+      }
+    ]
+  }
+}

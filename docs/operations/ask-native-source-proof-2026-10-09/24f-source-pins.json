@@ -1,0 +1,105 @@
+{
+  "baseline": "39e27a71e7a6ab505adaa3b9620000a04d96d955",
+  "branch": "codex/native-app-ask-20261009",
+  "sourcePins": [
+    {
+      "path": "src/platform/ask/native-systems.ts",
+      "sha256": "e7803599922cf686fbe2420ff35b44aec310bd580786319e6159304c3d1706fc"
+    },
+    {
+      "path": "src/app/api/workspace/ask/native-systems-server.ts",
+      "sha256": "5853718f53786bf3c7460782ddaf95cb4b0c1e82a03bf9e40e717d664bddc722"
+    },
+    {
+      "path": "src/platform/ask/tools.ts",
+      "sha256": "b576f71710b2e043bd1fc6a878f5e5c98ae98ef050ba6a73665846b9ab8d95aa"
+    },
+    {
+      "path": "src/platform/ask/resolution.ts",
+      "sha256": "d0d7d3e157c7106773cd4f94c9f429aa8889c10cb87a407d0c2680f054a69a74"
+    },
+    {
+      "path": "src/platform/ask/turn.ts",
+      "sha256": "525778bf6988f952c6eb570f1b451c8d24ba949a0f065d3cbed04628c992c0c0"
+    },
+    {
+      "path": "src/app/api/workspace/ask/route.ts",
+      "sha256": "dd6272abbb1dc8309f9b57a8dc7224721fe99a5026217e25b5bf8ba0536f80c2"
+    },
+    {
+      "path": "src/platform/ask/contracts.ts",
+      "sha256": "19f47ddfbd32d46b2063792d37d6a08a27e685a5bc87cb2f47d813d1074b5857"
+    },
+    {
+      "path": "src/platform/ask/classify.ts",
+      "sha256": "ba55e86afc82f3b4485eb1ffd383b598a82143cb4d075656a6ba7f988a1239f7"
+    },
+    {
+      "path": "src/experience/workspace/agency/SourcePackageControls.tsx",
+      "sha256": "5d9a030f2defcde8b0ff159ec035f42c72ad2e69a24a4079c9e72ddd08b4557b"
+    },
+    {
+      "path": "src/__tests__/ask-native-systems.test.ts",
+      "sha256": "ca3021873a24eaf9e264d2fdef25388ec1b15c011c0c745c9c2205f72f345e36"
+    },
+    {
+      "path": "src/__tests__/ask-native-tools.test.ts",
+      "sha256": "684ba3f4b2becb142f9d59c2b5f4831dc25cae19c0e57931a5ab12e7cb1235e6"
+    },
+    {
+      "path": "src/__tests__/source-package-recovery-ui.test.tsx",
+      "sha256": "5b416a8b371721f537a30c488b30120ce7a6fc3b8b53dd6eda5770844aea70d3"
+    },
+    {
+      "path": "src/__tests__/ask-strelva.test.ts",
+      "sha256": "7abaade9b355b548fde8285500cf91c77ad91eaf8675300b65cbef87b2288f39"
+    }
+  ],
+  "focusedTests": {
+    "files": 8,
+    "passed": 560,
+    "failed": 0,
+    "log": "docs/operations/ask-native-source-proof-2026-10-09/focused-green-final.log",
+    "stores": "real native/Version reference domains; mocked transport/decision/RPC where stated"
+  },
+  "focusedEslint": {
+    "exitCode": 0,
+    "sourceFiles": 13,
+    "registryFiles": 1,
+    "log": "docs/operations/ask-native-source-proof-2026-10-09/scoped-lint.log"
+  },
+  "red": [
+    {
+      "name": "canonical-system-original-red",
+      "source": "src/platform/ask/turn.ts",
+      "baseline": "39e27a71e7a6ab505adaa3b9620000a04d96d955",
+      "originalSha256": "2d851bcb653af577dd4a86350fc7ec996aca49d83247924117bedb76e6e1487f",
+      "candidateSha256": "525778bf6988f952c6eb570f1b451c8d24ba949a0f065d3cbed04628c992c0c0",
+      "exitCode": 1,
+      "restorationVerified": true,
+      "log": "docs/operations/ask-native-source-proof-2026-10-09/canonical-system-original-red.log"
+    },
+    {
+      "name": "listing-response-original-red",
+      "source": "src/experience/workspace/agency/SourcePackageControls.tsx",
+      "baseline": "39e27a71e7a6ab505adaa3b9620000a04d96d955",
+      "originalSha256": "8fa6263ba16687491fdad8e6a83138a0657b07f4d7d8467db6fe176580f5b112",
+      "candidateSha256": "bdaa1c23c53f77b4e4a5819ff25c6afeae0943f3fe9f6c8057761bf27cdc2c3c",
+      "exitCode": 1,
+      "restorationVerified": true,
+      "log": "docs/operations/ask-native-source-proof-2026-10-09/listing-response-original-red.log"
+    }
+  ],
+  "fullTypecheck": "UNRUN; coordinator scheduled after freeze",
+  "fullBuild": "UNRUN for this successor",
+  "nativeAuthBrowserModelProvider": "UNRUN; no commercial/provider/client qualification",
+  "fullReleaseQualified": false,
+  "newMigrations": 0,
+  "nativeRaceRequirements": 20,
+  "unsupportedOutcomes": [
+    "new/arbitrary native app creation",
+    "field/type/record/account/maintenance changes",
+    "chat approval/publication",
+    "full native assistance"
+  ]
+}

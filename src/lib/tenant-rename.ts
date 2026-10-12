@@ -14,10 +14,88 @@
  * by re-running `rekeyTenantRedis(old, new)` (idempotent). Caches are NOT rekeyed
  * (they rebuild from Postgres); only `reb:tenants:all` is busted.
  */
-import { getRedis } from "./redis";
-import { getSupabase } from "./db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { getSupabase } from "@/platform/infra/db/client";
 import { RESERVED_SUBDOMAINS } from "./tenant-host";
 import type { UnifiedEvent } from "./types";
+import { LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_LAST_FAILURE_KEY } from "./lead-mirror";
+
+/** Move a pending lead and its queue identity in one transaction. A worker
+ * that already read the old member can only remove that old member; the new
+ * member always points at a readable lead. RENAME keeps the lead's TTL. */
+export const REKEY_LEAD_MIRROR_LUA = `
+local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+local moved = 0
+local prefix = ARGV[1] .. ':'
+for i = 1, #rows, 2 do
+  local member = rows[i]
+  if string.sub(member, 1, #prefix) == prefix then
+    local id = string.sub(member, #prefix + 1)
+    local oldKey = 'lead:' .. ARGV[1] .. ':' .. id
+    local newKey = 'lead:' .. ARGV[2] .. ':' .. id
+    if redis.call('EXISTS', oldKey) == 1 then redis.call('RENAME', oldKey, newKey) end
+    if redis.call('EXISTS', newKey) == 1 then
+      local nextMember = ARGV[2] .. ':' .. id
+      local nextScore = redis.call('ZSCORE', KEYS[1], nextMember)
+      if not nextScore or tonumber(rows[i+1]) < tonumber(nextScore) then
+        redis.call('ZADD', KEYS[1], rows[i+1], nextMember)
+      end
+      redis.call('ZREM', KEYS[1], member)
+      moved = moved + 1
+    end
+  end
+end
+local rewritten = 0
+local diagnostic = redis.call('GET', KEYS[2])
+if diagnostic then
+  local ok, value = pcall(cjson.decode, diagnostic)
+  if ok and type(value) == 'table' and value.tenant == ARGV[1] then
+    value.tenant = ARGV[2]
+    redis.call('SET', KEYS[2], cjson.encode(value))
+    rewritten = 1
+  end
+end
+return {moved, rewritten}
+`;
+
+/** Pending client-record snapshots outlive their source cache. Move the
+ * queue identity and retained snapshot together; a worker holding the old
+ * identity cannot remove the newly renamed retry. */
+export const REKEY_CLIENT_RECORD_PENDING_LUA = `
+local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+local moved = 0
+for i = 1, #rows, 2 do
+  local store, tenant, id = string.match(rows[i], '^([^|]+)|([^|]+)|(.+)$')
+  if tenant == ARGV[1] then
+    local nextMember = store .. '|' .. ARGV[2] .. '|' .. id
+    local oldKey = ARGV[3] .. rows[i]
+    local nextKey = ARGV[3] .. nextMember
+    local oldBody = redis.call('GET', oldKey)
+    local nextBody = redis.call('GET', nextKey)
+    local useOld = oldBody and not nextBody
+    if oldBody and nextBody then
+      local oldOk, oldValue = pcall(cjson.decode, oldBody)
+      local nextOk, nextValue = pcall(cjson.decode, nextBody)
+      if oldOk and nextOk and oldValue.capturedAt and nextValue.capturedAt then
+        if store == 'inquiry_reply' then
+          useOld = oldValue.capturedAt < nextValue.capturedAt
+        else
+          useOld = oldValue.capturedAt > nextValue.capturedAt
+        end
+      end
+    end
+    if useOld then redis.call('RENAME', oldKey, nextKey)
+    elseif oldBody then redis.call('DEL', oldKey) end
+    local nextScore = redis.call('ZSCORE', KEYS[1], nextMember)
+    if not nextScore or tonumber(rows[i+1]) < tonumber(nextScore) then
+      redis.call('ZADD', KEYS[1], rows[i+1], nextMember)
+    end
+    redis.call('ZREM', KEYS[1], rows[i])
+    moved = moved + 1
+  end
+end
+return moved
+`;
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,40})$/;
 
@@ -70,6 +148,10 @@ export const authoritativePatterns = (t: string): string[] => [
   `reb:inquiry-capture-repair:${t}`, // durable capture-repair due index
   `reb:inquiry-capture-repair-job:${t}:*`, // capture-repair payloads
   `reb:inquiry-capture-repair-claim:${t}:*`, // capture-repair leases
+  // Submissions held as spam, including false positives (30-day TTL):
+  `reb:spam-pit:${t}`, // sorted index
+  `reb:spam-pit:item:${t}:*`, // one JSON record per held submission
+  `reb:client-email:${t}`, // operator's per-client email override
 ];
 
 export type RenameResult = {
@@ -101,6 +183,66 @@ function rewriteBlobTenant(value: unknown, oldSlug: string, newSlug: string): { 
   return { value: rec, changed };
 }
 
+/** Moves a non-string key in one atomic step. Returns the key's type, `none`
+ *  when the source is gone, or `string` (moved by the caller, which rewrites the
+ *  embedded tenant field). A free destination takes RENAME, which keeps the
+ *  TTL. An occupied destination (written under the new slug after the database
+ *  rename) keeps its own data and TTL: sorted-set members keep the higher
+ *  score, hash fields and set members already there win, and list items from
+ *  the old key are appended. Exported for the real-Redis test. */
+export const MOVE_TENANT_KEY_LUA = `
+local kind = redis.call('TYPE', KEYS[1])['ok']
+if kind == 'none' or kind == 'string' then return kind end
+if redis.call('EXISTS', KEYS[2]) == 0 then
+  redis.call('RENAME', KEYS[1], KEYS[2])
+  return kind
+end
+if kind == 'zset' then
+  local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+  for i = 1, #rows, 2 do
+    local current = redis.call('ZSCORE', KEYS[2], rows[i])
+    if not current or tonumber(current) < tonumber(rows[i + 1]) then
+      redis.call('ZADD', KEYS[2], rows[i + 1], rows[i])
+    end
+  end
+elseif kind == 'hash' then
+  local rows = redis.call('HGETALL', KEYS[1])
+  for i = 1, #rows, 2 do redis.call('HSETNX', KEYS[2], rows[i], rows[i + 1]) end
+elseif kind == 'set' then
+  local rows = redis.call('SMEMBERS', KEYS[1])
+  for i = 1, #rows do redis.call('SADD', KEYS[2], rows[i]) end
+elseif kind == 'list' then
+  local rows = redis.call('LRANGE', KEYS[1], 0, -1)
+  for i = 1, #rows do redis.call('RPUSH', KEYS[2], rows[i]) end
+else
+  return redis.error_reply('tenant_rename_unsupported_type:' .. kind)
+end
+redis.call('DEL', KEYS[1])
+return 'merged:' .. kind
+`;
+
+type RenameRedis = NonNullable<ReturnType<typeof getRedis>>;
+
+async function moveTenantKey(
+  redis: RenameRedis,
+  key: string,
+  newKey: string,
+  oldSlug: string,
+  newSlug: string,
+): Promise<{ moved: boolean; rewritten: boolean }> {
+  const kind = String(await redis.eval<[], string>(MOVE_TENANT_KEY_LUA, [key, newKey], []));
+  if (kind === "none") return { moved: false, rewritten: false };
+  if (kind !== "string") return { moved: true, rewritten: false };
+  const value = await redis.get(key);
+  if (value === null || value === undefined) return { moved: false, rewritten: false };
+  const ttl = Number(await redis.pttl(key));
+  const { value: rewritten, changed } = rewriteBlobTenant(value, oldSlug, newSlug);
+  if (ttl > 0) await redis.set(newKey, rewritten, { px: ttl });
+  else await redis.set(newKey, rewritten);
+  await redis.del(key);
+  return { moved: true, rewritten: changed };
+}
+
 /**
  * Move every Redis-authoritative key for a tenant from oldSlug to newSlug. Safe to
  * re-run: a source key that no longer exists is simply skipped. Returns counts +
@@ -110,6 +252,30 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
   const redis = getRedis();
   const out = { movedKeys: 0, rewrittenBlobs: 0, redisErrors: [] as string[] };
   if (!redis) return out;
+
+  // Global lead-mirror members embed the slug in their value, rather than
+  // their key. Move them before the generic lead-key pass, atomically with
+  // their payloads, so interrupted renames remain safe for the repair worker.
+  try {
+    const [moved, rewritten] = await redis.eval<[string, string], [number, number]>(REKEY_LEAD_MIRROR_LUA,
+      [LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_LAST_FAILURE_KEY], [oldSlug, newSlug]);
+    out.movedKeys += Number(moved);
+    out.rewrittenBlobs += Number(rewritten);
+  } catch (err) {
+    out.redisErrors.push(`lead-mirror: ${err instanceof Error ? err.message : String(err)}`);
+    // Do not move lead payloads without their queue identities. Recovery can
+    // rerun the same rename; every other authoritative family still proceeds.
+  }
+
+  // Inert for existing tenants until the durable-store rollout is armed.
+  if (process.env.STRELVA_CLIENT_RECORDS_DUAL_WRITE === "1" && process.env.DUAL_WRITE_PG !== "0") {
+    try {
+      out.movedKeys += Number(await redis.eval(REKEY_CLIENT_RECORD_PENDING_LUA,
+        ["reb:client-records:pending"], [oldSlug, newSlug, "reb:client-records:pending-payload:"]));
+    } catch (err) {
+      out.redisErrors.push(`client-records: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // 1) Event queue: rename the tenant zset, then rewrite each event blob's tenantId
   //    (getEvent/resolveEventAction compare event.tenantId, so a stale slug there
@@ -177,29 +343,40 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
     out.redisErrors.push(`reb:inquiry-reply-target:*: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 2) Generic authoritative prefixes: SCAN → copy value (rewriting an embedded
-  //    tenant field) to the rekeyed key → delete the old key.
+  // 2) Generic authoritative prefixes: SCAN, then move each key by its Redis
+  //    type. Strings are JSON blobs whose embedded tenant field is rewritten and
+  //    whose TTL is kept. Sorted sets, hashes, sets and lists (leads and orders
+  //    indexes, rewards, the spam index) move atomically in Lua: RENAME when the
+  //    new key is free (keeps the TTL), otherwise a merge that never overwrites
+  //    newer data already under the new slug. `get` on those types is a
+  //    WRONGTYPE error, which used to abort the rest of the pattern.
   for (const pattern of authoritativePatterns(oldSlug)) {
-    try {
-      let cursor = "0";
-      do {
-        const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
-        cursor = next;
-        for (const key of keys) {
-          const newKey = rekeySegments(key, oldSlug, newSlug);
-          if (newKey === key) continue;
-          const value = await redis.get(key);
-          if (value === null || value === undefined) continue;
-          const { value: rewritten, changed } = rewriteBlobTenant(value, oldSlug, newSlug);
-          await redis.set(newKey, rewritten);
-          await redis.del(key);
-          out.movedKeys++;
-          if (changed) out.rewrittenBlobs++;
+    // A failed atomic queue migration must retain its source lead records.
+    if (pattern === `lead:${oldSlug}:*` && out.redisErrors.some(error => error.startsWith("lead-mirror:"))) continue;
+    let cursor = "0";
+    do {
+      let keys: string[] = [];
+      try {
+        const [next, found] = await redis.scan(cursor, { match: pattern, count: 250 });
+        cursor = String(next);
+        keys = found;
+      } catch (err) {
+        out.redisErrors.push(`${pattern}: ${err instanceof Error ? err.message : String(err)}`);
+        break;
+      }
+      for (const key of keys) {
+        const newKey = rekeySegments(key, oldSlug, newSlug);
+        if (newKey === key) continue;
+        try {
+          const moved = await moveTenantKey(redis, key, newKey, oldSlug, newSlug);
+          if (moved.moved) out.movedKeys++;
+          if (moved.rewritten) out.rewrittenBlobs++;
+        } catch (err) {
+          // One bad key is recorded; the rest of the pattern still moves.
+          out.redisErrors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } while (cursor !== "0");
-    } catch (err) {
-      out.redisErrors.push(`${pattern}: ${err instanceof Error ? err.message : String(err)}`);
-    }
+      }
+    } while (cursor !== "0");
   }
 
   // 3) Bust the tenant-list cache so the renamed slug is picked up on next read.

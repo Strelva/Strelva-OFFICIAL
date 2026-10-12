@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
 }));
 
-vi.mock("@/lib/db/client", () => ({
+vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => ({ rpc: mocks.rpc }),
 }));
 

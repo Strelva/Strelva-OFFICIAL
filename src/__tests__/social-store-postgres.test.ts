@@ -39,8 +39,8 @@ function builder(): unknown {
   );
 }
 
-vi.mock("@/lib/db/client", async (orig) => ({
-  ...(await orig<typeof import("@/lib/db/client")>()),
+vi.mock("@/platform/infra/db/client", async (orig) => ({
+  ...(await orig<typeof import("@/platform/infra/db/client")>()),
   getSupabase: () => ({
     from: (t: string) => {
       supa.lastTable = t;

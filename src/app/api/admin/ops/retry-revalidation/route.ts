@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { logAuditEvent } from "@/lib/storage";
-import { logger } from "@/lib/logger";
+import { logger } from "@/platform/infra/logger";
 
 /**
  * Re-trigger revalidation for a single tenant. Thin wrapper over the existing

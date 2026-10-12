@@ -2,6 +2,12 @@
 
 ## Current decision
 
+October 4, 2026: Jacob selected Systems, Connections, Possibilities and
+Versions as the customer model ([CONTEXT.md](../../CONTEXT.md#product-model)).
+The managed default below still holds: a managed client's Systems are made and
+run for them. Demand, comprehension and delivery cost for the model are
+unproven.
+
 On October 1, 2026, Jacob selected managed delivery as the default for managed
 clients, with the website remaining clear and directly accessible. Agencies and
 people who deliberately choose to build retain creation tools. Strelva's

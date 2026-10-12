@@ -1,7 +1,7 @@
-import { getSupabase } from "@/lib/db/client";
-import { isSuperAdminUser } from "@/lib/db/repositories";
+import { getSupabase } from "@/platform/infra/db/client";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { assertWorkspaceMember, getWork } from "@/platform/workspaces/repository";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { createLearningService, type LearningStore } from "./service";
 
 /** A production build alone never enables internal R&D or grants staff access. */
@@ -22,6 +22,7 @@ const store: LearningStore = {
     const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<{ id: string; payload: unknown; created_at: string; updated_at: string }> | null; error: { message: string } | null }> };
     const { data, error } = await rpc.rpc("create_product_learning_work", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_payload: learning });
     if (error?.message.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+    if (error?.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
     if (error?.message.includes("learning_revision_conflict")) throw new WorkspaceConflictError("This workspace has reached its saved work limit.");
     if (error || !data?.[0]) throw new WorkspaceStoreError("The research responsibility could not be saved.");
     const row = data[0];
@@ -34,6 +35,7 @@ const store: LearningStore = {
     const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<{ payload: unknown; updated_at: string }> | null; error: { message: string } | null }> };
     const { data, error } = await rpc.rpc("update_product_learning_work", { p_work_id: work.id, p_workspace_id: work.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_expected_revision: expectedRevision, p_payload: learning });
     if (error?.message.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+    if (error?.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
     if (error?.message.includes("learning_revision_conflict")) throw new WorkspaceConflictError("Learning evidence changed. Reload before continuing.");
     if (error || !data?.[0]) throw new WorkspaceStoreError("The learning change could not be confirmed.");
     return { ...work, payload: data[0].payload, updatedAt: data[0].updated_at };

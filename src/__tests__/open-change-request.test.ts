@@ -12,7 +12,7 @@ const mockRedis = {
   mget: vi.fn(async (...keys: string[]) => keys.map(() => null)),
 };
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => mockRedis,
 }));
 

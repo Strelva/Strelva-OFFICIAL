@@ -1,0 +1,8 @@
+/* Composition only; fields, rows, states and actions are owned by the kit. */
+.entry { padding-top: 120px; }
+.form, .stack { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.form { max-width: 640px; }
+.address { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+.summary, .actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 767px) { .entry { padding-top: 48px; } .split, .address { grid-template-columns: minmax(0, 1fr); } .split { gap: 28px; } }

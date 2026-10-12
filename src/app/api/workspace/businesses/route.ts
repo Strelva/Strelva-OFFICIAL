@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
 import { listWorkspaces } from "@/platform/workspaces";
 import { enterCustomerBusiness } from "@/platform/workspaces/business-entry";
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,7 @@ export async function GET() {
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email." }, 401);
     const workspaces = await listWorkspaces(actor);
-    return json({ actorId: actor.userId, businesses: workspaces
+    return json({ actorId: actor.userId, actorEmail: actor.verifiedEmail, businesses: workspaces
       .filter(item => item.kind === "customer" && item.access === "member" && ["owner", "admin"].includes(item.role || ""))
       .map(({ id, name }) => ({ id, name })) });
   } catch (error) { return failure(error); }
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email." }, 401);
     if (await isRateLimitedWindowedAsync(`workspace:business-entry:${actor.userId}`, 30, 60_000)) return json({error:"Please wait before another setup request."},429);
-    return json(await enterCustomerBusiness(actor, await readWorkspaceBody(request, 16000)));
+    const entered = await enterCustomerBusiness(actor, await readWorkspaceBody(request, 16000));
+    if (!entered.alreadyCreated) void recordFunnelEvent("business_created", entered.workspaceId, { workspaceId: entered.workspaceId });
+    return json(entered);
   } catch (error) { return failure(error); }
 }

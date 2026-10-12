@@ -1,0 +1,8 @@
+.columns { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 40px; }
+.stack { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.contractLabel { flex: 0 0 130px; color: var(--st-text-3); font-size: 13px; line-height: 20px; }
+.actions { display: flex; flex-wrap: wrap; gap: 20px; }
+@media (max-width: 767px) {
+  .columns { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .contractLabel { flex-basis: 86px; }
+}

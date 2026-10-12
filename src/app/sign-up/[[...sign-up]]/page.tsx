@@ -1,19 +1,24 @@
+import { invitationEntryIdentity } from "@/server/agency-brand-entry";
+import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
+import { StEntry, StHead, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import Link from "next/link";
+import { StChoiceLink } from "@/components/ui/strelva/ChoiceCards";
 import { headers } from "next/headers";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { AGENCY_START_PATH, agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { BUSINESS_SIGNUP_PATH } from "@/platform/workspaces/business-start";
+import { tenantSignInNext } from "@/platform/owner-entry/env";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 export const metadata: Metadata = {
   title: "Create your Strelva account",
-  description: "Create a Strelva account to continue your work or access a managed website.",
+  description: "Create a Strelva account to run your business yourself, or to run it for clients.",
 };
 
 export const dynamic = "force-dynamic";
@@ -43,6 +48,7 @@ async function getInviteContext(searchParams: AuthSearchParams) {
   return {
     email,
     siteName: tenantConfig.siteName || invite.tenant,
+    brand: await resolveTenantBrand(invite.tenant),
   };
 }
 
@@ -56,13 +62,19 @@ async function getTenantAuthContext() {
   if (!tenant) return null;
 
   const tenantConfig = await getTenantConfig(tenant);
-  if (tenantConfig && tenantConfig.active === false) return null;
+  if (!tenantConfig || tenantConfig.active === false) return null;
 
+  // A missing or unavailable site theme is normal at entry. Never borrow the
+  // generic template brand just because this business has no saved theme.
+  const theme = tenantConfig ? await getStoredContent("theme", tenant).catch(() => null) : null;
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
+    brand: await resolveTenantBrand(tenant),
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
+    host: requestHeaders.get("host") || undefined,
+    brandFontFamily: theme?.fontDisplay?.trim().replaceAll("_", " ") || undefined,
   };
 }
 
@@ -79,156 +91,33 @@ export default async function SignUpPage({
   const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
   const invite = await getInviteContext(params);
 
-  if (invite) {
-    return (
-      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title="Create your dashboard account" />
-        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-          <section>
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-            >
-              <ArrowLeft className="size-4" />
-              Strelva
-            </Link>
-            <p className="mt-12 text-[14px] font-medium text-m-text-3">
-              Dashboard invite confirmed
-            </p>
-            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
-              Create access for {invite.siteName}.
-            </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Sign in with <strong>{invite.email}</strong> — the email your
-              invite was sent to. Strelva opens your site dashboard
-              automatically.
-            </p>
-          </section>
-
-          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn
-              next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"}
-              prefillEmail={invite.email}
-            />
-          </section>
-        </div>
-      </main>
-    );
-  }
-
+  if (invite) return <StEntry brand={invite.brand} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   const tenantAuth = await getTenantAuthContext();
-  if (tenantAuth) {
-    const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
-
-    return (
-      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title={`Create access for ${tenantAuth.siteName}`} />
-        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-          <section>
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-            >
-              <ArrowLeft className="size-4" />
-              Strelva
-            </Link>
-            <p className="mt-12 text-[14px] font-medium text-m-text-3">
-              Client dashboard
-            </p>
-            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
-              Create access for {tenantAuth.siteName}.
-            </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Sign in with the email your invite was sent to. Strelva opens
-              the dashboard for {tenantAuth.siteName}.
-            </p>
-          </section>
-
-          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next={dashboardPath} />
-          </section>
-        </div>
-      </main>
-    );
+  if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
+  if (workspaceOpen) {
+    const asAgency = agencySignupReleaseEnabled() && searchValue(params.as) === "agency";
+    // ADR 0015: "I run a business" goes straight to creating that business,
+    // not to a personal workspace with the business one click away in Help.
+    const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
+    const identity = await invitationEntryIdentity(invitationTarget);
+    return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
+      <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencySignupReleaseEnabled() ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
+      {identity ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
+      <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
+    </StEntry>;
   }
+  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/agencies">Want it done for you? Find an agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
+}
 
-  if (workspaceReleaseEnabled()) {
-    return (
-      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title="Create your Strelva account" />
-        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-          <section>
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-            >
-              <ArrowLeft className="size-4" />
-              Strelva
-            </Link>
-            <p className="mt-12 text-[14px] font-medium text-m-text-3">Your Strelva work</p>
-            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
-              Start your work here.
-            </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Sign in or create an account to save private work and return to it. Already manage a Strelva website? Use the email connected to that site.
-            </p>
-            <Link href="/access-request" className="mt-6 inline-flex text-[13px] text-m-text-2 underline underline-offset-2 hover:text-m-text">
-              Need a managed website? Request your build
-            </Link>
-          </section>
-
-          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next={invitationTarget || workspaceTarget || accountTarget || "/workspace"} />
-          </section>
-        </div>
-      </main>
-    );
-  }
-
-  const title = "Dashboard access is invite-only.";
-
-  return (
-    <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <AuthDocumentTitle title={title} />
-      <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-40px)] max-w-[960px] flex-col justify-center py-16">
-        <Link
-          href="/"
-          className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-        >
-          <ArrowLeft className="size-4" />
-          Strelva
-        </Link>
-
-        <section className="mt-12 overflow-hidden rounded-[28px] border border-m-rule bg-m-paper p-6 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-8 md:p-10">
-          <p className="text-[14px] font-medium text-m-text-3">
-            Dashboards are created from your build
-          </p>
-          <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
-            {title}
-          </h1>
-          <p className="mt-6 max-w-[640px] text-[16px] leading-[1.7] text-m-text-2">
-            Your dashboard opens when your site does. Already have access? Sign
-            in with the email connected to your site. No site yet? Request your
-            build and we will get you set up.
-          </p>
-
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/access-request"
-              className="marketing-button-primary h-11 px-5 text-[14px]"
-            >
-              Request your build
-              <ArrowRight className="size-4" />
-            </Link>
-            <Link
-              href="/sign-in"
-              className="marketing-button-secondary h-11 px-5 text-[14px]"
-            >
-              Sign in
-            </Link>
-          </div>
-        </section>
-      </div>
-    </main>
-  );
+function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {
+  const href = (kind: "business" | "agency") => {
+    const query = new URLSearchParams();
+    if (kind === "agency") query.set("as", "agency");
+    else if (next) query.set("next", next);
+    return query.size ? `/sign-up?${query}` : "/sign-up";
+  };
+  return <nav aria-label="Who this account is for" className="flex flex-col gap-3">
+    <p className="text-sm text-gray-muted">Who is this for?</p>
+    {(["business", "agency"] as const).map(kind => <StChoiceLink key={kind} href={href(kind)} selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"} detail={kind === "business" ? "Run your site, forms and bookings yourself. Bring in an agency anytime." : "Clients own their workspace; you work inside it."} />)}
+  </nav>;
 }

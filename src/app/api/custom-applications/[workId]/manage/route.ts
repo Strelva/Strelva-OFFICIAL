@@ -26,7 +26,7 @@ function failure(error: unknown) {
   if (error instanceof CustomApplicationConflictError) return json({ error: error.message, code: "custom_application_conflict" }, 409);
   if (error instanceof CustomApplicationBuildError) return json({ error: error.message, code: "custom_application_build_unavailable" }, 503);
   if (error instanceof z.ZodError) return json({ error: "Check the requested lifecycle change." }, 400);
-  return json({ error: "The custom application could not be confirmed." }, 503);
+  return json({ error: "The internal tool could not be confirmed." }, 503);
 }
 
 async function context(params: Promise<{ workId: string }>) {
@@ -34,10 +34,10 @@ async function context(params: Promise<{ workId: string }>) {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ workId: string }> }) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   try {
     const actor = await workspaceHttpActor();
-    if (!actor) return json({ error: "Sign in with a confirmed email to manage this custom application." }, 401);
+    if (!actor) return json({ error: "Sign in with a confirmed email to manage this internal tool." }, 401);
     return json({ application: await createCustomApplicationService().read(actor, await context(params)) });
   } catch (error) {
     return failure(error);
@@ -45,12 +45,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wor
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ workId: string }> }) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   const denied = workspaceWriteGuard(request);
   if (denied) return denied;
   try {
     const actor = await workspaceHttpActor();
-    if (!actor) return json({ error: "Sign in with a confirmed email to manage this custom application." }, 401);
+    if (!actor) return json({ error: "Sign in with a confirmed email to manage this internal tool." }, 401);
     const body = await readWorkspaceBody(request, 600_000);
     const action = z.string().parse((body as { action?: unknown })?.action);
     const id = await context(params);

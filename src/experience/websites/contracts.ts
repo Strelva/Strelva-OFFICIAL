@@ -5,11 +5,28 @@ import {
   type ReviseWebsiteInput,
   type Website,
   type WebsiteRecord,
+  type WebsiteBrief,
 } from "@/products/websites/contracts";
 import { WEBSITE_API_PATH, createWebsiteRequestId, websiteWorkPath } from "@/products/websites/client";
 import { websiteSchema } from "@/products/websites/contracts";
 
 export type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
+
+/** Saved work determines which website interface can read it, independently of new-work rollout. */
+export function websiteDocumentVersion(value: unknown): 2 | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as { version?: unknown; rebuild?: { version?: unknown } };
+  return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
+}
+
+/** Bind reader selection to the website identity, using the bounded server projection.
+ * Older same-origin snapshots may still carry a raw payload; that fallback
+ * only chooses a reader and never grants write or publication authority. */
+export function websiteWorkDocumentVersion(work: { productId: string; resourceKind: string; website?: { version: 1 | 2 }; payload: unknown } | null | undefined): 2 | undefined {
+  if (!work || work.productId !== "websites" || work.resourceKind !== "website") return undefined;
+  if (work.website) return work.website.version === 2 ? 2 : undefined;
+  return websiteDocumentVersion(work.payload);
+}
 
 /**
  * Browser transport for the website product. The product contract owns the
@@ -29,6 +46,48 @@ export class WebsiteExperienceError extends Error {
     super(message);
     this.name = "WebsiteExperienceError";
   }
+}
+
+/** A write may have committed before its acknowledgement reached the browser. */
+export class WebsiteUnconfirmedError extends Error {
+  constructor(reason?: string) { super(`${reason ? `${reason} ` : ""}The website change could not be confirmed. Check its current saved state before continuing.`); }
+}
+
+/** Cross-field lifecycle checks used for mutation acknowledgement and recovery reads. */
+export function currentWebsiteRecord(next: WebsiteRecord, workspaceId: string, workId?: string): WebsiteRecord {
+  const website = next.website, candidate = website.candidate;
+  const launch = website.launch;
+  const approved = Boolean(candidate && website.approvedCandidateRevision === candidate.revision);
+  const emptyLaunch = launch.status === "not_requested" && launch.candidateRevision === null && launch.receipt === null && launch.failure === null;
+  const selectedLaunch = Boolean(candidate && launch.candidateRevision === candidate.revision);
+  const phase = website.status === "draft" ? candidate === null && website.approvedCandidateRevision === null && emptyLaunch && website.lastError === null
+    : website.status === "preview_ready" ? Boolean(candidate) && website.approvedCandidateRevision === null && emptyLaunch && website.lastError === null
+    : website.status === "approved" ? approved && emptyLaunch && website.lastError === null
+    : website.status === "launch_pending" ? approved && selectedLaunch && launch.status === "pending" && (!launch.receipt || launch.receipt.status === "pending") && launch.failure === null && website.lastError === null
+    : website.status === "published" ? approved && selectedLaunch && launch.status === "published" && launch.receipt?.status === "published" && launch.failure === null && website.lastError === null
+    : website.lastError?.stage === "artifact" ? candidate === null && website.approvedCandidateRevision === null && emptyLaunch
+    : website.lastError?.stage === "launch" && approved && selectedLaunch && launch.status === "failed" && launch.receipt === null && Boolean(launch.failure);
+  const invalid = !phase || next.workspaceId !== workspaceId || Boolean(workId && next.workId !== workId)
+    || Boolean(candidate && candidate.revision > website.revision)
+    || Boolean(launch.receipt && (!candidate || launch.receipt.candidateRevision !== candidate.revision || launch.receipt.artifactHash !== candidate.contentHash));
+  if (invalid) throw new WebsiteUnconfirmedError();
+  return next;
+}
+
+type WebsiteMutation = "create" | "revise" | "approve" | "prepareLaunch";
+type MutationIdentity = { workspaceId: string; workId?: string; expectedRevision?: number; brief?: WebsiteBrief; candidateRevision?: number; candidateContentHash?: string };
+export function websiteMutationAcknowledgement(next: WebsiteRecord, action: WebsiteMutation, input: MutationIdentity): WebsiteRecord {
+  currentWebsiteRecord(next, input.workspaceId, input.workId);
+  const website = next.website, candidate = website.candidate;
+  const expectedBrief = input.brief;
+  const sameBrief = !expectedBrief || [...new Set([...Object.keys(expectedBrief), ...Object.keys(website.brief)])].every(key => expectedBrief[key as keyof WebsiteBrief] === website.brief[key as keyof WebsiteBrief]);
+  let valid = sameBrief;
+  if (action === "create") valid &&= website.revision >= 1 || website.status === "draft" && website.revision === 0;
+  if (action === "revise") valid &&= website.revision === input.expectedRevision! + 1 && website.approvedCandidateRevision === null && website.launch.status === "not_requested" && (website.status === "preview_ready" && candidate?.revision === website.revision || website.status === "failed" && website.lastError?.stage === "artifact" && candidate === null);
+  if (action === "approve") valid &&= website.revision === input.expectedRevision! + 1 && website.status === "approved" && candidate !== null && candidate.revision === input.candidateRevision && candidate.contentHash === input.candidateContentHash && website.approvedCandidateRevision === input.candidateRevision;
+  if (action === "prepareLaunch") valid &&= website.revision >= input.expectedRevision! && website.revision <= input.expectedRevision! + 2 && candidate !== null && candidate.revision === input.candidateRevision && candidate.contentHash === input.candidateContentHash && website.approvedCandidateRevision === input.candidateRevision && website.launch.candidateRevision === input.candidateRevision && (["launch_pending", "published"].includes(website.status) || website.status === "failed" && website.lastError?.stage === "launch");
+  if (!valid) throw new WebsiteUnconfirmedError();
+  return next;
 }
 
 function errorMessage(value: unknown, fallback: string): string {
@@ -84,13 +143,16 @@ async function record(response: Response, fallback: string, workspaceId: string)
 
 const jsonHeaders = { "Content-Type": "application/json", Accept: "application/json" };
 
-function post(path: string, body: unknown, fallback: string, workspaceId: string): Promise<WebsiteRecord> {
-  return fetch(path, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: jsonHeaders,
-    body: JSON.stringify(body),
-  }).then(response => record(response, fallback, workspaceId));
+async function post(path: string, body: unknown, fallback: string, input: MutationIdentity, action: WebsiteMutation): Promise<WebsiteRecord> {
+  try {
+    const response = await fetch(path, { method: "POST", credentials: "same-origin", headers: jsonHeaders, body: JSON.stringify(body) });
+    return websiteMutationAcknowledgement(await record(response, fallback, input.workspaceId), action, input);
+  } catch (error) {
+    // The route rejects an unauthenticated actor before calling any action.
+    // Other status codes can arise after persistence or launch preparation.
+    if (error instanceof WebsiteExperienceError && error.status === 401) throw error;
+    throw error instanceof WebsiteUnconfirmedError ? error : new WebsiteUnconfirmedError(error instanceof Error ? error.message : undefined);
+  }
 }
 
 /** The customer surface's sole HTTP transport for the website product. */
@@ -100,19 +162,19 @@ export const serverWebsiteTransport: WebsiteExperienceTransport = {
     return record(await fetch(`${websiteWorkPath(workId)}?${params}`, { signal, cache: "no-store", credentials: "same-origin" }), "The saved website could not be loaded.", workspaceId);
   },
   create(input) {
-    return post(WEBSITE_API_PATH, { action: "create", ...input }, "The website preview could not be created.", input.workspaceId);
+    return post(WEBSITE_API_PATH, { action: "create", ...input }, "The website preview could not be created.", input, "create");
   },
   revise(input) {
     const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "revise", ...body }, "The website preview could not be generated.", workspaceId);
+    return post(websiteWorkPath(workId), { action: "revise", ...body }, "The website preview could not be generated.", input, "revise");
   },
   approve(input) {
     const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "approve", ...body }, "This website preview could not be approved.", workspaceId);
+    return post(websiteWorkPath(workId), { action: "approve", ...body }, "This website preview could not be approved.", input, "approve");
   },
   prepareLaunch(input) {
     const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "prepareLaunch", ...body }, "Launch could not be prepared.", workspaceId);
+    return post(websiteWorkPath(workId), { action: "prepareLaunch", ...body }, "Launch could not be prepared.", input, "prepareLaunch");
   },
 };
 

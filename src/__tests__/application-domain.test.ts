@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  APPLICATION_RECENT_VERSIONS,
   APPLICATION_VERSION_HISTORY_LIMIT,
   applicationSpecSchema,
   type ApplicationRecord,
@@ -126,7 +127,7 @@ describe("native application domain", () => {
     expect(v2).toEqual(before);
   });
 
-  it("rejects incompatible rollback and exhausted history without partial changes", () => {
+  it("rejects incompatible rollback without partial changes", () => {
     const original = released();
     original.records = [{ id: "record-1", values: { subject: 123 } }];
     const before = structuredClone(original);
@@ -135,10 +136,16 @@ describe("native application domain", () => {
     })).toThrow("wrong type");
     expect(original).toEqual(before);
 
+  });
+
+  it("keeps revising past the old 100-version cap with a recent window", () => {
+    // Before 2026-10-07 the 101st candidate version threw "history limit".
     const full = draft();
     full.versions = Array.from({ length: APPLICATION_VERSION_HISTORY_LIMIT }, (_, i) => ({ version: i + 1, spec }));
     const fullBefore = structuredClone(full);
-    expect(() => reviseCandidate(full, { expectedDesignRevision: 1, spec })).toThrow("history limit");
+    const next = reviseCandidate(full, { expectedDesignRevision: 1, spec });
+    expect(next.versions).toHaveLength(APPLICATION_RECENT_VERSIONS);
+    expect(next.versions.at(-1)).toEqual({ version: next.candidate.specVersion, spec });
     expect(full).toEqual(fullBefore);
   });
 

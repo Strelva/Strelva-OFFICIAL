@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockGetRedis = vi.hoisted(() => vi.fn());
 const mockCreateInvitePg = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: mockGetRedis,
 }));
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   createInvite: mockCreateInvitePg,
 }));
 

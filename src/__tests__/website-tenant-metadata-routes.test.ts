@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 const request = vi.hoisted(() => ({ tenant: "first", preview: false, hosted: true }));
 vi.mock("@/products/websites/hosted-public", () => ({ getHostedSite: async () => request.hosted ? ({ tenant: request.tenant, origin: `https://${request.tenant}.example`, preview: request.preview, document: { pages: [{ path: "/" }, { path: `/services/${request.tenant}-service` }] } }) : null }));
 import sitemap from "@/app/sitemap";
@@ -32,6 +32,11 @@ describe("tenant metadata routes", () => {
     const jsonLd = (source: string) => source.slice(source.indexOf("async function LocalBusinessSchema()"), source.indexOf("export default async function TenantPublicLayout"));
     expect(metadata(current)).toBe(metadata(original));
     expect(jsonLd(current)).toBe(jsonLd(original));
+  });
+  it("allows the platform MCP and authorization discovery on the released app host", async () => {
+    request.hosted = false; vi.stubEnv("STRELVA_AGENT_READABLE", "1"); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    const rule = (await robots()).rules;
+    expect(rule).toMatchObject({ allow: expect.arrayContaining(["/api/mcp/public", "/.well-known/oauth-protected-resource", "/api/v1/*/openapi.json"]), disallow: ["/dashboard/", "/api/"] });
   });
   it("blocks private v2 preview indexing and page discovery", async () => {
     request.preview = true; expect(await sitemap()).toEqual([]); expect(await robots()).toEqual({ rules: { userAgent: "*", disallow: "/" } });

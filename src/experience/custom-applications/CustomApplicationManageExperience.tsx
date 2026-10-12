@@ -60,7 +60,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
     try {
       const response = await fetch(`/api/custom-applications/${encodeURIComponent(workId)}/manage`, { cache: "no-store", headers: { Accept: "application/json" } });
       const body: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(errorText(body, "The custom application could not be loaded."));
+      if (!response.ok) throw new Error(errorText(body, "The internal tool could not be loaded."));
       const next = (body as { application: CustomApplication }).application;
       setApplication(next);
       setTitle(next.candidate.title);
@@ -88,7 +88,7 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
     void load().catch(cause => {
       setApplication(null);
       setPreview(null);
-      setError(cause instanceof Error ? cause.message : "The custom application could not be loaded.");
+      setError(cause instanceof Error ? cause.message : "The internal tool could not be loaded.");
     });
   }, [load]);
 
@@ -135,21 +135,21 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
   const releaseVersion = application?.currentReleaseVersion;
   const rollbackVersions = useMemo(() => application?.releases.filter(release => release.version !== releaseVersion) ?? [], [application, releaseVersion]);
 
-  if (!application) return <div className="mx-auto max-w-4xl px-6 py-12">{loading ? <p role="status" className="text-sm text-gray-muted">Loading custom application…</p> : <section className="space-y-4 rounded-2xl border border-gray-border bg-surface p-6" aria-labelledby="custom-manage-error-heading"><h1 id="custom-manage-error-heading" className="font-display text-2xl font-medium">Custom application unavailable</h1><p role="alert" className="text-sm leading-6 text-gray-fg">{error || "The custom application could not be loaded."}</p><Button type="button" variant="secondary" onClick={() => void load().catch(cause => { setApplication(null); setPreview(null); setError(cause instanceof Error ? cause.message : "The custom application could not be loaded."); })}>Try again</Button></section>}</div>;
+  if (!application) return <div className="mx-auto max-w-4xl px-6 py-12">{loading ? <p role="status" className="text-sm text-gray-muted">Loading internal tool…</p> : <section className="space-y-4 rounded-2xl border border-gray-border bg-surface p-6" aria-labelledby="custom-manage-error-heading"><h1 id="custom-manage-error-heading" className="font-display text-2xl font-medium">Internal tool unavailable</h1><p role="alert" className="text-sm leading-6 text-gray-fg">{error || "The internal tool could not be loaded."}</p><Button type="button" variant="secondary" onClick={() => void load().catch(cause => { setApplication(null); setPreview(null); setError(cause instanceof Error ? cause.message : "The internal tool could not be loaded."); })}>Try again</Button></section>}</div>;
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 text-warm-black sm:px-6 sm:py-12">
       <header className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.16em] text-gray-muted">Custom application delivery</p>
+        <p className="text-xs uppercase tracking-[0.16em] text-gray-muted">Internal tool delivery</p>
         <h1 className="font-display text-3xl font-medium sm:text-4xl">{application.title}</h1>
         <p className="max-w-2xl text-sm leading-6 text-gray-fg">{readOnly ? "Inspect the exact reviewed artifact and release history. Existing access stays on its granted release." : "Build a bounded candidate, inspect the exact artifact, then release it to named recipients. Existing access stays on its granted release."}</p>
       </header>
-      <section className="grid gap-4 sm:grid-cols-3" aria-label="Application state">
+      <section className="grid gap-4 sm:grid-cols-3" aria-label="Internal tool state">
         <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Status</p><p className="mt-2 text-sm font-medium">{application.status}</p></div>
-        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Candidate</p><p className="mt-2 text-sm font-medium">v{application.candidate.version} · revision {application.candidate.revision}</p></div>
-        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Live release</p><p className="mt-2 text-sm font-medium">{releaseVersion ? `v${releaseVersion}` : "Not released"}</p></div>
+        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Candidate</p><p className="mt-2 text-sm font-medium">Release {application.candidate.version} draft · saved change {application.candidate.revision}</p></div>
+        <div className="rounded-2xl border border-gray-border bg-surface p-4"><p className="text-xs text-gray-muted">Live release</p><p className="mt-2 text-sm font-medium">{releaseVersion ? `Release ${releaseVersion}` : "Not released"}</p></div>
       </section>
       {!readOnly && !application.budget && application.status !== "retired" ? <section className="space-y-5 rounded-2xl border border-terra/30 bg-terra/5 p-5 sm:p-7" aria-labelledby="custom-budget-heading">
-        <div><h2 id="custom-budget-heading" className="font-display text-2xl font-medium">Finish local build authorization</h2><p className="mt-2 text-sm leading-6 text-gray-fg">This draft is saved, but its local budget admission did not finish. Retry here to continue the same work without creating a duplicate application.</p></div>
+        <div><h2 id="custom-budget-heading" className="font-display text-2xl font-medium">Finish local build authorization</h2><p className="mt-2 text-sm leading-6 text-gray-fg">This draft is saved, but its local budget admission did not finish. Retry here to continue the same work without creating a duplicate internal tool.</p></div>
         <div className="grid gap-4 sm:grid-cols-2">
           <TextInput label="Maximum authorized budget (USD)" type="number" min="0" max="10000" step="0.01" value={budgetMaximum} onChange={event => setBudgetMaximum(event.target.value)} disabled={busy} />
           <TextInput label="Expected build cost (USD)" type="number" min="0" max="10000" step="0.01" value={budgetEstimate} onChange={event => setBudgetEstimate(event.target.value)} disabled={busy} />
@@ -223,8 +223,8 @@ export function CustomApplicationManageExperience({ workId, readOnly = false }: 
         <div className="flex flex-wrap gap-3">
           {!readOnly ? <>
             <Button type="button" variant="secondary" disabled={busy || !canReview} onClick={() => void action("review", { expectedCandidateRevision: application.candidate.revision, artifactDigest: artifact!.artifactDigest, checks: checks.map(check => ({ ...check, passed: true as const })) })}>Record review checks</Button>
-            <Button type="button" disabled={busy || !canRelease} onClick={() => void action("release", { expectedCandidateRevision: application.candidate.revision, expectedReleaseVersion: application.currentReleaseVersion })}>Release candidate</Button>
-            {rollbackVersions.map(release => <Button key={release.version} type="button" variant="secondary" disabled={busy} onClick={() => void action("rollback", { expectedReleaseVersion: application.currentReleaseVersion, version: release.version })}>Rollback to v{release.version}</Button>)}
+            <Button type="button" disabled={busy || !canRelease} onClick={() => void action("release", { expectedCandidateRevision: application.candidate.revision, expectedReleaseVersion: application.currentReleaseVersion })}>Make it live</Button>
+            {rollbackVersions.map(release => <Button key={release.version} type="button" variant="secondary" disabled={busy} onClick={() => void action("rollback", { expectedReleaseVersion: application.currentReleaseVersion, version: release.version })}>Undo to Release {release.version}</Button>)}
           </> : null}
         </div>
         {notice ? <p role="status" className="rounded-xl border border-sage/30 bg-sage/5 p-3 text-sm text-sage-dark">{notice}</p> : null}

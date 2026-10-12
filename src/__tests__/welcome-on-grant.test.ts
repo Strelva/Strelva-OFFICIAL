@@ -16,7 +16,7 @@ const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockSendWelcomeEmail = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   CLIENT_ROLES: ["viewer", "editor", "admin", "owner"],
   assignUserToTenant: mockAssignUserToTenant,
   getCurrentUserEmail: mockGetCurrentUserEmail,

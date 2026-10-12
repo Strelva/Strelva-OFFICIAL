@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { runDueAutoPosts, draftReplyBacklog } from "@/lib/reviews/auto-reply";
 
 export const maxDuration = 300;

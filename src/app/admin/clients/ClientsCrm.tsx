@@ -20,6 +20,10 @@ export interface ClientRow {
   seoGrade: LetterGrade | null;
   /** Managed-readiness verdict, or null. Only "blocked" is a real problem. */
   launchStatus: "ready" | "watch" | "blocked" | null;
+  /** Evidence gaps prevent a current Live verdict; retained grades stay labelled. */
+  evidenceIssue?: string | null;
+  scanIssue?: string | null;
+  scannedAt?: string | null;
   /** Human billing label, e.g. "Growth · $199/mo" / "Legacy case study" / "No plan set". */
   billingLabel: string;
   /** Whether billing is set up (tier/custom/case_study). false = "none". */
@@ -28,10 +32,11 @@ export interface ClientRow {
 
 type StatusTone = "good" | "warn" | "crit" | "neutral";
 
-/** One clear verdict per client, absorbing active / at-risk / billing / readiness. */
-function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
+/** One clear verdict per site, absorbing active / at-risk / billing / readiness. */
+export function clientStatus(c: ClientRow): { label: string; tone: StatusTone; detail?: string } {
   if (!c.active) return { label: "Archived", tone: "neutral" };
   if (c.atRiskReason) return { label: "At risk", tone: "crit", detail: c.atRiskReason };
+  if (c.evidenceIssue || c.launchStatus === null) return { label: "Unverified", tone: "warn", detail: c.evidenceIssue ?? "Launch readiness unavailable. Open the site support record to check." };
   // A live client with no plan is a real revenue leak (amber). But a client still
   // in onboarding without billing is the NORMAL state — show it as a calm neutral
   // "In build", not an amber warning on every pre-launch row.
@@ -91,7 +96,7 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search clients…"
+            placeholder="Search sites…"
             className="w-full bg-transparent py-2.5 text-[12.5px] text-warm-white placeholder:text-gray-faint focus:outline-none"
           />
         </div>
@@ -104,13 +109,13 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
       {/* List */}
       {visible.length === 0 ? (
         <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
-          <p className="text-[14px] font-medium text-warm-white">No clients match</p>
-          <p className="mt-1 text-[12px] text-gray-muted">{query || filter !== "all" ? "Clear the filters to see everyone." : "Clients appear here once tenants exist."}</p>
+          <p className="text-[14px] font-medium text-warm-white">No sites match</p>
+          <p className="mt-1 text-[12px] text-gray-muted">{query || filter !== "all" ? "Clear the filters to see everyone." : "Site support records appear here once sites exist."}</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-glass-border bg-glass">
           <div className="hidden grid-cols-[1fr_52px_180px_120px] items-center gap-5 px-4 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-gray-faint md:grid">
-            <span>Client</span>
+            <span>Site</span>
             <span className="text-center">Health</span>
             <span>Billing</span>
             <span className="text-right">Status</span>
@@ -131,12 +136,14 @@ export function ClientsCrm({ clients }: { clients: ClientRow[] }) {
                       <p className="mt-0.5 truncate text-[11.5px] text-gray-muted">
                         {c.domain || c.ownerEmail || <span className="text-gray-faint">no domain yet</span>}
                       </p>
+                      {c.evidenceIssue && <p className="mt-1 text-[11.5px] text-gray-muted">{c.evidenceIssue}</p>}
+                      {c.scannedAt && <p className="mt-1 text-[11.5px] text-gray-muted">Last site scan: {Number.isFinite(Date.parse(c.scannedAt)) ? new Date(c.scannedAt).toLocaleString() : "Time unverified"}{c.scanIssue ? " · Historical grade" : ""}</p>}
                     </div>
                   </div>
 
                   {/* Health grade */}
                   <div className="pointer-events-none relative z-[1] hidden w-[52px] justify-center md:flex">
-                    {c.seoGrade ? <Grade grade={c.seoGrade} /> : <span className="text-[12px] text-gray-faint" title="Not scanned yet">&mdash;</span>}
+                    {c.seoGrade ? <span title={c.scanIssue ?? `Site scan: ${c.scannedAt ?? "Time unverified"}`}><Grade grade={c.seoGrade} /></span> : <span className="text-[12px] text-gray-faint" title="Not scanned yet">&mdash;</span>}
                   </div>
 
                   {/* Billing — the plan when set; a quiet dash otherwise (the Status

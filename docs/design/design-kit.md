@@ -126,7 +126,7 @@ Apply inside `[data-dashboard]`.
 - Motion should clarify continuity: route entry, queue state changes, save confirmation, preview highlights, and drawer/menu entrance.
 - Prefer CSS transitions and transforms. Avoid JS motion where CSS is enough.
 - Always honor `prefers-reduced-motion`.
-- Keep animation durations short: `150ms` to `300ms` for controls, up to `700ms` for storefront reveal effects.
+- Use the motion ladder in [motion.md](./motion.md): Press 80, Fast 140, Base 220, Slow 360, Long 600 ms. `pnpm check:motion` rejects raw durations and curves.
 
 ## Accessibility Standard
 

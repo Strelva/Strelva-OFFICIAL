@@ -44,7 +44,7 @@ function builder(): unknown {
   );
 }
 
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await (orig() as Promise<Record<string, unknown>>)),
   getSupabase: () => ({
     from: (t: string) => {

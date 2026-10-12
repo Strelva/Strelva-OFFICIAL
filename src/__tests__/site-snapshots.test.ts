@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticatedCronRequest } from "@/__tests__/support/cron";
 
@@ -33,7 +34,7 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => mockGetTenantFromHeaders(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   getActorContext: (...args: unknown[]) => mockGetActorContext(...args),
   requireTenantAccess: (...args: unknown[]) => mockRequireTenantAccess(...args),
   requireTenantPermission: (...args: unknown[]) => mockRequireTenantPermission(...args),

@@ -1,4 +1,4 @@
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { getWork } from "@/platform/workspaces/repository";

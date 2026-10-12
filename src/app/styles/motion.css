@@ -1,11 +1,109 @@
+/* Strelva motion. The only place durations and curves are written down.
+   Spec: docs/design/motion.md. Board: F · Motion (lutct) in
+   design/Strelva-Reborn-UI-UX-2026-10-08.pen. `scripts/check-motion.mjs`
+   fails on raw durations or curves anywhere else in product CSS. */
 :root {
-  --motion-feedback: 120ms;
-  --motion-disclosure: 360ms;
-  --motion-exit: 220ms;
-  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  /* Ladder. Every transition and animation uses one of these. */
+  --motion-press: 80ms;     /* buttons, keys, chips: scale on press */
+  --motion-fast: 140ms;     /* hover, focus, color, toggles, small lifts */
+  --motion-base: 220ms;     /* content swaps, entrances, panels, toasts, exits */
+  --motion-slow: 360ms;     /* sheets, disclosure, page-to-page, map lines */
+  --motion-long: 600ms;     /* drawn data marks, counted numerals, hero entrances */
+  --motion-hold: 800ms;     /* hold to accept */
+  --motion-stagger: 40ms;   /* between items in one group; cap 6 */
+
+  /* Loops. Only state that is genuinely ongoing loops. */
+  --motion-loop-fast: 1200ms;    /* spinners, typing, Down beacon */
+  --motion-loop: 1600ms;         /* skeletons, active step */
+  --motion-ambient: 2400ms;      /* Live beacon halo, gentle pulses */
+  --motion-ambient-slow: 4800ms; /* decorative sweeps on marketing surfaces */
+
+  /* Curves. */
+  --ease-settle: cubic-bezier(.2, .8, .2, 1);   /* default for everything that moves once */
+  --ease-draw: cubic-bezier(.65, 0, .35, 1);    /* lines, ribbons, bars drawing in */
+  --ease-breathe: cubic-bezier(.45, 0, .55, 1); /* loops */
   /* Soft overshoot for material shape; never use on text scale. */
-  --motion-gooey: linear(0, .14 10%, .46 22%, .79 38%, .96 55%, 1.035 72%, 1.012 88%, 1);
+  --ease-gooey: linear(0, .14 10%, .46 22%, .79 38%, .96 55%, 1.035 72%, 1.012 88%, 1);
+
+  /* Distances. */
+  --motion-rise: 8px;        /* entrances rise this far */
+  --motion-rise-toast: 12px; /* toasts and other floating things */
+  --motion-press-scale: .98;
+
+  /* Shared keyframe names. CSS Modules hash bare animation names, so module
+     files reference these through var(): `animation: var(--kf-enter) …`. */
+  --kf-enter: st-enter;
+  --kf-enter-float: st-enter-float;
+  --kf-enter-start: st-enter-start;
+  --kf-fade-in: st-fade-in;
+  --kf-breathe: st-breathe;
+  --kf-halo: st-halo;
+  --kf-spin: st-spin;
+
+  /* Role aliases kept for existing code. New code uses the ladder above. */
+  --motion-feedback: var(--motion-fast);
+  --motion-disclosure: var(--motion-slow);
+  --motion-exit: var(--motion-base);
+  --motion-ease: var(--ease-settle);
+  --motion-gooey: var(--ease-gooey);
+  --motion-reveal: var(--motion-base);
+  --motion-reveal-stagger: var(--motion-stagger);
+  --motion-draw: var(--motion-long);
+  --motion-draw-ease: var(--ease-draw);
+  --motion-count: var(--motion-long);
 }
+
+/* Reduced motion: nothing travels or scales. What remains is a 120 ms
+   crossfade, so state changes are still visible. Decorative loops opt out in
+   their own rule; progress spinners keep turning because they carry meaning. */
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-feedback: 0ms; --motion-disclosure: 0ms; --motion-exit: 0ms; }
+  :root {
+    --motion-press: 0ms;
+    --motion-fast: 120ms;
+    --motion-base: 120ms;
+    --motion-slow: 120ms;
+    --motion-long: 120ms;
+    --motion-stagger: 0ms;
+    --motion-rise: 0px;
+    --motion-rise-toast: 0px;
+    --motion-press-scale: 1;
+  }
+  html { scroll-behavior: auto !important; }
+}
+
+/* Shared keyframes. Components reuse these instead of declaring their own. */
+@keyframes st-enter {
+  from { opacity: 0; transform: translateY(var(--motion-rise)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes st-enter-float {
+  from { opacity: 0; transform: translateY(var(--motion-rise-toast)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes st-enter-start {
+  from { opacity: 0; transform: translateX(calc(var(--motion-rise) * -1)); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes st-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes st-breathe {
+  50% { opacity: .55; }
+}
+@keyframes st-halo {
+  0% { opacity: .9; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(1.6); }
+}
+@keyframes st-spin {
+  to { rotate: 360deg; }
+}
+
+/* Utilities for TSX. `st-enter` with `--i` set staggers within a group (cap 6). */
+.st-enter {
+  animation: st-enter var(--motion-base) var(--ease-settle) both;
+  animation-delay: calc(min(var(--i, 0), 5) * var(--motion-stagger));
+}
+.st-fade-in {
+  animation: st-fade-in var(--motion-base) var(--ease-settle) both;
 }

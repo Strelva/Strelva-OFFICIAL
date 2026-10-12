@@ -8,6 +8,7 @@
  *   npx tsx --env-file=.env.local scripts/seed-account-andy.ts          # dry-run
  *   npx tsx --env-file=.env.local scripts/seed-account-andy.ts --apply
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getAllAccounts, createAccount, linkTenantToAccount } from "../src/lib/accounts";
 
 const apply = process.argv.includes("--apply");

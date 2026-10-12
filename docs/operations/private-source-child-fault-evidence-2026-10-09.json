@@ -1,0 +1,64 @@
+{
+  "scope": "actual-harmless-local-child-faults",
+  "databaseExecuted": false,
+  "nativeSQLExecuted": false,
+  "fullReleaseQualified": false,
+  "status": "HOLD",
+  "cases": [
+    {
+      "case": "spawn-gap/repeated-signals/TERM-resistant/sibling",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 52462,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          },
+          {
+            "clientPid": 52463,
+            "forced": true,
+            "reaped": true,
+            "errors": [
+              "TERM wait: Bounded child timeout after 2 seconds"
+            ],
+            "returncode": -9
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 52462,
+            "backendPid": 52462,
+            "state": "CLOSED"
+          },
+          {
+            "clientPid": 52463,
+            "backendPid": 52463,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15
+        ]
+      }
+    }
+  ],
+  "failure": "Primary retention failure did not retain independent fallback",
+  "harnessSha256": "75bb2aca611826763807a98017bd1d1b6789e5da47004c85747ffa289981674f"
+}

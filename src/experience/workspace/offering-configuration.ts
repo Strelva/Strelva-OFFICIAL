@@ -3,7 +3,7 @@ import type { OfferingCollection, OfferingConfigurationField, OfferingDefinition
 
 export function availabilityLabel(definition: OfferingDefinitionView): string {
   if (definition.installability === "available") return definition.availability === "local" ? "Local release" : "Available to install";
-  if (definition.installability === "provider_only") return "Existing clients · provider setup";
+  if (definition.installability === "provider_only") return "Existing clients · agency setup";
   return "Release gated";
 }
 

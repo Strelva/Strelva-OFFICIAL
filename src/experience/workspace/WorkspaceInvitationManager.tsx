@@ -1,10 +1,8 @@
 "use client";
 
-import { Copy, Link2, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
+import { WorkspaceSurfaceShell } from "./WorkspaceSurfaceShell";
+import { StPage, StField, StHead, StSection, StSurface, StRows, StRow, StState, StPill, StTextButton, StNotice, StSkeleton, StEmpty } from "@/components/ui/strelva/Kit";
 
 type Role = "owner" | "admin" | "member";
 type Invitation = { id: string; recipientEmail: string; role: Role; status: "pending" | "accepted" | "revoked" | "expired"; expiresAt: string; createdAt: string };
@@ -15,18 +13,21 @@ async function responseJson<T>(response: Response, fallback: string): Promise<T>
   return body as T;
 }
 
-export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceInvitationManager({ workspaceId, businessName, systemsReleased = false }: { workspaceId: string; businessName?: string; systemsReleased?: boolean }) {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [createdLink, setCreatedLink] = useState("");
   const [loading, setLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setHistoryError(false);
+    setNotice(null);
     try {
       const body = await responseJson<{ invitations: Invitation[] }>(
         await fetch(`/api/workspace-invitations?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store" }),
@@ -34,6 +35,7 @@ export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: strin
       );
       setInvitations(Array.isArray(body.invitations) ? body.invitations : []);
     } catch (error) {
+      setHistoryError(true);
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Invitations could not be loaded." });
     } finally {
       setLoading(false);
@@ -81,34 +83,20 @@ export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: strin
     catch { setNotice({ kind: "error", message: "Copy is unavailable. Select the link and copy it manually." }); }
   }
 
-  return (
-    <main className="min-h-dvh bg-canvas px-6 py-12 text-warm-black md:px-8 lg:px-12">
-      <div className="mx-auto max-w-[960px]">
-        <a href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`} className="text-sm text-gray-muted underline-offset-4 hover:underline">Back to People &amp; access</a>
-        <div className="mt-10 flex items-start gap-4">
-          <div className="rounded-xl bg-accent/15 p-3 text-accent-text"><UserPlus className="size-5" aria-hidden="true" /></div>
-          <div><p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Workspace access</p><h1 className="mt-2 font-display text-[40px] font-medium leading-tight">Invite a person</h1><p className="mt-3 max-w-2xl text-base leading-6 text-gray-muted">Prepare a private seven-day link. The recipient sees the workspace and intended role, then explicitly accepts with the exact verified email address you entered.</p></div>
-        </div>
-
-        <Card padding="lg" className="mt-10">
-          <form onSubmit={create} className="grid gap-5 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
-            <TextInput label="Recipient email" type="email" autoComplete="email" required value={recipientEmail} onChange={event => setRecipientEmail(event.target.value)} placeholder="person@business.com" />
-            <SelectInput label="Workspace role" value={role} onChange={event => setRole(event.target.value as Role)} options={[{ value: "member", label: "Member" }, { value: "admin", label: "Admin" }, { value: "owner", label: "Owner" }]} />
-            <Button type="submit" size="lg" loading={submitting} icon={<Link2 className="size-4" />}>Create link</Button>
-          </form>
-          <p className="mt-4 text-xs leading-5 text-gray-muted"><ShieldCheck className="mr-1 inline size-4 align-text-bottom" aria-hidden="true" />The link alone grants no access. Acceptance rechecks the recipient’s confirmed Supabase identity.</p>
-          {createdLink ? <div className="mt-6 rounded-xl bg-surface-inset p-4"><label htmlFor="workspace-invitation-link" className="text-xs text-gray-muted">Private invitation link</label><div className="mt-2 flex flex-col gap-3 sm:flex-row"><input id="workspace-invitation-link" readOnly value={createdLink} className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-border bg-surface px-4 text-sm text-warm-black" onFocus={event => event.currentTarget.select()} /><Button type="button" variant="secondary" onClick={() => void copyLink()} icon={<Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button></div></div> : null}
-        </Card>
-
-        {notice ? <p role={notice.kind === "error" ? "alert" : "status"} className={`mt-5 rounded-xl border px-4 py-3 text-sm ${notice.kind === "error" ? "border-critical/30 text-critical" : "border-positive/30 text-positive"}`}>{notice.message}</p> : null}
-
-        <section className="mt-12" aria-labelledby="invitation-history-title">
-          <h2 id="invitation-history-title" className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Invitation history</h2>
-          {loading ? <p className="mt-4 flex items-center gap-2 text-sm text-gray-muted"><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Loading invitations</p>
-            : invitations.length === 0 ? <p className="mt-4 border-y border-gray-border py-6 text-sm text-gray-muted">No workspace invitations yet.</p>
-              : <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{invitations.map(invitation => <li key={invitation.id} className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium">{invitation.recipientEmail}</p><p className="mt-1 text-xs capitalize text-gray-muted">{invitation.role} · {invitation.status} · expires {new Date(invitation.expiresAt).toLocaleDateString()}</p></div>{invitation.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</Button> : null}</li>)}</ul>}
-        </section>
-      </div>
-    </main>
-  );
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={businessName} systemsReleased={systemsReleased}><StPage>
+    <StHead title="Invite someone" crumb={{label: "People & access", href: `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`}} meta="Prepare a private seven-day link. The recipient accepts with the exact verified email you enter." />
+    <StSurface label="Invitation form">
+      <form onSubmit={create} className="grid gap-5 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
+        <StField label="Recipient email"><input type="email" autoComplete="email" required value={recipientEmail} onChange={event => setRecipientEmail(event.target.value)} placeholder="person@business.com" /></StField>
+        <StField label="Workspace role"><select value={role} onChange={event => setRole(event.target.value as Role)}><option value="member">Member</option><option value="admin">Admin</option><option value="owner">Owner</option></select></StField>
+        <StPill type="submit" busy={submitting}>Create link</StPill>
+      </form>
+      <p className="mt-4 text-sm text-gray-muted">The link alone grants no access. Strelva checks the recipient’s confirmed identity when they accept.</p>
+      {createdLink ? <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end"><StField label="Private invitation link"><input id="workspace-invitation-link" readOnly value={createdLink} onFocus={event => event.currentTarget.select()} /></StField><StPill variant="soft" onClick={() => void copyLink()}>{copied ? "Copied" : "Copy link"}</StPill></div> : null}
+    </StSurface>
+    {notice ? <StNotice tone={notice.kind === "error" ? "critical" : undefined}><span role={notice.kind === "success" ? "status" : undefined}>{notice.message}</span></StNotice> : null}
+    <StSection title="Invitation history">
+      {loading ? <StSkeleton label="Loading invitations" /> : historyError ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Reload invitations</StTextButton>}>Invitation history could not be read.{invitations.length ? " The last read is kept until you reload." : ""}</StNotice> : !invitations.length ? <StEmpty>No workspace invitations yet.</StEmpty> : <StRows>{invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={<><StState kind={invitation.status === "pending" ? "need" : invitation.status === "accepted" ? "live" : "draft"}>{invitation.status}</StState>{invitation.status === "pending" ? <StTextButton tone="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</StTextButton> : null}</>} />)}</StRows>}
+    </StSection>
+  </StPage></WorkspaceSurfaceShell>;
 }

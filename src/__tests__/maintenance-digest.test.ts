@@ -6,7 +6,7 @@ const mockScan = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/storage", () => ({ getSectionTimestamps: mockTs }));
 vi.mock("@/lib/scan-store", () => ({ getScanSummary: mockScan }));
 vi.mock("@/lib/suggestions", () => ({ addSuggestion: vi.fn() }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
 import { buildMaintenanceDigest } from "@/lib/maintenance-digest";
 

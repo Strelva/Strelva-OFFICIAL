@@ -4,7 +4,7 @@ const boundary = vi.hoisted(() => ({
   rpc: vi.fn(async () => ({ data: [{ id: "grant-1", status: "published" }], error: null })),
 }));
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: boundary.rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: boundary.rpc }) }));
 
 import { publishPublicWebsiteBookingGrant } from "@/products/scheduling/public-booking-admin";
 

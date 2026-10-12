@@ -7,8 +7,8 @@
  * result and a destination for the operator board.
  */
 
-import { cleanSubjectText } from "@/lib/email/text";
-import { sendEmail } from "@/lib/email/send";
+import { cleanSubjectText } from "@/platform/infra/email/text";
+import { sendEmail } from "@/platform/infra/email/send";
 import { resolveLeadNotifyRecipients } from "@/lib/delivery-email";
 
 export interface DomainAlertLine {

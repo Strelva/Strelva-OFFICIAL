@@ -1,13 +1,14 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Clock3, Mail, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,
   InquiryMessageReviewPreview,
   InquiryMessageReviewRequest,
 } from "./message-review-contract";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
+import { StEmpty, StMono, StNotice, StPill, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import styles from "./message-review.module.css";
 
 export type {
@@ -24,14 +25,6 @@ export type {
 } from "./message-review-contract";
 
 const DEFAULT_ENDPOINT = "/api/inquiry-workspace/message-review";
-const COMPLETION_STATUSES = new Set<InquiryMessageReviewOutcome["status"]>([
-  "accepted",
-  "verified",
-  "delivered",
-  "accepted_unverified",
-  "reconciliation_required",
-  "sending",
-]);
 const OUTCOME_STATUSES = new Set<InquiryMessageReviewOutcome["status"]>([
   "ready",
   "awaiting_approval",
@@ -153,7 +146,14 @@ function readOutcome(value: unknown): InquiryMessageReviewOutcome | null {
   const status = row.status;
   if (!inquiryId || !isAction(action) || typeof status !== "string") return null;
   if (!OUTCOME_STATUSES.has(status as InquiryMessageReviewOutcome["status"]) || typeof row.retryable !== "boolean") return null;
-  const providerAccepted = ["accepted", "verified", "delivered", "accepted_unverified", "reconciliation_required"].includes(status);
+  const classification = classifyInquiryMessageOutcome({
+    status,
+    acceptedAt: typeof row.acceptedAt === "string" ? row.acceptedAt : null,
+    providerMessageId: typeof row.providerMessageId === "string" ? row.providerMessageId : null,
+    delivery: row.delivery,
+    retryAllowed: row.retryAllowed,
+    reason: typeof row.reason === "string" ? row.reason : null,
+  });
   return {
     inquiryId,
     action,
@@ -164,7 +164,9 @@ function readOutcome(value: unknown): InquiryMessageReviewOutcome | null {
     ...(Array.isArray(row.verificationEvidence) ? {
       verificationEvidence: row.verificationEvidence.filter((item): item is string => typeof item === "string"),
     } : {}),
-    retryable: providerAccepted ? false : row.retryable,
+    retryable: classification.retryAllowed ? row.retryable : false,
+    delivery: classification.delivery,
+    retryAllowed: classification.retryAllowed,
   };
 }
 
@@ -180,8 +182,15 @@ function actionLabel(action: InquiryMessageReviewAction): string {
   return "reply";
 }
 
-function outcomeClosesRetry(status: InquiryMessageReviewOutcome["status"]): boolean {
-  return COMPLETION_STATUSES.has(status);
+/** Only a message the provider never accepted may get a new review. */
+function outcomeAllowsNewReview(outcome: InquiryMessageReviewOutcome): boolean {
+  return classifyInquiryMessageOutcome(outcome).retryAllowed;
+}
+
+function undeliveredCause(outcome: InquiryMessageReviewOutcome): string {
+  if (outcome.status === "bounced") return "The recipient's mail server refused it.";
+  if (outcome.status === "suppressed") return "The provider would not send to this address.";
+  return "The provider reported that delivery failed.";
 }
 
 export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome): { title: string; detail: string; tone: "success" | "warning" | "error" } {
@@ -197,6 +206,21 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
       title: outcome.acceptedAt || outcome.providerMessageId ? "The message was accepted, but its receipt needs checking." : "We could not confirm what happened to this message.",
       detail: "Do not send it again. Check the delivery history before taking another action.",
       tone: "warning",
+    };
+  }
+  const { delivery } = classifyInquiryMessageOutcome(outcome);
+  if (delivery === "deferred") {
+    return {
+      title: "The provider is still trying to deliver this message.",
+      detail: "Nothing to do. The provider accepted it and keeps trying on its own.",
+      tone: "warning",
+    };
+  }
+  if (delivery === "undeliverable") {
+    return {
+      title: "This message was accepted but not delivered.",
+      detail: `${undeliveredCause(outcome)} It can't be sent again for this inquiry. ${outcome.action === "owner_notification" ? "Let your team know another way." : "Contact the customer another way."}`,
+      tone: "error",
     };
   }
   if (outcome.status === "accepted") {
@@ -220,25 +244,11 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
       tone: "success",
     };
   }
-  if (outcome.status === "bounced") {
+  if (outcome.status === "blocked" && outcome.reason === "different_message_already_sent") {
     return {
-      title: "The provider reported a bounce.",
-      detail: outcome.reason || "The message did not reach the recipient. Resolve the recipient issue before preparing another review.",
-      tone: "error",
-    };
-  }
-  if (outcome.status === "deferred") {
-    return {
-      title: "The provider deferred delivery.",
-      detail: outcome.reason || "Delivery is not confirmed. Resolve the provider issue before preparing another review.",
+      title: `A different ${actionLabel(outcome.action)} was already sent for this inquiry.`,
+      detail: "This one was not sent and can't be. Check the inquiry's history to see what went out.",
       tone: "warning",
-    };
-  }
-  if (outcome.status === "suppressed") {
-    return {
-      title: "The provider suppressed this message.",
-      detail: outcome.reason || "The provider did not deliver this message. Resolve the suppression before preparing another review.",
-      tone: "error",
     };
   }
   if (outcome.status === "blocked") {
@@ -355,7 +365,6 @@ export function InquiryMessageReview({
   const completed = state.status === "completed" ? messageReviewCompletionCopy(state.outcome) : null;
   const canSend = Boolean(review) && state.status === "ready";
   const busy = state.status === "preparing" || state.status === "approving";
-  const context = useMemo(() => businessId ? `Business ${businessId}` : "Authorized inquiry scope", [businessId]);
 
   async function approve(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -406,46 +415,35 @@ export function InquiryMessageReview({
     }
   }
 
-  return <section className={styles.panel} aria-labelledby={headingId} aria-busy={busy} data-message-review data-tenant-id={tenantId} data-inquiry-id={inquiryId}>
-    <div className={styles.header}>
-      <div>
-        <span className={styles.eyebrow}>MESSAGE REVIEW</span>
-        <h2 id={headingId} className="font-display">Review before sending</h2>
-        <p>Strelva prepares the exact message first. Sending requires your explicit approval for this inquiry.</p>
-      </div>
-      <span className={styles.scope}><ShieldCheck size={15} aria-hidden="true" />{context}</span>
-    </div>
+  return <section className={styles.panel} aria-labelledby={headingId} aria-busy={busy} data-workspace-theme="linen" data-message-review data-tenant-id={tenantId} data-inquiry-id={inquiryId} data-business-id={businessId}>
+    <h2 id={headingId} className={styles.heading}>Review before sending</h2>
+    {state.status === "preparing" ? <div className={styles.stack} role="status"><p className={styles.help}>Strelva is preparing the current message…</p><StSkeleton label="Preparing the current message" /><StSkeleton width="76%" /></div> : null}
+    {state.status === "idle" && !autoPrepare ? <StEmpty action={<StPill variant="soft" onClick={() => void prepare()} disabled={busy} data-review-prepare>Review current message</StPill>}>{initialReviewMismatch ? requestError : `Review the current ${actionLabel(action)} to inspect its recipient and text.`}</StEmpty> : null}
+    {state.status === "error" && !review ? <div className={styles.stack}><StNotice tone="critical">{state.message}</StNotice><StPill variant="soft" onClick={() => void prepare()} disabled={busy} data-review-prepare>Try again</StPill></div> : null}
 
-    {state.status === "preparing" ? <div className={styles.status} role="status"><Clock3 size={17} aria-hidden="true" /><div className={styles.statusContent}><p>Preparing the current message…</p></div></div> : null}
-    {state.status === "idle" && !autoPrepare ? <div className={styles.status}><Mail size={17} aria-hidden="true" /><div className={styles.statusContent}><p>{initialReviewMismatch ? requestError : `Review the current ${actionLabel(action)} to inspect its recipient and text.`}</p><button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy} data-review-prepare>Review current message</button></div></div> : null}
-    {state.status === "error" && !review ? <div className={styles.statusError} role="alert"><AlertCircle size={17} aria-hidden="true" /><div className={styles.statusContent}><p>{state.message}</p><button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy} data-review-prepare>Try again</button></div></div> : null}
-
-    {review ? <div className={styles.reviewBody}>
+    {review ? <StSurface tone={!completed ? "need" : undefined} label="Exact message review"><div className={styles.stack}>
+      <StState kind={completed ? completed.tone === "success" ? "live" : completed.tone === "warning" ? "need" : "down" : "need"}>{completed ? "Message review outcome" : `Strelva drafted this ${actionLabel(action)} · not sent`}</StState>
       <dl className={styles.facts}>
-        <div><dt>Recipient</dt><dd data-review-recipient>{review.recipient}</dd></div>
-        <div><dt>Subject</dt><dd data-review-subject>{review.subject}</dd></div>
-        <div><dt>Prepared</dt><dd>{preparedLabel(review.preparedAt)}</dd></div>
-        <div><dt>Expires</dt><dd>{expiryLabel(review.expiresAt)}</dd></div>
-        <div><dt>Policy</dt><dd>{review.policyVersion}</dd></div>
+        <dt>To</dt><dd data-review-recipient><StMono>{review.recipient}</StMono></dd>
+        <dt>Subject</dt><dd data-review-subject>{review.subject}</dd>
       </dl>
-      <div className={styles.message}>
-        <span className={styles.messageLabel}>Exact message</span>
-        <pre data-review-body>{review.body}</pre>
-      </div>
+      <p className={styles.message} data-review-body>{review.body}</p>
+      <details className={styles.details}><summary>Review details</summary><dl className={styles.facts}>
+        <dt>Prepared</dt><dd><StMono>{preparedLabel(review.preparedAt)}</StMono></dd>
+        <dt>Expires</dt><dd><StMono>{expiryLabel(review.expiresAt)}</StMono></dd>
+        <dt>Policy</dt><dd><StMono>{review.policyVersion}</StMono></dd>
+      </dl></details>
 
-      {completed ? <div className={completed.tone === "success" ? styles.success : completed.tone === "warning" ? styles.warning : styles.statusError} role={completed.tone === "error" ? "alert" : "status"}>
-        {completed.tone === "success" ? <CheckCircle2 size={17} aria-hidden="true" /> : <AlertCircle size={17} aria-hidden="true" />}
-        <div><strong>{completed.title}</strong><p>{completed.detail}</p></div>
-      </div> : null}
-      {state.status === "error" && review ? <div className={styles.statusError} role="alert"><AlertCircle size={17} aria-hidden="true" /><p>{requestError || "The message review could not be completed."}</p></div> : null}
+      {completed ? <div role={completed.tone === "error" ? undefined : "status"}><StNotice tone={completed.tone === "success" ? undefined : completed.tone === "warning" ? "need" : "critical"}><strong>{completed.title}</strong><p className={styles.outcomeDetail}>{completed.detail}</p></StNotice></div> : null}
+      {state.status === "error" && review ? <StNotice tone="critical">{requestError || "The message review could not be completed."}</StNotice> : null}
       {!completed ? <form onSubmit={(event) => void approve(event)} className={styles.actions}>
-        <button type="submit" className={styles.primaryButton} disabled={!canSend || busy} aria-describedby={sendHelpId} data-review-send>{busy ? "Checking approval…" : "Send this message"}</button>
-        <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare again</button>
-        <p id={sendHelpId}>Only the reviewed recipient, subject, and body can be approved. A changed or revoked review is rejected by the server.</p>
-      </form> : completed && state.status === "completed" && !outcomeClosesRetry(state.outcome.status) ? <div className={styles.actions}>
-        <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare a new review</button>
-        <p>The failed attempt was recorded. Resolve the issue before preparing another message.</p>
+        <StTextButton onClick={() => void prepare()} disabled={busy}>Prepare again</StTextButton>
+        <StPill type="submit" disabled={!canSend || busy} busy={state.status === "approving"} aria-describedby={sendHelpId} data-review-send>{busy ? "Checking approval…" : action === "reply" ? "Send reply" : "Send message"}</StPill>
+        <p id={sendHelpId} className={styles.help}>Only this recipient and exact message are approved. Strelva checks the current permission before sending.</p>
+      </form> : completed && state.status === "completed" && outcomeAllowsNewReview(state.outcome) ? <div className={styles.actions}>
+        <StPill variant="soft" onClick={() => void prepare()} disabled={busy}>Prepare a new review</StPill>
+        <p className={styles.help}>The failed attempt was recorded. Resolve the issue before preparing another message.</p>
       </div> : null}
-    </div> : null}
+    </div></StSurface> : null}
   </section>;
 }

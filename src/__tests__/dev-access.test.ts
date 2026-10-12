@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getDevAccessTenant, isDevAccessBypassEnabled } from "../lib/dev-access";
+import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 
 describe("dev access bypass", () => {
   beforeEach(() => {

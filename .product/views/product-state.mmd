@@ -1,0 +1,139 @@
+%% Product state from the 2026-10-04 lane audits; '= VERDICT' is the audit verdict copied from details.audit_verdict (view-only label). Local code + Sept 30 release record, not a fresh production read. Source revision 5.
+%% Generated from PRODUCT_MODEL revision 5; status=all, inactive=False, focus=all, hops=1
+flowchart LR
+  LATENT_VIEW_TITLE["Strelva #124; revision 5 #124; view: products, live business and verdicts"]
+  N_STATE_LEADS_REDIS(("state: Leads in Redis only #91;available#93;"))
+  class N_STATE_LEADS_REDIS type_state;
+  class N_STATE_LEADS_REDIS confirmed;
+  N_CAP_BOOKING_API{{"capability: Public booking API #91;partial#93;"}}
+  class N_CAP_BOOKING_API type_capability;
+  class N_CAP_BOOKING_API confirmed;
+  N_COMP_LEADS_TO_RECORD[["composition: Leads land in the business record #91;planned#93;"]]
+  class N_COMP_LEADS_TO_RECORD type_composition;
+  class N_COMP_LEADS_TO_RECORD proposed;
+  N_CAP_STANDING_CHECKS{{"capability: Bounded standing investigations #91;blocked#93;"}}
+  class N_CAP_STANDING_CHECKS type_capability;
+  class N_CAP_STANDING_CHECKS confirmed;
+  N_RISK_PUBLIC_BOOKING_PAUSE["risk: Paused schedule still takes public bookings #91;partial#93;"]
+  class N_RISK_PUBLIC_BOOKING_PAUSE type_custom;
+  class N_RISK_PUBLIC_BOOKING_PAUSE confirmed;
+  N_GAP_LEADS_UNSEEN["gap: Client leads expire unseen #91;absent#93;"]
+  class N_GAP_LEADS_UNSEEN type_custom;
+  class N_GAP_LEADS_UNSEEN confirmed;
+  N_OFFER_MANAGED_WEBSITES("offering: Managed websites for nine clients (tenant model) = LIVE #91;operating#93;")
+  class N_OFFER_MANAGED_WEBSITES type_offering;
+  class N_OFFER_MANAGED_WEBSITES confirmed;
+  N_SURF_V1_CONTRACT["surface: /api/v1 storefront contract = LIVE #91;operating#93;"]
+  class N_SURF_V1_CONTRACT type_surface;
+  class N_SURF_V1_CONTRACT confirmed;
+  N_INT_CLIENT_REPOS[("integration: Client site repos #91;operating#93;")]
+  class N_INT_CLIENT_REPOS type_integration;
+  class N_INT_CLIENT_REPOS confirmed;
+  N_GAP_CLIENT_REPO_COVERAGE["gap: Client contract checks cover 2 of 9 repos #91;absent#93;"]
+  class N_GAP_CLIENT_REPO_COVERAGE type_custom;
+  class N_GAP_CLIENT_REPO_COVERAGE confirmed;
+  N_CAP_STRIPE_BILLING{{"capability: Stripe webhook and pay links = LIVE #91;operating#93;"}}
+  class N_CAP_STRIPE_BILLING type_capability;
+  class N_CAP_STRIPE_BILLING confirmed;
+  N_SURF_OPERATOR_CONSOLE["surface: Operator console = LIVE for tenants; workspace parts SHIPPED-UNUSED #91;operating#93;"]
+  class N_SURF_OPERATOR_CONSOLE type_surface;
+  class N_SURF_OPERATOR_CONSOLE confirmed;
+  N_CAP_CRONS{{"capability: Scheduled jobs and heartbeat = LIVE #91;operating#93;"}}
+  class N_CAP_CRONS type_capability;
+  class N_CAP_CRONS confirmed;
+  N_RULE_PROXY_TENANT_AUTH{"rule: Proxy and tenant authorization = LIVE #91;operating#93;"}
+  class N_RULE_PROXY_TENANT_AUTH type_rule;
+  class N_RULE_PROXY_TENANT_AUTH confirmed;
+  N_CAP_WEBSITE_AGENT{{"capability: Ask Strelva website agent #91;operating#93;"}}
+  class N_CAP_WEBSITE_AGENT type_capability;
+  class N_CAP_WEBSITE_AGENT confirmed;
+  N_PROD_WEBSITE_REBUILD["product: Website rebuild and hosted publishing = WORKS-LOCALLY #91;partial#93;"]
+  class N_PROD_WEBSITE_REBUILD type_custom;
+  class N_PROD_WEBSITE_REBUILD confirmed;
+  N_PROD_WEBSITE_AUDIT["product: Website audit (/audit) = LIVE (public page); workspace save SHIPPED-UNUSED #91;operating#93;"]
+  class N_PROD_WEBSITE_AUDIT type_custom;
+  class N_PROD_WEBSITE_AUDIT confirmed;
+  N_PROD_AI_VISIBILITY["product: AI visibility scorecard = LIVE page; monitoring fake #91;partial#93;"]
+  class N_PROD_AI_VISIBILITY type_custom;
+  class N_PROD_AI_VISIBILITY confirmed;
+  N_PROD_DOMAIN_MONITOR["product: Domain monitor = LIVE #91;operating#93;"]
+  class N_PROD_DOMAIN_MONITOR type_custom;
+  class N_PROD_DOMAIN_MONITOR confirmed;
+  N_PROD_NATIVE_APPS["product: Native applications = SHIPPED-UNUSED #91;available#93;"]
+  class N_PROD_NATIVE_APPS type_custom;
+  class N_PROD_NATIVE_APPS confirmed;
+  N_PROD_CUSTOM_APPS["product: Custom applications = DEAD in production (WORKS-LOCALLY) #91;blocked#93;"]
+  class N_PROD_CUSTOM_APPS type_custom;
+  class N_PROD_CUSTOM_APPS confirmed;
+  N_PROD_TRACKER["product: Tracker = SHIPPED-UNUSED #91;available#93;"]
+  class N_PROD_TRACKER type_custom;
+  class N_PROD_TRACKER confirmed;
+  N_PROD_WORK_PLANS["product: Work plans = SHIPPED-UNUSED (flag off), WORKS-LOCALLY #91;blocked#93;"]
+  class N_PROD_WORK_PLANS type_custom;
+  class N_PROD_WORK_PLANS confirmed;
+  N_PROD_INVESTIGATIONS["product: Investigations (saved checks) = SHIPPED-UNUSED; scheduled half DEAD in production #91;partial#93;"]
+  class N_PROD_INVESTIGATIONS type_custom;
+  class N_PROD_INVESTIGATIONS confirmed;
+  N_PROD_OPERATIONS["product: Operations (delegated and standing work) = SHIPPED-UNUSED; standing DEAD in production #91;partial#93;"]
+  class N_PROD_OPERATIONS type_custom;
+  class N_PROD_OPERATIONS confirmed;
+  N_PROD_PRODUCT_LEARNING["product: Product learning = SCAFFOLD #91;blocked#93;"]
+  class N_PROD_PRODUCT_LEARNING type_custom;
+  class N_PROD_PRODUCT_LEARNING confirmed;
+  N_PROD_HOME_FINDER["product: Home Finder adapter = SCAFFOLD #91;blocked#93;"]
+  class N_PROD_HOME_FINDER type_custom;
+  class N_PROD_HOME_FINDER confirmed;
+  N_PROD_ONBOARDING["product: Onboarding cases = SHIPPED-UNUSED #91;available#93;"]
+  class N_PROD_ONBOARDING type_custom;
+  class N_PROD_ONBOARDING confirmed;
+  N_PROD_DOCUMENTS["product: Documents = SHIPPED-UNUSED; 200-edit bug #91;available#93;"]
+  class N_PROD_DOCUMENTS type_custom;
+  class N_PROD_DOCUMENTS confirmed;
+  N_PROD_ASSESSMENT["product: Assessment = SHIPPED-UNUSED #91;available#93;"]
+  class N_PROD_ASSESSMENT type_custom;
+  class N_PROD_ASSESSMENT confirmed;
+  N_PROD_WORKSPACE_SCHEDULING["product: Workspace scheduling = SHIPPED-UNUSED; public path unreachable #91;partial#93;"]
+  class N_PROD_WORKSPACE_SCHEDULING type_custom;
+  class N_PROD_WORKSPACE_SCHEDULING confirmed;
+  N_COMP_LEADS_TO_RECORD -.->|"fixes #91;proposed#93;"| N_STATE_LEADS_REDIS
+  N_OFFER_MANAGED_WEBSITES -->|"served_through"| N_SURF_V1_CONTRACT
+  N_INT_CLIENT_REPOS -->|"calls"| N_SURF_V1_CONTRACT
+  N_GAP_CLIENT_REPO_COVERAGE -->|"constrains"| N_INT_CLIENT_REPOS
+  N_OFFER_MANAGED_WEBSITES -->|"billed_through"| N_CAP_STRIPE_BILLING
+  N_SURF_OPERATOR_CONSOLE -->|"operates"| N_OFFER_MANAGED_WEBSITES
+  N_CAP_CRONS -->|"supports"| N_OFFER_MANAGED_WEBSITES
+  N_RULE_PROXY_TENANT_AUTH -->|"constrains"| N_OFFER_MANAGED_WEBSITES
+  N_CAP_WEBSITE_AGENT -->|"changes"| N_OFFER_MANAGED_WEBSITES
+  N_SURF_V1_CONTRACT -->|"writes"| N_STATE_LEADS_REDIS
+  N_GAP_LEADS_UNSEEN -->|"arises_from"| N_STATE_LEADS_REDIS
+  N_GAP_LEADS_UNSEEN -->|"affects"| N_OFFER_MANAGED_WEBSITES
+  N_COMP_LEADS_TO_RECORD -.->|"fixes #91;proposed#93;"| N_GAP_LEADS_UNSEEN
+  N_SURF_OPERATOR_CONSOLE -->|"omits"| N_GAP_LEADS_UNSEEN
+  N_PROD_WEBSITE_REBUILD -->|"posts_to"| N_SURF_V1_CONTRACT
+  N_PROD_WEBSITE_AUDIT -.->|"opens #91;proposed#93;"| N_PROD_WEBSITE_REBUILD
+  N_PROD_ASSESSMENT -->|"presents"| N_PROD_WEBSITE_AUDIT
+  N_PROD_ASSESSMENT -->|"presents"| N_PROD_AI_VISIBILITY
+  N_PROD_DOMAIN_MONITOR -->|"monitors"| N_OFFER_MANAGED_WEBSITES
+  N_PROD_TRACKER -->|"duplicates"| N_PROD_NATIVE_APPS
+  N_PROD_WORK_PLANS -->|"creates"| N_PROD_NATIVE_APPS
+  N_PROD_INVESTIGATIONS -->|"implements"| N_CAP_STANDING_CHECKS
+  N_PROD_ONBOARDING -->|"stores_files_in"| N_PROD_DOCUMENTS
+  N_PROD_WORKSPACE_SCHEDULING -->|"implements"| N_CAP_BOOKING_API
+  N_RISK_PUBLIC_BOOKING_PAUSE -->|"affects"| N_CAP_BOOKING_API
+  classDef type_capability fill:#FEF3C7,stroke:#A16207,color:#422006;
+  classDef type_composition fill:#FDE68A,stroke:#B45309,color:#451A03;
+  classDef type_custom fill:#FFFFFF,stroke:#64748B,color:#0F172A;
+  classDef type_integration fill:#E2E8F0,stroke:#475569,color:#0F172A;
+  classDef type_offering fill:#DCFCE7,stroke:#15803D,color:#052E16;
+  classDef type_rule fill:#F3E8FF,stroke:#7E22CE,color:#3B0764;
+  classDef type_state fill:#E0E7FF,stroke:#4338CA,color:#1E1B4B;
+  classDef type_surface fill:#F3F4F6,stroke:#6B7280,color:#111827;
+  classDef confirmed stroke-width:2px,stroke-dasharray:0;
+  classDef inferred stroke-width:2px,stroke-dasharray:2 3;
+  classDef proposed stroke-width:2px,stroke-dasharray:8 4;
+  LEGEND_CONFIRMED["confirmed: solid"]
+  class LEGEND_CONFIRMED confirmed;
+  LEGEND_INFERRED["inferred: dotted"]
+  class LEGEND_INFERRED inferred;
+  LEGEND_PROPOSED["proposed: dashed"]
+  class LEGEND_PROPOSED proposed;

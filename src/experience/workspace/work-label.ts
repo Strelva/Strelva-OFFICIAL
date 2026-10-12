@@ -1,3 +1,4 @@
+import { KIND_LABELS } from "@/platform/presentation/place-labels";
 import type { WorkspaceWork } from "./contracts";
 
 /**
@@ -7,18 +8,18 @@ import type { WorkspaceWork } from "./contracts";
  */
 export function workspaceWorkLabel(work: Pick<WorkspaceWork, "productId" | "resourceKind" | "assessment">): string {
   const labels: Record<string, string> = {
-    "websites:website": "Website",
-    "custom-applications:custom-application": "Custom application",
-    "onboarding:case": "Onboarding",
-    "applications:application": "Application",
-    "scheduling:schedule": "Schedule",
-    "investigations:investigation": "Ongoing check",
-    "operations:responsibility": "Delegated work",
+    "websites:website": KIND_LABELS.website,
+    "custom-applications:custom-application": KIND_LABELS.app,
+    "onboarding:case": KIND_LABELS.onboarding,
+    "applications:application": KIND_LABELS.app,
+    "scheduling:schedule": KIND_LABELS.bookings,
+    "investigations:investigation": KIND_LABELS.investigation,
+    "operations:responsibility": KIND_LABELS.request,
     "product-learning:learning": "Learning",
-    "tracker:tracker": "Tracker",
+    "tracker:tracker": KIND_LABELS.app,
     "documents:document": "Private document",
     "work_plans:plan": "Work plan",
-    "research:experiment": "Tracker experiment",
+    "research:experiment": "Internal tool trial",
   };
   return labels[`${work.productId}:${work.resourceKind}`] ?? work.assessment?.method.label ?? "Saved work · view unavailable";
 }

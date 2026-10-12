@@ -14,29 +14,41 @@ Other things live elsewhere:
 
 ## Where we're going
 
-Strelva lets businesses and agencies create, run, and keep reshaping the
-systems a business needs. A small business should be able to act on ideas that
-used to need its own software team.
+Strelva is where a business makes, runs and keeps reshaping its own systems.
+A small business should be able to act on ideas that used to need its own
+software team. Four nouns carry the product
+([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)):
 
-- **Working capabilities to start:** a website, bookings, customer inquiries,
-  publishing, internal apps. They share the business's information, people,
-  permissions, and connected tools.
-- **Creative tools to go further:** change how a capability works, connect it
-  to others, add your own interfaces and rules, and turn the pieces into a
-  service we never designed. Agents help build and run it.
-- **Ongoing operation to make it dependable:** governance, approvals,
-  receipts, monitoring, and recovery, so it keeps working as it changes.
+- **System:** something the business made in Strelva that works: a website,
+  a proposal, a booking page, an intake flow, an internal app. Its identity
+  survives changes to its content, data, logic and screens. Draft, Live or
+  Paused, with health tracked separately.
+- **Connection:** what a System works with: business facts, another System,
+  a person, a Google account, a domain. Each one is typed (reads, acts,
+  appears in, shares with, depends on, is triggered by).
+- **Possibility:** a working alternative you can open and compare, across one
+  or several Systems. **Make real** turns it on, and reports honestly when
+  only part of it landed.
+- **Version:** the same System adapted for another market, segment or agency
+  client, with lineage back to its source. Not a release.
 
-Agencies do this across clients and package their expertise as reusable
-offerings ([ADR 0010](../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md)).
-Businesses can use it directly.
+Example: a consultant's **proposal** System grows package selection, then
+onboarding. It stays the same System the whole way, and a proposal the client
+already accepted keeps its original terms.
 
-The workspace product (`src/platform`, `src/products`, `src/experience`) is
-where Strelva is going. Today the live business is managed websites for nine
-clients on the older tenant model (`src/lib`); those clients keep their service
-and move into business workspaces, with the managed website becoming one
-capability inside a workspace. Build new capability on the workspace model, not
-as tenant-only features. [CONTEXT.md](./CONTEXT.md) has the evidence.
+Records, grants, operations, approvals and receipts stay underneath. A
+customer hires Strelva to make and run their Systems and never has to build;
+an agency makes and adapts them for clients
+([ADR 0010](../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md));
+a business can also change its own. The rules (identity, connection contracts,
+isolation, pause and health) are in [CONTEXT.md](./CONTEXT.md#product-model).
+
+Today the live business is managed websites for nine clients on the older
+tenant model (`src/lib`). Those clients keep their service and move into
+business workspaces, where each website becomes their first System. Build new
+capability as Systems on the workspace model (`src/platform`, `src/products`,
+`src/experience`), not as tenant-only features. The model is selected
+direction, not a shipped runtime; [CONTEXT.md](./CONTEXT.md) has the evidence.
 
 Customers who hire Strelva never have to build their own site. A native tool
 never requires buying a website. A request for work is not an accepted job
@@ -89,12 +101,14 @@ and `created_at` on partial updates. `stable_id` never changes. Slug renames go
 through `src/lib/tenant-rename.ts` so no Redis state is left under the old slug.
 
 **One of each.** One scanner (`src/lib/scan.ts`, `scan-store.ts`). One set of
-agent tools (`src/lib/agent-shared.ts`). One email path (`src/lib/email/send.ts`,
-gated by `email-enabled.ts`). One secrets path (`src/lib/crypto/secrets.ts`).
+agent tools (`src/lib/agent-shared.ts`). One email path
+(`src/platform/infra/email/send.ts`, gated by `email/enabled.ts`). One secrets
+path (`src/platform/infra/crypto/secrets.ts`). Shared infrastructure lives in
+`src/platform/infra`; the old `src/lib` paths only re-export it.
 Extend these; don't build a second.
 
 **Crons.** Declare in `vercel.json`, authenticate with `requireCronRequest`,
-and register in `CRON_MAX_AGE_SECONDS` in `src/lib/heartbeat.ts`.
+and register in `CRON_MAX_AGE_SECONDS` in `src/platform/infra/heartbeat.ts`.
 
 **Outside writes.** Content and Google changes go through
 `src/lib/ai-governance.ts` and approval. The only exception is a tenant's
@@ -130,7 +144,7 @@ pnpm typecheck
 pnpm test                    # Vitest
 pnpm lint
 pnpm build
-pnpm check                   # lint + typecheck + test + build
+pnpm check                   # hosted-domain config + lint + typecheck + test + build
 pnpm check:ci                # what CI runs
 pnpm smoke                   # public Playwright smoke
 pnpm smoke:surfaces          # owner + operator surfaces with local fixtures
@@ -146,11 +160,46 @@ cluster and never touch production:
 ```bash
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:agency-workflow
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH \
+  STRELVA_MCP_HTTP_SQL_PROOF=1 bash scripts/check-agent-channel-sql.sh
 ```
 
+For agency workflow or provider/owner permission changes, run
+`check:agency-workflow` for the full ordered SQL job, then the authenticated
+browser proof. Read the [October 7 handoff](./docs/operations/agency-workflow-2026-10-07.md)
+for disposable Auth setup, simulated delivery/verification limits, and retained
+failure evidence. The bounded signed-in-owner three-flag browser runner is
+`bash scripts/check-agency-workflow-browser.sh`; it creates and cleans up only
+its own local Auth stack and app, with providers disabled and a fictional
+source-site transport. A passing local run is never proof of hosted delivery.
+
+The optional MCP proof above composes actual local HTTP with disposable
+Postgres; it rejects repository env files and proves no native assistant or
+Supabase browser sign-in. The [owner-assistant record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns setup, scopes and remaining HTTPS/client qualification.
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.
+
+The private money/apps integration adds native contracts to both SQL runners via
+`scripts/sql/money-apps-contracts.sh`; keep its ordered payer/Connect/native
+fixtures and public-key/read-only checks. See
+[the prepared handoff](./docs/operations/money-apps-prepared-2026-10-07.md) for
+current gates. The optional Sandbox adapter does not authorize installing its SDK,
+changing resource limits, enabling custom apps or using a paid provider.
+
+The isolated creator maintenance identity check is
+`bash scripts/check-creator-maintenance-identity.sh`; it covers original future
+royalty eligibility, populated guarded inverse/reapply and controlled current
+verification/membership races. See
+[its private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md).
+Completed-month evidence additionally uses
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-recurring-responsibilities.sh`.
+Keep its actual populated rollback refusal, historical identity/coverage checks,
+READ ONLY reader and controlled current-actor races. The
+[private monthly contract](docs/operations/responsibility-month-evidence-2026-10-08.md)
+distinguishes observed history from unavailable period-end state and billing.
 
 ## Done means proven
 
@@ -168,8 +217,10 @@ Postgres, or bypass mode changes what a green run means.
 
 | Topic | Owner |
 | --- | --- |
+| Product model: Systems, Connections, Possibilities, Versions | [CONTEXT.md](./CONTEXT.md#product-model); the full ledger is `PRODUCT_MODEL.md` (untracked, main checkout only) |
 | Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
 | Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
+| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md) is the word authority; [product-ontology](./docs/architecture/product-ontology.md) owns structure and governance rules |
 | Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |
 | CI and test modes | [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) |
 | Client dashboard | [docs/architecture/client-dashboard-ia.md](./docs/architecture/client-dashboard-ia.md) |

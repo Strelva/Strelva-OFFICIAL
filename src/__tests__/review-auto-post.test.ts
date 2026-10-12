@@ -1,3 +1,4 @@
+import { googleReviewContent } from "@/platform/infra/google-review-content";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 
@@ -28,7 +29,7 @@ vi.mock("@/lib/events", () => ({
   updateEvent: (...a: unknown[]) => mockUpdateEvent(...a),
   addEvent: (...a: unknown[]) => mockAddEvent(...a),
 }));
-vi.mock("@/lib/event-actions", () => ({ resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
+vi.mock("@/lib/event-actions", () => ({ AUTO_REPLY_ACTOR: "auto-reply-policy", resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
 vi.mock("@/lib/reviews/reply-voice", () => ({ getReplyVoice: (...a: unknown[]) => mockGetReplyVoice(...a) }));
 vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
 vi.mock("@/lib/review-replies", () => ({
@@ -54,7 +55,9 @@ function draft(over: Partial<UnifiedEvent> & { autoPostAt?: string | null } = {}
     time: new Date(NOW).toISOString(),
     metadata: {
       kind: "review_reply_draft",
+      providerContent: googleReviewContent(new Date(NOW)),
       reviewId: "rev1",
+      rating: 5,
       ...(autoPostAt !== undefined ? { autoPostAt } : {}),
     },
     ...rest,
@@ -70,10 +73,18 @@ describe("runDueAutoPosts", () => {
     mockUpdateEvent.mockResolvedValue({ changed: true });
   });
 
+  it("never auto-posts an expired provider context", async () => {
+    const expired = draft({ autoPostAt: new Date(NOW - 60_000).toISOString() });
+    expired.metadata!.providerContent = googleReviewContent(new Date(NOW - 30 * 86400000));
+    mockGetEvents.mockResolvedValue([expired]);
+    expect((await runDueAutoPosts(NOW)).posted).toBe(0);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
   it("posts a draft whose window has elapsed", async () => {
     mockGetEvents.mockResolvedValue([draft({ autoPostAt: new Date(NOW - 60_000).toISOString() })]);
     const res = await runDueAutoPosts(NOW);
-    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved");
+    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved", "auto-reply-policy");
     expect(res.posted).toBe(1);
   });
 
@@ -105,6 +116,18 @@ describe("runDueAutoPosts", () => {
     const res = await runDueAutoPosts(NOW);
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(res).toEqual({ posted: 0, failed: 0 });
+  });
+
+  it("never auto-posts a 1 or 2 star reply stamped before the rating rule; it stays with the owner", async () => {
+    const due = new Date(NOW - 60_000).toISOString();
+    const low = draft({ id: "low", autoPostAt: due });
+    low.metadata = { ...low.metadata, rating: 2 };
+    const unknown = draft({ id: "unknown", autoPostAt: due });
+    unknown.metadata = { ...unknown.metadata, rating: undefined };
+    mockGetEvents.mockResolvedValue([low, unknown]);
+    const res = await runDueAutoPosts(NOW);
+    expect(res).toEqual({ posted: 0, failed: 0 });
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 
   it("does NOT post a draft still inside its window", async () => {
@@ -147,7 +170,7 @@ describe("runDueAutoPosts", () => {
 // replies on. Guards under test (Deep Audit #2, #35): Google-only, respect a
 // durable dismissal, per-tenant cap, and the auto-mode autoPostAt stamp.
 function review(over: Record<string, unknown> = {}) {
-  return { id: "r1", externalId: "ext1", source: "google", author: "Sam", rating: 5, text: "great", reply: null, ...over };
+  return { providerContent: googleReviewContent(new Date(NOW)), id: "r1", externalId: "ext1", source: "google", author: "Sam", rating: 5, text: "great", reply: null, ...over };
 }
 
 describe("draftReplyBacklog", () => {
@@ -193,6 +216,14 @@ describe("draftReplyBacklog", () => {
     const evt = mockAddEvent.mock.calls[0]?.[0];
     expect(evt?.metadata?.kind).toBe("review_reply_draft");
     expect(evt?.metadata?.autoPostAt).toBeTruthy();
+  });
+
+  it("never stamps autoPostAt for a 1 or 2 star review, even in auto mode", async () => {
+    mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
+    mockGetReviews.mockResolvedValue([review({ id: "r1", externalId: "ext1", rating: 1 }), review({ id: "r2", externalId: "ext2", rating: 2 }), review({ id: "r3", externalId: "ext3", rating: 3 })]);
+    await draftReplyBacklog(NOW);
+    const stamped = mockAddEvent.mock.calls.map(([evt]) => [evt?.metadata?.rating, Boolean(evt?.metadata?.autoPostAt)]);
+    expect(stamped).toEqual([[1, false], [2, false], [3, true]]);
   });
 
   it("does NOT stamp autoPostAt in approve mode", async () => {

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { uploadTenantFile } from "@/lib/storage/upload-store";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimitedAsync } from "@/lib/rate-limit";
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { requireActiveSubscription } from "@/lib/subscription";
 
 export async function POST(request: Request) {

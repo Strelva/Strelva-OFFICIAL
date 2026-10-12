@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InquiryCapabilityState } from "@/products/inquiries/contracts";
 
 const mocks = vi.hoisted(() => ({
+  offer: vi.fn(),
   capture: vi.fn(),
   legacy: vi.fn(),
   limited: vi.fn(),
@@ -10,10 +11,17 @@ const mocks = vi.hoisted(() => ({
   tenant: vi.fn(),
   evidence: vi.fn(),
   workspace: vi.fn(),
+  notice: vi.fn(),
+  bookingOffer: vi.fn(),
 }));
 
-vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/bookings/inquiry-offers", () => ({ captureInquiryBookingOffer: mocks.offer }));
+vi.mock("@/products/inquiries", async (original) => ({ ...(await original<typeof import("@/products/inquiries")>()), prepareInquiryBookingOffer: mocks.bookingOffer, notifyInquiryOwner: mocks.notice }));
+
+vi.mock("@/products/inquiries/owner-notice", () => ({ notifyInquiryOwner: mocks.notice }));
+
+vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy, getLeadById: async () => null }));
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: mocks.limited,
   rateLimitKey: () => "inquiry-submit-test",
 }));
@@ -30,6 +38,9 @@ vi.mock("@/products/inquiries/server", async () => ({
   ...(await import("@/products/inquiries/workspace-exit")),
   getInquiryRepository: () => ({ getSnapshot: mocks.snapshot, compareAndSwap: vi.fn() }),
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   projectPublishedInquiry: (await import("@/products/inquiries/storefront")).projectPublishedInquiry,
   recordInquiryEvidence: mocks.evidence,
   validateInquiryFields: (await import("@/products/inquiries/inquiry-engine-operations")).validateInquiryFields,
@@ -93,8 +104,22 @@ function capabilityBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("public inquiry capability submission", () => {
+  it("adds bookable times only when the handoff switch is on; offer failure never loses capture", async () => {
+    const offer = { chooseUrl: "/inquiry-booking/fixture", slots: [{ label: "Friday 9 AM" }] };
+    mocks.bookingOffer.mockResolvedValue(offer);
+    const unchanged = await request(capabilityBody());
+    expect(await unchanged.json()).toEqual({ ok: true });
+    expect(mocks.bookingOffer).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "1");
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true, bookingOffer: offer });
+    expect(mocks.bookingOffer).toHaveBeenCalledWith({ tenantId: "acme", inquiryId: "lead-1" });
+    mocks.bookingOffer.mockRejectedValue(new Error("booking unavailable"));
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true });
+  });
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.offer.mockResolvedValue(null);
     mocks.capture.mockResolvedValue({ status: "captured", lead: { id: "lead-1", createdAt: time } });
     mocks.limited.mockResolvedValue(false);
     mocks.release.mockReturnValue(true);
@@ -102,6 +127,43 @@ describe("public inquiry capability submission", () => {
     mocks.tenant.mockResolvedValue({ active: true, stableId: "stable-business" });
     mocks.workspace.mockResolvedValue({ businessId: "stable-business", workspaceIds: [], exitCompleted: false });
     mocks.evidence.mockResolvedValue({ status: "recorded", receiptId: "receipt-1", timelineEventIds: ["event-1", "event-2"] });
+    mocks.notice.mockResolvedValue({ status: "accepted" });
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "");
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "");
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "");
+  });
+
+  it("keeps paused intake closed with the rollout off, and retains the exact published form with it on", async () => {
+    mocks.snapshot.mockResolvedValue({ state: { capabilities: [{ ...capability, status: "paused" }] } });
+    expect((await request(capabilityBody())).status).toBe(404);
+    expect(mocks.capture).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    expect((await request(capabilityBody())).status).toBe(200);
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.notice).not.toHaveBeenCalled();
+    expect(mocks.evidence).toHaveBeenCalledWith(expect.objectContaining({ expectedCapabilityVersion: 4 }));
+    expect((await request(capabilityBody({ capabilityVersion: 3 }))).status).toBe(409);
+  });
+
+  it("notifies the owner immediately for paused intake only under the notice flag; notice failure never loses the lead", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1");
+    mocks.snapshot.mockResolvedValue({ state: { capabilities: [{ ...capability, status: "paused" }] } });
+    mocks.notice.mockRejectedValue(new Error("notice unavailable"));
+    expect((await request(capabilityBody())).status).toBe(200);
+    expect(mocks.notice).toHaveBeenCalledWith({ tenantId: "acme", lead: { id: "lead-1", createdAt: time } });
+    expect(mocks.capture).toHaveBeenCalledWith("acme", expect.any(Object), { notifyOwner: false });
+  });
+
+  it("adds offered times only to a durable inquiry receipt and keeps customer identity server-owned", async () => {
+    mocks.capture.mockResolvedValue({ status:"captured", lead:{ id:"lead-1", createdAt:time, name:"Ada Rivera", email:"ada@example.test" } });
+    const offer = { serviceName:"Consultation", timeZone:"America/New_York", slots:[{ start:"2026-11-03T15:00:00Z", end:"2026-11-03T15:30:00Z" }], url:"https://app.strelva.test/book-inquiry/signed", token:"private-token", id:"private-id" };
+    mocks.offer.mockResolvedValue(offer);
+    const response = await request(capabilityBody());
+    expect(await response.json()).toEqual({ ok:true, bookingOffer:{ serviceName:offer.serviceName, timeZone:offer.timeZone, slots:offer.slots, url:offer.url } });
+    expect(mocks.offer).toHaveBeenCalledWith({ tenantId:"acme", inquiryId:"lead-1", customer:{name:"Ada Rivera",email:"ada@example.test"} });
   });
 
   it("rejects new intake after the mapped customer workspace exits", async () => {
@@ -244,11 +306,20 @@ describe("public inquiry capability submission", () => {
     expect(mocks.capture).not.toHaveBeenCalled();
   });
 
+  it("does not accept a capability duplicate without a recoverable lead receipt", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "duplicate", acceptedByPostgres: true });
+    const response = await request(capabilityBody());
+    expect(response.status).toBe(503);
+    expect(mocks.evidence).not.toHaveBeenCalled();
+  });
+
   it("preserves the additive legacy lead contract", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "captured", lead: { id: "lead_legacy" } });
     const response = await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" });
 
     expect(response.status).toBe(200);
-    expect(mocks.legacy).toHaveBeenCalledWith("acme", {
+    // Same legacy input and default owner notice (no options argument).
+    expect(mocks.capture).toHaveBeenCalledWith("acme", {
       name: "Legacy visitor",
       email: "legacy@example.test",
       message: undefined,
@@ -257,7 +328,16 @@ describe("public inquiry capability submission", () => {
     expect(mocks.snapshot).not.toHaveBeenCalled();
   });
 
+  it("answers 503 on the legacy path when no store confirmed the lead", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "unavailable", mirrored: false });
+    const response = await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" });
+    expect(response.status).toBe(503);
+    mocks.capture.mockResolvedValueOnce({ status: "unavailable", mirrored: true });
+    expect((await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" })).status).toBe(200);
+  });
+
   it("keeps a legacy form with extra fields on the legacy owner-notice path", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "captured", lead: { id: "lead_legacy" } });
     const response = await request({
       name: "Legacy visitor",
       email: "legacy@example.test",
@@ -266,13 +346,13 @@ describe("public inquiry capability submission", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(mocks.legacy).toHaveBeenCalledWith("acme", {
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).toHaveBeenCalledWith("acme", {
       name: "Legacy visitor",
       email: "legacy@example.test",
       message: undefined,
       source: "contact-form",
     });
-    expect(mocks.capture).not.toHaveBeenCalled();
     expect(mocks.snapshot).not.toHaveBeenCalled();
   });
 });

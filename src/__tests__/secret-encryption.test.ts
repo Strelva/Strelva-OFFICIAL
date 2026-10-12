@@ -36,7 +36,7 @@ function withKey(key: string | undefined, fn: () => void) {
 // Import under test (re-imported after env mutation via dynamic import in
 // tests that need a fresh module; static import covers the bulk of cases).
 // ---------------------------------------------------------------------------
-import { encryptSecret, decryptSecret } from "@/lib/crypto/secrets";
+import { encryptSecret, decryptSecret } from "@/platform/infra/crypto/secrets";
 
 const TEST_KEY = "test-passphrase-abc123";
 const PREFIX = "enc:v1:";

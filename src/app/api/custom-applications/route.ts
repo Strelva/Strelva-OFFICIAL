@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
+import { WorkspaceAccessError, WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 import {
   createCustomApplicationService,
   CustomApplicationAccessError,
@@ -24,15 +25,17 @@ function failure(error: unknown) {
     draftWorkId: error.workId,
     draftBudget: { maxAuthorizedCents: error.budget.maxAuthorizedCents, estimateCents: error.budget.estimateCents },
   }, 503);
+  if (error instanceof WorkspaceMakeSystemsError) return json({ error: error.message, code: error.code }, 403);
   if (error instanceof CustomApplicationAccessError) return json({ error: error.message, code: "custom_application_access_denied" }, 403);
   if (error instanceof CustomApplicationConflictError) return json({ error: error.message, code: "custom_application_conflict" }, 409);
   if (error instanceof CustomApplicationBuildError) return json({ error: error.message, code: "custom_application_build_unavailable" }, 503);
-  if (error instanceof z.ZodError) return json({ error: "Check the application source and budget details." }, 400);
-  return json({ error: "The custom application could not be confirmed." }, 503);
+  if (error instanceof WorkspaceAccessError) return json({ error: "This work is unavailable to your account.", code: "custom_application_access_denied" }, 403);
+  if (error instanceof z.ZodError) return json({ error: "Check the internal tool source and budget details." }, 400);
+  return json({ error: "The internal tool could not be confirmed." }, 503);
 }
 
 export async function POST(request: Request) {
-  if (!workspaceReleaseEnabled()) return json({ error: "Custom applications are not available yet." }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: "Internal tools are not available yet." }, 503);
   const denied = workspaceWriteGuard(request);
   if (denied) return denied;
   try {

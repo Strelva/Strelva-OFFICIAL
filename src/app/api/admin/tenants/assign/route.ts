@@ -7,7 +7,7 @@ import {
   findUserIdByEmail,
   LastOwnerError,
   type ClientRole,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 
 function normalizeEmail(value: unknown): string | null {

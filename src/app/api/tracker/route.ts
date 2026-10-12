@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/db/server-client";
-import { isSuperAdmin } from "@/lib/auth";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { previewTracker, readSavedTracker, readTrackerCoordinationOptions, saveNewTracker, editSavedTracker, recordTrackerExperiment } from "@/products/tracker/server";
@@ -8,7 +8,7 @@ import { TrackerConflictError, TrackerValidationError } from "@/products/tracker
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
-const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
 async function actor() {
   const user = await getSessionUser();
   return user?.email && user.email_confirmed_at ? { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() } : null;

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 
 import {
   WorkspaceAccessError,

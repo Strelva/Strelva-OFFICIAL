@@ -1,0 +1,178 @@
+/*
+ * October 9, 2026: the paper workspace (Strelva 1.0 design canon).
+ *
+ * Source of truth: design/Strelva-Reborn-UI-UX-2026-10-08.pen, variables
+ * `st-*`, and design/foundation/FOUNDATION.md sections 6 and 7. This replaces
+ * the October 6 ink rail: the workspace is paper with a dot grid, a floating
+ * light sidebar card, moss as the one action color and clay for Needs you.
+ *
+ * The `linen` attribute value stays (many selectors key on it). Everything
+ * here is declared after workspace-colors.css with the same specificity, so
+ * it wins without touching the earlier roles. Dark is opt-in through
+ * `data-workspace-mode="dark"` on the same element.
+ */
+:root [data-workspace-theme="linen"],
+:root [data-workspace-theme="linen"] [data-dashboard] {
+  --st-canvas: #f4f4f1;
+  --st-surface: #ffffff;
+  --st-inset: #efefeb;
+  --st-line: #e4e4df;
+  --st-text: #161715;
+  --st-text-2: #5f615c;
+  --st-text-3: #6b6d67;
+  --st-accent: #2f5236;
+  --st-accent-hover: #26442c;
+  --st-on-accent: #ffffff;
+  --st-live: #3e8e5a;
+  --st-need: #9c522c;
+  --st-need-tint: #f2e2d4;
+  --st-critical: #b3261e;
+  --st-selected: #eeeeea;
+  --st-brand: #7fa27a;
+  --st-glass: #ffffffc7;
+  --st-ring: #2f523629;
+  --st-need-ring: #9c522c24;
+  --st-live-ring: #3e8e5a26;
+  --st-critical-ring: #b3261e24;
+  --st-highlight: #ffffff;
+  --st-dot: #16171512;
+  --st-shadow-float: 0 1px 1px #1a221c14, 0 4px 12px #1a221c14, 0 16px 40px #1a221c1a;
+  --st-shadow-card: 0 1px 2px #1a221c0f, 0 8px 24px #1a221c0d;
+  --st-shadow-sidebar: 0 1px 2px #1a221c0a;
+
+  /* Geometry, from the Pen canon: radii 8/12/16/999, type 12/13/14/16/22/28. */
+  --st-r-sm: 8px;
+  --st-r-md: 12px;
+  --st-r-lg: 16px;
+  --st-column: 920px;
+  --st-column-wide: 1120px;
+  --st-font-mono: var(--font-mono-st, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Shared roles every workspace component already reads. */
+  --cream: var(--st-canvas);
+  --cream-dark: var(--st-inset);
+  --cream-mid: var(--st-line);
+  --sage: var(--st-accent);
+  --sage-dark: var(--st-accent-hover);
+  --sage-wash: var(--st-ring);
+  --bark: var(--st-text);
+  --bark-light: var(--st-text-2);
+  --bark-faded: var(--st-text-3);
+  --terra: var(--st-need);
+  --blush-light: var(--st-need-tint);
+  --warm-black: var(--st-text);
+  --on-warm-white: var(--st-text);
+  --accent: var(--st-accent);
+  --on-accent: var(--st-on-accent);
+  --accent-dim: var(--st-ring);
+  --accent-text: var(--st-accent);
+  --success: var(--st-live);
+  --success-dim: var(--st-live-ring);
+  --critical: var(--st-critical);
+  --action-danger: var(--st-critical);
+  --warning: var(--st-need);
+  --glass: #16171505;
+  --glass-border: var(--st-line);
+  --glass-active: #1617150f;
+  --gray-border: var(--st-line);
+  --gray-bg: var(--st-inset);
+  --gray-bg-hover: #1617150a;
+  --gray-bg-alt: #16171505;
+  --gray-muted: var(--st-text-2);
+  --gray-subtle: var(--st-text-3);
+  --gray-faint: var(--st-text-3);
+  --gray-fg: var(--st-text-2);
+  --surface: var(--st-surface);
+  --surface-base: var(--st-canvas);
+  --surface-raised: var(--st-surface);
+  --surface-inset: var(--st-inset);
+  --surface-popover: var(--st-surface);
+  --text-popover: var(--st-text-2);
+  --surface-tooltip: var(--st-text);
+  --text-tooltip: var(--st-canvas);
+
+  /* The navigation is a light floating card now, not an ink rail. */
+  --navigation-bg: var(--st-surface);
+  --navigation-border: transparent;
+  --navigation-text: var(--st-text);
+  --navigation-brand-text: var(--st-text);
+  --navigation-brand-mark: var(--st-text);
+  --navigation-accent: var(--st-brand);
+  --navigation-nav-text: var(--st-text-2);
+  --navigation-hover-bg: #1617150a;
+  --navigation-active-text: var(--st-text);
+  --navigation-selected-bg: var(--st-selected);
+  --navigation-utility-text: var(--st-text-2);
+  --navigation-action-text: var(--st-text);
+  --navigation-heading-text: var(--st-text-3);
+  --navigation-context-text: var(--st-text-3);
+  --navigation-description-text: var(--st-text-3);
+  --navigation-avatar-bg: var(--st-inset);
+  --navigation-avatar-text: var(--st-text-2);
+  --navigation-account-text: var(--st-text);
+  --navigation-account-detail: var(--st-text-3);
+  --navigation-account-icon: var(--st-text-3);
+  --navigation-signout-text: var(--st-text-3);
+  --navigation-control-border: var(--st-line);
+  --navigation-close-icon: var(--st-text-2);
+  --navigation-focus: var(--st-accent);
+  --navigation-badge-bg: var(--st-need);
+  --navigation-badge-text: #ffffff;
+  --navigation-selected-shadow: none;
+
+  /* Home roles onto paper. */
+  --home-bg: var(--st-canvas);
+  --home-ink: var(--st-text);
+  --home-muted: var(--st-text-2);
+  --home-subtle: var(--st-text-3);
+  --home-faint: var(--st-text-3);
+  --home-card: var(--st-surface);
+  --home-line: var(--st-line);
+  --home-line-strong: var(--st-line);
+  --home-accent: var(--st-accent);
+  --home-moss: var(--st-accent);
+  --home-moss-hover: var(--st-accent-hover);
+  --home-on-moss: var(--st-on-accent);
+  --home-live: var(--st-live);
+  --home-live-text: var(--st-live);
+  --home-clay: var(--st-need);
+  --home-clay-text: var(--st-need);
+  --home-clay-pale: var(--st-need-tint);
+  --home-card-shadow: none;
+  --home-panel-shadow: none;
+  --home-panel-border: var(--st-line);
+}
+
+:root [data-workspace-theme="linen"][data-workspace-mode="dark"],
+:root [data-workspace-theme="linen"][data-workspace-mode="dark"] [data-dashboard] {
+  color-scheme: dark;
+  --st-canvas: #111311;
+  --st-surface: #1b1d1b;
+  --st-inset: #272a27;
+  --st-line: #2f322f;
+  --st-text: #ecece7;
+  --st-text-2: #a9aba5;
+  --st-text-3: #8a8d86;
+  --st-accent: #a9c49a;
+  --st-accent-hover: #bcd3af;
+  --st-on-accent: #142018;
+  --st-live: #7fbf8e;
+  --st-need: #e0a274;
+  --st-need-tint: #3a2a1f;
+  --st-critical: #e4a6a6;
+  --st-selected: #272a27;
+  --st-brand: #a9c49a;
+  --st-glass: #1b1d1bc7;
+  --st-ring: #a9c49a33;
+  --st-need-ring: #e0a27433;
+  --st-live-ring: #7fbf8e33;
+  --st-critical-ring: #e4a6a633;
+  --st-highlight: #ffffff14;
+  --st-dot: #ecece70f;
+  --glass: #ecece705;
+  --glass-active: #ecece70f;
+  --gray-bg-hover: #ecece70a;
+  --gray-bg-alt: #ecece705;
+  --navigation-hover-bg: #ecece70a;
+  --navigation-badge-text: #142018;
+}

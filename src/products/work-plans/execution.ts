@@ -1,3 +1,5 @@
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { assertCanMakeSystems } from "@/platform/workspaces/repository";
 import { createHash } from "node:crypto";
 import { type QualifiedExecutableCapability } from "@/platform/capabilities";
 import { assertWorkspaceMember, persistWorkPlanOutput, readWorkPlanOutput, WorkspaceAccessError, type PersistWorkPlanOutputInput, type PersistedWorkPlanOutput, type WorkspaceActor } from "@/platform/workspaces";
@@ -76,7 +78,9 @@ export async function executeWorkPlanOutput(input: {
     inputs: input.inputs,
     decisions: input.decisions,
   });
-  await assertWorkspaceMember(input.actor, request.workspaceId);
+  const systemsMaker = await systemsReleasedFor(input.actor, request.workspaceId);
+  if (systemsMaker) await assertCanMakeSystems(input.actor, request.workspaceId);
+  else await assertWorkspaceMember(input.actor, request.workspaceId);
   const record = await readWorkPlan({ actor: input.actor, workspaceId: request.workspaceId, workId: request.planWorkId });
   if (record.plan.metadata.revision !== request.expectedPlanRevision ||
       record.plan.metadata.workspaceId !== request.workspaceId) {
@@ -102,6 +106,7 @@ export async function executeWorkPlanOutput(input: {
   try {
     native = buildNativeOutput({
       actor: input.actor,
+      linkFieldsReleased: systemsMaker,
       planWorkId: request.planWorkId,
       outputId: request.outputId,
       capability,

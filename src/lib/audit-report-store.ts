@@ -4,7 +4,7 @@
  * copy a validated result into Postgres-owned saved work, without lead details.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { AuditResult } from "./audit/types";
 
 const TTL_SECONDS = 60 * 60 * 24 * 60; // 60 days — long enough to click through an email later

@@ -333,9 +333,9 @@ test("a generated client carries a visitor inquiry and native Outlook booking to
     await bookingRoot.getByRole("button", { name: "Change time" }).click();
     const changed = await changedResponse;
     expect(changed.status(), await changed.text()).toBe(200);
-    await expect(bookingRoot.getByText("Outlook confirmed this reservation.")).toBeVisible();
+    await expect(bookingRoot.getByText("Outlook confirmed this booking.")).toBeVisible();
     await bookingRoot.getByRole("button", { name: "Cancel reservation" }).click();
-    await expect(bookingRoot.getByText("This reservation is cancelled.")).toBeVisible();
+    await expect(bookingRoot.getByText("This booking is cancelled.")).toBeVisible();
 
     const ownerInquiry = await responseJson(await owner.context.request.get(`/api/inquiry-workspace?tenantId=${encodeURIComponent(tenantId)}`));
     const inquiries = array(object(object(ownerInquiry.snapshot).state).inquiries).map(object);

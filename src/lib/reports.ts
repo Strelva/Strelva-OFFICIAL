@@ -1,9 +1,10 @@
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { workspacePorts } from "./workspace-ports";
+import { generateModelText } from "@/platform/infra/model-calls";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
 import { mapPool } from "./concurrency";
+import { ownerNoticeEmail } from "./owner-recipient";
 import { detectTrafficAnomaly } from "./anomaly";
 import type { TrafficAnomaly } from "./anomaly";
 import { STALE_DAYS } from "./utils";
@@ -14,7 +15,7 @@ import type { VisibilityDiff } from "./visibility/snapshots";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { getSearchConsolePerf, getGa4Perf } from "./analytics";
 import type { SearchPerf, GaPerf } from "./analytics";
-import type { EmailRow } from "./email/layout";
+import type { EmailRow } from "@/platform/infra/email/layout";
 
 export interface ServiceClickData {
   serviceId: string;
@@ -33,6 +34,8 @@ export interface VerifiedChangeItem {
 
 export interface WeeklyReportData {
   tenant: TenantConfig;
+  /** Who the report email goes to, by the one owner-recipient rule. Set by generateAllReports. */
+  ownerRecipient?: string;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
   /** tel: taps — a customer action folded into the "booked or called" total. */
@@ -300,6 +303,8 @@ export function detectStaleSections(
 }
 
 interface ReportSummaryInput {
+  /** Tenant slug, for the cost log. */
+  tenantId?: string;
   siteName: string;
   ownerName: string;
   pageViews: { total: number; thisWeek: number };
@@ -447,8 +452,7 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
 
   let text: string;
   try {
-    ({ text } = await generateText({
-      model: google("gemini-2.5-flash"),
+    ({ result: { text } } = await generateModelText({ purpose: "report", tenantId: data.tenantId ?? null, actorKind: "strelva" }, {
       prompt: `Write a short, warm weekly report email for ${data.ownerName} about their business website "${data.siteName}".
 
 ${statsBlock}
@@ -578,6 +582,7 @@ export async function generateWeeklyReport(
   const anomalyNarrative = formatAnomalyNarrative(detectTrafficAnomaly(dailyMetrics));
 
   const summary = await generateReportSummary({
+    tenantId: tenant.id,
     siteName: settings.siteName || tenant.siteName,
     ownerName: tenant.ownerName,
     pageViews,
@@ -594,6 +599,8 @@ export async function generateWeeklyReport(
     anomalyNarrative,
   });
 
+  const responsibilityProof = await (await workspacePorts().responsibilityProof()).responsibilityProofEmailParagraphs(tenantId, weekStart.toISOString(), new Date(weekEnd.getTime() + 1).toISOString());
+
   return {
     tenant,
     pageViews,
@@ -607,7 +614,7 @@ export async function generateWeeklyReport(
     failedVerifications,
     visibilityLines,
     analyticsRows,
-    summary,
+    summary: [summary, ...responsibilityProof].join("\n\n"),
   };
 }
 
@@ -642,7 +649,8 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
       skipped.push({ tenantId: tenant.id, reason: "inactive" });
       return;
     }
-    if (!tenant.ownerEmail) {
+    const ownerRecipient = await ownerNoticeEmail(tenant);
+    if (!ownerRecipient) {
       skipped.push({ tenantId: tenant.id, reason: "missing_owner_email" });
       return;
     }
@@ -650,7 +658,7 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
     try {
       const report = await generateWeeklyReport(tenant.id);
       if (report) {
-        reports.push(report);
+        reports.push({ ...report, ownerRecipient });
       } else {
         skipped.push({ tenantId: tenant.id, reason: "no_report" });
       }

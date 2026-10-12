@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ resolve: vi.fn(), resolveVersion: vi.fn() }));
 vi.mock("@/products/inquiries/portfolio", () => ({ resolveInquiryPattern: mocks.resolve, resolveInquiryPatternVersion: mocks.resolveVersion }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
-vi.mock("@/lib/auth", () => ({ getTenantRole: async () => "owner", roleHasPermission: () => true }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/auth", () => ({ getTenantRole: async () => "owner", roleHasPermission: () => true }));
 vi.mock("@/lib/connections", () => ({ getConnections: async () => [] }));
 vi.mock("@/products/inquiries/email-consent", () => ({ projectInquiryEmailConnection: async () => ({ status: "not_configured" }) }));
 vi.mock("@/products/inquiries/workspace-exit", () => ({

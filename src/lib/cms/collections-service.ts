@@ -4,8 +4,8 @@
  * Validates against the type registry, derives a slug, upserts to Postgres, and
  * logs activity. Keep route handlers and agent tools thin over this.
  */
-import { listEntries, getEntryBySlug, upsertEntry, deleteEntry } from "../db/repositories";
-import type { Row, Insert } from "../db/client";
+import { listEntries, getEntryBySlug, upsertEntry, deleteEntry } from "@/platform/infra/db/repositories";
+import type { Row, Insert } from "@/platform/infra/db/client";
 import { COLLECTION_TYPES, validateEntryData, entryTitle, type CollectionType } from "./collection-types";
 import { logActivity } from "../storage";
 

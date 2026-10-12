@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { addEvent, getOpenChangeRequest } from "@/lib/events";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, verifyAuth, isSuperAdmin } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth, isSuperAdmin } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";

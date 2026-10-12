@@ -10,16 +10,20 @@
  * COMMERCIAL INDEPENDENCE (resolved 2026-07): Presence / Growth / Scale and the
  * selected monthly amount are persisted on the tenant, but packaging does not
  * implicitly control a product capability or communication cadence. Cadence is
- * therefore an explicit per-tenant override in Redis, defaulting to monthly.
+ * therefore an explicit per-tenant override, defaulting to monthly.
  * A future Plan Inclusion policy may define a default, but it must remain an
  * explicit policy rather than an inference from a price key.
  *
- * Persistence is null-safe: no Redis ⇒ default monthly + no last-sent memory
- * (so the monthly throttle can't be enforced, which only matters in local dev —
- * prod always has Redis). Keys follow the `reb:` wire-prefix convention.
+ * Persistence (Systems catalog section 5): Postgres `tenant_report_state` is
+ * read first and written alongside the original `reb:report-cadence:{tenant}`
+ * and `reb:report-sent:{tenant}` keys, which are never renamed or deleted.
+ * Cadence falls back to Redis when Postgres has none; last-sent is the later
+ * of the two markers, so a send recorded in only one place still throttles.
+ * Null-safe: no Postgres and no Redis ⇒ default monthly + no last-sent memory.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
+import { callRedisMoveRpc, postgresNotInPlay } from "./storage/redis-move";
 
 export type ReportCadence = "weekly" | "monthly";
 
@@ -67,24 +71,86 @@ export function shouldSendReport(
   return false;
 }
 
-/** Read a tenant's cadence override. Defaults to "monthly". */
-export async function getReportCadence(tenant: string): Promise<ReportCadence> {
+interface PgReportState {
+  cadence: ReportCadence | null;
+  lastSentAt: number | null;
+}
+
+function parseMs(raw: unknown): number | null {
+  if (raw == null) return null;
+  const ms = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/** Postgres row for a tenant, or null (no row, not configured, or failed). */
+async function readPgState(tenant: string): Promise<PgReportState | null> {
+  const result = await callRedisMoveRpc("read_tenant_report_state", { p_tenant_id: tenant });
+  if (!result.ok || !result.data || typeof result.data !== "object") return null;
+  const row = result.data as { cadence?: unknown; lastSentAt?: unknown };
+  return {
+    cadence: row.cadence === "weekly" || row.cadence === "monthly" ? row.cadence : null,
+    lastSentAt: parseMs(row.lastSentAt),
+  };
+}
+
+async function readRedisCadence(tenant: string): Promise<ReportCadence | null> {
   const redis = getRedis();
-  if (!redis) return "monthly";
+  if (!redis) return null;
   try {
     const raw = await redis.get<string>(cadenceKey(tenant));
-    return raw === "weekly" ? "weekly" : "monthly";
+    return raw === "weekly" || raw === "monthly" ? raw : null;
   } catch {
-    return "monthly";
+    return null;
   }
 }
 
-/** Set a tenant's cadence override. Best-effort; no-op without Redis. */
+async function readRedisLastSent(tenant: string): Promise<number | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    return parseMs(await redis.get<string | number>(lastSentKey(tenant)));
+  } catch {
+    return null;
+  }
+}
+
+/** Postgres cadence when set, else the Redis override, else monthly. */
+function resolveCadence(pg: PgReportState | null, redisCadence: ReportCadence | null): ReportCadence {
+  return pg?.cadence ?? redisCadence ?? "monthly";
+}
+
+/**
+ * The later of the two markers. Reading both (not just Postgres) is what makes
+ * a missed copy safe: a send recorded only in Redis still throttles the next run.
+ */
+function resolveLastSent(pg: PgReportState | null, redisLastSent: number | null): number | null {
+  const values = [pg?.lastSentAt ?? null, redisLastSent].filter((v): v is number => v != null);
+  return values.length ? Math.max(...values) : null;
+}
+
+/** Read a tenant's cadence override. Defaults to "monthly". */
+export async function getReportCadence(tenant: string): Promise<ReportCadence> {
+  const pg = await readPgState(tenant);
+  if (pg?.cadence) return pg.cadence;
+  return resolveCadence(pg, await readRedisCadence(tenant));
+}
+
+/**
+ * Set a tenant's cadence override in Postgres and in the Redis key. If
+ * Postgres is in play and the write fails, this throws before touching Redis,
+ * so a stale Postgres row can never hide a newer Redis value. Without Postgres
+ * (no client, DUAL_WRITE_PG=0, migration not applied, tenant only in Redis)
+ * it writes Redis alone, exactly as before the move.
+ */
 export async function setReportCadence(
   tenant: string,
   cadence: ReportCadence,
 ): Promise<ReportCadence> {
   const value: ReportCadence = cadence === "weekly" ? "weekly" : "monthly";
+  const result = await callRedisMoveRpc("set_tenant_report_cadence", { p_tenant_id: tenant, p_cadence: value, p_via: "dual_write" });
+  if (!result.ok && !postgresNotInPlay(result)) {
+    throw new Error(`Report cadence could not be saved (${result.reason}).`);
+  }
   const redis = getRedis();
   if (redis) await redis.set(cadenceKey(tenant), value);
   return value;
@@ -92,28 +158,30 @@ export async function setReportCadence(
 
 /** When a tenant was last emailed a report (epoch ms), or null. Null-safe. */
 export async function getLastReportSentAt(tenant: string): Promise<number | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  try {
-    const raw = await redis.get<string | number>(lastSentKey(tenant));
-    if (raw == null) return null;
-    const ms = typeof raw === "number" ? raw : Number.parseInt(raw, 10);
-    return Number.isFinite(ms) ? ms : null;
-  } catch {
-    return null;
-  }
+  const [pg, redisLastSent] = await Promise.all([readPgState(tenant), readRedisLastSent(tenant)]);
+  return resolveLastSent(pg, redisLastSent);
 }
 
-/** Record that a tenant was emailed a report now (best-effort, never throws). */
+/** Record that a tenant was emailed a report now (both stores, best-effort, never throws). */
 export async function markReportSent(tenant: string, ts: number = Date.now()): Promise<void> {
   const redis = getRedis();
-  if (!redis) return;
-  try {
-    await redis.set(lastSentKey(tenant), String(ts));
-  } catch {
-    // A lost last-sent write only risks one extra send next run — never fail
-    // the cron over it.
-  }
+  await Promise.all([
+    callRedisMoveRpc("mark_tenant_report_sent", { p_tenant_id: tenant, p_sent_at: new Date(ts).toISOString(), p_via: "dual_write" })
+      .then((result) => {
+        if (!result.ok && !postgresNotInPlay(result)) {
+          console.error("[report-cadence] last-sent marker not copied to Postgres", { tenant, reason: result.reason });
+        }
+      }),
+    (async () => {
+      if (!redis) return;
+      try {
+        await redis.set(lastSentKey(tenant), String(ts));
+      } catch {
+        // A lost last-sent write only risks one extra send next run — never fail
+        // the cron over it. The Postgres marker usually still holds.
+      }
+    })(),
+  ]);
 }
 
 export interface ReportDueDecision {
@@ -122,11 +190,14 @@ export interface ReportDueDecision {
   lastSentAt: number | null;
 }
 
-/** Resolve cadence + last-sent from Redis and decide whether to send now. */
+/** Resolve cadence + last-sent (Postgres first, Redis fallback) and decide whether to send now. */
 export async function isReportDue(tenant: string, now: Date = new Date()): Promise<ReportDueDecision> {
-  const [cadence, lastSentAt] = await Promise.all([
-    getReportCadence(tenant),
-    getLastReportSentAt(tenant),
+  const [pg, redisCadence, redisLastSent] = await Promise.all([
+    readPgState(tenant),
+    readRedisCadence(tenant),
+    readRedisLastSent(tenant),
   ]);
+  const cadence = resolveCadence(pg, redisCadence);
+  const lastSentAt = resolveLastSent(pg, redisLastSent);
   return { send: shouldSendReport(cadence, lastSentAt, now), cadence, lastSentAt };
 }

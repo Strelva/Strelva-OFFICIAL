@@ -1,17 +1,26 @@
+import { admitPublicAgencyCheck } from "@/platform/agency-prospecting/check-admission";
+import { resolveAgencyAttribution, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+import { attributedAudit } from "@/lib/audit/attribution";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { getRedis } from "@/lib/redis";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { getRedis } from "@/platform/infra/redis";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import { findingsFromCategories, stripFabricatedEstimates } from "@/lib/lead-audit";
 import type { AuditResult } from "@/lib/audit/types";
 
 import { saveAuditReport } from "@/lib/audit-report-store";
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 
-async function retainedResponse(result: AuditResult) {
+async function retainedResponse(raw: AuditResult, agency?: AgencyAttribution, businessName?: string) {
+  const { businessName: _cachedName, ...identityNeutral } = raw;
+  const result = { ...attributedAudit(identityNeutral, agency), ...(businessName ? { businessName } : {}) };
   const reportId = await saveAuditReport(result, { name: "", email: "", url: result.url });
-  return NextResponse.json({ ...result, ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
+  // Funnel (ADR 0015): a check ran, from the direct door or an agency prospecting.
+  if (reportId) void recordFunnelEvent("check_run", `audit_${reportId}`, { agencyWorkspaceId: agency?.workspaceId ?? null });
+  return NextResponse.json({ ...result, ...(agency ? { findings: findingsFromCategories(result.categories) } : {}), ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
 }
 
 const MAX_SCANS_PER_DAY = 3;
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { url?: string; businessName?: string; location?: string };
+  let body: { url?: string; businessName?: string; location?: string; agency?: string };
   try {
     body = await request.json();
   } catch {
@@ -93,6 +102,10 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  if (body.businessName !== undefined && (typeof body.businessName !== "string" || !body.businessName.trim() || body.businessName.trim().length > 120)) {
+    return NextResponse.json({ error: "Business name must be between 1 and 120 characters." }, { status: 400 });
+  }
+  const businessName = body.businessName?.trim();
 
   let normalizedUrl = url;
   if (!/^https?:\/\//i.test(normalizedUrl)) {
@@ -122,6 +135,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let agency: AgencyAttribution | undefined;
+  try {
+    agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
+    if (agency) await admitPublicAgencyCheck(agency);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Agency check unavailable." },
+      { status: error instanceof AgencyProspectingError ? error.status : 503 });
+  }
+
   // Check result cache before running audit
   const cacheKey = `reb:audit:${normalizedUrl}`;
   const cacheRedis = getRedis();
@@ -129,7 +151,7 @@ export async function POST(request: NextRequest) {
     try {
       const cached = await cacheRedis.get(cacheKey);
       if (cached) {
-        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult);
+        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult, agency, businessName);
       }
     } catch {
       // Cache miss or error — proceed with fresh audit
@@ -161,7 +183,7 @@ export async function POST(request: NextRequest) {
       await cacheRedis.set(cacheKey, JSON.stringify(result), { ex: 3600 }).catch(() => {});
     }
 
-    return retainedResponse(result);
+    return retainedResponse(result, agency, businessName);
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: "audit-scan" },

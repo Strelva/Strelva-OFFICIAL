@@ -9,6 +9,8 @@ import { resolveRange, computePeriodStats } from "@/lib/analytics/period";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { AnalyticsLiveView } from "@/components/dashboard/AnalyticsLiveView";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 
 // Analytics = the LIVE / rolling surface. A range selector (Live · this week ·
 // this month · custom) drives every number, all computed live from the daily
@@ -19,6 +21,8 @@ export default async function AnalyticsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Moved to /workspace/results where owner entry is on; covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/analytics");
   const { tenant, clientFallbackRoot } = await requireDashboardView();
 
   const sp = await searchParams;

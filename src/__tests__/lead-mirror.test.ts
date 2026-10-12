@@ -4,11 +4,12 @@ import { makeRedisMock } from "./support/redis-mock";
 const redis = makeRedisMock();
 let redisAvailable = true;
 const alertOnce = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce }));
 
 import {
   LEAD_MIRROR_LAST_FAILURE_KEY,
+  LEAD_MIRROR_FAILURE_TIMEOUT_MS,
   LEAD_MIRROR_PENDING_KEY,
   getLeadMirrorHealth,
   leadMirrorPayload,
@@ -39,7 +40,7 @@ beforeEach(() => {
   alertOnce.mockReset();
   vi.unstubAllEnvs();
 });
-afterEach(() => setLeadMirrorDb(undefined));
+afterEach(() => { setLeadMirrorDb(undefined); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe("mirrorLead", () => {
   it("writes the lead through record_tenant_lead with the submission hash", async () => {
@@ -97,8 +98,43 @@ describe("mirrorLead", () => {
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "invalid" });
     db(async () => ({ data: null, error: { code: "PGRST202", message: "Could not find the function public.record_tenant_lead" } }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "schema_missing" });
+    // A missing schema pauses live copies (lead-mirror-schema-missing.test.ts); clear it.
+    redis.store.clear();
     db(async () => ({ data: { surprise: true }, error: null }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "error" });
+  });
+
+  it("bounds the complete failure path when both Redis and alert deduplication stall", async () => {
+    vi.useFakeTimers();
+    const never = new Promise<never>(() => {});
+    setLeadMirrorDb({ rpc: () => never } as unknown as LeadMirrorDb);
+    const queued = vi.spyOn(redis, "zadd").mockReturnValue(never);
+    const trim = vi.spyOn(redis, "zremrangebyrank");
+    alertOnce.mockReturnValue(never);
+    let finished = false;
+    const result = mirrorLead("gldf", lead, "abc123", { timeoutMs: 50 }).then(value => { finished = true; return value; });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(queued).toHaveBeenCalledTimes(1);
+    expect(alertOnce).toHaveBeenCalledTimes(1);
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(LEAD_MIRROR_FAILURE_TIMEOUT_MS);
+    await expect(result).resolves.toEqual({ status: "failed", reason: "timeout" });
+    expect(trim).not.toHaveBeenCalled();
+  });
+
+  it("does not start later Redis writes after a stalled queue request returns past the reporting deadline", async () => {
+    vi.useFakeTimers();
+    db(async () => ({ data: null, error: { message: "database unavailable" } }));
+    let release!: (value: number) => void;
+    vi.spyOn(redis, "zadd").mockReturnValue(new Promise(resolve => { release = resolve; }));
+    const trim = vi.spyOn(redis, "zremrangebyrank");
+    const result = mirrorLead("gldf", lead, "abc123");
+    await vi.advanceTimersByTimeAsync(LEAD_MIRROR_FAILURE_TIMEOUT_MS);
+    await expect(result).resolves.toEqual({ status: "failed", reason: "error" });
+    release(1);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(trim).not.toHaveBeenCalled();
+    expect(redis.store.has(LEAD_MIRROR_LAST_FAILURE_KEY)).toBe(false);
   });
 
   it("still pages when Redis is gone too", async () => {

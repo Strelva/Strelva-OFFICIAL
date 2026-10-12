@@ -58,9 +58,13 @@ describe("workspace exit request lifetime", () => {
 
     await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request })));
     await act(async () => pending.shift()!.resolve(response(options())));
-    const save = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Save exit choice"));
+    const save = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Hold to leave"));
     expect(save).toBeDefined();
     await act(async () => save!.click());
+    expect(pending).toHaveLength(0);
+    await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Cancel")!.click());
+    const currentSave = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent?.includes("Hold to leave"))!;
+    await act(async () => currentSave.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", metaKey: true, bubbles: true })));
     expect(pending).toHaveLength(1);
 
     await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: secondWorkspace, request })));
@@ -68,7 +72,20 @@ describe("workspace exit request lifetime", () => {
     await act(async () => pending[1]!.resolve(response(options())));
     await act(async () => pending[0]!.resolve(response({ state: completedState(firstWorkspace), replayed: false })));
 
-    expect(container.textContent).toContain("Prepare to leave this workspace");
+    expect(container.textContent).toContain("Leaving Strelva");
     expect(container.textContent).not.toContain("New work is paused.");
   });
+  it("keeps a rejected exit choice editable and sends the original command shape", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(response(options())).mockResolvedValueOnce(response({ error: "The owner permission changed. Nothing was recorded." }, 403));
+    await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request })));
+    const confirm = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent?.includes("Hold to leave"))!;
+    await act(async () => confirm.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+    const sent = JSON.parse(String(request.mock.calls[1]![1]?.body));
+    expect(sent).toMatchObject({ workspaceId: firstWorkspace, futureWork: "pause", providerParticipation: "keep", maintainedResources: { kind: "stop" } });
+    expect(sent.idempotencyKey).toBeTruthy();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Nothing was recorded");
+    expect(container.textContent).toContain("Leaving Strelva");
+    expect(confirm.disabled).toBe(false);
+  });
+
 });

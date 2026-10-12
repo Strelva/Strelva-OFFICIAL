@@ -92,11 +92,11 @@ describe("workspace product discovery", () => {
       initialView: "home",
     }));
     expect(html).toContain("data-inquiry-embedded");
-    expect(html).toContain("What should Strelva handle?");
+    expect(html).toMatch(/<h1[^>]*>Inquiries<\/h1>/);
     expect(html).not.toContain("Inquiry navigation");
   });
 
-  it("carries a start request into the inquiry New view", () => {
+  it("carries an ask into the inquiry New view", () => {
     const html = renderToStaticMarkup(createElement(InquiryWorkspaceExperience, {
       adapter: createPreviewInquiryAdapter("business"),
       basePath: "/workspace",

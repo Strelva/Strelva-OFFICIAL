@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getMember, getTransactions } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
 
@@ -15,6 +16,7 @@ export async function GET(
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const member = await getMember(tenant, email);
     if (!member) {

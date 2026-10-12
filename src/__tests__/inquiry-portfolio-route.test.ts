@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), enabled: vi.fn(), discover: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ verifyAuth: mocks.auth }));
-vi.mock("@/products/inquiries/release", () => ({ inquiryReleaseEnabled: mocks.enabled }));
+vi.mock("@/platform/infra/auth", () => ({ verifyAuth: mocks.auth }));
+vi.mock("@/products/inquiries/release", () => ({ inquiryReleaseEnabled: mocks.enabled, inquiryReleaseMayBeOn: () => mocks.enabled(), inquiryReleaseEnabledForTenant: async () => true }));
+vi.mock("@/platform/release-flags/viewer", () => ({ currentReleaseViewer: async () => ({ operator: false, tester: false }) }));
 vi.mock("@/products/inquiries/portfolio", () => ({ discoverInquiryPortfolio: mocks.discover }));
 import { GET } from "@/app/api/inquiry-workspace/portfolio/route";
 

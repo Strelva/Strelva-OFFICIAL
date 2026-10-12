@@ -5,7 +5,7 @@ import { ApplicationUseExperience } from "@/experience/applications/ApplicationU
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Application",
+  title: "Internal tool",
   robots: { index: false, follow: false },
   referrer: "no-referrer",
 };

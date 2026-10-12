@@ -1,5 +1,5 @@
 .experience {
-  --app-navigation-width: 244px;
+  --app-navigation-width: 264px;
   min-height: 100dvh;
   background: var(--surface-base);
   color: var(--warm-black);
@@ -8,11 +8,9 @@
 }
 
 /* The shared workspace owns the outer frame and scroll container. */
-.embedded { display: flex; min-width: 0; min-height: 100%; flex-direction: column; background: var(--surface-base); }
+.embedded { display: flex; min-width: 0; min-height: 100%; flex-direction: column; background: transparent; }
 .embedded .content { overflow: visible; }
-.embeddedNav { display: flex; flex-wrap: wrap; gap: .35rem; padding: .75rem clamp(1rem, 4vw, 3.5rem); border-bottom: 1px solid var(--gray-border); background: var(--surface-inset); }
-.embeddedNav button { min-height: 2.5rem; border-radius: .55rem; padding: .5rem .75rem; color: var(--gray-muted); font-size: .78rem; }
-.embeddedNav button:hover, .embeddedNavActive { background: var(--gray-bg-hover); color: var(--warm-black) !important; }
+.embeddedNav { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px clamp(16px, 4vw, 40px); }
 
 .frame { min-height: 100dvh; height: 100dvh; background: var(--surface-base); }
 .skip { position: fixed; z-index: 20; top: -5rem; left: 1rem; padding: .7rem 1rem; border-radius: .65rem; background: var(--accent); color: var(--on-accent); }
@@ -47,7 +45,7 @@
 .rehearsalNotice strong { color: var(--accent-text); }
 .noticeIcon { color: var(--accent-text); }
 .noticeDetail { color: var(--gray-muted); }
-.feedback { display: flex; align-items: center; gap: .55rem; max-width: 64rem; margin: 1rem auto 0; padding: .7rem .9rem; border: 1px solid var(--gray-border); border-radius: .7rem; background: var(--surface-inset); color: var(--gray-fg); }
+.feedback { max-width: var(--st-column); margin: 16px auto 0; padding: 0 24px; }
 .feedbackSuccess { color: var(--positive); }
 .feedbackError { color: var(--critical); }
 .page, .home { width: min(100%, 68rem); margin: 0 auto; padding: clamp(2rem, 5vw, 4.5rem) clamp(1rem, 4vw, 3.5rem); }
@@ -61,7 +59,7 @@
 .pageIntro p { max-width: 44rem; margin: 1rem 0 0; color: var(--gray-muted); font-size: 1rem; line-height: 1.65; }
 .backButton, .textButton, .whyLink { display: inline-flex; min-height: 2.75rem; align-items: center; gap: .45rem; color: var(--gray-muted); }
 .backButton:hover, .textButton:hover, .whyLink:hover { color: var(--warm-black); }
-.homeSections { display: grid; gap: 1.45rem; }
+.homeSections { display: grid; gap: 32px; }
 .homeSection { border-top: 1px solid var(--gray-border); padding-top: 1.1rem; }
 .sectionHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: .8rem; }
 .sectionTitle { display: flex; align-items: flex-start; gap: .65rem; color: var(--accent-text); }
@@ -92,12 +90,12 @@
 .composerLogo, .previewLogo { width: 1.7rem; height: 1.7rem; color: var(--accent-text); }
 .newForm { display: grid; max-width: 46rem; gap: .9rem; }
 .newForm label, .previewEditor label, .searchField { color: var(--warm-black); font-weight: 500; }
-.newForm textarea, .previewEditor input, .previewEditor textarea, .searchField input, .statementRow input { width: 100%; min-height: 3rem; border: 1px solid var(--gray-border); border-radius: .65rem; background: var(--surface-inset); color: var(--warm-black); padding: .75rem .85rem; font: inherit; }
-.newForm textarea, .previewEditor textarea { min-height: 8rem; resize: vertical; }
-.newForm textarea:focus-visible, .previewEditor input:focus-visible, .previewEditor textarea:focus-visible, .searchField:focus-within, .statementRow input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.previewEditor input, .previewEditor textarea, .searchField input, .statementRow input { width: 100%; min-height: 3rem; border: 1px solid var(--gray-border); border-radius: .65rem; background: var(--surface-inset); color: var(--warm-black); padding: .75rem .85rem; font: inherit; }
+.previewEditor textarea { min-height: 8rem; resize: vertical; }
+.previewEditor input:focus-visible, .previewEditor textarea:focus-visible, .searchField:focus-within, .statementRow input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .formFooter, .panelFooter, .editorActions, .receiptActions, .recordActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
 .formFooter { color: var(--gray-muted); font-size: .78rem; }
-.primaryButton, .secondaryButton, .dangerButton { display: inline-flex; min-height: 2.8rem; align-items: center; justify-content: center; gap: .45rem; border-radius: .65rem; padding: .65rem .9rem; font: inherit; font-size: .8rem; font-weight: 600; }
+.primaryButton, .secondaryButton, .dangerButton { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; padding: 10px 20px; font: inherit; font-size: 14px; font-weight: 500; }
 .primaryButton { background: var(--accent); color: var(--on-accent); }
 .secondaryButton { border: 1px solid var(--gray-border); background: var(--surface-inset); color: var(--warm-black); }
 .dangerButton { border: 1px solid color-mix(in srgb, var(--critical) 45%, var(--gray-border)); color: var(--critical); }
@@ -434,3 +432,18 @@
 
 /* Rehearsal is visible in the authenticated workspace as well as fixtures. */
 .content[data-rehearsal="true"] { background: color-mix(in srgb, var(--accent) 7%, var(--surface-base)); }
+
+/* Inquiry-owned layout only; the paper shell and rail use shared frame classes. */
+.platformMark { display: flex; align-items: center; gap: 8px; padding: 4px 10px 12px; color: var(--st-text-3); font-size: 12px; }
+.platformMark svg { width: 16px; height: 16px; }
+.timelineMeta { display: block; margin-top: 8px; overflow-wrap: anywhere; }
+.content { background: transparent; }
+.eyebrow { color: var(--st-text-3); font-size: 12px; letter-spacing: 0; text-transform: none; }
+.panelHeading h2, .sectionHeading h2, .responsibilityHeading h2 { font-size: 22px; font-weight: 500; line-height: 1.35; }
+.rowTitle, .rowMeta { white-space: normal; overflow-wrap: anywhere; }
+.workRow, .changeRow, .capabilityRow { min-height: 64px; gap: 16px; padding: 16px 0; }
+.rowIcon { color: var(--st-text-2); }
+.rowStatus { color: var(--st-text-3); }
+.previewEditor input, .previewEditor textarea, .searchField input, .statementRow input { border-radius: var(--st-r-md); background: var(--st-surface); font-size: 14px; }
+.experience :is(button, a, input, textarea, select):focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; }
+@media (pointer: coarse) { .experience :is(button, a, input, select) { min-height: 44px; } }

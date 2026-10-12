@@ -1,4 +1,5 @@
 /** Dry run by default. See docs/capabilities/website/website-rebuild-benchmark.md before paid use. */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { readFile, mkdir, writeFile, chmod } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { createHash, randomBytes } from "node:crypto";

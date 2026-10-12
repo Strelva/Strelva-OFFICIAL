@@ -19,7 +19,7 @@
  * so a Postgres blip can't 500 the queue).
  */
 
-import { getSupabase, type Insert, type Row } from "../db/client";
+import { getSupabase, type Insert, type Row } from "@/platform/infra/db/client";
 import type { UnifiedEvent } from "../types";
 import { proposalToEvent } from "./read";
 import type {

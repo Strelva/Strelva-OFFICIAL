@@ -11,6 +11,8 @@ import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { WeeklyBriefClient } from "@/components/dashboard/WeeklyBriefClient";
 import { ReportsViewToggle } from "@/components/dashboard/ReportsViewToggle";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 
 // Reports = the written recaps (the anti-churn proof surface). A Weekly/Monthly
 // toggle switches between the weekly brief and the monthly recap — same rich
@@ -21,6 +23,9 @@ export default async function ReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  // Moved to /workspace/recaps for a workspace with owner entry on. The layout
+  // redirects a full load; this covers a soft navigation from another page.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/reports");
   const { tenant, clientFallbackRoot } = await requireDashboardView();
   const sp = await searchParams;
   const viewParam = typeof sp.view === "string" ? sp.view : "weekly";

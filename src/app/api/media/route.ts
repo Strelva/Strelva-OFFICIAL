@@ -1,8 +1,9 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { listTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
 import { verifyRasterImage } from "@/lib/image-signature";
 
@@ -19,6 +20,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const assets = await listTenantMedia(tenant);
   return NextResponse.json({ assets });

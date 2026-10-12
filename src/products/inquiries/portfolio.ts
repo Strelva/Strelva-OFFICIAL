@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getCurrentUserTenants, requireTenantAccess } from "@/lib/auth";
+import { getCurrentUserTenants, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import type { InquiryCapabilityDefinition, InquiryWork } from "./contracts";
 import { resolveInquiryWorkspace } from "./workspace-exit";
@@ -8,6 +8,10 @@ import {
   type InquiryRepository,
   type InquiryWorkspaceSnapshot,
 } from "./repository";
+
+import { patternInstallationAsVersion } from "@/platform/system-versions/mapping";
+import type { PatternInstallation } from "./inquiry-pattern-updates";
+import type { InquiryLibraryVersionSummary } from "./portfolio-contracts";
 
 type InquiryWorkState = InquiryWork["state"];
 import type { InquiryAttentionSummary, InquiryPatternSummary, InquiryPortfolio } from "./portfolio-contracts";
@@ -98,15 +102,19 @@ function currentAttention(
 /** Read only explicit, currently authorized memberships into a safe portfolio. */
 export async function discoverInquiryPortfolio(
   repository: InquiryRepository = getInquiryRepository(),
+  /** Per site (release flag). Default: everything the caller can access. */
+  released: (tenantId: string) => Promise<boolean> = async () => true,
 ): Promise<InquiryPortfolio> {
   const attention: InquiryAttentionSummary[] = [];
   const patterns: InquiryPatternSummary[] = [];
+  const versions: InquiryLibraryVersionSummary[] = [];
   const unavailableTenantIds: string[] = [];
   const tenantIds = [...new Set(await getCurrentUserTenants())].sort();
 
   for (const tenantId of tenantIds) {
     const denied = await requireTenantAccess(tenantId);
     if (denied) continue;
+    if (!(await released(tenantId).catch(() => false))) continue;
     try {
       const config = await getTenantConfig(tenantId);
       if (!config?.active) continue;
@@ -121,6 +129,15 @@ export async function discoverInquiryPortfolio(
       const businessName = safeText(config.siteName, tenantId);
       attention.push(...currentAttention(tenantId, businessName, snapshot));
       patterns.push(...currentPatterns(tenantId, businessName, snapshot));
+      const installed = (snapshot.state as typeof snapshot.state & { patternInstallations?: PatternInstallation[] }).patternInstallations ?? [];
+      for (const installation of installed) {
+        const capability = snapshot.state.capabilities.find(item => item.id === installation.capabilityId && item.businessId === businessId);
+        if (installation.businessId !== businessId || !capability?.live || capability.live.businessId !== businessId) continue;
+        const version = patternInstallationAsVersion({ ...installation, targetVersion: capability.live.version });
+        versions.push({ id: installation.id, tenantId, businessName, name: safeText(capability.live.form.title, "Inquiry form"),
+          sourceBusinessId: version.source.businessId, sourceSystemId: version.source.systemId,
+          sourceRevision: version.source.number, currentRelease: version.currentRelease!, improvement: version.improvement });
+      }
     } catch {
       unavailableTenantIds.push(tenantId);
     }
@@ -128,7 +145,7 @@ export async function discoverInquiryPortfolio(
 
   attention.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   patterns.sort((left, right) => left.name.localeCompare(right.name) || left.id.localeCompare(right.id));
-  return { attention, patterns, unavailableTenantIds };
+  return { attention, patterns, unavailableTenantIds, ...(versions.length ? { versions } : {}) };
 }
 
 /** Resolve an opaque summary reference only after fresh source authorization. */

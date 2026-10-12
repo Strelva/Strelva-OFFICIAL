@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import * as http from "node:http";
 import * as https from "node:https";
 import { validateUrlSafety } from "@/lib/audit/checks";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 import { sniffImageType, readImageDimensions } from "@/lib/image-signature";
 import { uploadTenantMedia } from "@/lib/media-store";
 import type { SiteDocument } from "./site-document";
@@ -21,7 +22,7 @@ export async function fetchWebsiteAsset(raw: string, options: { maximumBytes?: n
     } finally { if (dnsTimer) clearTimeout(dnsTimer); }
     if (Date.now() >= deadline) throw new Error("Image download timed out.");
     const result = await new Promise<{ status: number; location?: string; buffer: Buffer }>((resolve,reject) => {
-      const request = (parsed.protocol === "https:" ? https : http).request(parsed,{ headers: { "User-Agent": "StrelvaRebuild/1.0", "Accept-Encoding": "identity", Accept: "image/avif,image/webp,image/*" }, lookup: (_hostname,_options,callback) => callback(null,address,4) },res => {
+      const request = (parsed.protocol === "https:" ? https : http).request(parsed,{ headers: { "User-Agent": "StrelvaRebuild/1.0", "Accept-Encoding": "identity", Accept: "image/avif,image/webp,image/*" }, ...pinnedRequestOptions(address) },res => {
         if ([301,302,303,307,308].includes(res.statusCode ?? 0)) { res.resume(); resolve({ status: res.statusCode!, location: res.headers.location, buffer: Buffer.alloc(0) }); return; }
         let size = 0; const buffers: Buffer[] = [];
         res.on("data",(chunk: Buffer) => { size += chunk.length; if (size > maximum) request.destroy(new Error("Image exceeds its byte limit.")); else buffers.push(chunk); });

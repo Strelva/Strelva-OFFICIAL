@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ session: vi.fn(), release: vi.fn(), preview: vi.fn(), read: vi.fn(), create: vi.fn(), edit: vi.fn(), experiment: vi.fn(), admin: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mocks.admin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin }));
 vi.mock("@/products/tracker/server", () => ({ previewTracker: mocks.preview, readSavedTracker: mocks.read, saveNewTracker: mocks.create, editSavedTracker: mocks.edit, recordTrackerExperiment: mocks.experiment }));
 import { GET, POST } from "@/app/api/tracker/route";
 const body = { action: "preview", workspaceId: "workspace", input: {} };

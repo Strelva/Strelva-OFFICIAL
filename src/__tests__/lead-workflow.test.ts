@@ -5,9 +5,9 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));
@@ -232,94 +232,16 @@ function workflowReq(body: unknown) {
   });
 }
 
-/** Seed a minimal delivery-lead record so the route's existence-check passes. */
-function seedLead(redis: ReturnType<typeof fakeRedis>) {
-  const lead = {
-    businessName: "Test Co",
-    email: "owner@test.com",
-    statusToken: TOKEN,
-    deliveryStatus: "received",
-    submittedAt: new Date().toISOString(),
-    statusUpdatedAt: new Date().toISOString(),
-  };
-  redis.store.set(`lead-status:${TOKEN}`, JSON.stringify(lead));
-}
-
 describe("POST /api/admin/leads/[token]/workflow", () => {
-  it("rejects a non-super-admin with 403", async () => {
+  it("requires support to inspect the compatibility refusal", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
-    mockGetRedis.mockReturnValue(fakeRedis());
     const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ status: "contacted" }), {
-      params: Promise.resolve({ token: TOKEN }),
-    });
-    expect(res.status).toBe(403);
-    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+    expect((await POST(workflowReq({ status: "contacted" }), { params: Promise.resolve({ token: TOKEN }) })).status).toBe(403);
   });
-
-  it("sets the workflow status, audits it, and returns the record", async () => {
-    const redis = fakeRedis();
-    seedLead(redis);
-    mockGetRedis.mockReturnValue(redis);
+  it.each([{ status: "contacted" }, { stage: "drafting" }, { status: "converted", note: "Done" }])("never works an agency prospect under platform authority: %j", async body => {
+    const redis = fakeRedis(); mockGetRedis.mockReturnValue(redis);
     const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ status: "contacted" }), {
-      params: Promise.resolve({ token: TOKEN }),
-    });
-    expect(res.status).toBe(200);
-    const payload = await res.json();
-    expect(payload.workflow).toMatchObject({ token: TOKEN, status: "contacted" });
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
-    const [entry] = mockLogAuditEvent.mock.calls[0] as [Record<string, unknown>];
-    expect(entry).toMatchObject({ action: "lead.workflow", targetType: "lead", targetId: TOKEN });
-  });
-
-  it("sets the customer delivery stage via { stage } and returns the record", async () => {
-    const redis = fakeRedis();
-    seedLead(redis);
-    mockGetRedis.mockReturnValue(redis);
-    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ stage: "drafting" }), {
-      params: Promise.resolve({ token: TOKEN }),
-    });
-    expect(res.status).toBe(200);
-    const payload = await res.json();
-    // "Site draft" maps to the coarse "converting" bucket for the board.
-    expect(payload.workflow).toMatchObject({ token: TOKEN, status: "converting" });
-    const stored = JSON.parse(String(redis.store.get(`lead-status:${TOKEN}`)));
-    expect(stored.deliveryStatus).toBe("drafting");
-  });
-
-  it("rejects an invalid stage with 400", async () => {
-    const redis = fakeRedis();
-    seedLead(redis);
-    mockGetRedis.mockReturnValue(redis);
-    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ stage: "shipped" }), {
-      params: Promise.resolve({ token: TOKEN }),
-    });
-    expect(res.status).toBe(400);
-    expect(mockLogAuditEvent).not.toHaveBeenCalled();
-  });
-
-  it("rejects an invalid status with 400", async () => {
-    const redis = fakeRedis();
-    seedLead(redis);
-    mockGetRedis.mockReturnValue(redis);
-    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ status: "won" }), {
-      params: Promise.resolve({ token: TOKEN }),
-    });
-    expect(res.status).toBe(400);
-    expect(mockLogAuditEvent).not.toHaveBeenCalled();
-  });
-
-  it("rejects a malformed lead token with 400", async () => {
-    mockGetRedis.mockReturnValue(fakeRedis());
-    const { POST } = await import("@/app/api/admin/leads/[token]/workflow/route");
-    const res = await POST(workflowReq({ status: "contacted" }), {
-      params: Promise.resolve({ token: "not-a-real-token" }),
-    });
-    expect(res.status).toBe(400);
-    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+    expect((await POST(workflowReq(body), { params: Promise.resolve({ token: TOKEN }) })).status).toBe(410);
+    expect(redis.set).not.toHaveBeenCalled(); expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
 });

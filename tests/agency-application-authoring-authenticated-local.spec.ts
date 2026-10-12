@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { localSql } from "./support/journeys";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres.");
 test.setTimeout(240_000);
@@ -50,8 +51,8 @@ test("a named agency operator revises one assigned application and returns it fo
   const owner = await signedInContext(browser, admin, "agency-authoring-customer");
   const operator = await signedInContext(browser, admin, "agency-authoring-operator");
   const outsider = await signedInContext(browser, admin, "agency-authoring-outsider");
-  const businessId = randomUUID();
-  const agencyId = randomUUID();
+  let businessId = "";
+  let agencyId = "";
   let appId = "";
   let deliveryId = "";
   let grantId = "";
@@ -62,16 +63,20 @@ test("a named agency operator revises one assigned application and returns it fo
     for (const person of [owner, operator, outsider]) {
       expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
     }
-    expect((await admin.from("workspaces").insert([
-      { id: businessId, kind: "customer", name: "Agency authoring customer", created_by: owner.userId },
-      { id: agencyId, kind: "agency", name: "Agency authoring studio", created_by: operator.userId },
-    ])).error).toBeNull();
-    expect((await admin.from("workspace_memberships").insert([
-      { workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: owner.userId },
-      { workspace_id: agencyId, user_id: operator.userId, role: "owner", created_by: operator.userId },
-    ])).error).toBeNull();
+    businessId = await ordinaryCustomerBusiness(owner, "Agency authoring customer");
+    const selectedAgency = await ordinaryAgencyMaker(browser, admin, owner, businessId, operator);
+    agencyId = selectedAgency.agencyId;
+    // Ordinary HTTP agency creation, owner-selected provider and current staffing;
+    // no customer membership overlay or hand-written provider seats.
 
-    let app = await post(owner.context.request, "/api/bounded-work", {
+
+    const refused = await post(owner.context.request, "/api/bounded-work", {
+      action: "create", productId: "applications", workspaceId: businessId,
+      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }],
+        components: [{ kind: "form", fields: ["request"] }] },
+    }, 403);
+    expect(refused.code).toBe("make_systems_required");
+    let app = await post(operator.context.request, "/api/bounded-work", {
       action: "create",
       productId: "applications",
       workspaceId: businessId,
@@ -82,7 +87,36 @@ test("a named agency operator revises one assigned application and returns it fo
       },
     }, 201) as unknown as ApplicationResponse;
     appId = app.id;
-    app = await post(owner.context.request, "/api/bounded-work", {
+    const readOnly = localSql<{ allowed: boolean; ids: string[]; snapshot: unknown }>(`begin read only;
+      select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3'),
+      'snapshot',public.read_agency_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid)); rollback;`, businessId, operator.userId, operator.email, appId);
+    expect(readOnly?.allowed).toBe(true);
+    expect(readOnly?.ids).toContain(appId);
+    expect(readOnly?.snapshot).toMatchObject({ payload: { status: "draft", records: [], releases: [], release: null } });
+    await getJson(operator.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
+    await getJson(outsider.context.request, `/api/bounded-work?productId=applications&workId=${appId}`, 403);
+    const foreignBusiness = await ordinaryCustomerBusiness(outsider, "Unrelated private customer business");
+    const foreignWork = await post(outsider.context.request, "/api/documents", { action: "create", workspaceId: foreignBusiness,
+      input: { title: "Foreign private record", text: "The selected creator must not read another business's work" } });
+    const crossBusiness = await operator.context.request.get(`/api/bounded-work?productId=applications&workId=${String(foreignWork.workId)}`);
+    expect(crossBusiness.status()).toBe(403);
+    expect(await crossBusiness.text()).not.toContain("Foreign private record");
+    await post(operator.context.request, "/api/bounded-work", {
+      action: "command", productId: "applications", workId: appId,
+      command: { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: null },
+    }, 403);
+    async function staff(active: boolean) {
+      const result = await admin.rpc("bulk_set_agency_client_staff", { p_user_id: operator.userId, p_verified_email: operator.email,
+        p_agency_workspace_id: agencyId, p_staff_user_ids: [operator.userId], p_workspace_ids: [businessId], p_active: active });
+      expect(result.error).toBeNull();
+    }
+    await staff(false);
+    await getJson(operator.context.request, `/api/bounded-work?productId=applications&workId=${appId}`, 403);
+    await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "rehearse", expectedRevision: app.payload.revision } }, 403);
+    await staff(true);
+    app = await post(operator.context.request, "/api/bounded-work", {
       action: "command", productId: "applications", workId: appId,
       command: { kind: "rehearse", expectedRevision: app.payload.revision },
     }) as unknown as ApplicationResponse;
@@ -90,6 +124,26 @@ test("a named agency operator revises one assigned application and returns it fo
       action: "command", productId: "applications", workId: appId,
       command: { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: app.payload.release?.version ?? null },
     }) as unknown as ApplicationResponse;
+
+    const privateRecord = "Customer record stays private after first publication";
+    app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "submit", expectedReleaseVersion: app.payload.release?.version, expectedRecordsRevision: 0,
+        record: { id: "customer-existing-record", values: { request: privateRecord } } } }) as unknown as ApplicationResponse;
+    const creatorAfterPublication = await operator.context.request.get(`/api/bounded-work?productId=applications&workId=${appId}`);
+    expect(creatorAfterPublication.status()).toBe(403);
+    expect(await creatorAfterPublication.text()).not.toContain(privateRecord);
+    const publishedReadOnly = localSql<{ allowed: boolean; ids: string[]; snapshot: unknown }>(`begin read only;
+      select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3'),
+      'snapshot',public.read_agency_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid)); rollback;`, businessId, operator.userId, operator.email, appId);
+    expect(publishedReadOnly?.allowed).toBe(false);
+    expect(publishedReadOnly?.ids).not.toContain(appId);
+    expect(publishedReadOnly?.snapshot).toBeNull();
+    const beforeRecordWrite = await getJson(owner.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
+    await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "submit", expectedReleaseVersion: app.payload.release?.version, expectedRecordsRevision: 1,
+        record: { id: "agency-cannot-submit", values: { request: "Denied customer record mutation" } } } }, 403);
+    expect(await getJson(owner.context.request, `/api/bounded-work?productId=applications&workId=${appId}`)).toEqual(beforeRecordWrite);
 
     const responsibility = await post(owner.context.request, "/api/operations", {
       action: "create",
@@ -164,12 +218,12 @@ test("a named agency operator revises one assigned application and returns it fo
     await customerPage.locator("ul button").filter({ hasText: "Accepted for review" }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await expect(customerPage.getByRole("heading", { name: "Move this request into delivery", exact: true })).toBeVisible();
-    await customerPage.getByLabel("Named provider operator email", { exact: true }).fill(operator.email);
+    await customerPage.getByLabel("Named agency operator email", { exact: true }).fill(operator.email);
     for (const checkbox of await customerPage.getByRole("checkbox").all()) {
       if (!(await checkbox.isChecked())) await checkbox.check();
     }
-    await customerPage.getByRole("button", { name: "Create exact provider assignment", exact: true }).click();
-    await expect(customerPage.getByText("Provider acceptance is still pending.", { exact: false })).toBeVisible();
+    await customerPage.getByRole("button", { name: "Create exact agency assignment", exact: true }).click();
+    await expect(customerPage.getByText("Agency acceptance is still pending.", { exact: false })).toBeVisible();
 
     const pendingDeliveries = await getJson(operator.context.request, `/api/offerings/provider-delivery?businessId=${businessId}`) as unknown as DeliveryListResponse;
     const pending = pendingDeliveries.deliveries.find((item: { installationId: string }) => item.installationId === installationId);
@@ -189,11 +243,26 @@ test("a named agency operator revises one assigned application and returns it fo
     agencyPage.setDefaultTimeout(20_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByRole("heading", { name: "Assigned application drafts", exact: true })).toBeVisible();
+    // The released agency Home opens Clients; assigned drafts live in Queue.
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
+    // Systems wording only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
+    await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Internal-tool drafts for clients" : "Assigned application drafts", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open draft", exact: true }).click();
-    await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("The client has not granted draft editing", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);
 
+    // Opening the operator route can reload another tab in the dev proof app.
+    // Reopen this owner's exact saved request after the operator's no-grant
+    // refusal, rather than relying on earlier in-memory delivery selection.
+    await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
+    await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
+    await customerPage.getByRole("button", { name: /Prepare the exact permit request application/ }).click();
+    await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
+    await expect(customerPage.getByText("Application draft editing", { exact: true })).toBeVisible();
     await customerPage.getByRole("button", { name: "Grant draft editing to named operator", exact: true }).click();
     await expect(customerPage.getByText("The named agency operator can now revise this exact application draft.", { exact: false })).toBeVisible();
     const grantResponse = await getJson(operator.context.request, `/api/agency-application-draft-access?workId=${appId}`) as unknown as GrantResponse;
@@ -217,25 +286,42 @@ test("a named agency operator revises one assigned application and returns it fo
       command: { kind: "revise", expectedDesignRevision: 0, spec: revised.payload.spec },
     }, 409);
 
+    // The named maker runs actual checks; the customer reviews and publishes.
+    await agencyPage.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(agencyPage.getByText("Checks passed. Return this draft to the client for review and publication.", { exact: true })).toBeVisible();
+
     const customerAppPage = await owner.context.newPage();
     customerAppPage.setDefaultTimeout(20_000);
     await customerAppPage.setViewportSize({ width: 1280, height: 900 });
     await customerAppPage.goto(`/workspace?workspaceId=${businessId}&view=applications&work=${appId}`, { waitUntil: "domcontentloaded" });
     await expect(customerAppPage.getByRole("heading", { name: "Agency permit requests", exact: true })).toBeVisible();
+    const customerReview = customerAppPage.getByRole("tab", { name: "Review", exact: true });
+    await customerReview.click();
+    await expect(customerReview).toHaveAttribute("aria-selected", "true");
+    const reviewDisclosure = customerAppPage.locator("details").filter({ has: customerAppPage.getByText("Review changes", { exact: true }) });
+    if (await reviewDisclosure.getAttribute("open") === null) await reviewDisclosure.getByText("Review changes", { exact: true }).click();
     await expect(customerAppPage.getByText('Field changed: "Request details"; label changes from "Request" to "Request details".', { exact: true })).toBeVisible();
-    await customerAppPage.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(customerAppPage.getByRole("button", { name: "Check proposed change", exact: true })).toHaveCount(0);
     await expect(customerAppPage.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await customerAppPage.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(customerAppPage.getByText(/Version 2 is live/)).toBeVisible();
+    await expect(customerAppPage.getByText(/Release 2 is live/)).toBeVisible();
 
     // The operator can still inspect the returned live result, but customer
     // publication remains the only release path.
     await agencyPage.reload({ waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByText("Version 2 is live.", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("Release 2 is live.", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
 
     await customerPage.bringToFront();
-    await customerPage.getByRole("textbox", { name: "Customer review", exact: true }).fill("Verified the agency receipt and published the returned draft.");
+    // Reopen the actual saved request after publication/operator navigation.
+    // Its delivery selection is local to the Help form and must be restored
+    // before confirming the completed receipt, regardless of dev tab refreshes.
+    await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
+    await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
+    await customerPage.getByRole("button", { name: /Prepare the exact permit request application/ }).click();
+    await expect(customerPage.locator(`#delivery-controls-${serviceRequest.request.id}`)).toBeVisible();
+    await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
+    await customerPage.getByRole("textbox", { name: "Your review", exact: true }).fill("Verified the agency receipt and published the returned draft.");
     await customerPage.getByRole("button", { name: "Confirm completed delivery", exact: true }).click();
     await expect(customerPage.getByText("The completed delivery is confirmed and linked to this request.", { exact: true })).toBeVisible();
 
@@ -253,7 +339,7 @@ test("a named agency operator revises one assigned application and returns it fo
     }, 403);
 
     await agencyPage.reload({ waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible({ timeout: 20_000 });
+    await expect(agencyPage.getByText("The client has not granted draft editing", { exact: false })).toBeVisible({ timeout: 20_000 });
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);
 
     await customerPage.reload({ waitUntil: "domcontentloaded" });

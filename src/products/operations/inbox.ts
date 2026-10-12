@@ -1,6 +1,7 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { responsibilitySchema, type Responsibility } from "@/platform/work-execution/engine";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { activationExceptions } from "./activation-exceptions";
 
 type Row = Record<string, unknown>;
 type Failure = { message?: unknown; code?: unknown } | null;
@@ -9,8 +10,10 @@ type Query = {
   select(columns?: string): Query;
   eq(column: string, value: unknown): Query;
   in(column: string, values: unknown[]): Query;
+  gt(column: string, value: unknown): Query;
   order(column: string, options?: { ascending?: boolean }): Query;
   limit(value: number): Query;
+  range(from: number, to: number): Query;
   then<TResult1 = QueryResult, TResult2 = never>(
     onfulfilled?: ((value: QueryResult) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
@@ -19,12 +22,13 @@ type Query = {
 type InternalDb = { from(table: string): Query };
 
 const MAX_ROWS = 500;
+const IN_CHUNK = 100;
 
 export type EffectCertainty = "none" | "accepted" | "unknown";
 
 export interface OperationalExceptionProjection {
   id: string;
-  source: "responsibility" | "standing_run";
+  source: "responsibility" | "standing_run" | "activation";
   workspaceId: string;
   workspaceName: string;
   workId: string;
@@ -87,10 +91,47 @@ function db(): InternalDb {
   return value as unknown as InternalDb;
 }
 
-async function selectRows(table: string, columns: string, limit = MAX_ROWS): Promise<Row[]> {
+async function selectRows(table: string, columns: string, limit = MAX_ROWS, all = false): Promise<Row[]> {
+  if (all) {
+    const result: Row[] = [];
+    for (let offset = 0; ; offset += MAX_ROWS) {
+      const page = await db().from(table).select(columns).order("id", { ascending: true }).range(offset, offset + MAX_ROWS - 1);
+      if (page.error || !Array.isArray(page.data)) throw new WorkspaceStoreError(`Operational ${table} records are unavailable.`);
+      result.push(...rows(page.data));
+      if (page.data.length < MAX_ROWS) return result;
+    }
+  }
   const result = await db().from(table).select(columns).limit(limit);
   if (result.error) throw new WorkspaceStoreError(`Operational ${table} records are unavailable.`);
   return rows(result.data);
+}
+
+async function runQuery(table: string, query: Query): Promise<Row[]> {
+  const result = await query;
+  if (result.error) throw new WorkspaceStoreError(`Operational ${table} records are unavailable.`);
+  return rows(result.data);
+}
+
+// Loads only the rows whose `column` is one of `values`, in bounded chunks so
+// a long id list never becomes one oversized request.
+async function selectByIds(
+  table: string,
+  columns: string,
+  column: string,
+  values: string[],
+  orderBy: string[],
+  narrow?: (query: Query) => Query,
+): Promise<Row[]> {
+  const unique = [...new Set(values.filter(Boolean))].sort();
+  const chunks: string[][] = [];
+  for (let index = 0; index < unique.length; index += IN_CHUNK) chunks.push(unique.slice(index, index + IN_CHUNK));
+  const results = await Promise.all(chunks.map((chunk) => {
+    let query = db().from(table).select(columns).in(column, chunk);
+    if (narrow) query = narrow(query);
+    for (const key of orderBy) query = query.order(key, { ascending: true });
+    return runQuery(table, query);
+  }));
+  return results.flat();
 }
 
 function parseResponsibility(value: unknown): Responsibility | null {
@@ -174,14 +215,14 @@ function exceptionLink(workspaceId: string, workId: string, stepId?: string): st
   return `/admin/work?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}${anchor}`;
 }
 
-export async function listOperationalExceptions(): Promise<OperationalExceptionProjection[]> {
+export async function listOperationalExceptions(options: { all?: boolean } = {}): Promise<OperationalExceptionProjection[]> {
   const [workRows, runRows, receiptRows, assignmentRows, userRows, workspaceRows] = await Promise.all([
-    selectRows("saved_product_work", "id,workspace_id,title,payload,updated_at"),
-    selectRows("standing_responsibility_runs", "id,workspace_id,finite_work_id,status,last_error,updated_at"),
-    selectRows("standing_responsibility_receipts", "id,run_id,step_id,attempt,status,effect,reason,finished_at,created_at"),
-    selectRows("operational_assignments", "id,work_id,assignee_user_id,assignee_email,assignee_kind,status,offered_at,expires_at"),
-    selectRows("users", "id,email"),
-    selectRows("workspaces", "id,name"),
+    selectRows("saved_product_work", "id,workspace_id,title,payload,updated_at", MAX_ROWS, options.all),
+    selectRows("standing_responsibility_runs", "id,workspace_id,finite_work_id,status,last_error,updated_at", MAX_ROWS, options.all),
+    selectRows("standing_responsibility_receipts", "id,run_id,step_id,attempt,status,effect,reason,finished_at,created_at", MAX_ROWS, options.all),
+    selectRows("operational_assignments", "id,work_id,assignee_user_id,assignee_email,assignee_kind,status,offered_at,expires_at", MAX_ROWS, options.all),
+    selectRows("users", "id,email", MAX_ROWS, options.all),
+    selectRows("workspaces", "id,name", MAX_ROWS, options.all),
   ]);
   const users = userMap(userRows);
   const workspaces = workspaceMap(workspaceRows);
@@ -305,24 +346,42 @@ export async function listOperationalExceptions(): Promise<OperationalExceptionP
       });
     }
   }
+  // Make real activations that need a person (partly live, waiting, unknown).
+  result.push(...activationExceptions(workRows, workspaces, users));
   return result.sort((a, b) => Date.parse(b.ageAt) - Date.parse(a.ageAt)).slice(0, MAX_ROWS);
 }
 
 export async function listAuthorizedOperationalInbox(actor: WorkspaceActor): Promise<OperationalInbox> {
   const verifiedEmail = actor.verifiedEmail.trim().toLowerCase();
-  const [assignmentRows, workRows, membershipRows, workspaceRows, providerRows] = await Promise.all([
-    selectRows("operational_assignments", "id,workspace_id,work_id,sponsor_id,sponsor_email,assignee_user_id,assignee_email,assignee_kind,assignee_workspace_id,status,offered_at,expires_at,work_scope"),
-    selectRows("saved_product_work", "id,workspace_id,title,payload"),
-    selectRows("workspace_memberships", "workspace_id,user_id,role"),
-    selectRows("workspaces", "id,name"),
-    selectRows("offering_provider_deliveries", "id,business_workspace_id,installation_id,assignment_id,status,expires_at"),
+  const now = Date.now();
+  // Only this actor's live assignments. The checks below repeat every
+  // condition as defense in depth; the query just keeps other businesses'
+  // rows out of memory and keeps the actor's rows from falling past the cap.
+  const assignmentRows = await runQuery("operational_assignments", db()
+    .from("operational_assignments")
+    .select("id,workspace_id,work_id,sponsor_id,sponsor_email,assignee_user_id,assignee_email,assignee_kind,assignee_workspace_id,status,offered_at,expires_at,work_scope")
+    .eq("assignee_user_id", actor.userId)
+    .in("status", ["offered", "accepted"])
+    .gt("expires_at", new Date(now).toISOString())
+    .order("expires_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(MAX_ROWS));
+  if (!assignmentRows.length) return { assignments: [] };
+  const workspaceIds = assignmentRows.flatMap((item) => [text(item.workspace_id), text(item.assignee_workspace_id)]);
+  const userIds = [...new Set([actor.userId, ...assignmentRows.map((item) => text(item.sponsor_id))].filter(Boolean))];
+  const [workRows, membershipRows, workspaceRows, providerRows] = await Promise.all([
+    selectByIds("saved_product_work", "id,workspace_id,title,payload", "id", assignmentRows.map((item) => text(item.work_id)), ["id"]),
+    selectByIds("workspace_memberships", "workspace_id,user_id,role", "workspace_id", workspaceIds, ["workspace_id", "user_id"],
+      (query) => query.in("user_id", userIds)),
+    selectByIds("workspaces", "id,name", "id", assignmentRows.map((item) => text(item.workspace_id)), ["id"]),
+    selectByIds("offering_provider_deliveries", "id,business_workspace_id,installation_id,assignment_id,status,expires_at", "assignment_id",
+      assignmentRows.map((item) => text(item.id)), ["assignment_id", "id"]),
   ]);
   const workById = new Map<string, Row>(workRows.map((item) => [text(item.id), item]));
   const workspaces = workspaceMap(workspaceRows);
   const membershipKeys = new Set(membershipRows.map((item) => `${text(item.workspace_id)}:${text(item.user_id)}`));
   const ownerKeys = new Set(membershipRows.filter((item) => text(item.role) === "owner").map((item) => `${text(item.workspace_id)}:${text(item.user_id)}`));
   const providerByAssignment = new Map(providerRows.map((item) => [text(item.assignment_id), item]));
-  const now = Date.now();
   const assignments: OperationalAssignmentInboxItem[] = [];
   for (const item of assignmentRows) {
     const assignmentId = text(item.id);

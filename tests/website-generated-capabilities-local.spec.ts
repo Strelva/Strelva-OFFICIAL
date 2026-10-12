@@ -117,9 +117,9 @@ test.describe("generated website published capability runtime", () => {
       await expect(bookingRoot.getByText("Your time is reserved.")).toBeVisible();
       await bookingRoot.getByLabel("Available time").selectOption("slot-87654321");
       await bookingRoot.getByRole("button", { name: "Change time" }).click();
-      await expect(bookingRoot.getByText(/This reservation is cancelled\./)).toHaveCount(0);
+      await expect(bookingRoot.getByText(/This booking is cancelled\./)).toHaveCount(0);
       await bookingRoot.getByRole("button", { name: "Cancel reservation" }).click();
-      await expect(bookingRoot.getByText("This reservation is cancelled.")).toBeVisible();
+      await expect(bookingRoot.getByText("This booking is cancelled.")).toBeVisible();
     } finally {
       await new Promise<void>(resolve => server.close(() => resolve()));
       rmSync(sourceDir, { recursive: true, force: true });

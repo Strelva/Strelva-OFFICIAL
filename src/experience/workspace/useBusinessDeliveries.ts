@@ -6,7 +6,7 @@ import { serviceRequestSchema } from "@/platform/service-requests/types";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { businessDeliveryItems, type BusinessDeliveryItem } from "./business-delivery-summary";
 
-const responseSchema = z.object({ requests: z.array(serviceRequestSchema) });
+const responseSchema = z.object({ requests: z.array(serviceRequestSchema), servingAgencies: z.array(z.object({ requestId: z.string().uuid(), displayName: z.string().nullable() }).strict()).optional() });
 type Result = { businessId: string; status: "ready"; items: BusinessDeliveryItem[] } | { businessId: string; status: "error"; message: string };
 export function useBusinessDeliveries(businessId: string | undefined) {
   const transport = useWorkspaceRequest();
@@ -20,7 +20,7 @@ export function useBusinessDeliveries(businessId: string | undefined) {
       if (!response.ok) throw new Error("Delivery status is unavailable. Your other saved work is unchanged.");
       const parsed = responseSchema.safeParse(body);
       if (!parsed.success || parsed.data.requests.some(request => request.businessId !== businessId)) throw new Error("The delivery scope could not be confirmed.");
-      if (!abort.signal.aborted) setResult({ businessId, status: "ready", items: businessDeliveryItems(parsed.data.requests) });
+      if (!abort.signal.aborted) setResult({ businessId, status: "ready", items: businessDeliveryItems(parsed.data.requests, new Map(parsed.data.servingAgencies?.map(item => [item.requestId, item.displayName]))) });
     }).catch(cause => { if (!abort.signal.aborted) setResult({ businessId, status: "error", message: cause instanceof Error ? cause.message : "Delivery status is unavailable." }); });
     return () => abort.abort();
   }, [businessId, transport, attempt]);

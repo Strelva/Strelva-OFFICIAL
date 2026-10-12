@@ -1,4 +1,4 @@
-import { CONTROL_PLANE_URL } from "@/lib/brand";
+import { CONTROL_PLANE_URL, OPERATOR_URL } from "@/platform/infra/brand";
 
 /**
  * The workspace is served from app.strelva.com in production, not from the
@@ -11,7 +11,7 @@ export function workspaceHref(requestHost: string, forwardedProto: string | null
   if (hostname === "admin.localhost") {
     return `${forwardedProto === "https" ? "https" : "http"}://localhost${port ? `:${port}` : ""}/workspace?view=${encodeURIComponent(view)}`;
   }
-  if (hostname === "admin.strelva.com") {
+  if (hostname === new URL(OPERATOR_URL).hostname) {
     return `${CONTROL_PLANE_URL}/workspace?view=${encodeURIComponent(view)}`;
   }
   return `/workspace?view=${encodeURIComponent(view)}`;

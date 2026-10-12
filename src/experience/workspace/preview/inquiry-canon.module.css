@@ -1,0 +1,32 @@
+.preview { color: var(--st-text); background: var(--st-canvas); font-family: var(--font-workspace, system-ui), sans-serif; }
+.inbox { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; }
+.detail, .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.detailHead, .inline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.name { font-size: 16px; font-weight: 600; line-height: 24px; margin: 0; }
+.body { margin: 0; font-size: 14px; line-height: 24px; overflow-wrap: anywhere; }
+.muted { color: var(--st-text-3); font-size: 12px; line-height: 20px; margin: 0; }
+.need { color: var(--st-need); }
+.actions { display: flex; gap: 16px; align-items: center; }
+.truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 270px; }
+.record { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 40px; }
+.facts { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; margin: 0; font-size: 14px; line-height: 20px; }
+.facts dt { color: var(--st-text-3); font-size: 13px; }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.movement { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.movementObject { display: flex; flex-direction: column; gap: 16px; }
+.mobileBack { display: none; }
+.mobileTabs { display: none; }
+@media (max-width: 767px) {
+  .inbox, .record { display: block; }
+  .inbox[data-detail="false"] .detail { display: none; }
+  .inbox[data-detail="true"] .people { display: none; }
+  .record > * + * { margin-top: 28px; }
+  .movement { grid-template-columns: 1fr; }
+  .mobileBack { display: block; }
+  .pageHead[data-detail="true"] { display: none; }
+  .truncate { max-width: 265px; }
+  .facts { grid-template-columns: 90px minmax(0, 1fr); }
+  .mobileTabs { display: flex; justify-content: space-around; position: fixed; bottom: 0; left: 0; right: 0; background: var(--st-surface); padding: 12px 8px; border-top: 1px solid var(--st-line); z-index: 30; font-size: 12px; }
+  .mobileTabs a { color: var(--st-text-3); text-decoration: none; padding: 8px; }
+  .mobileTabs a[aria-current] { color: var(--st-text); font-weight: 600; }
+}

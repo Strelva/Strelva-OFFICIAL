@@ -1,68 +1,28 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { HeroWordRotator } from "@/components/marketing/HeroWordRotator";
+import { StCopy, StHead, StPage, StPillLink, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 
 export const metadata: Metadata = {
-  title: "Strelva - Managed website operations for local businesses",
-  description:
-    "Strelva builds and manages local business websites with a weekly plain-English receipt and a simple update path.",
+  title: "Strelva — Make and run your business systems",
+  description: "Run your business or build for clients. Start with a free website and AI visibility check.",
 };
 
 export default function HomePage() {
-  return (
-    <>
-      <style>{`
-        .marketing-footer {
-          display: none;
-        }
-
-        .hero-word-single {
-          animation: hero-word-single 560ms var(--m-ease-expo, cubic-bezier(0.16, 1, 0.3, 1)) both;
-        }
-
-        @keyframes hero-word-single {
-          from {
-            opacity: 0;
-            transform: translate3d(0, 32%, 0);
-          }
-          to {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .hero-word-single {
-            animation: none;
-            transform: none;
-          }
-        }
-      `}</style>
-      <div className="relative h-[100svh] overflow-hidden px-5 pt-[4.25rem] md:px-8 md:pt-16">
-        <main className="relative z-10 mx-auto flex h-full max-w-[1240px] flex-col">
-          <section className="flex min-h-0 flex-1 items-center justify-center pb-5 pt-2 text-center">
-            <div className="motion-rise flex max-w-[960px] min-w-0 flex-col items-center">
-              <h1
-                className="max-w-[980px] font-semibold leading-[0.92] tracking-normal text-m-text"
-                style={{ fontSize: "clamp(3.25rem, 7.3vw, 7.45rem)" }}
-              >
-                <span>A site that keeps up when you change</span>
-                <HeroWordRotator />
-              </h1>
-              <p className="mt-6 max-w-[660px] text-[17px] leading-[1.55] tracking-normal text-m-text-2 sm:text-[19px]">
-                Send the change. Strelva keeps the site current, checks it before publish, and shows what worked.
-              </p>
-              <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
-                <Link href="/access-request?ref=home-hero" className="marketing-button-primary">
-                  Request your build
-                  <ArrowRight className="size-4" />
-                </Link>
-              </div>
-            </div>
-          </section>
-        </main>
-      </div>
-    </>
-  );
+  const businessOpen = workspaceReleaseEnabled();
+  const agencyOpen = agencySignupReleaseEnabled();
+  return <StPage>
+    <StHead title="What would you like to make possible?" meta="Make, run and keep reshaping the systems your business needs." />
+    <StSection title="Choose your starting point">
+      <StRows>
+        <StRow title="I run a business" detail={businessOpen ? "Make a website, booking page or another system. Start directly, or bring in an agency when you want help." : "Business accounts are coming soon. Start with a free check or request access."} end={<StTextButton href={businessOpen ? "/sign-up?as=business" : "/audit"}>{businessOpen ? "Start your business" : "Start a free check"}</StTextButton>} />
+        <StRow title="I build for clients" detail={agencyOpen ? "Create systems for clients, send work for their review and keep running it under your agency’s name." : "Agency accounts are coming soon. See how client work and verification will work."} end={<StTextButton href="/agencies">For agencies</StTextButton>} />
+      </StRows>
+    </StSection>
+    <StSection title="Start with your website">
+      <StCopy>One free check covers website health and whether Gemini names your business. No account required.</StCopy>
+      <StPillLink href="/audit">Check your website</StPillLink>
+    </StSection>
+    {!businessOpen && <StTextButton href="/access-request">Request access</StTextButton>}
+  </StPage>;
 }

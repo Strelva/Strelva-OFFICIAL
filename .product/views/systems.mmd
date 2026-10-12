@@ -1,0 +1,74 @@
+%% Generated from PRODUCT_MODEL revision 6; status=all, inactive=False, focus=DESIGN_SYSTEMS_PRODUCT_MODEL, hops=2
+flowchart LR
+  LATENT_VIEW_TITLE["Strelva #124; revision 6 #124; view: status=all, inactive=False, focus=DESIGN_SYSTEMS_PRODUCT_MODEL, hops=2"]
+  N_PRIM_BUSINESS(["primitive: Business #91;partial#93;"])
+  class N_PRIM_BUSINESS type_primitive;
+  class N_PRIM_BUSINESS proposed;
+  N_DESIGN_TYPED_DOMAINS["architecture: Typed domains with shared references #91;stale / planned#93;"]
+  class N_DESIGN_TYPED_DOMAINS type_custom;
+  class N_DESIGN_TYPED_DOMAINS proposed;
+  N_DESIGN_SYSTEMS_PRODUCT_MODEL["product_model: Systems, Connections, Possibilities, Versions #91;planned#93;"]
+  class N_DESIGN_SYSTEMS_PRODUCT_MODEL type_custom;
+  class N_DESIGN_SYSTEMS_PRODUCT_MODEL confirmed;
+  N_PRIM_SYSTEM(["primitive: System #91;partial#93;"])
+  class N_PRIM_SYSTEM type_primitive;
+  class N_PRIM_SYSTEM confirmed;
+  N_PRIM_SYSTEM_CONNECTION(["primitive: System connection #91;partial#93;"])
+  class N_PRIM_SYSTEM_CONNECTION type_primitive;
+  class N_PRIM_SYSTEM_CONNECTION confirmed;
+  N_PRIM_POSSIBILITY(["primitive: Possibility #91;partial#93;"])
+  class N_PRIM_POSSIBILITY type_primitive;
+  class N_PRIM_POSSIBILITY confirmed;
+  N_PRIM_CONTEXT_VERSION(["primitive: Contextual Version #91;partial#93;"])
+  class N_PRIM_CONTEXT_VERSION type_primitive;
+  class N_PRIM_CONTEXT_VERSION confirmed;
+  N_RULE_SYSTEM_OUTPUT_IDENTITY{"rule: System identity and issued outputs #91;partial#93;"}
+  class N_RULE_SYSTEM_OUTPUT_IDENTITY type_rule;
+  class N_RULE_SYSTEM_OUTPUT_IDENTITY proposed;
+  N_RULE_SYSTEM_PAUSE_HEALTH{"rule: Lifecycle and operational health #91;partial#93;"}
+  class N_RULE_SYSTEM_PAUSE_HEALTH type_rule;
+  class N_RULE_SYSTEM_PAUSE_HEALTH proposed;
+  N_COMP_SYSTEM_EVOLUTION[["composition: Proposal becomes a working customer process #91;planned#93;"]]
+  class N_COMP_SYSTEM_EVOLUTION type_composition;
+  class N_COMP_SYSTEM_EVOLUTION proposed;
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS["issue: Open defects on transition/systems #91;stale / absent#93;"]
+  class N_ISSUE_SYSTEMS_AUDIT_DEFECTS type_custom;
+  class N_ISSUE_SYSTEMS_AUDIT_DEFECTS confirmed;
+  N_PROD_NATIVE_APPS["product: Native applications #91;available#93;"]
+  class N_PROD_NATIVE_APPS type_custom;
+  class N_PROD_NATIVE_APPS confirmed;
+  N_PROD_CUSTOM_APPS["product: Custom applications #91;blocked#93;"]
+  class N_PROD_CUSTOM_APPS type_custom;
+  class N_PROD_CUSTOM_APPS confirmed;
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"has"| N_PRIM_SYSTEM_CONNECTION
+  N_PRIM_SYSTEM_CONNECTION -->|"connects_to"| N_PRIM_SYSTEM
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_POSSIBILITY
+  N_PRIM_POSSIBILITY -->|"changes_one_or_more"| N_PRIM_SYSTEM
+  N_PRIM_POSSIBILITY -->|"made_real_as_change_to"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"adapted_as"| N_PRIM_CONTEXT_VERSION
+  N_PRIM_CONTEXT_VERSION -->|"binds_locally"| N_PRIM_SYSTEM_CONNECTION
+  N_DESIGN_SYSTEMS_PRODUCT_MODEL -->|"presented_through"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -.->|"supported_by #91;proposed#93;"| N_DESIGN_TYPED_DOMAINS
+  N_PRIM_SYSTEM -.->|"requires #91;proposed#93;"| N_RULE_SYSTEM_OUTPUT_IDENTITY
+  N_PRIM_SYSTEM -.->|"requires #91;proposed#93;"| N_RULE_SYSTEM_PAUSE_HEALTH
+  N_PROD_NATIVE_APPS -.->|"seeds #91;inferred#93;"| N_PRIM_SYSTEM
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_SYSTEM
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_SYSTEM_CONNECTION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_PRIM_CONTEXT_VERSION
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS -->|"affects"| N_RULE_SYSTEM_PAUSE_HEALTH
+  N_COMP_SYSTEM_EVOLUTION -.->|"requires #91;proposed#93;"| N_PRIM_SYSTEM
+  N_PROD_CUSTOM_APPS -.->|"seeds #91;inferred#93;"| N_PRIM_SYSTEM
+  classDef type_composition fill:#FDE68A,stroke:#B45309,color:#451A03;
+  classDef type_custom fill:#FFFFFF,stroke:#64748B,color:#0F172A;
+  classDef type_primitive fill:#E8F0FE,stroke:#3659C9,color:#172554;
+  classDef type_rule fill:#F3E8FF,stroke:#7E22CE,color:#3B0764;
+  classDef confirmed stroke-width:2px,stroke-dasharray:0;
+  classDef inferred stroke-width:2px,stroke-dasharray:2 3;
+  classDef proposed stroke-width:2px,stroke-dasharray:8 4;
+  LEGEND_CONFIRMED["confirmed: solid"]
+  class LEGEND_CONFIRMED confirmed;
+  LEGEND_INFERRED["inferred: dotted"]
+  class LEGEND_INFERRED inferred;
+  LEGEND_PROPOSED["proposed: dashed"]
+  class LEGEND_PROPOSED proposed;

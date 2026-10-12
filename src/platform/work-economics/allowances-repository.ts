@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";
 import {
   WORK_ALLOWANCE_UNIT_KINDS,
@@ -57,6 +57,9 @@ const allowanceResult = z.object({
   workspaceId: z.string().uuid(),
   businessName: z.string().min(1),
   payerId: z.string().uuid(),
+  payerKind: z.enum(["business", "agency"]).optional(),
+  payerWorkspaceId: z.string().uuid().optional(),
+  canAccept: z.boolean().optional(),
   periodStart: z.string(),
   periodEnd: z.string(),
   spendingCapCents: z.number().int().nonnegative(),

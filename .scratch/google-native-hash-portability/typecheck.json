@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false
+  },
+  "include": [
+    "../../src/products/google-listing/server.ts",
+    "../../src/products/google-listing/native/server.ts",
+    "../../src/app/api/workspace/publishing/google/**/*.ts",
+    "../../src/__tests__/native-google-server.test.ts",
+    "../../src/__tests__/native-google-http.test.ts",
+    "../../src/__tests__/native-google-oauth.test.ts"
+  ],
+  "exclude": [
+    "../../node_modules"
+  ]
+}

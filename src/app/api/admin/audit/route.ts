@@ -1,5 +1,6 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAuditLog, getAllAuditEvents } from "@/lib/storage";
 
 /**
@@ -10,6 +11,7 @@ export async function GET(req: Request) {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.audit.read");
 
   const { searchParams } = new URL(req.url);
   const tenant = searchParams.get("tenant");

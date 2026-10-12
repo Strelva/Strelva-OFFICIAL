@@ -2,7 +2,7 @@ import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { CUSTOM_REPO_CONTRACT_VERSION, getCustomRepoMetadata } from "@/lib/custom-repos";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteCapabilityManifestSchema } from "@/lib/schemas";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import type { SectionCapability, SiteCapabilityManifest, TenantConfig } from "@/lib/types";
 import { isContentSection } from "@/lib/types";
 

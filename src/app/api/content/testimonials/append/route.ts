@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, getActorContext } from "@/lib/auth";
+import { requireTenantPermission, getActorContext } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { appendTestimonial } from "@/lib/testimonials";

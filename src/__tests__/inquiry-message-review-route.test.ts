@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
+  decider: vi.fn(),
   actor: vi.fn(),
   access: vi.fn(),
   permission: vi.fn(),
@@ -12,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   workspace: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/operator-decisions", () => ({ sessionTenantDecider: mocks.decider }));
+vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: mocks.verifyAuth,
   getAuthUserId: mocks.actor,
   requireTenantAccess: mocks.access,
@@ -25,6 +27,9 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
 }));
 vi.mock("@/products/inquiries", () => ({
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   prepareInquiryMessageReview: mocks.prepare,
   approveInquiryMessageReview: mocks.approve,
 }));
@@ -61,6 +66,7 @@ describe("authenticated inquiry message review route", () => {
     mocks.release.mockReturnValue(true);
     mocks.verifyAuth.mockResolvedValue(true);
     mocks.actor.mockResolvedValue("actor-1");
+    mocks.decider.mockResolvedValue({ kind: "member", actorId: "actor-1" });
     mocks.access.mockResolvedValue(null);
     mocks.permission.mockResolvedValue(null);
     mocks.config.mockResolvedValue(config);
@@ -73,6 +79,17 @@ describe("authenticated inquiry message review route", () => {
       reason: "provider read-back unavailable",
       retryable: true,
     });
+  });
+
+  it.each(["prepare", "approve"])("refuses operator %s before message rendering, receipts or delivery", async operation => {
+    mocks.decider.mockResolvedValue({ kind: "operator", operator: { userId: "actor-1" } });
+    expect((await POST(postRequest({ operation, tenantId: "tenant-a", inquiryId: "inquiry-1", action: "reply", reviewToken: "token", messageDigest: "a".repeat(64) }))).status).toBe(403);
+    expect(mocks.prepare).not.toHaveBeenCalled(); expect(mocks.approve).not.toHaveBeenCalled();
+  });
+  it("retains ordinary agency message preparation", async () => {
+    mocks.decider.mockResolvedValue({ kind: "agency_staff", staff: { userId: "actor-1", agencyWorkspaceId: "agency-1" } });
+    expect((await POST(postRequest({ operation: "prepare", tenantId: "tenant-a", inquiryId: "inquiry-1", action: "reply" }))).status).toBe(200);
+    expect(mocks.prepare).toHaveBeenCalled();
   });
 
   it("does not create a new message review after the mapped workspace exits", async () => {
@@ -159,6 +176,8 @@ describe("authenticated inquiry message review route", () => {
       status: "accepted_unverified",
       reason: "provider read-back unavailable",
       retryable: false,
+      delivery: "unconfirmed",
+      retryAllowed: false,
     } });
     expect(mocks.approve).toHaveBeenCalledWith({
       tenantId: "tenant-a",

@@ -26,6 +26,12 @@ describe("local workspace entrance", () => {
     }) })).rejects.toThrow("REDIRECT:/preview/strelva?view=ongoing&scenario=business&standingId=responsibility&assignmentId=assignment");
   });
 
+  it("keeps the open System and the fixture switches so a System page survives a reload", async () => {
+    await expect(WorkspacePreviewAlias({ searchParams: Promise.resolve({
+      scenario: "mooney", workspaceId: "a0000000-0000-4000-8000-000000000001", view: "system", system: "b0000000-0000-4000-8000-000000000004", systems: "on", websiteDetail: "partial", makeReal: "partly",
+    }) })).rejects.toThrow("REDIRECT:/preview/strelva?view=system&scenario=mooney&workspaceId=a0000000-0000-4000-8000-000000000001&systems=on&system=b0000000-0000-4000-8000-000000000004&makeReal=partly&websiteDetail=partial");
+  });
+
   it("does not expose the preview while its explicit gate is closed", async () => {
     preview.enabled = false;
     await expect(WorkspacePreviewAlias({ searchParams: Promise.resolve({}) })).rejects.toThrow("NOT_FOUND");

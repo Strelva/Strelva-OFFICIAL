@@ -2,7 +2,7 @@
  * The public (v1 contract) shape of a collection entry. snake_case Postgres row
  * -> camelCase wire shape, tenant_id dropped. Locked by the v1 contract tests.
  */
-import type { Row } from "../db/client";
+import type { Row } from "@/platform/infra/db/client";
 
 export interface PublicCollectionEntry {
   slug: string;

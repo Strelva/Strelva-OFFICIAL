@@ -28,7 +28,7 @@ vi.mock("@supabase/ssr", () => ({
 import {
   applyMiddlewareSupabaseResponse,
   createMiddlewareSupabase,
-} from "@/lib/db/middleware-client";
+} from "@/platform/infra/db/middleware-client";
 
 const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -56,7 +56,7 @@ describe("middleware Supabase session propagation", () => {
         {
           name: "sb-auth-token",
           value: "refreshed",
-          options: { httpOnly: true, sameSite: "lax", path: "/" },
+          options: { httpOnly: true, sameSite: "lax", path: "/", domain: ".strelva.com" },
         },
       ],
       { "Cache-Control": "private, no-store", Expires: "0" }
@@ -66,7 +66,18 @@ describe("middleware Supabase session propagation", () => {
 
     expect(request.cookies.get("sb-auth-token")?.value).toBe("refreshed");
     expect(response.cookies.get("sb-auth-token")?.value).toBe("refreshed");
+    expect(response.cookies.get("sb-auth-token")?.domain).toBeUndefined();
+    expect(response.headers.get("set-cookie")).not.toContain("Domain=");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(response.headers.get("Expires")).toBe("0");
   });
+  it("never copies a sites-apex Domain into an app session", () => {
+    const request = new NextRequest("https://app.strelva.com/dashboard");
+    createMiddlewareSupabase(request);
+    captured.cookies?.setAll([{ name: "sb-auth-token", value: "refreshed", options: { domain: ".sites.example", path: "/", sameSite: "lax", secure: true } }], {});
+    const response = applyMiddlewareSupabaseResponse(request, NextResponse.redirect("https://app.strelva.com/workspace"));
+    expect(response.headers.get("set-cookie")).not.toContain("Domain=");
+    expect(response.cookies.get("sb-auth-token")).toMatchObject({ value: "refreshed", secure: true, sameSite: "lax", path: "/" });
+  });
+
 });

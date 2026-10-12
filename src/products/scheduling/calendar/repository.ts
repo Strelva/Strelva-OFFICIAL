@@ -1,7 +1,8 @@
-import { decryptSecret, encryptSecret } from "@/lib/crypto/secrets";
-import { getSupabase } from "@/lib/db/client";
+import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
+import { getSupabase } from "@/platform/infra/db/client";
+import { isWorkspaceAuthorityFailure, workspaceRoleAllows } from "@/platform/workspaces/permissions";
 import { assertWorkspaceMember } from "@/platform/workspaces/repository";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type WorkspaceRole } from "@/platform/workspaces/types";
 import { z } from "zod";
 import {
   calendarConnectionInputSchema,
@@ -13,6 +14,7 @@ import {
   type CalendarReminderPolicy,
 } from "./contracts";
 import { refreshCalendarOAuthToken } from "./oauth";
+import { revokeProviderAuthorization, type ProviderRevocationResult, type RevocationOutcome } from "@/platform/infra/provider-revocation";
 
 type DbRow = Record<string, unknown>;
 type CalendarConnectionWithSecrets = CalendarConnection & { accessToken?: string; refreshToken?: string };
@@ -53,7 +55,13 @@ interface CalendarQuery extends PromiseLike<DbResult> {
   maybeSingle(): Promise<DbResult>;
   single(): Promise<DbResult>;
 }
-type CalendarDb = { from(table: string): CalendarQuery };
+type CalendarDb = {
+  from(table: string): CalendarQuery;
+  rpc(name: string, args: Record<string, unknown>): PromiseLike<DbResult>;
+};
+
+const CALENDAR_MANAGER_MESSAGE = "A workspace owner or administrator must manage calendar connections.";
+const CALENDAR_EXIT_MESSAGE = "Calendar connection changes are stopped for this workspace. Existing reservations remain available for review.";
 
 const TOKEN_REFRESH_SKEW_MS = 60 * 1000;
 const tokenRefreshes = new Map<string, Promise<CalendarConnectionWithSecrets>>();
@@ -73,7 +81,7 @@ export async function assertWorkspaceCalendarWriteAllowed(workspaceId: string): 
     const result = await client.rpc("workspace_exit_completed", { p_workspace_id: workspaceId });
     if (result.error || typeof result.data !== "boolean") throw new Error("workspace exit status unavailable");
     if (result.data) {
-      throw new WorkspaceConflictError("Calendar connection changes are stopped for this workspace. Existing reservations remain available for review.");
+      throw new WorkspaceConflictError(CALENDAR_EXIT_MESSAGE);
     }
   } catch (error) {
     if (error instanceof WorkspaceConflictError) throw error;
@@ -149,12 +157,26 @@ function mapReceipt(row: DbRow): CalendarEventReceipt {
   };
 }
 
+function failureDetail(error: unknown): string {
+  return error && typeof error === "object" ? `${(error as { code?: unknown }).code ?? ""} ${(error as { message?: unknown }).message ?? ""}` : "";
+}
+
 function failure(error: unknown, fallback: string): never {
-  const detail = error && typeof error === "object" ? `${(error as { code?: unknown }).code ?? ""} ${(error as { message?: unknown }).message ?? ""}` : "";
-  if (detail.includes("workspace_calendar_connections") || detail.includes("workspace_calendar_event_receipts")) {
-    throw new WorkspaceStoreError(fallback);
-  }
   throw new WorkspaceStoreError(fallback);
+}
+
+/** Maps errors raised inside the authority-checked calendar RPCs back to the
+ * errors the TypeScript gate throws, so callers see one contract. */
+function rpcFailure(error: unknown, fallback: string, accessMessage?: string): never {
+  const detail = failureDetail(error);
+  if (isWorkspaceAuthorityFailure(detail)) throw new WorkspaceAccessError(accessMessage);
+  if (detail.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(CALENDAR_EXIT_MESSAGE);
+  failure(error, fallback);
+}
+
+function firstRow(data: unknown): DbRow | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  return row && typeof row === "object" ? row as DbRow : null;
 }
 
 export async function listWorkspaceCalendarConnections(actor: WorkspaceActor, workspaceId: string): Promise<CalendarConnection[]> {
@@ -169,8 +191,8 @@ export async function listWorkspaceCalendarConnections(actor: WorkspaceActor, wo
 export async function assertWorkspaceCalendarManager(actor: WorkspaceActor, workspaceId: string): Promise<void> {
   const { data, error } = await db().from("workspace_memberships").select("role").eq("workspace_id", workspaceId).eq("user_id", actor.userId).maybeSingle();
   if (error) failure(error, "Workspace calendar permissions are unavailable.");
-  const role = data && typeof (data as DbRow).role === "string" ? (data as DbRow).role : "";
-  if (role !== "owner" && role !== "admin") throw new WorkspaceAccessError("A workspace owner or administrator must manage calendar connections.");
+  const role = data && typeof (data as DbRow).role === "string" ? (data as DbRow).role as WorkspaceRole : null;
+  if (!workspaceRoleAllows(role, "manage_calendar")) throw new WorkspaceAccessError(CALENDAR_MANAGER_MESSAGE);
 }
 
 /** Server-only credential read. The returned token must never cross an HTTP boundary. */
@@ -280,25 +302,24 @@ export async function saveWorkspaceCalendarConnection(
   const value = calendarConnectionInputSchema.parse(input);
   const timeZone = validTimeZone(value.timeZone);
   if (!credentials.accessToken.trim()) throw new WorkspaceStoreError("Calendar authorization is incomplete.");
-  const { data, error } = await db().from("workspace_calendar_connections").upsert({
-    workspace_id: workspaceId,
-    provider: value.provider,
-    calendar_id: value.calendarId,
-    calendar_name: value.calendarName,
-    time_zone: timeZone,
-    status,
-    scopes: credentials.scopes ?? [],
-    access_token_ciphertext: encryptSecret(credentials.accessToken),
-    refresh_token_ciphertext: encryptSecret(credentials.refreshToken),
-    token_expires_at: credentials.tokenExpiresAt ?? null,
-    reminder_policy: value.reminderPolicy,
-    last_error: null,
-    last_checked_at: null,
-    created_by: actor.userId,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "workspace_id,provider" }).select("*").single();
-  if (error || !data) failure(error, "Calendar connection could not be saved.");
-  return mapConnection(data as DbRow);
+  const { data, error } = await db().rpc("save_workspace_calendar_connection", {
+    p_workspace_id: workspaceId,
+    p_user_id: actor.userId,
+    p_provider: value.provider,
+    p_calendar_id: value.calendarId,
+    p_calendar_name: value.calendarName,
+    p_time_zone: timeZone,
+    p_status: status,
+    p_scopes: credentials.scopes ?? [],
+    p_access_token_ciphertext: encryptSecret(credentials.accessToken),
+    p_refresh_token_ciphertext: encryptSecret(credentials.refreshToken),
+    p_token_expires_at: credentials.tokenExpiresAt ?? null,
+    p_reminder_policy: value.reminderPolicy,
+  });
+  if (error) rpcFailure(error, "Calendar connection could not be saved.", CALENDAR_MANAGER_MESSAGE);
+  const row = firstRow(data);
+  if (!row) failure(null, "Calendar connection could not be saved.");
+  return mapConnection(row);
 }
 
 export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, input: CalendarConnectionInput): Promise<CalendarConnection> {
@@ -314,20 +335,72 @@ export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor
   });
 }
 
-export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<boolean> {
-  await assertWorkspaceCalendarManager(actor, workspaceId);
-  const { data, error } = await db().from("workspace_calendar_connections").update({
-    status: "revoked", access_token_ciphertext: null, refresh_token_ciphertext: null,
-    last_error: "Disconnected by a workspace member.", updated_at: new Date().toISOString(),
-  }).eq("workspace_id", workspaceId).eq("provider", provider).select("id");
-  if (error) failure(error, "Calendar connection could not be disconnected.");
-  return Boolean(Array.isArray(data) && data.length);
+export interface CalendarDisconnectResult {
+  disconnected: boolean;
+  receiptId: string;
+  revocationOutcome: RevocationOutcome;
+  revocationErrorCode: string | null;
+  localCleanupStatus: "complete" | "partial";
 }
 
-export async function markWorkspaceCalendarConnectionError(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider, message: string): Promise<void> {
+export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<CalendarDisconnectResult> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
-  const { error } = await db().from("workspace_calendar_connections").update({ status: "error", last_error: message.slice(0, 1000), updated_at: new Date().toISOString() }).eq("workspace_id", workspaceId).eq("provider", provider);
-  if (error) failure(error, "Calendar connection status could not be saved.");
+  // Read without refreshing. Disconnect must never make token refresh a
+  // prerequisite for wiping the stored grant.
+  let connection: CalendarConnectionWithSecrets | null = null;
+  let credentialReadFailed = false;
+  try {
+    connection = await readStoredCalendarConnection(workspaceId, provider);
+  } catch {
+    credentialReadFailed = true;
+  }
+  const token = connection?.refreshToken || connection?.accessToken || null;
+  let revocation: ProviderRevocationResult;
+  if (credentialReadFailed) {
+    revocation = { outcome: "failed", errorCode: "credential_read_failed" };
+  } else {
+    try {
+      revocation = await revokeProviderAuthorization(provider, token);
+    } catch {
+      revocation = { outcome: "failed", errorCode: "request_failed" };
+    }
+  }
+  const { data, error } = await db().rpc("disconnect_workspace_calendar_connection", {
+    p_workspace_id: workspaceId,
+    p_user_id: actor.userId,
+    p_provider: provider,
+    p_revocation_outcome: revocation.outcome,
+    p_revocation_error_code: revocation.errorCode,
+  });
+  if (error) rpcFailure(error, "Calendar connection could not be disconnected.", CALENDAR_MANAGER_MESSAGE);
+  const row = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const receiptId = typeof row.receiptId === "string" ? row.receiptId : "";
+  if (!receiptId) failure(null, "Calendar disconnect receipt could not be saved.");
+  return {
+    disconnected: row.disconnected === true,
+    receiptId,
+    revocationOutcome: revocation.outcome,
+    revocationErrorCode: revocation.errorCode,
+    localCleanupStatus: row.localCleanupStatus === "complete" ? "complete" : "partial",
+  };
+}
+
+export async function markWorkspaceCalendarConnectionError(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider, message: string, expectedUpdatedAt?: string): Promise<void> {
+  await assertWorkspaceCalendarManager(actor, workspaceId);
+  if (expectedUpdatedAt) {
+    const { error } = await db().from("workspace_calendar_connections").update({
+      status: "error", last_error: message.slice(0, 1000), updated_at: new Date().toISOString(),
+    }).eq("workspace_id", workspaceId).eq("provider", provider).eq("updated_at", expectedUpdatedAt);
+    if (error) failure(error, "Calendar connection status could not be saved.");
+    return;
+  }
+  const { error } = await db().rpc("mark_workspace_calendar_connection_error", {
+    p_workspace_id: workspaceId,
+    p_user_id: actor.userId,
+    p_provider: provider,
+    p_message: message.slice(0, 1000),
+  });
+  if (error) rpcFailure(error, "Calendar connection status could not be saved.", CALENDAR_MANAGER_MESSAGE);
 }
 
 export async function readCalendarEventReceipt(actor: WorkspaceActor, workspaceId: string, workId: string, requestId: string, provider: CalendarProvider): Promise<CalendarEventReceipt | null> {
@@ -344,9 +417,11 @@ export async function saveCalendarEventReceipt(actor: WorkspaceActor, receipt: O
     provider: receipt.provider, calendar_id: receipt.calendarId, idempotency_key: receipt.idempotencyKey, external_event_id: receipt.externalEventId ?? null,
     operation: receipt.operation, status: receipt.status, revision: receipt.revision, title: receipt.title, start_at: receipt.start, end_at: receipt.end,
     time_zone: validTimeZone(receipt.timeZone), reminder_policy: receipt.reminderPolicy, last_error: receipt.lastError ?? null,
-    attempted_at: receipt.attemptedAt ?? null, observed_at: receipt.observedAt ?? null, updated_at: new Date().toISOString(),
+    attempted_at: receipt.attemptedAt ?? null, observed_at: receipt.observedAt ?? null,
   };
-  const { data, error } = await db().from("workspace_calendar_event_receipts").upsert(payload, { onConflict: "workspace_id,work_id,request_id,provider" }).select("*").single();
-  if (error || !data) failure(error, "Calendar sync evidence could not be saved.");
-  return mapReceipt(data as DbRow);
+  const { data, error } = await db().rpc("save_workspace_calendar_event_receipt", { p_user_id: actor.userId, p_receipt: payload });
+  if (error) rpcFailure(error, "Calendar sync evidence could not be saved.");
+  const row = firstRow(data);
+  if (!row) failure(null, "Calendar sync evidence could not be saved.");
+  return mapReceipt(row);
 }

@@ -1,7 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
+import { createSystemWork, requireSystemMaker } from "@/platform/bounded-work/make-systems";
 import {
   WorkspaceAccessError,
   WorkspaceConflictError,
@@ -46,13 +47,13 @@ import {
 } from "./contracts";
 
 export class CustomApplicationAccessError extends WorkspaceAccessError {
-  constructor(message = "Custom application access denied") { super(message); this.name = "CustomApplicationAccessError"; }
+  constructor(message = "Internal tool access denied") { super(message); this.name = "CustomApplicationAccessError"; }
 }
 export class CustomApplicationConflictError extends WorkspaceConflictError {
-  constructor(message = "The custom application changed. Reload before continuing.") { super(message); this.name = "CustomApplicationConflictError"; }
+  constructor(message = "The internal tool changed. Reload before continuing.") { super(message); this.name = "CustomApplicationConflictError"; }
 }
 export class CustomApplicationBuildError extends WorkspaceStoreError {
-  constructor(message = "The custom application build could not be confirmed.") { super(message); this.name = "CustomApplicationBuildError"; }
+  constructor(message = "The internal tool build could not be confirmed.") { super(message); this.name = "CustomApplicationBuildError"; }
 }
 export class CustomApplicationBudgetRecoveryError extends CustomApplicationConflictError {
   constructor(readonly workId: string, readonly budget: CustomApplicationBudget, message = "Budget admission did not finish. Reopen this draft to retry the same workspace work.") {
@@ -128,7 +129,7 @@ function mapFor<T>(collection: WeakMap<BoundedStore, Map<string, T>>, store: Bou
 function durableDb(store: BoundedStore): CustomDb | null {
   if (store !== boundedStore) return null;
   const client = getSupabase();
-  if (!client) throw new WorkspaceStoreError("Custom application storage is unavailable.");
+  if (!client) throw new WorkspaceStoreError("Internal tool storage is unavailable.");
   return client as unknown as CustomDb;
 }
 
@@ -244,9 +245,9 @@ function mapRpcFailure(error: DbFailure): never {
   if (/custom_application_(access_denied|recipient_denied|maintenance_denied)|verified_identity_required|workspace_access_denied/.test(detail)) throw new CustomApplicationAccessError();
   if (detail.includes("workspace_exit_future_work_blocked")) throw new CustomApplicationConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (detail.includes("workspace_exit_resource_stopped")) throw new CustomApplicationConflictError(WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE);
-  if (/custom_application_(revision_conflict|release_conflict|review_required|artifact_conflict|budget_required|version_unavailable|grant_conflict|grant_expired|retired)/.test(detail)) throw new CustomApplicationConflictError(error?.message || "The custom application changed. Reload before continuing.");
+  if (/custom_application_(revision_conflict|release_conflict|review_required|artifact_conflict|budget_required|version_unavailable|grant_conflict|grant_expired|retired)/.test(detail)) throw new CustomApplicationConflictError(error?.message || "The internal tool changed. Reload before continuing.");
   if (/custom_application_(build_failed|storage_unavailable|unavailable)/.test(detail)) throw new CustomApplicationBuildError();
-  throw new WorkspaceStoreError("Custom application storage is unavailable.");
+  throw new WorkspaceStoreError("Internal tool storage is unavailable.");
 }
 
 async function rpc(db: CustomDb, name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -257,14 +258,14 @@ async function rpc(db: CustomDb, name: string, args: Record<string, unknown>): P
 
 function rpcRow(value: unknown): Record<string, unknown> {
   const row = Array.isArray(value) ? value[0] : value;
-  if (!row || typeof row !== "object" || Array.isArray(row)) throw new WorkspaceStoreError("Custom application state is unreadable.");
+  if (!row || typeof row !== "object" || Array.isArray(row)) throw new WorkspaceStoreError("Internal tool state is unreadable.");
   return row as Record<string, unknown>;
 }
 
 function parseDurable(value: unknown): CustomApplication {
   const row = rpcRow(value);
   const parsed = customApplicationSchema.safeParse(row);
-  if (!parsed.success) throw new WorkspaceStoreError("Custom application state is unreadable.");
+  if (!parsed.success) throw new WorkspaceStoreError("Internal tool state is unreadable.");
   return parsed.data;
 }
 
@@ -285,14 +286,14 @@ function parseGrant(value: unknown): CustomApplicationGrant {
     revokedAt: source.revoked_at ?? null,
   } : row);
   if (!parsed.success) {
-    throw new WorkspaceStoreError("Custom application access is unreadable.");
+    throw new WorkspaceStoreError("Internal tool access is unreadable.");
   }
   return parsed.data;
 }
 
 function parseUse(value: unknown): CustomApplicationUse {
   const parsed = customApplicationUseSchema.safeParse(value);
-  if (!parsed.success) throw new WorkspaceStoreError("Custom application use is unreadable.");
+  if (!parsed.success) throw new WorkspaceStoreError("Internal tool use is unreadable.");
   return parsed.data;
 }
 
@@ -307,7 +308,7 @@ async function lane<T>(store: BoundedStore, id: string, callback: () => Promise<
 }
 
 function managerForMemory(store: BoundedStore, actor: WorkspaceActor, work: SavedWork): void {
-  if (work.createdBy !== actor.userId) throw new CustomApplicationAccessError("Custom application design access is required.");
+  if (work.createdBy !== actor.userId) throw new CustomApplicationAccessError("Internal tool design access is required.");
 }
 
 async function manager(store: BoundedStore, actor: WorkspaceActor, work: SavedWork): Promise<void> {
@@ -426,7 +427,8 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
 
   async function create(actor: WorkspaceActor, workspaceId: string, raw: unknown): Promise<CustomApplication> {
     const input = customApplicationCreateInputSchema.parse(raw);
-    await store.member(actor, workspaceId);
+    // Only a Strelva operator or a delegated agency makes a System.
+    await requireSystemMaker(store, actor, workspaceId);
     const temporary = makeState(randomUUID(), workspaceId, actor, input, now);
     const payload = {
       version: 1,
@@ -444,7 +446,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
       budget: null,
       updatedAt: temporary.updatedAt,
     };
-    const work = await store.create(actor, workspaceId, {
+    const work = await createSystemWork(store, actor, workspaceId, {
       productId: CUSTOM_APPLICATION_PRODUCT,
       resourceKind: CUSTOM_APPLICATION_RESOURCE_KIND,
       title: input.title,
@@ -537,7 +539,9 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
     if (durableDb(store)) {
       const app = loaded.app!;
       if (app.candidate.revision !== input.expectedCandidateRevision) throw new CustomApplicationConflictError("This candidate changed. Reload before building it.");
-      if (!app.budget || app.budget.status !== "accepted") throw new CustomApplicationConflictError("Accept a build budget before building this application.");
+      if (!app.budget || app.budget.status !== "accepted") throw new CustomApplicationConflictError("Accept a build budget before building this internal tool.");
+      const sandbox = !options.build && process.env.STRELVA_CUSTOM_APPLICATION_BUILD_PROVIDER === "vercel-sandbox"
+        ? (await import("./sandbox-runtime")).configureSandboxApplicationRuntime(actor, app, durableDb(store)!) : null;
       const recheck = async () => {
         const current = await read(actor, id);
         if (current.status === "retired"
@@ -551,11 +555,11 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
           throw new CustomApplicationConflictError("The build target, budget, or live release changed before execution.");
         }
       };
-      const built = await economics.execute(actor, {
+      const built = await (sandbox?.execute ?? economics.execute)(actor, {
         workspaceId: loaded.work.workspaceId, workId: id, version: app.candidate.version,
         maximumCents: app.budget.maxAuthorizedCents, jobId: app.budget.jobId,
       }, async () => {
-        const artifact = await build({ workspaceId: loaded.work.workspaceId, resourceId: id, applicationVersion: app.candidate.version, files: app.candidate.files });
+        const artifact = await (sandbox?.build ?? build)({ workspaceId: loaded.work.workspaceId, resourceId: id, applicationVersion: app.candidate.version, files: app.candidate.files });
         await rpc(durableDb(store)!, "custom_application_store_artifact", {
           p_work_id: id, p_application_version: artifact.applicationVersion, p_source_digest: artifact.sourceDigest,
           p_artifact_digest: artifact.artifactDigest, p_image: artifact.image, p_html: artifact.html,
@@ -571,7 +575,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
       const current = await load(store, actor, id);
       const state = cloneState(current.state!);
       if (state.candidate.revision !== input.expectedCandidateRevision) throw new CustomApplicationConflictError("This candidate changed. Reload before building it.");
-      if (!state.budget || state.budget.status !== "accepted") throw new CustomApplicationConflictError("Accept a build budget before building this application.");
+      if (!state.budget || state.budget.status !== "accepted") throw new CustomApplicationConflictError("Accept a build budget before building this internal tool.");
       const authority = toApplication(current.work, state);
       const recheck = async () => {
         const reread = await read(actor, id);
@@ -645,7 +649,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
       if (!artifact || !reviewRecord || reviewRecord.artifactDigest !== artifact.artifactDigest) throw new CustomApplicationConflictError("A reviewed build is required before release.");
       const nextVersion = Math.max(0, ...state.releases.map(releaseItem => releaseItem.version)) + 1;
       const releaseRecord = customApplicationReleaseSchema.parse({ version: nextVersion, artifactDigest: artifact.artifactDigest, publishedAt: nowIso(now), publishedBy: actor.userId, review: reviewRecord });
-      if (state.releases.length >= 100) throw new CustomApplicationConflictError("This application has reached its release history limit.");
+      if (state.releases.length >= 100) throw new CustomApplicationConflictError("This internal tool has reached its release history limit.");
       state.releases.push(releaseRecord);
       state.currentReleaseVersion = nextVersion;
       state.status = "released";
@@ -669,7 +673,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
       const state = cloneState(current.state!);
       if (state.currentReleaseVersion !== input.expectedReleaseVersion) throw new CustomApplicationConflictError("The live release changed. Reload before rolling back.");
       const target = state.releases.find(releaseItem => releaseItem.version === input.version);
-      if (!target) throw new CustomApplicationConflictError("That released custom application version is unavailable.");
+      if (!target) throw new CustomApplicationConflictError("That internal tool release is unavailable.");
       if (!state.artifacts.has(state.candidate.version) && ![...state.artifacts.values()].some(artifact => artifact.artifactDigest === target.artifactDigest)) {
         throw new CustomApplicationConflictError("The rollback artifact is unavailable.");
       }
@@ -706,7 +710,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
     return lane(store, id, async () => {
       const current = await load(store, actor, id);
       const state = current.state!;
-      if (state.status !== "released" || state.currentReleaseVersion === null) throw new CustomApplicationConflictError("Release the application before granting access.");
+      if (state.status !== "released" || state.currentReleaseVersion === null) throw new CustomApplicationConflictError("Make the internal tool real before granting access.");
       const releaseVersion = input.releaseVersion ?? state.currentReleaseVersion;
       if (!state.releases.some(releaseItem => releaseItem.version === releaseVersion)) throw new CustomApplicationConflictError("That release is unavailable.");
       const grants = mapFor(memoryGrants, store);
@@ -723,7 +727,7 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
     await manager(store, actor, loaded.work);
     if (durableDb(store)) {
       const rows = await rpc(durableDb(store)!, "custom_application_list_grants", { p_work_id: id, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
-      if (!Array.isArray(rows)) throw new WorkspaceStoreError("Custom application access is unreadable.");
+      if (!Array.isArray(rows)) throw new WorkspaceStoreError("Internal tool access is unreadable.");
       return rows.map(parseGrant);
     }
     return [...mapFor(memoryGrants, store).values()].filter(grantItem => grantItem.workId === id).map(value => structuredClone(value));
@@ -751,10 +755,10 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
     const state = mapFor(memoryStates, store).get(id);
     if (!work || !state) throw new CustomApplicationAccessError();
     const grantRecord = [...mapFor(memoryGrants, store).values()].find(value => value.workId === id && value.recipientEmail === actor.verifiedEmail.trim().toLowerCase() && value.status === "active");
-    if (!grantRecord || Date.parse(grantRecord.expiresAt) <= now().getTime()) throw new CustomApplicationAccessError("This custom application link is no longer available to your account.");
-    if (state.status === "retired") throw new CustomApplicationAccessError("This custom application is no longer available.");
+    if (!grantRecord || Date.parse(grantRecord.expiresAt) <= now().getTime()) throw new CustomApplicationAccessError("This internal tool link is no longer available to your account.");
+    if (state.status === "retired") throw new CustomApplicationAccessError("This internal tool is no longer available.");
     const release = state.releases.find(releaseItem => releaseItem.version === grantRecord.releaseVersion);
-    if (!release) throw new CustomApplicationAccessError("The granted custom application version is unavailable.");
+    if (!release) throw new CustomApplicationAccessError("The shared internal tool release is unavailable.");
     const artifact = [...state.artifacts.values()].find(value => value.artifactDigest === release.artifactDigest);
     if (!artifact) throw new CustomApplicationBuildError("The granted artifact is unavailable.");
     return customApplicationUseSchema.parse({ workId: id, title: state.candidate.title, releaseVersion: release.version, artifactDigest: artifact.artifactDigest, html: artifact.html, grant: grantRecord });

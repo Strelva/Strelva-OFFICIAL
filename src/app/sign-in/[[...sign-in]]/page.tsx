@@ -1,22 +1,22 @@
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { invitationEntryIdentity } from "@/server/agency-brand-entry";
+import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 import type { Metadata } from "next";
-import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import { LogoFull } from "@/components/Logo";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
-import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { tenantSignInNext } from "@/platform/owner-entry/env";
 import { WorkspaceSignIn } from "@/experience/workspace/WorkspaceSignIn";
 
 export const metadata: Metadata = {
   title: "Sign in to your Strelva work",
-  description: "Sign in to Strelva to continue your work or open your managed website.",
+  description: "Sign in to run your business on Strelva, yourself or with your agency.",
 };
 
 export const dynamic = "force-dynamic";
@@ -46,6 +46,7 @@ async function getInviteContext(searchParams: AuthSearchParams) {
   return {
     email,
     siteName: tenantConfig.siteName || invite.tenant,
+    brand: await resolveTenantBrand(invite.tenant),
   };
 }
 
@@ -59,13 +60,19 @@ async function getTenantAuthContext() {
   if (!tenant) return null;
 
   const tenantConfig = await getTenantConfig(tenant);
-  if (tenantConfig && tenantConfig.active === false) return null;
+  if (!tenantConfig || tenantConfig.active === false) return null;
 
+  // A missing or unavailable site theme is normal at entry. Never borrow the
+  // generic template brand just because this business has no saved theme.
+  const theme = tenantConfig ? await getStoredContent("theme", tenant).catch(() => null) : null;
   const clientFallbackRoot = getClientFallbackRoot(requestHeaders);
   return {
     tenant,
+    brand: await resolveTenantBrand(tenant),
     clientFallbackRoot: isClientFallbackRoot(clientFallbackRoot) ? clientFallbackRoot : `/client/${tenant}`,
     siteName: getTenantSiteName(tenant, tenantConfig || undefined),
+    host: requestHeaders.get("host") || undefined,
+    brandFontFamily: theme?.fontDisplay?.trim().replaceAll("_", " ") || undefined,
   };
 }
 
@@ -85,35 +92,7 @@ export default async function SignInPage({
     : accountTarget || "/account";
   const invite = await getInviteContext(params);
   if (invite) {
-    return (
-      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title="Sign in to your dashboard" />
-        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-          <section>
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
-            >
-              <LogoFull />
-            </Link>
-            <p className="mt-12 text-[14px] font-medium text-m-text-3">
-              Invited dashboard access
-            </p>
-            <h1 className="mt-4 max-w-[720px] font-display text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
-              Sign in to manage {invite.siteName}.
-            </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Use <strong>{invite.email}</strong> so Strelva can connect
-              the pending invite, open the dashboard, and show what is working.
-            </p>
-          </section>
-
-          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next={inviteNext} prefillEmail={invite.email} />
-          </section>
-        </div>
-      </main>
-    );
+    return <WorkspaceSignIn brand={invite.brand} title={`Sign in to manage ${invite.siteName}`} description={`Use ${invite.email}, the email your invitation was sent to.`} next={inviteNext} prefillEmail={invite.email} />;
   }
 
   // Public product starts also serve returning customers. Revalidate the user
@@ -127,81 +106,16 @@ export default async function SignInPage({
     if (user?.id && user.email && user.email_confirmed_at) redirect(resumeTarget);
   }
 
-  if (workspaceOpen && (workspaceTarget || invitationTarget)) return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} />;
+  if (workspaceOpen && (workspaceTarget || invitationTarget)) {
+    const identity = await invitationEntryIdentity(invitationTarget);
+    return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} title={identity ? `Sign in for ${identity.businessName}` : "Sign in"} />;
+  }
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
-    const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
+    const dashboardPath = tenantSignInNext(tenantAuth.clientFallbackRoot);
 
-    return (
-      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-        <AuthDocumentTitle title={`Sign in to ${tenantAuth.siteName}`} />
-        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-          <section>
-            <Link
-              href="/"
-              className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
-            >
-              <LogoFull />
-            </Link>
-            <p className="mt-12 text-[14px] font-medium text-m-text-3">
-              Client dashboard
-            </p>
-            <h1 className="mt-4 max-w-[720px] font-display text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
-              Sign in to manage {tenantAuth.siteName}.
-            </h1>
-            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-              Use the email address connected to this site. After sign-in,
-              Strelva will open the dashboard for {tenantAuth.siteName}.
-            </p>
-          </section>
-
-          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next={dashboardPath} />
-          </section>
-        </div>
-      </main>
-    );
+    return <WorkspaceSignIn title={`Manage ${tenantAuth.siteName}`} description={`For the people ${tenantAuth.siteName} added. Visitors looking for the business should open its public website.`} next={dashboardPath} brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} />;
   }
-
-  return (
-    <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <AuthDocumentTitle title="Sign in to your Strelva work" />
-      <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
-        <section>
-          <Link
-            href="/"
-            className="inline-flex w-fit items-center transition-opacity hover:opacity-80"
-          >
-            <LogoFull />
-          </Link>
-          <p className="mt-12 text-[14px] font-medium text-m-text-3">Your Strelva work</p>
-          <h1 className="mt-4 max-w-[720px] font-display text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
-            Sign in to your work.
-          </h1>
-          <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-            Use the email connected to your Strelva account to continue. If you
-            manage a Strelva website, we&apos;ll open its existing dashboard. New
-            here?{" "}
-            <Link href="/ai-visibility" className="text-m-text underline underline-offset-2 hover:text-m-text-2">
-              Try the free AI Visibility audit
-            </Link>
-            .
-          </p>
-        </section>
-
-        <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-          {searchValue(params.error) === "auth_callback" && (
-            <p className="mb-4 rounded-[12px] border border-[color:var(--m-danger,#d33)]/30 bg-[color:var(--m-danger,#d33)]/10 px-4 py-3 text-[13px] leading-[1.6] text-[color:var(--m-danger,#d33)]">
-              Sign-in didn&apos;t complete. Please try again.
-              {searchValue(params.reason) ? (
-                <span className="mt-1 block font-mono text-[11px] opacity-80">{searchValue(params.reason)}</span>
-              ) : null}
-            </p>
-          )}
-          <SupabaseSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} />
-        </section>
-      </div>
-    </main>
-  );
+  return <WorkspaceSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} failed={searchValue(params.error) === "auth_callback"} />;
 }

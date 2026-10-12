@@ -1,0 +1,28 @@
+# Assign your team
+
+[Internal 1.0 draft](../README.md). Give each person access to the clients they serve.
+
+## Prepared for 1.0
+
+1. An agency owner or admin opens **Team**, enters the person's email and agency
+   role, and creates an invitation. Share the private link; this action does not
+   send email. The person accepts using the invited, confirmed email.
+2. Open that person's **Client assignments** and choose their clients. Only
+   clients with an active agency seat appear. Use **Assign several people or
+   clients** to add or remove up to 200 assignments in one transaction.
+3. Team lists each person's assigned clients. Remove a client assignment when
+   their work ends. **Remove staff** asks for confirmation and ends all their
+   client staff rows and revokes their agency work assignments. Rejoining does not
+   restore either.
+
+Owners and admins can change Member/Admin agency roles. Owner memberships and
+your own membership are protected in this surface. Agency roles do not select
+different permissions per client: assigned staff use the existing agency-seat
+operating role. Direct business membership and non-agency work grants retain
+their own authority. Do not grant business-owner access to staff as a workaround.
+
+This is locally tested implementation on `a1/agency-team`, behind the workspace
+and Systems release flags. It is not deployed or proof of actual staff use.
+After a failed or unconfirmed change, reload Team before changing it again.
+
+Client contact and inquiry access also depends on the decision in #241.

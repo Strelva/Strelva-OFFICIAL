@@ -17,12 +17,12 @@ vi.mock("@/lib/visibility/snapshots", () => ({
 }));
 
 const alertOnceMock = vi.fn(async (..._a: unknown[]) => {});
-vi.mock("@/lib/monitoring", () => ({
+vi.mock("@/platform/infra/monitoring", () => ({
   alertOnce: (...a: unknown[]) => alertOnceMock(...a),
 }));
 
 const recordHeartbeatMock = vi.fn(async (..._a: unknown[]) => {});
-vi.mock("@/lib/heartbeat", () => ({
+vi.mock("@/platform/infra/heartbeat", () => ({
   recordHeartbeat: (...a: unknown[]) => recordHeartbeatMock(...a),
 }));
 

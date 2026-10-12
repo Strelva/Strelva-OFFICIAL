@@ -4,6 +4,11 @@ Research and recommendation, October 2, 2026. Nothing here changes prices,
 production, or client agreements. Competitor figures come from vendor pages
 fetched today unless marked *third-party* or *unverified*.
 
+> **October 4, 2026:** the customer-facing noun is now a System, not an
+> offering ([CONTEXT.md](../../CONTEXT.md#product-model)). The market findings
+> and the accountability argument stand; offerings become packaging for
+> Systems.
+
 ## The short version
 
 Building software for a small business is now nearly free. A site costs

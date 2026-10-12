@@ -1,9 +1,9 @@
 name: Strelva Preview (nightly build)
 
-# Builds Strelva Preview every night from the Strelva Reborn (1.0.0)
+# Builds Strelva Preview every night from the Strelva Reborn
 # integration branch, runs the full local gate, reports progress against
 # docs/product/strelva-reborn.md, and tags a green build as
-# strelva-v1.0.0-preview.YYYYMMDD. Customers use Strelva (Stable);
+# strelva-v<REBORN_VERSION>-preview.YYYYMMDD. Customers use Strelva (Stable);
 # Strelva Preview is for Jacob and selected testers. It never deploys,
 # never reads production and never touches a client site.
 
@@ -15,14 +15,15 @@ on:
       ref:
         description: "Branch to build"
         required: true
-        default: reborn
+        default: reborn-1.0
 
 concurrency:
   group: strelva-preview
   cancel-in-progress: false
 
 env:
-  REBORN_REF: ${{ inputs.ref || 'reborn' }}
+  REBORN_REF: ${{ inputs.ref || 'reborn-1.0' }}
+  # The next Reborn version the reborn branch is building toward.
   REBORN_VERSION: 1.0.0
 
 jobs:

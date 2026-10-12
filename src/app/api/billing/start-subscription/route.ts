@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, getActorContext } from "@/lib/auth";
+import { requireTenantPermission, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import {
   BillingConfigurationError,

@@ -1,4 +1,3 @@
-import * as dns from "node:dns";
 import * as cheerio from "cheerio";
 import type { AuditContext } from "./context";
 import type { CategoryResult, CheckResult, PageSpeedResult } from "./types";
@@ -11,36 +10,10 @@ import { checkSecurity } from "./modules/security";
 import { checkAccessibility } from "./modules/accessibility";
 import { checkTrust } from "./modules/trust";
 import { checkContent } from "./modules/content";
+import { UnsafePublicUrlError } from "@/lib/public-url-safety";
+import { fetchPinnedPublicResponse } from "@/lib/pinned-public-text";
 
-// ---------------------------------------------------------------------------
-// SSRF protection
-// ---------------------------------------------------------------------------
-export function isPrivateIP(ip: string): boolean {
-  const parts = ip.split(".").map(Number);
-  const [p0, p1] = parts;
-  if (p0 === 0) return true;
-  if (p0 === 10) return true;
-  if (p0 === 100 && p1 !== undefined && p1 >= 64 && p1 <= 127) return true;
-  if (p0 === 127) return true;
-  if (p0 === 169 && p1 === 254) return true;
-  if (p0 === 172 && p1 !== undefined && p1 >= 16 && p1 <= 31) return true;
-  if (p0 === 192 && p1 === 168) return true;
-  if (p0 === 198 && p1 !== undefined && p1 >= 18 && p1 <= 19) return true;
-  return false;
-}
-
-export async function validateUrlSafety(url: string): Promise<{ address: string }> {
-  const parsed = new URL(url);
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error(`Blocked: non-HTTP scheme "${parsed.protocol}"`);
-  }
-  // Force IPv4 to prevent IPv6 SSRF bypass (::1, ::ffff:127.0.0.1, fe80::, etc.)
-  const { address } = await dns.promises.lookup(parsed.hostname, { family: 4 });
-  if (isPrivateIP(address)) {
-    throw new Error(`Blocked: resolved to private IP ${address}`);
-  }
-  return { address };
-}
+export { UnsafePublicUrlError, isPrivateIP, validateUrlSafety } from "@/lib/public-url-safety";
 
 // ---------------------------------------------------------------------------
 // Category weights (the slugs the modules emit). Sums to 1.0; the roll-up in
@@ -85,10 +58,14 @@ function fetchWithTimeout(url: string, ms: number): Promise<Response> {
  *  publish an llms.txt / robots.txt" checks on a site that publishes nothing. */
 async function fetchTextSafe(url: string, ms = 6000): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(url, ms);
-    if (!res.ok) return null;
+    const res = await fetchPinnedPublicResponse(url, {
+      timeoutMs: ms,
+      maxBytes: 1_000_000,
+      headers: AUDIT_FETCH_HEADERS,
+    });
+    if (!res || res.status < 200 || res.status >= 300) return null;
     const contentType = (res.headers.get("content-type") || "").toLowerCase();
-    const body = await res.text();
+    const body = res.body.toString("utf8");
     if (contentType.includes("text/html")) return null;
     const head = body.trimStart().slice(0, 200).toLowerCase();
     if (head.startsWith("<!doctype html") || head.startsWith("<html")) return null;
@@ -366,27 +343,43 @@ async function buildAuditContext(
   let headers = new Headers();
   let fetchOk = false;
   let httpStatus: number | undefined;
+  let retryHttp = false;
 
   try {
-    const res = await fetchWithTimeout(startUrl, 15_000);
-    html = await res.text();
-    fetchedUrl = res.url || startUrl;
-    headers = res.headers;
-    fetchOk = res.ok;
-    httpStatus = res.status;
-  } catch {
-    if (startUrl.startsWith("https://")) {
-      try {
-        const httpUrl = startUrl.replace(/^https:/, "http:");
-        const res = await fetchWithTimeout(httpUrl, 15_000);
-        html = await res.text();
-        fetchedUrl = res.url || httpUrl;
+    const res = await fetchPinnedPublicResponse(startUrl, {
+      timeoutMs: 15_000,
+      maxBytes: 8 * 1024 * 1024,
+      headers: AUDIT_FETCH_HEADERS,
+    });
+    if (res) {
+      html = res.body.toString("utf8");
+      fetchedUrl = res.url;
+      headers = res.headers;
+      fetchOk = res.status >= 200 && res.status < 300;
+      httpStatus = res.status;
+    } else retryHttp = true;
+  } catch (error) {
+    if (error instanceof UnsafePublicUrlError) throw error;
+    retryHttp = true;
+  }
+  if (retryHttp && startUrl.startsWith("https://")) {
+    try {
+      const httpUrl = startUrl.replace(/^https:/, "http:");
+      const res = await fetchPinnedPublicResponse(httpUrl, {
+        timeoutMs: 15_000,
+        maxBytes: 8 * 1024 * 1024,
+        headers: AUDIT_FETCH_HEADERS,
+      });
+      if (res) {
+        html = res.body.toString("utf8");
+        fetchedUrl = res.url;
         headers = res.headers;
-        fetchOk = res.ok;
+        fetchOk = res.status >= 200 && res.status < 300;
         httpStatus = res.status;
-      } catch {
-        // proceed with empty html — modules reflect missing data honestly
       }
+    } catch (fallbackError) {
+      if (fallbackError instanceof UnsafePublicUrlError) throw fallbackError;
+      // proceed with empty html — modules reflect missing data honestly
     }
   }
   // A challenge/interstitial (Cloudflare "Attention Required", generic WAF block)
@@ -395,14 +388,7 @@ async function buildAuditContext(
     fetchOk = false;
   }
 
-  // DNS-rebinding guard: if a redirect changed host, re-validate the final host.
   const finalUrl = new URL(fetchedUrl);
-  if (finalUrl.hostname !== new URL(startUrl).hostname) {
-    const { address } = await dns.promises.lookup(finalUrl.hostname, { family: 4 });
-    if (isPrivateIP(address)) {
-      throw new Error(`Blocked: redirect target resolved to private IP ${address}`);
-    }
-  }
 
   const origin = finalUrl.origin;
   const [robotsTxt, sitemapXml, llmsTxt] = await Promise.all([
@@ -455,9 +441,6 @@ export async function runAuditSnapshot(
 ): Promise<AuditRunSnapshot> {
   let url = inputUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
-
-  // SSRF protection — reject private/internal addresses before any fetch.
-  await validateUrlSafety(url);
 
   // PageSpeed Insights uses a standard Google Cloud API key. Reuse the existing
   // Google key (the Generative-AI/Gemini key is a Cloud API key on the same

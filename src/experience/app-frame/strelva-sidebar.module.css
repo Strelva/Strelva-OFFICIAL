@@ -110,7 +110,7 @@
   line-height: 20px;
   text-align: left;
   text-decoration: none;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
 }
 
 .navItem:hover,
@@ -377,7 +377,284 @@
   flex-shrink: 0;
 }
 
+.recent .pinned[aria-current="page"],
 .recent .allApps[aria-current="page"] {
   background: var(--gray-bg-hover);
   color: var(--gray-fg);
 }
+
+.badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 18px;
+  place-items: center;
+  margin-left: auto;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: var(--navigation-badge-bg, var(--accent));
+  color: var(--navigation-badge-text, var(--on-accent));
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+}
+
+/*
+ * October 6, 2026: the ink rail beside linen content. The rail keeps its
+ * shared-token markup; inside the linen workspace those tokens resolve to
+ * the navigation roles, so nested controls (sign out, workspace select)
+ * render on ink too.
+ */
+:global([data-workspace-theme="linen"]) .sidebar {
+  --warm-black: var(--navigation-text);
+  --gray-fg: var(--navigation-active-text);
+  --gray-muted: var(--navigation-nav-text);
+  --gray-subtle: var(--navigation-heading-text);
+  --gray-faint: var(--navigation-heading-text);
+  --gray-border: var(--navigation-border);
+  --gray-bg: var(--navigation-hover-bg);
+  --gray-bg-hover: var(--navigation-hover-bg);
+  --gray-bg-alt: var(--navigation-hover-bg);
+  --surface: var(--navigation-selected-bg);
+  --surface-inset: var(--navigation-bg);
+  --accent: var(--navigation-focus);
+  --on-accent: var(--navigation-avatar-text);
+  color-scheme: dark;
+  padding: 14px 10px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-right: 0;
+  background: var(--navigation-bg);
+  color: var(--navigation-text);
+}
+
+:global([data-workspace-theme="linen"]) .brand,
+:global([data-workspace-theme="linen"]) .brandMark {
+  color: var(--navigation-brand-text);
+}
+
+:global([data-workspace-theme="linen"]) .brandMark {
+  --m-accent: var(--navigation-accent);
+}
+
+:global([data-workspace-theme="linen"]) .businessContext select {
+  color: var(--navigation-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:global([data-workspace-theme="linen"]) .businessContext select option {
+  background: var(--navigation-selected-bg);
+  color: var(--navigation-text);
+}
+
+:global([data-workspace-theme="linen"]) .navItem,
+:global([data-workspace-theme="linen"]) .newAction {
+  min-height: 34px;
+  gap: 11px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  color: var(--navigation-nav-text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem:hover {
+  background: var(--navigation-hover-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .navItem[aria-current="page"],
+:global([data-workspace-theme="linen"]) .recent .pinned[aria-current="page"],
+:global([data-workspace-theme="linen"]) .recent .allApps[aria-current="page"],
+:global([data-workspace-theme="linen"]) .account[aria-current="page"] {
+  background: var(--navigation-selected-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .newAction {
+  background: transparent;
+  color: var(--navigation-nav-text);
+  font-weight: 400;
+}
+
+:global([data-workspace-theme="linen"]) .newAction:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--navigation-hover-bg);
+}
+
+:global([data-workspace-theme="linen"]) .primary {
+  border-top: 0;
+}
+
+:global([data-workspace-theme="linen"]) .recent {
+  margin-top: 22px;
+}
+
+:global([data-workspace-theme="linen"]) .recent h2,
+:global([data-workspace-theme="linen"]) .contextual h2 {
+  padding: 0 10px 6px;
+  color: var(--navigation-heading-text);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:global([data-workspace-theme="linen"]) .recent a,
+:global([data-workspace-theme="linen"]) .contextual a,
+:global([data-workspace-theme="linen"]) .contextual button {
+  min-height: 34px;
+  gap: 11px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  color: var(--navigation-nav-text);
+  font-size: 14px;
+}
+
+:global([data-workspace-theme="linen"]) .recent a:hover {
+  background: var(--navigation-hover-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .pinned svg {
+  color: var(--navigation-nav-text);
+}
+
+:global([data-workspace-theme="linen"]) .footer {
+  border-top: 0;
+}
+
+:global([data-workspace-theme="linen"]) .footer .navItem {
+  font-size: 13px;
+}
+
+:global([data-workspace-theme="linen"]) .avatar {
+  border: 0;
+  background: var(--navigation-avatar-bg);
+  color: var(--navigation-avatar-text);
+  font-weight: 600;
+}
+
+:global([data-workspace-theme="linen"]) .account strong {
+  color: var(--navigation-account-text);
+  font-size: 13px;
+}
+
+:global([data-workspace-theme="linen"]) .account small {
+  color: var(--navigation-account-detail);
+  font-size: 11px;
+}
+
+:global([data-workspace-theme="linen"]) .signOut,
+:global([data-workspace-theme="linen"]) .mobileClose {
+  color: var(--navigation-signout-text);
+}
+
+:global([data-workspace-theme="linen"]) .sidebar :is(a, button, select):focus-visible {
+  outline-color: var(--navigation-focus);
+}
+
+@media (pointer: coarse) {
+  /* Apply after the linen treatment so its compact desktop rows cannot
+     override the touch geometry. */
+  .sidebar :is(a, button, select),
+  :global([data-workspace-theme="linen"]) .sidebar :is(a, button, select) {
+    min-height: 44px;
+  }
+
+  .mobileClose {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+}
+
+/*
+ * October 9, 2026: the paper workspace. The navigation is a light card that
+ * floats on the dot paper, sized to its content (Jacob: "the side bar should
+ * not be the entire thing"), instead of the October 6 full-height ink rail.
+ * Tokens come from src/app/styles/workspace-paper.css.
+ */
+@media (min-width: 1024px) {
+  :global([data-workspace-theme="linen"]) .sidebar {
+    width: calc(100% - 12px);
+    height: auto;
+    max-height: calc(100% - 24px);
+    flex: 0 1 auto;
+    margin: 12px 0 12px 12px;
+    padding: 14px 10px 10px;
+    border-radius: var(--st-r-lg, 16px);
+    background: var(--st-surface);
+    box-shadow: var(--st-shadow-sidebar);
+  }
+}
+
+:global([data-workspace-theme="linen"]) .sidebar {
+  color-scheme: inherit;
+  background: var(--st-surface);
+}
+
+:global([data-workspace-theme="linen"]) .brand {
+  gap: 10px;
+  font-family: var(--font-workspace, system-ui), sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:global([data-workspace-theme="linen"]) .navItem,
+:global([data-workspace-theme="linen"]) .newAction,
+:global([data-workspace-theme="linen"]) .recent a,
+:global([data-workspace-theme="linen"]) .contextual a,
+:global([data-workspace-theme="linen"]) .contextual button {
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--st-r-sm, 8px);
+  font-size: 14px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem svg,
+:global([data-workspace-theme="linen"]) .newAction svg {
+  width: 16px;
+  height: 16px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem[aria-current="page"] {
+  font-weight: 500;
+}
+
+:global([data-workspace-theme="linen"]) .recent {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--st-line);
+}
+
+:global([data-workspace-theme="linen"]) .recent h2 {
+  font-size: 12px;
+}
+
+:global([data-workspace-theme="linen"]) .footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--st-line);
+}
+
+:global([data-workspace-theme="linen"]) .avatar {
+  background: var(--st-inset);
+  color: var(--st-text-2);
+}
+
+:global([data-workspace-theme="linen"]) .badge {
+  background: var(--st-need);
+}
+
+@media (pointer: coarse) {
+  :global([data-workspace-theme="linen"]) .sidebar :is(a, button, select) {
+    min-height: 44px;
+  }
+}
+
+/* Workspace identity and platform credit share one header in every shell. */
+.workspaceName { min-width: 0; overflow-wrap: anywhere; }
+.agencyLogo { display: block; max-width: 100%; max-height: 48px; object-fit: contain; margin-bottom: 6px; }
+.platformMark { display: inline-flex; flex: 0 0 auto; margin-left: auto; padding: 4px 8px; }
+.brandCredit { margin: 0; padding: 0 8px 10px; color: var(--gray-muted); font-size: 11px; line-height: 16px; flex-shrink: 0; }
+.brand { min-width: 0; }

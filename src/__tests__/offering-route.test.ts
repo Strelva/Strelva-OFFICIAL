@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/offerings", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/platform/offerings");

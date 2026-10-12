@@ -6,7 +6,7 @@ const mockUpdateTenant = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));

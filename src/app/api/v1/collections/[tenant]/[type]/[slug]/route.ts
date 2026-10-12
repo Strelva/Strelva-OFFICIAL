@@ -5,7 +5,7 @@
  * entry by slug (or any status when preview=true). Versioned contract.
  */
 import { NextResponse } from "next/server";
-import { getEntryBySlug } from "@/lib/db/repositories";
+import { getEntryBySlug } from "@/platform/infra/db/repositories";
 import { isCollectionType } from "@/lib/cms/collection-types";
 import { getTenantConfig } from "@/lib/tenants";
 import { toPublicEntry } from "@/lib/cms/public-entry";

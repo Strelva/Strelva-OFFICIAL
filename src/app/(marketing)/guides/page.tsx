@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Clock } from "lucide-react";
 import { listGuides, guidesByCategory } from "@/lib/guides";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 
 export const metadata: Metadata = {
   title: "Website Guides - Strelva",

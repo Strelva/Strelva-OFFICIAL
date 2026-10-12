@@ -37,7 +37,7 @@ function builder(): unknown {
   );
 }
 
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   getSupabase: () => ({
     from: (t: string) => {

@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
   getWork: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ requireTenantAccess: mocks.requireTenantAccess }));
+vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: mocks.requireTenantAccess }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.getTenantConfig }));
 vi.mock("@/platform/workspaces/repository", () => ({ getWork: mocks.getWork }));
 

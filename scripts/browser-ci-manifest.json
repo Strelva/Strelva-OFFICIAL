@@ -1,0 +1,3705 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "file": "access-review-authenticated-local.spec.ts",
+      "context": "native",
+      "cases": [
+        {
+          "title": "real Auth organization review excludes inaccessible businesses and revokes current member authority with audit",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "account-continuity-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a public continuation reaches the selected customer business once and keeps unsafe input recoverable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an invitation recipient can recover the exact return path, while an expired link stays terminal",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "account-continuity-fresh-account-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a fresh account follows the public continuation through a local email callback into one customer brief",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "account-continuity-marketing-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "the marketing composer crosses the local origin boundary into one fresh customer brief",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "admin-operator.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "admin operator surfaces: overview feed, client cockpit, drafts",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "admin client cockpit renders the operator panels",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "legacy tenant routes redirect into the clients console",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-add-client-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an agency adds a client by URL with a provider seat, and the owner claims it with the copied link",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an agency adds a client from its prospects list; a plain member is refused",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-application-authoring-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a named agency operator revises one assigned application and returns it for customer publication",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-neutral-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "flags off preserve ordinary accounts and deny new client effects without creating work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-signup.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "the per-account cap is explained where the name was entered",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed out, the checklist asks for sign-in and returns to agency setup",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "another agency's checklist is refused, and a failed read can be retried",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a member sees verification but cannot invite, and a verified effect reads as verified",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "sign-up asks business or agency and the agency path leads to setup",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a new agency is created through create_agency and opens its checklist",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "sign-up asks business or agency and the agency path leads to setup",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a new agency is created through create_agency and opens its checklist",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-website-authoring-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "customer grants one managed website draft, agency prepares it, and customer publishes then revokes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agency-workflow-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "ordinary agency adds a client, gets the owner's exact approval, publishes, and reads the receipt",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agent-access-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an exact-work personal AI token can read and propose, then revocation stops both",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agent-business-booking-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "bounded issuer fixture: native owner context stays business-bound and current authority removal stops access",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "native public booking discovery, disabled admission, scanner preview and status rate limits produce no booking effect",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "agent-connections-ui.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "assistant connection wraps and disconnects at 320px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant connection wraps and disconnects at 360px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant connection wraps and disconnects at 768px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant connection wraps and disconnects at 1280px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant connection wraps and disconnects at 1600px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "owners can revoke a connection whose old owner lost authority",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "confirmed disconnect survives a failed refresh and reload recovers",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "unconfirmed mutation clears stale controls until reload",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant empty state",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant permission state",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant loading state",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "assistant error state",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "consent explains client identity, renewal, and website review permissions",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "native website review requires owner fact decisions before approval",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "api-contract.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "v1 leads intake rejects an empty body before writing",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 leads intake rejects a non-JSON body",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 track beacon rejects an invalid event",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 track beacon rejects an empty body",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 content route is read-only \u2014 no public writes",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 write routes reject GET (POST-only surfaces)",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 read routes reject tenant-slug traversal",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cron routes are not publicly triggerable",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "application-installation-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "independently owned businesses install and update definitions without copying customer records",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "application-request-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an owner starts with a request and delivers an application through the UI, using a prepared model response",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "application-review-fixture.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "review fixture connects a prepared request result, owner use, employee use, release review, rollback, and revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "application-use-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a verified staff recipient uses one released version while a candidate changes, then survives rollback and revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a verified recipient edits a date record through a stale correction and recovers it",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "ordinary agency template becomes a private native app, then a live app without copying preview records",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "application-use-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "finished application is a focused keyboard usable experience with responsive records",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "finished application renders a bounded select and submits the chosen option",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "finished application shows a revoked error without exposing the saved experience",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a document-only grant still renders its permitted records",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "corrections submit form fields while preserving visible office notes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "cancelling a correction starts a distinct new record",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared records offer only authorized corrections at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared records offer only authorized corrections at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an edit-only recipient keeps a date correction after a stale response",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "architecture-union-inquiry.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "1440px installed inquiry withholds an unqualified Open destination",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px installed inquiry withholds an unqualified Open destination",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "architecture-union.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "1440px V1 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px V2 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px V1 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px V2 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "320px V1 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "320px V2 accepted save survives failed deferred retries and current save works after recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "V1 retry403 removes retained tool access",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "V1 business navigation refuses late workspace retry",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "V2 retry403 removes retained tool access",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "V2 business navigation refuses late workspace retry",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "assistant-connections-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "bounded issuer fixture: real Auth connection renewal stops after owner disconnect",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "bounded issuer fixture: real Auth connection renewal stops after owner authority withdrawal",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "atmospheric-components.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "material renders, pauses, suspends and restores after context loss",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "responsive geometry, states, dialog keyboard recovery and theme",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "reduced motion and unsupported WebGL retain readable controls",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared controls have consistent geometry and keyboard focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "live transparency and forced-color preferences switch to opaque fallback",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "gooey disclosure reverses safely and removes collapsed controls from focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "foundation fields announce descriptions and tabs use a roving relationship",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "billing-payments-prerequisites-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "native unpriced billing homes preserve payer authority and merchant prerequisites after access withdrawal",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "booking-approval-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a booking request becomes the owner's decision and Approve confirms it at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a visitor's request-mode booking on the tenant site reaches Needs you",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "bounded-work-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "private app uses its declared form, records and selected result on desktop and mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a conflicting reservation preserves the requested time and does not claim a booking",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a native reservation can change time without changing its identity",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unchanged sources keep unresolved differences visible and read-only work cannot run",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "document drafting stays with the document and preserves writing after provider failure",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a generated app is reviewed as a result and saved through its exact plan output",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "browser-ci-public-boundaries.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "public smoke keeps preview-only and disposable fixture routes hidden",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "calendar-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real Auth and Postgres carry a reservation through synthetic calendar create, change and cancel",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "calendar-exit-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "stopped owners can read back and cancel an accepted calendar event while new changes stay blocked",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "calendar-ui-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "authenticated schedule controls show provider discovery, conflict recovery and responsive keyboard use",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "catalog-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a Strelva maker takes a sentence through Draft, rehearsal, Live, member submit and labeled staff use",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owners file Requests and a failed maker plan files one pending Request without losing the sentence",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "client-records-cutover-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "all 13 stores backfill with measured parity; real durable reads and writes survive owned Redis outage and refuse unqualified cutover",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "color-system.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "foundation foregrounds pass on their supported surfaces in both themes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared buttons retain readable rendered labels in resting and hover states",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "control-plane-smoke.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "health endpoint is available",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "marketing surface renders",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "versioned public content API rejects invalid tenant slugs",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "creator-maintenance-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "current creator authority schedules immutable maintenance and retains history after refusal and exit",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "cross-tenant-access.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "authenticated content read for a different tenant is denied (403)",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "authenticated content write for a different tenant is denied (403)",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "tenant dashboard page for a different tenant is gated (redirect or 403)",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "custom-application-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "local Auth recipient uses its reviewed release while candidate changes and rollback preserves the pinned grant",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "custom-application-use-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "custom application recipient can retry an unavailable read at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "custom application recipient can retry an unavailable read at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "custom application parent blocks direct and meta-refresh frame navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "customer-frontend.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "marketing homepage gives a customer clear starting points",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "legacy onboard route redirects to the access request",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "access request returns a no-login delivery status handoff",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "tenant public pages render without server errors",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "core customer pages fit mobile viewports",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "tenant preview pages can be embedded by the dashboard",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "normal tenant pages keep anti-framing protections",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "signed-out dashboard visitors are sent to sign-in, never shown the dashboard",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "signed-out account access is sent to sign-in",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "the sign-in page renders the current Supabase sign-in surface",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "signed-out no-access recovery is sent to sign-in",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "dashboard-owner.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner dashboard surfaces are reachable and product-complete enough to orient",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "site editor surfaces the draft state and can discard it without publishing",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "client fallback editor keeps drafts isolated from the active site",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "client presence surfaces render their real content",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "settings sections and report views switch on interaction",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "dashboard surfaces are feature-gated per tenant",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "analytics range selector drives the reporting window",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "email-only-owner-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an owner who never signs in decides a booking request by email link only",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an owner without an account approves Make real by email link",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "full-model-flags-off-authenticated-local.spec.ts",
+      "context": "dark",
+      "cases": [
+        {
+          "title": "additive switches refuse authority and provider effects through real Auth",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "governed-money-terms-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "current business owner accepts an exact recorded price and period through real Auth without a charge",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "horizontal-operations-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "approved budgeted work completes a native document edit and refuses another account",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "native scheduling keeps one reservation identity through cancel, reschedule and retry",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "scheduling, generated applications and two-source investigation persist with their native checks",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "illustrated-home.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "request-first Home opens saved work on desktop and mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty and read-only Home retain their permitted actions",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Home retains useful controls with reduced motion",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unavailable workspace does not present stale work as ready",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Home search retains its query and request review retains the owner's words",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "home carries the full multi-part request into plan review",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "new carries the full multi-part request into plan review",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Home keeps decisions, allowance, business switching and site assignment reachable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "the same navigation remains across primary surfaces and utilities",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "the retired Customers address opens Home and drops the old view",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "mobile navigation traps focus and opens search without background interaction",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiries-1-0-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a visitor's message reaches the owner's Inquiries; a held one is released by the owner",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real local Auth and Postgres preserve an inquiry through publish and undo",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-controls-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "keeps rule, responsibility, onboarding, and Inspector actions reviewable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-delivery-surface-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "provider bounce and blocked follow-up are visible in Needs you, Inspector, and Why",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a provider timeline outage is visible and removes the unsafe Why fix",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-exit-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real Auth blocks future inquiry work after exit while retaining delivery recovery and another tenant",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-inbox-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner sees the exact recipient and message, then one truthful provider receipt",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "uncertain response retains the exact immutable draft and rechecks the same claim",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "held review reports a refusal without removing evidence",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty does not offer a reply or invent a record",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "permission does not offer a reply or invent a record",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "error does not offer a reply or invent a record",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "narrow inbox and keyboard reply stay inside the viewport",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keyboard reply keeps one exact attempt through lost and invalid receipts without stealing outside focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unknown held decision freezes actions and reloads fresh fictional inquiries without another mutation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keyboard reply keeps one exact attempt through lost and invalid receipts without stealing outside focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unknown held decision freezes actions and reloads fresh fictional inquiries without another mutation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keyboard reply keeps one exact attempt through lost and invalid receipts without stealing outside focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unknown held decision freezes actions and reloads fresh fictional inquiries without another mutation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-library-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "canonical Library shows existing inquiry Versions at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "external inquiry form remains named and honest at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "canonical Library shows existing inquiry Versions at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "external inquiry form remains named and honest at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-member-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "assigned member ordinary reply and owner-only commitment error (desktop)",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "assigned member ordinary reply and owner-only commitment error (mobile)",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unassigned member receives permission explanation and no direct send control",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-offering-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a business owner connects an existing inquiry workspace through the local offering",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-onboarding-api-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "failed API scan keeps all seven editable facts and a correction survives reload",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-portfolio-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "attention opens the selected draft without losing preview work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a copied pattern uses the chosen staff and needs its own rehearsal",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-running-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "Running keeps honest inquiry policy and other work through switch loading/error at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Running keeps honest inquiry policy and other work through switch loading/error at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-system-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "current form comes before records and contextual history, without offering a builder",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner selects up to three times and approves the exact final reply once",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unavailable appointment times retain the editable inquiry draft",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "business switch clears the previous records and draft through loading and error",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "business switch clears the previous records and draft through loading and permission",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "mobile current form and reply use shared controls without overflow",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice ready is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice requested is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice expired is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice error is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice conflict is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "signed booking choice rate is usable on mobile and truthful about confirmation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "inquiry-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "edits the actual form, rehearses and inspects the published after view",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "business home keeps four ordered sections and a narrow sidebar",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "mobile menu closes into a full-width usable request form",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "read-only and unavailable states do not enable mutations or show fake customers",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "investigation-history-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real owner pages committed investigation runs, retries an evicted exact request, and loses history access after revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "investigation-public-website-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "saves a public page URL in an ongoing check and shows the source receipt",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "launch-business-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "fresh business, agency-built native work, and delivery retain one owner at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "fresh business, agency-built native work, and delivery retain one owner at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "lettering-morph.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "lettering reshapes opaque outlines and reverses without losing its endpoint",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "make-real-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "the owner makes a website Possibility real through Needs you and sees a partial, honest result",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "make-real-live-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a real owner reviews and makes native inquiry/app changes live, proves receipts and rollback, and sees booking's pending verification",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "marketing-launch-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "marketing applications reaches one customer business at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "marketing onboarding reaches one customer business at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "marketing website reaches one customer business at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "marketing applications reaches one customer business at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "marketing onboarding reaches one customer business at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "marketing website reaches one customer business at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "marketing-public-website-continuation-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "the public website brief crosses the marketing origin, Auth return, and owned website draft",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "offering-websites-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "local Auth and Postgres enforce business website assignment through the customer workspace",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "onboarding-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real local Auth can create, review, accept, reopen, and isolate onboarding work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "opened-work-composition.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "1440px workspace ready",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px workspace loading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px workspace error",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px workspace permission",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px workspace read-only",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px workspace empty",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system ready",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system loading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system error",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system permission",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system read-only",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "1440px system empty",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace ready",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace loading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace error",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace permission",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace read-only",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px workspace empty",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system ready",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system loading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system error",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system permission",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system read-only",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "390px system empty",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "operational-assignment-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner offers, recovers, links, and revokes one approved job",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "verified assignee inspects, explicitly accepts, and runs only the next approved step on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "expired and unavailable assignments expose no operation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "operational-assignments-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an accepted member runs exact zero-cost work as themselves, then revocation and expiry stop the next effect",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "operations-budget-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an accepted budget attaches before work starts and cost recording stays automatic",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an unknown effect holds the cap and offers verification rather than retry",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "read-only budget inspection cannot accept, cancel, or start work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unavailable budget storage prevents starting work and exposes recovery",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a stopped owner can review and reconcile an uncertain action without starting new work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "operator-queue-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator takes a request from /admin/queue and closes it with minutes at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "operator-surfaces.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "operator surface renders on a clean backend: /admin",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/clients",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/leads",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/analytics",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/audit",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/actions",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/onboard",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/pay-links",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/ops",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/digests",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "operator surface renders on a clean backend: /admin/drafts",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "internal navigation remains usable on desktop and mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "ordinary-source-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "ordinary customer and agency owners author private sources and recipient owners accept separate native Versions",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "owner-journey-1-0-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "operator converts and invites; the owner accepts, lands on the admin host and decides by one-tap link",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "What changed lists the approved booking decision with its undo state",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "owner-surfaces.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "client cockpit renders for a resolvable tenant",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner Today surface renders without crashing",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner surface renders for a resolvable tenant: /dashboard/settings",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner surface renders for a resolvable tenant: /dashboard/store",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner surface renders for a resolvable tenant: /dashboard/history",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner surface renders for a resolvable tenant: /dashboard/analytics",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner surface renders for a resolvable tenant: /dashboard/google",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "personal-ai-access-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an owner issues, copies, switches away from, and revokes exact-work AI access",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an unavailable token list blocks issuance and offers recovery",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "private-authority-authenticated-local.spec.ts",
+      "context": "private",
+      "cases": [
+        {
+          "title": "actual source producer commits before populated inverse refusal",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "actual owner grant producer commits before populated inverse refusal",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "actual expired install grant removes installed Version maker authority",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "actual staff withdrawal removes installed Version maker authority",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "qualified B draft retains exact A installation scope",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "actual direct customer admin removal serializes installed Version writes",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "actual dual role customer admin removal refuses expired provider fallback",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "product-entry.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "public assessment stays in the product, preserves input on failure, and offers private continuation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "website audit supports legacy URL input and keeps result actions in the product",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile public navigation stays inline and the form remains reachable",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "expired public reports preserve a route back to useful work",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "product-learning-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "internal learning retains a complete synthetic evidence-to-changed-decision trace with independent review and revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "product-learning-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "reviews source evidence, pauses recurring work, and recovers from unavailable research on desktop and mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "provider-change-cancel-ui.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "Owner can recover an unacknowledged request with keyboard, pending and retry at 1280px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "Recovery controls exclude admin, agency and clocked/completed requests at 1280px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "Owner can recover an unacknowledged request with keyboard, pending and retry at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "Recovery controls exclude admin, agency and clocked/completed requests at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "provider-client-queue.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "provider queue delivery states at 1280px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "provider queue delivery states at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "provider queue delivery states at 320px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "provider queue also appears with the Systems release off and is absent for delegated agency readers",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "provider-seat-workspace.spec.ts",
+      "context": "workspace",
+      "cases": [
+        {
+          "title": "provider client entry opens saved rebuild with retry, without general member controls",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "public-check-conversion-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a real anonymous URL check survives Auth and becomes private business evidence, an unverified System and a prepared Possibility",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "public-continuation-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a browser-held public brief survives Auth, requires an explicit destination, and stays private after import",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "public-continuation-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "retained public brief names its context and only writable destinations",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "public-website-bookings-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a generated client carries a visitor inquiry and native Outlook booking to the owner",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "public-website-continuation-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "a confirmed public brief can start one owned website draft after Auth",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "release-1-0-flags-off-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "with every 1.0 flag off, a converted business's owner sees the workspace as before 1.0",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "release-legacy-website-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "create loss preserves the full brief and explicit recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "saved loss preserves the full brief and explicit recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "create loss preserves the full brief and explicit recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "saved loss preserves the full brief and explicit recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "create loss preserves the full brief and explicit recovery with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "saved loss preserves the full brief and explicit recovery with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "saved launch failure keeps the approved preview and reports failure without claiming a pending result",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-needs-you-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "real decision discovery recovers truthful home at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "real decision discovery recovers truthful needs-you at 320px with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-public-keyboard.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "visibility audit gives keyboard focus to the pending and completed result",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "website audit gives keyboard focus to the pending and completed result",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-public-states.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "visibility audit retains accessible pending, validation and recoverable errors across widths",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "website audit retains accessible pending, validation and recoverable errors across widths",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-website-entry-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "saved website work tracks the current build and review at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "saved website work preserves pending and lost-save recovery at 320px with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-website-fact-revision.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "approved website facts can be revised with keyboard recovery at 1440px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "approved website facts can be revised with keyboard recovery at 390px",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "approved website facts can be revised with keyboard recovery at 320px with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "contact removal preserves keyboard recovery, errors and read-only limits",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "contact removal preserves keyboard recovery, errors and read-only limits",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "contact removal preserves keyboard recovery, errors and read-only limits with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-website-forms-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "v1 pending authority loss and regain cannot adopt its earlier acknowledgement",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 valid save recovers keyboard focus to the current form heading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v1 valid save preserves outside focus",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v2 pending authority loss and regain cannot adopt its earlier acknowledgement",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v2 valid save recovers keyboard focus to the current form heading",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "v2 valid save preserves outside focus",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "managed v2 publication permission loss hides pending forms and requires saved-state reconciliation after regain",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "lost acknowledgement requires saved-state reconciliation with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "malformed acknowledgement requires saved-state reconciliation with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-website-report-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "rejects wrong-period and malformed reports, then reads the selected month",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "rejects wrong-period and malformed reports, then reads the selected month with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-website-routing-recovery.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "domain lost acknowledgement uses only exact GET recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover lost receipt requires exact POST check then fresh current read",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "domain malformed acknowledgement uses only exact GET recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover malformed receipt requires exact POST check then fresh current read",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "domain lost acknowledgement uses only exact GET recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover lost receipt requires exact POST check then fresh current read",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "domain malformed acknowledgement uses only exact GET recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover malformed receipt requires exact POST check then fresh current read",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "domain lost acknowledgement uses only exact GET recovery with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover lost receipt requires exact POST check then fresh current read with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "domain malformed acknowledgement uses only exact GET recovery with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cutover malformed receipt requires exact POST check then fresh current read with enlarged text",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "pending domain command survives role loss and blocks a newly exposed undo until exact GET recovery",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "release-workspace-navigation.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "skip-to-work moves keyboard focus beyond navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "browser Back returns template focus to its list trigger",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "touch navigation keeps 44px targets and 320px reflow",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "System \u2192 switch business \u2192 reload \u2192 Back/Forward at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "System \u2192 switch business \u2192 reload \u2192 Back/Forward at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "location reads preserve empty/loading/error/permission presentation at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "location reads preserve empty/loading/error/permission presentation at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "self-service-library.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "template customization and native app creation at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "template customization and native app creation at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "custom template drafts survive reload without creating an app",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "selected template URL survives delayed router updates and reload",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "read-only users can inspect templates without creating apps",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an agency's maker permission does not enable creation in a shared client",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a visible request edit replaces the previously submitted request across tools",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "supplier onboarding keeps the original request and explicit checklist",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "service-request-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "persists, reopens, and reviews a service request through local Auth and Postgres",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "shared-frame.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "preserves managed navigation and keeps chat as the single conversation route",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "opens a contextual managed discussion beside non-chat work and returns focus",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "makes the contextual rail a focused mobile replacement without horizontal overflow",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps the existing navigation reachable when the shared frame collapses it",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps global and website navigation together on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "switches websites through an accessible control and the authorized destination",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps Website selected while opening Brand Kit",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "smoke.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "health endpoint works",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "public v1 GLDF content route is unauthenticated",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "public v1 GLDF page config route is unauthenticated",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "cron maintenance endpoint is not public",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "sign-up page renders the current create-account surface",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "staff-request-offering-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an owner publishes, shares, updates, and resumes the staff request offering",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "standing-responsibilities-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "admits two current saved checks as distinct finite jobs, replays a trigger, and gates a revoked job",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an owner can discover, create, and reopen ongoing work in the workspace",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "systems-experience-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "Home presents The Mooney Firm's actual Systems and what needs the owner",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "opening the website gives it the page, compares, and runs Make real on an isolated copy",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "bookings and internal tools open as the actual thing, with lineage beside them",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "read-only access sees Systems but cannot change them or make anything real",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a member who is not an owner sees why Make real is unavailable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a member can use apps and bookings without management controls",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty, loading and error states say what is true",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "an agency sees its source Systems and each client's Version",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "two locations on one account are Versions of one website",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Home and a System reflow on a phone",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "with Systems off, Home is the pre-Systems workspace and System links open Home",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "with Systems off, Home reflows on a phone",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tenant-cleanup-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real super-admin retains pending removal and retries the exact native receipt at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "real super-admin retains pending removal and retries the exact native receipt at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tracker-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real local auth and Postgres preserve tracker edits and enforce another user and revoked membership",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tracker-coordination-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "record assignment and relationships survive reload and undo preserves a later cell edit",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tracker-handoff-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "real local auth preserves tracker handoff, delegated read, and customer revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tracker-local-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "local tracker uses the same import and edit flow without sending CSV to an API",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "tracker-ui.spec.ts",
+      "context": "workspace",
+      "cases": [
+        {
+          "title": "owner can import, save, reload, edit with conflict feedback, paginate, and record R&D evidence",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "delegated tracker work stays readable and read only on mobile",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "selected records retain assignment and exact related records, with conflict recovery and scoped Undo",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "units-standards-authenticated-local.spec.ts",
+      "context": "native",
+      "cases": [
+        {
+          "title": "real Auth Units bind business Versions, preserve owner decisions on standards and stop writes after authority withdrawal",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "ux-capture.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "desktop dash-today",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-ask-strelva",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-website",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-content",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-assets",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-history",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-google-business",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-analytics",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-reports",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-reviews",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-settings",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-health",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-integrations",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-store",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-roster",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-schedule",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-members",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-leads",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop dash-needs-you",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-overview",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-clients",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-client-detail",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-leads",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-analytics",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-actions",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-drafts",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-digests",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-ops",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-audit",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-onboard",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "desktop admin-pay-links",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-today",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-ask-strelva",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-website",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-content",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-assets",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-history",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-google-business",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-analytics",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-reports",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-reviews",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-settings",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-health",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-integrations",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-store",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-roster",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-schedule",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-members",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-leads",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile dash-needs-you",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-overview",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-clients",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-client-detail",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-leads",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-analytics",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-actions",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-drafts",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-digests",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-ops",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-audit",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-onboard",
+          "project": "desktop",
+          "originalStatus": "passed"
+        },
+        {
+          "title": "mobile admin-pay-links",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "versions-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an agency's improvement reaches a client's Version only when the owner approves it",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "w6-owner-ask-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "Ask drafts route to Needs you, refuses chat approval and stays usable at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Operator invitation preparation and revoke send nothing at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Ask drafts route to Needs you, refuses chat approval and stays usable at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Operator invitation preparation and revoke send nothing at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Ask handles unavailable, unsaved, released-off and read-only states at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Invitation suppression, failure and permission states remain honest at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Ask handles unavailable, unsaved, released-off and read-only states at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Invitation suppression, failure and permission states remain honest at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Booking Try uses only a local test receipt at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Working page-set Try keeps navigation isolated at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Complete signed-review renderer keeps visitor actions disabled at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Booking Try uses only a local test receipt at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Working page-set Try keeps navigation isolated at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Complete signed-review renderer keeps visitor actions disabled at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "w6-version-possibilities-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "Version alternatives share Possibilities and one Make real decision at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version alternatives share Possibilities and one Make real decision at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version Possibilities loading is explicit on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version Possibilities error is explicit on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version Possibilities empty is explicit on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version Possibilities read-only is explicit on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Version Possibilities missing-account is explicit on mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "w6-version-siblings-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "Sibling context and real definition changes at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Sibling comparison empty at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Sibling comparison unavailable at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Sibling context and real definition changes at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Sibling comparison empty at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Sibling comparison unavailable at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Changing from an owner example to a member example drops Version write controls",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Read-only member can compare scoped sibling shapes without a write control",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "Read-only member can compare scoped sibling shapes without a write control despite full display mode",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "website-creation-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "website creation, preview, approval and revision persist at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "website creation, preview, approval and revision persist at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "website-generated-capabilities-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "submits inquiry and reserves, changes, and cancels a booking against local protocol fixtures",
+          "project": "desktop",
+          "originalStatus": "passed"
+        }
+      ]
+    },
+    {
+      "file": "website-history-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "website owner can reopen unavailable history without a false empty result",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "website-wave6-ui.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "both website entry paths and retained failure at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saved crawl omissions and permission state at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner History prepares exact snapshot and document restores at 1280px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "both website entry paths and retained failure at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saved crawl omissions and permission state at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner History prepares exact snapshot and document restores at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "both website entry paths and retained failure at 320px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saved crawl omissions and permission state at 320px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "owner History prepares exact snapshot and document restores at 320px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty, loading, unavailable and permission states stay honest",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "work-authority-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "verified outside contribution survives review and loses access on revocation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "work-plan-application-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "accepting a model-free plan fixture creates one native application draft with server-owned maintenance",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-exit-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner records a local exit choice through the real Auth route and can still review its retained state",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-export-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "current owner downloads a bounded usable workspace snapshot while other access is denied",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-export-v3-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner downloads real schema-3 categories after exit pauses work; linked-tenant masking, retained history and withdrawn agency authority hold",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-invitations-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "owner invitation links require explicit exact-email acceptance and preserve stronger membership",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-payer-transition-authenticated-local.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "an exact verified successor accepts future jobs while existing unknown costs stay with the original payer",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-release.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "keeps one navigation around saved work on desktop and mobile",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps a pending business switch through stale work navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps a pending business switch through stale settings navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps a pending business switch through stale products navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "workspace sign-in and failed callback retain the workspace destination",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "separates signed-out recovery from a temporary workspace failure",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "creates a private assessment and restores it after reload",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "requires explicit confirmation before saving a public scorecard privately",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "preserves a public save destination when signed out",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps public-save confirmation open after a rejected save",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "never presents unavailable measurement as a failing grade and labels partial evidence",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps product discovery coherent and managed work scoped to authorized links",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps managed discovery honest when tenant links are temporarily unavailable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "returns from an empty agency view to My work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps My work and Shared with me context-local and read-only",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "hands work to the named customer with optional access unchecked, then revokes it",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "hands a tracker to the named customer and keeps optional agency access read-only",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "resets a created handoff link when the selected work changes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "drops a late handoff completion after the work context changes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "keeps delegated customer work read-only while customer-owned work retains controls",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "ignores a stale workspace response after a newer account switch",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "lets someone prepare a capability request without claiming it was submitted",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "does not add a completed assessment to a workspace selected while it was running",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "drops a late tracker save after the workspace changes",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "restores the exact agency result across reload and browser history",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "never substitutes another result for an unavailable deep link",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "preserves a private result through signed-out and failed callback recovery",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a retry retains the business inputs of an unmeasured assessment",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saves and reopens a website audit without trusting a browser payload",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "recovers the same assessment after a lost response and reload",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "agency queue pages through all clients and reports unavailable work at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "agency queue pages through all clients and reports unavailable work at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "unavailable payer history does not claim that no payer exists",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty allowance records explain billing status without implying access",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "switching businesses clears the previous payer while the next history loads",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "onboarding opens inside the shared workspace navigation",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saved custom applications reopen in the shared workspace and expose unavailable records at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "saved custom applications reopen in the shared workspace and expose unavailable records at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "workspace-ui-preview.spec.ts",
+      "context": "public",
+      "cases": [
+        {
+          "title": "shared navigation remains available while opening and finding work",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared workspace resumes inquiry work inside the one Strelva frame",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "account-authorized websites stay separate from business installations",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a business owner can assign an authorized website from Home and keep website controls native",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "a business owner can propose a future payer and the exact addressee can accept",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "direct customer can inspect an offering setup and its local allowance",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "empty workspace can create an explicitly fictional local assessment",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "mobile navigation closes on Escape and selection, and does not overflow",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "agency home names a client that failed to load and loads it on retry",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "shared read-only work cannot start an assessment",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "preview account navigation remains local and exposes no real sign-out",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "preview controls reserve viewport space so the account stays visible",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "isolated Website editor accepts structured text and image draft controls",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "isolated Website editor surfaces a permission failure without accepting the draft",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "website history restores into a draft before publish",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "website editor supports a draft change from a phone-sized viewport",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "website editor keeps a mobile permission failure recoverable",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    }
+  ]
+}

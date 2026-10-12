@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
   getPayLink,
@@ -46,6 +46,10 @@ export async function POST(
   const config = await getPayLink(slug);
   if (!config) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (config.revokedAt) {
+    return NextResponse.json({ error: "This payment link has expired. Ask the agency for a new link." }, { status: 410 });
   }
 
   const body = await readJsonObject(req);

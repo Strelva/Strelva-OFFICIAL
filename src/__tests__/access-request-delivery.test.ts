@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRedisStore = vi.hoisted(() => new Map<string, unknown>());
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn(() => "access-request-intake:test"),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => ({
     get: vi.fn((key: string) => Promise.resolve(mockRedisStore.get(key) ?? null)),
     set: vi.fn((key: string, value: unknown) => {
@@ -47,13 +47,43 @@ describe("access request delivery flow", () => {
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
 
+  it.each([["business_access", "/sign-up"], ["agency_access", "/sign-up?as=agency"]])("routes %s to platform entry without sales storage or notifications", async (requestType, next) => {
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const res = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType, email: "already@example.invalid" }) }));
+    expect(res.status).toBe(200); expect(await res.json()).toEqual({ success: true, requestType, next });
+    expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "website", "agency_service_unconfirmed"])("rejects an unchosen/unknown sales path: %s", async requestType => {
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const res = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType, businessName: "Demo", email: "owner@example.invalid" }) }));
+    expect(res.status).toBe(400); expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+
+  it.each(["11111111-1111-4111-8111-111111111111", ""])("records server-selected agency ownership only for explicit service intake (%s)", async configured => {
+    process.env.STRELVA_AGENCY_WORKSPACE_ID = configured;
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const response = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({
+      requestType: "agency_service", businessName: "Northside Bakery", email: "owner@bakery.example",
+      agencyWorkspaceId: "22222222-2222-4222-8222-222222222222",
+    }) }));
+    expect(response.status).toBe(200);
+    const raw = mockRedisStore.get("lead:owner@bakery.example");
+    const lead = JSON.parse(String(raw));
+    expect(lead).toMatchObject({ requestType: "agency_service", agencyWorkspaceId: configured || null });
+    const { getDeliveryLeadByToken } = await import("@/lib/access-request-delivery");
+    const read = await getDeliveryLeadByToken(lead.statusToken);
+    expect(read?.requestType).toBe("agency_service");
+    expect(read?.agencyWorkspaceId ?? null).toBe(configured || null);
+  });
+
   it("creates a no-login delivery link and sends the first signup email", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
 
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "Owner@Example.com",
         location: "Buffalo, NY",
@@ -71,7 +101,7 @@ describe("access request delivery flow", () => {
     });
     expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
     expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: "Strelva <hello@updates.strelva.com>",
+      from: '"Strelva" <hello@updates.strelva.com>',
       to: "owner@example.com",
       subject: "We received Demo Studio's site request",
       html: expect.stringContaining(`href="${body.statusUrl}"`),
@@ -96,7 +126,7 @@ describe("access request delivery flow", () => {
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         phone: "(716) 555-0100",
@@ -130,7 +160,7 @@ describe("access request delivery flow", () => {
     const response = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         description: "Build request: weekly proof",
@@ -152,7 +182,7 @@ describe("access request delivery flow", () => {
     const firstResponse = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Demo Studio",
         email: "owner@example.com",
         description: "Build request: weekly proof",
@@ -165,7 +195,7 @@ describe("access request delivery flow", () => {
     const repeatResponse = await POST(new Request("http://localhost/api/access-request/intake", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ requestType: "agency_service",
         businessName: "Second Studio",
         email: "Owner@Example.com",
         description: "Build request: another site",

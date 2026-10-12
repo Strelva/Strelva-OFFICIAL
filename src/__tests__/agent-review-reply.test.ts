@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Positive tool cases serve a converted business. Keep the real model helper's
+// admission, and supply only its trusted tenant-to-workspace lookup seam.
+const mockBillingWorkspace = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/release-flags/store", () => ({
+  releaseWorkspaceForTenant: mockBillingWorkspace,
+}));
+beforeEach(() => {
+  mockBillingWorkspace.mockResolvedValue("a0000000-0000-4000-8000-000000000001");
+});
+
 /**
  * Trust coverage for the chat agent's review + social tools:
  *
@@ -77,7 +87,7 @@ vi.mock("ai", () => ({
   },
 }));
 
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: { id: "primary" }, label: "primary" }),
   getFallbackModel: () => null,
   isTransientModelError: () => false,
@@ -87,14 +97,14 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("test-tenant"),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: () => Promise.resolve(null),
   requireTenantPermission: () => Promise.resolve(null),
   getAuthUserId: () => Promise.resolve("user_test"),
   isSuperAdmin: () => Promise.resolve(false),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: () => Promise.resolve(false),
 }));
 
@@ -188,6 +198,17 @@ describe("agent reply_to_review tool", () => {
       const review = [GOOGLE_REVIEW, YELP_REVIEW].find((r) => r.id === id);
       return Promise.resolve(review ? { ...review, reply } : null);
     });
+  });
+
+  it("pauses an unconverted business before drafting or saving a review reply", async () => {
+    mockBillingWorkspace.mockResolvedValue(null);
+    mockCapturedTools = {};
+    const response = await runAgent({ name: "reply_to_review", args: { reviewId: "rev_google_1", reply: "Thanks" } });
+    expect(response).toContain("Nothing was changed");
+    expect(mockBillingWorkspace).toHaveBeenCalledExactlyOnceWith("test-tenant");
+    expect(mockCapturedTools).toEqual({});
+    expect(mockAddEvent).not.toHaveBeenCalled();
+    expect(mockReplyToReview).not.toHaveBeenCalled();
   });
 
   it("queues a review_reply_draft for a Google review when Google is connected — never posts or claims live", async () => {

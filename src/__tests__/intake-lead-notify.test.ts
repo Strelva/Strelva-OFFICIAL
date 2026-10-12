@@ -5,12 +5,12 @@ const kv = vi.hoisted(() => new Map<string, unknown>());
 const zset = vi.hoisted(() => [] as Array<{ score: number; member: string }>);
 const redisPresent = vi.hoisted(() => ({ value: true }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn(() => "access-request-intake:test"),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() =>
     redisPresent.value
       ? {
@@ -126,7 +126,7 @@ describe("intake route — team notification", () => {
       new Request("http://localhost/api/access-request/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ requestType: "agency_service",
           businessName: "Demo Studio",
           email: "owner@example.com",
           phone: "(716) 555-0100",
@@ -171,7 +171,7 @@ describe("intake route — team notification", () => {
       new Request("http://localhost/api/access-request/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ requestType: "agency_service",
           businessName: "Demo Studio",
           email: "owner@example.com",
           description: "First submission",
@@ -185,7 +185,7 @@ describe("intake route — team notification", () => {
       new Request("http://localhost/api/access-request/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ requestType: "agency_service",
           businessName: "Demo Studio",
           email: "Owner@Example.com",
           description: "Second submission",

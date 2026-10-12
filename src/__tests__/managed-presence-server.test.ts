@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   getTenantDashboardFallbackUrl: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUserTenants: mocks.getCurrentUserTenants }));
+vi.mock("@/platform/infra/auth", () => ({ getCurrentUserTenants: mocks.getCurrentUserTenants }));
 vi.mock("@/lib/tenants", () => ({
   getTenantConfig: mocks.getTenantConfig,
   isActiveTenant: (tenant: { active?: boolean }) => tenant.active !== false,

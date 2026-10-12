@@ -8,9 +8,9 @@
 import path from "path";
 import type { SocialPost } from "../types";
 import { readDevFile, writeDevFile } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase } from "../db/client";
-import type { Row, Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase } from "@/platform/infra/db/client";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 const DEV_SOCIAL_PATH = (tenant: string) =>
   path.join(process.cwd(), `dev-social-${tenant}.json`);

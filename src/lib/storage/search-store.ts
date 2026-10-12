@@ -9,8 +9,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { SearchData } from "../types";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 // --- Postgres repo helpers (self-contained; do NOT move to repositories.ts) ---
 

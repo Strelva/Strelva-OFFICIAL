@@ -1,29 +1,17 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { readJsonObject } from "@/lib/request-body";
-import { getAllTenants, createTenant, updateTenant, isActiveTenant, getTenantConfig } from "@/lib/tenants";
+import { getAllTenants, updateTenant, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { applyFeatureChange, cleanTenantFeatureIds, FeatureGuardError } from "@/lib/features/registry";
-import { normalizeTenantDomain } from "@/lib/tenant-urls";
-import { CUSTOM_REPO_CONTRACT_VERSION, DEFAULT_DELIVERY_MODEL } from "@/lib/custom-repos";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
-import type { DesignTokenScope, TenantConfig, TenantDeliveryModel, TenantFeature } from "@/lib/types";
-
-const DELIVERY_MODELS = new Set<TenantDeliveryModel>(["custom_repo", "platform_template"]);
-const DESIGN_TOKENS = new Set<DesignTokenScope>(["colors", "fonts", "buttons", "spacing", "radius", "motion", "imagery"]);
+import { normalizeTrackPublicKey } from "@/lib/track-signature";
+import { setTenantTrackPublicKey } from "@/lib/tracking-signing-keys";
+import type { TenantConfig } from "@/lib/types";
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function cleanFeatures(value: unknown): TenantFeature[] {
-  return cleanTenantFeatureIds(value);
-}
-
-function cleanDesignTokens(value: unknown): DesignTokenScope[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.filter((token): token is DesignTokenScope => DESIGN_TOKENS.has(token as DesignTokenScope));
 }
 
 export async function GET(req: Request) {
@@ -31,108 +19,17 @@ export async function GET(req: Request) {
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "true";
   const tenants = await getAllTenants();
   return NextResponse.json(includeArchived ? tenants : tenants.filter(isActiveTenant));
 }
 
-export async function POST(req: Request) {
-  const admin = await isSuperAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const body = await readJsonObject(req);
-  if (!body) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
-
-  const {
-    siteName: rawSiteName,
-    ownerName: rawOwnerName,
-    ownerEmail: rawOwnerEmail,
-    industry: rawIndustry,
-    template: rawTemplate,
-    subdomain: rawSubdomain,
-    features,
-    productionDomain,
-    adminDomain,
-    deliveryModel: rawDeliveryModel,
-    customRepo,
-  } = body;
-  const siteName = cleanString(rawSiteName);
-  const ownerName = cleanString(rawOwnerName);
-  const ownerEmail = cleanString(rawOwnerEmail);
-  const industry = cleanString(rawIndustry);
-  const template = cleanString(rawTemplate);
-  const subdomain = cleanString(rawSubdomain);
-  const deliveryModel = DELIVERY_MODELS.has(rawDeliveryModel as TenantDeliveryModel)
-    ? rawDeliveryModel as TenantDeliveryModel
-    : DEFAULT_DELIVERY_MODEL;
-  const cleanCustomRepo = customRepo && typeof customRepo === "object" && !Array.isArray(customRepo)
-    ? customRepo as Record<string, unknown>
-    : {};
-  
-  // Light validation: if a repoUrl is provided, ensure it's a valid HTTPS URL.
-  const repoUrl = cleanString(cleanCustomRepo.repoUrl);
-  if (repoUrl && !isSafeFetchUrl(repoUrl)) {
-    return NextResponse.json(
-      { error: "Invalid customRepo.repoUrl: must be a valid HTTPS URL" },
-      { status: 400 }
-    );
-  }
-
-  if (!siteName || !ownerName || !industry || !template || !subdomain) {
-    return NextResponse.json(
-      { error: "Missing required fields: siteName, ownerName, industry, template, subdomain" },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const tenant = await createTenant({
-      siteName,
-      ownerName,
-      ownerEmail: ownerEmail || undefined,
-      industry,
-      template,
-      deliveryModel,
-      subdomain,
-      features: cleanFeatures(features),
-      productionDomain: typeof productionDomain === "string" ? normalizeTenantDomain(productionDomain) || undefined : undefined,
-      adminDomain: typeof adminDomain === "string" ? normalizeTenantDomain(adminDomain) || undefined : undefined,
-      customRepo: deliveryModel === "custom_repo" ? {
-        repoName: cleanString(cleanCustomRepo.repoName) || subdomain,
-        repoUrl: cleanString(cleanCustomRepo.repoUrl) || undefined,
-        localPath: cleanString(cleanCustomRepo.localPath) || undefined,
-        capabilityManifestUrl: cleanString(cleanCustomRepo.capabilityManifestUrl) || undefined,
-        supportedDesignTokens: cleanDesignTokens(cleanCustomRepo.supportedDesignTokens),
-        supportsPageConfig: typeof cleanCustomRepo.supportsPageConfig === "boolean" ? cleanCustomRepo.supportsPageConfig : true,
-        supportsDraftPreview: typeof cleanCustomRepo.supportsDraftPreview === "boolean" ? cleanCustomRepo.supportsDraftPreview : true,
-        supportsInlineEditing: typeof cleanCustomRepo.supportsInlineEditing === "boolean" ? cleanCustomRepo.supportsInlineEditing : true,
-        contractVersion: cleanString(cleanCustomRepo.contractVersion) || CUSTOM_REPO_CONTRACT_VERSION,
-        productionUrl: typeof productionDomain === "string" && normalizeTenantDomain(productionDomain)
-          ? `https://${normalizeTenantDomain(productionDomain)}`
-          : undefined,
-        revalidationHealth: "unknown",
-      } : undefined,
-    });
-    await logAuditEvent({
-      tenant: tenant.id,
-      action: "tenant.create",
-      targetType: "tenant",
-      targetId: tenant.id,
-      actor: await getActorContext(tenant.id),
-      metadata: { siteName: tenant.siteName, deliveryModel: tenant.deliveryModel },
-    });
-    return NextResponse.json(tenant, { status: 201 });
-  } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create tenant" },
-      { status: 409 }
-    );
-  }
+/** Client setup uses the ordinary agency or business entry. */
+export async function POST(_request: Request) {
+  if (!await isSuperAdmin()) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return NextResponse.json({ error: "Create client workspaces through ordinary agency access. Nothing changed." }, { status: 410 });
 }
 
 export async function PATCH(req: Request) {
@@ -152,6 +49,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Missing tenant id" }, { status: 400 });
   }
 
+  // Support configuration must never be a second agency authoring surface.
+  const clientFields = ["siteName", "ownerName", "ownerEmail", "ownerPhone", "bookingProvider", "bookingUrl", "industry", "personality", "businessRules", "autoPublish", "autoApproveThreshold", "reviewsConfig", "visibility"];
+  if (clientFields.some(field => Object.hasOwn(updates, field))) {
+    return NextResponse.json({ error: "Client settings require ordinary business or agency access. Nothing changed." }, { status: 403 });
+  }
+
   // Whitelist + type-check the mutable fields. Without this, an arbitrary
   // (super-admin) body wrote unchecked keys/types straight into the tenant
   // source-of-truth in Sanity.
@@ -169,6 +72,8 @@ export async function PATCH(req: Request) {
       revalidateUrl: z.string().max(2048),
       // Operator-settable when wiring a client's revalidation (super-admin gated).
       revalidationSecret: z.string().max(512),
+      // Per-site public key for verifying server-signed tracking orders.
+      trackingPublicKey: z.string().max(512),
       siteUrl: z.string().max(2048),
       active: z.boolean(),
       subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
@@ -228,7 +133,19 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const data = parsedUpdates.data as Partial<TenantConfig> & { features?: string[] };
+  const { trackingPublicKey: rawTrackingPublicKey, ...tenantUpdates } = parsedUpdates.data;
+  const trackingPublicKeyProvided = Object.hasOwn(parsedUpdates.data, "trackingPublicKey");
+  const normalizedTrackingPublicKey = rawTrackingPublicKey?.trim()
+    ? normalizeTrackPublicKey(rawTrackingPublicKey)
+    : null;
+  if (trackingPublicKeyProvided && rawTrackingPublicKey?.trim() && !normalizedTrackingPublicKey) {
+    return NextResponse.json({ error: "trackingPublicKey must be a valid Ed25519 public key" }, { status: 400 });
+  }
+  if (trackingPublicKeyProvided && Object.keys(tenantUpdates).length > 0) {
+    return NextResponse.json({ error: "Update trackingPublicKey separately from tenant fields" }, { status: 400 });
+  }
+
+  const data = tenantUpdates as Partial<TenantConfig> & { features?: string[] };
 
   // Feature toggle: validate + expand sets + refuse to remove a locked core feature.
   if (data.features !== undefined) {
@@ -268,7 +185,20 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const updated = await updateTenant(id, data as Partial<TenantConfig>);
+  let updated: TenantConfig | null;
+  if (trackingPublicKeyProvided) {
+    updated = await getTenantConfig(id) ?? null;
+    if (updated) {
+      try {
+        await setTenantTrackPublicKey(id, normalizedTrackingPublicKey);
+      } catch (error) {
+        console.error("[admin tenants PATCH] tracking key update failed", id, error);
+        return NextResponse.json({ error: "Tracking key storage is unavailable" }, { status: 503 });
+      }
+    }
+  } else {
+    updated = await updateTenant(id, data as Partial<TenantConfig>);
+  }
   if (!updated) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
@@ -282,5 +212,8 @@ export async function PATCH(req: Request) {
     metadata: { fields: Object.keys(updates) },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json({
+    ...updated,
+    ...(trackingPublicKeyProvided ? { trackingPublicKeyConfigured: Boolean(normalizedTrackingPublicKey) } : {}),
+  });
 }

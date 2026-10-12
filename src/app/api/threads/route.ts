@@ -1,6 +1,7 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { listThreads, createThread } from "@/lib/threads";
 import { readOptionalJsonObject } from "@/lib/request-body";
 
@@ -12,6 +13,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const threads = await listThreads(tenant);
     return NextResponse.json(threads);
@@ -28,7 +30,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const tenant = await getTenantFromHeaders();
-    const denied = await requireTenantAccess(tenant);
+    const denied = await requireTenantPermission(tenant, "content:write");
     if (denied) return denied;
 
     const body = await readOptionalJsonObject(request);

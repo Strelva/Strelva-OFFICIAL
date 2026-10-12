@@ -17,10 +17,10 @@ function context(overrides: Partial<WorkspaceStartContext> = {}): WorkspaceStart
       { id: "tracker", name: "Spreadsheet tracker", availability: "available" },
       { id: "inquiries", name: "Inquiry work", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", availability: "managed" },
-      { id: "applications", name: "Internal applications", availability: "available" },
+      { id: "applications", name: "Internal tools", availability: "available" },
       { id: "scheduling", name: "Scheduling", availability: "available" },
       { id: "investigations", name: "Ongoing checks", availability: "available" },
-      { id: "operations", name: "Delegated work", availability: "available" },
+      { id: "operations", name: "Request", availability: "available" },
     ],
     inquiryBusinesses: [{ id: "harbor", title: "Harbor Dental" }],
     managedSites: [{ id: "harbor-site", title: "Harbor Dental", href: "/preview/strelva/website" }],
@@ -77,10 +77,10 @@ describe("workspace start planner", () => {
 
   it("names the native destination in each horizontal continuation", () => {
     for (const [request, label] of [
-      ["Build a staff request app", "Prepare application"],
-      ["Help my staff request time off", "Open scheduling"],
-      ["Reconcile two spreadsheets", "Open ongoing checks"],
-      ["Delegate these approved steps", "Open ongoing work"],
+      ["Build a staff request app", "Prepare internal tool"],
+      ["Help my staff request time off", "Open Bookings"],
+      ["Reconcile two spreadsheets", "Open saved checks"],
+      ["Delegate these approved steps", "Open request"],
     ] as const) {
       const plan = planWorkspaceStart(request, context());
       expect(workspaceStartContinueLabel(plan)).toBe(label);
@@ -89,10 +89,10 @@ describe("workspace start planner", () => {
 
   it("names saved horizontal work by the surface that can reopen it", () => {
     expect(workspaceWorkLabel({ productId: "onboarding", resourceKind: "case" })).toBe("Onboarding");
-    expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Application");
-    expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Schedule");
-    expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Ongoing check");
-    expect(workspaceWorkLabel({ productId: "operations", resourceKind: "responsibility" })).toBe("Delegated work");
+    expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Internal tool");
+    expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Bookings");
+    expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Saved check");
+    expect(workspaceWorkLabel({ productId: "operations", resourceKind: "responsibility" })).toBe("Request");
     expect(workspaceWorkLabel({ productId: "future", resourceKind: "result" })).toBe("Saved work · view unavailable");
   });
 
@@ -129,7 +129,9 @@ describe("workspace start planner", () => {
     const unavailableSite = planWorkspaceStart("Make our website work better.", context({ managedWorkUnavailable: true, managedSites: [] }));
     expect(unavailableSite).toMatchObject({ route: "website", status: "blocked" });
     expect(unavailableSite.reason).toContain("temporarily unavailable");
-    expect(planWorkspaceStart("Create my website.", context()).route).toBe("websites");
+    // A managed client's new-website request goes to Strelva; a self-serve workspace creates it.
+    expect(planWorkspaceStart("Create my website.", context())).toMatchObject({ route: "help", deliveryMode: "service" });
+    expect(planWorkspaceStart("Create my website.", context({ managedSites: [] })).route).toBe("websites");
   });
 
   it("routes unknown intent to scoped help", () => {
@@ -185,14 +187,16 @@ describe("workspace start planner", () => {
       onHelp: () => undefined,
     }));
     expect(html).toContain("data-workspace-start");
-    expect(html).toContain("What should happen next?");
+    expect(html).toContain("What should Strelva run for your business?");
+    expect(html.match(/<textarea\b/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Proposed next step"');
     expect(html).toContain("Give staff one place to make requests");
     expect(html).toContain("Make supplier onboarding consistent");
     expect(html).toContain("Get a new website live");
-    expect(html).toContain("Continue with this request");
+    expect(html).toContain("Continue with this ask");
     expect(html).toContain("Stop customer inquiries being missed");
     expect(html).toContain("Make this spreadsheet operational");
-    expect(html).toContain("See what AI understands about us");
+    expect(html).toContain("See what assistants understand about us");
     expect(html).toContain("Make our website work better");
     expect(html).not.toContain("general AI task");
   });

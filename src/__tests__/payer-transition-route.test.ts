@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), release: vi.fn(), read: vi.fn(), inbox: vi.fn(), command: vi.fn(), acceptJob: vi.fn() }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/work-economics/payer-transitions", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/platform/work-economics/payer-transitions")>();

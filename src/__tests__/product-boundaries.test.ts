@@ -47,7 +47,7 @@ describe("product import boundaries", () => {
     expect(checkProductBoundaries("src/products/ai-visibility/server.ts", `
       export { score } from "./score";
       import { identity } from "@/platform/identity";
-      import { store } from "@/lib/redis";
+      import { store } from "@/platform/infra/redis";
     `)).toEqual([]);
     expect(checkProductBoundaries("src/__tests__/scoring.test.ts", `
       import { score } from "@/products/ai-visibility/score";
@@ -68,7 +68,7 @@ describe("product import boundaries", () => {
 
   it("keeps the native application domain independent of runtime adapters", () => {
     expect(checkProductBoundaries("src/products/applications/domain.ts", `
-      import { getSupabase } from "@/lib/db/client";
+      import { getSupabase } from "@/platform/infra/db/client";
       export { service } from "./server";
       const storage = import("./repository");
       const crypto = require("node:crypto");
@@ -90,7 +90,7 @@ describe("product import boundaries", () => {
       "src/platform/workspaces/types.ts",
     ]) {
       expect(checkProductBoundaries(file, `
-        export { client } from "@/lib/db/client";
+        export { client } from "@/platform/infra/db/client";
       `)).toHaveLength(1);
     }
     expect(checkProductBoundaries("src/products/applications/contracts.ts", `

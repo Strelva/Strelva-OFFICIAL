@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   WorkspaceAccessError,
   WorkspaceConflictError,
@@ -160,7 +160,7 @@ function mapPolicy(row: DbRow): StandingResponsibilityRecord {
   const parsed = standingResponsibilitySchema.parse(payload);
   const cursor = optionalText(row.next_trigger_at);
   const policy = cursor && parsed.trigger.kind === "interval"
-    ? { ...parsed, trigger: { ...parsed.trigger, nextAt: cursor } }
+    ? { ...parsed, trigger: { ...parsed.trigger, nextAt: new Date(cursor).toISOString() } }
     : parsed;
   return {
     id: text(row.id),
@@ -453,3 +453,6 @@ export async function readStandingRunForWork(actor: WorkspaceActor, workspaceId:
   if (result.error) databaseError(result.error, "The ongoing run could not be checked.");
   return result.data ? mapRun(result.data) : null;
 }
+
+/** Shared table projections for the provider-scoped proof reader. */
+export { mapPolicy as mapStandingPolicyRow, mapRun as mapStandingRunRow, mapReceipt as mapStandingReceiptRow };

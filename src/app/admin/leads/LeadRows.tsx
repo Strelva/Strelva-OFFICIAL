@@ -7,9 +7,9 @@ import {
   type DeliveryStatus,
   DELIVERY_STATUSES,
   deliveryStatusLabel,
-} from "@/lib/access-request-delivery";
+} from "@/lib/access-request-delivery-contracts";
 import type { LeadWorkflow, LeadWorkflowStatus } from "@/lib/lead-workflow";
-import { Chip } from "@/app/admin/console";
+import { StEmpty, StField, StMono, StNotice, StPill, StRow, StRows, StSegmented, StState, StTextButton, type BeaconKind } from "@/components/ui/strelva/Kit";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -58,14 +58,14 @@ function isStale(status: LeadWorkflowStatus, updatedAt: string | null): boolean 
 // Constants
 // ---------------------------------------------------------------------------
 
-type WorkflowTone = "good" | "warn" | "crit" | "neutral" | "accent";
+type WorkflowTone = BeaconKind;
 
 const WORKFLOW_TONE: Record<LeadWorkflowStatus, WorkflowTone> = {
-  new: "neutral",
-  contacted: "warn",
-  converting: "accent",
-  converted: "good",
-  dismissed: "neutral",
+  new: "draft",
+  contacted: "need",
+  converting: "need",
+  converted: "live",
+  dismissed: "draft",
 };
 
 const WORKFLOW_LABEL: Record<LeadWorkflowStatus, string> = {
@@ -94,11 +94,13 @@ function NoteEditor({
   currentStatus,
   initialNote,
   onSave,
+  readOnly,
 }: {
   token: string;
   currentStatus: LeadWorkflowStatus;
   initialNote?: string;
   onSave: (note: string) => void;
+  readOnly: boolean;
 }) {
   const [value, setValue] = useState(initialNote ?? "");
   const [saving, setSaving] = useState(false);
@@ -106,6 +108,7 @@ function NoteEditor({
   const lastSavedRef = useRef(initialNote ?? "");
 
   async function handleBlur() {
+    if (readOnly) return;
     const trimmed = value.trim();
     if (trimmed === lastSavedRef.current.trim()) return;
     setSaving(true);
@@ -130,24 +133,12 @@ function NoteEditor({
     }
   }
 
-  return (
-    <div className="relative">
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => void handleBlur()}
-        placeholder="Add a note…"
-        rows={2}
-        className="w-full resize-none rounded-lg border border-glass-border bg-white/[0.04] px-3 py-2 text-xs text-warm-white placeholder:text-gray-faint/60 focus:border-accent/40 focus:outline-none transition-colors"
-      />
-      {saving && (
-        <span className="absolute right-2 bottom-2 text-[10px] text-gray-faint">saving…</span>
-      )}
-      {!saving && failed && (
-        <span className="absolute right-2 bottom-2 text-[10px] text-critical">not saved — blur to retry</span>
-      )}
-    </div>
-  );
+  return <div className="flex flex-col gap-2">
+    <StField label="Internal note" hint="Saved when you leave this field.">
+      <textarea value={value} disabled={readOnly} onChange={event => setValue(event.target.value)} onBlur={() => void handleBlur()} placeholder="Add a note…" rows={2} />
+    </StField>
+    {saving ? <span role="status">Saving…</span> : failed ? <StNotice tone="critical">Note not saved. Leave the field again to retry.</StNotice> : null}
+  </div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,6 +155,7 @@ function LeadCard({
   onNoteChange,
   onConvert,
   receded,
+  readOnly,
 }: {
   lead: DeliveryLead;
   wf: LeadWorkflow;
@@ -174,6 +166,7 @@ function LeadCard({
   onNoteChange: (token: string, note: string) => void;
   onConvert: (lead: DeliveryLead) => Promise<void>;
   receded: boolean;
+  readOnly: boolean;
 }) {
   const status = wf.status;
   const updatedAt = wf.updatedAt ?? lead.statusUpdatedAt;
@@ -181,136 +174,28 @@ function LeadCard({
   const stale = isStale(status, updatedAt);
   const currentNote = notesByToken[lead.statusToken] ?? wf.note ?? "";
 
-  return (
-    <div
-      className={`px-5 py-4 transition-colors hover:bg-white/[0.02] ${receded ? "opacity-50" : ""}`}
-    >
-      {/* Row 1: status badge + age + submitted time */}
-      <div className="flex flex-wrap items-center gap-2 mb-2.5">
-        <Chip tone={WORKFLOW_TONE[status]}>{WORKFLOW_LABEL[status]}</Chip>
-        {ageLabel && (
-          <span
-            className={`text-[11px] ${stale ? "text-warning font-medium" : "text-gray-faint"}`}
-          >
-            {ageLabel}
-          </span>
-        )}
-        {lead.currentWebsite && (
-          <a
-            href={lead.currentWebsite}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="View current site"
-            className="ml-auto text-gray-faint hover:text-gray-muted transition-colors"
-            title={lead.currentWebsite}
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              <polyline points="15 3 21 3 21 9" />
-              <line x1="10" y1="14" x2="21" y2="3" />
-            </svg>
-          </a>
-        )}
+  return <StRow title={lead.businessName} detail={lead.location || undefined} kind={receded ? "Dismissed prospect" : "Site request"} end={<StState kind={WORKFLOW_TONE[status]}>{WORKFLOW_LABEL[status]}</StState>} align="start">
+    <div className="flex flex-col gap-4 pt-4">
+      <div className="flex flex-wrap items-center gap-4">
+        <StMono>{relativeTime(lead.submittedAt)}</StMono>
+        {ageLabel ? <StMono tone={stale ? "need" : undefined}>{ageLabel}</StMono> : null}
+        {lead.currentWebsite ? <StTextButton href={lead.currentWebsite} target="_blank" rel="noopener noreferrer">View current site</StTextButton> : null}
       </div>
-
-      {/* Row 2: business name + meta */}
-      <div className="mb-1">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="font-medium text-warm-white leading-snug">{lead.businessName}</span>
-          {lead.location && (
-            <span className="text-xs text-gray-faint">{lead.location}</span>
-          )}
-          <span className="text-[11px] text-gray-faint ml-auto shrink-0">
-            {relativeTime(lead.submittedAt)}
-          </span>
-        </div>
-        {lead.referredBy && (
-          <p className="text-[11px] text-gray-faint mt-0.5">Ref: {lead.referredBy}</p>
-        )}
+      {lead.referredBy ? <p className="text-sm text-gray-muted">Referred by {lead.referredBy}</p> : null}
+      {lead.description ? <p className="whitespace-pre-wrap text-sm text-gray-muted">{lead.description}</p> : null}
+      <div className="flex flex-wrap items-center gap-4">
+        <StTextButton href={`mailto:${lead.email}`}>Reply to {lead.email}</StTextButton>
+        {lead.phone ? <StMono>{lead.phone}</StMono> : null}
       </div>
-
-      {/* Row 3: message */}
-      {lead.description && (
-        <p className="mt-2 text-xs text-gray-muted whitespace-pre-wrap leading-relaxed">
-          {lead.description}
-        </p>
-      )}
-
-      {/* Row 4: contact line */}
-      <div className="mt-2.5 flex flex-wrap items-center gap-3">
-        <a
-          href={`mailto:${lead.email}`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-glass-border px-2.5 py-1 text-[11.5px] text-gray-muted hover:text-warm-white hover:border-accent/30 transition-colors"
-          title={`Email ${lead.email}`}
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="2" y="4" width="20" height="16" rx="2" />
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-          </svg>
-          Reply
-        </a>
-        {lead.phone && (
-          <span className="text-[11.5px] text-gray-faint">{lead.phone}</span>
-        )}
-      </div>
-
-      {/* Row 5: note editor */}
-      <div className="mt-3">
-        <NoteEditor
-          token={lead.statusToken}
-          currentStatus={status}
-          initialNote={currentNote}
-          onSave={(note) => onNoteChange(lead.statusToken, note)}
-        />
-      </div>
-
-      {/* Row 6: stage control — what the lead sees on their tracker link — + convert. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label htmlFor={`stage-${lead.statusToken}`} className="text-[11px] text-gray-faint">
-          Customer sees
-        </label>
-        <select
-          id={`stage-${lead.statusToken}`}
-          value={stage}
-          disabled={pending}
-          onChange={(e) => void onStageChange(lead.statusToken, e.target.value as DeliveryStatus)}
-          className="rounded-md border border-glass-border bg-gray-bg px-2 py-1 text-xs text-warm-white disabled:opacity-40"
-        >
-          {DELIVERY_STATUSES.map((st) => (
-            <option key={st} value={st}>
-              {deliveryStatusLabel(st)}
-            </option>
-          ))}
+      <NoteEditor token={lead.statusToken} currentStatus={status} initialNote={currentNote} readOnly={readOnly} onSave={note => onNoteChange(lead.statusToken, note)} />
+      <StField label="Client sees">
+        <select value={stage} disabled={readOnly || pending} onChange={event => void onStageChange(lead.statusToken, event.target.value as DeliveryStatus)}>
+          {DELIVERY_STATUSES.map(item => <option key={item} value={item}>{deliveryStatusLabel(item)}</option>)}
         </select>
-        <button
-          onClick={() => void onConvert(lead)}
-          disabled={pending}
-          title="Provision the site and take the lead live"
-          className="ml-auto rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-40"
-        >
-          Convert
-        </button>
-      </div>
+      </StField>
+      <div className="flex justify-end"><StPill variant="soft" onClick={() => void onConvert(lead)} disabled={readOnly || pending} title="Provision the site and take the prospect live">Convert</StPill></div>
     </div>
-  );
+  </StRow>;
 }
 
 // ---------------------------------------------------------------------------
@@ -320,9 +205,11 @@ function LeadCard({
 export function LeadRows({
   leads,
   initialWorkflow,
+  readOnly = true,
 }: {
   leads: DeliveryLead[];
   initialWorkflow: Record<string, LeadWorkflow>;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [workflow, setWorkflow] = useState<Record<string, LeadWorkflow>>(initialWorkflow);
@@ -344,6 +231,7 @@ export function LeadRows({
   const [showDismissed, setShowDismissed] = useState(false);
 
   async function setStatus(token: string, status: LeadWorkflowStatus): Promise<boolean> {
+    if (readOnly) return false;
     setPending((p) => ({ ...p, [token]: true }));
     setActionError(null);
     try {
@@ -370,6 +258,7 @@ export function LeadRows({
 
   // Set the customer-facing delivery stage directly (the tracker link updates).
   async function setDeliveryStage(token: string, stage: DeliveryStatus): Promise<boolean> {
+    if (readOnly) return false;
     const prev = stageByToken[token];
     setStageByToken((s) => ({ ...s, [token]: stage })); // optimistic
     setPending((p) => ({ ...p, [token]: true }));
@@ -442,90 +331,13 @@ export function LeadRows({
   }, [active, workflow]);
 
   function renderList(rows: DeliveryLead[], receded: boolean) {
-    return (
-      <div className="rounded-2xl border border-glass-border bg-glass overflow-hidden divide-y divide-glass-border/50">
-        {rows.map((lead) => (
-          <LeadCard
-            key={lead.statusToken}
-            lead={lead}
-            wf={workflow[lead.statusToken] ?? { token: lead.statusToken, status: "new", updatedAt: null }}
-            pending={Boolean(pending[lead.statusToken])}
-            notesByToken={notesByToken}
-            stage={stageByToken[lead.statusToken] ?? lead.deliveryStatus}
-            onStageChange={setDeliveryStage}
-            onNoteChange={handleNoteChange}
-            onConvert={convert}
-            receded={receded}
-          />
-        ))}
-      </div>
-    );
+    return <StRows label={receded ? "Dismissed prospects" : "Active prospects"}>{rows.map(lead => <LeadCard key={lead.statusToken} lead={lead} wf={workflow[lead.statusToken] ?? { token: lead.statusToken, status: "new", updatedAt: null }} pending={Boolean(pending[lead.statusToken])} notesByToken={notesByToken} stage={stageByToken[lead.statusToken] ?? lead.deliveryStatus} onStageChange={setDeliveryStage} onNoteChange={handleNoteChange} onConvert={convert} receded={receded} readOnly={readOnly} />)}</StRows>;
   }
 
-  return (
-    <div className="space-y-6">
-      {actionError && (
-        <p className="rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[12px] text-critical" role="alert">
-          {actionError}
-        </p>
-      )}
-      {/* Filter strip — only shown when there are active leads */}
-      {active.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {FILTER_OPTIONS.map((opt) => {
-            const count = counts[opt.value] ?? 0;
-            if (opt.value !== "all" && count === 0) return null;
-            const isActive = filter === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setFilter(opt.value)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  isActive
-                    ? "border-accent/40 bg-accent/10 text-accent"
-                    : "border-glass-border bg-glass text-gray-muted hover:text-warm-white"
-                }`}
-              >
-                {opt.label}
-                <span className={`font-mono tabular-nums ${isActive ? "text-accent/70" : "text-gray-faint"}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Active leads */}
-      {filtered.length === 0 ? (
-        <div className="rounded-2xl border border-glass-border bg-glass p-10 text-center">
-          <p className="text-sm font-medium text-warm-white">
-            {active.length === 0 ? "No prospects to work" : `No ${filter} prospects`}
-          </p>
-          <p className="mt-1 text-xs text-gray-muted">
-            {active.length === 0 && dismissed.length > 0
-              ? "Every prospect has been worked or dismissed."
-              : active.length === 0
-                ? "Access requests land here the moment they come in."
-                : "Try a different filter."}
-          </p>
-        </div>
-      ) : (
-        renderList(filtered, false)
-      )}
-
-      {/* Dismissed section */}
-      {dismissed.length > 0 && (
-        <div className="space-y-3">
-          <button
-            onClick={() => setShowDismissed((s) => !s)}
-            className="text-xs font-medium text-gray-muted hover:text-warm-white transition-colors"
-          >
-            {showDismissed ? "Hide" : "Show"} dismissed ({dismissed.length})
-          </button>
-          {showDismissed && renderList(dismissed, true)}
-        </div>
-      )}
-    </div>
-  );
+  return <div className="flex flex-col gap-6">
+    {actionError ? <StNotice tone="critical">{actionError}</StNotice> : null}
+    {active.length > 0 ? <StSegmented value={filter} label="Filter prospects" onChange={setFilter} options={FILTER_OPTIONS.filter(option => option.value === "all" || (counts[option.value] ?? 0) > 0).map(option => ({ value: option.value, label: `${option.label} (${counts[option.value] ?? 0})` }))} /> : null}
+    {filtered.length ? renderList(filtered, false) : <StEmpty>{active.length === 0 ? "No prospects to review. Access requests will appear here." : `No ${filter} prospects. Try a different filter.`}</StEmpty>}
+    {dismissed.length ? <div className="flex flex-col gap-4"><StTextButton onClick={() => setShowDismissed(value => !value)} aria-expanded={showDismissed}>{showDismissed ? "Hide" : "Show"} dismissed ({dismissed.length})</StTextButton>{showDismissed ? renderList(dismissed, true) : null}</div> : null}
+  </div>;
 }

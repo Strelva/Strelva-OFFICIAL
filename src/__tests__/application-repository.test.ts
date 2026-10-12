@@ -9,10 +9,11 @@ import {
   type SavedWork,
 } from "@/platform/workspaces/types";
 import { createApplicationDraft } from "@/products/applications/server";
+import { markCreatorDraftSnapshot } from "@/platform/workspaces/creator-draft-snapshot";
 import { durableDb, durableRpc, load } from "@/products/applications/repository";
 
 const database = vi.hoisted(() => ({ current: vi.fn() }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: database.current }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: database.current }));
 
 const actor = { userId: "owner", verifiedEmail: "owner@example.com" };
 const payload = createApplicationDraft({
@@ -51,6 +52,17 @@ describe("native application storage authority", () => {
     await expect(load(boundedStore, actor, work.id)).rejects.toBeInstanceOf(WorkspaceStoreError);
     expect(db.from).toHaveBeenCalledWith("application_states");
     expect(db.rpc).not.toHaveBeenCalled();
+  });
+
+  it("keeps an authorized draft snapshot isolated from records created by concurrent publication", async () => {
+    const db = { from: vi.fn(() => { throw new Error("Private customer record must not be fetched"); }), rpc: vi.fn() };
+    database.current.mockReturnValue(db);
+    const draft = markCreatorDraftSnapshot({ ...work, payload: { ...payload, status: "draft", records: [], recordsRevision: 0, release: null, releases: [] } });
+    vi.spyOn(boundedStore, "read").mockResolvedValue(draft);
+    const loaded = await load(boundedStore, actor, work.id);
+    expect(loaded.state.records).toEqual([]);
+    expect(loaded.state.releases).toEqual([]);
+    expect(db.from).not.toHaveBeenCalled();
   });
 
   it("uses legacy compatibility state only for an explicitly injected store", async () => {

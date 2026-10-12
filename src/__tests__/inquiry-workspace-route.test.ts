@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
   class InquiryValidationError extends Error {}
   return {
     verifyAuth: vi.fn(),
+    decider: vi.fn(),
     actor: vi.fn(),
     access: vi.fn(),
     permission: vi.fn(),
@@ -23,13 +25,15 @@ const mocks = vi.hoisted(() => {
     read: vi.fn(),
     execute: vi.fn(),
     workspace: vi.fn(),
+    systemsRelease: vi.fn(),
     InquiryConcurrencyError,
     InquiryPersistenceError,
     InquiryValidationError,
   };
 });
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/lib/operator-decisions", () => ({ sessionTenantDecider: mocks.decider }));
+vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: mocks.verifyAuth,
   getAuthUserId: mocks.actor,
   requireTenantAccess: mocks.access,
@@ -41,6 +45,9 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
 vi.mock("@/products/inquiries/server", async () => ({
   ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   parseInquirySurfaceAction: mocks.parse,
   inquiryPermissionForAction: mocks.permissionForAction,
   readInquirySurface: mocks.read,
@@ -54,6 +61,8 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
   InquiryWorkspaceExitBlockedError: class InquiryWorkspaceExitBlockedError extends Error {},
   InquiryWorkspaceExitUnavailableError: class InquiryWorkspaceExitUnavailableError extends Error {},
 }));
+
+vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: mocks.systemsRelease }));
 
 import { GET, POST } from "@/app/api/inquiry-workspace/route";
 
@@ -79,6 +88,7 @@ describe("authenticated inquiry workspace route", () => {
     mocks.release.mockReturnValue(true);
     mocks.verifyAuth.mockResolvedValue(true);
     mocks.actor.mockResolvedValue("owner-1");
+    mocks.decider.mockResolvedValue({ kind: "member", actorId: "owner-1" });
     mocks.access.mockImplementation(async (tenant: string) => tenant === "tenant-a" ? null : new Response(null, { status: 404 }));
     mocks.permission.mockResolvedValue(null);
     mocks.routedTenant.mockResolvedValue("tenant-a");
@@ -87,12 +97,29 @@ describe("authenticated inquiry workspace route", () => {
     mocks.permissionForAction.mockReturnValue("content:write");
     mocks.read.mockResolvedValue(surface);
     mocks.execute.mockResolvedValue(surface);
+    mocks.systemsRelease.mockResolvedValue(true);
     mocks.workspace.mockImplementation(async ({ fallbackBusinessId }: { fallbackBusinessId: string }) => ({
       businessId: fallbackBusinessId,
       workspaceIds: [],
       exitCompleted: false,
       mapped: false,
     }));
+  });
+
+  it.each(["start", "edit-draft", "publish", "undo", "set-email-consent"])("refuses forged platform-authorized %s commands before action parsing and writes", async kind => {
+    mocks.decider.mockResolvedValue({ kind: "operator", operator: { userId: "operator-1" } });
+    expect((await POST(postRequest({ tenantId: "tenant-a", expectedRevision: 4, action: { kind } }))).status).toBe(403);
+    expect(mocks.parse).not.toHaveBeenCalled(); expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("retains audited operator support inspection without mutation", async () => {
+    mocks.decider.mockResolvedValue({ kind: "operator", operator: { userId: "operator-1" } });
+    expect((await GET(getRequest())).status).toBe(200);
+    expect(mocks.read).toHaveBeenCalled(); expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("accepts independently authorized ordinary agency commands", async () => {
+    mocks.decider.mockResolvedValue({ kind: "agency_staff", staff: { userId: "owner-1", agencyWorkspaceId: "agency-1" } });
+    expect((await POST(postRequest({ tenantId: "tenant-a", expectedRevision: 4, action: canonicalAction }))).status).toBe(200);
+    expect(mocks.execute).toHaveBeenCalled();
   });
 
   it("keeps both methods closed before authentication when the release is disabled", async () => {
@@ -119,6 +146,27 @@ describe("authenticated inquiry workspace route", () => {
     expect(await response.json()).toEqual(surface);
     expect(mocks.access).toHaveBeenCalledWith("tenant-a");
     expect(mocks.read).toHaveBeenCalledWith({ tenantId: "tenant-a", businessId: "business-stable", config });
+  });
+
+  it("carries an existing trusted workspace association into the surface without guessing from tenant identity", async () => {
+    mocks.workspace.mockResolvedValue({ businessId: "mapped-workspace", workspaceIds: ["mapped-workspace"], exitCompleted: false, mapped: true });
+    expect((await GET(getRequest())).status).toBe(200);
+    expect(mocks.read).toHaveBeenCalledWith({ tenantId: "tenant-a", businessId: "mapped-workspace", workspaceId: "mapped-workspace", systemsReleased: true, config });
+    expect((await POST(postRequest({ tenantId: "tenant-a", expectedRevision: 3, action: canonicalAction }))).status).toBe(200);
+    expect(mocks.execute).toHaveBeenCalledWith(expect.objectContaining({ context: { tenantId: "tenant-a", businessId: "mapped-workspace", workspaceId: "mapped-workspace", systemsReleased: true, config, exitCompleted: false } }));
+  });
+
+  it("keeps mapped-workspace Systems navigation off when its flag read fails", async () => {
+    mocks.workspace.mockResolvedValue({ businessId: "mapped-workspace", workspaceIds: ["mapped-workspace"], exitCompleted: false, mapped: true });
+    mocks.systemsRelease.mockRejectedValue(new Error("flag store unavailable"));
+    expect((await GET(getRequest())).status).toBe(200);
+    expect(mocks.read).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "mapped-workspace", systemsReleased: false }));
+  });
+
+  it("does not read a workspace association for a denied tenant", async () => {
+    expect((await GET(getRequest("tenant-b"))).status).toBe(404);
+    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(mocks.read).not.toHaveBeenCalled();
   });
 
   it("binds a mutation to the authenticated actor and server business scope", async () => {

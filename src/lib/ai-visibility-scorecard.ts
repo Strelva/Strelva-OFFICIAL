@@ -1,4 +1,8 @@
+import type { AiVisibilityScorecard } from "@/platform/infra/ai-visibility-scorecard";
 import type { VisibilitySnapshot } from "./visibility/snapshots";
+
+// Preserve the tenant entry point while workspace consumers use the shared contract.
+export type { AiVisibilityScorecard } from "@/platform/infra/ai-visibility-scorecard";
 
 /**
  * "You in AI answers" scorecard — the owner-facing view of the AI-search
@@ -15,23 +19,6 @@ import type { VisibilitySnapshot } from "./visibility/snapshots";
  *  - "New this week" is only claimed when a prior snapshot exists AND the query
  *    was probed-and-absent last week — never on a first-ever probe.
  */
-
-export interface AiVisibilityScorecard {
-  /** The service/trade, for the owner-plain copy ("ask AI for a {service}"). */
-  service: string;
-  /** How many probed queries name the business. */
-  mentionedCount: number;
-  /** How many queries were actually probed this week (the honest denominator). */
-  total: number;
-  /** The queries you come up in — positive framing, listed as-is. */
-  mentionedQueries: string[];
-  /** Queries you newly appear in vs last week (the trend win). */
-  newlyAppeared: string[];
-  /** True when at least one AI answer was probed this week. */
-  hasData: boolean;
-  /** When the latest snapshot was checked (for a subtle "as of" note). */
-  checkedAt: string | null;
-}
 
 export function buildAiVisibilityScorecard(
   latest: VisibilitySnapshot | null,

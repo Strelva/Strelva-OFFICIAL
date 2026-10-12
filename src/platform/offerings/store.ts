@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { OfferingDb } from "./schema";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import {
@@ -134,6 +134,9 @@ function mapInstallation(row: DbRow): OfferingInstallationRecord {
   const result: OfferingInstallationRecord = {
     id: text(row.id),
     businessId: text(row.business_workspace_id),
+    ...(optionalText(row.source_revision_id) ? { sourceRevisionId: optionalText(row.source_revision_id) } : {}),
+    ...(optionalText(row.creator_workspace_id) ? { creatorWorkspaceId: optionalText(row.creator_workspace_id) } : {}),
+    ...(optionalText(row.version_lineage_id) ? { versionLineageId: optionalText(row.version_lineage_id) } : {}),
     definitionId: text(row.definition_id),
     definitionVersion: text(row.definition_version),
     status,

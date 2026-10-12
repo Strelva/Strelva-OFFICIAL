@@ -14,8 +14,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
-import { alertOnce } from "@/lib/monitoring";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { selectRunWindow } from "@/lib/visibility/schedule";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";

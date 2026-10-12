@@ -14,9 +14,9 @@
 
 import type { SitePageConfig, PageConfig } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase } from "../db/client";
-import type { Row, Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase } from "@/platform/infra/db/client";
+import type { Row, Insert } from "@/platform/infra/db/client";
 import {
   getCachedPageConfig,
   invalidateCachedPageConfig,

@@ -1,5 +1,6 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getSuggestions, updateSuggestion } from "@/lib/suggestions";
 import { requireActiveSubscription } from "@/lib/subscription";
@@ -12,6 +13,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const permissionDenied = await requireTenantPermission(tenant, "content:write");
   if (permissionDenied) return permissionDenied;
+  await authorizeTenantOperatorRead(tenant, ["content:write"]);
 
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;

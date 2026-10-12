@@ -1,102 +1,13 @@
-"use client";
-
-import { useState } from "react";
-import { Check, X, FileText, Activity, ClipboardCheck } from "lucide-react";
+import { StCopy, StEmpty, StMono, StRow, StRows, StSection, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { MaintenanceDigest } from "@/lib/maintenance-digest";
-import { AdminEmpty } from "@/app/admin/console";
 
-export function MaintenanceDigests({ initialDigests }: { initialDigests: MaintenanceDigest[] }) {
-  const [digests, setDigests] = useState(initialDigests);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
-
-  async function decide(tenant: string, decision: "approved" | "dismissed") {
-    setBusy(tenant);
-    setError("");
-    try {
-      const res = await fetch("/api/admin/maintenance-digest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ tenant, decision }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body?.error || "Couldn't record that.");
-        return;
-      }
-      // Optimistically drop the decided digest from the pending list.
-      setDigests((cur) => cur.filter((d) => d.tenant !== tenant));
-    } catch {
-      setError("Couldn't record that. Check your connection.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  if (digests.length === 0) {
-    return (
-      <AdminEmpty
-        tone="good"
-        icon={<ClipboardCheck className="h-5 w-5" strokeWidth={1.6} />}
-        title="Nothing needs review"
-        description="Maintenance digests generate weekly (Mondays). Anything that needs your eyes shows up here."
-      />
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {error && <p className="text-[13px] text-critical">{error}</p>}
-      {digests.map((d) => (
-        <div key={d.tenant} className="rounded-xl border border-glass-border bg-surface-raised p-5">
-          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="truncate text-[14px] font-semibold tracking-[-0.01em] text-warm-white">{d.siteName || d.tenant}</p>
-              <p className="text-[12px] text-gray-muted">
-                {d.items.length} item{d.items.length === 1 ? "" : "s"} · week of {d.weekOf}
-              </p>
-            </div>
-            <div className="flex shrink-0 gap-2">
-              <button
-                type="button"
-                onClick={() => decide(d.tenant, "approved")}
-                disabled={busy === d.tenant}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent/85 disabled:opacity-60"
-              >
-                <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                Approve
-              </button>
-              <button
-                type="button"
-                onClick={() => decide(d.tenant, "dismissed")}
-                disabled={busy === d.tenant}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-glass-border px-3 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:text-warm-white disabled:opacity-60"
-              >
-                <X className="h-3.5 w-3.5" strokeWidth={1.8} />
-                Dismiss
-              </button>
-            </div>
-          </div>
-          <ul className="space-y-2">
-            {d.items.map((item) => (
-              <li key={item.id} className="flex items-start gap-2.5 rounded-lg bg-glass px-3 py-2.5">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-dim text-accent">
-                  {item.type === "health" ? (
-                    <Activity className="h-3.5 w-3.5" strokeWidth={1.7} />
-                  ) : (
-                    <FileText className="h-3.5 w-3.5" strokeWidth={1.7} />
-                  )}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-warm-white">{item.title}</p>
-                  <p className="text-[12px] leading-relaxed text-gray-muted">{item.detail}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
-  );
+/** Support inspection only; digest decisions belong to the business workspace. */
+export function MaintenanceDigests({ initialDigests }: { initialDigests: MaintenanceDigest[]; request?: typeof fetch }) {
+  if (initialDigests.length === 0) return <StEmpty><StState kind="live">No pending digests</StState><StCopy muted>Maintenance digests are prepared weekly on Mondays. Any proposed upkeep appears here for inspection.</StCopy></StEmpty>;
+  return <div className="space-y-6">
+    <StCopy muted>The business owner reviews proposed upkeep. Platform support cannot approve or dismiss it.</StCopy>
+    {initialDigests.map(digest => <StSection key={digest.tenant} title={<StTextButton href={`/admin/clients/${encodeURIComponent(digest.tenant)}`}>{digest.siteName || digest.tenant}</StTextButton>} meta={<StMono>{digest.items.length} items · week of {digest.weekOf}</StMono>} action={<StTextButton href="/workspace">Open business workspace</StTextButton>}>
+      <StRows label={`Proposed upkeep for ${digest.siteName || digest.tenant}`}>{digest.items.map(item => <StRow key={item.id} kind={item.type === "health" ? "Site health" : "Content"} title={item.title} detail={item.detail} />)}</StRows>
+    </StSection>)}
+  </div>;
 }

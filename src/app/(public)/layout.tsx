@@ -1,15 +1,17 @@
+import { publicBusinessProfile } from "@/platform/agent-channel/profile";
+import { publicFactsFromRecord, businessJsonLd } from "@/products/connected-sites/contracts";
 import type { Metadata } from "next";
 import { getHostedSite } from "@/products/websites/index";
 import { safeJsonLd, siteDocumentJsonLd, siteDocumentMetadata } from "@/products/websites/index";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
 import { IframeScrollListener } from "@/components/public/IframeScrollListener";
 import { EditModeOverlay } from "@/components/public/EditModeOverlay";
 import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
 import { defaults } from "@/lib/defaults";
-import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
+import { getTenantFromHeaders, getTenantFromHost, isPreviewMode } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { themeContentToCssVars } from "@/lib/design-tokens";
@@ -21,6 +23,10 @@ async function isAdminDomain(): Promise<boolean> {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  if (!h.get("x-tenant") && !getTenantFromHost(h.get("host") || "")) {
+    return { title: "Strelva", robots: { index: false, follow: false } };
+  }
   const hosted = await getHostedSite();
   if (hosted) return siteDocumentMetadata(hosted.document, "/", hosted.origin, hosted.preview);
   const tenant = await getTenantFromHeaders();
@@ -209,6 +215,9 @@ export default async function TenantPublicLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // DEFAULT_TENANT is a legacy fixture fallback, never a public platform brand.
+  const h = await headers();
+  if (!h.get("x-tenant") && !getTenantFromHost(h.get("host") || "")) notFound();
   const [tenant, isPreview, isAdmin] = await Promise.all([
     getTenantFromHeaders(),
     isPreviewMode(),
@@ -222,9 +231,13 @@ export default async function TenantPublicLayout({
   }
 
   const hosted = await getHostedSite();
+  let hostedSchema = hosted ? siteDocumentJsonLd(hosted.document, hosted.origin, hosted.config?.industry) : null;
+  if (hosted && !hosted.preview && process.env.STRELVA_AGENT_READABLE === "1" && process.env.STRELVA_WORKSPACE_RELEASE === "1") {
+    try { const p = await publicBusinessProfile(hosted.tenant); const recordSchema = businessJsonLd({ ...publicFactsFromRecord(p), policies: p.policies, verification: p.verification }, hosted.origin); if (recordSchema) hostedSchema = { ...hostedSchema, ...recordSchema, "@type": hostedSchema?.["@type"] }; } catch { /* The issued page survives a record-read outage. */ }
+  }
   if (hosted) return <>
     <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]">Skip to content</a>
-    {!hosted.preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(siteDocumentJsonLd(hosted.document, hosted.origin, hosted.config?.industry)) }} />}
+    {!hosted.preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(hostedSchema) }} />}
     <main id="main-content">{children}</main>
   </>;
 

@@ -1,3 +1,4 @@
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { acceptWorkspaceInvitation, inspectWorkspaceInvitation, WorkspaceInvitationRecipientError } from "@/platform/workspaces/invitations";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
@@ -9,7 +10,9 @@ type Context = { params: Promise<{ token: string }> };
 export async function GET(_request: Request, context: Context) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "Workspace invitations are not available." }, 503);
   try {
-    return workspaceJson({ invitation: await inspectWorkspaceInvitation((await context.params).token) });
+    const invitation = await inspectWorkspaceInvitation((await context.params).token);
+    const brand = await resolveOwnerBrand(invitation.workspaceId);
+    return workspaceJson({ invitation: { ...invitation, brand } });
   } catch (error) {
     if (error instanceof WorkspaceAccessError) return workspaceJson({ error: "This invitation is missing or unavailable." }, 404);
     return workspaceHttpFailure(error);

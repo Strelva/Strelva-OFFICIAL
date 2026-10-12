@@ -7,7 +7,7 @@
  * record when Redis is unconfigured (writes become a no-op that still returns the
  * computed state).
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export type CrmStage = "lead" | "building" | "live" | "at_risk" | "churned";
 

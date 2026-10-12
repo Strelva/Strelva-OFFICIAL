@@ -16,7 +16,7 @@ const mockStoreRecentReply = vi.fn();
 const mockAddEvent = vi.fn();
 const mockGetEvents = vi.fn();
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: (...a: unknown[]) => mockIsSuperAdmin(...a) }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: (...a: unknown[]) => mockIsSuperAdmin(...a) }));
 vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a) }));
 vi.mock("@/lib/review-replies", () => ({
@@ -54,45 +54,15 @@ beforeEach(() => {
   mockStoreRecentReply.mockResolvedValue(undefined);
 });
 
-describe("draftReviewReplyForReview", () => {
-  it("rejects a non-super-admin without touching the queue", async () => {
+describe("retired operator review drafting", () => {
+  it("rejects non-admins without touching client records", async () => {
     mockIsSuperAdmin.mockResolvedValue(false);
-    const res = await draftReviewReplyForReview("gldf", "r1");
-    expect(res).toEqual({ ok: false, drafted: false, reason: "unauthorized" });
+    expect(await draftReviewReplyForReview("gldf", "r1")).toEqual({ ok: false, drafted: false, reason: "unauthorized" });
+    expect(mockGetReviews).not.toHaveBeenCalled();
     expect(mockAddEvent).not.toHaveBeenCalled();
   });
-
-  it("queues a PENDING review_reply_draft (never publishes) for a matched review", async () => {
-    const res = await draftReviewReplyForReview("gldf", "r1");
-    expect(res).toEqual({ ok: true, drafted: true });
-    expect(mockAddEvent).toHaveBeenCalledTimes(1);
-    const event = mockAddEvent.mock.calls[0]![0];
-    expect(event.status).toBe("pending");
-    expect(event.type).toBe("review");
-    expect(event.metadata.kind).toBe("review_reply_draft");
-    // dedupe key follows the poller convention (provider externalId)
-    expect(event.metadata.reviewId).toBe("ext-r1");
-  });
-
-  it("is idempotent when a pending draft already exists", async () => {
-    mockGetEvents.mockResolvedValue([
-      { type: "review", metadata: { kind: "review_reply_draft", reviewId: "ext-r1" } },
-    ]);
-    const res = await draftReviewReplyForReview("gldf", "r1");
-    expect(res).toEqual({ ok: true, drafted: false, reason: "already_drafted" });
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("no-ops honestly when the review already has a reply", async () => {
-    mockGetReviews.mockResolvedValue([review({ reply: "Already handled" })]);
-    const res = await draftReviewReplyForReview("gldf", "r1");
-    expect(res).toEqual({ ok: true, drafted: false, reason: "already_replied" });
-    expect(mockAddEvent).not.toHaveBeenCalled();
-  });
-
-  it("reports a draft failure without throwing", async () => {
-    mockDraftReviewReply.mockRejectedValue(new Error("model down"));
-    const res = await draftReviewReplyForReview("gldf", "r1");
-    expect(res).toEqual({ ok: false, drafted: false, reason: "draft_failed" });
+  it.each([["gldf", "r1"], ["missing", "unknown"], ["", ""]])("retires platform-authorized drafting for %s/%s before reads and effects", async (tenant, reviewId) => {
+    expect(await draftReviewReplyForReview(tenant, reviewId)).toEqual({ ok: false, drafted: false, reason: "platform_content_authority_retired" });
+    for (const call of [mockGetTenantConfig, mockGetReviews, mockDraftReviewReply, mockGetEvents, mockAddEvent, mockStoreRecentReply]) expect(call).not.toHaveBeenCalled();
   });
 });

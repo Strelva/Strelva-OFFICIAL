@@ -1,5 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantConfig } from "../lib/types";
+import { modelAdmissionRpc, modelAdmissionWorkspaceId } from "./support/model-admission";
+import { setReleaseFlagsDb } from "@/platform/release-flags/store";
+
+const modelRpc = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: modelRpc }), isSupabaseConfigured: () => false }));
 
 // --- Gemini mock: lets each test decide whether generateText resolves or throws.
 const generateTextMock = vi.fn();
@@ -96,8 +101,15 @@ function reportData(overrides: Partial<WeeklyReportData> = {}): WeeklyReportData
   };
 }
 
+beforeEach(() => {
+  vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "1");
+  setReleaseFlagsDb(null);
+  modelRpc.mockReset().mockImplementation(modelAdmissionRpc);
+});
 afterEach(() => {
   vi.clearAllMocks();
+  setReleaseFlagsDb(null);
+  vi.unstubAllEnvs();
 });
 
 describe("buildReportSubject (verdict-first)", () => {
@@ -280,6 +292,7 @@ describe("generateReportSummary fallback path", () => {
     expect(report).not.toBeNull();
     // Deterministic phrasing proves the fallback ran instead of the model.
     expect(report!.summary).toContain("people found you this week");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
   });
 
   it("falls back when Gemini returns empty text", async () => {
@@ -288,6 +301,7 @@ describe("generateReportSummary fallback path", () => {
 
     const report = await generateWeeklyReport("t1");
     expect(report!.summary).toContain("people found you this week");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
   });
 
   it("uses the model output when Gemini succeeds", async () => {
@@ -296,6 +310,22 @@ describe("generateReportSummary fallback path", () => {
 
     const report = await generateWeeklyReport("t1");
     expect(report!.summary).toBe("Great week! The model wrote this.");
+    expect(generateTextMock).toHaveBeenCalledTimes(1);
+    expect(modelRpc).toHaveBeenCalledWith("resolve_billing_workspace", { p_workspace_id: null, p_tenant_id: "t1" });
+    expect(modelRpc).toHaveBeenCalledWith("business_ai_budget", { p_workspace_id: modelAdmissionWorkspaceId });
+  });
+
+  it.each(["missing", "unavailable"])("uses an uncharged report when the trusted workspace is %s", async state => {
+    vi.stubEnv("STRELVA_BUSINESS_AI_BUDGET", "0");
+    getTenantConfigMock.mockResolvedValue(tenant({ id: "t1" }));
+    modelRpc.mockResolvedValue({ data: null, error: state === "unavailable" ? { message: "mapping unavailable" } : null });
+    generateTextMock.mockResolvedValue({ text: "must not be used" });
+    const report = await generateWeeklyReport("t1");
+    expect(report!.summary).toContain("people found you this week");
+    expect(generateTextMock).not.toHaveBeenCalled();
+    expect(modelRpc.mock.calls.filter(([name]) => ["resolve_billing_workspace", "business_ai_budget", "record_model_calls"].includes(name))).toEqual([
+      ["resolve_billing_workspace", { p_workspace_id: null, p_tenant_id: "t1" }],
+    ]);
   });
 });
 

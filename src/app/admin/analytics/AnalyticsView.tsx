@@ -520,7 +520,7 @@ export function AnalyticsView({
             <input
               value={tenantQuery}
               onChange={(e) => setTenantQuery(e.target.value)}
-              placeholder="Filter clients…"
+              placeholder="Filter sites…"
               className="w-full bg-transparent py-2 text-[12px] text-warm-white placeholder:text-gray-faint focus:outline-none"
             />
           </div>
@@ -545,7 +545,7 @@ export function AnalyticsView({
             );
           })}
           {visibleTenants.length === 0 && (
-            <span className="text-xs text-gray-faint">No clients match</span>
+            <span className="text-xs text-gray-faint">No sites match</span>
           )}
         </div>
       </div>

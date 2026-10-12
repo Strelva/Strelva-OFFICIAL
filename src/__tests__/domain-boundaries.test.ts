@@ -17,7 +17,7 @@ describe("transitive domain dependencies", () => {
   it.each([
     'import type { Store } from "./repository";',
     'export { Page } from "@/experience/example";',
-    'const db = import("@/lib/db/client");',
+    'const db = import("@/platform/infra/db/client");',
     'import Store = require("./server.js");',
     'type Service = import("./delivery-service").Service;',
   ])("rejects adapter dependencies: %s", (source) => {

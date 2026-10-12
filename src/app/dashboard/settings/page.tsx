@@ -1291,7 +1291,7 @@ const BILLING_STATUS_COPY: Record<SubscriptionStatus, { label: string; className
 const FOUNDER_COMP_COPY = {
   label: "Founder comp",
   className: "bg-warning/12 text-warning",
-  note: "Full access is comped for this founder account. No customer billing is due.",
+  note: "Full access is comped for this founder account. No billing is due.",
 };
 
 function BillingSection() {

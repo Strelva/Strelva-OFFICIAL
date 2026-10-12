@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * GET /api/dashboard/site-audit/history
  *
@@ -12,7 +13,7 @@
 
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getScanHistory } from "@/lib/scan-store";
 
@@ -27,6 +28,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   try {
     // scan-store keeps points oldest-to-newest; the card wants newest-first.

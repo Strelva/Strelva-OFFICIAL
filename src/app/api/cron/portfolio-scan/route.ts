@@ -1,9 +1,11 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { scanAllTenants } from "@/lib/scan";
 import { getAllTenants } from "@/lib/tenants";
 import { getScanSummaries } from "@/lib/scan-store";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { sendHealthRegressionEmail } from "@/lib/delivery-email";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { requireCronRequest } from "@/lib/cron-auth";
@@ -78,8 +80,9 @@ export async function GET(request: Request) {
     if (prior.overallScore - s.score < HEALTH_REGRESSION_MIN_DROP) continue;
 
     const tenant = tenantById.get(s.tenant);
-    const email = tenant?.ownerEmail?.trim();
-    if (!tenant || !email || !redis) continue;
+    if (!tenant || !redis) continue;
+    const email = await ownerNoticeEmail(tenant);
+    if (!email) continue;
 
     const key = `reb:health-alert-sent:${s.tenant}:${prior.grade}>${s.grade}`;
     const fresh = await redis.set(key, "1", { nx: true, ex: HEALTH_ALERT_TTL_SECONDS }).catch(() => null);
@@ -93,7 +96,7 @@ export async function GET(request: Request) {
       currentGrade: s.grade,
       previousScore: prior.overallScore,
       currentScore: s.score,
-      healthUrl: getTenantDashboardUrl(tenant, "/dashboard/health"),
+      healthUrl: await ownerNoticeUrl(tenant, "/dashboard/health", getTenantDashboardUrl(tenant, "/dashboard/health")),
       // Opt in to the CRM comms log so a real health-drop alert accrues on the timeline.
       tenantId: tenant.id,
       logPrefix: "[cron portfolio-scan]",

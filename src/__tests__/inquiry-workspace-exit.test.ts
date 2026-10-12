@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   client: null as unknown,
 }));
 
-vi.mock("@/lib/db/client", () => ({
+vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => mocks.client,
 }));
 

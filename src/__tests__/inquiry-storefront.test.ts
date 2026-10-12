@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InquiryCapabilityState } from "@/products/inquiries/contracts";
 import { projectPublishedInquiry } from "@/products/inquiries/storefront";
 
@@ -7,6 +7,9 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/products/inquiries/server", async () => ({
   ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   getInquiryRepository: () => ({ getSnapshot: mocks.snapshot }),
   projectPublishedInquiry: (await import("@/products/inquiries/storefront")).projectPublishedInquiry,
 }));
@@ -31,12 +34,14 @@ const capability: InquiryCapabilityState = {
 const request = () => GET(new Request("https://app.example/api/v1/inquiries/example?capabilityId=cap-example"), { params: Promise.resolve({ tenant: "example" }) });
 
 describe("public inquiry form read", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.release.mockReturnValue(true);
     mocks.tenant.mockResolvedValue({ active: true, stableId: "stable-business" });
     mocks.snapshot.mockResolvedValue({ state: { capabilities: [capability] } });
     mocks.workspace.mockResolvedValue({ businessId: "stable-business", workspaceIds: [], exitCompleted: false, mapped: false });
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "");
   });
 
   it("publishes only the form and its exact version, never private routing", async () => {
@@ -71,6 +76,19 @@ describe("public inquiry form read", () => {
 
   it("allows readback of an accepted version still awaiting verification", () => {
     expect(projectPublishedInquiry({ ...capability, status: "live_unverified" })?.version).toBe(3);
+  });
+
+  it("keeps the paused published form available behind the durable-record rollout without exposing routing", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    mocks.snapshot.mockResolvedValue({ state: { capabilities: [{ ...capability, status: "paused" }] } });
+    const response = await request();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.version).toBe(3);
+    expect(JSON.stringify(body)).not.toContain("private-inbox");
+    vi.stubEnv("DUAL_WRITE_PG", "0");
+    expect(projectPublishedInquiry({ ...capability, status: "paused" })).toBeNull();
   });
 
   it("distinguishes missing forms from unavailable persistence", async () => {

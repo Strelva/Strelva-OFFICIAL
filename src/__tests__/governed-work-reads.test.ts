@@ -10,7 +10,7 @@ const mockRedis = {
   get: vi.fn(),
 };
 let redisClient: typeof mockRedis | null = mockRedis;
-vi.mock("../lib/redis", () => ({ getRedis: () => redisClient }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redisClient }));
 
 // Stub the governed-work repository so we can assert whether the Postgres READ
 // path is touched (and, when it is, substitute a reconstructed event). Provide

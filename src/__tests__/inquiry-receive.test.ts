@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
-import { recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
+import { evaluateInquiryResponsibility, recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
+import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
+import { inquiryCurrentness } from "@/products/inquiries/currentness";
+import { setInquiryRecordsDb } from "@/platform/infra/inquiry-records";
 
 const TENANT = "acme";
 const BUSINESS = "acme-business";
@@ -69,6 +72,41 @@ function snapshot() {
 const fields = { name: "Ada Rivera", email: "ada@example.test", timeline: "Soon" };
 
 describe("canonical inquiry receive seam", () => {
+  afterEach(() => { vi.unstubAllEnvs(); setInquiryRecordsDb(undefined); });
+  it("validates current confirmed business services without rewriting the captured form release", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_BUSINESS_FACTS", "1");
+    setInquiryRecordsDb({ rpc: vi.fn(async name => ({ error: null, data: name === "read_inquiry_business_context" ? {
+      workspaceId: "f6300000-0000-4000-8000-000000000010", facts: {}, people: [],
+      services: [{ id: "f6300000-0000-4000-8000-000000000020", name: "Current catering", description: null, priceText: null, active: true, verified: true }],
+    } : null })) });
+    const repository = createInMemoryInquiryRepository();
+    const value = snapshot(); const definition = value.state.capabilities[0]!.live!;
+    definition.form.fields[2] = { id: "service", label: "Service", kind: "select", component: "select_field", required: true, options: ["Old catering"] };
+    definition.record.fields[2] = definition.form.fields[2]!;
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state: value.state });
+    expect(await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_current_service", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields: { name: "Ada", email: "ada@example.test", service: "Current catering" }, receivedAt: RECEIVED_AT, repository })).toMatchObject({ status: "recorded" });
+    const saved = await repository.getSnapshot(TENANT, BUSINESS);
+    expect(saved?.state.capabilities[0]?.live?.form.fields[2]?.options).toEqual(["Old catering"]);
+    expect(saved?.state.timeline.some(event => event.inquiryId === "lead_current_service" && event.type === "record_created")).toBe(true);
+    expect(await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_removed_service", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields: { name: "Ada", email: "ada@example.test", service: "Old catering" }, receivedAt: RECEIVED_AT, repository })).toMatchObject({ status: "rejected" });
+  });
+  it("records paused intake without resuming its capability or authorizing customer work", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = "paused";
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_paused", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields, receivedAt: RECEIVED_AT, repository });
+    expect(result.status).toBe("recorded");
+    const saved = await repository.getSnapshot(TENANT, BUSINESS);
+    expect(saved?.state.capabilities[0]!.status).toBe("paused");
+    expect(saved?.state.timeline.filter((event) => event.inquiryId === "lead_paused").map((event) => event.type)).toEqual(["received", "record_created"]);
+    expect(inquiryCurrentness(saved!.state, BUSINESS, { capabilityId: CAPABILITY, capabilityVersion: 2 })).toMatchObject({ current: false, reason: "not_live" });
+  });
   it("records engine receipt and received/record-created timeline, then reads it idempotently", async () => {
     const repository = createInMemoryInquiryRepository();
     const seeded = await repository.compareAndSwap({
@@ -108,6 +146,86 @@ describe("canonical inquiry receive seam", () => {
       repository,
     });
     expect(second).toMatchObject({ status: "already_recorded", receiptId: first.receiptId });
+  });
+
+  // The same table runs against message review approval and the follow-up sweep.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("records an inquiry for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = status;
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: `lead_${status}`,
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: createMemoryInquiryCaptureRepairStore(),
+    });
+    expect(result.status).toBe(current ? "recorded" : "stale");
+  });
+
+  it.each([
+    ["a republished intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.live!.version = 3; }, "inquiry_capability_changed"],
+    ["a paused intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.status = "paused"; }, "inquiry_capability_unavailable"],
+  ] as const)("queues a receipt repair when a submission meets %s", async (_label, change, reason) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    change(state);
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const queue = createMemoryInquiryCaptureRepairStore();
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: queue,
+    });
+    expect(result).toEqual({ status: "stale", reason });
+    expect(await queue.listDue({ tenantId: TENANT, now: RECEIVED_AT, limit: 10 })).toMatchObject([{
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      capabilityVersion: 2,
+      lastError: reason,
+    }]);
+  });
+
+  it("evaluates the newest created responsibility even when an older one sorts first", () => {
+    const workspace = snapshot();
+    const engine = new InquiryEngine({ businessId: BUSINESS, state: workspace.state, now: () => RECEIVED_AT });
+    const base = {
+      capabilityId: CAPABILITY,
+      actorId: "owner-1",
+      title: "Handle inquiries",
+      scope: "Reply to inquiries.",
+      allowedActions: ["reply" as const],
+      escalation: { primary: "owner@acme.test", secondary: null },
+      hours: { timezone: "UTC", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" },
+    };
+    const older = engine.createResponsibility({ ...base, now: "2026-09-01T00:00:00.000Z" });
+    engine.createResponsibility({ ...base, now: "2026-09-05T00:00:00.000Z" });
+    // Pausing touches the older policy last, and it now sorts first.
+    engine.pauseResponsibility(older.id, "owner-1", "2026-09-10T00:00:00.000Z");
+    const state = engine.snapshot();
+    state.responsibilities.reverse();
+    const evaluation = evaluateInquiryResponsibility({ ...workspace, state: { ...state, inquiries: [] } }, CAPABILITY, "reply", "This reply is from Strelva.", RECEIVED_AT);
+    expect(evaluation?.reason).not.toBe("This responsibility is paused.");
+    expect(evaluation?.decision).toBe("approval_required");
   });
 
   it("rejects a changed select option before writing a receipt", async () => {

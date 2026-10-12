@@ -29,6 +29,7 @@ export function ContentAutonomyPanel() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [note, setNote] = useState("");
   const dashboardHref = useDashboardOptional()?.dashboardHref ?? ((p: string) => p);
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function ContentAutonomyPanel() {
     setMode(next);
     setSaving(true);
     setError("");
+    setNote("");
     setSaved(false);
     try {
       const res = await fetch(dashboardHref("/api/dashboard/content-autonomy"), {
@@ -58,7 +60,11 @@ export function ContentAutonomyPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ mode: next }),
       });
-      if (!res.ok) throw new Error("Couldn't save that.");
+      const data = (await res.json().catch(() => null)) as { mode?: ContentAutonomy; note?: string | null; error?: string } | null;
+      if (!res.ok) throw new Error(data?.error || "Couldn't save that.");
+      // The business's Needs you policy decides what is in force; show it, and why when it differs.
+      if (data?.mode === "auto" || data?.mode === "approve") setMode(data.mode);
+      if (data?.note) setNote(data.note);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
@@ -110,6 +116,7 @@ export function ContentAutonomyPanel() {
         })}
       </div>
 
+      {note && <p className="mt-2 text-[12px] leading-relaxed text-gray-muted" role="status">{note}</p>}
       {error && <p className="mt-2 text-[12px] text-critical" role="alert">{error}</p>}
     </section>
   );

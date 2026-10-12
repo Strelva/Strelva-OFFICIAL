@@ -4,7 +4,7 @@ import { makeRedisMock } from "./support/redis-mock";
 const mockRedis = makeRedisMock();
 const store = new Map<string, unknown>();
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/storage", () => ({
   getContent: async (section: string, tenant: string) => store.get(`${tenant}:${section}`) ?? null,
   setContent: async (section: string, value: unknown, tenant: string) => {

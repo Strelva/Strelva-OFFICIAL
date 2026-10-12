@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
   buildDeliveryStatusUrl,
@@ -9,7 +9,8 @@ import {
   type DeliveryPlan,
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
-import { OPERATOR_URL } from "@/lib/brand";
+import { strelvaAgencyWorkspaceId } from "@/platform/workspaces/strelva-agency";
+import { OPERATOR_URL } from "@/platform/infra/brand";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 
 export async function POST(req: Request) {
@@ -20,6 +21,16 @@ export async function POST(req: Request) {
   const body = await readJsonObject(req);
   if (!body) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  // Account access is platform entry, not consent to agency sales. These typed
+  // routes never create a delivery lead or send a sales notification.
+  if (body.requestType === "business_access" || body.requestType === "agency_access") {
+    return NextResponse.json({ success: true, requestType: body.requestType,
+      next: body.requestType === "agency_access" ? "/sign-up?as=agency" : "/sign-up" });
+  }
+  if (body.requestType !== "agency_service") {
+    return NextResponse.json({ error: "Choose business access, agency access, or explicitly request Strelva Agency's service." }, { status: 400 });
   }
 
   const { businessName, description, location, email, phone, currentWebsite, plan, referredBy } = body;
@@ -104,6 +115,8 @@ export async function POST(req: Request) {
 
   const leadData = {
     businessName: normalizedBusinessName,
+    requestType: "agency_service",
+    agencyWorkspaceId: strelvaAgencyWorkspaceId(),
     description: safeDescription || null,
     location: safeLocation || null,
     email: normalizedEmail,
