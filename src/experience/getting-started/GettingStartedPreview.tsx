@@ -9,12 +9,11 @@ import { StartBusinessFromCheck } from "./StartBusinessFromCheck";
 
 const BUSINESS = "d2960000-0000-4000-8000-000000000001";
 const FOUND: FoundFact[] = [
-  { id: "display_name:northside", key: "display_name", label: "Business name", display: "Northside Bakery & Café", value: "Northside Bakery & Café", source: { url: "https://northside-bakery.example/", quote: "Northside Bakery & Café" }, current: "Northside Bakery" },
-  { id: "phone:1", key: "phone", label: "Phone", display: "(716) 555-0142", value: "(716) 555-0142", source: { url: "https://northside-bakery.example/contact", quote: "Call us at (716) 555-0142 to order" }, current: null },
-  { id: "email:1", key: "email", label: "Public email", display: "orders@northside-bakery.example", value: "orders@northside-bakery.example", source: { url: "https://northside-bakery.example/contact", quote: "orders@northside-bakery.example" }, current: null },
-  { id: "address:1", key: "address", label: "Address", display: "418 Elmwood Ave, Buffalo, NY 14222", value: { formatted: "418 Elmwood Ave, Buffalo, NY 14222" }, source: { url: "https://northside-bakery.example/visit", quote: "418 Elmwood Ave, Buffalo, NY 14222" }, current: null },
-  { id: "service:cakes", key: "service", label: "Service", display: "Custom celebration cakes", value: "Custom celebration cakes", source: { url: "https://northside-bakery.example/cakes", quote: "Custom celebration cakes" }, current: null },
-  { id: "service:catering", key: "service", label: "Service", display: "Office breakfast catering", value: "Office breakfast catering", source: { url: "https://northside-bakery.example/catering", quote: "Office breakfast catering for 10 to 200" }, current: null },
+  { entity: "fact", key: "phone", id: "phone:1", label: "Phone", display: "(716) 555-0142", value: "(716) 555-0142", sourceUrl: "https://northside-bakery.example/contact", quote: "Call us at (716) 555-0142 to order", current: "(716) 555-0100" },
+  { entity: "fact", key: "email", id: "email:1", label: "Email", display: "orders@northside-bakery.example", value: "orders@northside-bakery.example", sourceUrl: "https://northside-bakery.example/contact", quote: "orders@northside-bakery.example", current: null },
+  { entity: "fact", key: "address", id: "address:1", label: "Address", display: "418 Elmwood Ave, Buffalo, NY 14222", value: { formatted: "418 Elmwood Ave, Buffalo, NY 14222" }, sourceUrl: "https://northside-bakery.example/visit", quote: "418 Elmwood Ave, Buffalo, NY 14222", current: null },
+  { entity: "service", id: "service:cakes", label: "Service", display: "Custom celebration cakes", value: { name: "Custom celebration cakes" }, sourceUrl: "https://northside-bakery.example/cakes", quote: "Custom celebration cakes", current: null },
+  { entity: "service", id: "service:catering", label: "Service", display: "Office breakfast catering", value: { name: "Office breakfast catering" }, sourceUrl: "https://northside-bakery.example/catering", quote: "Office breakfast catering for 10 to 200", current: null },
 ];
 
 /** Fictional business. Every request stays in this preview; nothing is read or written. */

@@ -9,32 +9,46 @@ import { z } from "zod";
  * record until the owner confirms it; confirming is the owner's own write.
  */
 
-export const FOUND_FACT_KEYS = ["display_name", "phone", "email", "address", "service"] as const;
+/*
+ * One Found-fact shape for the whole product: these mirror lane L3's
+ * `foundFactInputSchema` / `FOUND_FACT_KEYS` in
+ * src/products/agency-clients/contracts.ts (table `business_found_facts`,
+ * migration 20261024300000_claim_review.sql) field for field. At merge,
+ * import them from there and delete these copies. The owner path here does
+ * not stage rows: L3's table and RPCs are agency-add/claim only (agency id
+ * NOT NULL), so the owner reads and decides in one sitting.
+ */
+export const FOUND_FACT_KEYS = ["phone", "email", "address", "hours", "description", "links"] as const;
 export type FoundFactKey = typeof FOUND_FACT_KEYS[number];
+export type FoundFactEntity = "fact" | "service" | "person";
 
-export const FOUND_FACT_LABELS: Record<FoundFactKey, string> = {
-  display_name: "Business name",
-  phone: "Phone",
-  email: "Public email",
-  address: "Address",
-  service: "Service",
+export const FOUND_FACT_LABELS: Record<FoundFactKey | "service" | "person", string> = {
+  phone: "Phone", email: "Email", address: "Address", hours: "Hours", description: "Description", links: "Links",
+  service: "Service", person: "Person",
 };
 
-export interface FoundFactSource { url: string; quote: string }
+const sourceUrl = z.string().min(8).max(2048).regex(/^https?:\/\/\S+$/);
+const quote = z.string().trim().min(1).max(300);
+const named = z.object({ name: z.string().trim().min(1).max(160) }).strict();
 
-export interface FoundFact {
-  /** Stable within one reading: key plus the value's text. */
+/** One thing the crawl read, before the owner has seen it (L3's `foundFactInputSchema`). */
+export const foundFactInputSchema = z.discriminatedUnion("entity", [
+  z.object({ entity: z.literal("fact"), key: z.enum(FOUND_FACT_KEYS), value: z.unknown(), sourceUrl, quote }).strict(),
+  z.object({ entity: z.literal("service"), value: named, sourceUrl, quote }).strict(),
+  z.object({ entity: z.literal("person"), value: named, sourceUrl, quote }).strict(),
+]);
+export type FoundFactInput = z.infer<typeof foundFactInputSchema>;
+
+/** A Found fact as the owner sees it here: the L3 input shape plus what the screen needs. */
+export type FoundFact = FoundFactInput & {
+  /** Stable within one reading. */
   id: string;
-  key: FoundFactKey;
   label: string;
   /** What the owner reads; for an address, its formatted line. */
   display: string;
-  /** The value exactly as the business record would store it. */
-  value: unknown;
-  source: FoundFactSource | null;
   /** What the record holds for this key today, when it differs. */
   current: string | null;
-}
+};
 
 export interface WebsiteReading {
   url: string;
@@ -70,7 +84,7 @@ export const gettingStartedActionSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("confirm_found_facts"), workspaceId: uuid, revision: z.number().int().min(0),
     website: z.string().trim().min(1).max(2048).optional(),
-    facts: z.array(z.object({ key: z.enum(FOUND_FACT_KEYS), value: z.unknown() }).strict()).max(40),
+    facts: z.array(foundFactInputSchema).max(40),
   }).strict(),
 ]);
 export type GettingStartedAction = z.infer<typeof gettingStartedActionSchema>;

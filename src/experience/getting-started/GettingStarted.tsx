@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { StEmpty, StHead, StLabel, StNotice, StPage, StPill, StRow, StRows, StSection, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import { heldBriefKey, type FoundFact, type GettingStartedBusiness, type WebsiteReading } from "@/products/getting-started/contracts";
+import { heldBriefKey, type FoundFact, type FoundFactInput, type GettingStartedBusiness, type WebsiteReading } from "@/products/getting-started/contracts";
 
 export interface GettingStartedLinks {
   home: string;
@@ -18,6 +18,13 @@ export interface GettingStartedLinks {
 }
 
 const noSubscription = () => () => undefined;
+
+/** Send back exactly the shared Found-fact shape; screen-only fields stay here. */
+function foundFactInput(fact: FoundFact): FoundFactInput {
+  return fact.entity === "fact"
+    ? { entity: "fact", key: fact.key, value: fact.value, sourceUrl: fact.sourceUrl, quote: fact.quote }
+    : { entity: fact.entity, value: fact.value, sourceUrl: fact.sourceUrl, quote: fact.quote };
+}
 
 function errorText(body: unknown, fallback: string): string {
   return body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string" ? (body as { error: string }).error : fallback;
@@ -112,7 +119,7 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
     const facts = reading.facts.filter(fact => chosen.has(fact.id));
     inFlight.current = true; setBusy("save"); setError("");
     try {
-      const body = await post({ action: "confirm_found_facts", workspaceId: business.workspaceId, revision: reading.revision, ...(useAsWebsite ? { website: reading.url } : {}), facts: facts.map(fact => ({ key: fact.key, value: fact.value })) }) as { saved?: string[]; revision?: number };
+      const body = await post({ action: "confirm_found_facts", workspaceId: business.workspaceId, revision: reading.revision, ...(useAsWebsite ? { website: reading.url } : {}), facts: facts.map(foundFactInput) }) as { saved?: string[]; revision?: number };
       setSaved(body.saved ?? []);
       onSaved(typeof body.revision === "number" ? body.revision : revision, useAsWebsite ? reading.url : null);
       setReading(null);
@@ -145,7 +152,7 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
                 <span className="text-[12px] text-gray-muted">{fact.label}</span>
                 <span className="break-words text-[14px] text-warm-black">{fact.display}</span>
                 {fact.current ? <span className="text-[12px] text-gray-muted">Replaces {fact.current}</span> : null}
-                {fact.source ? <span className="break-words text-[12px] text-gray-muted">From <a className="underline underline-offset-2" href={fact.source.url} target="_blank" rel="noopener noreferrer">{sourceLabel(fact.source.url)}</a>: &ldquo;{fact.source.quote}&rdquo;</span> : <span className="text-[12px] text-gray-muted">Source not recorded</span>}
+                <span className="break-words text-[12px] text-gray-muted">From <a className="underline underline-offset-2" href={fact.sourceUrl} target="_blank" rel="noopener noreferrer">{sourceLabel(fact.sourceUrl)}</a>: &ldquo;{fact.quote}&rdquo;</span>
               </span>
             </label>
           </li>)}</ul>}

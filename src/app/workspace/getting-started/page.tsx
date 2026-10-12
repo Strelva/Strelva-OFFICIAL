@@ -40,7 +40,8 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
         home,
         details: `/workspace/business-details?${new URLSearchParams({ workspaceId })}`,
         agency: `/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`,
-        google: state.data.google ? `/workspace/google?${new URLSearchParams({ workspaceId })}` : null,
+        // L4 owns the fresh Connect Google start there and brings the owner back here.
+        google: state.data.google ? `/workspace/google?${new URLSearchParams({ workspaceId, returnTo: gettingStartedHref(workspaceId) })}` : null,
         connect: state.data.connect ? `/workspace/site?${new URLSearchParams({ workspaceId, entry: "connect" })}` : null,
         request: requestId ? `/workspace/delivery/${requestId}` : null,
       }} />

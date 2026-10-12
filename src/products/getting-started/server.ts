@@ -12,7 +12,7 @@ import { savePublicAiVisibilityResult } from "@/products/ai-visibility/usecase";
 import { getPublicWebsiteAudit, savePublicWebsiteAudit } from "@/products/website-audit/server";
 import { crawlWebsite, WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
 import { extractBusinessFacts } from "@/products/websites/rebuild-pipeline";
-import { CHECK_RESULT_ID, type CheckForBusiness, type FoundFactKey, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
+import { CHECK_RESULT_ID, type CheckForBusiness, type FoundFactInput, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
 import { confirmedPatch, foundFactsFromReading } from "./found-facts";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "./website";
 
@@ -165,7 +165,7 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
   }
 
   /** The owner's own write: only what they ticked, against the revision they saw. */
-  async function confirm(actor: WorkspaceActor, input: { workspaceId: string; revision: number; website?: string; facts: Array<{ key: FoundFactKey; value: unknown }> }) {
+  async function confirm(actor: WorkspaceActor, input: { workspaceId: string; revision: number; website?: string; facts: FoundFactInput[] }) {
     await directBusiness(actor, input.workspaceId);
     const record = await deps.readRecord(actor, input.workspaceId);
     if (record.access !== "owner") throw new WorkspaceAccessError();

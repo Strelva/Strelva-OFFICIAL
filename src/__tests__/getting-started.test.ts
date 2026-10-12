@@ -5,6 +5,7 @@ import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspa
 import type { BusinessFacts } from "@/products/websites/rebuild-pipeline";
 import { WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
 import { confirmedPatch, foundFactsFromReading } from "@/products/getting-started/found-facts";
+import { foundFactInputSchema } from "@/products/getting-started/contracts";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "@/products/getting-started/website";
 import { createGettingStarted, GettingStartedInputError, GettingStartedRateLimitError, GettingStartedUnavailableError, type GettingStartedDeps } from "@/products/getting-started/server";
 
@@ -73,35 +74,46 @@ describe("one website on the business record", () => {
   });
 });
 
-describe("found facts", () => {
-  it("offers only record-shaped facts, each with its page and quote", () => {
+describe("found facts (the shared Found-fact shape)", () => {
+  const key = (item: { entity: string; key?: string }) => item.entity === "fact" ? item.key : item.entity;
+  it("offers only record-shaped facts, each with its page and quote, in L3's input shape", () => {
     const facts = foundFactsFromReading(reading(), record());
-    expect(facts.map(item => [item.key, item.display])).toEqual([
-      ["display_name", "Northside Bakery"], ["phone", "(716) 555-0100"], ["email", "hello@northside.example"],
+    expect(facts.map(item => [key(item), item.display])).toEqual([
+      ["phone", "(716) 555-0100"], ["email", "hello@northside.example"],
       ["address", "12 Elm St, Buffalo, NY 14201"], ["service", "Custom cakes"], ["service", "Bread"],
     ]);
-    expect(facts.find(item => item.key === "email")?.source).toEqual({ url: "https://northside.example/contact", quote: "Hello@Northside.example" });
-    expect(facts.every(item => item.source)).toBe(true);
+    expect(facts.find(item => key(item) === "email")).toMatchObject({ entity: "fact", key: "email", sourceUrl: "https://northside.example/contact", quote: "Hello@Northside.example" });
+    expect(facts.find(item => item.display === "Bread")).toMatchObject({ entity: "service", value: { name: "Bread" } });
+    for (const item of facts) {
+      const { id: _id, label: _label, display: _display, current: _current, ...input } = item;
+      expect(foundFactInputSchema.safeParse(input).success).toBe(true);
+    }
   });
 
   it("skips what the record already holds and shows what a fact would replace", () => {
     const facts = foundFactsFromReading(reading(), record({
-      facts: { display_name: fact("Northside Bakery"), phone: fact("716-555-0199") },
+      facts: { phone: fact("716-555-0199"), email: fact("hello@northside.example") },
       services: [{ id: "5a000000-0000-4000-8000-0000000000c1", name: "bread", description: null, durationMinutes: null, priceText: null, active: true, position: 0, externalRef: null, source: "owner", verified: false, updatedAt: "2026-10-12T00:00:00.000Z" }],
     }));
-    expect(facts.some(item => item.key === "display_name")).toBe(false);
-    expect(facts.find(item => item.key === "phone")?.current).toBe("716-555-0199");
-    expect(facts.filter(item => item.key === "service").map(item => item.display)).toEqual(["Custom cakes"]);
+    expect(facts.some(item => key(item) === "email")).toBe(false);
+    expect(facts.find(item => key(item) === "phone")?.current).toBe("716-555-0199");
+    expect(facts.filter(item => item.entity === "service").map(item => item.display)).toEqual(["Custom cakes"]);
   });
 
   it("builds the owner's write from ticked facts only, revalidating each value", () => {
-    const planned = confirmedPatch(record(), [{ key: "phone", value: "(716) 555-0100" }, { key: "service", value: "Custom cakes" }, { key: "service", value: "custom cakes" }], "northside.example");
+    const src = { sourceUrl: "https://northside.example/", quote: "q" };
+    const planned = confirmedPatch(record(), [
+      { entity: "fact", key: "phone", value: "(716) 555-0100", ...src },
+      { entity: "service", value: { name: "Custom cakes" }, ...src },
+      { entity: "service", value: { name: "custom cakes" }, ...src },
+    ], "northside.example");
     expect(planned).toEqual({ kind: "patch", keys: ["phone", "links", "services"], patch: {
       facts: { phone: { value: "(716) 555-0100" }, links: { value: [{ kind: "website", url: "https://northside.example/" }] } },
       services: [{ op: "upsert", name: "Custom cakes" }],
     } });
-    expect(confirmedPatch(record(), [{ key: "email", value: "not an email" }])).toMatchObject({ kind: "invalid" });
-    expect(confirmedPatch(record({ facts: { phone: fact("(716) 555-0100") } }), [{ key: "phone", value: "(716) 555-0100" }])).toEqual({ kind: "unchanged" });
+    expect(confirmedPatch(record(), [{ entity: "fact", key: "email", value: "not an email", ...src }])).toMatchObject({ kind: "invalid" });
+    expect(confirmedPatch(record(), [{ entity: "fact", key: "hours", value: { weekly: [] }, ...src }])).toMatchObject({ kind: "invalid" });
+    expect(confirmedPatch(record({ facts: { phone: fact("(716) 555-0100") } }), [{ entity: "fact", key: "phone", value: "(716) 555-0100", ...src }])).toEqual({ kind: "unchanged" });
   });
 });
 
@@ -168,7 +180,7 @@ describe("Use my current website", () => {
     const d = member();
     const result = await createGettingStarted(d).readWebsite(ACTOR, BUSINESS, "northside.example");
     expect(result).toMatchObject({ url: "https://northside.example/", revision: 3, pagesRead: 2 });
-    expect(result.facts.length).toBe(6);
+    expect(result.facts.length).toBe(5);
     expect(d.crawl).toHaveBeenCalledWith("https://northside.example/", { maxPages: 5, timeoutMs: 15_000, maxBytes: 2_000_000 });
     expect(d.patchRecord).not.toHaveBeenCalled();
   });
@@ -190,15 +202,15 @@ describe("Use my current website", () => {
 
   it("confirms only the ticked facts as the owner's own write against the revision shown", async () => {
     const d = member();
-    const saved = await createGettingStarted(d).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, website: "northside.example", facts: [{ key: "email", value: "hello@northside.example" }] });
+    const saved = await createGettingStarted(d).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, website: "northside.example", facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] });
     expect(saved).toEqual({ saved: ["email", "links"], revision: 4 });
     expect(d.patchRecord).toHaveBeenCalledWith(ACTOR, BUSINESS, 3, { facts: { email: { value: "hello@northside.example" }, links: { value: [{ kind: "website", url: "https://northside.example/" }] } } }, expect.objectContaining({ source: "owner" }));
   });
 
   it("refuses a stale reading and a non-owner confirmation", async () => {
-    await expect(createGettingStarted(member()).confirm(ACTOR, { workspaceId: BUSINESS, revision: 2, facts: [{ key: "email", value: "hello@northside.example" }] })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    await expect(createGettingStarted(member()).confirm(ACTOR, { workspaceId: BUSINESS, revision: 2, facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] })).rejects.toBeInstanceOf(WorkspaceConflictError);
     const admin = member(); vi.mocked(admin.readRecord).mockResolvedValue(record({ access: "admin" }));
-    await expect(createGettingStarted(admin).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, facts: [{ key: "email", value: "hello@northside.example" }] })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(createGettingStarted(admin).confirm(ACTOR, { workspaceId: BUSINESS, revision: 3, facts: [{ entity: "fact", key: "email", value: "hello@northside.example", sourceUrl: "https://northside.example/contact", quote: "hello" }] })).rejects.toBeInstanceOf(WorkspaceAccessError);
     expect(admin.patchRecord).not.toHaveBeenCalled();
   });
 });

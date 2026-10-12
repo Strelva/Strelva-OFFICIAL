@@ -23,10 +23,10 @@ async function mount(node: React.ReactElement, transport: Transport) {
 }
 const button = (text: string) => [...container.querySelectorAll("button")].find(item => item.textContent?.includes(text));
 
-const links: GettingStartedLinks = { home: `/workspace?workspaceId=${BUSINESS}`, details: `/workspace/business-details?workspaceId=${BUSINESS}`, agency: `/workspace?workspaceId=${BUSINESS}&view=help`, google: `/workspace/google?workspaceId=${BUSINESS}`, connect: null, request: null };
+const links: GettingStartedLinks = { home: `/workspace?workspaceId=${BUSINESS}`, details: `/workspace/business-details?workspaceId=${BUSINESS}`, agency: `/workspace?workspaceId=${BUSINESS}&view=help`, google: `/workspace/google?workspaceId=${BUSINESS}&returnTo=%2Fworkspace%2Fgetting-started%3FworkspaceId%3D${BUSINESS}`, connect: null, request: null };
 const found: FoundFact[] = [
-  { id: "phone:1", key: "phone", label: "Phone", display: "(716) 555-0100", value: "(716) 555-0100", source: { url: "https://northside.example/contact", quote: "Call (716) 555-0100" }, current: null },
-  { id: "service:cakes", key: "service", label: "Service", display: "Custom cakes", value: "Custom cakes", source: { url: "https://northside.example/", quote: "Custom cakes" }, current: null },
+  { entity: "fact", key: "phone", id: "phone:1", label: "Phone", display: "(716) 555-0100", value: "(716) 555-0100", sourceUrl: "https://northside.example/contact", quote: "Call (716) 555-0100", current: null },
+  { entity: "service", id: "service:cakes", label: "Service", display: "Custom cakes", value: { name: "Custom cakes" }, sourceUrl: "https://northside.example/", quote: "Custom cakes", current: null },
 ];
 
 describe("Start with this fix (owner door)", () => {
@@ -67,7 +67,7 @@ describe("Getting started", () => {
     expect(container.querySelector("h1")?.textContent).toBe("Northside Bakery");
     expect(container.textContent).toContain("northside.example");
     expect(container.querySelector<HTMLInputElement>('input[type="url"]')!.value).toBe("https://northside.example/");
-    expect(container.querySelector(`a[href="${links.google}"]`)?.textContent).toContain("Connect Google");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.google)?.textContent).toContain("Connect Google");
     expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.agency)?.textContent).toContain("Bring in an agency");
     // Keep your site isn't open for this business: no dead link.
     expect(container.textContent).toContain("Keep your site");
@@ -102,7 +102,7 @@ describe("Getting started", () => {
     await act(async () => boxes[1]!.click());
     await act(async () => button("Add 1 detail")!.click());
     const confirm = transport.mock.calls.map(([, init]) => JSON.parse(String(init!.body))).find(body => body.action === "confirm_found_facts");
-    expect(confirm).toEqual({ action: "confirm_found_facts", workspaceId: BUSINESS, revision: 2, facts: [{ key: "phone", value: "(716) 555-0100" }] });
+    expect(confirm).toEqual({ action: "confirm_found_facts", workspaceId: BUSINESS, revision: 2, facts: [{ entity: "fact", key: "phone", value: "(716) 555-0100", sourceUrl: "https://northside.example/contact", quote: "Call (716) 555-0100" }] });
     expect(container.textContent).toContain("Added to your business.");
   });
 
