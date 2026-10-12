@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { CircleAlert, Loader2 } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { StComposerBar, StComposerDock, StEmpty, StHead, StMono, StNotice, StRows, StRow, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { SelectInput } from "@/components/ui/TextInput";
+import { GooeyDisclosure } from "@/components/ui/motion/GooeyDisclosure";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
@@ -63,6 +64,8 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const [toolLabel, setToolLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const historyId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const place = systemName ?? businessName;
@@ -212,14 +215,16 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       options={[{ value: "", label: "I am asking" }, { value: "email", label: "The owner, by email" }, { value: "phone", label: "The owner, by phone" }]}
       onChange={event => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
       helperText="The owner still decides in Needs you." /> : null}
-    <details className={styles.history}>
-      <summary>Earlier conversations</summary>
+    <div className={styles.history}>
+      <StTextButton aria-expanded={historyOpen} aria-controls={historyId} onClick={() => setHistoryOpen(open => !open)}>Earlier conversations</StTextButton>
+      <GooeyDisclosure id={historyId} open={historyOpen}>
       {historyState === "loading" ? <><p role="status">Loading conversations…</p><StSkeleton label="Loading conversations" /></>
         : historyState === "unavailable" ? <StNotice>Earlier conversations can&apos;t be read right now. New ones may not be saved. <StTextButton onClick={() => void loadConversations()}>Try again</StTextButton></StNotice>
         : historyState === "off" ? <StNotice>Ask Strelva isn&apos;t on for this business yet.</StNotice>
         : conversations.length === 0 ? <StEmpty>Nothing yet. Conversations you start here are kept for this business.</StEmpty>
         : <StRows>{conversations.map(item => <StRow key={item.id} selected={item.id === conversationId} title={<StTextButton disabled={streaming || opening === item.id} onClick={() => void openConversation(item.id)}>{item.title}</StTextButton>} detail={item.mine ? undefined : "Someone else's conversation"} end={<StMono>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono>} />)}</StRows>}
-    </details>
+      </GooeyDisclosure>
+    </div>
     <p className={styles.note}>{blockedReason ?? "Saying yes here never approves anything. Approvals happen in Needs you."}</p>
     {compact ? composer : <StComposerDock>{composer}</StComposerDock>}
   </section>;

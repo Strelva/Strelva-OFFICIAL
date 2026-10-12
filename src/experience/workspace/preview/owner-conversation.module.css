@@ -1,3 +1,7 @@
+.scroll { min-height: 0; flex: 1; overflow-y: auto; }
+.conversations { display: grid; gap: 4px; padding-top: 12px; }
+.conversations a { display: flex; align-items: center; min-height: 44px; font-weight: 400; line-height: 20px; overflow-wrap: anywhere; text-decoration: none; color: var(--st-text-2); }
+.conversations a[aria-current="page"] { background: var(--st-inset); color: var(--st-text); font-weight: 500; }
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .objectHeader { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 14px 16px; background: var(--st-inset); color: var(--st-text); font-size: 14px; line-height: 22px; }
 .objectHeader > :last-child { margin-left: auto; }
