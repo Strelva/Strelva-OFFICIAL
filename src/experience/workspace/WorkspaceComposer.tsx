@@ -17,7 +17,7 @@ export interface WorkspaceComposerProps {
   onTemplates?: () => void;
   onChange?: (ask: string) => void;
   onEdited?: (ask: string) => void;
-  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Browse Apps" label. */
+  /** Compatibility input; the browse label is "Browse Apps" in both release states. */
   systemsReleased?: boolean;
   /** `glass`: the compact frosted composer on Home's dusk band (October 6, 2026). */
   tone?: "default" | "glass" | "dock";
@@ -29,7 +29,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One ask editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false, tone = "default", scope }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased: _systemsReleased = false, tone = "default", scope }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
