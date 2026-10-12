@@ -8,21 +8,14 @@
  * internal operator metadata for a handful of leads, read-modify-write, degrades
  * to a default `new` record when Redis is unconfigured.
  */
+import type { LeadWorkflowStatus, LeadWorkflow } from "@/platform/infra/lead-workflow-contracts";
+export type { LeadWorkflowStatus, LeadWorkflow } from "@/platform/infra/lead-workflow-contracts";
 import { getRedis } from "@/platform/infra/redis";
 import {
   getDeliveryLeadByToken,
   updateDeliveryLeadStatus,
   type DeliveryStatus,
 } from "@/lib/access-request-delivery";
-
-export type LeadWorkflowStatus = "new" | "contacted" | "converting" | "converted" | "dismissed";
-
-export interface LeadWorkflow {
-  token: string;
-  status: LeadWorkflowStatus;
-  note?: string;
-  updatedAt: string | null;
-}
 
 // `converting` is the intermediate state set when the operator clicks Convert and
 // hands off to the onboard form. It flips to `converted` ONLY when provisioning

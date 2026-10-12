@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { recordedActorSchema } from "@/platform/presentation/actor";
+import { recordedActorSchema } from "@/platform/workspaces/types";
 import { baseSchema } from "@/platform/bounded-work/contracts";
 import { applicationDateOnlySchema } from "./date-only";
 

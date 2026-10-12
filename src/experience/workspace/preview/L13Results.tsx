@@ -1,8 +1,8 @@
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceResultsView, type WorkspaceResultsState } from "@/experience/places/WorkspaceResults";
 import { StNotice, StPage } from "@/components/ui/strelva/Kit";
-import { resolveRange, type RangeKey } from "@/lib/analytics/period";
-import type { SiteResults } from "@/products/websites/linked-results";
+import { resolveRange, type RangeKey } from "@/platform/infra/analytics/range";
+import type { SiteResults } from "@/products/websites/server";
 
 /** Fictional records only. This rehearsal exercises the production presentation. */
 const WORKSPACE = "5e000000-0000-4000-8000-000000000010";

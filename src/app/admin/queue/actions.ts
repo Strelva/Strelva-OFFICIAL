@@ -17,7 +17,7 @@ import {
   OperatorQueueAccessError, OperatorQueueConflictError, OperatorQueueValidationError,
   type MarkAction, type QueueActor, type QueueItem,
 } from "@/platform/operator-queue/contracts";
-import { markQueueItem, readOperatorQueue } from "@/platform/operator-queue/service";
+import { markQueueItem, readOperatorQueue } from "@/server/operator-queue/service";
 import { EFFORT_CATEGORY_BY_KIND } from "@/platform/operator-queue/rules";
 import { PostgresBusinessEffortStore, recordBusinessEffort } from "@/platform/business-effort";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";

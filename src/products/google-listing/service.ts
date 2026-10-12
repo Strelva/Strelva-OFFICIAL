@@ -49,6 +49,8 @@ export interface ListingContext {
   /** SSRF guard for URLs Google will fetch. Defaults to the audit check. */
   onWriteAccepted?: () => Promise<void>;
   onWriteUnconfirmed?: () => Promise<void>;
+  /** Captures the selected durable receipt before raw dispatch/pacing. */
+  onDispatchReady?: (receipt: ListingReceipt) => void;
   checkUrl?: (url: string) => Promise<void>;
   /** Throws unless the person behind an operator_* authority is the
    * business's acting provider for Google on this location (seat, staff row,
@@ -203,6 +205,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.snapshot_expired };
   }
   let written: GoogleResult<T>;
+  ctx.onDispatchReady?.(receipt);
   try {
     const dispatchClient = ctx.client.withWriteAuthority?.(async () => {
       if (!(await providerCleared()) || snapshotExpired()) throw new Error("Google write authority ended before dispatch.");

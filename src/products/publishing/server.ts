@@ -115,3 +115,7 @@ export const prepareTenantCollectionDraft = async (...args: Parameters<typeof im
 
 export { sendApprovedNewsletterIssues, newsletterSenderEnabled } from "./newsletter-sender";
 export type { PublishingSnapshot } from "./projection";
+
+/** Systems projection uses server-side deterministic identity hashing. */
+export { addPublishingSystems } from "./projection";
+export type { PublishingProjection } from "./projection";

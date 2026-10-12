@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 
 const deps = vi.hoisted(() => ({ on: vi.fn() }));
-vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: deps.on }));
+vi.mock("@/products/connected-sites/server", async () => {
+  const { connectedSitesStore } = await import("@/products/connected-sites/store");
+  return { connectedSitesReleasedFor: deps.on, connectedSitesStore };
+});
 
 import { setConnectedSitesStoreForTests } from "@/products/connected-sites/store";
 import { readConnectedSiteInquiries } from "@/products/inquiries/linked-leads";

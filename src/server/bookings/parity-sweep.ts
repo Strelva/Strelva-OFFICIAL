@@ -1,9 +1,9 @@
 /** Daily read-only comparison. The sole write is an atomic parity batch.
  * Never backfills, repairs, flips reads, sends mail or writes booking data. */
-import { bookingStoreWriteEnabled } from "./flags";
-import { legacyBookingPorts } from "./legacy-ports";
-import { checkTenantBookingParity, type BookingParityReport, type LegacyBookingPorts } from "./move";
-import { bookingStoreDb, type BookingStoreDb } from "./store";
+import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { legacyBookingPorts } from "@/server/bookings/legacy-ports";
+import { checkTenantBookingParity, type BookingParityReport, type LegacyBookingPorts } from "@/platform/bookings/move";
+import { bookingStoreDb, type BookingStoreDb } from "@/platform/bookings/store";
 
 export interface BookingParitySweepDeps {
   tenants(): Promise<string[]>;

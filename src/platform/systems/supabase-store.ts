@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
+import type { Database } from "@/platform/infra/db/database.types";
 import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
@@ -26,8 +27,26 @@ import type { SystemStore } from "./store";
  * shapes arguments and maps database errors. */
 
 type DbError = { message?: string; code?: string } | null;
+type Functions = Database["public"]["Functions"];
+/** The generated schema owns function names and arguments; the Systems port
+ * exposes only operations this adapter is responsible for. */
+export type SystemRpcName = keyof Pick<Functions,
+  | "read_business_systems" | "read_business_system" | "read_existing_business_systems"
+  | "create_business_system" | "update_business_system" | "record_system_revision"
+  | "set_system_current_revision" | "transition_system_lifecycle" | "issue_system_output"
+  | "accept_system_output" | "connect_system" | "set_system_connection_state"
+>;
+/** Postgres type generation does not describe nullable function arguments.
+ * These two SQL commands explicitly accept a null expected revision. Keep
+ * those exceptions named rather than widening every argument to unknown. */
+export type SystemRpcArgs<Name extends SystemRpcName> =
+  Name extends "record_system_revision"
+    ? Omit<Functions[Name]["Args"], "p_expected_change"> & { p_expected_change: number | null }
+    : Name extends "set_system_current_revision"
+      ? Omit<Functions[Name]["Args"], "p_expected_current"> & { p_expected_current: string | null }
+      : Functions[Name]["Args"];
 export type SystemsDb = {
-  rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: DbError }>;
+  rpc<Name extends SystemRpcName>(name: Name, args: SystemRpcArgs<NoInfer<Name>>): PromiseLike<{ data: unknown; error: DbError }>;
 };
 
 let override: SystemsDb | null = null;
@@ -41,7 +60,12 @@ export function systemsDb(): SystemsDb {
   if (override) return override;
   const client = getSupabase();
   if (!client) throw new WorkspaceStoreError("System storage is unavailable.");
-  return client as unknown as SystemsDb;
+  return {
+    // This adapter accounts for the two documented SQL-null arguments above.
+    // Names and all other arguments stay checked against the generated schema.
+    rpc: <Name extends SystemRpcName>(name: Name, args: SystemRpcArgs<Name>) =>
+      client.rpc(name, args as Functions[Name]["Args"]),
+  };
 }
 
 const ACCESS_CODES = ["business_record_access_denied", "system_not_found"];
@@ -88,8 +112,8 @@ const uuid = z.string().uuid();
 const changeNumber = z.number().int().positive();
 /** Replayed responses carry `replayed: true`; the schemas strip it. */
 const digest = (body: unknown) => sha256(canonicalJson(body));
-export async function callSystems<T>(
-  name: string, args: Record<string, unknown>, schema: z.ZodType<T>, fallback: string, db: SystemsDb = systemsDb(),
+export async function callSystems<T, Name extends SystemRpcName>(
+  name: Name, args: SystemRpcArgs<NoInfer<Name>>, schema: z.ZodType<T>, fallback: string, db: SystemsDb = systemsDb(),
 ): Promise<T> {
   const { data, error } = await db.rpc(name, args);
   if (error) mapSystemsError(error, fallback);
@@ -99,7 +123,7 @@ export async function callSystems<T>(
 }
 
 export function createSupabaseSystemStore(db?: SystemsDb): SystemStore {
-  const call = <T>(name: string, args: Record<string, unknown>, schema: z.ZodType<T>, fallback: string) =>
+  const call = <T, Name extends SystemRpcName>(name: Name, args: SystemRpcArgs<NoInfer<Name>>, schema: z.ZodType<T>, fallback: string) =>
     callSystems(name, args, schema, fallback, db ?? systemsDb());
 
   return {

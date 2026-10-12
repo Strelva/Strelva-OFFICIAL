@@ -8,14 +8,17 @@
  * email is switched on rather than being lost forever — the same "only stamp on a
  * real send" discipline the review-nudge cron uses.
  *
- * One-click Approve / Not-yet links go only to a site with no business: the
- * route refuses them once the site is converted (src/app/api/approve), so a
- * converted owner gets the review and the dashboard link.
+ * Converted review links bind the current trusted recipient, workspace and
+ * authority version. Missing or inconsistent authority suppresses the buttons.
+ * Unconverted sites retain their existing tenant links.
  */
 import { resolveOwnerNoticeRecipient } from "./owner-recipient";
 import { getRedis } from "@/platform/infra/redis";
 import { sendReviewNeedsReplyEmail } from "./delivery-email";
 import type { TenantConfig } from "./types";
+import { readReviewApprovalAuthority } from "./review-approval-authority";
+import { buildReviewApproveUrl } from "./approve-link";
+import { getTenantDashboardUrl } from "./tenant-urls";
 
 /** Keep the per-review marker well past the poll window so a re-seen review can't
  *  re-alert. `reb:` persistent-key prefix per AGENTS.md. */
@@ -33,12 +36,24 @@ export async function maybeAlertNewReview(params: {
   draftedReply?: string;
   approveUrl?: string;
   notYetUrl?: string;
+  reviewEventId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   const recipient = await resolveOwnerNoticeRecipient(params.tenant);
   if (!recipient) return false;
   const { email } = recipient;
-  const links = recipient.workspaceId === null ? { approveUrl: params.approveUrl, notYetUrl: params.notYetUrl } : {};
+  let links: { approveUrl?: string; notYetUrl?: string } = recipient.workspaceId === null
+    ? { approveUrl: params.approveUrl, notYetUrl: params.notYetUrl } : {};
+  if (recipient.workspaceId !== null && params.reviewEventId && params.draftedReply) {
+    const authority = await readReviewApprovalAuthority(params.tenant.id);
+    if (authority?.workspaceId === recipient.workspaceId && authority.recipient === email) {
+      const origin = getTenantDashboardUrl(params.tenant, "/");
+      const claims = { tenantId: params.tenant.id, eventId: params.reviewEventId, workspaceId: authority.workspaceId,
+        recipient: authority.recipient, authorityVersion: authority.version };
+      links = { approveUrl: buildReviewApproveUrl(origin, { ...claims, action: "approve" }),
+        notYetUrl: buildReviewApproveUrl(origin, { ...claims, action: "not-yet" }) };
+    }
+  }
 
   const redis = getRedis();
   // No dedup store → don't risk re-alerting the same review on every poll.

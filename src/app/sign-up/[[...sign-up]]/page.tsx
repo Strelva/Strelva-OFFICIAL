@@ -1,4 +1,4 @@
-import { invitationEntryIdentity } from "@/platform/agency-brand/entry";
+import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { StEntry, StHead, StSurface, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import type { Metadata } from "next";

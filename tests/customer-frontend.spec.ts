@@ -140,7 +140,7 @@ test("signed-out dashboard visitors are sent to sign-in, never shown the dashboa
   const response = await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("signed-out account access is sent to sign-in", async ({ page }) => {
@@ -148,14 +148,14 @@ test("signed-out account access is sent to sign-in", async ({ page }) => {
   const response = await page.goto("/account", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 });
 
 test("the sign-in page renders the current Supabase sign-in surface", async ({ request }) => {
   const response = await request.get("/sign-in");
   expect(response.status()).toBeLessThan(400);
   const html = await response.text();
-  expect(html).toContain("Sign in to your work.");
+  expect(html).toMatch(/<h1[^>]*>Sign in<\/h1>/);
   expect(html).not.toContain("Dashboard sign-in is paused");
 });
 
@@ -167,5 +167,5 @@ test("signed-out no-access recovery is sent to sign-in", async ({ page }) => {
   const response = await page.goto("/no-access", { waitUntil: "domcontentloaded" });
   expect(response?.status()).toBeLessThan(500);
   await expect(page).toHaveURL(/\/sign-in/);
-  await expect(page.getByRole("heading", { name: /sign in to/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Sign in", exact: true })).toBeVisible();
 });

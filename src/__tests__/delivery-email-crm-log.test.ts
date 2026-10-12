@@ -62,6 +62,23 @@ describe("delivery-email CRM comms auto-log", () => {
     });
   });
 
+  it("records platform billing as Strelva even when the tenant's agency has a different brand", async () => {
+    process.env.EMAIL_SENDING_ENABLED = "true";
+    const { sendPaymentPastDueEmail } = await import("@/lib/delivery-email");
+
+    expect(await sendPaymentPastDueEmail({
+      email: "chelsea@example.com",
+      businessName: "Rohlax Wellness",
+      dashboardUrl: "https://admin.rohlax.com/dashboard",
+      tenantId: "rohlax",
+    })).toBe(true);
+    expect(addActivityMock).toHaveBeenCalledExactlyOnceWith("rohlax", {
+      kind: "email",
+      summary: "Sent: payment-past-due email",
+      author: "Strelva",
+    });
+  });
+
   it("does NOT log when the client email switch is paused (no real send)", async () => {
     delete process.env.EMAIL_SENDING_ENABLED; // prod default = paused
     const { sendReviewRequestEmail } = await import("@/lib/delivery-email");

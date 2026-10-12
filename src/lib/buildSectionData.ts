@@ -1,4 +1,4 @@
-import type { SectionData } from "@/components/dashboard/ContentBrowser";
+import type { SectionData } from "@/platform/infra/section-summary";
 import { truncate, getFreshness } from "@/lib/utils";
 import type { ContentMap } from "@/lib/types";
 

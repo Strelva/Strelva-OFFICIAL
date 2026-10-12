@@ -5,7 +5,7 @@ vi.mock("@/platform/workspaces/invitations", () => ({ inspectWorkspaceInvitation
 vi.mock("@/products/agency-clients/server", () => ({ readOwnerClaim: mock.claim }));
 vi.mock("@/platform/agency-brand/server", () => ({ resolveOwnerBrand: mock.brand }));
 
-import { invitationEntryIdentity } from "@/platform/agency-brand/entry";
+import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 
 const token = "a".repeat(43);

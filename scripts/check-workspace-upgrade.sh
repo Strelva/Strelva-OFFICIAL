@@ -73,11 +73,19 @@ early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
   if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* ]]; then continue; fi
+  # Coherence projections wrap October 20-22 readers; they follow that tail below.
+  if [[ "$migration_name" == 20261023* && "$migration_name" != "20261023200000_tenant_review_approval_continuity.sql" ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then
     if [[ "$migration_name" != "$upgrade_migration" ]]; then
       continue
     fi
     tail_started=1
+  fi
+  if [[ "$migration_name" == "20261023200000_tenant_review_approval_continuity.sql" ]]; then
+    # Historical owner-trust rollback deliberately drops its table CASCADE.
+    # Rehearse those reversals before installing its additive admission trigger;
+    # then qualify continuity on the restored final schema below.
+    continue
   fi
   if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
     # Apply it after the historical conversion fixtures below so they
@@ -539,6 +547,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022174500_pri
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-source-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175000_reward_durable_mutations.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/reward-durable-catalog-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175050_legacy_google_creation_defaults.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-creation-defaults-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175100_legacy_google_operation_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/legacy-google-operation-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-operation-authority-schema.sql"
@@ -556,3 +566,16 @@ psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sq
 
 # #251: bounded platform support reads; pure snapshot APIs remain unchanged.
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
+
+# Coherence identity and client projections, after the readers they wrap.
+for coherence_migration in "$repo_root"/supabase/migrations/20261023*.sql; do
+  [[ "$(basename "$coherence_migration")" == "20261023200000_tenant_review_approval_continuity.sql" ]] && continue
+  psql "${psql_args[@]}" --file="$coherence_migration"
+done
+
+# Install the forward-only review authority evidence after historical destructive
+# rollback rehearsals; application rollback must retain admitted command history.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql"
+python3 "$repo_root/scripts/check-review-approval-concurrency.py" "${psql_args[@]}"
+printf 'Review approval continuity and dispatch admission passed on the upgraded final schema.\n'

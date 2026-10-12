@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PublicFrame } from "@/experience/product/PublicFrame";
 import { StNotice, StPage } from "@/components/ui/strelva/Kit";
-import { WebsiteAuditPage, WebsiteAuditPending } from "@/products/website-audit/WebsiteAuditPage";
-import type { AuditResult } from "@/lib/audit/types";
+import { WebsiteAuditPage, WebsiteAuditPending } from "@/products/website-audit";
+import type { AuditResult } from "@/platform/infra/audit-contracts";
 
 const result: AuditResult = { url: "https://attymooney.com", scannedAt: "2026-10-09T14:44:00Z", overallScore: 72, grade: "C", categories: [
   { name: "Search", slug: "seo", weight: .25, score: 60, checks: [{ name: "Page descriptions", status: "warn", score: 60, message: "Some pages have no description for search results.", impact: "A clear description tells people what they can find on the page.", priority: "high" }] },

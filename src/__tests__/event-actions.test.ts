@@ -93,6 +93,7 @@ vi.mock("../lib/gbp-replies", () => ({
 
 import { agencyStaffActorId, operatorActorId, resolveEventAction } from "../lib/event-actions";
 import { recordApproval, recordRejection } from "../lib/ai-auto-approve";
+import { signApproveToken } from "../lib/approve-link";
 
 describe("resolveEventAction", () => {
   beforeEach(() => {
@@ -102,6 +103,29 @@ describe("resolveEventAction", () => {
     mockRevalidateClientSite.mockResolvedValue(undefined);
     mockIsInquiryMessageReviewEvent.mockReturnValue(false);
     mockAuthorizeInquiryPublicationActor.mockResolvedValue({ allowed: true });
+  });
+
+  it.each([
+    { eventId: "different-review", action: "approve" as const, resolveAction: "approved" as const },
+    { eventId: "review-fixture", action: "approve" as const, resolveAction: "dismissed" as const },
+  ])("refuses a review token for a different event or action before claiming", async fixture => {
+    process.env.APPROVE_LINK_SECRET = "fixture-review-secret";
+    mockGetEvent.mockResolvedValue({ id: "review-fixture", tenantId: "tenant-a", type: "review", status: "pending", metadata: { kind: "review_reply_draft" } });
+    const token = signApproveToken({ tenantId: "tenant-a", eventId: fixture.eventId, action: fixture.action });
+    expect(await resolveEventAction("tenant-a", "review-fixture", fixture.resolveAction, "user", { reviewApprovalToken: token }))
+      .toEqual({ changed: false, reason: "review_approval_authority_changed" });
+    expect(mockClaimEventAction).not.toHaveBeenCalled(); expect(mockPublishReviewReply).not.toHaveBeenCalled();
+  });
+
+  it("refuses a changed event kind after claiming rather than dispatching another effect", async () => {
+    process.env.APPROVE_LINK_SECRET = "fixture-review-secret";
+    const event = { id: "review-fixture", tenantId: "tenant-a", type: "review", status: "pending", metadata: { kind: "review_reply_draft" } };
+    mockGetEvent.mockResolvedValueOnce(event).mockResolvedValueOnce({ ...event, type: "content_update", metadata: { kind: "agent_preview" } });
+    const token = signApproveToken({ tenantId: "tenant-a", eventId: event.id, action: "approve" });
+    expect(await resolveEventAction("tenant-a", event.id, "approved", "user", { reviewApprovalToken: token }))
+      .toEqual({ changed: false, reason: "review_approval_authority_changed" });
+    expect(mockClaimEventAction).toHaveBeenCalledTimes(1); expect(mockFinishEventAction).toHaveBeenCalledWith(event.id, "attempt_1", { state: "failed", reason: "review_approval_authority_changed" });
+    expect(mockPublishReviewReply).not.toHaveBeenCalled(); expect(mockSetContent).not.toHaveBeenCalled();
   });
 
   it("keeps approved content resolved when public observation fails, without a second publish", async () => {

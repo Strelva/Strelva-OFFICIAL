@@ -8,7 +8,7 @@ import { renderRebuildPreview, websiteRebuildSchema, safeSitePathSchema, escapeS
 import { ownerDecisionSchema, type OwnerDecision } from "@/platform/needs-you/contracts";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "./links";
 export { OWNER_WEBSITE_PREVIEW_PATH, ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "./links";
-import { websiteDocumentCopyItems, websiteDocumentFactItems, websiteDocumentItem } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentCopyItems, websiteDocumentFactItems, websiteDocumentItem } from "@/server/needs-you/sources/website-document";
 
 const resultSchema = z.object({
   item: ownerDecisionSchema,

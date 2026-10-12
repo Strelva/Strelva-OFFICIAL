@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { projectQueue } from "@/platform/operator-queue/project";
-import { listingReadbackItems, readListingReadbackSource } from "@/platform/operator-queue/sources";
+import { listingReadbackItems, readListingReadbackSource } from "@/server/operator-queue/sources";
 import { readListingReadbackFailures, setOperatorQueueDb, type ListingReadbackFailure } from "@/platform/operator-queue/store";
 
 /**

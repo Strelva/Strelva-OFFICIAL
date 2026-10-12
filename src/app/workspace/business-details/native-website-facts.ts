@@ -19,7 +19,7 @@ import { siteEditingFor } from "@/products/websites/server";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ResolveBy } from "@/platform/needs-you/adapters";
 import type { BusinessFactsReceipt } from "@/platform/needs-you/sources/business-facts";
-import { needsYouStore } from "@/platform/needs-you/server";
+import { needsYouStore } from "@/server/needs-you/server";
 
 const CONTACT_KEYS = ["phone", "email", "address", "hours"] as const;
 

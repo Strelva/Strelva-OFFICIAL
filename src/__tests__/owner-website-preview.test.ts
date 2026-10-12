@@ -2,7 +2,7 @@ import { load } from "cheerio";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { signWorkspaceApproveToken } from "@/lib/approve-link";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewResponse } from "@/app/api/owner-website-preview/preview";
-import { websiteDocumentCopyItems, websiteDocumentItem } from "@/platform/needs-you/sources/website-document";
+import { websiteDocumentCopyItems, websiteDocumentItem } from "@/server/needs-you/sources/website-document";
 import { websiteRebuildSchema, type WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
 import { siteDocumentSchema, siteDocumentHash } from "@/products/websites/site-document";
 import { needsYouMemoryStore } from "./support/needs-you-memory";

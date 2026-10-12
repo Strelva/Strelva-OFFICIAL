@@ -10,7 +10,7 @@ begin
   raise exception 'statement unexpectedly succeeded: %',statement;
 end $$;
 -- The aggregate fixture deliberately omits the legacy content store.
-create table if not exists public.content_versions(id text primary key,tenant_id text not null,section text not null,data jsonb not null,created_at timestamptz not null);
+create table if not exists public.content_versions(id text primary key,tenant_id text not null,section text not null,data jsonb not null,author text not null,status text not null,created_at timestamptz not null);
 insert into public.users(id,email,verified_at) values
   ('7c000000-0000-4000-8000-000000000001','wsr-owner@example.test',now()),
   ('7c000000-0000-4000-8000-000000000002','wsr-member@example.test',now()),
@@ -26,9 +26,9 @@ insert into public.tenants(id,site_name,delivery_model,stable_id) values
   ('wsr-site','Fictional website','custom_repo','7c000000-0000-4000-8000-000000000020');
 insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
   values('7c000000-0000-4000-8000-000000000020','wsr-site','7c000000-0000-4000-8000-000000000010','7c000000-0000-4000-8000-000000000001','7c000000-0000-4000-8000-000000000030',repeat('a',64),'{}');
-insert into public.content_versions(id,tenant_id,section,data,created_at) values
-  ('wsr-v1','wsr-site','hero','{"heading":"Fictional one"}','2026-10-01T10:00:00Z'),
-  ('wsr-v2','wsr-site','hero','{"heading":"Fictional two"}','2026-10-02T10:00:00Z');
+insert into public.content_versions(id,tenant_id,section,data,created_at,author,status) values
+  ('wsr-v1','wsr-site','hero','{"heading":"Fictional one"}','2026-10-01T10:00:00Z','user','live'),
+  ('wsr-v2','wsr-site','hero','{"heading":"Fictional two"}','2026-10-02T10:00:00Z','user','live');
 
 do $$
 declare ws uuid:='7c000000-0000-4000-8000-000000000010'; stable uuid:='7c000000-0000-4000-8000-000000000020';
@@ -43,7 +43,7 @@ begin
   perform pg_temp.wsr_assert(public.reconcile_website_system_releases(ws,owner_id,'wsr-owner@example.test',v_system_id,'tenant',stable::text,true)=0,'repeated repair writes no revision');
   perform pg_temp.wsr_assert(public.observe_tenant_content('wsr-site','wsr-v2')=0,'observation and repair share one source key');
   pointer:=s.current_revision_id;
-  insert into public.content_versions(id,tenant_id,section,data,created_at) values('wsr-late-old','wsr-site','hero','{}','2026-09-01T10:00:00Z');
+  insert into public.content_versions(id,tenant_id,section,data,created_at,author,status) values('wsr-late-old','wsr-site','hero','{}','2026-09-01T10:00:00Z','user','live');
   perform public.reconcile_website_system_releases(ws,owner_id,'wsr-owner@example.test',v_system_id,'tenant',stable::text,true);
   perform pg_temp.wsr_assert((select current_revision_id from public.systems where systems.id=v_system_id)=pointer,'a late older receipt does not rewind current');
   insert into public.service_requests(business_workspace_id,status,request_text,outcome,context,scope,provider_kind,created_by)

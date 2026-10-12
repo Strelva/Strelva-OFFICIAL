@@ -142,7 +142,7 @@ function psqlDb(connection: string): PossibilitiesDb & SystemsDb & ActivationsDb
   const base = [...connection.split(" ").filter(Boolean), "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1"];
   return {
     exec(sql) { return execFileSync("psql", base, { input: sql, encoding: "utf8" }).trim(); },
-    async rpc(name, args) {
+    async rpc(name: string, args: Record<string, unknown>) {
       const keys = Object.keys(args).filter((key) => args[key] !== undefined);
       const vars = keys.flatMap((key, i) => args[key] === null ? [] : ["-v", `a${i}=${typeof args[key] === "object" ? JSON.stringify(args[key]) : String(args[key])}`]);
       const params = keys.map((key, i) => args[key] === null ? `${key} => null::${TYPES[key] ?? "text"}` : `${key} => :'a${i}'::${TYPES[key] ?? (typeof args[key] === "object" ? "jsonb" : "text")}`).join(", ");

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), heartbeat: vi.fn(), alert: vi.fn(), db: vi.fn() }));
-vi.mock("@/platform/bookings/parity-sweep", () => ({ runBookingParitySweep: mocks.run }));
+vi.mock("@/server/bookings/parity-sweep", () => ({ runBookingParitySweep: mocks.run }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alert }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: mocks.db }));

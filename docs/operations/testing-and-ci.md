@@ -52,9 +52,34 @@ contracts are not disposable just because an import search finds no callers.
 
 ## Playwright (`tests/*.spec.ts`) — two modes
 
-`pnpm smoke` runs `playwright test`. The webServer is `next dev` (see
-`playwright.config.ts`); against an external server set `PLAYWRIGHT_BASE_URL`.
-`retries: 2` in CI absorbs cold-compile hiccups.
+`pnpm smoke` runs the mandatory context gate in `scripts/check-browser-ci.mjs`.
+Its exact case manifest is `scripts/browser-ci-manifest.json`: collection from
+the unchanged default Playwright config must match every filename, title,
+project and original gate status. Added, removed or renamed cases require an
+explicit manifest update; unassigned or missing cases fail the gate.
+
+The public context keeps providers empty, bypass off and previews off, including
+an assertion that fictional proof routes are hidden. Preview cases use their
+own loopback `next dev` with previews enabled. Three documented architecture
+fixtures are copied only into absent temporary routes, guarded against non-dev
+or preview-off access, and removed on success, failure or interruption. Workspace
+fixture cases use a separate workspace-on context. Each context owns its app;
+external `PLAYWRIGHT_BASE_URL` values are refused. Existing CI retries, timeouts,
+assertions and the default `testIgnore` list are unchanged.
+
+The owned Auth contexts are mandatory: `check-full-model-journeys.sh` runs
+`full-native` and `full-dark`, and `check-private-authority-journeys.sh` runs the
+seven current-authority cases. Their existing source, Docker, local Auth, SQL,
+case identity/count and no-skip proof gates remain authoritative. Missing local
+prerequisites fail; fictional UI results never replace native evidence. Existing
+specs originally skipped in the public context retain their original guards.
+
+For independent diagnosis run `node scripts/check-browser-ci.mjs --context`
+with `public`, `preview`, `workspace`, `native`, `dark` or `private`. Passing one
+context is not a passing `pnpm smoke`. `pnpm smoke:workspace` and
+`pnpm smoke:surfaces` remain separate mandatory checks in `check-ci.sh`.
+The ordinary focused Playwright command still uses `playwright.config.ts` and
+supports an external `PLAYWRIGHT_BASE_URL`; CI retries remain 2.
 
 The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_ACCESS=1`,
 `src/lib/dev-access.ts`) grants super-admin and is what splits the two modes:

@@ -69,7 +69,9 @@
     ".next-full-model-journeys/types/**/*.ts",
     ".next-full-model-journeys/dev/types/**/*.ts",
     ".next-private-authority-journeys/types/**/*.ts",
-    ".next-private-authority-journeys/dev/types/**/*.ts"
+    ".next-private-authority-journeys/dev/types/**/*.ts",
+    ".next-agency-minimum/types/**/*.ts",
+    ".next-agency-minimum/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

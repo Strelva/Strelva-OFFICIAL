@@ -26,7 +26,7 @@ import { createPublicBookingService, PublicBookingError, type PublicBookingBindi
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
 import { bookingReadSource } from "@/platform/bookings/flags";
 import { recordPublicAvailability, changePublicRecord, cancelPublicRecord, confirmPublicRecord } from "@/platform/bookings/public-record";
-import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
+import { publicBookingStoreHook, subtractStoreBookings } from "@/server/bookings/public-api";
 
 type DbRow = Record<string, unknown>;
 type DbResult = { data: unknown; error: { code?: unknown; message?: unknown } | null };

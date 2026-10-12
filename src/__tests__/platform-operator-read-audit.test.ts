@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
-vi.mock("@/platform/operator-queue/sources", () => ({ readAllSources: vi.fn() }));
+vi.mock("@/server/operator-queue/sources", () => ({ readAllSources: vi.fn() }));
 
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 import { PostgresBusinessEffortStore } from "@/platform/business-effort/repository";
@@ -10,7 +10,7 @@ import { readCatalogReportFailures } from "@/platform/catalog-reports/operator-s
 import { readToolNoticeFailures } from "@/platform/catalog-reports/tool-notices";
 import { readToolContactConflicts } from "@/platform/catalog-reports/tool-history";
 import { readQueueContext, readGoogleWriteUncertainty, readReceipts, readListingReadbackFailures, setOperatorQueueDb } from "@/platform/operator-queue/store";
-import { readOperatorQueue } from "@/platform/operator-queue/service";
+import { readOperatorQueue } from "@/server/operator-queue/service";
 import { OperatorQueueAccessError, OperatorQueueUnavailableError } from "@/platform/operator-queue/contracts";
 
 const actor = { userId: "20090039-0000-4000-8000-000000000001", verifiedEmail: "operator@example.test" };

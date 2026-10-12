@@ -8,6 +8,8 @@
  * brain and the live ops endpoint compute the same numbers from one place.
  */
 
+import type { DomainDriftItem, FailedAiWriteItem, OpsMetrics, OpsReport } from "@/platform/infra/ops-contracts";
+export type { DomainDriftItem, FailedAiWriteItem, OpsMetrics, OpsReport } from "@/platform/infra/ops-contracts";
 import { getRedis } from "@/platform/infra/redis";
 import { getAllTenants } from "./tenants";
 import { getTenantPrimaryDomain } from "./tenant-urls";
@@ -40,43 +42,6 @@ async function scanKeyCount(
     }
   } while (cursor !== "0");
   return count;
-}
-
-/** One domain-drift finding, carrying the tenant so the ops board can deep-link it. */
-export interface DomainDriftItem {
-  tenantId: string;
-  message: string;
-}
-
-export interface FailedAiWriteItem {
-  tenantId: string;
-  title: string;
-  error: string;
-}
-
-export interface OpsMetrics {
-  webhookFailures: number;
-  revalidationFailures: number;
-  pendingEvents: Record<string, number>;
-  totalPendingEvents: number;
-  failedAiWrites: number;
-  /** Failed AI write events, for the drilldown list. */
-  failedAiWriteItems?: FailedAiWriteItem[];
-  /** Human-readable drift lines (kept for the count + attention feed). */
-  tenantDomainDrift: string[];
-  /** Same drift, structured so each row links into `/admin/clients/[id]`. Always
-   * populated by `buildOpsReport`; optional so existing snapshot fixtures stay valid. */
-  domainDrift?: DomainDriftItem[];
-}
-
-type RecentFailure = Awaited<ReturnType<typeof getRecentFailures>>[number];
-
-export interface OpsReport {
-  timestamp: string;
-  activeTenants: number;
-  metrics: OpsMetrics;
-  /** Most recent revalidation failures (capped) for display. */
-  revalidationFailures: RecentFailure[];
 }
 
 /**

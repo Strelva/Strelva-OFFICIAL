@@ -4,7 +4,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { PLATFORMS } from "@/products/connected-sites/contracts";
 import { ConnectedSiteInputError, connectSite, connectedSitesReleaseEnabled, connectedSitesReleasedFor, presentConnectedSite, readConnectedSites, verifySite } from "@/products/connected-sites/server";
-import { connectedSitesStore } from "@/products/connected-sites/store";
+import { connectedSitesStore } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
 

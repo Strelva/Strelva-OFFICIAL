@@ -273,3 +273,6 @@ export class OperatorQueueConflictError extends Error {
 export class OperatorQueueUnavailableError extends Error {
   constructor(message = "Queue storage is unavailable. Nothing was saved.") { super(message); this.name = "OperatorQueueUnavailableError"; }
 }
+
+/** Minimal tenant identity consumed by read-only queue projections. */
+export interface QueueTenant { id: string; siteName?: string; stableId?: string }

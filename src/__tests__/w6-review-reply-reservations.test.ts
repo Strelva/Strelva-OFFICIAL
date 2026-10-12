@@ -19,6 +19,32 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 describe("review replies through durable dispatch reservations", () => {
+  it("compatibility admits the exact reserved PUT even with the operator release off", async () => {
+    vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0");
+    const settle = vi.fn(async () => {});
+    const beforeDispatch = vi.fn(async () => ({ settle }));
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({})).mockResolvedValueOnce(json({})).mockResolvedValueOnce(json({ reviewReply: { comment: "Thanks" } }));
+    expect(await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch })).toMatchObject({ published: true });
+    expect(beforeDispatch).toHaveBeenCalledWith("attempt", "https://mybusiness.googleapis.com/v4/accounts/1/locations/2/reviews/review/reply");
+    expect(beforeDispatch.mock.invocationCallOrder[0]!).toBeLessThan(fetch.mock.invocationCallOrder[1]!);
+    expect(settle).toHaveBeenCalledWith(200);
+  });
+  it("sends no PUT after lost admission response and records definitive no-dispatch", async () => {
+    const beforeDispatch = vi.fn(async () => { throw new Error("lost admission response"); });
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({}));
+    expect(await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch })).toMatchObject({ published: false });
+    expect(fetch.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
+    expect(mocks.complete).toHaveBeenCalledWith("attempt", expect.objectContaining({ acceptance: "rejected", acceptanceDetail: expect.stringContaining("Nothing sent") }));
+  });
+  it.each([0, 503])("compatibility keeps provider uncertainty %s unretryable", async status => {
+    const settle = vi.fn(async () => {});
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({}));
+    if (status) fetch.mockResolvedValueOnce(json({}, status)); else fetch.mockRejectedValueOnce(new Error("lost Google response"));
+    const result = await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch: async () => ({ settle }) });
+    expect(result).toMatchObject({ published: false, evidence: expect.stringMatching(/uncertain/i) });
+    expect(mocks.complete).toHaveBeenCalledWith("attempt", expect.objectContaining({ acceptance: "unknown" }));
+    expect(settle).toHaveBeenCalledWith(status);
+  });
   it.each(["matched", "differs", "failed"])("settles accepted before %s read-back and reads the review resource", async result => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ reviewReply: { comment: "Before" } })).mockResolvedValueOnce(json({}));
     fetch.mockResolvedValueOnce(result === "failed" ? json({}, 503) : json({ reviewReply: { comment: result === "matched" ? "Thank you!" : "Other" } }));
