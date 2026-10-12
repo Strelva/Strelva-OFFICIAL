@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GOOGLE_RECONNECT_COOKIE, finishGoogleReconnect, reconnectHash, reconnectReleaseEnabled, reconnectStore, verifyReconnectToken } from "@/products/publishing/server";
+import { GOOGLE_RECONNECT_COOKIE, GoogleReconnectRefused, finishGoogleReconnect, reconnectHash, reconnectReleaseEnabled, reconnectStore, verifyReconnectToken } from "@/products/publishing/server";
 import { reconnectPage } from "@/products/publishing/server";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -20,7 +20,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (!target || target.workspaceId !== claims.workspaceId || target.recipient !== claims.recipient) return finish("This reconnect link has already been used or the owner changed.", 410);
     const code = request.nextUrl.searchParams.get("code");
     if (request.nextUrl.searchParams.has("error") || !code) return finish("Google access was not granted. Your drafts remain saved. Request a new reconnect link to try again.", 400);
-    await finishGoogleReconnect(target, code);
+    try { await finishGoogleReconnect(target, code); } catch (error) {
+      if (!(error instanceof GoogleReconnectRefused)) throw error;
+      // Nothing was stored: reopen the episode so the right account can retry.
+      await store.target("release", target.id, { stateHash: reconnectHash(state) }).catch(() => null);
+      return finish(error.message, 403);
+    }
     await store.restored(target.id);
     return finish("Google access is restored. Your drafts remain saved. Reconnect does not approve them; drafts needing a fresh approval stay waiting in your workspace.", 200);
   } catch { return finish("Google reconnect could not be completed. Your drafts remain saved. Request a new link to try again.", 503); }

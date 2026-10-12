@@ -26,24 +26,26 @@ const nextSteps = [
 ];
 
 type InitialFeedback = { state: FormState; message?: string; email?: string; statusUrl?: string };
+/** Carried over from the check the person just ran (owner door), never typed twice. */
+type Carried = { businessName?: string; currentWebsite?: string };
 
-export function AccessRequestPage({ initialFeedback }: { initialFeedback?: InitialFeedback } = {}) {
+export function AccessRequestPage({ initialFeedback, carried }: { initialFeedback?: InitialFeedback; carried?: Carried } = {}) {
   return (
     <Suspense fallback={<StEntry><StSkeleton label="Loading request form" /></StEntry>}>
-      <AccessRequestForm initialFeedback={initialFeedback} />
+      <AccessRequestForm initialFeedback={initialFeedback} carried={carried} />
     </Suspense>
   );
 }
 
-function AccessRequestForm({ initialFeedback }: { initialFeedback?: InitialFeedback }) {
+function AccessRequestForm({ initialFeedback, carried }: { initialFeedback?: InitialFeedback; carried?: Carried }) {
   const searchParams = useSearchParams();
   const ref = searchParams.get("ref") || "";
   const [agencyServiceChosen, setAgencyServiceChosen] = useState(Boolean(initialFeedback));
-  const [businessName, setBusinessName] = useState("");
+  const [businessName, setBusinessName] = useState(carried?.businessName || "");
   const [email, setEmail] = useState(initialFeedback?.email || "");
   const [phone, setPhone] = useState("");
   const [location, setLocation] = useState("");
-  const [currentWebsite, setCurrentWebsite] = useState("");
+  const [currentWebsite, setCurrentWebsite] = useState(carried?.currentWebsite || "");
   const [plan, setPlan] = useState("");
   const [request, setRequest] = useState("");
   const [state, setState] = useState<FormState>(initialFeedback?.state || "idle");

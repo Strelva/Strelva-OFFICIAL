@@ -893,7 +893,7 @@ export async function executeInquirySurface(input: {
         if (!(["http:", "https:"] as string[]).includes(website.protocol)) throw new InquiryValidationError("Use an HTTP or HTTPS website address.");
         if (website.username || website.password) throw new InquiryValidationError("Use a website address without credentials.");
       } else if (!Object.hasOwn(SETUP_FIELD_LABELS, action.statementId)) {
-        throw new InquiryValidationError("That onboarding statement cannot be edited.");
+        throw new InquiryValidationError("That website fact cannot be edited.");
       }
       engine._addActionReceipt({ businessId: context.businessId, requestId: null, capabilityId: null, inquiryId: null, responsibilityId: null,
         actor: { kind: "person", id: actorId }, action: "onboarding_correction", what: `Confirmed the ${action.statementId} setup statement.`,

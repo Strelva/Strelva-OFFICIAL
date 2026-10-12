@@ -51,6 +51,8 @@ export interface SiteLeads {
   unavailable: boolean;
   /** Owner/admin reply action, only after the booking offers and store-read gates. */
   bookingProposals?: true;
+  /** Email the business forwarded to its Strelva address (20261024500000). */
+  forwarded?: true;
 }
 
 export interface HeldView {
@@ -107,6 +109,41 @@ export interface LeadDependencies {
   /** Null when connected sites are off for this business. Throws when they can't be read. */
   canProposeBookings?: typeof ownerCanProposeBookingTimes;
   connected?: (actor: WorkspaceActor, workspaceId: string) => Promise<ConnectedSiteInquiries[] | null>;
+  /** Forwarded inquiries (kept and released) when forwarding is on for the business; null when off. */
+  forwarded?: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceInquiryLead[] | null>;
+}
+
+/** A row recorded from a business's forwarding address. */
+export function isForwardedLead(lead: Pick<WorkspaceInquiryLead, "recordedVia">): boolean {
+  return lead.recordedVia === "forwarded_email";
+}
+
+/** Forwarded inquiries, when forwarding is released for this business. */
+export async function readForwardedInquiryLeads(actor: WorkspaceActor, workspaceId: string): Promise<WorkspaceInquiryLead[] | null> {
+  const { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } = await import("@/products/inquiry-forwarding/server");
+  if (!inquiryForwardingReleaseEnabled()) return null;
+  const { releaseViewerFor } = await import("@/platform/release-flags/viewer");
+  if (!(await inquiryForwardingReleasedFor(workspaceId, await releaseViewerFor(actor)))) return null;
+  const rows = await readWorkspaceInquiryLeads(actor, workspaceId, { states: ["kept", "released"], limit: 500 });
+  return rows.filter(isForwardedLead);
+}
+
+/** A forwarded inquiry as the inbox shows it: the subject and how it arrived ride along as fields. */
+export function forwardedLeadView(lead: WorkspaceInquiryLead): LeadView {
+  const fields = Object.entries(lead.fields).filter(([key, value]) => ["subject", "phone", "forwardedBy"].includes(key) && value.trim()) as Array<[string, string]>;
+  return {
+    id: lead.id,
+    rowId: lead.id,
+    name: lead.name.trim() || "Someone",
+    email: lead.email?.trim() || null,
+    message: lead.message?.trim() || null,
+    source: "Forwarded email",
+    fields,
+    createdAt: lead.capturedAt,
+    ...(lead.reply ? { reply: lead.reply } : {}),
+    ...(lead.replyPermission ? { replyPermission: lead.replyPermission } : {}),
+    ...(lead.intakeState === "released" ? { releasedRowId: lead.id } : {}),
+  };
 }
 
 /** Active connected sites with their inquiries, newest first; a revoked site stays while it has inquiries. */
@@ -136,6 +173,7 @@ const defaults: LeadDependencies = {
     ]).then(([held, released, kept]) => ({ held, released, kept }))
     : null,
   connected: readConnectedSiteInquiries,
+  forwarded: readForwardedInquiryLeads,
   // Lazy: inquiry reads must not load the bookings server graph.
   canProposeBookings: async (...args) => (await import("@/products/bookings/server")).ownerCanProposeBookingTimes(...args),
 };
@@ -222,7 +260,7 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
     try {
       const kept = (await dependencies.leads(site.tenantId)).map(leadView);
       const seen = new Set(kept.map((lead) => lead.id));
-      const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !seen.has(lead.leadId)).map(releasedLeadView);
+      const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !isForwardedLead(lead) && !seen.has(lead.leadId)).map(releasedLeadView);
       const rowById = new Map([...(records?.kept ?? []), ...(records?.released ?? [])].filter((lead) => lead.tenantId === site.tenantId).map((lead) => [lead.leadId, lead]));
       const mapped = kept.map((lead) => { const row = rowById.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
       const leads = [...mapped, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -232,7 +270,8 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
       return { ...base, leads: [], lastThirtyDays: 0, unavailable: true };
     }
   }));
-  const result: WorkspaceLeads = { denied, sites: [...managed, ...(await connectedSections(actor, workspaceId, dependencies))] };
+  const forwardedSection = await forwardedSectionFor(actor, workspaceId, dependencies);
+  const result: WorkspaceLeads = { denied, sites: [...managed, ...(await connectedSections(actor, workspaceId, dependencies)), ...(forwardedSection ? [forwardedSection] : [])] };
   // Connected rows share the same review and receipt store. A released row
   // can be put back, and an accepted purpose remains closed after reload.
   for (const section of result.sites.filter((site) => site.connected)) {
@@ -251,11 +290,28 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
   if (pending) {
     // Held items of a site this person can't read through the tenant check stay hidden, like its inbox.
     result.held = {
-      items: (records?.held ?? []).filter((lead) => (lead.connectedSiteId && result.sites.some((site) => site.key === `connected:${lead.connectedSiteId}`)) || (lead.tenantId !== null && allowed.has(lead.tenantId))).map(heldView),
+      items: (records?.held ?? []).filter((lead) => isForwardedLead(lead) ? Boolean(forwardedSection)
+        : (lead.connectedSiteId && result.sites.some((site) => site.key === `connected:${lead.connectedSiteId}`)) || (lead.tenantId !== null && allowed.has(lead.tenantId))).map(heldView),
       unavailable: recordsUnavailable,
     };
   }
   return result;
+}
+
+/** Forwarded email as one inbox section, while forwarding is on. A failed read is "unavailable", never empty. */
+async function forwardedSectionFor(actor: WorkspaceActor, workspaceId: string, dependencies: LeadDependencies): Promise<SiteLeads | null> {
+  if (!dependencies.forwarded) return null;
+  const base = { key: "forwarded", tenantId: null, forwarded: true as const, siteName: "Forwarded email" };
+  try {
+    const rows = await dependencies.forwarded(actor, workspaceId);
+    if (!rows) return null;
+    const leads = rows.map(forwardedLeadView).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return { ...base, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false };
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError) throw error;
+    console.error("[inquiries] forwarded read failed", { workspaceId, error: error instanceof Error ? error.message : String(error) });
+    return { ...base, leads: [], lastThirtyDays: 0, unavailable: true };
+  }
 }
 
 /** Connected sites as inbox sections. A failed read is one "unavailable" section, never an empty inbox. */

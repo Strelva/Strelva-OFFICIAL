@@ -23,7 +23,7 @@ function draftLine(review: ReviewView, mode: SiteReviews["replyMode"]): string {
 /** Used by both the listing System and its complete reviews place. */
 export function ReviewRows({ workspaceId, site, publishing = false, readOnly = false, request }: { workspaceId: string; site: SiteReviews; publishing?: boolean; readOnly?: boolean; request?: typeof fetch }) {
   if (site.unavailable) return <StNotice tone="critical">Reviews for {site.siteName} couldn&apos;t be read right now. Nothing changed on your listing.</StNotice>;
-  if (!site.reviews.length) return <StEmpty>No reviews yet. {site.googleConnected ? "New Google reviews appear here after Strelva reads them." : "Once your Google listing is connected, reviews show up here with a drafted reply. Ask Strelva to connect it."}</StEmpty>;
+  if (!site.reviews.length) return <StEmpty>No reviews yet. {site.googleConnected ? "New Google reviews appear here after Strelva reads them." : "Once your Google listing is connected, reviews show up here with a drafted reply. The business owner connects it on the Google page."}</StEmpty>;
   const firstPending = site.reviews.find(review => !review.reply)?.id;
   return <StRows label={`Reviews for ${site.siteName}`}>{site.reviews.map(review => <StRow key={review.id} align="start" title={<span className={styles.reviewHead}><span>{review.author}</span><span aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span><StMono as="time" dateTime={review.date}>{whenLabel(review.date)}</StMono></span>}>
     <article aria-label={`${SOURCE[review.source]} review by ${review.author}`} className={styles.stack}>

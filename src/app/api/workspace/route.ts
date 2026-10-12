@@ -1,7 +1,7 @@
 import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
-import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
+import { agencyAddClientReleaseEnabled, agencyImportReleaseEnabled } from "@/products/agency-clients";
 import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
 import { initializeRebuildHandoff } from "@/products/websites/index";
@@ -17,6 +17,7 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
 import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import type { ProductDefinition } from "@/platform/products";
 import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
@@ -318,7 +319,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

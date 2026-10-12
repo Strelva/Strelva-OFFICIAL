@@ -113,7 +113,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
   }
   // Workspace homes of old /dashboard pages (owner-entry spec §5). Each takes
   // its business, and Results also its time window.
-  const place = value?.match(/^\/workspace\/(inquiries|reviews|results|business-details)\?/);
+  const place = value?.match(/^\/workspace\/(inquiries|reviews|results|business-details|getting-started)\?/);
   if (value && place) {
     const target = new URL(value, "https://workspace.invalid");
     const params = target.searchParams;

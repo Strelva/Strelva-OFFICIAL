@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { foundFactDecisionSchema, foundFactSchema } from "@/products/found-facts/contracts";
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 
 /**
@@ -22,6 +23,22 @@ export const addAgencyClientInputSchema = z.object({
   /** Where the owner claim link is addressed. Nothing is sent to it. */
   ownerEmail: email.optional(),
   idempotencyKey: uuid,
+  /**
+   * Found facts the agency already holds (Import clients carries a sheet's or
+   * a HighLevel sub-account's phone and address). They win over what the scan
+   * found. Behind the claim review they are staged in the one Found-fact
+   * store with their import source; otherwise they are stored like scanned
+   * facts (the agency's, unconfirmed).
+   */
+  foundFacts: z.object({
+    phone: z.string().trim().min(3).max(40).optional(),
+    address: z.string().trim().min(1).max(200).optional(),
+    /** Which import and which row they came from. */
+    source: z.object({
+      kind: z.enum(["client_import_sheet", "client_import_gohighlevel"]),
+      ref: z.string().trim().min(1).max(200).regex(/^\S+$/),
+    }).strict().optional(),
+  }).strict().optional(),
 }).strict().refine((input) => input.url || input.prospectId || input.name, "Enter the business's website, or choose a prospect.")
   .refine((input) => !input.leadToken || !input.prospectId, "Choose either an agency lead or a prospect.")
   .refine((input) => !input.leadToken || Boolean(input.name), "Enter the lead's business name before adding the client.");
@@ -126,9 +143,21 @@ export interface AddAgencyClientResult {
   ownerClaimError: string | null;
   website: ClientWebsiteEntries;
   aiCheck: ClientAiCheck;
+  /** Only behind the claim review release: what was staged for the owner. */
+  found?: ClientFoundFacts;
   /** Business creation and marking its source lead converted have separate receipts. */
   leadConversion?: { status: "converted" | "unconfirmed"; message?: string };
 }
+
+/** What an add staged for the owner's claim, and the areas the agency may Prepare until then. */
+export interface ClientFoundFacts {
+  status: "staged" | "owner_claimed" | "unavailable";
+  staged: number;
+  waiting: number;
+  preparing: string[];
+  message?: string;
+}
+export const AGENCY_CLIENT_FOUND_LIMIT = 120;
 
 /** An agency-owned private assessment of the client's public website. */
 export type ClientAiCheck =
@@ -143,3 +172,56 @@ export function clientWebsiteEntries(customerWorkspaceId: string): ClientWebsite
 
 export const OWNER_CLAIM_PATH = "/workspace/claim/";
 export const OWNER_CLAIM_LIFETIME_DAYS = 14;
+
+/* ── Claim review (STRELVA_CLAIM_REVIEW_RELEASE) ─────────────────────────────
+ * GLOSSARY: Found fact, Claim, Prepare / Full control. What the add found on
+ * the client's site is staged as Found facts (with the page and words it came
+ * from) and joins the business record only when the owner confirms it at the
+ * claim. Until the claim, the adding agency holds Prepare in every area; at
+ * the claim the owner decides each area. SQL contract:
+ * supabase/migrations/20261024300000_claim_review.sql. */
+
+// The one Found-fact shape lives in src/products/found-facts/contracts.ts.
+export {
+  FOUND_FACT_KEYS, FOUND_FACT_LABELS, FOUND_FACT_SOURCE_LABELS, foundFactInputSchema, foundFactSchema, importedFoundFactInputSchema,
+  type AgencyFoundFactInput, type FoundFact, type FoundFactInput, type FoundFactKey, type ImportedFoundFactInput,
+} from "@/products/found-facts/contracts";
+
+export const CLAIM_AREAS = ["website", "inquiries", "bookings", "google", "internal_tools"] as const;
+export type ClaimArea = (typeof CLAIM_AREAS)[number];
+export const CLAIM_AREA_CHOICES = ["prepare", "full_control", "none"] as const;
+export type ClaimAreaChoice = (typeof CLAIM_AREA_CHOICES)[number];
+const areaChoice = z.enum(CLAIM_AREA_CHOICES);
+
+export const claimReviewSchema = z.object({
+  status: z.enum(["pending", "accepted", "revoked", "expired"]),
+  workspaceId: uuid,
+  workspaceName: z.string(),
+  agencyWorkspaceId: uuid,
+  agencyName: z.string(),
+  found: z.array(foundFactSchema),
+  prepared: z.array(z.object({ id: uuid, name: z.string(), kind: z.string() }).strict()),
+  /** Areas where another agency already holds Full control; Full control can't be chosen there. */
+  fullControlTaken: z.array(z.enum(CLAIM_AREAS)),
+}).strict();
+export type ClaimReview = z.infer<typeof claimReviewSchema>;
+
+export const claimFactDecisionSchema = foundFactDecisionSchema;
+export type ClaimFactDecision = z.infer<typeof claimFactDecisionSchema>;
+
+export const claimReviewAcceptInputSchema = z.object({
+  facts: z.array(claimFactDecisionSchema).max(200)
+    .refine((items) => new Set(items.map((item) => item.id)).size === items.length, "Decide each found fact once."),
+  areas: z.object({ website: areaChoice, inquiries: areaChoice, bookings: areaChoice, google: areaChoice, internal_tools: areaChoice }).strict(),
+}).strict();
+export type ClaimReviewAcceptInput = z.infer<typeof claimReviewAcceptInputSchema>;
+
+export const claimReviewAcceptedSchema = ownerClaimAcceptedSchema.extend({
+  areas: z.partialRecord(z.enum(CLAIM_AREAS), z.enum(CLAIM_AREA_CHOICES)).optional(),
+  facts: z.object({ confirmed: z.number().int().min(0), changed: z.number().int().min(0), removed: z.number().int().min(0), later: z.number().int().min(0).optional(), waiting: z.number().int().min(0) }).optional(),
+  /** Areas where the owner chose Full control: it starts when the agency accepts. */
+  waitingForAgency: z.array(z.enum(CLAIM_AREAS)).optional(),
+});
+export type ClaimReviewAccepted = z.infer<typeof claimReviewAcceptedSchema>;
+
+export * from "./import-contract";

@@ -8,6 +8,7 @@ import { TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
 import { businessStartHref, businessStartAsk, type BusinessStartProduct } from "@/platform/workspaces/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { gettingStartedHref } from "@/platform/business-signup-release";
 import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { StCopy, StHead, StNotice, StPill, StTextField } from "@/components/ui/strelva/Kit";
 
@@ -18,7 +19,9 @@ function message(body: unknown, fallback: string): string {
 }
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
-export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), initialName = "", sourceCheckId, navigate = href => window.location.assign(href) }: { initialRequest?: string; initialName?: string; sourceCheckId?: string; startProduct?: BusinessStartProduct; navigate?: (href: string) => void }) {
+/** With `gettingStarted` (STRELVA_BUSINESS_SIGNUP_RELEASE, decided by the page), a help or website
+ * start lands on the business's Getting started view instead of its Home. */
+export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), initialName = "", sourceCheckId, gettingStarted = false, navigate = href => window.location.assign(href) }: { initialRequest?: string; initialName?: string; sourceCheckId?: string; startProduct?: BusinessStartProduct; gettingStarted?: boolean; navigate?: (href: string) => void }) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
   const [selected, setSelected] = useState("new");
@@ -103,6 +106,11 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
         throw new Error("Your ask is saved, but it could not be carried to Home. Allow session storage, then retry this setup.");
       }
       sessionStorage.removeItem(key); setPending(null);
+      // A typed request opened an Ask conversation: Home shows it. Otherwise a help or website start lands on Getting started.
+      if (gettingStarted && !result.data.askConversationId && (startProduct === "help" || startProduct === "website")) {
+        navigate(gettingStartedHref(result.data.workspaceId, result.data.requestId));
+        return;
+      }
       navigate(`/workspace?workspaceId=${encodeURIComponent(result.data.workspaceId)}&view=home`);
     } catch (cause) { if (isCurrent()) setError(cause instanceof Error ? cause.message : "Setup is not confirmed. Retry the retained setup."); }
     finally { mutation.current = false; if (isCurrent()) setSaving(false); }

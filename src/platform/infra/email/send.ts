@@ -450,3 +450,50 @@ export async function getReceivedEmailReadback(input: {
     return { status: "unavailable", reason: "email_provider_receiving_readback_unavailable" };
   }
 }
+
+export interface ReceivedEmailMessage {
+  id: string;
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  replyTo: string[];
+  subject: string;
+  text: string | null;
+  html: string | null;
+  headers: Record<string, string>;
+  messageId: string | null;
+}
+
+export type ReceivedEmailMessageResult =
+  | { status: "available"; message: ReceivedEmailMessage }
+  | { status: "unavailable"; reason: string };
+
+/**
+ * Read one received message's content (forwarded inquiries, 20261024500000).
+ * A provider read only: nothing is sent. The caller keeps the parsed fields
+ * it needs and drops the rest; attachments are never fetched.
+ */
+export async function getReceivedEmailMessage(emailId: string): Promise<ReceivedEmailMessageResult> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !/^[A-Za-z0-9-]{1,100}$/.test(emailId)) return { status: "unavailable", reason: "email_provider_receiving_unavailable" };
+  const strings = (value: unknown): string[] => (Array.isArray(value) ? value : value == null ? [] : [value]).filter((item): item is string => typeof item === "string").slice(0, 50);
+  try {
+    const { Resend } = await import("resend");
+    const response = await new Resend(apiKey).emails.receiving.get(emailId);
+    const data = response.data;
+    if (response.error || !data || typeof data.from !== "string" || data.id !== emailId) return { status: "unavailable", reason: "email_provider_receiving_unavailable" };
+    const headers = data.headers && typeof data.headers === "object"
+      ? Object.fromEntries(Object.entries(data.headers).filter(([, value]) => typeof value === "string").slice(0, 200)) as Record<string, string>
+      : {};
+    return { status: "available", message: {
+      id: data.id, from: data.from, to: strings(data.to), cc: strings(data.cc), bcc: strings(data.bcc), replyTo: strings(data.reply_to),
+      subject: typeof data.subject === "string" ? data.subject.slice(0, 998) : "",
+      text: typeof data.text === "string" ? data.text.slice(0, 200_000) : null,
+      html: typeof data.html === "string" ? data.html.slice(0, 400_000) : null,
+      headers, messageId: typeof data.message_id === "string" ? data.message_id : null,
+    } };
+  } catch {
+    return { status: "unavailable", reason: "email_provider_receiving_unavailable" };
+  }
+}

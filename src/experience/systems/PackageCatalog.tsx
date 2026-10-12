@@ -32,7 +32,7 @@ function ScopedPackageCatalog({ workspaceId, canInstall, canGrantInstall = false
     return () => controller.abort();
   }, [request, workspaceId, attempt]);
   return <section aria-labelledby="qualified-apps-title" className="space-y-5 border-t border-gray-border pt-6">
-    <header><h2 id="qualified-apps-title" className="font-display text-xl text-warm-black">Ready-made systems from creators</h2><p className="mt-2 text-sm text-gray-muted">Review what an internal tool can use. Add an internal tool draft with your business’s own records and accounts, then approve its release in Needs you.</p></header>
+    <header><h2 id="qualified-apps-title" className="font-display text-xl text-warm-black">Apps from creators</h2><p className="mt-2 text-sm text-gray-muted">Review what an internal tool can use. Add an internal tool draft with your business’s own records and accounts, then approve its release in Needs you.</p></header>
     {canInstall ? <Link className="inline-flex min-h-12 items-center text-sm underline" href={`/workspace/version-sources?workspaceId=${workspaceId}`}>Create or share a reusable internal tool</Link> : null}
     {!listings && !error ? <p role="status" className="text-sm text-gray-muted">Reading qualified internal tools…</p> : null}
     {error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button size="sm" variant="secondary" onClick={() => { setListings(null); setError(""); setAttempt(value => value + 1); }}>Retry internal tools</Button></div> : null}

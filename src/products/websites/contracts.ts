@@ -255,3 +255,5 @@ export interface WebsiteRecord {
   createdAt: string;
   updatedAt: string;
 }
+
+export { normalizeWebsiteRebuildUrl } from "./rebuild-url";

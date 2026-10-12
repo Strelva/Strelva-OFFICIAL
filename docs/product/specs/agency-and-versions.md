@@ -24,7 +24,7 @@ the owner's same title and a link to the exact Needs you item. No operator
 bucket or operator queue supplies client-service authority. An incomplete
 client/source read stays explicit; it cannot prove nothing is waiting.
 
-**Library** is the agency's sources and client Versions. **Ready-made systems**
+**Library** is the agency's own Apps and their client Versions. **Apps**
 includes qualified reusable definitions from Library alongside clearly
 identified starters and services; packaging never
 copies client records, accounts, secrets or grants. **Internal tool** is the

@@ -46,9 +46,11 @@ function lineBreakLength(content: string, index: number): number {
  */
 export function parseTrackerCsv(
   content: string,
-  options: { sourceId?: string } = {},
+  options: { sourceId?: string; delimiter?: "," | "\t" | ";" } = {},
 ): TrackerCsvParseResult {
   const sourceId = options.sourceId || "csv-source";
+  // Comma by default; a tab for TSV or a range pasted from a spreadsheet.
+  const delimiter = options.delimiter ?? ",";
   const input = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
   const records: ParsedTrackerCsvRecord[] = [];
   const warnings: TrackerWarning[] = [];
@@ -136,7 +138,7 @@ export function parseTrackerCsv(
       continue;
     }
 
-    if (character === ",") {
+    if (character === delimiter) {
       if (closedQuote) closedQuote = false;
       pushField();
       hasRecordContent = true;
@@ -158,7 +160,7 @@ export function parseTrackerCsv(
         recordNumber,
         recordStartLine,
         line,
-        "Characters after a closing quote must be followed by a comma or line break.",
+        delimiter === "," ? "Characters after a closing quote must be followed by a comma or line break." : "Characters after a closing quote must be followed by a separator or line break.",
         fields.length + 1,
       ));
       closedQuote = false;
@@ -181,7 +183,7 @@ export function parseTrackerCsv(
 
   // A newline already commits the final record. Do not append a phantom empty
   // record for the common trailing-newline case.
-  if (fields.length > 0 || field.length > 0 || hasRecordContent || input.endsWith(",")) {
+  if (fields.length > 0 || field.length > 0 || hasRecordContent || input.endsWith(delimiter)) {
     pushRecord(line);
   }
 

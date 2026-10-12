@@ -29,6 +29,8 @@ export interface RebuildExperienceProps {
   canPublish?: boolean;
   agency?: boolean;
   initialRequest?: string;
+  /** The business's one website (owner door), prefilled into "Your current website". */
+  initialUrl?: string;
   initialRecord?: RebuildView;
   transport?: RebuildTransport;
   onSaved?: (workId: string) => void;
@@ -104,7 +106,7 @@ function WebsiteFactEditor({ text, origin, disabled, onSave, onRemove }: {
 export function RebuildExperience(props: RebuildExperienceProps) {
   return <ScopedRebuildExperience key={`${props.workspaceId}:${props.workId ?? props.initialRecord?.workId ?? "new"}`} {...props} />;
 }
-function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved, onCurrentRecord, minimumRecordRevision }: RebuildExperienceProps) {
+function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialUrl = "", initialRecord, transport = serverRebuildTransport, onSaved, onCurrentRecord, minimumRecordRevision }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
   const acceptedRecord = useRef(initialRecord ?? null);
   const guardedCurrentRecords = minimumRecordRevision !== undefined;
@@ -159,7 +161,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
   const [allowAgencyPublish, setAllowAgencyPublish] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [descriptionMode, setDescriptionMode] = useState(Boolean(initialRequest));
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
   const [businessName, setBusinessName] = useState("");
   const [description, setDescription] = useState(initialRequest);
   const [domain, setDomain] = useState("");

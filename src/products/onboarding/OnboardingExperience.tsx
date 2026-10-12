@@ -154,7 +154,7 @@ function OnboardingSession({ workspaceId, initialCaseId, initialRequest = "", on
       <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <aside className="space-y-5">
           <header>
-            <p className="text-sm text-gray-muted">Private onboarding</p>
+            <p className="text-sm text-gray-muted">Onboarding</p>
             <h1 className="mt-2 font-display text-3xl">Collect the right records.</h1>
             <p className="mt-3 text-sm leading-6 text-gray-muted">Keep each requirement, saved document, reviewer, and decision together. Automatic extraction stays proposed until a person accepts it.</p>
           </header>

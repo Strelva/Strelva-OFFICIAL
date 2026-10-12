@@ -139,7 +139,7 @@ test("mobile navigation traps focus and opens search without background interact
   await expect(page.getByRole("combobox", { name: /Search/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await trigger.click();
-  await navigation(page).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Assign to this business", exact: true }).click();

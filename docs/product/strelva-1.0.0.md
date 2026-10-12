@@ -52,8 +52,9 @@ and exact decision link; it does not consume the platform-operator queue.
 [GLOSSARY.md](../../GLOSSARY.md) owns the shared names: **Possibility** stays;
 **Proposal** stays a research response underneath. **Internal tool** is the kind,
 **Internal tools** the collection; each opens by its own name. **Library** and
-**Ready-made systems** share qualified reusable sources across the agency and
-business views; starters and services remain separately identified.
+**Apps** share qualified reusable Systems across the agency and
+business views (an App is a reusable System a creator publishes; installing it
+gives the business a Version); starters and services remain separately identified.
 Owners ask for the Running result and approve its limits; agencies configure
 supported Saved checks and cadence. Unsupported results remain Requests.
 

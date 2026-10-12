@@ -252,6 +252,11 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261024132000": "ux_agency_identity_catalog_guard",
   "20261024132100": "agency_native_page_commands",
   "20261024132400": "ux_agency2_decision_predecessors",
+  "20261024200000": "agency_client_add_limit_overrides",
+  "20261024300000": "business_found_facts",
+  "20261024400000": "workspace_google_read_grants",
+  "20261024500000": "inquiry_forwarding_addresses",
+  "20261024600000": "agency_source_connections",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -292,6 +297,7 @@ export const FLAG_ENV = [
   "STRELVA_OWNER_ENTRY",
   "STRELVA_SYSTEMS_RELEASE",
   "STRELVA_AGENCY_SIGNUP_RELEASE",
+  "STRELVA_BUSINESS_SIGNUP_RELEASE",
   "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
   "STRELVA_CATALOG_REPORTS_RELEASE",
   "STRELVA_NEWSLETTER_CONTACTS_RELEASE",

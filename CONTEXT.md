@@ -181,7 +181,7 @@ owner decisions show read-only **Waiting on [business]**, the same title and
 an exact-item link into the owner's **Needs you**. It does not consume a
 platform-operator queue. **Possibility** stays a working alternative; Proposal
 is a research response underneath. **Internal tool** is the kind, **Internal
-tools** the collection, and Systems open by their own names. Qualified Library sources appear in Ready-made systems as reusable definitions,
+tools** the collection, and Systems open by their own names. Qualified Library sources appear in **Apps** as reusable definitions,
 without client data, accounts, secrets or grants. Built-in starters and managed
 services keep their distinct origin and acceptance requirements.
 
@@ -208,6 +208,11 @@ This is selected direction. The original October 4 model did not prove a
 shipped runtime; the dated checkpoints above own later local and bounded
 production evidence. Nothing in these decisions proves demand, delivery cost
 or pricing.
+
+A System is made in Strelva or brought in: a website the business already runs
+elsewhere, or its Google listing, is a System from the day it is connected
+(GLOSSARY, October 12). An **App** is a reusable System a creator publishes;
+installing one gives the business a Version.
 
 Walk it with The Mooney Firm. Its website is a **System**: it stays the same
 System through a rebuild, a new domain or a new booking section. It has

@@ -71,7 +71,7 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
   const normalized = query.trim().toLocaleLowerCase();
   const visible = APP_TEMPLATES.filter(template => (category === "All" || template.category === category) && `${template.name} ${template.description}`.toLocaleLowerCase().includes(normalized));
   return <section className={styles.library} aria-labelledby="template-library-title">
-    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Ready-made internal tools</h1><p>Start with a working tool. Adjust the fields, try it, then save a private copy to your business.</p></header>
+    <header className={styles.heading}><p>{props.businessName}</p><h1 id="template-library-title">Apps for internal tools</h1><p>Start with a working tool. Adjust the fields, try it, then save a private copy to your business.</p></header>
     <div className={styles.filterbar}>
       <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search templates</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Find a template…" /></label>
       <div className={styles.categories} aria-label="Template categories">{categories.map(item => <button key={item} type="button" aria-pressed={category === item} onClick={() => setCategory(item)}>{item}</button>)}</div>

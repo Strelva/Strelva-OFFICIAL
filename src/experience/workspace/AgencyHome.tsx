@@ -295,7 +295,7 @@ export function AgencyHome({
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your sources. Qualified releases you share appear in your clients’ Ready-made systems." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
+    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Library holds your sources. Qualified releases you share appear in your clients’ Apps." : "Each client owns its Systems and records. Library is available when Systems are enabled for this agency."}</p>
   </section>;
 
   const creditSection = credits.length ? <section className="mt-12" aria-labelledby={`${id}-credits`}>
@@ -310,6 +310,7 @@ export function AgencyHome({
     <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Each client is shown with the access you have in that business. Clients keep ownership and control access.</p>
     {canUseTools && (snapshot.releases?.agencyAddClient || snapshot.releases?.agencySetup || snapshot.releases?.agencyProspecting) ? <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
       {snapshot.releases?.agencyAddClient ? <a href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 text-[13px] font-medium text-on-accent hover:bg-accent/85"><Plus size={15} aria-hidden="true" />Add a client</a> : null}
+      {snapshot.releases?.agencyImportClients ? <a href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Import clients<ArrowRight size={15} aria-hidden="true" /></a> : null}
       {snapshot.releases?.agencySetup ? <a href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Agency setup and verification<ArrowRight size={15} aria-hidden="true" /></a> : null}
       {snapshot.releases?.agencyProspecting ? <a href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">View prospects<ArrowRight size={15} aria-hidden="true" /></a> : null}
     </div> : null}
@@ -372,6 +373,7 @@ export function AgencyHome({
   return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
     <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · <StMono>Loaded {combined.clients.length} of {combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
+      {snapshot.releases?.agencyImportClients ? <StPillLink variant="soft" href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Import clients</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
       {snapshot.releases?.agencyProspecting ? <StTextButton href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`}>Prospects</StTextButton> : null}
     </>} />

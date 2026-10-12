@@ -2168,6 +2168,60 @@
           "rollbackStatus": "Prepared inverse only; disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
         }
       ]
+    },
+    {
+      "id": "agency-client-import",
+      "status": "Getting started L2 Import clients and per-agency add limits: held and unqualified. Focused local PostgreSQL contract (scripts/check-agency-client-import-sql.sh) and the ordered agency workflow runner only; hosted Auth and production migration application UNRUN; no packet batch or deployment authority granted.",
+      "items": [
+        {
+          "file": "20261024200000_agency_client_import.sql",
+          "sha256": "9b65636c3662bd243a3aedc74001943e0ba3f54497ba90607270ab3bdf8609bd",
+          "rollback": "rollback-20261024200000_agency_client_import.sql",
+          "rollbackSha256": "45b013f9d268ff107406d62f7e59131a791dc573d81b1a5ca9055cf114fcf322",
+          "rollbackStatus": "Prepared inverse restores agency_add_client exactly as 20261015100000 left it and drops the limits tables and readers; refuses once any operator-set limit or its history exists. Local throwaway PostgreSQL only; production application UNRUN/held."
+        }
+      ]
+    },
+    {
+      "id": "onboarding-getting-started",
+      "status": "Oct 12 onboarding: one Found-fact store and claim review, Google read grant and agency connect link, inquiry forwarding, agency source connections (HighLevel), reconnect account match. Rehearsed on the Oct 12 production restore; each feature flag off by default.",
+      "items": [
+        {
+          "file": "20261024300000_claim_review.sql",
+          "sha256": "8dd9eb2b3dee0c15924f77de76e6b333368b47780143b07e87024059ca60f623",
+          "rollback": "rollback-20261024300000_claim_review.sql",
+          "rollbackSha256": "572fd0404abee23fddcc3d22d13a8371dfc76602126d3340dbdcc76d5c56a02e",
+          "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
+        },
+        {
+          "file": "20261024400000_google_found_facts_and_read_grant.sql",
+          "sha256": "8634996536fb7bd6d4621ac33ce2abca9d28569bf2a9265c638aef502f2ff1a3",
+          "rollback": "rollback-20261024400000_google_found_facts_and_read_grant.sql",
+          "rollbackSha256": "767af4a97c27560357796ed281ce0608cfd66b36111e00603c04e499794bdf06",
+          "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
+        },
+        {
+          "file": "20261024500000_inquiry_forwarding.sql",
+          "sha256": "450475d172904ab5ffde07d1471c946078a4b4d99d347c6465167c2527ce9461",
+          "rollback": "rollback-20261024500000_inquiry_forwarding.sql",
+          "rollbackSha256": "1686592739dd97273c9defe1fa0aed7e20d45fb1fab0fbc2001a4850b3ebd80e",
+          "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
+        },
+        {
+          "file": "20261024600000_agency_source_connections.sql",
+          "sha256": "b477acc99bb489264b32fc866a415f4715add116ac5234594e7e5fed9300cebe",
+          "rollback": "rollback-20261024600000_agency_source_connections.sql",
+          "rollbackSha256": "4936de42bc4818ebe023ea45d60fe98711388d6f1742dc4c984640ffb20fe4f5",
+          "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
+        },
+        {
+          "file": "20261024710000_publishing_reconnect_account_match.sql",
+          "sha256": "ae6911380d7ddbdeb2af04f6be2acfb3a3fd8601c7f1cecc009cc67eb507166a",
+          "rollback": "rollback-20261024710000_publishing_reconnect_account_match.sql",
+          "rollbackSha256": "ae141865cea4d98fa8f8910f0300539a8187d0f0c16f2d7ffd046cabe9ac314b",
+          "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
+        }
+      ]
     }
   ]
 }

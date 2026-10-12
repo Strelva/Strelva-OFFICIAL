@@ -4,6 +4,8 @@ import { readPlace } from "@/platform/owner-entry/place-state";
 import { readWorkspaceInquiryInbox } from "@/products/inquiries";
 import { z } from "zod";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { inquiryForwardingReleaseEnabled, inquiryForwardingReleasedFor } from "@/products/inquiry-forwarding/server";
 import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceShell";
 import { listWorkspaces } from "@/platform/workspaces";
 import { systemsReleasedFor } from "@/platform/systems-release";
@@ -22,7 +24,9 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
     listWorkspaces(actor).catch(() => []),
     systemsReleasedFor(actor, workspaceId).catch(() => false),
   ]);
+  const forwarding = state.kind !== "permission" && inquiryForwardingReleaseEnabled()
+    && await inquiryForwardingReleasedFor(workspaceId, await releaseViewerFor(actor)).catch(() => false);
   return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}>
-    <StPage><WorkspaceInquiries workspaceId={workspaceId} state={state} embedded /></StPage>
+    <StPage><WorkspaceInquiries workspaceId={workspaceId} state={state} forwarding={forwarding} embedded /></StPage>
   </WorkspaceSurfaceShell>;
 }

@@ -148,6 +148,7 @@ describe("auth access pages", () => {
 
   it("uses work language and workspace return for the general auth path when open", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
@@ -166,6 +167,7 @@ describe("auth access pages", () => {
 
   it("asks business or agency when the agency front door is on, and sends agencies to setup", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
@@ -190,6 +192,7 @@ describe("auth access pages", () => {
 
   it("keeps the agency choice off by default", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
@@ -202,6 +205,7 @@ describe("auth access pages", () => {
 
   it("preserves a supported public-result destination through general signup", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const target = "/workspace?save=scan_public123";
@@ -216,6 +220,7 @@ describe("auth access pages", () => {
 
   it("preserves the private public-brief continuation through general sign-up and sign-in", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const target = "/workspace/account?continue=public";
@@ -327,6 +332,7 @@ describe("auth access pages", () => {
 
   it("falls back to the workspace root for an unsafe signup destination", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
@@ -337,5 +343,45 @@ describe("auth access pages", () => {
 
     expect(html).toContain("&quot;next&quot;:&quot;/workspace/business/new&quot;");
     expect(html).not.toContain("evil.example");
+  });
+
+  it("keeps direct business sign-up closed when only the workspace is open", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    mockHeaderValues.clear();
+    mockGetInvite.mockResolvedValue(null);
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+
+    for (const next of [undefined, "/workspace?save=scan_public123", "/workspace/account?continue=public"]) {
+      const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve(next ? { next } : {}) }));
+      expect(html).toContain("New accounts open soon");
+      expect(html).toContain("Want it done for you? Find an agency");
+      expect(html).not.toContain('data-supabase="sign-in"');
+      expect(html).not.toContain("/workspace/business/new");
+      // No agency door either: nothing points at agency sign-up.
+      expect(html).not.toContain("as=agency");
+    }
+  });
+
+  it("keeps the agency door and claim links open while business sign-up is closed", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
+    mockHeaderValues.clear();
+    mockGetInvite.mockResolvedValue(null);
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+
+    const closed = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({}) }));
+    expect(closed).toContain("New accounts open soon");
+    expect(closed).toContain('href="/sign-up?as=agency"');
+    expect(closed).not.toContain("Who is this for?");
+
+    const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
+    expect(agency).toContain("Create your account");
+    expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
+    expect(agency).not.toContain("I run a business");
+
+    const claim = `/workspace/claim/${"a".repeat(43)}`;
+    const claimed = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ next: claim }) }));
+    expect(claimed).toContain(`&quot;next&quot;:&quot;${claim}&quot;`);
+    expect(claimed).not.toContain("New accounts open soon");
   });
 });

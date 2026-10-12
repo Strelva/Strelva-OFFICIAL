@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { expectedConnectedSiteSystemId } from "@/products/connected-sites/client";
-import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StState, StSteps, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StState, StSteps, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import styles from "./connected-sites.module.css";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
+import { GUIDE_ORDER, installGuide, installStepsText } from "@/products/connected-sites/client";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
@@ -18,17 +19,16 @@ export interface ConnectableSite {
   verifiedAt: string | null;
   systemId: string;
   snippet: { script: string; meta: string | null };
+  /** What the owner said the site is built with, when known. */
+  platform?: SitePlatform;
 }
 
-const PLATFORM_LABEL: Partial<Record<SitePlatform, string>> = {
-  unknown: "I'm not sure", custom: "Custom or hand-written", wix: "Wix", squarespace: "Squarespace", wordpress: "WordPress", webflow: "Webflow",
-  shopify: "Shopify", framer: "Framer", godaddy: "GoDaddy", "google-sites": "Google Sites", square: "Square", duda: "Duda", carrd: "Carrd",
-};
-const PLATFORM_OPTIONS = PLATFORMS.filter(value => PLATFORM_LABEL[value]).map(value => ({ value, label: PLATFORM_LABEL[value]! }));
+const PLATFORM_OPTIONS = GUIDE_ORDER.filter(value => (PLATFORMS as readonly string[]).includes(value)).map(value => ({ value, label: installGuide(value).label }));
 const UNCONFIRMED_CONNECTION = "We couldn't confirm the connection's current state. Reload the page to check before trying again.";
 const connectedResponse = z.object({ site: z.object({
   id: z.string().uuid(), siteHost: z.string().min(1), siteUrl: z.string().url(), status: z.enum(["active", "revoked"]),
   verifiedAt: z.string().nullable(), systemId: z.string().uuid(), snippet: z.object({ script: z.string(), meta: z.string().nullable() }),
+  platform: z.enum(PLATFORMS).optional(),
 }) });
 // Confirmation mirrors normalizeSiteUrl's stored address; the server owns validation.
 function submittedAddress(raw: string): { siteUrl: string; siteHost: string } | null {
@@ -45,19 +45,21 @@ const errorResponse = z.object({ error: z.string() });
  * the live page to confirm the site is theirs → the website opens as a
  * System. Strelva never edits the pages. Every call is rechecked on the server.
  */
-export function ConnectSiteExperience(props: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string }) {
+export function ConnectSiteExperience(props: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string; /** The business's one website (owner door). */ initialUrl?: string }) {
   return <ConnectSiteExperienceContent key={props.workspaceId} {...props} />;
 }
 
-function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, appBase = "" }: Parameters<typeof ConnectSiteExperience>[0]) {
+function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, appBase = "", initialUrl = "" }: Parameters<typeof ConnectSiteExperience>[0]) {
   const request = useWorkspaceRequest();
   const [site, setSite] = useState<ConnectableSite | null>(() => initialSites.find(item => item.status === "active") ?? null);
   const [sites, setSites] = useState(initialSites.filter(item => item.status === "active"));
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialUrl);
   const [platform, setPlatform] = useState<SitePlatform>("unknown");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [guidePlatform, setGuidePlatform] = useState<SitePlatform | null>(null);
+  const [stepsCopied, setStepsCopied] = useState(false);
   const inFlight = useRef(false);
   const needsReload = useRef(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
@@ -125,12 +127,21 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     try { await navigator.clipboard.writeText([site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")); setCopied(true); }
     catch { setError("Copy is unavailable. Select the lines and copy them manually."); }
   }
+  // The guide follows what the owner chose; they can switch it without changing the saved site.
+  const shownPlatform: SitePlatform = guidePlatform ?? site?.platform ?? platform;
+  const guide = installGuide(shownPlatform);
+  async function copySteps() {
+    if (!site) return;
+    const lines = [site.snippet.meta, site.snippet.script].filter(Boolean).join("\n");
+    try { await navigator.clipboard.writeText(installStepsText({ platform: shownPlatform, siteHost: site.siteHost, lines })); setStepsCopied(true); }
+    catch { setError("Copy is unavailable. Select the steps and copy them manually."); }
+  }
 
   return <div ref={scope}><StPage>
     <StHead crumb={{ label: "Systems", href: `${appBase}/workspace?${new URLSearchParams({ workspaceId })}` }} title={site ? `Connect ${site.siteHost}` : "Bring the website you already have"}
       meta="Keep your site where it is. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages." />
     {sites.length ? <div className={styles.stack}>
-      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { if (!inFlight.current && !needsReload.current) { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); setCopied(false); } }} disabled={busy || unconfirmed} />
+      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { if (!inFlight.current && !needsReload.current) { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); setCopied(false); setStepsCopied(false); setGuidePlatform(null); } }} disabled={busy || unconfirmed} />
       {site && canManage ? <StTextButton disabled={busy || unconfirmed} onClick={() => { if (!inFlight.current && !needsReload.current) { setSite(null); setError(""); setCopied(false); } }}>Connect another website</StTextButton> : null}
     </div> : null}
     {!site ? canManage ? <StSurface label="Connect your website"><form className={styles.stack} onSubmit={connect} noValidate aria-label="Connect your website">
@@ -143,7 +154,7 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
         <StSurface label="Lines to add to your site"><div className={styles.stack}>
           <h2 ref={resultHeading} tabIndex={-1} id={site.verifiedAt ? "connected-done" : "connected-install"} className="text-base font-semibold">{site.verifiedAt ? `${site.siteHost} is connected` : `Add these two lines to ${site.siteHost}`}</h2>
           {site.verifiedAt ? <><StState kind="live">Connected</StState><p className={styles.body}>The site stays with your current provider. Its connection to Strelva is verified.</p></> : <>
-            <p className={styles.body}>Paste them into your site&rsquo;s header code (most builders call it &ldquo;custom code&rdquo;), on every page. Someone else runs your site? Send them these lines; they&rsquo;re safe to share.</p>
+            <p className={styles.body}>They go in your site&rsquo;s header code, on every page. Your pages stay as they are. Someone else runs your site? Copy the steps below and send them; the lines are safe to share.</p>
             <pre className={styles.code} tabIndex={0} aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
             <div className={styles.actions}><StPill variant="soft" onClick={() => void copy()}>{copied ? "Copied" : "Copy"}</StPill>{copied ? <span role="status" className={styles.body}>Lines copied</span> : null}</div>
           </>}
@@ -164,6 +175,13 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
           </StRows>
         </StSection>
       </div>
+      {!site.verifiedAt ? <StSection title="Where to paste them" meta={guide.label}>
+          <SelectInput label="Your site is built with" value={shownPlatform} options={PLATFORM_OPTIONS} onChange={event => { setGuidePlatform(event.target.value as SitePlatform); setStepsCopied(false); }} />
+          {guide.supported ? null : <StNotice>{guide.label} can&rsquo;t run these lines.</StNotice>}
+          <StRows label={`Steps for ${guide.label}`}>{guide.steps.map((step, index) => <StRow key={step} lead={<StMono>{index + 1}</StMono>} title={step} stackOnPhone={false} />)}</StRows>
+          {guide.requires ? <p className={styles.body}>{guide.requires}</p> : null}
+          {guide.supported ? <div className={styles.actions}><StPill variant="soft" onClick={() => void copySteps()}>{stepsCopied ? "Steps copied" : "Copy steps for your web person"}</StPill>{stepsCopied ? <span role="status" className={styles.body}>Steps copied. Send them to whoever runs your site.</span> : null}</div> : null}
+      </StSection> : null}
     </>}
     {error ? <StNotice tone="critical"><p ref={alert} tabIndex={-1}>{error}</p></StNotice> : null}
     {unconfirmed ? <div><StPill ref={reloadAction} variant="soft" disabled={busy} onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload connection</StPill></div> : null}

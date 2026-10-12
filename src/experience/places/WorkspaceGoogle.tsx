@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { StEmpty, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { PublishingPage, type PublishingState } from "@/experience/publishing/PublishingPage";
@@ -12,11 +13,12 @@ export interface GoogleListingPreview { category: string; rating: string; review
 function Context({ workspaceId, listing }: { workspaceId: string; listing: Listings[number] }) {
   return <><input type="hidden" name="workspaceId" value={workspaceId} /><input type="hidden" name="tenantId" value={listing.tenantId} /><input type="hidden" name="locationId" value={listing.locationId} /><input type="hidden" name="commandId" value={crypto.randomUUID()} /></>;
 }
-export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText, reviews, listingPreview, reviewRequest }: { workspaceId: string; state: PublishingState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string; reviews?: PublishingState<SiteReviews[]>; listingPreview?: GoogleListingPreview; reviewRequest?: typeof fetch }) {
+export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText, reviews, listingPreview, reviewRequest, connect }: { workspaceId: string; state: PublishingState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string; reviews?: PublishingState<SiteReviews[]>; listingPreview?: GoogleListingPreview; reviewRequest?: typeof fetch; connect?: ReactNode }) {
   const listings = state.kind === "ready" ? state.data : [];
   return <PublishingPage workspaceId={workspaceId} title="Google listing" meta="Your business on Google Search and Maps · Strelva drafts, you approve, Google publishes" state={state} errorTitle="Google listing couldn't load" errorBody="Your drafts and receipts are kept. Reload to try again.">
     {result ? <p role="status" className={styles.copy}>{result}</p> : null}
-    {!listings.length && state.kind === "ready" ? <StEmpty>No Google listing is connected here. Ask Strelva to connect Google; access needs the business owner&apos;s consent.</StEmpty> : null}
+    {state.kind === "ready" && connect ? connect : null}
+    {!listings.length && state.kind === "ready" && !connect ? <StEmpty>No Google listing is connected here yet. The business owner connects it with their own Google account.</StEmpty> : null}
     {listings.map(listing => {
       const blocked = listing.control.paused || !listing.connected || listing.control.accessPending;
       const site = reviews?.kind === "ready" ? reviews.data.find(site => site.tenantId === listing.tenantId && listings.filter(item => item.tenantId === listing.tenantId).length === 1) : undefined;

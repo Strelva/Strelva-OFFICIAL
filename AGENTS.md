@@ -19,8 +19,12 @@ A small business should be able to act on ideas that used to need its own
 software team. Four nouns carry the product
 ([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)):
 
-- **System:** something the business made in Strelva that works: a website,
-  a proposal, a booking page, an intake flow, an internal app. Its identity
+- **System:** something that works and that the business runs through
+  Strelva: a website, a proposal, a booking page, an intake flow, an internal
+  tool. It is made in Strelva or brought in (a website the business already
+  runs elsewhere, or its Google listing, is a System once connected). An
+  **App** is a reusable System a creator publishes; installing it gives the
+  business a Version. Its identity
   survives changes to its content, data, logic and screens. Draft, Live or
   Paused, with health tracked separately.
 - **Connection:** what a System works with: business facts, another System,

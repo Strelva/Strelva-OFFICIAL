@@ -98,7 +98,7 @@ describe("workspace offering experience", () => {
 
   it("keeps scoped work sharing from implying business-wide offering access", () => {
     const html = renderDirectory({ status: "unavailable", reason: "This work-share does not include business-wide offering access." }, null);
-    expect(html).toContain("Ready-made systems are set up for a business.");
+    expect(html).toContain("Apps are installed for a business.");
     expect(html).toContain("does not include business-wide offering access");
   });
 
@@ -117,7 +117,7 @@ describe("workspace offering experience", () => {
       onCommand: async () => null,
       onWebsiteCommand: async () => null,
     }));
-    expect(html).toContain("Ready-made systems");
+    expect(html).toContain("Apps you can install");
     expect(html).toContain("Documents");
     expect(html).toContain("This work-share does not include business-wide offering access.");
   });
@@ -178,7 +178,7 @@ describe("workspace offering experience", () => {
       onCommand: async () => null,
       onWebsiteCommand: async () => null,
     }));
-    expect(html).toContain("Ready-made systems");
+    expect(html).toContain("Apps you can install");
     expect(html).toContain("Applications");
     expect(html).toContain("Staff request application");
     expect(html).toContain("Start setup");
@@ -316,10 +316,10 @@ describe("workspace offering experience", () => {
     expect([...boundManagedWebsiteIds(state)]).toEqual(["bound-site"]);
     // Both release states use the shared customer names.
     const html = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined }));
-    expect(html).toContain("Ready-made systems");
+    expect(html).toContain(">Apps<");
     expect(html).toContain("managed website");
     const released = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined, systemsReleased: true }));
-    expect(released).toContain("Ready-made systems");
+    expect(released).toContain(">Apps<");
     expect(released).toContain("managed website");
   });
 

@@ -90,7 +90,7 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("heading", { name: "No matching work" })).toBeVisible();
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).getByRole("button", { name: "Home Finder: Explore example", exact: true }).click();
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
@@ -106,7 +106,7 @@ test("shared navigation remains available while opening and finding work", async
 
 test("shared workspace resumes inquiry work inside the one Strelva frame", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=managed");
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Inquiry work: Start", exact: true }).click();
   await page.getByRole("button", { name: "Open Buffalo Realty", exact: true }).click();
@@ -214,7 +214,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
     await allowance.screenshot({ path: "output/product-experience/work-allowance-desktop.png" });
   }
 
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Useful outcomes for this business." })).toBeVisible();
   await expect(page.getByText("Start work that is available here, or request setup when it needs a connected service or release decision.")).toBeVisible();
@@ -229,7 +229,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await managedWebsiteChanges.getByRole("button", { name: "Managed website changes: Start setup", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Install Managed website changes" })).toBeVisible();
   await expect(page.locator("form").getByRole("combobox")).toHaveValue("99999999-9999-4999-8999-999999999999");
-  await page.getByRole("button", { name: "Back to ready-made systems" }).click();
+  await page.getByRole("button", { name: "Back to Apps" }).click();
 
   const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
   await staffRequestOffering.getByRole("button", { name: "Staff request application: Start setup", exact: true }).click();
@@ -335,7 +335,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await pinned.getByRole("link", { name: "Staff requests", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Back to Apps" }).click();
-  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
   await installedStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
@@ -365,7 +365,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
 test("empty workspace can create an explicitly fictional local assessment", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=empty");
   await expect(page.getByRole("heading", { name: "No saved result yet.", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   const assessment = page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" });
   await expect(assessment).toContainText("Available to start");
@@ -400,7 +400,7 @@ test("mobile navigation closes on Escape and selection, and does not overflow", 
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
@@ -435,7 +435,7 @@ test("agency home names a client that failed to load and loads it on retry", asy
 test("shared read-only work cannot start an assessment", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=read-only");
   await expect(page.getByRole("heading", { name: "Review what was shared." })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Useful outcomes for this workspace.", exact: true })).toBeVisible();
   await expect(page.getByText("This work-share does not include business-wide offering access.", { exact: false })).toBeVisible();

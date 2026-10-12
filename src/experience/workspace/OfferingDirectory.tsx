@@ -221,22 +221,22 @@ export function WorkspaceOfferingDirectory({
       })
     : null;
   const renderProductFallback = (statusMessage: string, role: "status" | "alert" = "status", retry = false) => <section aria-labelledby="business-offerings-title">
-    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Ready-made</p><h2 id="business-offerings-title">Ready-made systems</h2><p>Start work that is available here, or explore an example while business setup is being checked.</p></header>
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Apps</p><h2 id="business-offerings-title">Apps you can install</h2><p>Start work that is available here, or explore an example while business setup is being checked.</p></header>
     <DiscoveryRows entries={discoveryEntries ?? []} onOffering={() => undefined} onProduct={onOpenProduct} onRequestSetup={onRequestSetup} />
     <p className={role === "alert" ? styles.error : styles.note} role={role}>{statusMessage}</p>
     {retry ? <button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button> : null}
   </section>;
   if (state.status === "unavailable") {
     if (discoveryEntries) return renderProductFallback(state.reason);
-    return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Ready-made systems are set up for a business.</h2><p>{state.reason}</p></section>;
+    return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Apps are installed for a business.</h2><p>{state.reason}</p></section>;
   }
   if (state.status === "loading") {
-    if (discoveryEntries) return renderProductFallback("Checking whether ready-made systems can be set up here…");
-    return <p className={styles.status} role="status">Loading ready-made systems…</p>;
+    if (discoveryEntries) return renderProductFallback("Checking whether Apps can be installed here…");
+    return <p className={styles.status} role="status">Loading Apps…</p>;
   }
   if (state.status === "error") {
-    if (discoveryEntries) return renderProductFallback(`${state.message} Ready-made systems remain unavailable until this is checked again.`, "alert", true);
-    return <section className={styles.status}><h2>Ready-made systems could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
+    if (discoveryEntries) return renderProductFallback(`${state.message} Apps remain unavailable until this is checked again.`, "alert", true);
+    return <section className={styles.status}><h2>Apps could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
   }
 
   const selectedInstallation = state.collection.installations.find((installation) => installation.id === selectedId);
@@ -246,7 +246,7 @@ export function WorkspaceOfferingDirectory({
 
   const currentByDefinition = new Map(state.collection.installations.filter((installation) => installation.status !== "retired").map((installation) => [installation.definitionId, installation]));
   return <section aria-labelledby="business-offerings-title">
-    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Ready-made</p><h2 id="business-offerings-title">Ready-made systems</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Set up a ready-made system around work the business already owns. Availability does not grant access or promise an agency."}</p></header>
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Apps</p><h2 id="business-offerings-title">Apps you can install</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Install an App around work the business already owns. Availability does not grant access or promise an agency."}</p></header>
     <WebsiteAssignments collection={state.collection} sites={managedSites} saving={state.saving} onCommand={onWebsiteCommand} />
     {discoveryEntries ? <DiscoveryRows entries={discoveryEntries} onOffering={(entry) => {
       if (entry.offering) onSelect(entry.installation?.id ?? entry.offering.id);
@@ -283,13 +283,13 @@ export function BusinessOfferingSummary({
   const panelTitle = "Set up for this business";
   if (state.status === "unavailable") return null;
   if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p role="status">Loading…</p></section>;
-  if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p>These records are unavailable. Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>Open ready-made systems</button></section>;
+  if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p>These records are unavailable. Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>Open Apps</button></section>;
   const current = state.collection.installations.filter((installation) => installation.status !== "retired");
   const agencyState = agencyDeliveryState ?? providerDeliveryState ?? fetchedAgencyDeliveryState;
   const agencyDeliveries = agencyState.status === "ready" ? agencyState.deliveries : [];
   return <section className={styles.homePanel} aria-labelledby="home-offerings">
-    <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Ready-made systems</h2><span>{current.length}</span></header>
-    {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>Nothing ready-made is set up for this business. Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>Explore ready-made systems</button></div>}
+    <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Apps</h2><span>{current.length}</span></header>
+    {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>No Apps are installed for this business. Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>Explore Apps</button></div>}
     <BusinessAgencyStatus state={agencyState} deliveries={agencyDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
   </section>;
 }

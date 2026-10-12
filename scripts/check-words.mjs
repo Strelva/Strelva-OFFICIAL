@@ -10,10 +10,12 @@ import ts from "typescript";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const retired = [
   "Strelva handled", "Internal applications", "Custom application", "Reusable applications",
-  "Apps from creators", "Private app", "Delegated work", "Reservations", "Website monitoring",
+  "Private app", "Delegated work", "Reservations", "Website monitoring",
   "saved investigation", "Provider handoff", "Provider change", "Your dashboard", "Make it real",
   "People and access", "offering record", "Business installations", "active provider seat",
   "All apps and files",
+  // October 12: "Apps" names reusable Systems creators publish (GLOSSARY App / Apps).
+  "Ready-made",
   "Approve and publish", "Source revisions", "Filed for Strelva", "All files and results",
 ];
 const businessScreen = /^(src\/experience\/(?!agency\/)|src\/products\/[^/]+\/[^/]+\.tsx$|src\/app\/(workspace|apps|preview)\/)/;

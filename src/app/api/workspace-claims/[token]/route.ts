@@ -1,5 +1,5 @@
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { acceptOwnerClaim, agencyAddClientReleaseEnabled, AgencyClientError, readOwnerClaim } from "@/products/agency-clients/server";
+import { acceptOwnerClaim, agencyAddClientReleaseEnabled, AgencyClientError, claimReviewReleaseEnabled, readOwnerClaim } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ token: string }> };
@@ -23,6 +23,8 @@ export async function POST(request: Request, context: Context) {
   if (!agencyAddClientReleaseEnabled()) return workspaceJson({ error: "This link isn't available." }, 404);
   const guard = workspaceWriteGuard(request);
   if (guard) return guard;
+  // Behind the claim review, the owner decides each area before taking the business.
+  if (claimReviewReleaseEnabled()) return workspaceJson({ error: "Review what your agency found and prepared, then claim.", code: "claim_review_required" }, 409);
   const actor = await workspaceHttpActor();
   if (!actor) return workspaceJson({ error: "Sign in with the email this link was sent to." }, 401);
   try {

@@ -4,6 +4,7 @@ import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/produc
 import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { InquiryInbox } from "./InquiryInbox";
 import { HeldInquiryActions } from "./HeldInquiryActions";
+import { ForwardInquiries } from "./ForwardInquiries";
 import { placeHomeHref, whenLabel, type PlaceState } from "./WorkspacePlace";
 
 /**
@@ -55,6 +56,9 @@ function reasonLabel(reason: string | null): string {
   if (!reason) return "Looked like spam";
   if (reason === "honeypot") return "Filled in a field people can't see";
   if (reason === "turnstile") return "Failed the robot check";
+  if (reason === "spam_header") return "Your email marked it as spam";
+  if (reason === "bulk_mail") return "Looked like a newsletter or mailing list";
+  if (reason === "volume") return "Arrived with an unusual number of forwarded messages";
   return "Looked like spam";
 }
 
@@ -74,18 +78,19 @@ function HeldSection({ held, workspaceId }: { held: HeldInquiries; workspaceId: 
   </StSection>;
 }
 
-export function WorkspaceInquiries({ workspaceId, state, embedded = false }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean }) {
+export function WorkspaceInquiries({ workspaceId, state, embedded = false, forwarding = false }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean; forwarding?: boolean }) {
   const data = state.kind === "ready" ? state.data : null;
   const content = <>
     <StHead crumb={embedded ? undefined : { label: "Home", href: placeHomeHref(workspaceId) }} title="Inquiries" meta={data?.durable ? "People who contacted you through your site. Your inquiries stay on record." : "People who contacted you through your site. Strelva keeps the last 90 days here."} />
     {state.kind === "permission" ? <StEmpty action={<StPillLink variant="soft" href="/workspace">Open your workspace</StPillLink>}>Your account isn&apos;t a member of this business. Ask its owner to invite you.</StEmpty> : state.kind === "error" ? <StNotice tone="critical">Inquiries couldn&apos;t load. Nothing is lost. Reload to check the current records.</StNotice> : <>
       {data?.denied.length ? <StNotice>Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
-      {data && data.sites.length === 0 && data.denied.length === 0 ? <StEmpty>No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</StEmpty> : null}
+      {data && data.sites.length === 0 && data.denied.length === 0 && !forwarding ? <StEmpty>No site is connected to this business yet. Inquiries start once a connected site sends its contact form here.</StEmpty> : null}
       {data?.sites.map(site => <StSection key={site.key} id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} title={site.connected ? `${site.siteName} (your site)` : site.siteName} meta={site.unavailable ? undefined : <StMono>{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</StMono>}>
-        {site.unavailable ? <StNotice tone="critical">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</StNotice> : site.leads.length === 0 ? <StEmpty>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</StEmpty> : <InquiryInbox key={`${workspaceId}:${site.key}`} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: whenLabel(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} /> }))} />}
+        {site.unavailable ? <StNotice tone="critical">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</StNotice> : site.leads.length === 0 ? <StEmpty>{site.forwarded ? "No forwarded email yet. Each inquiry you forward shows up here with the sender and what they asked." : <>No one has reached out yet. When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</>}</StEmpty> : <InquiryInbox key={`${workspaceId}:${site.key}`} entries={site.leads.map(lead => ({ id: lead.id, name: lead.name, summary: lead.message, at: whenLabel(lead.createdAt), waiting: !!lead.email && data.workspaceReplies === true && !lead.reply, record: <LeadCard lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} /> }))} />}
       </StSection>)}
       {data?.nextPage ? <StTextButton href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</StTextButton> : null}
       {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}
+      {forwarding ? <ForwardInquiries workspaceId={workspaceId} /> : null}
     </>}
   </>;
   return embedded ? <section className="grid gap-6">{content}</section> : <main data-dashboard data-workspace-theme="linen" data-workspace-mode="light"><StPage>{content}</StPage></main>;
