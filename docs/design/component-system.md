@@ -591,6 +591,29 @@ two plain links in a pill group with `aria-current`. Checked in Chromium at
 horizontal overflow. Jacob's visual acceptance, screen readers and physical
 devices remain open.
 
+### Getting started, owner door (October 12, flag off)
+
+[GettingStarted](../../src/experience/getting-started/GettingStarted.tsx) at
+`/workspace/getting-started` and
+[StartBusinessFromCheck](../../src/experience/getting-started/StartBusinessFromCheck.tsx)
+in the workspace's public-save dialog (`STRELVA_BUSINESS_SIGNUP_RELEASE`).
+Composed from the 1.0 kit only: `StPage`, `StHead` (crumb back to the business
+home), `StSection`, `StRows`/`StRow` for the next steps, `StTextField`,
+`StPill`, `StNotice`, `StEmpty`. Found facts are a plain list of labelled native
+checkboxes (44px rows, visible 2px focus), each with its value, what it would
+replace and its source page and quote; the one primary action adds the ticked
+ones. A step that isn't open for the business shows "Not open for your
+business yet." with no link. The dialog shell is
+[WorkspaceDialog](../../src/experience/workspace/WorkspaceDialog.tsx),
+extracted unchanged from the public-save overlay (focus on first control,
+contained Tab, Escape unless busy, focus returned on close). States: loading,
+check unavailable (save here still offered), ready, read in progress, read
+failed (focus back to the address), found, found nothing, saved, held brief,
+filed request, non-owner, closed steps. Checked locally at 1280 and 390 px on
+`/preview/strelva/getting-started?state=…` (fictional transport): no horizontal
+overflow, dialog Tab stays inside. Focus drops to the page while a read is in
+flight. No signed-in browser run, screen reader or device check yet.
+
 ## Extending the foundation
 
 Use the existing source owners and references. Keep changes small enough to

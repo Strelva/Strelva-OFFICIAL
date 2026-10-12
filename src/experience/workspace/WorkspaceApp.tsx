@@ -16,11 +16,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
 import { AccessHandoffOverlay, AccessPanel } from "./WorkspaceAccess";
 import { WorkspaceLayout } from "./WorkspaceLayout";
+import { WorkspaceDialog } from "./WorkspaceDialog";
+import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusinessFromCheck";
 import { normalizeWorkspaceHandoffPreview, normalizeWorkspaceSnapshot, normalizeWorkspaceWork } from "./result";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceRequestContext, useWorkspaceRequest, WorkspaceRequestError, readResponse, usePostAction } from "./WorkspaceRequest";
@@ -666,7 +668,22 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         />
       ) : null}
 
-      {!handoffLoading && !(handoffToken && handoffPreview) && publicSaveResultId ? (
+      {!handoffLoading && !(handoffToken && handoffPreview) && publicSaveResultId && snapshot?.releases?.businessSignup ? (
+        // The owner door: the check becomes the business, with saving here kept as the other choice.
+        <StartBusinessFromCheck
+          resultId={publicSaveResultId}
+          workspaceName={currentWorkspace?.name || "Current workspace"}
+          savingHere={publicSaveSaving}
+          saveHereError={publicSaveError}
+          onSaveHere={() => void savePublicResult()}
+          onClose={() => {
+            if (publicSaveSaving) return;
+            clearPublicSaveQuery();
+            setPublicSaveResultId(null);
+            setPublicSaveError("");
+          }}
+        />
+      ) : !handoffLoading && !(handoffToken && handoffPreview) && publicSaveResultId ? (
         <PublicResultSaveOverlay
           workspaceName={currentWorkspace?.name || "Current workspace"}
           saving={publicSaveSaving}
@@ -714,54 +731,17 @@ function DelegatedEmpty() {
 }
 
 function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose }: { workspaceName: string; saving: boolean; error: string; onSave: () => void; onClose: () => void }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialogRef.current?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus();
-    if (!dialogRef.current?.contains(document.activeElement)) dialogRef.current?.focus();
-    return () => previousFocusRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    if (saving && !dialogRef.current?.querySelector("button:not([disabled])")) dialogRef.current?.focus();
-  }, [saving]);
-
-  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      if (!saving) onClose();
-      return;
-    }
-    if (event.key !== "Tab") return;
-    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? []);
-    if (!focusable.length) {
-      event.preventDefault();
-      dialogRef.current?.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-  }
-
   return (
-    <div ref={dialogRef} tabIndex={-1} onKeyDown={handleDialogKeyDown} role="dialog" aria-modal="true" aria-labelledby="public-save-title" className="fixed inset-0 z-50 overflow-y-auto bg-overlay-scrim p-3 outline-none sm:p-8">
-      <div className="mx-auto flex min-h-full max-w-xl items-center">
-        <div className="w-full rounded-2xl border border-gray-border bg-surface p-5 shadow-2xl sm:p-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Private workspace</p>
-          <h1 id="public-save-title" className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black">Save a private copy of this result?</h1>
-          <p className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-[13px] text-gray-fg"><span className="font-medium text-warm-black">Workspace:</span> {workspaceName}</p>
-          <p className="mt-5 text-[14px] leading-relaxed text-gray-muted">This creates a new private work item in this workspace. The original public report stays separate and its source ownership does not change.</p>
-          {error ? <p role="alert" className="mt-4 rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[13px] leading-relaxed text-critical">{error}</p> : null}
-          <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button type="button" variant="secondary" size="lg" disabled={saving} onClick={onClose}>Back</Button>
-            <Button type="button" size="lg" loading={saving} onClick={onSave} icon={<ArrowRight className="h-4 w-4" />}>Save a copy</Button>
-          </div>
-        </div>
+    <WorkspaceDialog labelledBy="public-save-title" busy={saving} onClose={onClose}>
+      <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Private workspace</p>
+      <h1 id="public-save-title" className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black">Save a private copy of this result?</h1>
+      <p className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-[13px] text-gray-fg"><span className="font-medium text-warm-black">Workspace:</span> {workspaceName}</p>
+      <p className="mt-5 text-[14px] leading-relaxed text-gray-muted">This creates a new private work item in this workspace. The original public report stays separate and its source ownership does not change.</p>
+      {error ? <p role="alert" className="mt-4 rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[13px] leading-relaxed text-critical">{error}</p> : null}
+      <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button type="button" variant="secondary" size="lg" disabled={saving} onClick={onClose}>Back</Button>
+        <Button type="button" size="lg" loading={saving} onClick={onSave} icon={<ArrowRight className="h-4 w-4" />}>Save a copy</Button>
       </div>
-    </div>
+    </WorkspaceDialog>
   );
 }
