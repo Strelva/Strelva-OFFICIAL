@@ -1,7 +1,7 @@
 /** Screen words only. Stable product IDs and routes keep their existing names. */
 export const PLACE_LABELS = {
   home: "Home", needsYou: "Needs you", requests: "Requests", running: "Running",
-  systems: "Systems", systemsAndFiles: "All systems and files", readyMade: "Ready-made",
+  systems: "Systems", systemsAndFiles: "All systems and files", apps: "Apps",
   yours: "Yours", whatChanged: "What changed", businessDetails: "Business details",
   access: "People & access", help: "Help", account: "Account", system: "System", ask: "Ask Strelva",
 } as const;

@@ -19,7 +19,7 @@ for (const width of [1440, 390]) test(`${width}px installed inquiry withholds an
   await expect(surface).toContainText("Unavailable");
   await expect(surface.getByRole("link")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /Open/ })).toHaveCount(0);
-  const back = page.getByRole("button", { name: "Back to ready-made systems" });
+  const back = page.getByRole("button", { name: "Back to Apps" });
   await back.focus(); await expect(back).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(outside).toEqual([]); expect(errors).toEqual([]);

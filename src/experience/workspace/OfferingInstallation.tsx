@@ -120,7 +120,7 @@ export function OfferingInstallationView({
   }
 
   return <div className={styles.detail}>
-    <button type="button" className={styles.back} onClick={onBack}>Back to ready-made systems</button>
+    <button type="button" className={styles.back} onClick={onBack}>Back to Apps</button>
     <header>
       <p className={styles.eyebrow}>{installation.status === "active" ? "Installed" : installation.status === "draft" ? "Draft setup" : "Retired"}</p>
       <h2>{definition?.name ?? installation.definitionId}</h2>
@@ -371,7 +371,7 @@ export function OfferingInstallView({
   }
 
   return <form className={styles.detail} onSubmit={install}>
-    <button type="button" className={styles.back} onClick={onBack}>Back to ready-made systems</button>
+    <button type="button" className={styles.back} onClick={onBack}>Back to Apps</button>
     <header><p className={styles.eyebrow}>{availabilityLabel(definition)}</p><h2>Install {definition.name}</h2><p>{definition.description}</p></header>
     <p className={styles.note}>{definition.installationNote}</p>
 
