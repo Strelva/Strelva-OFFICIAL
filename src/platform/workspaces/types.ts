@@ -1,3 +1,14 @@
+import { z } from "zod";
+
+/** Identity recorded for an action, independent of runtime and presentation. */
+export const recordedActorSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("platform") }),
+  z.object({ kind: z.literal("agency"), displayName: z.string().trim().min(1) }),
+  z.object({ kind: z.literal("person"), displayName: z.string().trim().min(1) }),
+  z.object({ kind: z.literal("operator"), displayName: z.string().trim().min(1).optional() }),
+]);
+export type RecordedActor = z.infer<typeof recordedActorSchema>;
+
 export type WorkspaceKind = "personal" | "agency" | "customer";
 export type WorkspaceRole = "owner" | "admin" | "member";
 

@@ -1,7 +1,7 @@
 /** Entry identity comes from a verified invitation/claim, never branding in a URL. */
 import { inspectWorkspaceInvitation } from "@/platform/workspaces/invitations";
 import { readOwnerClaim } from "@/products/agency-clients/server";
-import { resolveOwnerBrand } from "./server";
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 export type InvitationEntryIdentity = { businessName: string; brand: OwnerBrand | string };

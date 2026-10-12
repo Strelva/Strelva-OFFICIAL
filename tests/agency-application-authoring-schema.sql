@@ -49,6 +49,21 @@ begin
     (agency_id, operator_id, 'member', operator_id)
   on conflict (workspace_id, user_id) do update set role = excluded.role;
 
+  -- The full current schema requires an active client seat and assigned staff
+  -- before an agency operator can accept delivery work. The early historical
+  -- owner also uses this fixture before the seat tables exist.
+  if to_regclass('public.provider_seats') is not null then
+    insert into public.workspace_memberships(workspace_id,user_id,role,created_by)
+      values(agency_id,owner_id,'owner',owner_id)
+      on conflict (workspace_id,user_id) do nothing;
+    insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
+      values(customer_id,agency_id,'owner',owner_id)
+      on conflict (customer_workspace_id,agency_workspace_id) where status='active' do nothing;
+    insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by)
+      values(agency_id,customer_id,operator_id,owner_id)
+      on conflict (agency_workspace_id,customer_workspace_id,user_id) where status='active' do nothing;
+  end if;
+
   app_spec := jsonb_build_object(
     'title', 'Customer intake',
     'maintenanceOwner', owner_id::text,

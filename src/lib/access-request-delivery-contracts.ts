@@ -1,29 +1,6 @@
 /** Browser-safe delivery stages and wire types. Storage, tokens and email stay server-side. */
-export type DeliveryStatus =
-  | "received"
-  | "reviewing"
-  | "drafting"
-  | "owner_review"
-  | "launch_ready"
-  | "launched"
-  | "paused";
-
-export type DeliveryPlan = "one-time" | "monthly";
-
-export interface DeliveryLead {
-  businessName: string;
-  description?: string | null;
-  location?: string | null;
-  email: string;
-  phone?: string | null;
-  currentWebsite?: string | null;
-  plan?: DeliveryPlan | null;
-  referredBy?: string | null;
-  statusToken: string;
-  deliveryStatus: DeliveryStatus;
-  submittedAt: string;
-  statusUpdatedAt: string;
-}
+import type { DeliveryStatus } from "@/platform/infra/delivery-contracts";
+export type { DeliveryStatus, DeliveryPlan, DeliveryLead } from "@/platform/infra/delivery-contracts";
 
 export const deliverySteps: Array<{
   id: Exclude<DeliveryStatus, "paused">;

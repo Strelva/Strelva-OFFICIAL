@@ -48,3 +48,4 @@ export type {
   AiVisibilityWorkResourceKind,
   PrivateAiVisibilityWorkPayload,
 } from "./work";
+export { default as answerCheckStyles } from "./answer-check.module.css";

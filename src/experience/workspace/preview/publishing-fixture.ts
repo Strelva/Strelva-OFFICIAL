@@ -60,7 +60,7 @@ export const PUBLISHING_LISTING_PREVIEW = {
   googleHours: "Sat 10–2", recordHours: "Closed Sat", fixLabel: "Prepare Saturday hours correction",
   pendingReview: "Google is still reviewing the photo you added Oct 7. Google decides; Strelva checks for updates.",
 };
-export const PUBLISHING_REVIEW_SITE: import("@/products/google-listing/linked-reviews").SiteReviews = {
+export const PUBLISHING_REVIEW_SITE: import("@/products/google-listing/server").SiteReviews = {
   tenantId: "juniper", siteName: "The Mooney Firm", googleConnected: true, googlePlaceId: null, replyMode: "approve", unavailable: false,
   reviews: [
     { id: "fictional-patel", author: "M. Patel", source: "google", rating: 5, text: "Thank you for helping us settle this without court. Sheri kept both sides calm.", date: "2026-10-06T15:00:00Z", reply: null, repliedAt: null, draft: { reply: "Thank you. It was a privilege to help both sides reach an agreement.", autoPostAt: null } },

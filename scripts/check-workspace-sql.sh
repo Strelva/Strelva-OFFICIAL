@@ -74,6 +74,27 @@ create table public.tenants (
   subscription_status text not null default 'none'
 );
 
+-- Guarded tenant teardown refuses tenants with completed one-time payments.
+create table public.build_payments (
+  session_id text primary key,
+  tenant_id text references public.tenants(id) on delete set null on update cascade,
+  amount_cents integer not null,
+  created_at timestamptz not null default now()
+);
+
+-- Website content history; tenant conversion reads the latest version.
+create table public.content_versions (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on delete cascade on update cascade,
+  section text not null,
+  data jsonb not null,
+  author text not null,
+  status text not null,
+  changes jsonb,
+  request_id text,
+  created_at timestamptz not null default now()
+);
+
 -- The migration's compatibility mirror targets the legacy operator audit log.
 -- Keep the isolated workspace fixture's subset so linked-client checks still
 -- exercise the mirror while agency workspaces exercise the native audit.
@@ -1741,6 +1762,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022174500_pri
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-source-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175000_reward_durable_mutations.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/reward-durable-catalog-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175050_legacy_google_creation_defaults.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-creation-defaults-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175100_legacy_google_operation_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/legacy-google-operation-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-operation-authority-schema.sql"

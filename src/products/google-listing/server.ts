@@ -42,4 +42,5 @@ export { commandNativeGoogle } from "./native/server";
 export { beginNativeGoogleOAuth, finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "./native/oauth";
 
 export { readWorkspaceReviews } from "./linked-reviews";
+export type { ReviewView, SiteReviews, WorkspaceReviews } from "./linked-reviews";
 export { receiptHeadline } from "./service";

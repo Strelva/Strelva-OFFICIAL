@@ -1,6 +1,6 @@
 /** Fictional email content for the canon. Never imported by a sender. */
-import { bookingVisitorPaperEmail, cardDeclinedPaperEmail, exportReadyPaperEmail, morningNeedsYouEmail, newInquiryEmail, offeredDatesPaperEmail, ownerInvitationPaperEmail, urgentNeedsYouEmail, weeklyRecapEmail } from "@/lib/email/paper";
-import type { PaperEmail } from "@/lib/email/paper";
+import { bookingVisitorPaperEmail, cardDeclinedPaperEmail, exportReadyPaperEmail, morningNeedsYouEmail, newInquiryEmail, offeredDatesPaperEmail, ownerInvitationPaperEmail, urgentNeedsYouEmail, weeklyRecapEmail } from "@/platform/infra/email/paper-templates";
+import type { PaperEmail } from "@/platform/infra/email/paper";
 
 export const EMAIL_PREVIEW_DRAFT = "Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it: attymooney.com/sessions";
 export const EMAIL_PREVIEW_IDENTITY = { sender: "Strelva Agency for The Mooney Firm", senderDetail: "Runs on Strelva · to sheri@attymooney.com · 9:12 AM" };

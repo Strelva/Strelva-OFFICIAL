@@ -1,3 +1,5 @@
+import type { RevalidationFailure } from "@/platform/infra/revalidation-contracts";
+export type { RevalidationFailure } from "@/platform/infra/revalidation-contracts";
 import { createRevalidationBody, signRevalidationBody } from "./scaffold-contracts";
 import { getTenantConfig, getActiveTenants } from "./tenants";
 import { getTenantDeliveryModel } from "./custom-repos";
@@ -7,14 +9,6 @@ import { getSectionTimestamps } from "./storage";
 import { logger } from "@/platform/infra/logger";
 import { addSentryBreadcrumb } from "./sentry-context";
 import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
-
-export interface RevalidationFailure {
-  tenantId: string;
-  url: string;
-  error: string;
-  timestamp: string;
-  attempts: number;
-}
 
 export interface ReconciliationResult {
   tenantId: string;

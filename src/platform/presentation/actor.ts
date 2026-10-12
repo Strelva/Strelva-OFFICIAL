@@ -1,13 +1,5 @@
-import { z } from "zod";
-
-/** Presentation of the actor recorded for this action, never the current agency seat. */
-export const recordedActorSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("platform") }),
-  z.object({ kind: z.literal("agency"), displayName: z.string().trim().min(1) }),
-  z.object({ kind: z.literal("person"), displayName: z.string().trim().min(1) }),
-  z.object({ kind: z.literal("operator"), displayName: z.string().trim().min(1).optional() }),
-]);
-export type RecordedActor = z.infer<typeof recordedActorSchema>;
+import { recordedActorSchema, type RecordedActor } from "@/platform/workspaces/types";
+export { recordedActorSchema, type RecordedActor } from "@/platform/workspaces/types";
 
 export const ACTOR_NOT_RECORDED = "Actor not recorded";
 

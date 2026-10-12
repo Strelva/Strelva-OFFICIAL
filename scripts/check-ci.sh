@@ -12,6 +12,10 @@ cd "$repo_root"
 # while an existing empty value remains authoritative. This subprocess-only
 # cleanup prevents local credentials from changing smoke/test meaning.
 export CI=true
+# Bound local runner capacity on shared hosts without changing test clocks,
+# assertions, coverage, or the number of tests. Vitest's existing worker seam
+# also applies to nested SQL-owner unit checks.
+export STRELVA_LOCAL_TEST_WORKERS="${STRELVA_LOCAL_TEST_WORKERS:-4}"
 export DATA_SOURCE="" CONTENT_SOURCE="" TENANTS_SOURCE=""
 export REB_DEV_UNGATED_ACCESS=0 SCAFFOLD_DEV_UNGATED_ACCESS=0 REB_DEV_TENANT="" SCAFFOLD_DEV_TENANT=""
 export STRELVA_UI_PREVIEW=0 STRELVA_WORKSPACE_RELEASE=0 STRELVA_CUSTOMERS_RELEASE=0

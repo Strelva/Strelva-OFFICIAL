@@ -3,7 +3,7 @@ import { StEmpty, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, S
 import { PublishingPage, type PublishingState } from "@/experience/publishing/PublishingPage";
 import styles from "@/experience/publishing/publishing.module.css";
 import { ReviewRows } from "./WorkspaceReviews";
-import type { SiteReviews } from "@/products/google-listing/linked-reviews";
+import type { SiteReviews } from "@/products/google-listing/server";
 import type { readWorkspaceGoogle } from "@/products/google-listing/server";
 
 type Listings = Awaited<ReturnType<typeof readWorkspaceGoogle>>;

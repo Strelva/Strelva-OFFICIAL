@@ -6,6 +6,10 @@ do $$declare owner_id uuid:=gen_random_uuid();manager_id uuid:=gen_random_uuid()
  insert into public.users(id,email,verified_at) values(owner_id,'admission-owner@example.test',now()),(manager_id,'admission-manager@example.test',now());
  insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Native admission business',owner_id),(agency,'agency','Native admission agency',manager_id);
  insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',owner_id),(agency,manager_id,'admin',manager_id);
+ -- Native business workspaces do not automatically create the billing row.
+ -- This fixture changes its payer later, so provide that real prerequisite.
+ insert into public.accounts(workspace_id,name,billing_type,payment_status,created_via)
+ values(ws,'Native admission business','none','none','operator');
  perform public.manage_connected_account(ws,owner_id,'admission-owner@example.test','reserve');
  perform public.record_connected_account(ws,'acct_AdmissionBusiness',array['merchant'],'fixture','{}','{}',true);
  select c.generation into generation from public.connected_accounts c where workspace_id=ws;
@@ -33,8 +37,8 @@ do $$declare owner_id uuid:=gen_random_uuid();manager_id uuid:=gen_random_uuid()
  perform public.claim_business_payment_channel(p,'agent');
  insert into public.agent_payment_reservations(payment_id,workspace_id,amount_cents,currency) values(p,ws,1000,'usd');
  perform pg_temp.ma_denied(format('select public.assert_agent_payment_admission(%L,%L,%s)',p,'acct_AdmissionBusiness',generation),'agent_payment_admission_denied');
- insert into public.business_bookings(id,calendar_key,workspace_id,legacy_id,status,origin,service_name_at_booking,start_at,end_at,block_end_at,time_zone,customer_name,customer_email,recorded_via)
- values(booking_id,ws,ws,'native-deposit-fixture','held','agent','Consultation',clock_timestamp()+interval '4 days',clock_timestamp()+interval '4 days 30 minutes',clock_timestamp()+interval '4 days 30 minutes','UTC','Fixture customer','customer@example.test','native');
+ insert into public.business_bookings(id,calendar_key,workspace_id,legacy_id,status,origin,service_name_at_booking,start_at,end_at,block_end_at,time_zone,customer_name,customer_email,recorded_via,created_at,updated_at)
+ values(booking_id,ws,ws,'native-deposit-fixture','held','agent','Consultation',clock_timestamp()+interval '4 days',clock_timestamp()+interval '4 days 30 minutes',clock_timestamp()+interval '4 days 30 minutes','UTC','Fixture customer','customer@example.test','native',clock_timestamp(),clock_timestamp());
  request_id:=gen_random_uuid();
  insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key)
  values(request_id,ws,'deposit',booking_id,'[{"name":"Booking deposit","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('f',64),owner_id,'native-deposit-request');
@@ -54,7 +58,7 @@ do $$declare owner_id uuid:=gen_random_uuid();manager_id uuid:=gen_random_uuid()
  update public.users set verified_at=null where id=owner_id;
  perform pg_temp.ma_denied(format('select public.assert_agency_billing_mutation(%L,%L,%L,%L,%L,%s)',intent_id,manager_id,'admission-manager@example.test','admission-owner@example.test','acct_AdmissionAgency',generation),'agency_invoice_denied');
  update public.users set verified_at=now() where id=owner_id;
- update public.accounts set payer_kind='business',payer_workspace_id=ws where workspace_id=ws;
+ update public.accounts set payer_kind='business',payer_workspace_id=null where workspace_id=ws;
  perform pg_temp.ma_denied(format('select public.assert_agency_billing_mutation(%L,%L,%L,%L,%L,%s)',intent_id,manager_id,'admission-manager@example.test','admission-owner@example.test','acct_AdmissionAgency',generation),'agency_invoice_conflict');
  update public.accounts set payer_kind='agency',payer_workspace_id=agency where workspace_id=ws;
  delete from public.workspace_memberships where workspace_id=agency and user_id=manager_id;
@@ -63,7 +67,7 @@ do $$declare owner_id uuid:=gen_random_uuid();manager_id uuid:=gen_random_uuid()
  -- Exit after reservation blocks only a new provider effect; observation recovery remains.
  request_id:=gen_random_uuid();
  insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key)
- values(request_id,ws,'quote',gen_random_uuid(),'[{"name":"Exit race quote","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('a',64),owner_id,'native-exit-request');
+ values(request_id,ws,'quote',gen_random_uuid(),'[{"name":"Exit race quote","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',encode(sha256('native-exit-request'::bytea),'hex'),owner_id,'native-exit-request');
  p:=(public.reserve_business_payment(ws,'native-exit-payment','quote',1000,'usd',request_id::text)->>'id')::uuid;
  perform public.claim_business_payment_channel(p,'agent');
  insert into public.agent_payment_reservations(payment_id,workspace_id,amount_cents,currency) values(p,ws,1000,'usd');

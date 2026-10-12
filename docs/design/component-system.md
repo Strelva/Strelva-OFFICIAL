@@ -1240,6 +1240,12 @@ Local proof and remaining limits live in
 
 ### Agency check attribution (October 7, local)
 
+`AiVisibilityAssessmentResult` gives a measured grade and score one accessible
+name, including partial measurement when applicable. Unmeasured checks show no
+grade or score. Partial checks retain their recorded evidence-limit explanation.
+The existing workspace desktop/mobile acceptance checks retain
+this semantic result contract.
+
 `AiVisibilityPage`, `AiVisibilityResultView`, and `WebsiteAuditPage` retain their
 owned forms/result geometry and semantic marketing tokens. Public attributed
 results add name-only agency identity, neutral provider advice and an agency

@@ -3,9 +3,9 @@ import { BadgeCheck } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
 import type { PublicFacts } from "@/products/connected-sites/contracts";
-import { formatAddress, mapsUrl, weeklyHours } from "@/products/connected-sites/business-page";
-import { publishedPolicyRows } from "@/products/connected-sites/published-policies";
-import { BusinessEvidence } from "@/products/connected-sites/BusinessEvidence";
+import { formatAddress, mapsUrl, weeklyHours } from "@/products/connected-sites";
+import { publishedPolicyRows } from "@/products/connected-sites";
+import { BusinessEvidence } from "@/products/connected-sites";
 import styles from "./assistants.module.css";
 
 export interface ProfileFact { label: string; value: string; source: string; detail?: string }

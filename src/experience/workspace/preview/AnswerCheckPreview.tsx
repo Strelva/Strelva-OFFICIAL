@@ -3,10 +3,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PublicFrame } from "@/experience/product/PublicFrame";
 import { AiVisibilityPage } from "@/products/ai-visibility";
-import { AiVisibilityResultView } from "@/products/ai-visibility/AiVisibilityResultView";
+import { AiVisibilityResultView } from "@/products/ai-visibility";
 import { StCopy, StEmpty, StTextField, StHead, StLabel, StMono, StNotice, StPage, StPill, StPillLink, StSteps, StSurface } from "@/components/ui/strelva/Kit";
 import { answerCheckFixture, answerSampleFixture } from "./answer-check-fixture";
-import styles from "@/products/ai-visibility/answer-check.module.css";
+import { answerCheckStyles as styles } from "@/products/ai-visibility";
 
 export function AnswerCheckPreview({ state }: { state: string }) {
   const router = useRouter();

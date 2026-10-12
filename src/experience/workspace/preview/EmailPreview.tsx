@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { LogoMark } from "@/components/Logo";
 import { TextArea } from "@/components/ui/TextInput";
 import { StEmpty, StSignedPage, StHead, StLabel, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
-import { renderPaperEmailBody } from "@/lib/email/paper";
+import { renderPaperEmailBody } from "@/platform/infra/email/paper";
 import { EMAIL_PREVIEW_CONFIRM_STATES, EMAIL_PREVIEW_CONTEXTS, EMAIL_PREVIEW_TEMPLATES, type EmailConfirmState, type EmailPreviewContext } from "./email-fixture";
 
 const explanatory = ["review", "review-not-yet", "website", "website-not-yet", "possibility", "invitation", "billing", "export", "booking", "dates"];
