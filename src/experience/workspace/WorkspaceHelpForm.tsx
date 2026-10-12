@@ -5,6 +5,7 @@ import { ArrowRight, Copy, Mail } from "lucide-react";
 import type { ServiceRequest, ServiceRequestAgency } from "@/platform/service-requests";
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { BringInAgency } from "./BringInAgency";
 import { useServiceRequestProviders } from "./useServiceRequestProviders";
 import { ServiceRequestDeliveryCompletion } from "./ServiceRequestDeliveryCompletion";
 import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
@@ -35,6 +36,8 @@ export interface WorkspaceHelpProps {
   providerOptions?: readonly WorkspaceHelpProviderOption[];
   scope?: readonly string[];
   onSaved?: (request: ServiceRequest) => void;
+  /** An owner may bring in and end agencies (ADR 0015); others see the list. */
+  canManageAgencies?: boolean;
 }
 
 function requestKey(): string {
@@ -78,7 +81,7 @@ function responseMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
-export function WorkspaceHelp({ workspaceName, hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved }: WorkspaceHelpProps) {
+export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved, canManageAgencies = false }: WorkspaceHelpProps) {
   const [request, setRequest] = useState(initialRequest);
   const [outcome, setOutcome] = useState("");
   const suppliedRecipients = useMemo(() => agencyOptions === undefined ? providerOptions : agencyOptions.map(option => ({ label: option.label, provider: option.agency })), [agencyOptions, providerOptions]);
@@ -294,7 +297,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService, onAgency, init
         {workspaceId ? <>
           <label htmlFor="request-outcome">What would a useful outcome look like? <span>(optional)</span></label>
           <textarea id="request-outcome" rows={4} maxLength={3000} value={outcome} onChange={event => { setOutcome(event.target.value); setSaved(null); setMessage(""); }} placeholder="Add detail if the outcome needs more explanation." />
-          {agencyChoices.loading ? <><p role="status">Loading agency choices…</p><StSkeleton label="Loading agency choices" /></> : agencyChoices.error ? <StNotice tone="critical">{agencyChoices.error}</StNotice> : !recipients.length ? <StNotice>Choose an agency in business access before requesting work. Platform support remains available by email.</StNotice> : null}
+          {agencyChoices.loading ? <><p role="status">Loading agency choices…</p><StSkeleton label="Loading agency choices" /></> : agencyChoices.error ? <StNotice tone="critical">{agencyChoices.error}</StNotice> : !recipients.length ? <StNotice>Bring in an agency below before requesting work. Platform support remains available by email.</StNotice> : null}
           <label htmlFor="request-provider">Who should review this?</label>
           <select id="request-provider" value={provider ? JSON.stringify(provider) : ""} onChange={event => { const option = selectableRecipients.find(item => JSON.stringify(item.provider) === event.target.value); if (option) { setProvider(option.provider); setSaved(null); setMessage(""); } }}><option value="">Choose an agency</option>{selectableRecipients.map(option => <option key={JSON.stringify(option.provider)} value={JSON.stringify(option.provider)}>{option.label}</option>)}</select>
         </> : null}
@@ -317,10 +320,9 @@ export function WorkspaceHelp({ workspaceName, hasManagedService, onAgency, init
       {deliveryContextError ? <StNotice tone="critical">{deliveryContextError} <StTextButton onClick={openDeliveryControls}>Try again</StTextButton></StNotice> : null}
     </StSection> : null}
     {editingRequest && deliveryContext ? <ServiceRequestDeliveryCompletion request={editingRequest} installation={deliveryContext.installation} responsibilities={deliveryContext.responsibilities} onRequestUpdated={updated => { setEditingRequest(updated); setSaved(updated); setSavedRequests(current => current.map(item => item.id === updated.id ? updated : item)); }} /> : null}
-    <StSection title={hasManagedService ? "Your managed service continues." : "Want an agency involved?"}>
-      <p className={styles.copy}>{hasManagedService ? "Your agreed service and website controls remain available. Open your website to review work, manage settings, and see its billing details." : "Choose an agency for implementation or ongoing service. Scope is agreed before work begins."}</p>
-      <StTextButton href="mailto:hello@strelva.com?subject=Working%20with%20Strelva">Contact the team<ArrowRight size={16} aria-hidden="true" /></StTextButton>
-    </StSection>
+    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} /> : <StSection title="Want it done for you?">
+      <p className={styles.copy}>Open your business in Strelva to bring in an agency. You choose what it can do, and it accepts before anything changes.</p>
+    </StSection>}
     <StSection title="Working for a client?">
       <p className={styles.copy}>Use an agency workspace to prepare assessments and hand a copy to your client. Access is scoped to the work that was shared; broader product management still needs a supported permission.</p>
       {onAgency ? <StTextButton onClick={onAgency}>Sharing &amp; agency access<ArrowRight size={16} aria-hidden="true" /></StTextButton> : null}

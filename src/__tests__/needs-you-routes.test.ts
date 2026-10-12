@@ -15,7 +15,9 @@ const mocks = vi.hoisted(() => ({
   workspaces: vi.fn(),
   undo: vi.fn(),
   superAdmin: vi.fn(async () => false),
+  seat: vi.fn(async (): Promise<unknown> => null),
 }));
+vi.mock("@/products/agency-clients/server", () => ({ providerSeatBusiness: mocks.seat }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
@@ -139,6 +141,20 @@ describe("/api/workspace/needs-you", () => {
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(403);
     mocks.decide.mockResolvedValueOnce({ status: "changed", item: null });
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(409);
+  });
+
+  it("lets staff of an agency with a seat decide as the agency, never as the owner (ADR 0015)", async () => {
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    mocks.workspaces.mockResolvedValue([]);
+    mocks.seat.mockResolvedValueOnce({ id: WS, kind: "customer", access: "provider_seat", name: "Mooney" });
+    mocks.decide.mockResolvedValueOnce({ status: "done", item: { id: ITEM } });
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledWith({ ...body, by: { kind: "agency", actor: ACTOR } });
+    mocks.decide.mockClear();
+    mocks.seat.mockResolvedValueOnce(null);
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(403);
+    expect(mocks.decide).not.toHaveBeenCalled();
   });
 
   it("refuses a Strelva operator holding an admin seat: the owner decides (#530)", async () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { AgencyProposals } from "./agency/AgencyProposals";
 import Link from "next/link";
 
 import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, Plus, RefreshCw, Users } from "lucide-react";
@@ -394,6 +395,7 @@ export function AgencyHome({
     </TabsPanel>
 
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+      <AgencyProposals agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} />
       <p className="mb-4 text-sm text-gray-muted">Oldest first within each kind. Open the client’s own System or work.</p>
       {queueList}
       {combined ? <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>Loaded {combined.clients.length} of {combined.total} clients</StMono>{combined.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients for Queue</StPill> : null}</div> : null}
