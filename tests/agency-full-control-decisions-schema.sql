@@ -1,7 +1,15 @@
 \set ON_ERROR_STOP 1
+-- Keep the original boundary fixture runnable; the later admission contract
+-- intentionally withholds unsupported execution and owns its exact receipts.
+select to_regprocedure('public.read_agency_decision_receipt(uuid,uuid,uuid,text,uuid,text)') is not null as agency2_installed \gset
+\if :agency2_installed
+\ir agency2-decisions-schema.sql
+\else
+\set ON_ERROR_STOP 1
 -- Run after the ordered schema, including 20261024123100. Fictional records
 -- roll back. This proves decision authority, not hosted/provider execution.
 begin;
+\ir support/agency-proposal-response.sql
 create function pg_temp.ux_assert(value boolean, message text) returns void language plpgsql as $$
 begin if value is not true then raise exception 'agency decision proof: %',message; end if; end $$;
 create function pg_temp.ux_expect(statement text, expected text) returns void language plpgsql as $$
@@ -49,9 +57,9 @@ begin
   perform public.set_agency_directory_listing(lead_id,'ux-lead@agency.example.test',other_agency,'Google help',true);
   perform public.bring_in_agency(owner_id,'ux-owner@bakery.example.test',business,agency,
     '[{"scope":"website","level":"full_control"},{"scope":"internal_tools","level":"full_control"},{"scope":"inquiries","level":"full_control"},{"scope":"bookings","level":"full_control"}]','I agree');
-  perform public.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',agency,business,true);
+  perform pg_temp.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',agency,business,true);
   perform public.bring_in_agency(owner_id,'ux-owner@bakery.example.test',business,other_agency,'[{"scope":"google","level":"full_control"}]','I agree');
-  perform public.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',other_agency,business,true);
+  perform pg_temp.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',other_agency,business,true);
   perform public.set_agency_client_staff(lead_id,'ux-lead@agency.example.test',agency,business,staff_id,true);
   perform public.set_agency_client_staff(lead_id,'ux-lead@agency.example.test',other_agency,business,staff_id,true);
   item := public.open_owner_decision(business,jsonb_build_object('kind','system.go_live','route','owner_decides','title','Website publishing',
@@ -114,3 +122,5 @@ do $$ begin
   exception when others then if sqlerrm <> 'owner_decision_access_denied' then raise; end if; end;
 end $$;
 rollback;
+
+\endif

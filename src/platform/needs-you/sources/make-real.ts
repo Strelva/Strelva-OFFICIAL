@@ -27,6 +27,7 @@ import type { OwnerDecision, PolicySetting, ProposedItem } from "../contracts";
 import type { SourceAdapter } from "../adapters";
 
 export interface ReadyPlan {
+  actor?: import("@/platform/presentation/actor").RecordedActor;
   possibilityId: string;
   candidateRevision: number;
   fingerprint: string;
@@ -101,6 +102,7 @@ export function makeRealItem(plan: ReadyPlan, workspaceId: string, policies: rea
   if (evaluation.route !== "owner_decides" && evaluation.route !== "strelva_reviews") return null;
   const affects = plan.affects.length ? ` It changes ${plan.affects.join(" and ")}.` : "";
   return {
+    ...(plan.actor ? { actor: plan.actor } : {}),
     kind,
     route: evaluation.route,
     systemId: plan.systemId,

@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP 1
 -- Prepared native selected-agency booking actor proof; every fictional row rolls back.
 begin;
+\ir support/agency-proposal-response.sql
 create function pg_temp.ux_assert(value boolean,message text) returns void language plpgsql as $$
 begin if value is not true then raise exception 'booking actor proof: %',message; end if; end $$;
 insert into public.users(id,email,verified_at) values
@@ -39,7 +40,7 @@ declare owner_id uuid := 'b2000000-0000-4000-8000-000000000001'; lead_id uuid :=
 begin
   perform public.set_agency_directory_listing(lead_id,'ux-lead@agency.example.test',agency,'Booking help',true);
   perform public.bring_in_agency(owner_id,'ux-owner@bakery.example.test',business,agency,'[{"scope":"bookings","level":"full_control"}]','I agree');
-  perform public.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',agency,business,true);
+  perform pg_temp.respond_to_agency_proposal(lead_id,'ux-lead@agency.example.test',agency,business,true);
   perform public.set_agency_client_staff(lead_id,'ux-lead@agency.example.test',agency,business,staff_id,true);
   item := public.open_owner_decision(business,jsonb_build_object('kind','customer.commitment','route','owner_decides','title','Booking request: Fictional Customer','approveEffect','The booking is confirmed.','notYetEffect','The time is released.','sourceLifecycle','booking_request','sourceId',booking::text,'revisionHash',repeat('a',64)));
   claim := public.claim_scoped_agency_owner_decision(business,(item->>'id')::uuid,repeat('a',64),'approve',staff_id,'ux-staff@agency.example.test',agency);

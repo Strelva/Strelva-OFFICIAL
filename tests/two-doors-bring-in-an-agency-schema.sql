@@ -3,6 +3,7 @@
 -- scope, agency decisions inside full_control only, and ending one agency.
 \set ON_ERROR_STOP 1
 begin;
+\ir support/agency-proposal-response.sql
 create function pg_temp.expect_error(statement text, expected text) returns void language plpgsql as $$
 begin
   begin execute statement; exception when others then
@@ -54,7 +55,7 @@ begin
   -- One full_control agency per scope, even while proposed.
   perform pg_temp.expect_error(format('select public.bring_in_agency(%L,%L,%L,%L,%L,%L)',owner_id,'owner@bakery.example.test',bakery,strelva_agency,'[{"scope":"website","level":"full_control"}]','I agree'),'agency_scope_taken');
 
-  result := public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test',north,bakery,true);
+  result := pg_temp.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test',north,bakery,true);
   if result->>'status' <> 'accepted' then raise exception 'acceptance failed: %', result; end if;
   if not exists (select 1 from public.provider_seats where customer_workspace_id=bakery and agency_workspace_id=north and status='active') then raise exception 'acceptance opened no seat'; end if;
   if not exists (select 1 from public.workspace_providers where customer_workspace_id=bakery and provider_workspace_id=north and status='active') then raise exception 'first agency should be of record'; end if;
@@ -62,7 +63,7 @@ begin
 
   -- A second agency for another scope: the business has several agencies.
   perform public.bring_in_agency(owner_id,'owner@bakery.example.test',bakery,strelva_agency,'[{"scope":"bookings","level":"full_control"}]','Strelva Agency may run bookings.');
-  perform public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000003','lead@strelva-agency.example.test',strelva_agency,bakery,true);
+  perform pg_temp.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000003','lead@strelva-agency.example.test',strelva_agency,bakery,true);
   agencies := public.read_business_agencies(owner_id,'owner@bakery.example.test',bakery);
   if jsonb_array_length(agencies) <> 2 then raise exception 'expected two agencies: %', agencies; end if;
   if public.business_single_agency(bakery) is not null then raise exception 'two agencies must not resolve to one'; end if;

@@ -80,6 +80,19 @@ function router(handlers: { clients?: () => Response | Promise<Response>; librar
   });
 }
 
+it("names unavailable offer reads while preserving known requests and offers", async () => {
+  const { AgencyClientList } = await import("@/experience/workspace/agency/AgencyViews");
+  const host = document.createElement("div"); document.body.appendChild(host);
+  const root = createRoot(host); roots.push(root);
+  await act(async () => root.render(createElement(AgencyClientList, {
+    clients: [{ ...row(1, { openRequests: 2, improvementsWaiting: 1, improvementsStatus: "unavailable" }), pageIndex: 0 }],
+    total: 1, agencyName: "Harbor Agency", hasMore: false, loadingMore: false, moreError: false, retrying: new Set<number>(), now: Date.now(),
+    onOpen: () => undefined, onRetryPage: () => undefined, onMore: () => undefined,
+  })));
+  expect(host.textContent).toContain("2 open requests · 1 improvement to review · Some improvements unavailable");
+  expect(host.textContent).not.toContain("1 improvement ready");
+});
+
 describe("agency home on the batched read", () => {
   it("shows health independently of lifecycle and names incomplete Queue sources", async () => {
     const request = router({ clients: () => Response.json(page([row(1, { systems: [{ id: uuid("51000000", 1), name: "Client website", kind: "website", lifecycle: "live", versionContext: null,

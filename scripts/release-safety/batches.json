@@ -2125,6 +2125,27 @@
           "rollback": "rollback-20261024124700_ux_integration_booking_actor.sql",
           "rollbackSha256": "0de7257632431559b93820c9ebe53b27babf42b8cd31dd2e43843423fda599d7",
           "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132000_ux_agency_proposal_identity.sql",
+          "sha256": "3e380c523a17d766c8758841c46bad00036508ab2cd3fb2a918431de0fda9765",
+          "rollback": "rollback-20261024132000_ux_agency_proposal_identity.sql",
+          "rollbackSha256": "37a1ea03fddaeba9b8419ff2c5a5a903b454165265f4154a0cdb86a62ed691fa",
+          "rollbackStatus": "Prepared inverse only; exact catalog guard and pending-proposal refusal. Ordered disposable SQL, owner-revocation races, inverse/reapply and hosted Auth UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132400_ux_agency2_decision_recovery.sql",
+          "sha256": "5d447ea207d1acf90ed265fb2cb302c87725af3724378b7c47d32f1f22287286",
+          "rollback": "rollback-20261024132400_ux_agency2_decision_recovery.sql",
+          "rollbackSha256": "cf7c7d288c833d430196e523ddf5e50a858eef5f1cddd65b3cfa3dad454f4f00",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261024132100_ux_agency_native_pages.sql",
+          "sha256": "64638855889e35ec8a27c542cf3ad06674059da86a1e0f7de4cc59445bf05896",
+          "rollback": "rollback-20261024132100_ux_agency_native_pages.sql",
+          "rollbackSha256": "acdd8dc8689b7fa4a35c86e050dc7e04806edb96c500bc097b842d51b17aa476",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, positive form/booking fixtures, populated refusal and reapply qualification UNRUN/held. No production application authorized."
         }
       ]
     },

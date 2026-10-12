@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
-import { claimAgencyDecision, readAgencyDecisions, reviewAgencyDecisions } from "@/experience/workspace/agency/decision-server";
+import { claimAgencyDecision, readAgencyDecisions, readAgencyDecisionReceipt, reviewAgencyDecisions } from "@/experience/workspace/agency/decision-server";
 
 const mocks = vi.hoisted(() => ({ rpc: vi.fn(), review: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
@@ -50,5 +50,29 @@ describe("agency scoped decision projection", () => {
     expect(await reviewAgencyDecisions(ACTOR, WS)).toMatchObject({ items: [{ review: ["All exact values"], revisionHash: item.revisionHash }], complete: true });
     expect(mocks.review).toHaveBeenCalledWith(item, { workspaceId: WS, actor: ACTOR });
     expect(await reviewAgencyDecisions(ACTOR, WS)).toMatchObject({ items: [{ review: null }], complete: false });
+  });
+});
+
+describe("agency exact outcome recovery", () => {
+  const agency = "c0000000-0000-4000-8000-000000000001";
+  it("withholds unsupported source execution from the agency read", async () => {
+    mocks.rpc.mockResolvedValue({ data: [item, ...["website_document", "website_domain", "make_real"].map(sourceLifecycle => ({ ...item, sourceLifecycle }))], error: null });
+    expect(await readAgencyDecisions(ACTOR, WS, agency)).toEqual([item]);
+  });
+  it("reads one exact reviewed outcome through the scoped RPC", async () => {
+    const finished = { ...item, state: "approved", outcome: "done_unverified", decidedActor: { kind: "agency", agencyId: agency, displayName: "Outside Agency" } };
+    mocks.rpc.mockResolvedValue({ data: finished, error: null });
+    expect(await readAgencyDecisionReceipt(ACTOR, WS, agency, item.id, item.revisionHash)).toEqual(finished);
+    expect(mocks.rpc).toHaveBeenCalledWith("read_agency_decision_receipt", { p_workspace_id: WS, p_agency_workspace_id: agency, p_decision_id: item.id, p_revision_hash: item.revisionHash, p_user_id: ACTOR.userId, p_verified_email: "staff@agency.example.test" });
+  });
+  it.each([{ id: "d0000000-0000-4000-8000-000000000002" }, { revisionHash: "b".repeat(64) }, { workspaceId: agency }, { route: "strelva_reviews" }])("does not accept a foreign outcome: %o", async patch => {
+    mocks.rpc.mockResolvedValue({ data: { ...item, ...patch }, error: null });
+    await expect(readAgencyDecisionReceipt(ACTOR, WS, agency, item.id, item.revisionHash)).rejects.toBeInstanceOf(WorkspaceStoreError);
+  });
+  it("keeps loss of authority distinct from an unreadable outcome", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "owner_decision_access_denied" } });
+    await expect(readAgencyDecisionReceipt(ACTOR, WS, agency, item.id, item.revisionHash)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "unavailable" } });
+    await expect(readAgencyDecisionReceipt(ACTOR, WS, agency, item.id, item.revisionHash)).rejects.toBeInstanceOf(WorkspaceStoreError);
   });
 });

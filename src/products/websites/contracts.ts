@@ -1,4 +1,6 @@
 import { z } from "zod";
+export { agencyPageInputSchema, agencyPageChoiceSchema, agencyPageChoicesSchema, agencyPageReceiptSchema } from "./agency-page-contracts";
+export type { AgencyPageInput } from "./agency-page-contracts";
 
 export const WEBSITE_VERSION = 1 as const;
 export const WEBSITE_RENDERER_CONTRACT_VERSION = "v1" as const;

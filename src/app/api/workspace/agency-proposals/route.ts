@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const actor = await workspaceHttpActor();
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email." }, 401);
     if (await isRateLimitedWindowedAsync(`workspace:agency-proposals:${actor.userId}`, 30, 60_000)) return workspaceJson({ error: "Please wait a minute before trying again." }, 429);
-    const body = z.object({ agencyId: z.string().uuid(), businessId: z.string().uuid(), accept: z.boolean() }).strict().parse(await readWorkspaceBody(request, 4_000));
-    return workspaceJson({ status: await respondToAgencyProposal(actor, body.agencyId, body.businessId, body.accept) });
+    const body = z.object({ agencyId: z.string().uuid(), businessId: z.string().uuid(), accept: z.boolean(), proposalId: z.string().regex(/^[a-f0-9]{64}$/) }).strict().parse(await readWorkspaceBody(request, 4_000));
+    return workspaceJson({ status: await respondToAgencyProposal(actor, body.agencyId, body.businessId, body.accept, body.proposalId) });
   } catch (error) { return workspaceHttpFailure(error); }
 }
