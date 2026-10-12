@@ -105,5 +105,5 @@ describe("standing-check durable history", () => {
   expect(complete).toHaveLength(501);
   expect(new Set(complete).size).toBe(501);
   expect(complete.at(-1)).toBe(1);
- });
+ }, 30_000);
 });

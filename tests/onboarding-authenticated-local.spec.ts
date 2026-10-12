@@ -38,7 +38,7 @@ test("real local Auth can create, review, accept, reopen, and isolate onboarding
     await page.locator('input[type="file"]').setInputFiles({ name: "tax-id.pdf", mimeType: "application/pdf", buffer: originalBytes });
     const uploadResult = await uploadResponse;
     expect(uploadResult.status(), await uploadResult.text()).toBe(201);
-    await expect(page.getByText(/Supplied · document revision/).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Supplied · document Release/).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/Automatic extraction unavailable for this file/)).toBeVisible();
     await page.getByLabel("Tax ID").fill("12-3456789");
     await page.getByRole("button", { name: "Save review", exact: true }).click();

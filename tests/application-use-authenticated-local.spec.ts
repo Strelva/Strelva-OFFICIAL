@@ -51,9 +51,7 @@ test("a verified staff recipient uses one released version while a candidate cha
   let primaryFailure: unknown;
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Local agency-built tool customer");
-    const refused = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId,
-      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }], components: [{ kind: "form", fields: ["request"] }] } }, 403);
-    expect(refused.code).toBe("make_systems_required");
+    // ADR 0015: business owners may make Systems in their own business; this journey covers the agency-built path.
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
 
     let app = await post(maker.context.request, "/api/bounded-work", {
@@ -339,9 +337,7 @@ test("a verified recipient edits a date record through a stale correction and re
   let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Local agency-built tool customer");
-    const refused = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId,
-      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }], components: [{ kind: "form", fields: ["request"] }] } }, 403);
-    expect(refused.code).toBe("make_systems_required");
+    // ADR 0015: business owners may make Systems in their own business; this journey covers the agency-built path.
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
 
     let app = await post(maker.context.request, "/api/bounded-work", {
@@ -460,9 +456,7 @@ test("ordinary agency template becomes a private native app, then a live app wit
   let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Local agency template customer");
-    const refused = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId,
-      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }], components: [{ kind: "form", fields: ["request"] }] } }, 403);
-    expect(refused.code).toBe("make_systems_required");
+    // ADR 0015: business owners may make Systems in their own business; this journey covers the agency-built path.
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
     const page = await maker.context.newPage();
     await page.goto(`/workspace?workspaceId=${workspaceId}&view=products`);

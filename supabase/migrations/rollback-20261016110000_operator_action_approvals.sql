@@ -4,7 +4,8 @@ lock table public.operator_action_approvals, public.workspace_operator_audit_eve
 
 -- Refuse rollback after audit/approval data exists or if any object from this
 -- migration has drifted. The fingerprint covers function bodies, table shape,
--- constraints, indexes, triggers and direct ACLs.
+-- constraints, indexes, triggers and direct ACLs (owner role name normalized,
+-- so the guard is the same on any bootstrap user).
 do $rollback_guard$
 declare
   fingerprint text;
@@ -16,7 +17,7 @@ begin
 
   select md5(
     coalesce((
-      select string_agg(p.oid::regprocedure::text || E'\n' || pg_get_functiondef(p.oid) || E'\nACL:' || coalesce(p.proacl::text, ''), E'\n' order by p.oid::regprocedure::text)
+      select string_agg(p.oid::regprocedure::text || E'\n' || pg_get_functiondef(p.oid) || E'\nACL:' || replace(replace(coalesce(p.proacl::text, ''), '/'||current_user, '/OWNER'), current_user||'=', 'OWNER='), E'\n' order by p.oid::regprocedure::text)
       from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any(array[
         'operator_email_identity','operator_owner_invitation_trusted_recipient','operator_audit_context_valid',
         'workspace_operator_audit_immutable','operator_action_approval_immutable','record_workspace_operator_audit',
@@ -47,14 +48,14 @@ begin
       where n.nspname = 'public' and r.relname = any(array['operator_action_approvals','workspace_operator_audit_events'])
     ), '')
     || coalesce((
-      select string_agg(c.relname || ':' || c.relrowsecurity || ':' || c.relforcerowsecurity || ':' || coalesce(c.relacl::text, ''), E'\n' order by c.relname)
+      select string_agg(c.relname || ':' || c.relrowsecurity || ':' || c.relforcerowsecurity || ':' || replace(replace(coalesce(c.relacl::text, ''), '/'||current_user, '/OWNER'), current_user||'=', 'OWNER='), E'\n' order by c.relname)
       from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public' and c.relname = any(array['operator_action_approvals','workspace_operator_audit_events'])
     ), '')
   ) into fingerprint;
 
   raise notice 'operator_action_approval_rollback_fingerprint=%', fingerprint;
-  if fingerprint is distinct from '27c9fce962f7cb088e4746a72b1f32c2' then
+  if fingerprint is distinct from '477aabbb067f69acc69799daad6c3121' then
     raise exception 'operator_action_approval_rollback_wrong_schema_or_drift';
   end if;
 end;

@@ -1175,7 +1175,8 @@
         {
           "file": "20261016110000_operator_action_approvals.sql",
           "sha256": "e9e4a204e497caa46acc2e113c74e11b18dd1e8aa0996b629dabb650dafee002",
-          "rollback": "rollback-20261016110000_operator_action_approvals.sql"
+          "rollback": "rollback-20261016110000_operator_action_approvals.sql",
+          "rollbackSha256": "5432fc413a848b1ba00919928ebef169d3be41e2d3baf1a7fc51db6584281a58"
         },
         {
           "file": "20261017110000_inquiry_lead_retention.sql",

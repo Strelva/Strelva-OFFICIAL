@@ -131,7 +131,7 @@ describe("native business receipt and phone", () => {
     vi.stubGlobal("fetch",fetcher);
     const root=document.createElement("div");root.setAttribute("data-strelva-capability","booking");root.setAttribute("data-strelva-config",JSON.stringify(config));document.body.append(root);
     mountPublishedCapabilities(document);await settle();
-    expect(root.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value}.`);
+    expect(root.textContent).toContain(`Times shown in ${(Intl.DateTimeFormat().resolvedOptions().timeZone === "UTC" ? "UTC" : new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value)}.`);
     const name=root.querySelector<HTMLInputElement>("#strelva-booking-name")!;const email=root.querySelector<HTMLInputElement>("#strelva-booking-email")!;const phone=root.querySelector<HTMLInputElement>("#strelva-booking-phone")!;
     name.value="Dana";email.value="dana@example.test";phone.value=" 716-555-0123 ";
     root.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await settle();
@@ -164,7 +164,7 @@ describe("generated booking receipt next action", () => {
     const section = root.querySelector('section[aria-label="Booking receipt"]')!;
     expect(section.querySelector("h3")?.textContent).toBe("Check your email to confirm");
     expect(section.textContent).toContain("Confirm by");
-    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(metadata.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
+    expect(section.textContent).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone === "UTC" ? "UTC" : new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(metadata.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
     expect(section.textContent).not.toContain("Cancel booking");
     section.querySelector<HTMLButtonElement>("button")!.click();
     await settle();

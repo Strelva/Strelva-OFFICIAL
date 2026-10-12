@@ -30,7 +30,8 @@ for (const width of [1440, 390]) {
     const setupRequest=page.waitForRequest(r=>new URL(r.url()).pathname==="/api/workspace/businesses"&&r.method()==="POST");
     await page.getByRole("button",{name:"Continue with this business",exact:true}).click();
     const setupCommand=(await setupRequest).postDataJSON();
-    await expect(page).toHaveURL(/\/workspace\?workspaceId=[a-f0-9-]+&view=applications$/);
+    // #635: a new business lands on its Home.
+    await expect(page).toHaveURL(/\/workspace\?workspaceId=[a-f0-9-]+&view=home$/);
     businessId=new URL(page.url()).searchParams.get("workspaceId")!;
     expect(businessId).toMatch(/^[a-f0-9-]{36}$/);
     const repeated=await owner.context.request.post("/api/workspace/businesses",{headers:{origin:env.app},data:setupCommand});
@@ -41,14 +42,7 @@ for (const width of [1440, 390]) {
     expect(strangerWorkspace.status()).toBe(404);
     expect(await strangerWorkspace.json()).toEqual({error:"Workspace unavailable."});
 
-    // Ordinary ownership cannot create internal tools. A separate genuine
-    // agency actor builds via the actual UI; no owner receives maker privileges.
-    const refused = await owner.context.request.post("/api/bounded-work", { headers: { origin: env.app }, data: {
-      action: "create", productId: "applications", workspaceId: businessId,
-      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }], components: [{ kind: "form", fields: ["request"] }] },
-    } });
-    expect(refused.status(), await refused.text()).toBe(403);
-    expect((await refused.json()).code).toBe("make_systems_required");
+    // ADR 0015: owners may make Systems themselves; this journey covers a separate genuine agency building via the UI.
     maker = await ordinaryAgencyMaker(browser, admin, owner, businessId);
     const makerPage = await maker.context.newPage();
     makerPage.setDefaultTimeout(30_000);

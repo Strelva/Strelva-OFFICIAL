@@ -30,6 +30,8 @@ test("persists, reopens, and reviews a service request through local Auth and Po
       { workspace_id: agencyId, user_id: owner.userId, role: "member", created_by: agency.userId },
     ])).error).toBeNull();
 
+    // Two doors (Oct 11): an agency is recorded on the business by its provider seat; only those appear as choices.
+    expect((await admin.from("provider_seats").insert({ customer_workspace_id: businessId, agency_workspace_id: agencyId, granted_by_kind: "owner", granted_by: owner.userId })).error).toBeNull();
     expect((await owner.context.request.get(`/api/workspace?workspaceId=${encodeURIComponent(businessId)}`)).status()).toBe(200);
     customerPage = await owner.context.newPage();
     customerPage.setDefaultTimeout(20_000);
