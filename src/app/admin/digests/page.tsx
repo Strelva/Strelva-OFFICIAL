@@ -5,6 +5,9 @@ import { MaintenanceDigests } from "./MaintenanceDigests";
 
 import { StHead, StPage } from "@/components/ui/strelva/Kit";
 
+// Operator authority and pending digests must be evaluated for each request.
+export const dynamic = "force-dynamic";
+
 /** Operator review of the weekly autonomous-maintenance digests. The admin
  *  layout already gates super-admin access. */
 export default async function DigestsPage() {
