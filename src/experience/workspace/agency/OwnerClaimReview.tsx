@@ -158,7 +158,7 @@ export function ClaimNextSteps({ workspaceId, workspaceName, returnTo, alreadyAc
     <StState kind="live">You’re the owner</StState>
     <StCopy>{alreadyAccepted ? "You already claimed it with this link." : "Your choices are saved."} Two optional steps help your agency do more. Each takes a minute, and you can skip them.</StCopy>
     <StRows label="Optional next steps">
-      <StRow kind="Optional" title="Connect Google" detail="Lets your agency prepare changes to your Google listing. You still approve before anything posts."
+      <StRow kind="Optional" title="Connect Google" detail="Lets your agency work on your Google listing the way you chose. Connecting posts nothing."
         end={skipped.google ? <StMono>Skipped</StMono> : <span className="flex flex-wrap gap-3"><StPill variant="soft" onClick={() => navigate(google)}>Connect Google</StPill><StTextButton onClick={() => setSkipped((s) => ({ ...s, google: true }))}>Skip</StTextButton></span>} />
       <StRow kind="Optional" title="Connect your calendar" detail="Shows when you’re busy so bookings don’t clash. No booking is sent."
         end={skipped.calendar ? <StMono>Skipped</StMono> : <span className="flex flex-wrap gap-3"><StPill variant="soft" onClick={() => navigate(calendar)}>Connect calendar</StPill><StTextButton onClick={() => setSkipped((s) => ({ ...s, calendar: true }))}>Skip</StTextButton></span>} />
