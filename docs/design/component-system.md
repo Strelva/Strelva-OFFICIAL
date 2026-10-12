@@ -32,8 +32,8 @@ is neutral and holds agency-authored sends.
 Internal tool is the kind, Internal tools the collection; each System opens by
 name. Bookings, Saved check, Agency handoff, History, recap, Make real and Ask
 Strelva on phone use the shared names registry. Possibility remains a working
-alternative, never a bare suggestion or research Proposal. Library and Ready-made
-systems share qualified reusable definitions without client data or grants;
+alternative, never a bare suggestion or research Proposal. Library and Apps
+share qualified reusable definitions without client data or grants;
 starters and managed services remain separately identified.
 `pnpm check:words` is required by ADR 0014; this amendment makes no claim that
 it or the rendered coherence changes have passed in this worktree.
@@ -1868,7 +1868,7 @@ The shared [screen-label registry](../../src/platform/presentation/place-labels.
 keeps System kinds and workspace places consistent. Systems use **Internal tool**,
 **Bookings** and **Saved check**; owner places use **Requests**, **Running**,
 **What changed** and **People & access**. Discovery separates **Yours** and
-**Ready-made**. Phone navigation uses **Ask Strelva**. Running's saved-check
+**Apps**. Phone navigation uses **Ask Strelva**. Running's saved-check
 entrance preserves `returnTo=running`. Running first offers **What should stay true?**
 and **Request an ongoing result**, opening the existing help route in the exact
 workspace. This click saves no Request and promises no accepted work. Supported
@@ -1885,7 +1885,7 @@ labels and navigation grant no approval, payer or exit authority.
 
 [PackageDeclaration](../../src/experience/systems/PackageDeclaration.tsx) presents
 source and recipient permissions through one declaration mapping. Library,
-Ready-made and installed-Version rows retain their recorded source, creator and
+Apps and installed-Version rows retain their recorded source, creator and
 context lineage; built-in starters and services do not acquire Library lineage.
 Prepared Version receipts open the exact scoped review. Website preparation
 names the business, agency and assigned person; grant consent checks those
