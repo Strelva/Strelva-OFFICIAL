@@ -29,8 +29,16 @@ run_contracts() {
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 ordered=$( { find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql'; for extra in ${TWO_DOORS_EXTRA_MIGRATIONS:-}; do printf '%s\n' "$extra"; done; } | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2)
 forwards=$(printf '%s\n' $ordered | grep '_two_doors_')
+# Rehearse this exact historical packet before applying any later wrappers.
+# Later migrations may depend on its tables and capture its function bodies.
+first_forward="$(basename "$(printf '%s\n' $forwards | head -n 1)")"
+last_forward="$(basename "$(printf '%s\n' $forwards | tail -n 1)")"
 for migration in $ordered; do
-  [[ "$migration" == *_two_doors_* || "$(basename "$migration")" == 2026102412* ]] || apply "$migration"
+  migration_name="$(basename "$migration")"
+  if [[ "$migration_name" < "$first_forward" ]]; then apply "$migration"; fi
+  if [[ "$migration_name" > "$first_forward" && "$migration_name" < "$last_forward" && "$migration" != *_two_doors_* ]]; then
+    printf 'Unexpected migration inside two doors packet: %s\n' "$migration_name" >&2; exit 1
+  fi
 done
 fingerprint before
 for forward in $forwards; do apply "$forward"; done
@@ -44,6 +52,6 @@ fingerprint reapplied
 diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2 || { printf 'Two doors reapply differs from the first apply.\n' >&2; exit 1; }
 run_contracts
 for migration in $ordered; do
-  [[ "$(basename "$migration")" != 2026102412* ]] || apply "$migration"
+  if [[ "$(basename "$migration")" > "$last_forward" ]]; then apply "$migration"; fi
 done
 printf 'Two doors SQL contract passed (forward, exact rollback, reapply, ordered UX successors).\n'

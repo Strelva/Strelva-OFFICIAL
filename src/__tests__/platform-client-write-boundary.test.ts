@@ -1,16 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ role: vi.fn(), support: vi.fn(), inspect: vi.fn(), write: vi.fn(), getContent: vi.fn() }));
+const mocks = vi.hoisted(() => ({ role: vi.fn(), support: vi.fn(), inspect: vi.fn(), write: vi.fn(), getContent: vi.fn(), model: vi.fn() }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => ({ id: "operator", email: "operator@example.invalid", email_confirmed_at: "2026-01-01" }) }));
 vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: mocks.role, isSuperAdminUser: mocks.support }));
 vi.mock("@/platform/infra/inspect-mode", () => ({ isInspecting: mocks.inspect }));
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeTenantOperatorRead: async () => undefined }));
 vi.mock("@/lib/tenant", () => ({ requireTenantFromHeaders: async () => "client", getTenantFromHeaders: async () => "client" }));
 vi.mock("@/lib/storage", () => ({ getContent: mocks.getContent, setContent: mocks.write, recordSectionUpdate: mocks.write, logActivity: mocks.write, logAuditEvent: mocks.write, getDraftContent: mocks.getContent, setDraftContent: mocks.write, clearDraft: mocks.write, appendVersion: mocks.write }));
+vi.mock("@/platform/infra/model-calls", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/platform/infra/model-calls")>(),
+  streamModelText: mocks.model,
+}));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: async () => null }));
 vi.mock("@/lib/review-replies", () => ({ draftReviewReply: mocks.write, buildDeterministicReply: mocks.write }));
 import { GET, PUT, DELETE } from "@/app/api/content/[section]/route";
 import { POST as draftReply } from "@/app/api/reviews/draft-reply/route";
 import { PUT as contentAutonomy } from "@/app/api/dashboard/content-autonomy/route";
+import { POST as askAgent } from "@/app/api/agent/route";
 const section = { params: Promise.resolve({ section: "hero" }) };
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("REB_DEV_UNGATED_ACCESS", "0"); vi.stubEnv("SCAFFOLD_DEV_UNGATED_ACCESS", "0");
@@ -30,10 +35,21 @@ describe("client routes under the actual shared tenant permission guard", () => 
     expect((await contentAutonomy(new Request("http://localhost/api/dashboard/content-autonomy", { method: "PUT", body: '{"mode":"auto"}' }))).status).toBe(403);
     expect(mocks.write).not.toHaveBeenCalled();
   });
+  it("refuses platform-only agent authoring before tools or model admission", async () => {
+    expect((await askAgent(new Request("http://localhost/api/agent", {
+      method: "POST", body: '{"messages":[{"role":"user","content":"Change my site"}]}',
+    }))).status).toBe(403);
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.model).not.toHaveBeenCalled();
+  });
   it("keeps a double-hat owner in inspection read-only", async () => {
     mocks.role.mockResolvedValue("owner"); mocks.inspect.mockResolvedValue(true);
     expect((await PUT(new Request("http://localhost/api/content/hero", { method: "PUT", body: "{}" }), section)).status).toBe(403);
+    expect((await askAgent(new Request("http://localhost/api/agent", {
+      method: "POST", body: '{"messages":[{"role":"user","content":"Change my site"}]}',
+    }))).status).toBe(403);
     expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.model).not.toHaveBeenCalled();
   });
   it("does not draft a deterministic fallback when the authority read fails", async () => {
     mocks.role.mockRejectedValue(new Error("membership unavailable"));

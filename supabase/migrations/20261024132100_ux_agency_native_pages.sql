@@ -95,7 +95,7 @@ end $$;
 
 create function public.submit_agency_native_page(p_agency_workspace_id uuid,p_workspace_id uuid,p_user_id uuid,p_verified_email text,p_input jsonb,p_document jsonb,p_payload jsonb,p_content_hash text,p_canonical_document text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
-declare prior jsonb; base jsonb; doc jsonb; item record; page jsonb; root text; heading text; form_id text; receipt jsonb; head public.website_document_heads; work_id uuid:=(p_input->>'workId')::uuid;
+declare prior jsonb; base jsonb; doc jsonb; item record; page jsonb; root text; heading text; form_id text; expected_node_type text; expected_variant text; receipt jsonb; head public.website_document_heads; work_id uuid:=(p_input->>'workId')::uuid;
 begin
  -- Native website writes take the workspace lock before document/work locks.
  perform pg_advisory_xact_lock(hashtextextended(p_workspace_id::text,7415));
@@ -124,10 +124,11 @@ begin
  if page is distinct from jsonb_build_object('path',p_input->>'path','title',p_input->>'title','description',p_input->>'description','root',root)
   or exists(select 1 from jsonb_array_elements(doc->'pages') p where p->>'path'=p_input->>'path') then raise exception 'agency_page_invalid'; end if;
  heading:=p_document->'nodes'->root->'children'->>0; form_id:=p_document->'nodes'->root->'children'->>1;
+ expected_node_type:=case when p_input->>'kind'='form' then 'InquiryForm' else 'Booking' end;
  if root is null or heading is null or form_id is null or doc->'nodes' ? root or doc->'nodes' ? heading or doc->'nodes' ? form_id
   or p_document->'nodes'->root->>'type' is distinct from 'Section' or jsonb_array_length(p_document->'nodes'->root->'children')<>2
   or p_document->'nodes'->heading->>'type' is distinct from 'PageHeader'
-  or p_document->'nodes'->form_id->>'type' is distinct from case when p_input->>'kind'='form' then 'InquiryForm' else 'Booking' end
+  or p_document->'nodes'->form_id->>'type' is distinct from expected_node_type
   or p_document->'nodes'->heading->'props' is distinct from jsonb_build_object('title',p_input->>'title','body',p_input->>'description')
   or p_document->'nodes'->form_id->'props' is distinct from jsonb_build_object('title',p_input->>'title') then raise exception 'agency_page_invalid'; end if;
  -- New review evidence belongs only to the three introduced nodes. It
@@ -138,8 +139,9 @@ begin
    or not exists(select 1 from jsonb_each(p_document->'nodes') n where n.key in (root,heading,form_id) and n.value->'factIds' ? item.key) then raise exception 'agency_page_invalid'; end if;
  end loop;
  for item in select key,value from jsonb_each(p_document->'nodes') where key in (root,heading,form_id) loop
+  expected_variant:=case item.key when root then 'container' when heading then 'standard' else 'inline' end;
   if item.value->>'id' is distinct from item.key or item.value-'id'-'type'-'variant'-'props'-'children'-'factIds'-'verification'<>'{}'::jsonb
-   or item.value->>'variant' is distinct from case item.key when root then 'container' when heading then 'standard' else 'inline' end
+   or item.value->>'variant' is distinct from expected_variant
    or (item.key=root and item.value->'props'<>'{}'::jsonb)
    or (item.key<>root and item.value->'children'<>'[]'::jsonb)
    or exists(select 1 from jsonb_array_elements_text(item.value->'factIds') f where doc->'facts' ? f or not (p_document->'facts' ? f))

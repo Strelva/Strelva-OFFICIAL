@@ -24,6 +24,10 @@ apply "$repo_root/scripts/sql/local-supabase-shim.sql"
 ux_count=0
 while IFS= read -r migration; do
   migration_name="$(basename "$migration")"
+  # Keep the original twelve contracts at their historical boundary. Pass 2
+  # changes admission and captures these bodies, so install it after the
+  # original retained inverse/refusal proofs instead of applying it early.
+  if [[ "$migration_name" == 2026102413* ]]; then continue; fi
   if [[ "$migration_name" == 2026102412* ]]; then
     fingerprint before
     apply "$migration"
@@ -55,7 +59,13 @@ for guarded in 'chrome-recorded-actors:20261024123500_ux_chrome_recorded_actors.
   forward="${inverse_spec%%:*}"; reason="${inverse_spec#*:}"
   psql "${original_psql_args[@]}" --command='create database ux_populated_inverse template postgres' >/dev/null
   psql_args=("${original_psql_args[@]}" --dbname=ux_populated_inverse)
-  sed 's/^rollback;$/commit;/' "$repo_root/tests/$fixture.sql" >"$cluster_root/populated-$fixture.sql"
+  # Relative includes otherwise resolve under the temporary directory. Keep
+  # every original helper and contract while retaining the fictional rows.
+  awk -v test_root="$repo_root/tests" '
+    /^\\ir / { print "\\ir " test_root "/" $2; next }
+    /^rollback;$/ { print "commit;"; next }
+    { print }
+  ' "$repo_root/tests/$fixture.sql" >"$cluster_root/populated-$fixture.sql"
   apply "$cluster_root/populated-$fixture.sql"
   fingerprint populated
   if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$forward" >"$cluster_root/refusal.log" 2>&1; then
@@ -67,9 +77,26 @@ for guarded in 'chrome-recorded-actors:20261024123500_ux_chrome_recorded_actors.
   psql_args=("${original_psql_args[@]}")
   psql "${psql_args[@]}" --command='drop database ux_populated_inverse' >/dev/null
 done
+# Install every pass-2 successor in the same sorted order as a fresh database,
+# rehearsing its inverse before any later wrapper captures the new definition.
+pass2_count=0
+while IFS= read -r migration; do
+  migration_name="$(basename "$migration")"
+  fingerprint before
+  apply "$migration"
+  fingerprint forward
+  apply "$repo_root/supabase/migrations/rollback-$migration_name"
+  fingerprint inverse
+  diff -u "$cluster_root/before.catalog" "$cluster_root/inverse.catalog" >&2
+  apply "$migration"
+  fingerprint reapplied
+  diff -u "$cluster_root/forward.catalog" "$cluster_root/reapplied.catalog" >&2
+  pass2_count=$((pass2_count + 1))
+done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '2026102413*.sql' | sort)
+[[ "$pass2_count" == 5 ]] || { printf 'Expected five pass-2 UX forwards; found %s\n' "$pass2_count" >&2; exit 1; }
 # These owned runners retain their distinct isolation, concurrent reservation,
 # selected-agency and populated-safe-inverse evidence on separate clusters.
-for lane_runner in check-ux-trust-email-sql.sh check-ux-trust-ui-budget-sql.sh check-ux-owner-agency-access-sql.sh check-agency-qualification-sql.sh; do
+for lane_runner in check-ux-trust-email-sql.sh check-ux-trust-ui-budget-sql.sh check-ux-owner-agency-access-sql.sh check-agency-qualification-sql.sh check-ux-owner2-sql.sh check-ux-agency-proposal-identity-sql.sh check-ux-agency-native-pages-sql.sh check-agency2-decisions-sql.sh; do
   bash "$repo_root/scripts/$lane_runner"
 done
-printf 'UX audit SQL passed: twelve ordered forwards, exact empty inverses/reapply, every new native fixture, snapshot refusal and lane race/authority proofs. Local only.\n'
+printf 'UX audit SQL passed: seventeen ordered forwards, exact empty inverses/reapply, every new native fixture, snapshot refusal and lane race/authority proofs. Local only.\n'

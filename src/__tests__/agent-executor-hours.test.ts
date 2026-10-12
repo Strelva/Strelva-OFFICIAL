@@ -1,6 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+// Positive tool cases serve a converted business. Keep the real model helper's
+// admission, and supply only its trusted tenant-to-workspace lookup seam.
+const mockBillingWorkspace = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/release-flags/store", () => ({
+  releaseWorkspaceForTenant: mockBillingWorkspace,
+}));
+beforeEach(() => {
+  mockBillingWorkspace.mockResolvedValue("a0000000-0000-4000-8000-000000000001");
+});
+
 /**
  * Governance parity for update_business_hours: the programmatic executor
  * (src/lib/agent-executor.ts) must queue the SAME `gbp_hours_draft` pending
@@ -167,8 +177,8 @@ describe("agent-executor update_business_hours", () => {
             { day: "MONDAY", open: "09:00", close: "17:00" },
             { day: "SATURDAY", open: "10:00", close: "14:00" },
           ],
-          // The proactive executor tags its drafts operator-approve-first.
-          reviewAudience: "operator",
+          // Background execution retains the ordinary owner approval path.
+          reviewAudience: "owner",
         },
       })
     );
@@ -176,11 +186,28 @@ describe("agent-executor update_business_hours", () => {
     // The Google write is approval-gated — the executor must not call it.
     expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
 
+    expect(mockSendSlackNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining("needs owner approval") }),
+      "tenant",
+      expect.anything(),
+    );
     expect(trace.agentResult.status).toBe("queued");
     const output = trace.toolCalls[0]!.output as { agentResultStatus: string; message: string };
     expect(output.agentResultStatus).toBe("queued");
     expect(output.message).toContain("once approved");
 
     expect(Object.keys(mockCapturedTools)).toContain("update_business_hours");
+    expect(mockBillingWorkspace).toHaveBeenCalledExactlyOnceWith("gldf");
+  });
+
+  it("pauses without trusted business scope before running tools", async () => {
+    mockBillingWorkspace.mockResolvedValue(null);
+    mockCapturedTools = {};
+    const { executeAgentPromptDetailed } = await import("@/lib/agent-executor");
+    await expect(executeAgentPromptDetailed("gldf", "Update our hours"))
+      .rejects.toThrow("Usage could not be confirmed");
+    expect(mockAddEvent).not.toHaveBeenCalled();
+    expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
+    expect(mockCapturedTools).toEqual({});
   });
 });

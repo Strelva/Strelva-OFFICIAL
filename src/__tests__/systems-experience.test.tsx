@@ -52,7 +52,7 @@ describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
 });
 
 it("uses recorded agency identity equally and never claims a requested provider operates the site", () => {
-  for (const name of ["Strelva", "Another agency"]) {
+  for (const name of ["Strelva Agency", "Another agency"]) {
     const projected = { ...mooney, providerOfRecord: { agencyWorkspaceId: "20000000-0000-4000-8000-000000000001", name } };
     expect(readBusinessSystems({ snapshot: snapshot([], projected), sites: [mooneySite] }).systems[0]?.operatedBy).toBe(name);
   }
@@ -64,7 +64,7 @@ describe("Systems read adapter over the spine projection", () => {
   it("shows the business facts boundary for repo-only, native content, and hosted websites", () => {
     for (const scenario of [
       { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Changes to this site go through its repository" },
-      { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "native website content" },
+      { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "website content for review and publishing" },
       { editing: "native" as const, savedWorkId: "document", status: "not_connected", sentence: "not connected", businessFactsConnected: false },
       { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders", businessFactsConnected: true },
     ]) {
@@ -296,7 +296,7 @@ describe("Make real and the System page", () => {
     const html = render({ system: { ...site, kind: "bookings", lifecycle: "paused", surface: { kind: "work", workId: "w", productId: "unknown" },
       possibilities: [{ ...site.possibilities[0]!, status: "exploring", staleReason: "attymooney.com changed since this was built." }] } });
     expect(html).toContain("Paused. Bookings already made are kept.");
-    expect(html).toContain("attymooney.com changed since this was built. Strelva is refreshing it.");
+    expect(html).toContain("attymooney.com changed since this was built. A fresh check is needed.");
   });
 
   it("gives a non-owner a visible permission state on Make real", () => {

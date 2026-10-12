@@ -83,8 +83,10 @@ it("keeps phone tabs, safe area, and composer clearance in one shared scrolling 
   const kit = readFileSync("src/components/ui/strelva/kit.module.css", "utf8");
   const shell = readFileSync("src/experience/app-frame/strelva-shell.module.css", "utf8");
   const nav = readFileSync("src/experience/workspace/owner-phone-navigation.module.css", "utf8");
-  expect(kit).toContain("padding-bottom: var(--st-composer-clearance)");
-  expect(kit).toContain("scroll-padding-bottom: var(--st-composer-clearance)");
+  const clearance = kit.match(/:global\(\[data-st-composer-clearance\]\)\s*\{([^}]+)\}/)?.[1];
+  expect(clearance).toBeDefined();
+  expect(clearance).toContain("padding-bottom: var(--st-composer-clearance, 0px)");
+  expect(clearance).toContain("scroll-padding-bottom: var(--st-composer-clearance, 0px)");
   expect(kit).toContain("margin-bottom: calc(-1 * var(--st-composer-clearance, 0px))");
   expect(kit).toContain("calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px))");
   expect(shell).toContain("--st-phone-navigation-height: 64px");

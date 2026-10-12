@@ -33,6 +33,9 @@ const reads = vi.hoisted(() => ({
   loadOwnerInvitations: vi.fn(),
   loadDomainView: vi.fn(),
   loadBusinessEffort: vi.fn(),
+  getAuthUserId: vi.fn(),
+  getTenantAgencySeat: vi.fn(),
+  releaseWorkspaceForTenant: vi.fn(),
 }));
 vi.mock("@/lib/storage", () => ({ getClickCounts: reads.getClickCounts, getActivity: reads.getActivity, listDrafts: reads.listDrafts, getDailyMetrics: reads.getDailyMetrics }));
 vi.mock("@/lib/scan-store", () => ({ getScanSummary: reads.getScanSummary, getScanHistory: reads.getScanHistory }));
@@ -57,7 +60,9 @@ vi.mock("@/lib/client-leads", () => ({ getClientLeadsForOperator: reads.getClien
 vi.mock("@/platform/owner-entry/operator-invitations", () => ({ loadOwnerInvitations: reads.loadOwnerInvitations }));
 vi.mock("@/platform/operator-queue/domain-view-loader", () => ({ loadDomainView: reads.loadDomainView }));
 vi.mock("@/app/admin/work/effort-data", () => ({ loadBusinessEffort: reads.loadBusinessEffort }));
-vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => true }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => true, getAuthUserId: reads.getAuthUserId }));
+vi.mock("@/platform/infra/db/repositories", () => ({ getTenantAgencySeat: reads.getTenantAgencySeat }));
+vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: reads.releaseWorkspaceForTenant }));
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: async () => undefined }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: async () => ({ id: "fixture", siteName: "Fixture business", active: true }) }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantPublicUrl: () => "https://fixture.test", getTenantDashboardFallbackUrl: () => "https://app.test/workspace" }));
@@ -109,10 +114,42 @@ beforeEach(() => {
   reads.operatorSuggestions.mockReturnValue([]);
   reads.resolveBillingType.mockReturnValue("none");
   reads.loadBusinessEffort.mockResolvedValue({ state: "disabled" });
+  reads.getAuthUserId.mockResolvedValue("operator-fixture");
   reads.loadDomainView.mockResolvedValue({ rows: [{ domain: "fixture.test", uptime: { state: "up" } }], monitorKnown: true, monitorScannedAt: new Date().toISOString() });
 });
 
 describe("operator client page evidence", () => {
+  it("keeps platform inspection read-only without an ordinary agency seat", async () => {
+    const html = await page();
+    expect(html).toContain('href="https://app.test/api/admin/inspect?on=1&amp;to=%2Fworkspace"');
+    expect(html).toContain("Open workspace (read-only)");
+    expect(html).toContain("Check ordinary agency access");
+    expect(html).not.toContain("Open client through your agency seat");
+    expect(reads.getTenantAgencySeat).toHaveBeenCalledWith("operator-fixture", "fixture");
+    expect(reads.releaseWorkspaceForTenant).not.toHaveBeenCalled();
+  });
+
+  it("exits inspection only for the tenant's trusted business under ordinary agency access", async () => {
+    reads.getTenantAgencySeat.mockResolvedValue("ordinary-agency");
+    reads.releaseWorkspaceForTenant.mockResolvedValue("business-workspace");
+    const html = await page();
+    expect(html).toContain('href="https://app.test/api/admin/inspect?on=0&amp;to=%2Fworkspace%3FworkspaceId%3Dbusiness-workspace"');
+    expect(html).toContain("Open client through your agency seat");
+    expect(reads.releaseWorkspaceForTenant).toHaveBeenCalledWith("fixture");
+    expect(html).toContain("Open workspace (read-only)");
+  });
+
+  it("preserves support inspection and health evidence when the ordinary agency read fails", async () => {
+    reads.getTenantAgencySeat.mockRejectedValue(new Error("private authority details"));
+    const html = await page();
+    expect(html).toContain("Check ordinary agency access");
+    expect(html).toContain("Open workspace (read-only)");
+    expect(html).toContain("Healthy. Nothing needs you.");
+    expect(html).not.toContain("Open client through your agency seat");
+    expect(html).not.toContain("private authority details");
+    expect(reads.releaseWorkspaceForTenant).not.toHaveBeenCalled();
+  });
+
   it("keeps Healthy for successful reads with a current site scan", async () => {
     expect(await page()).toContain("Healthy. Nothing needs you.");
   });
