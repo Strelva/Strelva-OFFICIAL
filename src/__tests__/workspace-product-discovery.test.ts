@@ -92,7 +92,7 @@ describe("workspace product discovery", () => {
       initialView: "home",
     }));
     expect(html).toContain("data-inquiry-embedded");
-    expect(html).toContain("What should Strelva handle?");
+    expect(html).toMatch(/<h1[^>]*>Inquiries<\/h1>/);
     expect(html).not.toContain("Inquiry navigation");
   });
 

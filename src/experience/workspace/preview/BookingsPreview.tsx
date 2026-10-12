@@ -1,6 +1,7 @@
 import { WorkspaceBookings, type WorkspaceBookingsState } from "@/experience/bookings/WorkspaceBookings";
 import type { BookingRow, SiteBookings } from "@/products/bookings/server";
 import { WorkspaceBookingsLoading } from "@/experience/bookings/WorkspaceBookingsLoading";
+import { SystemsCanonShell } from "./SystemsCanonShell";
 
 const WORKSPACE = "5e000000-0000-4000-8000-000000000010";
 
@@ -17,7 +18,14 @@ const ROWS: BookingRow[] = [
 /** Opening hours from the fictional business record: Tuesday to Saturday. */
 const OPENING = [2, 3, 4, 5].map((day) => ({ day, opens: "09:00", closes: "19:00" })).concat([{ day: 6, opens: "09:00", closes: "17:00" }]);
 
-export async function BookingsPreview({ searchParams }: { searchParams: Promise<{ state?: string; view?: string; source?: string }> }) {
+export async function BookingsPreview({ searchParams }: { searchParams: Promise<{ state?: string; view?: string; source?: string; mode?: string }> }) {
+  const { mode } = await searchParams;
+  return <SystemsCanonShell businessName="Twin Trees Wellness" systemName="Bookings" mode={mode === "dark" ? "dark" : "light"} pins={[
+    { id: "bookings", title: "Bookings", kind: "bookings", current: true, href: "/preview/strelva/bookings" },
+  ]}><BookingsContent searchParams={searchParams} /></SystemsCanonShell>;
+}
+
+async function BookingsContent({ searchParams }: { searchParams: Promise<{ state?: string; view?: string; source?: string }> }) {
   const { state: name, view: viewParam, source } = await searchParams;
   const view = viewParam === "day" ? "day" : "week";
   const range = view === "day" ? { from: "2026-11-06", to: "2026-11-06" } : { from: "2026-11-02", to: "2026-11-08" };

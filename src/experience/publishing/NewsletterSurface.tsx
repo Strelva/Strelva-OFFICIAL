@@ -36,8 +36,8 @@ export function NewsletterSurface({ data, context, busy, canApprove, command }: 
         <StState kind={draft.status === "pending" ? "need" : "draft"}>{draft.status === "pending" ? "Draft · needs your approval" : "Declined"}</StState>
         <p className={styles.copy}>Sending is paused. Approval keeps this issue and its receipt; no subscriber receives email.</p>
         {canApprove && draft.status === "pending" ? <>
-          {draft.id === firstPending ? <StHold label={busy ? "Saving approval…" : "Hold to approve"} disabled={busy} block onAccept={() => command("approve", draft.id)} /> : <StPill variant="soft" disabled={busy} onClick={() => command("approve", draft.id)}>Approve issue</StPill>}
-          <StTextButton disabled={busy} onClick={() => command("not_yet", draft.id)}>Not this month</StTextButton>
+          {draft.id === firstPending ? <StHold label={busy ? "Saving approval…" : "Hold to make it live"} disabled={busy} block onAccept={() => command("approve", draft.id)} /> : <StPill variant="soft" disabled={busy} onClick={() => command("approve", draft.id)}>Make it live</StPill>}
+          <StTextButton disabled={busy} onClick={() => command("not_yet", draft.id)}>Not yet</StTextButton>
         </> : draft.status === "pending" ? <StNotice>Only an authorized owner can approve this issue.</StNotice> : null}
         {index === 0 && data.content.outputs[0] ? <IssueEvidence issue={data.content.outputs[0]} context={context} /> : null}
       </aside>

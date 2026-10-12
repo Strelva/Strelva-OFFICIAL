@@ -88,7 +88,7 @@ export const REQUEST_STATE_LABELS: Record<InquiryRequestState, string> = {
   planned: "Plan ready",
   editing: "Editing the result",
   rehearsing: "Rehearsal running",
-  ready_to_publish: "Ready to make real",
+  ready_to_publish: "Ready to make it live",
   publishing: "Making live",
   live_unverified: "Live, verification pending",
   handled: "Handled",

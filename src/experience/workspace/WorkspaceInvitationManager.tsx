@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { WorkspaceSurfaceShell } from "./WorkspaceSurfaceShell";
 import { StPage, StField, StHead, StSection, StSurface, StRows, StRow, StState, StPill, StTextButton, StNotice, StSkeleton, StEmpty } from "@/components/ui/strelva/Kit";
 
 type Role = "owner" | "admin" | "member";
@@ -12,18 +13,21 @@ async function responseJson<T>(response: Response, fallback: string): Promise<T>
   return body as T;
 }
 
-export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceInvitationManager({ workspaceId, businessName, systemsReleased = false }: { workspaceId: string; businessName?: string; systemsReleased?: boolean }) {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [role, setRole] = useState<Role>("member");
   const [createdLink, setCreatedLink] = useState("");
   const [loading, setLoading] = useState(true);
+  const [historyError, setHistoryError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setHistoryError(false);
+    setNotice(null);
     try {
       const body = await responseJson<{ invitations: Invitation[] }>(
         await fetch(`/api/workspace-invitations?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store" }),
@@ -31,6 +35,7 @@ export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: strin
       );
       setInvitations(Array.isArray(body.invitations) ? body.invitations : []);
     } catch (error) {
+      setHistoryError(true);
       setNotice({ kind: "error", message: error instanceof Error ? error.message : "Invitations could not be loaded." });
     } finally {
       setLoading(false);
@@ -78,7 +83,7 @@ export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: strin
     catch { setNotice({ kind: "error", message: "Copy is unavailable. Select the link and copy it manually." }); }
   }
 
-  return <StPage>
+  return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={businessName} systemsReleased={systemsReleased}><StPage>
     <StHead title="Invite someone" crumb={{label: "People & access", href: `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=access`}} meta="Prepare a private seven-day link. The recipient accepts with the exact verified email you enter." />
     <StSurface label="Invitation form">
       <form onSubmit={create} className="grid gap-5 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
@@ -91,7 +96,7 @@ export function WorkspaceInvitationManager({ workspaceId }: { workspaceId: strin
     </StSurface>
     {notice ? <StNotice tone={notice.kind === "error" ? "critical" : undefined}><span role={notice.kind === "success" ? "status" : undefined}>{notice.message}</span></StNotice> : null}
     <StSection title="Invitation history">
-      {loading ? <StSkeleton label="Loading invitations" /> : !invitations.length ? <StEmpty>No workspace invitations yet.</StEmpty> : <StRows>{invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={<><StState kind={invitation.status === "pending" ? "need" : invitation.status === "accepted" ? "live" : "draft"}>{invitation.status}</StState>{invitation.status === "pending" ? <StTextButton tone="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</StTextButton> : null}</>} />)}</StRows>}
+      {loading ? <StSkeleton label="Loading invitations" /> : historyError ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Reload invitations</StTextButton>}>Invitation history could not be read.{invitations.length ? " The last read is kept until you reload." : ""}</StNotice> : !invitations.length ? <StEmpty>No workspace invitations yet.</StEmpty> : <StRows>{invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={<><StState kind={invitation.status === "pending" ? "need" : invitation.status === "accepted" ? "live" : "draft"}>{invitation.status}</StState>{invitation.status === "pending" ? <StTextButton tone="danger" disabled={submitting} onClick={() => void revoke(invitation.id)}>Revoke</StTextButton> : null}</>} />)}</StRows>}
     </StSection>
-  </StPage>;
+  </StPage></WorkspaceSurfaceShell>;
 }

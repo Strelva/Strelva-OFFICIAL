@@ -10,7 +10,5 @@ export const metadata: Metadata = { title: "Owner invitations · Local interface
 export default async function OwnerInvitationsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; delivery?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { state, delivery } = await searchParams;
-  return <main data-dashboard className="min-h-screen bg-surface-base p-6 text-warm-white md:p-8">
-    <div className="mx-auto max-w-[960px]"><OwnerInvitationPreview state={state} delivery={delivery} /></div>
-  </main>;
+  return <OwnerInvitationPreview state={state} delivery={delivery} />;
 }

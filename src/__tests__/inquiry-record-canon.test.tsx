@@ -25,7 +25,7 @@ describe("inquiry record on the canon kit", () => {
     expect(html).toContain("Test Person");
     expect(html).toContain("A submitted message");
     expect(html).toContain("What happened");
-    expect(html).toContain("Form at time of submission: revision");
+    expect(html).toContain("Form at time of submission: Release");
     for (const outcome of ["recorded", "accepted", "failed", "blocked"]) expect(html).toContain(`${outcome} outcome evidence`);
     expect(html).toContain("Recorded owner");
     expect(html).toContain("test-receipt-3");

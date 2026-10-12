@@ -58,6 +58,20 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
 `StComposerBar`, `StComposerDock`, `StSplit`, `StField`, `StEntry`.
+
+October 12 legacy adoption adds [StChoiceCards / StChoiceLink](../../src/components/ui/strelva/ChoiceCards.tsx):
+full-card account choices use native radio semantics, a shared group name, visible
+focus and kit-selected marks; route-backed choices use the same card with
+`aria-current`. The input remains accessible without the browser's blue radio.
+The local entry preview uses these cards. Live sign-up adoption belongs to the
+owner audit lane. [WorkspaceSurfaceShell](../../src/experience/workspace/WorkspaceSurfaceShell.tsx)
+keeps native bookings, site pages, invitations and Version review branches in
+the common workspace frame. Website publishing uses kit fields, open entry rows
+and a single standalone title; customer relationships retain their distinct job
+in open kit rows. The inquiry experience retains its state machine and history
+rail while adopting paper tokens, kit controls and shared sidebar geometry.
+Local unit checks cover these contracts; rendered desktop/mobile proof remains
+pending under the October 12 disk constraint. See the audit legacy handoff.
 L6 adds native labeled fields (44px minimum), a responsive object/consequence
 split within the calm column, and the 400px sign-in entry column (`width="account"` gives the personal account
 a wider column with the same brand/help header). `StRow.value`
