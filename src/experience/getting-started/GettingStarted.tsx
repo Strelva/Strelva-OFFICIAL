@@ -77,7 +77,13 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
   const inFlight = useRef(false);
   const resultsId = useId();
   const resultsRef = useRef<HTMLHeadingElement>(null);
+  const urlRef = useRef<HTMLInputElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  // Controls are disabled while a request runs; once they're enabled again, put focus back where the person can act.
+  const pendingFocus = useRef<{ current: HTMLElement | null } | null>(null);
+  const refocus = (target: { current: HTMLElement | null }) => { pendingFocus.current = target; };
   useEffect(() => { if (reading) resultsRef.current?.focus(); }, [reading]);
+  useEffect(() => { if (busy === null && pendingFocus.current) { pendingFocus.current.current?.focus(); pendingFocus.current = null; } }, [busy]);
 
   async function post(body: unknown) {
     const response = await transport("/api/workspace/getting-started", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -97,7 +103,7 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
       setReading(body.reading);
       setChosen(new Set(body.reading.facts.filter(fact => !fact.current).map(fact => fact.id)));
       setUseAsWebsite(!website);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't read this website."); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "We couldn't read this website."); refocus(urlRef); }
     finally { inFlight.current = false; setBusy(null); }
   }
 
@@ -110,7 +116,8 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
       setSaved(body.saved ?? []);
       onSaved(typeof body.revision === "number" ? body.revision : revision, useAsWebsite ? reading.url : null);
       setReading(null);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Your details couldn't be added. Nothing changed."); }
+      refocus(urlRef);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Your details couldn't be added. Nothing changed."); refocus(confirmRef); }
     finally { inFlight.current = false; setBusy(null); }
   }
 
@@ -122,12 +129,12 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
     <p className="text-[14px] leading-relaxed text-gray-muted">We read your public pages and show what we find, with where we found it. Nothing is added to your business until you choose it. Your site doesn&rsquo;t change.</p>
     {!business.canConfirm ? <StNotice>Only the business owner can add details found on the website.</StNotice> : <>
       <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={event => void read(event)}>
-        <div className="flex-1"><StTextField label="Your website" type="url" inputMode="url" autoComplete="url" spellCheck={false} autoCapitalize="none" placeholder="yourbusiness.com" value={url} maxLength={2048} disabled={busy !== null} onChange={event => { setUrl(event.target.value); setError(""); }} /></div>
+        <div className="flex-1"><StTextField ref={urlRef} label="Your website" type="url" inputMode="url" autoComplete="url" spellCheck={false} autoCapitalize="none" placeholder="yourbusiness.com" value={url} maxLength={2048} disabled={busy !== null} onChange={event => { setUrl(event.target.value); setError(""); }} /></div>
         <StPill type="submit" variant={reading ? "soft" : "primary"} busy={busy === "read"} disabled={busy === "save"}>{reading ? "Read again" : "Read my website"}</StPill>
       </form>
       {busy === "read" ? <p role="status" className="text-[13px] text-gray-muted">Reading up to five pages. This can take a few seconds…</p> : null}
       {error ? <StNotice tone="critical">{error}</StNotice> : null}
-      {saved ? <StNotice action={<StTextButton href={detailsHref}>Review business details</StTextButton>}>{saved.length ? "Added to your business. You can change any of it in Business details." : "Nothing new to add. Your business already has these details."}</StNotice> : null}
+      <div role="status">{saved ? <StNotice action={<StTextButton href={detailsHref}>Review business details</StTextButton>}>{saved.length ? "Added to your business. You can change any of it in Business details." : "Nothing new to add. Your business already has these details."}</StNotice> : null}</div>
       {reading ? <div className="flex flex-col gap-3" aria-labelledby={resultsId}>
         <h4 id={resultsId} ref={resultsRef} tabIndex={-1} className="text-[15px] font-medium text-warm-black outline-none">Found on {sourceLabel(reading.url)}</h4>
         {reading.facts.length === 0 ? <StEmpty action={<StTextButton href={detailsHref}>Add details yourself</StTextButton>}>We read {reading.pagesRead === 1 ? "1 page" : `${reading.pagesRead} pages`} but found no details we could add.</StEmpty>
@@ -146,7 +153,7 @@ function UseCurrentWebsite({ business, website, revision, detailsHref, onSaved }
           <input type="checkbox" className="mt-1 size-4 shrink-0 accent-warm-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={useAsWebsite} disabled={busy !== null} onChange={event => setUseAsWebsite(event.target.checked)} />
           <span className="text-[14px] text-warm-black">Use {sourceLabel(reading.url)} as my business&rsquo;s website</span>
         </label> : null}
-        <div><StPill busy={busy === "save"} disabled={busy === "read" || count === 0} onClick={() => void confirm()}>{count ? `Add ${count === 1 ? "1 detail" : `${count} details`} to my business` : "Choose details to add"}</StPill></div>
+        <div><StPill ref={confirmRef} busy={busy === "save"} disabled={busy === "read" || count === 0} onClick={() => void confirm()}>{count ? `Add ${count === 1 ? "1 detail" : `${count} details`} to my business` : "Choose details to add"}</StPill></div>
       </div> : null}
     </>}
   </div>;

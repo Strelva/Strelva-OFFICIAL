@@ -34,8 +34,8 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
     return { business, google, connect };
   });
   const home = `/workspace?${new URLSearchParams({ workspaceId })}`;
+  // Content goes straight into the shell (as Help does); an extra scroll wrapper squeezes the sidebar.
   return <StrelvaShell title="Getting started" workspaceId={workspaceId} accountName={user.email}>
-    <div className="min-h-0 flex-1 overflow-y-auto">
       {state.kind === "ready" ? <GettingStarted business={state.data.business} links={{
         home,
         details: `/workspace/business-details?${new URLSearchParams({ workspaceId })}`,
@@ -49,6 +49,5 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
           <p className="mt-3 text-[15px] leading-6 text-gray-muted">{state.kind === "permission" ? "Sign in with the account that owns it, or ask its owner to invite you." : "Nothing changed. Try again in a moment."}</p>
           <Link className="mt-4 inline-block underline underline-offset-4" href="/workspace">Go to your workspace</Link>
         </div>}
-    </div>
   </StrelvaShell>;
 }
