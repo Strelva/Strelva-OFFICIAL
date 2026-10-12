@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DraftChangePreview } from "@/app/admin/drafts/DraftChangePreview";
 import { DraftActions } from "@/app/admin/drafts/DraftActions";
 import { LeadRows } from "@/app/admin/leads/LeadRows";
+import { LeadsView } from "@/app/admin/leads/LeadsView";
 import { RetryRevalidationButton } from "@/app/admin/ops/RetryRevalidationButton";
 import { OpsView } from "@/app/admin/ops/OpsView";
 import type { DeliveryLead } from "@/lib/access-request-delivery";
@@ -21,6 +22,14 @@ async function click(label: string) { const button = [...container.querySelector
 const lead: DeliveryLead = { businessName: "Test business", email: "owner@example.test", statusToken: "test-token", deliveryStatus: "received", submittedAt: "2026-10-01T12:00:00Z", statusUpdatedAt: "2026-10-01T12:00:00Z" };
 
 describe("paper operator records", () => {
+  it("keeps the admin lead list read-only and explains the ordinary agency home", () => {
+    const request = vi.fn(); vi.stubGlobal("fetch", request);
+    act(() => root.render(createElement(LeadsView, { leads: [lead], initialWorkflow: {} })));
+    expect(container.textContent).toContain("Strelva Agency manages its leads in its workspace");
+    expect(container.querySelector("select:not(:disabled),textarea:not(:disabled)")).toBeNull();
+    expect([...container.querySelectorAll("button:not(:disabled)")].some(button => /Convert|Dismiss|Save note/.test(button.textContent || ""))).toBe(false);
+    expect(request).not.toHaveBeenCalled();
+  });
   it("shows complete field differences without any operator decision controls", () => {
     const request = vi.fn(); vi.stubGlobal("fetch", request);
     act(() => root.render(createElement(DraftActions, { tenant: "test", section: "hero", preview: { type: "content_update", metadata: { diffs: [{ field: "Headline", type: "changed", before: "Old title", after: "New title" }] } } })));

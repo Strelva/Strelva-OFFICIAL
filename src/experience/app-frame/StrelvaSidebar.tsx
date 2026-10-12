@@ -20,6 +20,8 @@ type NavigableSection = Exclude<StrelvaSection, "account">;
 type AgencyNavigationView = "clients" | "queue" | "library" | "team";
 export interface AgencyNavigation {
   paymentLinksCurrent?: boolean;
+  leadsAvailable?: boolean;
+  leadsCurrent?: boolean;
   active?: AgencyNavigationView;
   onNavigate?: (view: AgencyNavigationView) => void;
   hrefs?: Partial<Record<AgencyNavigationView, string>>;
@@ -111,7 +113,7 @@ export function StrelvaSidebar({ agencyNavigation, ownerBrand, workspaceName, ac
       </div>
       {allClients ? <Link className={styles.navItem} href={allClients.href} onClick={event => navigateInPlace(event, allClients.onOpen ? () => { onCloseMobile?.(); allClients.onOpen?.(); } : undefined)}><Users size={18} aria-hidden="true" /><span>All clients</span></Link> : null}
       <nav className={styles.primary} aria-label="Main">{agencyNavigation ? ([{ view: "clients", label: "Clients", icon: Users }, { view: "queue", label: "Queue", icon: Inbox }, { view: "library", label: "Library", icon: Library }, { view: "team", label: "Team", icon: Users }] as const).map(({ view, label, icon: Icon }) => <Link key={view} className={styles.navItem} href={agencyNavigation.hrefs?.[view] || `${href("home")}&agencyView=${view}`} aria-current={agencyNavigation.active === view ? "page" : undefined} onClick={event => { navigateInPlace(event, agencyNavigation.onNavigate ? () => { onCloseMobile?.(); agencyNavigation.onNavigate?.(view); } : undefined); if (!agencyNavigation.onNavigate) onCloseMobile?.(); }}><Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span></Link>) : primaryItems.map(item)}</nav>
-      {agencyNavigation && workspaceId ? <nav aria-label="Agency payments"><Link className={styles.navItem} href={`${appBase}/workspace/payment-links?workspaceId=${encodeURIComponent(workspaceId)}`} aria-current={agencyNavigation.paymentLinksCurrent ? "page" : undefined} onClick={onCloseMobile}><FileText size={18} strokeWidth={1.6} aria-hidden="true" /><span>Payment links</span></Link></nav> : null}
+      {agencyNavigation && workspaceId ? <nav aria-label="Agency sales">{agencyNavigation.leadsAvailable ? <Link className={styles.navItem} href={`${appBase}/workspace/leads?workspaceId=${encodeURIComponent(workspaceId)}`} aria-current={agencyNavigation.leadsCurrent ? "page" : undefined} onClick={onCloseMobile}><Inbox size={18} strokeWidth={1.6} aria-hidden="true" /><span>Leads</span></Link> : null}<Link className={styles.navItem} href={`${appBase}/workspace/payment-links?workspaceId=${encodeURIComponent(workspaceId)}`} aria-current={agencyNavigation.paymentLinksCurrent ? "page" : undefined} onClick={onCloseMobile}><FileText size={18} strokeWidth={1.6} aria-hidden="true" /><span>Payment links</span></Link></nav> : null}
       {pinned.length ? <section className={styles.recent} aria-label={pinnedLabel}><h2>{pinnedLabel}</h2>{pinned.map(entry => {
         const Icon = PINNED_ICONS[entry.kind || "website"];
         return <Link key={entry.id} className={styles.pinned} href={entry.href} title={entry.title} aria-current={entry.current ? "page" : undefined} onClick={event => navigateInPlace(event, entry.onOpen ? () => { onCloseMobile?.(); entry.onOpen?.(); } : undefined)}><Icon size={15} strokeWidth={1.6} aria-hidden="true" /><span>{entry.title}</span></Link>;

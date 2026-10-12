@@ -179,14 +179,23 @@ export function workspaceReturnTarget(value: string | null): string | null {
     if (target.hash || target.pathname !== "/workspace/agency/start" || target.searchParams.size !== 1 || !workspaceId || !UUID.test(workspaceId)) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
+  if (value && /^\/workspace\/(leads|payment-links)\?/.test(value)) {
+    const target = new URL(value, "https://workspace.invalid");
+    const params = target.searchParams;
+    if (target.hash || !["/workspace/leads", "/workspace/payment-links"].includes(target.pathname)
+      || !UUID.test(params.get("workspaceId") || "") || [...params.keys()].some(key => !["workspaceId", "leadToken"].includes(key) || params.getAll(key).length !== 1)
+      || (params.has("leadToken") && (target.pathname !== "/workspace/payment-links" || !/^[a-f0-9]{36}$/.test(params.get("leadToken") || "")))) return null;
+    return `${target.pathname}?${params}`;
+  }
   // An agency adds a client (#259): one agency, optionally one of its prospects.
   if (value?.startsWith("/workspace/agency/clients/new?")) {
     const target = new URL(value, "https://workspace.invalid");
     const params = target.searchParams;
     const workspaceId = params.get("workspaceId");
     const prospect = params.get("prospect");
-    if (target.hash || target.pathname !== "/workspace/agency/clients/new" || [...params.keys()].some((key) => !["workspaceId", "prospect"].includes(key) || params.getAll(key).length !== 1)
-      || !workspaceId || !UUID.test(workspaceId) || (prospect !== null && !UUID.test(prospect))) return null;
+    const leadToken = params.get("leadToken");
+    if (target.hash || target.pathname !== "/workspace/agency/clients/new" || [...params.keys()].some((key) => !["workspaceId", "prospect", "leadToken"].includes(key) || params.getAll(key).length !== 1)
+      || !workspaceId || !UUID.test(workspaceId) || (prospect !== null && !UUID.test(prospect)) || (leadToken !== null && !/^[a-f0-9]{36}$/.test(leadToken)) || (prospect !== null && leadToken !== null)) return null;
     return `${target.pathname}?${params}`;
   }
   if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;

@@ -24,17 +24,21 @@ function confirmedLink(value: unknown, body: Record<string, unknown>, agencyId: 
     && link.amountCents === body.amountCents && link.minCents === body.minCents && link.maxCents === body.maxCents;
 }
 
-export function AgencyPaymentLinks({ agencyWorkspaceId, request = fetch }: { agencyWorkspaceId: string; request?: typeof fetch }) {
-  return <ScopedPaymentLinks key={agencyWorkspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} />;
+type ProspectPrefill = { token?: string; name: string; description: string };
+
+export function AgencyPaymentLinks({ agencyWorkspaceId, initialProspect, request = fetch }: { agencyWorkspaceId: string; initialProspect?: ProspectPrefill; request?: typeof fetch }) {
+  return <ScopedPaymentLinks key={agencyWorkspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} initialProspect={initialProspect} />;
 }
 
-function ScopedPaymentLinks({ agencyWorkspaceId, request }: { agencyWorkspaceId: string; request: typeof fetch }) {
+function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { agencyWorkspaceId: string; request: typeof fetch; initialProspect?: ProspectPrefill }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [client, setClient] = useState("");
+  const sourceScope = initialProspect?.token || "manual";
+  const [clientSelection, setClientSelection] = useState({ scope: sourceScope, id: "" });
+  const client = clientSelection.scope === sourceScope ? clientSelection.id : "";
   const [range, setRange] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Record<string, unknown> | null>(null);
@@ -85,7 +89,7 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request }: { agencyWorkspaceId:
     <StTextButton onClick={() => void load()} disabled={busy || loading}>Refresh payment links</StTextButton>
     {error ? <StNotice tone="critical">{error}{stale && snapshot ? " Retained links may be out of date. Refresh before changing anything." : ""}</StNotice> : null}
     {message ? <StNotice>{message}</StNotice> : null}
-    {pending ? <StNotice>This exact request is awaiting confirmation. Its terms are held.<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
+    {pending ? <StNotice>This exact request is awaiting confirmation. Its terms are held.{pending.action === "create" ? ` Submitted for ${String(pending.clientName)}: ${String(pending.description)}.` : ""}<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
     {loading && !snapshot ? <StSkeleton label="Reading payment links" /> : !snapshot ? <StEmpty>Payment links are unavailable. Confirm your agency owner or admin access, then refresh.</StEmpty> : !snapshot.legacyMerchant ? <>
       <AgencyCheckoutStatus availability={snapshot.checkoutAvailability} paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`} />
       <StCopy>Client payment agreements use your agency&apos;s Stripe merchant account. Prepare a one-off agreement from the client&apos;s billing controls.</StCopy>
@@ -93,7 +97,7 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request }: { agencyWorkspaceId:
     </> : <>
       <StNotice>{snapshot.agency.name} is the merchant for these one-time payments. A payment link does not start a subscription.</StNotice>
       <StSection title="Create a payment link">
-        <form className="grid gap-4" ref={form} onSubmit={event => {
+        <form key={sourceScope} className="grid gap-4" ref={form} onSubmit={event => {
           event.preventDefault(); if (disabled) return;
           const values = new FormData(event.currentTarget);
           const clientName = snapshot.clients.find(item => item.customerWorkspaceId === client)?.name || String(values.get("clientName") || "");
@@ -102,9 +106,9 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request }: { agencyWorkspaceId:
             description: values.get("description"), ...(range ? { minCents: Number(values.get("min")) * 100, maxCents: Number(values.get("max")) * 100 } : { amountCents: Number(values.get("amount")) * 100 }),
           });
         }}>
-          <StField label="Client"><select name="client" value={client} disabled={disabled} onChange={event => setClient(event.target.value)}><option value="">Named prospect</option>{snapshot.clients.map(item => <option key={item.customerWorkspaceId} value={item.customerWorkspaceId}>{item.name}</option>)}</select></StField>
-          {!client ? <StTextField label="Prospect name" name="clientName" required maxLength={160} disabled={disabled} /> : null}
-          <StTextField label="What this payment covers" name="description" required maxLength={1000} disabled={disabled} />
+          <StField label="Client"><select name="client" value={client} disabled={disabled} onChange={event => setClientSelection({ scope: sourceScope, id: event.target.value })}><option value="">Named prospect</option>{snapshot.clients.map(item => <option key={item.customerWorkspaceId} value={item.customerWorkspaceId}>{item.name}</option>)}</select></StField>
+          {!client ? <StTextField label="Prospect name" name="clientName" defaultValue={initialProspect?.name} required maxLength={160} disabled={disabled} /> : null}
+          <StTextField label="What this payment covers" name="description" defaultValue={initialProspect?.description} required maxLength={1000} disabled={disabled} />
           <StField label="Amount choice" hint="USD · $50 to $10,000 · $50 steps"><select value={range ? "range" : "fixed"} disabled={disabled} onChange={event => setRange(event.target.value === "range")}><option value="fixed">Fixed amount</option><option value="range">Client chooses within a range</option></select></StField>
           {range ? <><StTextField label="Minimum (USD)" name="min" type="number" min={50} max={10000} step={50} required disabled={disabled} /><StTextField label="Maximum (USD)" name="max" type="number" min={50} max={10000} step={50} required disabled={disabled} /></> : <StTextField label="Amount (USD)" name="amount" type="number" min={50} max={10000} step={50} required disabled={disabled} />}
           <StTextField label="Payment address (optional)" name="slug" maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" description="Generated if left empty. Use lowercase letters, numbers and hyphens." disabled={disabled} />

@@ -60,6 +60,23 @@ describe("access request delivery flow", () => {
     expect(res.status).toBe(400); expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
+  it.each(["11111111-1111-4111-8111-111111111111", ""])("records server-selected agency ownership only for explicit service intake (%s)", async configured => {
+    process.env.STRELVA_AGENCY_WORKSPACE_ID = configured;
+    const { POST } = await import("@/app/api/access-request/intake/route");
+    const response = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({
+      requestType: "agency_service", businessName: "Northside Bakery", email: "owner@bakery.example",
+      agencyWorkspaceId: "22222222-2222-4222-8222-222222222222",
+    }) }));
+    expect(response.status).toBe(200);
+    const raw = mockRedisStore.get("lead:owner@bakery.example");
+    const lead = JSON.parse(String(raw));
+    expect(lead).toMatchObject({ requestType: "agency_service", agencyWorkspaceId: configured || null });
+    const { getDeliveryLeadByToken } = await import("@/lib/access-request-delivery");
+    const read = await getDeliveryLeadByToken(lead.statusToken);
+    expect(read?.requestType).toBe("agency_service");
+    expect(read?.agencyWorkspaceId ?? null).toBe(configured || null);
+  });
+
   it("creates a no-login delivery link and sends the first signup email", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
 

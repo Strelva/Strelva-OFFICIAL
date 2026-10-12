@@ -72,7 +72,7 @@ describe("delivery client dependencies", () => {
   it("detects the original server-store import even through its transitive helpers", () => {
     const originalImport = readSource(leadRows)!.replace("@/lib/access-request-delivery-contracts", "@/lib/access-request-delivery");
     const violations = browserDependencies(leadRows, file => file === leadRows ? originalImport : readSource(file));
-    expect(violations).toContain("src/lib/access-request-delivery.ts: crypto");
+    expect(violations).toContain("src/platform/infra/access-request-delivery.ts: crypto");
   });
 
   it("keeps the publishing browser entry and its actual preview runtime graph free of server dependencies", () => {

@@ -11,11 +11,17 @@ const snapshot = (extra: Record<string, unknown> = {}) => ({ agency: { id: agenc
 const roots: ReturnType<typeof createRoot>[] = [];
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("FormData", window.FormData); });
 afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
-async function render(request: typeof fetch) {
+async function render(request: typeof fetch, initialProspect?: { token?: string; name: string; description: string }) {
   const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
-  await act(async () => root.render(<AgencyPaymentLinks agencyWorkspaceId={agency} request={request} />));
+  await act(async () => root.render(<AgencyPaymentLinks agencyWorkspaceId={agency} request={request} initialProspect={initialProspect} />));
   return node;
 }
+it("prefills a server-authorized lead as a named prospect for review", async () => {
+  const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())), { name: "Northside Bakery", description: "Agreed website work" });
+  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Northside Bakery");
+  expect(node.querySelector<HTMLInputElement>('[name="description"]')?.value).toBe("Agreed website work");
+  expect(node.querySelector<HTMLInputElement>('[name="amount"]')?.value).toBe("");
+});
 const button = (node: HTMLElement, label: string) => [...node.querySelectorAll("button")].find(item => item.textContent === label)!;
 async function submit(node: HTMLElement) {
   (node.querySelector('[name="clientName"]') as HTMLInputElement).value = "Prospect Coffee";
@@ -26,6 +32,26 @@ async function submit(node: HTMLElement) {
 function saved(body: Record<string, unknown>) {
   return { ...legacy, clientName: body.clientName, slug: "saved-coffee", agencyWorkspaceId: agency, agencyDisplayName: "Strelva Agency", createdBy: actor, customCopy: body.description, amountCents: body.amountCents, minCents: body.minCents, maxCents: body.maxCents, businessWorkspaceId: body.businessWorkspaceId };
 }
+
+it("refreshes a different lead's prefill while retaining an earlier uncertain command verbatim", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const request = vi.fn<typeof fetch>(async (_url, init) => {
+    if (init?.method !== "POST") return Response.json(snapshot());
+    bodies.push(JSON.parse(String(init.body)));
+    if (bodies.length === 1) throw new Error("Lost response");
+    return Response.json({ payLink: saved(bodies[0]!) });
+  });
+  const node = await render(request, { token: "a".repeat(36), name: "First lead", description: "First scope" });
+  await submit(node);
+  await act(async () => roots.at(-1)!.render(<AgencyPaymentLinks agencyWorkspaceId={agency} request={request} initialProspect={{ token: "b".repeat(36), name: "Second lead", description: "Second scope" }} />));
+  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Second lead");
+  expect(node.querySelector<HTMLInputElement>('[name="description"]')?.value).toBe("Second scope");
+  expect(button(node, "Create payment link").disabled).toBe(true);
+  expect(node.textContent).toContain("Submitted for Prospect Coffee: Agreed build");
+  await act(async () => button(node, "Retry the same request").click());
+  expect(bodies[1]).toEqual(bodies[0]);
+  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Second lead");
+});
 
 it("shows paid status and historical attribution without inventing the old actor", async () => {
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())));

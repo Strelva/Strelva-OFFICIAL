@@ -9,6 +9,7 @@ import {
   type DeliveryPlan,
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
+import { strelvaAgencyWorkspaceId } from "@/platform/workspaces/strelva-agency";
 import { OPERATOR_URL } from "@/platform/infra/brand";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 
@@ -114,6 +115,8 @@ export async function POST(req: Request) {
 
   const leadData = {
     businessName: normalizedBusinessName,
+    requestType: "agency_service",
+    agencyWorkspaceId: strelvaAgencyWorkspaceId(),
     description: safeDescription || null,
     location: safeLocation || null,
     email: normalizedEmail,

@@ -180,3 +180,14 @@ it("a move cannot preserve a malformed or repeated public-save hint", () => {
     expect(new URL(href, "https://test.invalid").searchParams.has("save")).toBe(false);
   }
 });
+
+it("preserves opaque agency lead handoffs through sign-in without query contact data", () => {
+  const token = "a".repeat(36);
+  for (const path of ["/workspace/agency/clients/new", "/workspace/payment-links"]) {
+    const href = `${path}?workspaceId=${workspaceId}&leadToken=${token}`;
+    expect(workspaceReturnTarget(href)).toBe(href);
+    for (const suffix of ["&email=owner%40example.test", "&leadToken=" + token, "&prospect=" + workspaceId]) expect(workspaceReturnTarget(href + suffix)).toBeNull();
+    expect(workspaceReturnTarget(`${path}?workspaceId=${workspaceId}&leadToken=invalid`)).toBeNull();
+  }
+  expect(workspaceReturnTarget(`/workspace/leads?workspaceId=${workspaceId}`)).toBe(`/workspace/leads?workspaceId=${workspaceId}`);
+});

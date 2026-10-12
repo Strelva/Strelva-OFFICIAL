@@ -87,6 +87,22 @@ export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspace
     return () => controller.abort();
   }, [ownerBrand, signedIn, brandScope, appBase, presentationScope]);
   const presentationBrand = ownerBrand ?? (loadedBrand?.scope === presentationScope ? loadedBrand.brand ?? undefined : undefined);
+  const [leadAvailability, setLeadAvailability] = useState<{ scope: string; available: boolean } | null>(null);
+  const hasAgencyNavigation = Boolean(agencyNavigation);
+  const suppliedLeadAvailability = agencyNavigation?.leadsAvailable;
+  const leadScope = `${appBase}|${workspaceId || ""}|${accountDetail || accountName}|${signedIn}`;
+  useEffect(() => {
+    if (!hasAgencyNavigation || suppliedLeadAvailability !== undefined || !signedIn || !workspaceId) return;
+    const controller = new AbortController();
+    fetch(`${appBase}/api/agency/leads?agencyWorkspaceId=${encodeURIComponent(workspaceId)}&availability=1`, { signal: controller.signal, cache: "no-store" })
+      .then(async response => {
+        const value = response.ok ? await response.json() : null;
+        if (!controller.signal.aborted) setLeadAvailability({ scope: leadScope, available: value?.available === true && value.agencyWorkspaceId === workspaceId });
+      })
+      .catch(() => { if (!controller.signal.aborted) setLeadAvailability({ scope: leadScope, available: false }); });
+    return () => controller.abort();
+  }, [hasAgencyNavigation, suppliedLeadAvailability, appBase, workspaceId, signedIn, leadScope]);
+  const salesNavigation = agencyNavigation ? { ...agencyNavigation, leadsAvailable: signedIn && (agencyNavigation.leadsAvailable ?? (leadAvailability?.scope === leadScope && leadAvailability.available)) } : undefined;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -117,7 +133,7 @@ export function StrelvaShell({ agencyNavigation, tenantId, ownerBrand, workspace
   return <div data-dashboard data-workspace-theme={theme === "linen" ? "linen" : undefined} className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
     <AppFrame className={styles.shell} navigationLabel={`${navigationName || "Workspace"} navigation`} navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={agencyNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
+      navigation={<StrelvaSidebar allClients={allClients} agencyNavigation={salesNavigation} ownerBrand={presentationBrand} workspaceName={navigationName} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
       notice={notice} rightRail={rightRail} rightRailId={rightRailId} rightRailTitle={rightRailTitle} rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>

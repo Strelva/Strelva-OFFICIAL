@@ -8,7 +8,7 @@ export function LeadsView({ leads, initialWorkflow }: { leads: DeliveryLead[]; i
   const counts = ["new", "contacted", "converting"].map(status => ({ status, count: leads.filter(lead => (initialWorkflow[lead.statusToken]?.status ?? "new") === status).length })).filter(item => item.count > 0);
   return <StPage>
     <StHead title={OPERATOR_DESTINATIONS.prospects.label} meta={`Strelva Agency · ${counts.length ? counts.map(item => `${item.count} ${item.status}`).join(" · ") : "People who requested a site. Review their request and delivery status."}`} />
-    <p>Read-only support records. Work prospects through ordinary agency access.</p>
+    <p>Read-only support records. Strelva Agency manages its leads in its workspace.</p>
     {leads.length ? <LeadRows readOnly leads={leads} initialWorkflow={initialWorkflow} /> : <StEmpty action={<StTextButton href="/audit">Open the audit tool</StTextButton>}>No prospects yet. Access requests from potential clients appear here.</StEmpty>}
   </StPage>;
 }

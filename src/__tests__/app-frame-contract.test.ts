@@ -12,6 +12,17 @@ const managedShell = () => readFileSync(path.join(root, "src/components/dashboar
 const workspaceSignOut = () => readFileSync(path.join(root, "src/experience/workspace/WorkspaceSignOutButton.tsx"), "utf8");
 
 describe("shared app frame accessibility contract", () => {
+  it("places configured agency Leads next to Payment links and hides it without current admission", () => {
+    const workspaceId = "11111111-1111-4111-8111-111111111111";
+    const base = { workspaceId, workspaceName: "Strelva Agency", children: createElement("p", null, "Agency"), signOut: null };
+    const authorized = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation: { leadsAvailable: true, leadsCurrent: true } }));
+    expect(authorized).toContain(`/workspace/leads?workspaceId=${workspaceId}`);
+    expect(authorized).toContain('aria-current="page"'); expect(authorized).toContain("Payment links");
+    for (const agencyNavigation of [{ leadsAvailable: false }, {}]) {
+      const html = renderToStaticMarkup(createElement(StrelvaShell, { ...base, agencyNavigation }));
+      expect(html).not.toContain("/workspace/leads?"); expect(html).toContain("Payment links");
+    }
+  });
   it("keeps collapsed navigation and mobile modal surfaces out of competing focus trees", () => {
     const source = frame();
     const styles = frameStyles();

@@ -8,9 +8,10 @@ import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { buildPayLinkConfig, createAgencyPayLink, getPayLink, listPayLinks, normalizePayLinkSlug, payLinkDigest, PayLinkValidationError, revokePayLink } from "@/platform/infra/pay-links";
 import { listBuildPayments } from "@/platform/infra/revenue";
 
+import { strelvaAgencyWorkspaceId } from "@/platform/workspaces/strelva-agency";
+
 const uuid = z.string().uuid();
 const clientsSchema = z.array(z.object({ customerWorkspaceId: uuid, name: z.string().min(1) }));
-export function legacyMerchantAgencyId() { return process.env.STRELVA_LEGACY_MERCHANT_AGENCY_WORKSPACE_ID?.trim() || null; }
 
 export async function paymentLinkAgency(actor: WorkspaceActor, id: string) {
   const agency = (await listMemberAgencies(actor)).find(item => item.id === uuid.parse(id));
@@ -20,7 +21,7 @@ export async function paymentLinkAgency(actor: WorkspaceActor, id: string) {
 
 async function currentMerchantAgency(actor: WorkspaceActor, id: string) {
   const agency = await paymentLinkAgency(actor, id);
-  if (agency.id !== legacyMerchantAgencyId()) throw new WorkspaceAccessError();
+  if (agency.id !== strelvaAgencyWorkspaceId()) throw new WorkspaceAccessError();
   return agency;
 }
 
@@ -42,7 +43,7 @@ async function agencyClients(actor: WorkspaceActor, agencyWorkspaceId: string) {
 
 export async function readAgencyPaymentLinks(actor: WorkspaceActor, agencyWorkspaceId: string) {
   const agency = await paymentLinkAgency(actor, agencyWorkspaceId);
-  const legacyMerchant = agency.id === legacyMerchantAgencyId();
+  const legacyMerchant = agency.id === strelvaAgencyWorkspaceId();
   const checkoutAvailability = await readCheckoutAvailability(agency.id);
   if (!legacyMerchant) return { agency, currentActorId: actor.userId, legacyMerchant, checkoutAvailability, payLinks: [], paidPayments: {}, paymentStatusAvailable: true, clients: [] };
   if (!getRedis()) throw new WorkspaceStoreError("Payment link storage is unavailable.");
@@ -76,7 +77,7 @@ export async function commandAgencyPaymentLink(actor: WorkspaceActor, raw: unkno
   const input = paymentLinkCommandSchema.parse(raw);
   if (input.expectedActorId && input.expectedActorId !== actor.userId) throw new WorkspaceAccessError();
   const agency = await paymentLinkAgency(actor, input.agencyWorkspaceId);
-  if (agency.id !== legacyMerchantAgencyId()) throw new WorkspaceAccessError("Use your agency's Connect payment agreements.");
+  if (agency.id !== strelvaAgencyWorkspaceId()) throw new WorkspaceAccessError("Use your agency's Connect payment agreements.");
   if (input.action === "revoke") {
     const slug = normalizePayLinkSlug(input.slug);
     if (!slug || (slug === "rohlax" || slug === "index")) throw new PayLinkValidationError("Choose an existing payment link.");

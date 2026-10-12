@@ -5,6 +5,9 @@ import { VersionAccessError } from "@/platform/system-versions";
 import { isWorkspaceBodyTooLarge as isBodyTooLarge, readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { readAgencyClientsPage } from "@/experience/workspace/agency-server";
 import { addAgencyClient, agencyAddClientReleaseEnabled, agencyClientActionSchema, AgencyClientError, issueAgencyClientOwnerClaim } from "@/products/agency-clients/server";
+import { agencyClientAdditionSchema } from "@/products/agency-clients/contracts";
+import { AgencyLeadError, beginAgencyLeadConversion, completeAgencyLeadConversion } from "@/experience/workspace/leads/leads-server";
+import { normalizeRebuildUrl, WebsiteCrawlError } from "@/products/websites/server";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +53,33 @@ export async function POST(request: Request) {
     const body = agencyClientActionSchema.parse(await readWorkspaceBody(request, 4_000));
     // Each add may fetch the client's site; keep a person to a human pace.
     if (await isRateLimitedWindowedAsync(`workspace:agency-client-add:${actor.userId}`, 10, 60_000)) return workspaceJson({ error: "Please wait a minute before adding another client." }, 429);
-    if (body.action === "add") return workspaceJson(await addAgencyClient(actor, body), 201);
+    if (body.action === "add") {
+      if (body.leadToken) {
+        // Reject known-invalid URLs before binding the lead to an immutable request.
+        if (body.url) {
+          try { normalizeRebuildUrl(body.url); }
+          catch (error) { throw new AgencyClientError(error instanceof WebsiteCrawlError ? error.message : "Enter a public website address.", 400, "agency_client_invalid"); }
+        }
+        await beginAgencyLeadConversion(actor, body.agencyWorkspaceId, body.leadToken, body.idempotencyKey, body);
+      }
+      const result = await addAgencyClient(actor, body);
+      if (body.leadToken) {
+        const client = agencyClientAdditionSchema.safeParse(result.client);
+        if (!client.success || client.data.agencyWorkspaceId !== body.agencyWorkspaceId || client.data.addedBy !== actor.userId) {
+          return workspaceJson({ error: "The client result could not be confirmed. Retry the same request to check it." }, 503);
+        }
+        try {
+          await completeAgencyLeadConversion(actor, body.agencyWorkspaceId, body.leadToken, body.idempotencyKey, client.data.customerWorkspaceId);
+          result.leadConversion = { status: "converted" };
+        } catch {
+          result.leadConversion = { status: "unconfirmed", message: "The client was added, but its lead status could not be confirmed. Retry this same request to confirm the conversion." };
+        }
+      }
+      return workspaceJson(result, 201);
+    }
     return workspaceJson({ ownerClaim: await issueAgencyClientOwnerClaim(actor, body) }, 201);
   } catch (error) {
+    if (error instanceof AgencyLeadError) return workspaceJson({ error: error.message, code: error.code }, error.status);
     if (error instanceof AgencyClientError) return workspaceJson({ error: error.message, code: error.code }, error.status);
     if (error instanceof z.ZodError && !isBodyTooLarge(error)) {
       return workspaceJson({ error: error.issues.find((issue) => issue.code === "custom")?.message ?? "Check the business name, website and owner email." }, 400);

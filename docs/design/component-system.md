@@ -2274,3 +2274,38 @@ existing validated brand resolver; historical records never acquire a current
 actor. Local DOM and route tests cover these contracts. Desktop/phone rendering,
 real Auth and native Redis script execution remain coordinator acceptance work
 under the audit's no-server/no-browser stop point.
+
+### October 12 · Strelva Agency lead management
+
+[AgencyLeads](../../src/experience/workspace/leads/AgencyLeads.tsx) composes the
+existing St* rows, fields, notices, states and text actions in agency chrome.
+Only the configured agency's ordinary verified owners/admins see its Leads
+place beside Payment links. The shared shell reads membership-only admission;
+unknown admission and member roles hide the place. The agency identity uses the
+existing validated brand resolver. Other agencies receive no lead-feed claim.
+
+Rows retain request context, historical ownership qualification, canonical
+status and appended notes. Empty, loading, error, permission and stale states
+retain Refresh. Uncertain writes hold the exact submitted body and key; Refresh
+only reads. Convert opens the ordinary agency add-client flow through an opaque
+lead token. Preparing that form stays Converting; confirmed client creation is
+Converted. Release-disabled client creation holds that action.
+
+[AgencyAddClient](../../src/experience/workspace/agency/AgencyAddClient.tsx)
+receives server-authorized lead prefill, including a name-only client when no
+website exists. It requires a reviewed business name and uses the existing URL
+normalizer before reserving conversion. Lost replies and reloads recover the
+original actor's persisted request and key; an unavailable or foreign request
+stays held. A confirmed business with an unconfirmed lead update retains both
+facts and offers exact-request recovery. No owner email is sent.
+
+[AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
+receives lead name and bounded scope text through the same authorized server
+read. Changing the source token resets the draft fields and client selection,
+while an earlier uncertain payment command retains its submitted terms and key.
+Prices remain a separate review. The admin lead list remains disabled support
+inspection and names the agency workspace as the place to manage leads.
+
+Local DOM, route and mocked-store tests cover these contracts. Native Redis
+execution, actual Auth and desktop/phone rendering remain unproven under the
+lane brief's explicit no-server/no-browser/no-socket stop point.

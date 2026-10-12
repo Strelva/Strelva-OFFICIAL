@@ -8,8 +8,8 @@ import { StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
 import { FirstClientHandoff } from "./FirstClientHandoff";
 import { Tabs } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
-import type { AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
-import { agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
+import type { AddAgencyClientInput, AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
+import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
 
 /**
  * An agency adds a client (#259). The agency names a website or picks one of
@@ -20,17 +20,18 @@ import { agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-
  */
 
 interface Prospect { id: string; business: string; url: string | null; name: string; email: string; grade: string; score: number }
+interface InitialLead { token: string; businessName: string; email: string; currentWebsite: string | null }
 
 class RequestError extends Error {
-  constructor(readonly status: number, message: string) { super(message); }
+  constructor(readonly status: number, message: string, readonly code?: string) { super(message); }
 }
 
 async function readJson<T>(response: Response, fallback: string): Promise<T> {
   const body = await response.json().catch(() => {
     if (response.ok) throw new Error(fallback);
     return {};
-  }) as { error?: unknown };
-  if (!response.ok) throw new RequestError(response.status, typeof body.error === "string" ? body.error : fallback);
+  }) as { error?: unknown; code?: unknown };
+  if (!response.ok) throw new RequestError(response.status, typeof body.error === "string" ? body.error : fallback, typeof body.code === "string" ? body.code : undefined);
   return body as T;
 }
 
@@ -55,11 +56,14 @@ function currentOwnerClaim(claim: OwnerClaim | null, client?: AgencyClientListIt
   return claim && Date.parse(claim.expiresAt) > Date.now() && (!client || client.pendingClaim?.claimId === claim.claimId) ? claim : null;
 }
 
-export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId }: { agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null }) {
+export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId }: {
+  agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialLead?: InitialLead;
+  initialConversion?: AddAgencyClientInput | null; conversionHeld?: boolean; convertedBusinessWorkspaceId?: string;
+}) {
   const [source, setSource] = useState<"url" | "prospect">(initialProspectId && prospecting ? "prospect" : "url");
-  const [url, setUrl] = useState("");
-  const [name, setName] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState("");
+  const [url, setUrl] = useState(initialConversion ? initialConversion.url ?? "" : initialLead?.currentWebsite ?? "");
+  const [name, setName] = useState(initialConversion ? initialConversion.name ?? "" : initialLead?.businessName.slice(0, 120) ?? "");
+  const [ownerEmail, setOwnerEmail] = useState(initialConversion ? initialConversion.ownerEmail ?? "" : initialLead?.email ?? "");
   const [prospectId, setProspectId] = useState<string | null>(initialProspectId);
   const [prospects, setProspects] = useState<Prospect[] | null>(null);
   const [prospectError, setProspectError] = useState("");
@@ -71,7 +75,10 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
   const [signedOut, setSignedOut] = useState(false);
   const [result, setResult] = useState<AddAgencyClientResult | null>(null);
   // One key per intended add, so a retry after a lost response replays instead of adding twice.
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => initialConversion?.idempotencyKey ?? crypto.randomUUID());
+  const submittedBody = useRef<string | null>(initialConversion ? JSON.stringify(initialConversion) : null);
+  const submittingNow = useRef(false);
+  const [requestHeld, setRequestHeld] = useState(Boolean(initialConversion));
   const [listAttempt, setListAttempt] = useState(0);
   const id = useId().replace(/:/g, "");
   const agencyHref = `/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`;
@@ -120,32 +127,53 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
     setError("");
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (source === "url" && !url.trim()) { setError("Enter the business’s website."); return; }
+  async function submit(event?: FormEvent) {
+    event?.preventDefault();
+    if (submittingNow.current || conversionHeld) return;
+    const isReplay = submittedBody.current !== null;
+    if (!submittedBody.current && source === "url" && !url.trim() && !(initialLead && name.trim())) { setError(initialLead ? "Enter the business name or website." : "Enter the business’s website."); return; }
     if (source === "prospect" && !prospectId) { setError("Choose a prospect."); return; }
+    if (!submittedBody.current) {
+      const input = addAgencyClientInputSchema.safeParse({
+        action: "add", agencyWorkspaceId, idempotencyKey,
+        ...(source === "url" ? (url.trim() ? { url: url.trim() } : {}) : { prospectId }),
+        ...(name.trim() ? { name: name.trim() } : {}),
+        ...(ownerEmail.trim() ? { ownerEmail: ownerEmail.trim() } : {}),
+        ...(initialLead ? { leadToken: initialLead.token } : {}),
+      });
+      if (!input.success) { setError("Check the business name, website and owner email."); return; }
+      submittedBody.current = JSON.stringify(input.data);
+    }
+    submittingNow.current = true;
+    setRequestHeld(true);
     setSubmitting(true); setError("");
     try {
       const body = await readJson<AddAgencyClientResult>(await fetch("/api/workspace/agency-clients", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "add", agencyWorkspaceId, idempotencyKey,
-          ...(source === "url" ? { url: url.trim() } : { prospectId }),
-          ...(name.trim() ? { name: name.trim() } : {}),
-          ...(ownerEmail.trim() ? { ownerEmail: ownerEmail.trim() } : {}),
-        }),
+        body: submittedBody.current,
       }), "The client couldn’t be added.");
+      const client = agencyClientAdditionSchema.safeParse(body.client);
+      if (!client.success || client.data.agencyWorkspaceId !== agencyWorkspaceId
+        || !body.scan || !Array.isArray(body.scan.seeded) || !body.website || typeof body.website.rebuildOpenToAgency !== "boolean"
+        || (initialLead && !["converted", "unconfirmed"].includes(body.leadConversion?.status ?? ""))) {
+        throw new Error("The client result could not be confirmed.");
+      }
       setResult(body);
       void loadClients();
     } catch (cause) {
       if (cause instanceof RequestError && cause.status === 401) { setSignedOut(true); return; }
-      setError(cause instanceof Error && cause.message ? cause.message : "The client couldn’t be added.");
+      const uncertain = !(cause instanceof RequestError) || cause.status >= 500;
+      if (!uncertain && !isReplay && (!initialLead || (cause instanceof RequestError && cause.code === "agency_client_invalid"))) { submittedBody.current = null; setRequestHeld(false); }
+      setError(`${uncertain ? "Outcome not confirmed. Retry this same request before starting another client. " : ""}${cause instanceof Error && cause.message ? cause.message : "The client couldn’t be added."}`);
     } finally {
+      submittingNow.current = false;
       setSubmitting(false);
     }
   }
 
   function another() {
+    if (initialLead) return;
+    submittedBody.current = null; setRequestHeld(false);
     setResult(null); setUrl(""); setName(""); setOwnerEmail(""); setProspectId(null); setError("");
     setIdempotencyKey(crypto.randomUUID());
     // The owner may have claimed a client meanwhile; show the list as it is now.
@@ -157,31 +185,43 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
       <section className="mt-16 max-w-xl">
         <h1 className="font-display text-[32px] font-medium leading-tight">Sign in to add a client.</h1>
         <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Use the account you run your agency with. You come straight back here.</p>
-        <Link href={`/sign-in?next=${encodeURIComponent(`/workspace/agency/clients/new?workspaceId=${agencyWorkspaceId}`)}`} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-medium text-on-accent hover:bg-accent/85">Sign in<ArrowRight className="size-4" aria-hidden="true" /></Link>
+        <Link href={`/sign-in?next=${encodeURIComponent(`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, ...(initialLead ? { leadToken: initialLead.token } : {}) })}`)}`} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-medium text-on-accent hover:bg-accent/85">Sign in<ArrowRight className="size-4" aria-hidden="true" /></Link>
       </section>
     </Shell>;
   }
 
   return <Shell agencyHref={agencyHref}>
-    {result
-      ? <AddedClient result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
+    {conversionHeld ? <section className="mt-12" aria-labelledby={`${id}-held-title`}>
+      <h1 id={`${id}-held-title`} className="font-display text-[32px] font-medium leading-tight">{convertedBusinessWorkspaceId ? "This lead is already a client" : "This lead’s conversion is held"}</h1>
+      <p role="status" className="mt-3 text-[14px] leading-relaxed text-gray-muted">{convertedBusinessWorkspaceId ? "The client business was created. Open it to continue." : "The person who started this conversion must confirm its outcome before another client can be added."}</p>
+      {convertedBusinessWorkspaceId ? <div className="mt-6"><StPillLink href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client workspace</StPillLink></div> : null}
+      <StTextButton className="mt-6" href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
+    </section> : result
+      ? <><AddedClient result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} allowAnother={!initialLead} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
+        {result.leadConversion ? <div className="mt-6" role="status"><p className="text-[13px] text-gray-muted">{result.leadConversion.status === "converted" ? "Lead converted. The client business was created." : result.leadConversion.message ?? "The client was added, but its lead status has not been confirmed."}</p>
+          {result.leadConversion.status === "unconfirmed" ? <StTextButton onClick={() => void submit()} disabled={submitting}>{submitting ? "Confirming conversion" : "Confirm lead conversion"}</StTextButton> : null}
+          <StTextButton href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
+          {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error}</p> : null}
+        </div> : null}</>
       : <section className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]" aria-labelledby={`${id}-title`}>
         <div>
           <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-accent-text">New client</p>
           <h1 id={`${id}-title`} className="mt-3 font-display text-[40px] font-medium leading-tight">Add a client</h1>
-          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">Start from the website they already have, or from someone who ran your check.</p>
+          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{initialLead ? "Review the details from this lead. Adding their business confirms the conversion; nothing is emailed." : "Start from the website they already have, or from someone who ran your check."}</p>
           <form onSubmit={submit} className="mt-8 max-w-lg" noValidate aria-busy={submitting || undefined}>
-            {prospecting ? <Tabs aria-label="Where this client comes from" variant="segment" value={source} onChange={(value) => { setSource(value as "url" | "prospect"); setError(""); }}
-              items={[{ value: "url", label: "Website" }, { value: "prospect", label: "Prospect" }]} /> : null}
-            <div className="mt-6 grid gap-5">
+            {prospecting && !initialLead ? <Tabs aria-label="Where this client comes from" variant="segment" value={source} onChange={(value) => { setSource(value as "url" | "prospect"); setError(""); }}
+              items={[{ value: "url", label: "Website", disabled: requestHeld }, { value: "prospect", label: "Prospect", disabled: requestHeld }]} /> : null}
+            <fieldset disabled={requestHeld || submitting} className="mt-6 grid min-w-0 gap-5">
+              <legend className="sr-only">Client details</legend>
               {source === "url"
-                ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText="We read their details and run an AI Visibility check saved in your agency. Nothing on their site changes." />
+                ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required={!initialLead} disabled={requestHeld || submitting} maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText={initialLead ? "Optional. A business can be added before it has a website." : "We read their details and run an AI Visibility check saved in your agency. Nothing on their site changes."} />
                 : <ProspectPicker prospects={prospects} error={prospectError} added={added} value={prospectId} onChoose={choose} />}
-              <TextInput label="Business name" autoComplete="organization" maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
-              <TextInput label="Owner’s email" type="email" autoComplete="email" maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Strelva doesn’t email it yet; you’ll copy it." />
-            </div>
+              <TextInput label="Business name" autoComplete="organization" required={Boolean(initialLead)} disabled={requestHeld || submitting} maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
+              <TextInput label="Owner’s email" type="email" autoComplete="email" disabled={requestHeld || submitting} maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Strelva doesn’t email it yet; you’ll copy it." />
+            </fieldset>
             {error ? <p role="alert" className="mt-4 text-[13px] text-critical">{error}</p> : null}
-            <Button type="submit" size="lg" loading={submitting} className="mt-6" icon={<ArrowRight className="size-4" />}>{submitting ? "Adding client" : "Add client"}</Button>
+            {requestHeld ? <p role="status" className="mt-4 text-[13px] text-gray-muted">This request is held with its original details. Retrying checks the same client addition.</p> : null}
+            <Button type="submit" size="lg" loading={submitting} className="mt-6" icon={<ArrowRight className="size-4" />}>{submitting ? "Adding client" : requestHeld ? "Confirm client addition" : "Add client"}</Button>
           </form>
         </div>
         <ol className="self-start border-t border-gray-border text-[13px] leading-relaxed text-gray-muted lg:mt-24" aria-label="What adding a client does">
@@ -228,7 +268,7 @@ function ProspectPicker({ prospects, error, added, value, onChoose }: { prospect
   </fieldset>;
 }
 
-export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; onClaim: (claim: OwnerClaim) => void }) {
+export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, allowAnother = true, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; allowAnother?: boolean; onClaim: (claim: OwnerClaim) => void }) {
   const id = useId().replace(/:/g, "");
   const { client, scan } = result;
   const ownerClaim = currentOwnerClaim(result.ownerClaim, currentClient);
@@ -284,7 +324,7 @@ export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, 
     </div>
 
     <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-gray-border pt-6">
-      <Button variant="secondary" onClick={onAnother} icon={<RefreshCw className="size-4" />}>Add another client</Button>
+      {allowAnother ? <Button variant="secondary" onClick={onAnother} icon={<RefreshCw className="size-4" />}>Add another client</Button> : null}
       <a href={agencyHref} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium underline-offset-4 hover:underline">Back to clients<ArrowRight className="size-4" aria-hidden="true" /></a>
     </div>
   </section>;

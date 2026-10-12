@@ -57,7 +57,7 @@ const create = (extras: Record<string, unknown> = {}) => ({ action: "create", ag
 const post = (body: unknown, headers: Record<string, string> = {}) => POST(new Request("https://app.example.test/api/agency/payment-links", { method: "POST", headers: { origin: "https://app.example.test", "content-type": "application/json", ...headers }, body: JSON.stringify(body) }));
 const read = (id = agency) => GET(new Request(`https://app.example.test/api/agency/payment-links?agencyWorkspaceId=${id}`));
 beforeEach(() => {
-  vi.clearAllMocks(); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_LEGACY_MERCHANT_AGENCY_WORKSPACE_ID", agency);
+  vi.clearAllMocks(); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", agency);
   mocks.actor.mockResolvedValue(actor); mocks.list.mockResolvedValue([member]); mocks.rpc.mockResolvedValue({ data: [{ customerWorkspaceId: client, name: "Client Coffee" }], error: null });
   mocks.payments.mockResolvedValue([]); mocks.availability.mockResolvedValue({ status: "coming_soon" });
   mocks.brand.mockResolvedValue({ agencyId: agency, name: "Strelva Agency" });
@@ -116,7 +116,7 @@ describe("ordinary agency legacy merchant payment links", () => {
   });
   it("requires confirmed email and defaults closed when the merchant config or release flag is absent", async () => {
     mocks.actor.mockResolvedValue(null); expect((await post(create())).status).toBe(401);
-    mocks.actor.mockResolvedValue(actor); vi.stubEnv("STRELVA_LEGACY_MERCHANT_AGENCY_WORKSPACE_ID", "");
+    mocks.actor.mockResolvedValue(actor); vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", "");
     expect((await post(create())).status).toBe(403); expect((await (await read()).json()).legacyMerchant).toBe(false);
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0"); expect((await read()).status).toBe(503); expect((await post(create())).status).toBe(503);
     expect(memory.redis.eval).not.toHaveBeenCalled();
