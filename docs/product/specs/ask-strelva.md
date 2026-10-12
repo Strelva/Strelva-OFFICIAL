@@ -146,13 +146,14 @@ Behaviors, each testable.
    approves there or from the email link. This keeps an approval tied to the
    exact change and out of reach of text injected through reviews, inquiries
    or site content.
-7. **Managed default.** In a workspace with a managed relationship (an active
-   `tenant_workspace_links` row, or `serviceRelationship: "managed_client"` in
-   `src/platform/relationships`), "build a new website", "redo the site" or
-   "add a booking page" become a **Request to Strelva** by default. No special
-   wording like "hire Strelva" is needed. Self-making is offered second, and
-   only where the owner can make Systems. This closes audit P1 #7
-   (`docs/operations/reborn-integration-audit-2026-10-05.md`).
+7. **Agency default, never a Strelva default** (ADR 0015, Oct 11). When the
+   business has a recorded agency (its provider of record, else its only
+   agency), "build a new website", "redo the site" or "add a booking page"
+   become a **Request to that agency**, named on screen. With several agencies
+   and none of record, the owner chooses in Requests. With no agency, nothing
+   is filed: the owner makes it from Start or brings in an agency from Help.
+   Ask drafts always land in the owner's Needs you, never an operator queue.
+   Supersedes the earlier "Request to Strelva" default (audit P1 #7).
 8. **Possibilities.** When the ask is bigger than an edit (a new flow, a new
    page set, a rebuild), Strelva opens a Possibility instead of drafting a
    direct edit. It says what the Possibility pins and that nothing live

@@ -163,7 +163,11 @@ Owner entry isn't a System. It's the door to the **Business**.
    effect within 60 seconds, without a deploy. Switching a flag on records a
    server-side approval for the authenticated operator and audits that actor;
    the browser supplies no approver or approval ID.
-8. **Owners are invited through an operator.** For a converted workspace, a
+8. **Converted businesses: owners are invited through an operator.** This
+   applies only to businesses converted from the tenant model (the existing
+   clients, who stay silent). A new business signs up and owns its workspace
+   directly ([ADR 0015](../../../../docs/adr/0015-two-doors-self-serve-and-agencies.md));
+   "I run a business" lands on business creation. For a converted workspace, a
    Strelva operator (active `super_admins` row and `admin` membership) can
    invite exactly one owner. The address defaults to the business's trusted
    recipient. Use `business_trusted_owner_recipient` when available; until
