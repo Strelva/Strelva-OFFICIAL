@@ -10,3 +10,4 @@ export { stateWorkspaceHint } from "./signed";
 export type { StoredFoundFact } from "./store";
 export { beginReadGrant, finishReadGrant, readGrantAvailable, readGrantView, readGrantProperties, chooseReadGrantProperties, readGrantSummary, disconnectReadGrant, READ_GRANT_COOKIE, READ_GRANT_CALLBACK_PATH, READ_GRANT_SCOPES } from "./read-grant";
 export type { ReadGrantView, ReadGrantSummary } from "./read-grant";
+export { GOOGLE_RETURN_COOKIE, safeReturnTo, withGoogleOutcome } from "./return-to";

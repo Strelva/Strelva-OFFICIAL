@@ -25,6 +25,8 @@ export interface GoogleConnectProps {
   foundFacts?: GoogleFoundFactView[];
   actions: { start: Action; choose: Action; reread: Action; decide: Action };
   agencyRequest?: typeof fetch;
+  /** A validated same-origin path to go back to after connecting (for example the claim review). */
+  returnTo?: string | null;
 }
 
 const CONNECT_MESSAGES: Record<string, { text: string; tone?: "critical" }> = {
@@ -66,13 +68,14 @@ function Notice({ message }: { message?: { text: string; tone?: "critical" } }) 
   return message ? <StNotice tone={message.tone}><p role="status" className={styles.copy}>{message.text}</p></StNotice> : null;
 }
 
-export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params, choices, foundFacts = [], actions, agencyRequest }: GoogleConnectProps) {
+export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params, choices, foundFacts = [], actions, agencyRequest, returnTo }: GoogleConnectProps) {
   const hidden = <input type="hidden" name="workspaceId" value={workspaceId} />;
   const owner = viewer === "owner" && enabled;
   return <div className={styles.stack}>
     <Notice message={params.connect ? CONNECT_MESSAGES[params.connect] : undefined} />
     <Notice message={params.read ? READ_MESSAGES[params.read] : undefined} />
     <Notice message={params.fact ? FACT_MESSAGES[params.fact] : undefined} />
+    {hasListing && returnTo ? <div className={styles.actions}><StTextButton href={returnTo}>Continue where you were</StTextButton></div> : null}
 
     {!hasListing && owner && params.connect === "choose" && choices ? <StSection title="Choose your listing" meta={choices.googleEmail}>
       <p className={styles.copy}>These are the listings this Google account manages. Connect the one for this business. Google asks you to confirm once more.</p>
@@ -83,7 +86,8 @@ export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params
 
     {!hasListing ? owner ? <StSection title="Connect Google">
       <p className={styles.copy}>Sign in with the Google account that runs your Business Profile. Strelva reads your listing&apos;s hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you approve it.</p>
-      <form action={actions.start}>{hidden}<StPill type="submit">Connect Google</StPill></form>
+      {/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}
+      <form action={actions.start} className={styles.actions}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StPill type="submit">Connect Google</StPill>{returnTo ? <StTextButton href={returnTo}>Skip for now</StTextButton> : null}</form>
     </StSection> : viewer === "agency" && enabled ? <StSection title="Google isn't connected yet">
       <p className={styles.copy}>The owner connects Google with their own account. Copy a link and send it to them yourself; Strelva doesn&apos;t send it.</p>
       <AgencyConnectLinkButton workspaceId={workspaceId} request={agencyRequest} />

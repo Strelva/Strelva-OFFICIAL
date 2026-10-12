@@ -8,7 +8,7 @@ import { readPlace } from "@/platform/owner-entry/place-state";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readWorkspaceGoogle } from "@/products/google-listing/server";
-import { GOOGLE_DISCOVER_CHOICES_COOKIE, ownerConnectAvailable, readDiscoveryChoices, readFoundFacts, readGrantAvailable, readGrantProperties, readGrantSummary, readGrantView } from "@/products/google-listing/connect";
+import { GOOGLE_DISCOVER_CHOICES_COOKIE, ownerConnectAvailable, readDiscoveryChoices, readFoundFacts, readGrantAvailable, readGrantProperties, readGrantSummary, readGrantView, safeReturnTo } from "@/products/google-listing/connect";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
 import { GoogleConnect, type GoogleConnectViewer } from "@/experience/places/GoogleConnect";
 import { GoogleReadGrant } from "@/experience/places/GoogleReadGrant";
@@ -38,7 +38,7 @@ export default async function GooglePage({ searchParams }: { searchParams: Promi
     return <GoogleReadGrant workspaceId={workspaceId} owner={viewer === "owner"} view={view} properties={properties} summary={summary} result={one(params.search)} actions={{ start: startSearchReadGrant, choose: chooseSearchProperty, disconnect: disconnectSearchReadGrant }} />;
   })().catch(() => null) : null;
   const connect = <><GoogleConnect workspaceId={workspaceId} viewer={viewer} enabled={enabled} hasListing={state.kind === "ready" && state.data.length > 0}
-    params={{ connect: one(params.connect), read: one(params.read), fact: one(params.fact) }} choices={choices} foundFacts={foundFacts}
+    params={{ connect: one(params.connect), read: one(params.read), fact: one(params.fact) }} returnTo={safeReturnTo(params.returnTo)} choices={choices} foundFacts={foundFacts}
     actions={{ start: startGoogleConnect, choose: chooseGoogleListing, reread: rereadGoogleFoundFacts, decide: decideGoogleFoundFact }} />{readGrant}</>;
   return <WorkspaceGoogle workspaceId={workspaceId} state={state} reviews={reviews} action={googleListingAction} connect={connect} reviewId={typeof params.reviewId === "string" ? params.reviewId : undefined} replyText={typeof params.replyText === "string" ? params.replyText : undefined} result={typeof params.result === "string" ? params.result : undefined} />;
 }

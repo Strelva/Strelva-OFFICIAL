@@ -157,13 +157,6 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
             <p className={styles.body}>They go in your site&rsquo;s header code, on every page. Your pages stay as they are. Someone else runs your site? Copy the steps below and send them; the lines are safe to share.</p>
             <pre className={styles.code} tabIndex={0} aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
             <div className={styles.actions}><StPill variant="soft" onClick={() => void copy()}>{copied ? "Copied" : "Copy"}</StPill>{copied ? <span role="status" className={styles.body}>Lines copied</span> : null}</div>
-            <StSection title="Where to paste them" meta={guide.label}>
-              <SelectInput label="Your site is built with" value={shownPlatform} options={PLATFORM_OPTIONS} onChange={event => { setGuidePlatform(event.target.value as SitePlatform); setStepsCopied(false); }} />
-              {guide.supported ? null : <StNotice>{guide.label} can&rsquo;t run these lines.</StNotice>}
-              <StRows label={`Steps for ${guide.label}`}>{guide.steps.map((step, index) => <StRow key={step} lead={<StMono>{index + 1}</StMono>} title={step} stackOnPhone={false} />)}</StRows>
-              {guide.requires ? <p className={styles.body}>{guide.requires}</p> : null}
-              {guide.supported ? <div className={styles.actions}><StPill variant="soft" onClick={() => void copySteps()}>{stepsCopied ? "Steps copied" : "Copy steps for your web person"}</StPill>{stepsCopied ? <span role="status" className={styles.body}>Steps copied. Send them to whoever runs your site.</span> : null}</div> : null}
-            </StSection>
           </>}
         </div></StSurface>
         <StSection title={site.verifiedAt ? "The site is connected" : "Publish, then check"}>
@@ -182,6 +175,13 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
           </StRows>
         </StSection>
       </div>
+      {!site.verifiedAt ? <StSection title="Where to paste them" meta={guide.label}>
+          <SelectInput label="Your site is built with" value={shownPlatform} options={PLATFORM_OPTIONS} onChange={event => { setGuidePlatform(event.target.value as SitePlatform); setStepsCopied(false); }} />
+          {guide.supported ? null : <StNotice>{guide.label} can&rsquo;t run these lines.</StNotice>}
+          <StRows label={`Steps for ${guide.label}`}>{guide.steps.map((step, index) => <StRow key={step} lead={<StMono>{index + 1}</StMono>} title={step} stackOnPhone={false} />)}</StRows>
+          {guide.requires ? <p className={styles.body}>{guide.requires}</p> : null}
+          {guide.supported ? <div className={styles.actions}><StPill variant="soft" onClick={() => void copySteps()}>{stepsCopied ? "Steps copied" : "Copy steps for your web person"}</StPill>{stepsCopied ? <span role="status" className={styles.body}>Steps copied. Send them to whoever runs your site.</span> : null}</div> : null}
+      </StSection> : null}
     </>}
     {error ? <StNotice tone="critical"><p ref={alert} tabIndex={-1}>{error}</p></StNotice> : null}
     {unconfirmed ? <div><StPill ref={reloadAction} variant="soft" disabled={busy} onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload connection</StPill></div> : null}

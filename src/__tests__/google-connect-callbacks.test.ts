@@ -47,3 +47,18 @@ describe("returning from Google", () => {
     expect((await discoverCallback(request("/api/workspace/publishing/google/discover/callback"))).headers.get("location")).toContain("connect=access_pending");
   });
 });
+
+import { safeReturnTo, withGoogleOutcome } from "@/products/google-listing/connect/return-to";
+describe("returnTo after Connect Google", () => {
+  it("honors only a same-origin relative path", () => {
+    expect(safeReturnTo("/workspace/claim/t?x=1")).toBe("/workspace/claim/t?x=1");
+    for (const bad of ["https://evil.test/x", "//evil.test/x", "/\\evil.test", "/api/workspace/x", "workspace/claim", "javascript:alert(1)", "/a\nb", "", null, `/${"a".repeat(600)}`]) expect(safeReturnTo(bad)).toBeNull();
+    expect(withGoogleOutcome("/workspace/claim/t?x=1", { google: "connected" })).toBe("/workspace/claim/t?x=1&google=connected");
+  });
+  it("sends the owner back to the claim review after the grant, and ignores a forged cookie", async () => {
+    f.finish.mockResolvedValue({ workspaceId: WS, status: "connected" }); f.importFacts.mockResolvedValue({ status: "found", count: 3 });
+    const withCookie = (value: string) => new NextRequest(`https://app.example.test/api/workspace/publishing/google/oauth/callback?state=${state}&code=c`, { headers: { accept: "text/html", cookie: `strelva_native_google_oauth=n; strelva_google_return=${encodeURIComponent(value)}` } });
+    expect((await nativeCallback(withCookie("/workspace/claim/t"))).headers.get("location")).toBe("https://app.example.test/workspace/claim/t?google=connected&read=found");
+    expect((await nativeCallback(withCookie("https://evil.test/"))).headers.get("location")).toBe(`https://app.example.test/workspace/google?workspaceId=${WS}&connect=connected&read=found`);
+  });
+});

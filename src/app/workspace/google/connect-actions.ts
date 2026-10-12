@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { beginNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/server";
-import { admitOwnerConnect, beginGoogleDiscovery, beginReadGrant, chooseReadGrantProperties, chosenTarget, decideFoundFact, disconnectReadGrant, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, importGoogleFoundFacts, READ_GRANT_COOKIE, readDiscoveryChoices } from "@/products/google-listing/connect";
+import { admitOwnerConnect, beginGoogleDiscovery, beginReadGrant, chooseReadGrantProperties, chosenTarget, decideFoundFact, disconnectReadGrant, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, GOOGLE_RETURN_COOKIE, importGoogleFoundFacts, safeReturnTo, READ_GRANT_COOKIE, readDiscoveryChoices } from "@/products/google-listing/connect";
 
 /** Owner Connect Google and found-fact decisions. Every Google call here is a read or a consent redirect. */
 async function owner(form: FormData) {
@@ -24,7 +24,12 @@ export async function startGoogleConnect(form: FormData): Promise<void> {
   let url: string;
   try {
     const started = await beginGoogleDiscovery(actor, workspaceId, appOrigin(), { admit: admitOwnerConnect });
-    (await cookies()).set(GOOGLE_DISCOVER_COOKIE, started.nonce, { httpOnly: true, sameSite: "lax", secure: appOrigin().startsWith("https:"), path: "/api/workspace/publishing/google/discover", maxAge: 600 });
+    const store = await cookies();
+    store.set(GOOGLE_DISCOVER_COOKIE, started.nonce, { httpOnly: true, sameSite: "lax", secure: appOrigin().startsWith("https:"), path: "/api/workspace/publishing/google/discover", maxAge: 600 });
+    // A step that sent the owner here (the claim review) gets them back after the grant.
+    const returnTo = safeReturnTo(form.get("returnTo"));
+    if (returnTo) store.set(GOOGLE_RETURN_COOKIE, returnTo, { httpOnly: true, sameSite: "lax", secure: appOrigin().startsWith("https:"), path: "/", maxAge: 1800 });
+    else store.delete(GOOGLE_RETURN_COOKIE);
     url = started.url;
   } catch { redirect(page(workspaceId, { connect: "unavailable" })); }
   redirect(url);

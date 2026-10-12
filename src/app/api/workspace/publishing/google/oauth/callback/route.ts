@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/server";
-import { googleOwnerConnectEnabled, importGoogleFoundFacts, stateWorkspaceHint } from "@/products/google-listing/connect";
+import { GOOGLE_RETURN_COOKIE, googleOwnerConnectEnabled, importGoogleFoundFacts, safeReturnTo, stateWorkspaceHint, withGoogleOutcome } from "@/products/google-listing/connect";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platform/workspaces/http";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 export const dynamic="force-dynamic";
@@ -21,6 +21,8 @@ export async function GET(request:NextRequest){
  if(browser){
   // Found facts are read once now. The grant stays even if Google refuses this read (quota 0 before API approval, for example).
   const read=await importGoogleFoundFacts(actor,connected.workspaceId).catch(()=>({status:"unavailable" as const,count:0}));
+  const returnTo=safeReturnTo(request.cookies.get(GOOGLE_RETURN_COOKIE)?.value);
+  if(returnTo){const response=NextResponse.redirect(new URL(withGoogleOutcome(returnTo,{google:"connected",read:read.status}),request.nextUrl.origin),303);response.cookies.delete(NATIVE_GOOGLE_OAUTH_COOKIE);response.cookies.delete(GOOGLE_RETURN_COOKIE);response.headers.set("Cache-Control","no-store");response.headers.set("Referrer-Policy","no-referrer");return response;}
   return backToGoogle(request,connected.workspaceId,{connect:"connected",read:read.status});
  }
  const result=workspaceJson(connected);

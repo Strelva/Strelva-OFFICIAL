@@ -32,13 +32,13 @@ export type StoredFoundFact = z.infer<typeof storedFoundFactSchema>;
 const list = z.array(storedFoundFactSchema);
 
 export async function readFoundFacts(actor: WorkspaceActor, workspaceId: string): Promise<StoredFoundFact[]> {
-  return list.parse(await call("read_found_facts", { ...who(actor), p_workspace_id: workspaceId }));
+  return list.parse(await call("read_google_found_facts", { ...who(actor), p_workspace_id: workspaceId }));
 }
 export async function recordGoogleFoundFacts(actor: WorkspaceActor, workspaceId: string, sourceRef: string, facts: GoogleFoundFact[]): Promise<StoredFoundFact[]> {
   return list.parse(await call("record_google_found_facts", { ...who(actor), p_workspace_id: workspaceId, p_source_ref: sourceRef, p_facts: facts.map(fact => ({ key: fact.key, value: fact.value })) }));
 }
 export async function settleFoundFact(actor: WorkspaceActor, workspaceId: string, factId: string, outcome: "confirmed" | "dismissed"): Promise<void> {
-  z.object({ id: z.string().uuid(), status: z.enum(["confirmed", "dismissed"]) }).parse(await call("settle_found_fact", { ...who(actor), p_workspace_id: workspaceId, p_fact_id: factId, p_outcome: outcome }));
+  z.object({ id: z.string().uuid(), status: z.enum(["confirmed", "dismissed"]) }).parse(await call("settle_google_found_fact", { ...who(actor), p_workspace_id: workspaceId, p_fact_id: factId, p_outcome: outcome }));
 }
 
 export const agencyLinkSchema = z.discriminatedUnion("kind", [

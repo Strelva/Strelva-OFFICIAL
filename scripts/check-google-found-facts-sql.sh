@@ -36,11 +36,11 @@ SQL
 migration="$repo_root/supabase/migrations/20261024400000_google_found_facts_and_read_grant.sql"
 rollback="$repo_root/supabase/migrations/rollback-20261024400000_google_found_facts_and_read_grant.sql"
 psql "${psql_args[@]}" --file="$migration"
-psql "${psql_args[@]}" --command="select has_function_privilege('authenticated','public.read_found_facts(uuid,text,uuid)','execute') as authenticated_can_execute" | grep -q " f$" || { echo 'authenticated can execute found facts'; exit 1; }
-psql "${psql_args[@]}" --command="begin; set local role authenticated; select count(*) from public.business_found_facts; rollback;" >/dev/null 2>&1 && { echo 'authenticated can read found facts'; exit 1; }
+psql "${psql_args[@]}" --command="select has_function_privilege('authenticated','public.read_google_found_facts(uuid,text,uuid)','execute') as authenticated_can_execute" | grep -q " f$" || { echo 'authenticated can execute found facts'; exit 1; }
+psql "${psql_args[@]}" --command="begin; set local role authenticated; select count(*) from public.business_google_found_facts; rollback;" >/dev/null 2>&1 && { echo 'authenticated can read found facts'; exit 1; }
 psql "${psql_args[@]}" --file="$repo_root/tests/google-found-facts-schema.sql"
 psql "${psql_args[@]}" --file="$rollback"
-psql "${psql_args[@]}" --command="select to_regclass('public.business_found_facts') is null and to_regclass('public.workspace_google_read_grants') is null" | grep -q " t$" || { echo 'rollback left tables'; exit 1; }
+psql "${psql_args[@]}" --command="select to_regclass('public.business_google_found_facts') is null and to_regclass('public.workspace_google_read_grants') is null" | grep -q " t$" || { echo 'rollback left tables'; exit 1; }
 psql "${psql_args[@]}" --command="update public.workspace_account_bindings set status='connected'; insert into public.workspace_google_locations select '30000000-0000-4000-8000-000000000001','accounts/1','loc1' where not exists (select 1 from public.workspace_google_locations); insert into public.workspace_account_bindings select '30000000-0000-4000-8000-000000000001','20000000-0000-4000-8000-000000000001','google',null,'connected' where not exists (select 1 from public.workspace_account_bindings); update public.provider_seats set status='active';"
 psql "${psql_args[@]}" --file="$migration"
 psql "${psql_args[@]}" --file="$repo_root/tests/google-found-facts-schema.sql"

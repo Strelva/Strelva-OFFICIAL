@@ -1,5 +1,9 @@
 -- Getting started L4 (2026-10-12): bring what you have from Google.
 --
+-- Merge note: lane L3 (20261024300000_claim_review.sql) adds business_found_facts
+-- for website-crawl facts (agency_workspace_id, source_url, quote required).
+-- This table is the Google-listing twin, named apart so both apply; see
+-- .scratch/onboarding-build-2026-10-12/L4-connect.md for the reconcile plan.
 -- 1. Found facts (GLOSSARY: Found fact). Facts Strelva read from somewhere the
 --    business already is, kept beside the business record with their source.
 --    Nothing here writes business_facts: the owner confirms a found fact
@@ -15,7 +19,7 @@
 begin;
 set local lock_timeout = '3s';
 
-create table public.business_found_facts (
+create table public.business_google_found_facts (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   source text not null check (source in ('google_listing')),
@@ -29,11 +33,11 @@ create table public.business_found_facts (
   settled_at timestamptz,
   check ((status = 'open') = (settled_at is null and settled_by is null))
 );
-create unique index business_found_facts_one_open_idx on public.business_found_facts(workspace_id, source, fact_key) where status = 'open';
-alter table public.business_found_facts enable row level security;
-revoke all on public.business_found_facts from public, anon, authenticated;
+create unique index business_google_found_facts_one_open_idx on public.business_google_found_facts(workspace_id, source, fact_key) where status = 'open';
+alter table public.business_google_found_facts enable row level security;
+revoke all on public.business_google_found_facts from public, anon, authenticated;
 
-create function public.found_fact_member(p_user_id uuid, p_verified_email text, p_workspace_id uuid, p_owner boolean) returns void
+create function public.google_found_fact_member(p_user_id uuid, p_verified_email text, p_workspace_id uuid, p_owner boolean) returns void
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 begin
   perform 1 from public.users u join public.workspace_memberships m on m.user_id = u.id
@@ -44,13 +48,13 @@ begin
 end;
 $$;
 
-create function public.read_found_facts(p_user_id uuid, p_verified_email text, p_workspace_id uuid) returns jsonb
+create function public.read_google_found_facts(p_user_id uuid, p_verified_email text, p_workspace_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 begin
-  perform public.found_fact_member(p_user_id, p_verified_email, p_workspace_id, false);
+  perform public.google_found_fact_member(p_user_id, p_verified_email, p_workspace_id, false);
   return coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'source', f.source, 'sourceRef', f.source_ref, 'key', f.fact_key,
     'value', f.value, 'foundAt', f.found_at) order by f.fact_key)
-    from public.business_found_facts f where f.workspace_id = p_workspace_id and f.status = 'open'), '[]'::jsonb);
+    from public.business_google_found_facts f where f.workspace_id = p_workspace_id and f.status = 'open'), '[]'::jsonb);
 end;
 $$;
 
@@ -61,7 +65,7 @@ create function public.record_google_found_facts(p_user_id uuid, p_verified_emai
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare item jsonb; v_key text; dismissed jsonb;
 begin
-  perform public.found_fact_member(p_user_id, p_verified_email, p_workspace_id, true);
+  perform public.google_found_fact_member(p_user_id, p_verified_email, p_workspace_id, true);
   if jsonb_typeof(p_facts) is distinct from 'array' or jsonb_array_length(p_facts) > 5 then raise exception 'found_fact_invalid'; end if;
   perform 1 from public.workspace_account_bindings b join public.workspace_google_locations l on l.binding_id = b.id
     where b.workspace_id = p_workspace_id and b.provider = 'google' and b.origin_tenant_stable_id is null and b.status = 'connected'
@@ -70,28 +74,28 @@ begin
   for item in select * from jsonb_array_elements(p_facts) loop
     v_key := item->>'key';
     if v_key is null or item->'value' is null then raise exception 'found_fact_invalid'; end if;
-    select f.value into dismissed from public.business_found_facts f where f.workspace_id = p_workspace_id and f.source = 'google_listing'
+    select f.value into dismissed from public.business_google_found_facts f where f.workspace_id = p_workspace_id and f.source = 'google_listing'
       and f.fact_key = v_key and f.status = 'dismissed' order by f.settled_at desc limit 1;
     if dismissed is not null and dismissed = item->'value' then continue; end if;
-    update public.business_found_facts set value = item->'value', source_ref = p_source_ref, found_by = p_user_id, found_at = clock_timestamp()
+    update public.business_google_found_facts set value = item->'value', source_ref = p_source_ref, found_by = p_user_id, found_at = clock_timestamp()
       where workspace_id = p_workspace_id and source = 'google_listing' and fact_key = v_key and status = 'open';
     if not found then
-      insert into public.business_found_facts(workspace_id, source, source_ref, fact_key, value, found_by)
+      insert into public.business_google_found_facts(workspace_id, source, source_ref, fact_key, value, found_by)
         values (p_workspace_id, 'google_listing', p_source_ref, v_key, item->'value', p_user_id);
     end if;
   end loop;
-  return public.read_found_facts(p_user_id, p_verified_email, p_workspace_id);
+  return public.read_google_found_facts(p_user_id, p_verified_email, p_workspace_id);
 end;
 $$;
 
 -- Confirming here only closes the found fact. The record write happened first,
 -- through patch_business_record as the owner.
-create function public.settle_found_fact(p_user_id uuid, p_verified_email text, p_workspace_id uuid, p_fact_id uuid, p_outcome text) returns jsonb
+create function public.settle_google_found_fact(p_user_id uuid, p_verified_email text, p_workspace_id uuid, p_fact_id uuid, p_outcome text) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 begin
-  perform public.found_fact_member(p_user_id, p_verified_email, p_workspace_id, true);
+  perform public.google_found_fact_member(p_user_id, p_verified_email, p_workspace_id, true);
   if p_outcome not in ('confirmed','dismissed') then raise exception 'found_fact_invalid'; end if;
-  update public.business_found_facts set status = p_outcome, settled_by = p_user_id, settled_at = clock_timestamp()
+  update public.business_google_found_facts set status = p_outcome, settled_by = p_user_id, settled_at = clock_timestamp()
     where id = p_fact_id and workspace_id = p_workspace_id and status = 'open';
   if not found then raise exception 'found_fact_not_open'; end if;
   return jsonb_build_object('id', p_fact_id, 'status', p_outcome);
@@ -125,7 +129,7 @@ language plpgsql security definer set search_path = public, pg_temp as $$
 declare g public.workspace_google_read_grants%rowtype; owner_only boolean := p_action in ('save','select','revoke');
 begin
   if p_input is null or jsonb_typeof(p_input) <> 'object' or octet_length(p_input::text) > 8192 then raise exception 'google_read_grant_invalid'; end if;
-  perform public.found_fact_member(p_user_id, p_verified_email, p_workspace_id, owner_only);
+  perform public.google_found_fact_member(p_user_id, p_verified_email, p_workspace_id, owner_only);
   if p_action = 'save' then
     insert into public.workspace_google_read_grants as x (workspace_id, subject, google_email, scopes, refresh_token_ciphertext, access_token_ciphertext, token_expires_at, status, connected_by)
       values (p_workspace_id, p_input->>'subject', lower(p_input->>'googleEmail'), array(select jsonb_array_elements_text(p_input->'scopes')),
@@ -189,10 +193,10 @@ begin
 end;
 $$;
 
-revoke all on function public.found_fact_member(uuid,text,uuid,boolean), public.read_found_facts(uuid,text,uuid),
-  public.record_google_found_facts(uuid,text,uuid,text,jsonb), public.settle_found_fact(uuid,text,uuid,uuid,text),
+revoke all on function public.google_found_fact_member(uuid,text,uuid,boolean), public.read_google_found_facts(uuid,text,uuid),
+  public.record_google_found_facts(uuid,text,uuid,text,jsonb), public.settle_google_found_fact(uuid,text,uuid,uuid,text),
   public.google_read_grant(uuid,text,uuid,text,jsonb), public.agency_google_connect_link(uuid,text,uuid) from public, anon, authenticated;
-grant execute on function public.read_found_facts(uuid,text,uuid), public.record_google_found_facts(uuid,text,uuid,text,jsonb),
-  public.settle_found_fact(uuid,text,uuid,uuid,text), public.google_read_grant(uuid,text,uuid,text,jsonb),
+grant execute on function public.read_google_found_facts(uuid,text,uuid), public.record_google_found_facts(uuid,text,uuid,text,jsonb),
+  public.settle_google_found_fact(uuid,text,uuid,uuid,text), public.google_read_grant(uuid,text,uuid,text,jsonb),
   public.agency_google_connect_link(uuid,text,uuid) to service_role;
 commit;

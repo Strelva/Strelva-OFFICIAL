@@ -63,3 +63,11 @@ describe("Search Console and Analytics section", () => {
     expect(grant({ view: view(true), summary: { gsc: { status: "unavailable" }, ga4: { status: "unavailable" } } })).toContain("Couldn&#x27;t be read right now. The connection is kept.");
   });
 });
+
+describe("Connect Google from the claim review", () => {
+  it("carries a validated returnTo through the one-click start and offers skip / continue", () => {
+    const fresh = render({ returnTo: "/workspace/claim/t" });
+    expect(fresh).toContain('name="returnTo" value="/workspace/claim/t"'); expect(fresh).toContain("Skip for now");
+    expect(render({ hasListing: true, returnTo: "/workspace/claim/t" })).toContain("Continue where you were");
+  });
+});
