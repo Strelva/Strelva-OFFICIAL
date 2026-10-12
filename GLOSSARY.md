@@ -27,11 +27,13 @@ state and holds agency-authored sends; it never silently becomes Strelva.
 ### Systems and their state
 
 **System** _(label open)_:
-Something a business made in Strelva that works, such as a website, proposal,
-booking page, intake flow or internal tool. Its identity survives changes to
-its content, data, logic and screens. Draft, Live and Paused express intent;
-Health is separate.
-_Avoid_: product, project, installation, module, app (as the general noun)
+Something that works and that a business runs through Strelva, such as a website,
+proposal, booking page, intake flow or internal tool. It is either made in
+Strelva or brought in: a website the business already runs elsewhere or its
+Google listing is a System from the day it is connected. Its identity survives
+changes to its content, data, logic and screens. Draft, Live and Paused express
+intent; Health is separate.
+_Avoid_: product, project, installation, module, app (for a business's own System)
 
 **Connection** _(label open)_:
 What a System reads, acts on, appears in, shares with, depends on or is triggered
@@ -159,12 +161,38 @@ anything changes. Strelva Agency is listed the same way as any agency.
 _Avoid_: Contact the team, Request your build, hire Strelva, platform support
 (for getting work done)
 
+**Getting started**:
+How a business or agency starts on Strelva from what it already has: its website,
+its Google listing, its tools and, for an agency, its existing clients. Nothing
+has to move first.
+_Avoid_: onboarding (a System kind a business runs for its own customers),
+migration, setup wizard
+
+**Found fact**:
+A fact Strelva read from somewhere the business already is, such as its website
+or Google listing, shown with where it came from. It joins the business record
+only when the owner confirms it.
+_Avoid_: suggestion, imported fact, auto-filled, confirmed (until confirmed)
+
+**Import clients**:
+An agency adding many clients at once, from a list or from a tool it already
+uses. Each imported client is added exactly as one added by hand and still
+needs its owner's claim.
+_Avoid_: bulk upload, migration, sync (as synonyms)
+
+**Claim**:
+The owner taking up a business an agency added. The owner sees what was found
+and prepared, confirms facts and decides what each agency may do.
+_Avoid_: activation, invite acceptance, transfer
+
 **Prepare / Full control**:
 What a business lets one agency do in one area (website, inquiries, bookings,
 Google, internal tools). Prepare: the agency builds and stages; the owner
 approves. Full control: the agency approves and makes it live in that area. One
 agency holds Full control of an area. Payer, adding and ending agencies, data
-and exit always stay with the owner.
+and exit always stay with the owner. Before a claim, the agency that added the
+business may Prepare in every area and nothing it prepares goes live; at the claim
+the owner decides each area.
 _Avoid_: admin access, white-label, delegation (on screen)
 
 **Inquiry**:
@@ -199,18 +227,22 @@ same title and a link to that exact item, without approval controls.
 _Avoid_: operator queue (as the agency's source), Strelva's work (platform bucket),
 Needs you (as the cross-client place name)
 
-**Ready-made / Ready-made systems**:
-Where a business finds reusable Systems it can ask to use, including qualified
-Library sources and clearly labeled starters. Managed services are an agency's
-offer, named by that agency and requiring accepted scope; they are not reusable
-source Systems and never a default for a business. Internal tools is a kind filter;
-setup does not imply agency acceptance or operating authority.
-_Avoid_: Apps from creators, Get or build, More tools and managed services, All products
+**App / Apps**:
+A reusable System a creator publishes for other businesses to install. Installing
+an App gives the business a Version: its own System, with its own data, accounts
+and grants, and lineage back to the App. The App's creator is credited for every
+business that runs a Version of it; who runs that Version is a separate matter.
+Apps is also where a business finds them. Managed services are an agency's offer,
+not Apps, and never a default for a business. Installing grants no agency
+authority.
+_Avoid_: Ready-made, catalog item, plugin, template (as synonyms); app (for a
+business's own System); an outside platform's app (Strelva's listing in another
+product is not an App)
 
 **Library**:
-The agency's reusable sources and their client Versions, with improvements and
-conflicts; a source offered as Ready-made is the same reusable definition viewed
-from the business side, without transferring records, accounts, secrets or grants.
+An agency's own Apps and their client Versions, with improvements and conflicts;
+an App a business sees in Apps is the same reusable definition, installed without
+transferring records, accounts, secrets or grants.
 _Avoid_: separate catalog model, implicit client-data sharing
 
 **Section**:
@@ -353,8 +385,7 @@ for that business.
 _Avoid_: owner (as a synonym), billing owner, account holder
 
 **Creator**:
-Anyone who builds something other businesses can install: an agency, an
-independent builder or Strelva.
+Anyone who publishes Apps: an agency, an independent builder or Strelva Agency.
 _Avoid_: developer, partner, vendor (as synonyms)
 
 **Agency verification**:
@@ -617,6 +648,9 @@ including who acted.
 _Avoid_: delivery receipt, provider receipt, guaranteed delivery
 
 ## Open naming questions
+
+- **AI Visibility:** whether it is an App whose install gives a business a System,
+  or a Saved check that contributes to a website's Health, remains open.
 
 - **On-screen labels:** What changed, Possibility, Queue and Internal tool are
   decided. Other labels marked open remain Jacob's call; those open choices do
