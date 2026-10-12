@@ -20,9 +20,10 @@ export async function purgeGoogleReviewContent(): Promise<{ reviews: number; eve
   const redis = getRedis();
   if (!redis) throw new Error("Review retention Redis unavailable.");
   // Reconcile file provenance before purging its original API event evidence.
-  for (const file of await fs.readdir(process.cwd())) {
+  // Local dev files only; turbopackIgnore keeps the build from tracing the whole project.
+  for (const file of await fs.readdir(/* turbopackIgnore: true */ process.cwd())) {
     if (!/^dev-reviews-[A-Za-z0-9_-]+\.json$/.test(file)) continue;
-    const target = path.join(process.cwd(), file);
+    const target = path.join(/* turbopackIgnore: true */ process.cwd(), file);
     const rows = JSON.parse(await fs.readFile(target, "utf8")) as ReviewItem[];
     const reconciled = await reconcileLegacyReviewImports(file.slice("dev-reviews-".length, -".json".length), rows);
     const projected = reconciled.map(row => projectGoogleReview(row));
