@@ -19,7 +19,8 @@ begin
     (owner_id,'chrome-owner@example.test',now(),'{"name":"Jo"}'),
     (staff_id,'chrome-staff@example.test',now(),'{"name":"Agency member"}');
   insert into public.users(id,email,verified_at) values
-    (owner_id,'chrome-owner@example.test',now()),(staff_id,'chrome-staff@example.test',now());
+    (owner_id,'chrome-owner@example.test',now()),(staff_id,'chrome-staff@example.test',now())
+    on conflict (id) do update set email=excluded.email, verified_at=excluded.verified_at;
   insert into public.workspaces(id,kind,name,created_by) values
     (business_id,'customer','Chrome fixture business',owner_id),(agency_id,'agency','Original Studio',staff_id);
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values

@@ -10,7 +10,7 @@ alter table public.business_booking_history add constraint ux_booking_actor_snap
 
 create function public.decide_scoped_agency_booking_request(p_workspace_id uuid, p_booking_id uuid, p_decision text, p_decision_id uuid)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
-declare d public.owner_decisions; b public.business_bookings; target text; principal uuid; agency uuid; email text;
+declare d public.owner_decisions; b public.business_bookings; target text; expected_state text; principal uuid; agency uuid; email text;
 begin
   select * into d from public.owner_decisions where id=p_decision_id and workspace_id=p_workspace_id;
   principal := (d.deciding_actor->>'userId')::uuid;
@@ -20,10 +20,11 @@ begin
   if not found then raise exception 'booking_agency_decision_required'; end if;
   perform 1 from public.super_admins where user_id=principal for share;
   select * into d from public.owner_decisions where id=p_decision_id and workspace_id=p_workspace_id for update;
+  expected_state := case p_decision when 'approve' then 'approved' when 'not_yet' then 'declined' else '' end;
   if d.id is null or d.source_lifecycle <> 'booking_request' or d.source_id <> p_booking_id::text
     or d.decided_by_kind <> 'agency_session' or coalesce(d.deciding_actor->>'kind','') <> 'agency'
     or nullif(d.deciding_actor->>'agencyId','') is null or nullif(d.deciding_actor->>'userId','') is null
-    or d.outcome is not null or d.state <> case p_decision when 'approve' then 'approved' when 'not_yet' then 'declined' else '' end
+    or d.outcome is not null or d.state <> expected_state
     then raise exception 'booking_agency_decision_required'; end if;
   principal := (d.deciding_actor->>'userId')::uuid; agency := (d.deciding_actor->>'agencyId')::uuid;
   -- Lock the same current authority rows before the effect. A captured name is

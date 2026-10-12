@@ -60,7 +60,7 @@ begin
   perform pg_temp.ux_assert(caught,'support cannot execute client booking after claim');
   caught := false;
   begin
-    update public.agency_scope_grants set status='ended' where customer_workspace_id=business and agency_workspace_id=agency and scope='bookings';
+    update public.agency_scope_grants set status='ended', ended_at=clock_timestamp(), ended_by=owner_id where customer_workspace_id=business and agency_workspace_id=agency and scope='bookings';
     perform public.decide_scoped_agency_booking_request(business,booking,'approve',(item->>'id')::uuid);
   exception when others then if sqlerrm <> 'booking_agency_access_denied' then raise; end if; caught := true; end;
   perform pg_temp.ux_assert(caught,'revoked grant cannot execute after claim');

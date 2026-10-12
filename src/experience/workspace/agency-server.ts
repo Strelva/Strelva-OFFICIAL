@@ -170,6 +170,13 @@ export async function reviewAllImprovements(
   if (!source.revisions.some(revision => revision.number === input.revision)) throw new WorkspaceStoreError("That release is not in this library. Refresh the library.");
   const { versions, store, actor: pending } = services(actor, db);
   const versionActor = await pending;
+  // Never move a Version backwards: a stale request is refused as a whole,
+  // before anything is adopted.
+  for (const versionId of new Set(input.versionIds)) {
+    if (!source.versions.some((version) => version.versionId === versionId)) continue;
+    const lineage = await store.getLineage(versionActor, versionId);
+    if (lineage && lineage.baseline.revision > input.revision) throw new WorkspaceStoreError("A newer release is available. Refresh the library.");
+  }
   const results: AgencyBulkReviewResult["results"] = [];
   for (const versionId of [...new Set(input.versionIds)]) {
     const item = source.versions.find((version) => version.versionId === versionId);

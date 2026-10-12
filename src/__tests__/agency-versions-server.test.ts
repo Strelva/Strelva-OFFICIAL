@@ -212,7 +212,7 @@ describe.runIf(Boolean(PSQL))("Library and Review all on local PostgreSQL", () =
     expect(harbor.currentRelease).toBeNull();
     expect((await versions.readVersion(owners[2]!, ids[2]!)).baselineRevision).toBe(1);
     // A stale revision is refused as a whole.
-    await expect(reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids }, h.db!)).rejects.toThrow(/newer revision/);
+    await expect(reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids }, h.db!)).rejects.toThrow(/newer release/);
     // Someone outside the agency reads nothing.
     await expect(readAgencyLibrary({ userId: owners[0]!.userId, verifiedEmail: owners[0]!.verifiedEmail! }, agency, h.db!)).rejects.toBeInstanceOf(VersionAccessError);
   }, 30_000);
