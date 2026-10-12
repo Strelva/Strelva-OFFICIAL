@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { beginNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/server";
-import { admitOwnerConnect, beginGoogleDiscovery, chosenTarget, decideFoundFact, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, importGoogleFoundFacts, readDiscoveryChoices } from "@/products/google-listing/connect";
+import { admitOwnerConnect, beginGoogleDiscovery, beginReadGrant, chooseReadGrantProperties, chosenTarget, decideFoundFact, disconnectReadGrant, GOOGLE_DISCOVER_CHOICES_COOKIE, GOOGLE_DISCOVER_COOKIE, importGoogleFoundFacts, READ_GRANT_COOKIE, readDiscoveryChoices } from "@/products/google-listing/connect";
 
 /** Owner Connect Google and found-fact decisions. Every Google call here is a read or a consent redirect. */
 async function owner(form: FormData) {
@@ -61,4 +61,32 @@ export async function decideGoogleFoundFact(form: FormData): Promise<void> {
     outcome = await decideFoundFact(actor, workspaceId, { factId: String(form.get("factId")), decision: form.get("decision") === "dismiss" ? "dismiss" : "confirm", commandId: String(form.get("commandId")) });
   } catch { /* reported below */ }
   redirect(page(workspaceId, { fact: outcome }));
+}
+
+export async function startSearchReadGrant(form: FormData): Promise<void> {
+  const { workspaceId, actor } = await owner(form);
+  let url: string;
+  try {
+    const started = await beginReadGrant(actor, workspaceId, appOrigin());
+    (await cookies()).set(READ_GRANT_COOKIE, started.nonce, { httpOnly: true, sameSite: "lax", secure: appOrigin().startsWith("https:"), path: "/api/workspace/google/read-grant", maxAge: 600 });
+    url = started.url;
+  } catch { redirect(page(workspaceId, { search: "unavailable" })); }
+  redirect(url);
+}
+
+export async function chooseSearchProperty(form: FormData): Promise<void> {
+  const { workspaceId, actor } = await owner(form);
+  let result = "chosen";
+  try {
+    const gsc = form.get("gscProperty"), ga4 = form.get("ga4Property");
+    await chooseReadGrantProperties(actor, workspaceId, { ...(typeof gsc === "string" && gsc ? { gscProperty: gsc } : {}), ...(typeof ga4 === "string" && ga4 ? { ga4Property: ga4 } : {}) });
+  } catch { result = "failed"; }
+  redirect(page(workspaceId, { search: result }));
+}
+
+export async function disconnectSearchReadGrant(form: FormData): Promise<void> {
+  const { workspaceId, actor } = await owner(form);
+  let result = "failed";
+  try { result = await disconnectReadGrant(actor, workspaceId); } catch { /* reported below */ }
+  redirect(page(workspaceId, { search: result }));
 }

@@ -47,3 +47,19 @@ describe("Connect Google on the Google place", () => {
     expect(page).toContain("No Google listing is connected here yet."); expect(page).not.toContain("Ask Strelva");
   });
 });
+
+import { GoogleReadGrant } from "@/experience/places/GoogleReadGrant";
+describe("Search Console and Analytics section", () => {
+  const view = (connected: boolean) => ({ connected, googleEmail: connected ? "web@agency.test" : null, gsc: { granted: connected, property: null }, ga4: { granted: connected, property: "properties/42" } });
+  const grant = (props: Record<string, unknown>) => renderToStaticMarkup(createElement(GoogleReadGrant, { workspaceId: WS, owner: true, view: view(false), actions: { start: action, choose: action, disconnect: action }, ...props }));
+  it("offers the owner a separate read-only sign-in and says it's separate from the listing", () => {
+    const page = grant({});
+    expect(page).toContain("Connect Search Console and Analytics"); expect(page).toContain("separate from your listing"); expect(page).toContain("Read only");
+    expect(grant({ owner: false })).toContain("The business owner connects Search Console and Analytics.");
+  });
+  it("shows the summary to everyone and honest unavailable states", () => {
+    const page = grant({ owner: false, view: view(true), summary: { gsc: { status: "unconfigured" }, ga4: { status: "ok", report: { users: 1200, sessions: 1500, pageviews: 4000 } } } });
+    expect(page).toContain("No Search Console site chosen yet."); expect(page).toContain("1,200"); expect(page).not.toContain("Disconnect");
+    expect(grant({ view: view(true), summary: { gsc: { status: "unavailable" }, ga4: { status: "unavailable" } } })).toContain("Couldn&#x27;t be read right now. The connection is kept.");
+  });
+});

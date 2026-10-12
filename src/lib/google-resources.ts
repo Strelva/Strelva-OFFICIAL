@@ -89,7 +89,7 @@ async function googleJson(url: string, token: string): Promise<JsonRecord | null
   }
 }
 
-async function listSearchConsoleResources(token: string): Promise<GoogleResource[] | null> {
+export async function listSearchConsoleResources(token: string): Promise<GoogleResource[] | null> {
   const body = await googleJson(GSC_SITES_URL, token);
   if (!body) return null;
   const entries = Array.isArray(body.siteEntry) ? body.siteEntry : [];
@@ -100,7 +100,7 @@ async function listSearchConsoleResources(token: string): Promise<GoogleResource
   }));
 }
 
-async function listGa4Resources(token: string): Promise<GoogleResource[] | null> {
+export async function listGa4Resources(token: string): Promise<GoogleResource[] | null> {
   const body = await googleJson(`${GA4_ACCOUNTS_URL}?pageSize=100`, token);
   if (!body) return null;
   const accounts = Array.isArray(body.accountSummaries) ? body.accountSummaries : [];
