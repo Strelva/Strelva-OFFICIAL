@@ -27,10 +27,11 @@ async function input(element: HTMLInputElement, value: string) {
 const button = (name: string) => [...node.querySelectorAll("button")].find(item => item.textContent?.trim() === name)!;
 
 describe("independently released website entry", () => {
-  it("chooses neither path when both are available and hides disabled paths", () => {
+  it("opens Keep your site by default, keeps a new website one choice away, and hides disabled paths", () => {
     const render = (connectedEnabled: boolean, rebuildEnabled: boolean, requested: string | null) => renderToStaticMarkup(createElement(WebsiteEntry, { workspaceId: WS, connectedEnabled, rebuildEnabled, path: websiteEntryPath(connectedEnabled, rebuildEnabled, requested), canManage: true }));
     const both = render(true, true, null);
-    expect(both).toContain("Connect your existing website"); expect(both).toContain("Prepare a new website"); expect(both).not.toContain("<form");
+    expect(both).toContain("Keep your site"); expect(both).toContain("Prepare a new website"); expect(both).toContain("Get my two lines");
+    expect(render(true, true, "rebuild")).toContain("Your current website");
     expect(render(false, false, null)).not.toContain("<form");
     const connect = render(true, false, null);
     expect(connect).toContain("Get my two lines"); expect(connect).not.toContain("Prepare a new website");

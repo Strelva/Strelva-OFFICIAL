@@ -12,7 +12,7 @@ import type { WebsiteEntryPath } from "./site-navigation";
 
 const noDraftSubscription = () => () => undefined;
 
-/** Both prepared entry paths stay available without selecting a launch default. */
+/** Keep your site (connect) is the default path; preparing a new website stays one choice away. */
 type WebsiteEntryProps = { workspaceId: string; connectedEnabled: boolean; rebuildEnabled: boolean; path: WebsiteEntryPath | null;
   canManage: boolean; canPublish?: boolean; actorEmail?: string; agency?: boolean; operator?: boolean; sites?: ConnectableSite[]; rebuilds?: RebuildView[]; initialWorkId?: string;
   appBase?: string; entryBase?: string; transport?: RebuildTransport;
@@ -53,8 +53,8 @@ function ScopedWebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, pat
   return <div className={styles.entry}>
     {connectedEnabled && rebuildEnabled || !path ? <StPage><nav aria-label="Website options" className={styles.options}>
       {!path ? <StHead title="Your website in Strelva" meta="Connect the site you already have, or prepare a new one. You review it before anything goes live." /> : null}
-      {connectedEnabled ? <StTextButton href={href("connect")}>Connect your existing website</StTextButton> : null}
-      {rebuildEnabled ? <StTextButton href={href("rebuild")}>Prepare a new website</StTextButton> : null}
+      {connectedEnabled ? <StTextButton href={href("connect")} aria-current={path === "connect" ? "page" : undefined}>Keep your site</StTextButton> : null}
+      {rebuildEnabled ? <StTextButton href={href("rebuild")} aria-current={path === "rebuild" ? "page" : undefined}>Prepare a new website</StTextButton> : null}
       {!connectedEnabled && !rebuildEnabled ? <StNotice>Website entry isn&rsquo;t open for this business yet.</StNotice> : null}
     </nav></StPage> : null}
     {path === "connect" && connectedEnabled ? <ConnectSiteExperience workspaceId={workspaceId} canManage={canManage} initialSites={sites} appBase={appBase} /> : null}

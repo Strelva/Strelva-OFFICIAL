@@ -60,7 +60,7 @@ function SearchResults({ site, connectHref }: { site: SiteResults; connectHref: 
     {search?.status === "ok" ? <>
       <StCopy><StMono>{count(search.clicks)}</StMono> clicks · <StMono>{count(search.impressions)}</StMono> impressions · <StMono>{(search.ctr * 100).toFixed(1)}%</StMono> click rate · average rank <StMono>{search.position.toFixed(1)}</StMono></StCopy>
       {search.topQueries.length ? <StTable label="Search queries" columns={[{ key: "query", label: "Search" }, { key: "clicks", label: "Clicks", mono: true }, { key: "position", label: "Rank", mono: true }]} rows={search.topQueries.slice(0, 5).map((query, index) => ({ key: String(index), cells: { query: query.query, clicks: count(query.clicks), position: query.position.toFixed(1) } }))} /> : <StEmpty>Google is connected. No search queries have been reported yet.</StEmpty>}
-    </> : search?.status === "unavailable" ? <StNotice>Search results couldn&apos;t be read right now. Your Google connection is kept.</StNotice> : <StEmpty>Google search isn&apos;t connected.<StTextButton href={connectHref}>Ask Strelva to connect Google</StTextButton></StEmpty>}
+    </> : search?.status === "unavailable" ? <StNotice>Search results couldn&apos;t be read right now. Your Google connection is kept.</StNotice> : <StEmpty>Google search isn&apos;t connected.<StTextButton href={connectHref}>Connect Google</StTextButton></StEmpty>}
   </StSection>;
 }
 
@@ -71,12 +71,13 @@ function VisitorSources({ site, connectHref }: { site: SiteResults; connectHref:
       <StCopy><StMono>{count(ga.users)}</StMono> visitors · <StMono>{count(ga.sessions)}</StMono> visits · <StMono>{count(ga.pageviews)}</StMono> page views</StCopy>
       {ga.topSources.filter(source => source.sessions > 0).length ? <StRows>{ga.topSources.filter(source => source.sessions > 0).slice(0, 6).map((source, index) => <StRow key={index} title={source.source === "(direct)" ? "Direct" : source.source} end={<StMono>{count(source.sessions)} visits</StMono>} />)}</StRows> : <StEmpty>No visitor sources have been reported yet.</StEmpty>}
       {ga.topPages.filter(page => page.views > 0).length ? <StSection title="Where they landed"><StRows>{ga.topPages.filter(page => page.views > 0).slice(0, 5).map((page, index) => <StRow key={index} title={<StMono tone="text">{page.path}</StMono>} end={<StMono>{count(page.views)} views</StMono>} />)}</StRows></StSection> : null}
-    </> : ga?.status === "unavailable" ? <StNotice>Visitor sources couldn&apos;t be read right now. Your Google connection is kept.</StNotice> : <StEmpty>Visitor sources aren&apos;t connected.<StTextButton href={connectHref}>Ask Strelva to connect Google</StTextButton></StEmpty>}
+    </> : ga?.status === "unavailable" ? <StNotice>Visitor sources couldn&apos;t be read right now. Your Google connection is kept.</StNotice> : <StEmpty>Visitor sources aren&apos;t connected.<StTextButton href={connectHref}>Connect Google</StTextButton></StEmpty>}
   </StSection>;
 }
 
 function SiteResultsView({ workspaceId, site }: { workspaceId: string; site: SiteResults }) {
-  const connectHref = `/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`;
+  // Google is connected by the owner with their own account, on the Google place.
+  const connectHref = `/workspace/google?workspaceId=${encodeURIComponent(workspaceId)}`;
   const answers = site.aiVisibility;
   const milestone = site.milestone;
   return <div className={styles.stack}>

@@ -2,10 +2,12 @@ import { NATIVE_TABS, REQUEST_TABS, type SiteTab } from "@/platform/workspaces/s
 
 export type WebsiteEntryPath = "connect" | "rebuild";
 
+/** Keep your site is the default: an owner who already has a website starts
+ * by connecting it where it is. Preparing a new one stays one choice away. */
 export function websiteEntryPath(connect: boolean, rebuild: boolean, requested: string | null): WebsiteEntryPath | null {
   if (requested === "connect") return connect ? "connect" : null;
   if (requested === "rebuild") return rebuild ? "rebuild" : null;
-  return connect === rebuild ? null : connect ? "connect" : "rebuild";
+  return connect ? "connect" : rebuild ? "rebuild" : null;
 }
 
 /** Managed owners request and review work. Tenant editing stays with operators. */
