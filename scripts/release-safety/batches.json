@@ -2222,6 +2222,20 @@
           "rollbackStatus": "Prepared inverse; focused local PostgreSQL contract passes (claim review, Google read grant, inquiry forwarding, agency source connections) and the forward applies as postgres on a restore of the Oct 12 production dump after all 385 applied migrations."
         }
       ]
+    },
+    {
+      "id": "security-provider-health-alerts-2026-10-12",
+      "status": "prepared locally; unapplied; no production authority",
+      "description": "Read-only current provider health alerts (#271)",
+      "note": "Additive service-only read projection; checks the current provider relationship, active seat, assigned staff, actor verified email and current agency membership. Qualified on a disposable local ordered schema only. No rollout, flag activation, outside effect or synthetic form-submit authority. Preserves every existing batch, digest pin and recovery scope.",
+      "items": [
+        {
+          "file": "20261024800001_provider_health_alerts.sql",
+          "sha256": "412550da8b83094487126a1d0b44a883672bf96504aeee6a00ec30d05a6023f6",
+          "rollback": "rollback-20261024800001_provider_health_alerts.sql",
+          "rollbackSha256": "0d1fd0971f14ded3e8353836c76fd1d543def76f11ece1a0cded9eca7c4bf6fd"
+        }
+      ]
     }
   ]
 }

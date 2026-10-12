@@ -49,6 +49,14 @@ export function domainObservations(subjectId: string, health: TenantDomainHealth
       message: health.nearestExpiryDays <= 0 ? `${host} registration has expired.` : expiring ? `${host} registration expires in ${health.nearestExpiryDays} days.` : `${host} registration is current.`,
     });
   }
+  for (const check of health.checks) {
+    if (!("sslDaysToExpiry" in check)) continue;
+    const days = check.sslDaysToExpiry;
+    result.push({ subjectId, signal: `domain.ssl:${check.host}`, outcome: days == null ? "unknown" : days <= 0 ? "fail" : days <= EXPIRY_WARN_DAYS ? "warn" : "pass",
+      ...(days != null && days <= 0 ? { impact: "blocking" as const } : {}), observedAt: days == null ? null : check.checkedAt,
+      maxAgeSeconds: DOMAIN_WINDOW, source: "domain-monitor", message: days == null ? `${check.host} certificate expiry has not been verified.`
+        : days <= 0 ? `${check.host} SSL certificate has expired.` : days <= EXPIRY_WARN_DAYS ? `${check.host} SSL certificate expires in ${days} days.` : `${check.host} SSL certificate is current.` });
+  }
   return result;
 }
 

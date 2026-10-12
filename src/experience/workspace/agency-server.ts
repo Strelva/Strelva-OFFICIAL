@@ -20,6 +20,8 @@ import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 import { addAgencyOperatorOverview } from "./agency/operator-overview";
 import { projectAgencyLibraryOffers } from "./agency/library-offers";
+import { addAgencyProviderAlerts } from "./agency/provider-alerts";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
 import type { VersionLineage } from "@/platform/system-versions";
@@ -84,7 +86,8 @@ export async function readAgencyClientsPage(
   } else {
     library = { agencyWorkspaceId, sources: [] };
   }
-  return addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library));
+  const overview = await addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library));
+  return operatorQueueReleaseEnabled() ? addAgencyProviderAlerts(actor, overview, db) : overview;
 }
 
 const sourcesSchema = z.object({

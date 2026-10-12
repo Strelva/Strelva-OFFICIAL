@@ -14,6 +14,9 @@ export interface DomainCheck {
   /** Registry expiry (ISO date) from RDAP, or null when unavailable. */
   expiresAt: string | null;
   daysToExpiry: number | null;
+  /** Optional so stored scans predating certificate checks remain readable. */
+  sslExpiresAt?: string | null;
+  sslDaysToExpiry?: number | null;
   checkedAt: string;
   latencyMs: number | null;
 }
