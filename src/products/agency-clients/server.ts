@@ -46,7 +46,8 @@ import {
   type OwnerClaimAccepted,
   type OwnerClaimPreview,
 } from "./contracts";
-import { seedFromSite, type SiteSeed } from "./seed";
+import { seedFromSite, type SeedFacts, type SiteSeed } from "./seed";
+import { factValueSchemas } from "@/platform/business-record/contracts";
 import { runPrivateAiVisibilityAssessment, parseAiVisibilityAssessmentPayload, isAiVisibilityWorkResourceKind } from "@/products/ai-visibility/server";
 import type { SavedWork } from "@/platform/workspaces/types";
 import type { ClientAiCheck } from "./contracts";
@@ -97,6 +98,11 @@ const FAILURES: Array<[string, number, string]> = [
   ["agency_client_claim_not_found", 404, "This link is missing or no longer works."],
   ["agency_client_claim_invalid", 400, "Check the owner's email address."],
   ["agency_client_invalid", 400, "Check the business name and website."],
+  ["agency_client_limits_reason_required", 400, "Give a reason for changing this agency's limits."],
+  ["agency_client_limits_invalid", 400, "Set both limits: 1 to 500 a day, and 1 to 2,000 waiting for their owner."],
+  ["agency_client_limits_agency_invalid", 404, "That agency wasn't found."],
+  ["agency_client_limits_revision_conflict", 409, "Someone changed this agency's limits meanwhile. Reload and try again."],
+  ["workspace_release_operator_required", 403, "Only a Strelva operator can change an agency's limits."],
   ["workspace_exit_future_work_blocked", 409, "This business has left Strelva."],
 ];
 
@@ -110,6 +116,8 @@ function fail(error: DbError, fallback: string): never {
   if (match) throw new AgencyClientError(match[2], match[1], match[0]);
   throw new AgencyClientError(fallback, 503, "unavailable");
 }
+/** The same refusal mapping, for the import and limits readers beside this module. */
+export { fail as agencyClientRpcFailure };
 
 async function call<T>(deps: AgencyClientDeps, name: string, args: Record<string, unknown>, schema: z.ZodType<T>, fallback: string): Promise<T> {
   const { data, error } = await deps.rpc(name, args);
@@ -170,6 +178,18 @@ async function checkClientSite(actor: WorkspaceActor, client: AgencyClientAdditi
 
 const uuidWorkId = z.string().uuid();
 
+/** The agency's own found facts over the scan's; each must already be a valid record value or it is left out. */
+function withFoundFacts(seed: SiteSeed, found: AddAgencyClientInput["foundFacts"]): SiteSeed {
+  if (!found) return seed;
+  const facts: SeedFacts = { ...seed.facts };
+  const phone = found.phone ? factValueSchemas.phone.safeParse(found.phone) : null;
+  const address = found.address ? factValueSchemas.address.safeParse({ formatted: found.address }) : null;
+  if (phone?.success) facts.phone = { value: phone.data };
+  if (address?.success) facts.address = { value: address.data };
+  const seeded = [...new Set([...seed.scan.seeded, ...(phone?.success ? ["phone"] : []), ...(address?.success ? ["address"] : [])])];
+  return { scan: { ...seed.scan, seeded }, facts };
+}
+
 /** Create the client business from a URL or a prospect, then (optionally) its owner claim link. */
 export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyClientInput, deps: AgencyClientDeps = defaultDeps()): Promise<AddAgencyClientResult> {
   if (input.url) publicUrl(input.url);
@@ -180,7 +200,8 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
   const prospect = input.prospectId ? await readProspect(deps, actor, input.agencyWorkspaceId, input.prospectId) : null;
   const rawUrl = input.url ?? prospect?.url ?? null;
   const url = rawUrl ? publicUrl(rawUrl) : null;
-  const seed = url ? await deps.seed(url) : { scan: NOT_SCANNED, facts: {} };
+  const scanned = url ? await deps.seed(url) : { scan: NOT_SCANNED, facts: {} };
+  const seed = withFoundFacts(scanned, input.foundFacts);
   const name = (input.name ?? prospect?.business ?? seed.scan.name ?? "").trim().slice(0, 120);
   if (!name) throw new AgencyClientError("We couldn't find the business's name on its site. Enter it.", 400, "agency_client_name_required");
   // The digest covers what the agency asked for, not what the scan found, so

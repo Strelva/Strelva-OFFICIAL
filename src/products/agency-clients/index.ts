@@ -8,3 +8,17 @@ export function agencyAddClientReleaseEnabled(
 ): boolean {
   return workspaceReleaseEnabled() && environment.STRELVA_AGENCY_ADD_CLIENT_RELEASE === "1";
 }
+
+/**
+ * Import clients (GLOSSARY: Import clients). Off unless
+ * STRELVA_AGENCY_IMPORT_RELEASE=1, layered on the add-client release: an
+ * imported client is added the ordinary way, so import is never on without it.
+ */
+export function agencyImportReleaseEnabled(
+  environment: { STRELVA_AGENCY_ADD_CLIENT_RELEASE?: string; STRELVA_AGENCY_IMPORT_RELEASE?: string } = {
+    STRELVA_AGENCY_ADD_CLIENT_RELEASE: process.env.STRELVA_AGENCY_ADD_CLIENT_RELEASE,
+    STRELVA_AGENCY_IMPORT_RELEASE: process.env.STRELVA_AGENCY_IMPORT_RELEASE,
+  },
+): boolean {
+  return agencyAddClientReleaseEnabled(environment) && environment.STRELVA_AGENCY_IMPORT_RELEASE === "1";
+}
