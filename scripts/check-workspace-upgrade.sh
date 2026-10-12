@@ -73,6 +73,8 @@ early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
   if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* ]]; then continue; fi
+  # Coherence projections wrap October 20-22 readers; they follow that tail below.
+  if [[ "$migration_name" == 20261023* && "$migration_name" != "20261023200000_tenant_review_approval_continuity.sql" ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then
     if [[ "$migration_name" != "$upgrade_migration" ]]; then
       continue
@@ -564,6 +566,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sq
 
 # #251: bounded platform support reads; pure snapshot APIs remain unchanged.
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
+
+# Coherence identity and client projections, after the readers they wrap.
+for coherence_migration in "$repo_root"/supabase/migrations/20261023*.sql; do
+  [[ "$(basename "$coherence_migration")" == "20261023200000_tenant_review_approval_continuity.sql" ]] && continue
+  psql "${psql_args[@]}" --file="$coherence_migration"
+done
 
 # Install the forward-only review authority evidence after historical destructive
 # rollback rehearsals; application rollback must retain admitted command history.
