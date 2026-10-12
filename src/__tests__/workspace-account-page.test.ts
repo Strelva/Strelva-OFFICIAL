@@ -104,7 +104,7 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("Harbor Dental");
     expect(text).toContain("Your business");
     expect(text).toContain("Read-only access");
-    expect(text).toContain("Each site keeps its own people, settings, and agreed service");
+    expect(text).toContain("Each site keeps its own people and settings");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=personal");
     expect(linksFrom(page)).toContain("/workspace?workspaceId=customer");
   });

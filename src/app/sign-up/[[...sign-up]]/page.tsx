@@ -18,7 +18,7 @@ import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTa
 
 export const metadata: Metadata = {
   title: "Create your Strelva account",
-  description: "Create a Strelva account to continue your work or access a managed website.",
+  description: "Create a Strelva account to run your business yourself, or to run it for clients.",
 };
 
 export const dynamic = "force-dynamic";

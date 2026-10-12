@@ -1,3 +1,4 @@
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { googleMakeRealPorts } from "@/experience/systems/live-server";
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
@@ -65,7 +66,9 @@ export async function POST(request: Request) {
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
     const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts(body.expectedPlan));
     if (!path) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
-    if (path.kind === "live") return workspaceJson({ live: path.result });
+    // Funnel (ADR 0015): the first time this business makes something real. One row per business.
+    const firstLive = () => void recordFunnelEvent("first_live", workspace.id, { workspaceId: workspace.id });
+    if (path.kind === "live") { firstLive(); return workspaceJson({ live: path.result }); }
     if (needsYouReleaseEnabled()) {
       const decided = await makeRealThroughNeedsYou(actor, workspace.id, path.possibilityId, {
         google: googleMakeRealPorts,
@@ -78,7 +81,8 @@ export async function POST(request: Request) {
       if (decided.status === "changed" || decided.status === "already_handled" || decided.status === "expired") {
         return workspaceJson({ error: "This changed since you opened it. Reload and look again. Nothing changed.", status: decided.status }, 409);
       }
-      if (!decided.result) return workspaceJson({ error: "Make real could not start. Nothing changed. Strelva is on it.", status: decided.status, reason: decided.reason }, 409);
+      if (!decided.result) return workspaceJson({ error: "Make real could not start. Nothing changed. Try again in a moment.", status: decided.status, reason: decided.reason }, 409);
+      firstLive();
       return workspaceJson({ result: decided.result, decision: decided.status });
     }
     const managed = await listManagedPresenceWork().catch(() => ({ managedWork: [] as Array<{ id: string; domain?: string }> }));
@@ -87,6 +91,7 @@ export async function POST(request: Request) {
       siteDomains: new Map(managed.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }, path.possibilityId, { canActivate: true });
     if (!result) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
+    firstLive();
     return workspaceJson({ result });
   } catch (error) {
     return workspaceHttpFailure(error);

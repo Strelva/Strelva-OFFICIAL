@@ -2005,6 +2005,13 @@
           "rollback": "rollback-20261023143000_two_doors_business_ai_budget.sql",
           "rollbackSha256": "e8f064f6a2107b2de095009f0071dbb98d7b55e314349231fb5c59f8c9a0f2b2",
           "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
+        },
+        {
+          "file": "20261023144000_two_doors_funnel_events.sql",
+          "sha256": "655eea55aa9207257701aa8fa0cadb2da50a9529488270ab1219ff3b703ca315",
+          "rollback": "rollback-20261023144000_two_doors_funnel_events.sql",
+          "rollbackSha256": "6ceadea4c953aa83515747292528500344256de1dbf12c2cd867331dd7061f43",
+          "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
         }
       ]
     }

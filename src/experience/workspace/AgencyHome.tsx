@@ -423,5 +423,5 @@ export function AgencyHome({
     {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} />{view === "build" && combined?.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients to build for</StPill> : null}</TabsPanel> : null}
     {privateWork}
     {creditSection}
-  </StPage><StComposerDock><StComposerBar scope={agencyName} placeholder="Bring a client need, Strelva builds it with you" value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></StComposerDock></div>;
+  </StPage><StComposerDock><StComposerBar scope={agencyName} placeholder="Bring a client need and build it here" value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></StComposerDock></div>;
 }

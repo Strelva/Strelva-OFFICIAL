@@ -5,6 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
 import { listWorkspaces } from "@/platform/workspaces";
 import { enterCustomerBusiness } from "@/platform/workspaces/business-entry";
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email." }, 401);
     if (await isRateLimitedWindowedAsync(`workspace:business-entry:${actor.userId}`, 30, 60_000)) return json({error:"Please wait before another setup request."},429);
-    return json(await enterCustomerBusiness(actor, await readWorkspaceBody(request, 16000)));
+    const entered = await enterCustomerBusiness(actor, await readWorkspaceBody(request, 16000));
+    if (!entered.alreadyCreated) void recordFunnelEvent("business_created", entered.workspaceId, { workspaceId: entered.workspaceId });
+    return json(entered);
   } catch (error) { return failure(error); }
 }

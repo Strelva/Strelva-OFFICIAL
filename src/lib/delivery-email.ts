@@ -808,7 +808,7 @@ function buildHealthRegressionEmailOptions(params: {
     heading: "Your site health dropped",
     paragraphs: [
       `${greeting}our latest scan of ${business} found the site-health grade slipped from ${params.previousGrade} to ${params.currentGrade}. This usually means something changed: a slower page, a broken link, or an SEO signal that regressed.`,
-      "You don't need to do anything technical. Open your workspace to see what changed, or just tell the assistant and we'll look into it for you.",
+      "You don't need to do anything technical. Open your workspace to see what changed, or ask about it there.",
     ],
     rows: [
       { label: "Previous", value: `${params.previousGrade} (${params.previousScore})` },

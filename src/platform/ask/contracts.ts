@@ -100,8 +100,8 @@ export type AskRefusalCode = (typeof ASK_REFUSAL_CODES)[number];
 
 /** One sentence each: the reason and where it is done instead (spec section 4). */
 export const ASK_REFUSALS: Record<AskRefusalCode, string> = {
-  money: "I can't change billing, plans, pay links or refunds from here. Billing is in Business details, or reply to your Strelva email and we'll sort it.",
-  domains: "I can't add, remove or move a domain. Domains are in Business details, and Strelva handles domain moves for you.",
+  money: "I can't change billing, plans, pay links or refunds from here. Billing is in Business details, under Plan and billing.",
+  domains: "I can't add, remove or move a domain. Connect a domain from your website once it's published, or ask your agency to.",
   people: "I can't invite people, change roles or remove anyone. People & access are in Business details, for an owner.",
   exit_or_delete: "I can't pause, export, delete or leave the business or a site from here. That's in Business details, for an owner.",
   approval_in_chat: "I can't approve anything from the conversation. Approve it in Needs you, or from the link in your email, so the approval stays tied to that exact change.",

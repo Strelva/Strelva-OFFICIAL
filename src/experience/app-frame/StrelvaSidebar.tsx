@@ -74,7 +74,7 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 /** One navigation contract for owners, agencies, account and managed work. */
 export function StrelvaSidebar({ agencyNavigation, ownerBrand, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients }: Props) {
   const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
-  const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : "All apps and files";
+  const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : "All files and results";
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
   const newHref = `${appBase}/workspace?view=start${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`;
   const searchHref = `${href("work")}&search=1`;

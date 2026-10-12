@@ -48,7 +48,7 @@ import type { SystemStore } from "./store";
  * Not mapped, on purpose: plans, investigations, responsibilities, learning
  * items and onboarding cases are work or records inside a System, not
  * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Private
- * documents are supporting files under the business ("All apps and files"),
+ * documents are supporting files under the business ("All files and results"),
  * not Systems, at 1.0.0 (docs/product/specs/systems-catalog.md 3.5). A saved
  * check is evidence in the health of the System it watches (3.6). Retired
  * applications are omitted.

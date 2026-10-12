@@ -24,7 +24,7 @@ export function AgencyAuthoring({ request, snapshot, clients, kind, onOpenClient
   const url = `/api/workspace/agency-authoring?agencyWorkspaceId=${encodeURIComponent(agencyId)}`;
   if (kind === "package") return <AgencyPackage key={agencyId} request={request} workspaceId={agencyId} url={url} />;
   return <StSection title="Make a System for a client">
-    <StLabel>Agency owners and admins choose a business where they have current owner or admin authoring access, then describe the result. Strelva builds a draft there; the owner decides when it goes live.</StLabel>
+    <StLabel>Agency owners and admins choose a business where they have current owner or admin authoring access, then describe the result. The draft is built there; the owner decides when it goes live.</StLabel>
     {choices.length ? <StSurface label="Client to build for"><SelectInput label="Client" value={clientId} onChange={event => setClientId(event.target.value)} options={[{ value: "", label: "Choose a client" }, ...choices.map(client => ({ value: client.workspaceId, label: client.name }))]} /></StSurface> : <StEmpty>No client is available to build for. An agency owner or admin with current owner or admin authoring access to a client can choose that business here. Assigned staff open Clients to review permitted Systems; editing an existing draft requires separate authorization from the client.</StEmpty>}
     {clientId && choices.some(client => client.workspaceId === clientId) ? <WorkPlanExperience key={clientId} workspaceId={clientId}
       initialRequest="Make an internal tool for this business. " sources={[]} prepareUrl={`${url}&action=prepare`} outputUrl={`${url}&action=execute`}

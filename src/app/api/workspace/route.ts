@@ -1,3 +1,4 @@
+import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
 import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
@@ -356,10 +357,12 @@ export async function POST(request: Request) {
       }
       case "save_website_audit": {
         const work = await savePublicWebsiteAudit({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });
+        void recordFunnelEvent("check_saved", input.resultId, { workspaceId: input.workspaceId });
         return json({ work: await presentSavedWork(current, work) });
       }
       case "save_public_result": {
         const saved = await savePublicAiVisibilityResult({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });
+        void recordFunnelEvent("check_saved", input.resultId, { workspaceId: input.workspaceId });
         return json({ work: await presentSavedWork(current, saved.work), alreadySaved: !saved.created }, saved.created ? 201 : 200);
       }
       case "handoff": {

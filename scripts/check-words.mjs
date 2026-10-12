@@ -13,6 +13,7 @@ const retired = [
   "Apps from creators", "Private app", "Delegated work", "Reservations", "Website monitoring",
   "saved investigation", "Provider handoff", "Provider change", "Your dashboard", "Make it real",
   "People and access", "offering record", "Business installations", "active provider seat",
+  "All apps and files",
 ];
 const businessScreen = /^(src\/experience\/(?!agency\/)|src\/products\/[^/]+\/[^/]+\.tsx$|src\/app\/(workspace|apps|preview)\/)/;
 const excluded = /(^|\/)(__tests__|tests|migrations|dashboard)(\/|$)|\.(test|spec)\.[cm]?[jt]sx?$/;

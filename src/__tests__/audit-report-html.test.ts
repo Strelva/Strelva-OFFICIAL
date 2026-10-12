@@ -81,7 +81,7 @@ describe("renderAuditReport", () => {
   });
 
   it("includes the Strelva CTA pointing to the access request", () => {
-    expect(html).toContain("We can do all of this for you");
+    expect(html).toContain("Fix these yourself, or have an agency do it");
     expect(html).toContain("/access-request");
   });
 

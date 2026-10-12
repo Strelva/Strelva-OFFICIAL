@@ -4,7 +4,8 @@ This is the single authority for words in product copy, docs and the internal
 model. The [product ontology](./docs/architecture/product-ontology.md) owns
 structure and governance rules; both CONTEXT.md files point here for language.
 These definitions apply Jacob's decisions of October 9–11, 2026, including
-[ADR 0014](../docs/adr/0014-one-model-at-three-zooms.md).
+[ADR 0014](../docs/adr/0014-one-model-at-three-zooms.md) and
+[ADR 0015](../docs/adr/0015-two-doors-self-serve-and-agencies.md).
 
 ## On screen
 
@@ -15,8 +16,9 @@ and Queue and select Internal tool. Internal distinctions stay in Underneath.
 The named actor is whoever did the work. An agency uses its display name with
 “Runs on Strelva” credit. “Strelva Agency” names Strelva's own agency.
 “Strelva” alone names only real platform actions: platform billing, account
-authentication, platform checks and support. Never infer the actor from the viewer; an unknown actor is
-“Actor not recorded”.
+authentication, platform checks and support, and work the platform does for a
+business that uses Strelva itself with no agency (ADR 0015). Never infer the
+actor from the viewer; an unknown actor is “Actor not recorded”.
 
 Owners see their agency's brand in the workspace shell, emails, entry and signed
 pages. End customers see the business's name. Failed brand lookup shows a neutral
@@ -83,8 +85,10 @@ _Avoid_: saved investigation, Ongoing check, Website monitoring (for all checks)
 
 **Request / Requests** _(label open)_:
 Asked-for work with an end: Asked → Needs you → In progress → Ready for your
-review → Done. A Request sent to an agency is not an accepted job until scope
-and deadline are agreed.
+review → Done. A Request goes to the business's own agency; it is not an
+accepted job until scope and deadline are agreed. A business with no agency
+makes the thing itself or brings in an agency first; there is no default
+recipient.
 _Avoid_: Work (as a business-screen noun), start request, ticket, obligation
 
 **Running** _(label open)_:
@@ -111,6 +115,7 @@ _Avoid_: Strelva (as a fallback actor), Strelva or your team
 **Ask Strelva** _(label open)_:
 Where a person says what they want to happen. Their words are an ask before
 work exists; an ask alone grants no permission to run, share or publish anything.
+The platform answers, drafts and prepares; no person at Strelva is behind it.
 _Avoid_: Start, start request, prompt, Chats (as the phone place name)
 
 ### People and businesses
@@ -136,8 +141,31 @@ may be chosen as payer for a business.
 _Avoid_: provider (for people), partner, reseller, white-labeler (as synonyms)
 
 **Owner**:
-The business's owner role: decides, launches, exits and invites.
+The business's owner role: decides, launches, exits and invites. An owner who
+uses Strelva directly makes the business's Systems too (ADR 0015).
 _Avoid_: payer (as a synonym), agency (as a synonym), account holder
+
+**Use it yourself / Run it for others**:
+The two doors into Strelva (ADR 0015). Use it yourself: a business runs Strelva
+directly, with no agency and no human service. Run it for others: anyone who
+runs work for several businesses works through the agency zooms. One product.
+_Avoid_: self-serve tier, direct plan, DIY (on screen); managed client (for a
+business with no agency)
+
+**Bring in an agency**:
+The one way a business gets work done for it. The owner chooses from a list of
+agencies, never a default, picks what each may do, and the agency accepts before
+anything changes. Strelva Agency is listed the same way as any agency.
+_Avoid_: Contact the team, Request your build, hire Strelva, platform support
+(for getting work done)
+
+**Prepare / Full control**:
+What a business lets one agency do in one area (website, inquiries, bookings,
+Google, internal tools). Prepare: the agency builds and stages; the owner
+approves. Full control: the agency approves and makes it live in that area. One
+agency holds Full control of an area. Payer, adding and ending agencies, data
+and exit always stay with the owner.
+_Avoid_: admin access, white-label, delegation (on screen)
 
 **Inquiry**:
 One end customer's request to a business, with its handling status and assignee.
@@ -173,8 +201,9 @@ Needs you (as the cross-client place name)
 
 **Ready-made / Ready-made systems**:
 Where a business finds reusable Systems it can ask to use, including qualified
-Library sources and clearly labeled starters. Managed services remain separately
-identified and require accepted scope; they are not reusable source Systems. Internal tools is a kind filter;
+Library sources and clearly labeled starters. Managed services are an agency's
+offer, named by that agency and requiring accepted scope; they are not reusable
+source Systems and never a default for a business. Internal tools is a kind filter;
 setup does not imply agency acceptance or operating authority.
 _Avoid_: Apps from creators, Get or build, More tools and managed services, All products
 
@@ -307,8 +336,9 @@ for something the platform, "Strelva", did.
 _Avoid_: Strelva (alone, for the agency), Strelva staff, house agency, operator, platform
 
 **Agency basis**:
-Why a business has the agency it has: an existing contract with that agency,
-or the owner's own choice.
+Why a business has the agency it has: the owner brought it in from the agency
+list, or (for businesses that moved in from the older tenant model) an existing
+contract with that agency.
 _Avoid_: default agency, assignment, provider attribution
 
 **Platform operator**:

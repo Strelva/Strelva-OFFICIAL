@@ -289,7 +289,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
     setDeliveryContextAttempt((value) => value + 1);
   }
   return <StPage>
-    <div ref={headingRef} tabIndex={-1}><StHead title="What do you need?" meta="Request work from an agency, or contact platform support about Strelva." /></div>
+    <div ref={headingRef} tabIndex={-1}><StHead title="What do you need?" meta="Send a request to your agency, bring one in, or contact Strelva about the platform itself." /></div>
     <StSection title="Tell us about it." id="request-title"><StSurface label="Help request">
       <div className={styles.form}>
         <label htmlFor="capability-request">What are you trying to do?</label>

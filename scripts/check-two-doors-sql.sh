@@ -23,6 +23,7 @@ run_contracts() {
   for contract in "$repo_root"/tests/two-doors-*-schema.sql; do psql "${psql_args[@]}" --file="$contract" >/dev/null; done
   # The read-only cost report parses and runs on the real schema.
   psql "${psql_args[@]}" -v days=14 --file="$repo_root/scripts/sql/cost-per-business-report.sql" >/dev/null
+  psql "${psql_args[@]}" --file="$repo_root/scripts/sql/funnel-report.sql" >/dev/null
 }
 
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
