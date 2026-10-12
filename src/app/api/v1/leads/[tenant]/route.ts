@@ -11,7 +11,7 @@
 import { captureInquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
 import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { captureLead } from "@/lib/leads";
@@ -82,13 +82,15 @@ export async function POST(
   }
 
   try {
-    // Tighter ceiling than the analytics beacon — a form submit is a deliberate
-    // act, not a per-pageview event. Fail open on a limiter error.
+    // Keep intake available when the shared limiter fails, but never remove
+    // its ceiling. The fallback is weaker (per process), so it is only used
+    // during an outage; the normal limit remains shared across instances.
+    const limitKey = rateLimitKey(req, `v1-leads:${tenant}`);
     let limited = false;
     try {
-      limited = await isRateLimitedAsync(rateLimitKey(req, `v1-leads:${tenant}`), 20);
+      limited = await isRateLimitedAsync(limitKey, 20);
     } catch {
-      limited = false;
+      limited = isRateLimitedPerInstance(limitKey, 20);
     }
     if (limited) {
       return corsJson({ error: "Too many requests" }, 429);
