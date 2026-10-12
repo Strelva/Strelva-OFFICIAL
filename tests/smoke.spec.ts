@@ -36,7 +36,9 @@ test("sign-up page renders the current create-account surface", async ({ request
   const response = await request.get("/sign-up");
   expect(response.status()).toBeLessThan(400);
   const html = await response.text();
-  expect(html).toContain("Workspace access is invite-only");
+  // ADR 0015: the closed door points at the free check, with Strelva Agency as one labeled choice.
+  expect(html).toContain("New accounts open soon");
+  expect(html).toContain('href="/audit"');
   expect(html).toContain('href="/access-request"');
   expect(html).not.toContain("Dashboard signup is paused");
 });
