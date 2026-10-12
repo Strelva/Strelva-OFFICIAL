@@ -60,7 +60,7 @@ describe("public audit feedback", () => {
     it(`${kind} audit identifies an invalid URL and keeps the input`, async () => {
       const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
       await act(async () => root.render(kind === "ai" ? createElement(AiVisibilityPage) : createElement(WebsiteAuditPage)));
-      if (kind === "ai") await input("#business-name", "Fictional Bakery");
+      await input("#business-name", "Fictional Bakery");
       const selector = kind === "ai" ? "#website" : '[aria-label="Website address"]';
       await input(selector, "http://[");
       await submit();
@@ -71,17 +71,17 @@ describe("public audit feedback", () => {
       expect(fetch).not.toHaveBeenCalled();
     });
     it(`${kind} audit announces pending work and associates a server failure with the restored form`, async () => {
-      let finish!: (response: Response) => void;
-      vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { finish = resolve; })));
+      const finishes: ((response: Response) => void)[] = [];
+      vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(resolve => { finishes.push(resolve); })));
       await act(async () => root.render(kind === "ai" ? createElement(AiVisibilityPage) : createElement(WebsiteAuditPage)));
-      if (kind === "ai") await input("#business-name", "Fictional Bakery");
+      await input("#business-name", "Fictional Bakery");
       const selector = kind === "ai" ? "#website" : '[aria-label="Website address"]';
       await input(selector, "bakery.example");
       await submit();
       expect(container.querySelector('[role="status"]')?.textContent).toMatch(kind === "ai" ? /Reading the public website/ : /Reading the website and running its checks/);
       expect(container.querySelector("form")).toBeNull();
       expect(document.activeElement?.tagName).toBe("H1");
-      await act(async () => finish(new Response(JSON.stringify({ error: "Try again later." }), { status: 503 })));
+      await act(async () => finishes.forEach(finish => finish(new Response(JSON.stringify({ error: "Try again later." }), { status: 503 }))));
       const field = container.querySelector<HTMLInputElement>(selector)!;
       expect(field.value).toBe("bakery.example");
       expect(field.hasAttribute("aria-invalid")).toBe(false);

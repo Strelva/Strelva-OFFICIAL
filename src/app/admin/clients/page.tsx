@@ -19,6 +19,7 @@ import { ScanAllButton } from "../ScanAllButton";
 import { ClientsCrm, type ClientRow } from "./ClientsCrm";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { billingLabel, billingMonthlyCents, isBillingConfigured, resolveBillingType } from "@/lib/billing-type";
+import { StTextButton } from "@/components/ui/strelva/Kit";
 
 /** The client's public domain (bare host), from productionDomain or siteUrl; null for
  *  a tenant not yet on its own domain (a *.strelva.com / *.vercel.app placeholder). */
@@ -138,6 +139,7 @@ export default async function AdminClientsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2.5">
+          <StTextButton href="/admin/convert">Conversion dry run</StTextButton>
           <ScanAllButton />
           <Link
             href="/admin/onboard"
