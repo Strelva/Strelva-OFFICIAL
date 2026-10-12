@@ -9,7 +9,7 @@ import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
  *   and, for each client Version the actor may read, its improvement state from
  *   the Versions service's three-way compare.
  * - `reviewAllImprovements`: "Review all". For each selected Version that is
- *   ready, adopt the latest revision into its working definition so it waits
+ *   ready, adopt the exact qualified release into its working definition so it waits
  *   as a Possibility for that client's own approval. Conflicted, missing-account
  *   and up-to-date Versions are skipped, never forced. Nothing is released
  *   here: going live is a separate release through the release gate.
@@ -113,17 +113,17 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
         const view = await versions.readVersion(versionActor, item.versionId);
         const base = {
           versionId: item.versionId, workspaceId: item.workspaceId, clientName: item.clientName, systemId: item.systemId, systemName: item.systemName,
-          context: view.context, baselineRevision: view.baselineRevision, currentRelease: view.currentRelease,
+          context: view.context, localChanges: view.overrides.length, baselineRevision: view.baselineRevision, currentRelease: view.currentRelease,
         };
         if (view.access !== "owner") {
           // A grant shows lineage, not accounts: the compare cannot be finished honestly.
-          rows.push({ ...base, state: "unavailable", conflicts: [], missingBindings: [], declinedReason: null });
+          rows.push({ ...base, state: "unavailable", improvementRevision: null, conflicts: [], missingBindings: [], declinedReason: null });
           continue;
         }
         const offers = await versions.listAvailableImprovements(versionActor, item.versionId);
         const { state, latest, declinedReason } = improvementState(offers, view.decisions);
         rows.push({
-          ...base, state, declinedReason,
+          ...base, state, declinedReason, improvementRevision: latest?.sourceRevision ?? null,
           conflicts: (latest?.conflicts ?? []).map((conflict) => ({ path: conflict.path, local: conflict.local ?? null, upstream: conflict.upstream ?? null })),
           missingBindings: latest?.missingBindings ?? [],
         });
@@ -131,8 +131,8 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
         // One Version that cannot be read is named; the rest still load.
         rows.push({
           versionId: item.versionId, workspaceId: item.workspaceId, clientName: item.clientName, systemId: item.systemId, systemName: item.systemName,
-          context: { kind: "agency_client", label: item.clientName }, baselineRevision: 1, currentRelease: null,
-          state: "unavailable", conflicts: [], missingBindings: [], declinedReason: null,
+          context: { kind: "agency_client", label: item.clientName }, localChanges: null, baselineRevision: 1, currentRelease: null,
+          state: "unavailable", improvementRevision: null, conflicts: [], missingBindings: [], declinedReason: null,
         });
       }
     }
@@ -167,8 +167,7 @@ export async function reviewAllImprovements(
   const sources = await readAgencyVersionSources(actor, input.agencyWorkspaceId, db);
   const source = sources.find((item) => item.systemId === input.sourceSystemId);
   if (!source) throw new WorkspaceStoreError("That source is not in this library.");
-  const latest = source.revisions.at(-1)?.number;
-  if (latest !== input.revision) throw new WorkspaceStoreError("A newer revision was published. Reload the library.");
+  if (!source.revisions.some(revision => revision.number === input.revision)) throw new WorkspaceStoreError("That release is not in this library. Refresh the library.");
   const { versions, store, actor: pending } = services(actor, db);
   const versionActor = await pending;
   const results: AgencyBulkReviewResult["results"] = [];
@@ -186,8 +185,8 @@ export async function reviewAllImprovements(
       if (comparison.status === "up_to_date") {
         // A reply lost after adoption can resume the decision/receipt without adopting twice.
         const existing = await store.getLineage(versionActor, versionId);
-        const receipt = existing ? await prepare(actor, existing) : null;
-        results.push(receipt ? { ...named, outcome: "prepared", detail: "The draft and its release decision are ready. Nothing went live.", ...receipt } : { ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." });
+        const receipt = existing?.baseline.revision === input.revision ? await prepare(actor, existing) : null;
+        results.push(receipt ? { ...named, outcome: "prepared", detail: "The draft and its release decision are ready. Nothing went live.", ...receipt } : { ...named, outcome: "skipped_up_to_date", detail: "Already includes this release." });
         continue;
       }
       if (comparison.conflicts.length) {

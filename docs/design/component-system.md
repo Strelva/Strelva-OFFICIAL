@@ -1959,3 +1959,40 @@ A staff assignment permits scoped client reads, not arbitrary new-System
 authoring. Exact existing drafts need their separate client authorization.
 No writer or eligibility grant is widened by this presentation correction.
 Local fixtures and unit tests do not qualify hosted authority or email delivery.
+
+### October 12 · agency brand fields
+
+AgencyBrandEditor composes the existing `StTextField` with native `color` and
+`file` input semantics, and kit buttons for Save and Remove logo. The kit owns
+the 48px color picker and file-selector button paint through `kit.module.css`;
+labels, errors, keyboard focus and disabled states keep the existing field
+contract. Logo format and size are checked before reading; server image validation
+remains authoritative. Unconfirmed saves require a saved-brand read before another
+write. Initial read failures offer that same recovery. These are source and DOM
+contracts; desktop/phone rendered acceptance remains outstanding.
+
+### October 12 · agency decision, Library and payer review
+
+Agency Clients exposes a scoped Full-control decision panel on kit rows with the
+exact review, consequence, recorded actor, `Hold to make it live` and `Not yet`.
+Booking commitments retain `Hold to confirm`. Owner-only payer, exit, access and
+private details do not become agency decisions. A lost response triggers a current
+read before controls return; unreadable reviews stay disabled.
+
+Library selections carry each Version's exact qualified Release through
+preparation. Latest publication is displayed separately from qualified offers.
+Confirmed source/offer mutations refresh the Library; Refresh Library recovers
+stale or uncertain reads without replaying a write. Release labels and Time this
+month now match owner language in agency compositions and fictional previews.
+
+Agency billing offers serving agencies through the authorized business-agency
+read. `AgencyPayerRequests` composes kit sections, surfaces and pills to show only
+pending requests addressed to that agency. Checkout defaults closed and distinguishes
+Coming soon, setup required, unavailable and ready. Merchant readiness and the
+existing server fulfillment guard both remain required.
+
+`FirstClientHandoff` composes kit steps around the recorded Draft, Review, Owner
+claim and Live status. Prepared links, owner acceptance and verified publication
+remain distinct evidence. Source publication never proves the owner’s separate
+client copy is live. These changes have local source/DOM evidence; actual
+Auth, provider execution and desktop/phone rendering require separate proof.

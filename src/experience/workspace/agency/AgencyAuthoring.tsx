@@ -70,19 +70,19 @@ function AgencyPackage({ request, workspaceId, url }: { request: typeof fetch; w
     finally { inFlight.current = false; setBusy(false); }
   }
   return <div className="space-y-7" aria-label="Package a System">
-    <StSection title={selected ? `Package r${selected.revision + 1}: ${selected.name}` : "Package a System"}>
-      <StLabel>Publishing makes a source revision available. No client changes until its owner says yes.</StLabel>
+    <StSection title={selected ? `Release ${selected.revision + 1} draft: ${selected.name}` : "Package a System"}>
+      <StLabel>Publishing makes a source release available. No client changes until its owner says yes.</StLabel>
       {!state && !error ? <StSkeleton label="Loading reusable Systems" /> : null}
       {error ? <StNotice tone="critical">{error}{!state ? <StTextButton onClick={() => setAttempt(value => value + 1)}>Retry</StTextButton> : null}</StNotice> : null}
-      {state?.choices.length ? <SelectInput label="System owned by this agency" value={systemId} disabled={busy || Boolean(pending.current)} onChange={event => setSystemId(event.target.value)} options={[{ value: "", label: "Choose a System" }, ...state.choices.map(choice => ({ value: choice.systemId, label: `${choice.name} · revision ${choice.revision + 1}` }))]} /> : state ? <StEmpty>No reusable Systems yet. Make an internal tool in this agency, or adapt a source into this agency first.</StEmpty> : null}
+      {state?.choices.length ? <SelectInput label="System owned by this agency" value={systemId} disabled={busy || Boolean(pending.current)} onChange={event => setSystemId(event.target.value)} options={[{ value: "", label: "Choose a System" }, ...state.choices.map(choice => ({ value: choice.systemId, label: `${choice.name} · Release ${choice.revision + 1} draft` }))]} /> : state ? <StEmpty>No reusable Systems yet. Make an internal tool in this agency, or adapt a source into this agency first.</StEmpty> : null}
     </StSection>
     {selected ? <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.55fr)]">
       <div className="space-y-7"><StSurface label="What owners will read"><TextArea label="What owners will read" value={summary} maxLength={500} required rows={3} disabled={busy || Boolean(pending.current)} onChange={event => setSummary(event.target.value)} /></StSurface>
-        <StSection title="Rehearsal"><StNotice>Per-client rehearsal results are not available in this read. Publishing this source revision does not qualify it or publish a client’s Version.</StNotice></StSection>
+        <StSection title="Rehearsal"><StNotice>Per-client rehearsal results are not available in this read. Publishing this source release does not qualify it or publish a client’s Version.</StNotice></StSection>
         <details><summary className="cursor-pointer text-sm text-gray-muted">Pushed standards</summary><div className="mt-3 space-y-3"><TextInput label="Pushed standards (optional field paths, separated by commas)" value={locks} disabled={busy || Boolean(pending.current)} onChange={event => setLocks(event.target.value)} placeholder="branding.name, policy.cancellation" /><StLabel>Locked fields must exist in this definition. Client Versions take the source value; their own accounts, data and local fields remain independent.</StLabel></div></details>
-      </div><div className="space-y-5"><StSection title="New things it needs"><StLabel>Accounts, records and permissions stay with each business. The new source revision needs its own qualification.</StLabel></StSection><StSection title="Cost to run"><StLabel>[Run cost] · not available for this source revision.</StLabel></StSection><StHold label={pending.current && !receipt ? "Hold to retry this package" : `Hold to publish r${selected.revision + 1}`} disabled={busy || !summary.trim() || Boolean(receipt)} onAccept={() => void publish()} block /></div>
+      </div><div className="space-y-5"><StSection title="New things it needs"><StLabel>Accounts, records and permissions stay with each business. The new source release needs its own qualification.</StLabel></StSection><StSection title="Cost to run"><StLabel>Run cost is not available for this release.</StLabel></StSection><StHold label={pending.current && !receipt ? "Hold to retry this package" : "Hold to make it live"} disabled={busy || !summary.trim() || Boolean(receipt)} onAccept={() => void publish()} block /></div>
     </div> : null}
-    {receipt ? <div role="status"><StState kind="live">Source revision {receipt.revision} is published.</StState><StLabel>Open Library to prepare it for client review.</StLabel></div> : null}
+    {receipt ? <div role="status"><StState kind="live">Release {receipt.revision} is published.</StState><StLabel>Open Library to prepare it for client review.</StLabel></div> : null}
     {state?.unavailable.length ? <StSection title="Systems that cannot be packaged yet"><StRows>{state.unavailable.map(item => <StRow key={item.systemId} title={item.name} detail="No reusable definition could be read." end={<StState kind="down">Could not read</StState>} />)}</StRows></StSection> : null}
   </div>;
 }

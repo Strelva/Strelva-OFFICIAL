@@ -220,7 +220,19 @@ export function latestRevision(source: AgencyLibrarySource): AgencyLibrarySource
 
 /** Only `ready` Versions are ever sent. Conflicts and missing accounts are never forced. */
 export function reviewableVersionIds(source: AgencyLibrarySource): string[] {
-  return source.versions.filter((version) => version.state === "ready").map((version) => version.versionId);
+  return source.versions.filter((version) => version.state === "ready" && version.improvementRevision && source.revisions.some(revision => revision.number === version.improvementRevision)).map((version) => version.versionId);
+}
+
+/** A bulk request never substitutes a newer unqualified release for an offer. */
+export function reviewableVersionGroups(source: AgencyLibrarySource, selectedIds = reviewableVersionIds(source)): Array<{ revision: number; versionIds: string[] }> {
+  const ready = new Set(reviewableVersionIds(source));
+  const groups = new Map<number, string[]>();
+  for (const version of source.versions) {
+    if (!ready.has(version.versionId) || !selectedIds.includes(version.versionId)) continue;
+    const revision = version.improvementRevision!;
+    groups.set(revision, [...(groups.get(revision) ?? []), version.versionId]);
+  }
+  return [...groups].sort(([a], [b]) => a - b).map(([revision, versionIds]) => ({ revision, versionIds }));
 }
 
 export type ReviewLine = AgencyBulkReviewResult["results"][number];
@@ -249,7 +261,7 @@ export function reviewLineLabel(line: ReviewLine): string {
 }
 
 /**
- * Sends the latest revision with only the ready Versions. Returns null and
+ * Sends the exact qualified release with only its ready Versions. Returns null and
  * sends nothing when no Version is ready.
  */
 export async function reviewAllReady(
@@ -257,8 +269,8 @@ export async function reviewAllReady(
   agencyWorkspaceId: string,
   source: AgencyLibrarySource,
 ): Promise<AgencyBulkReviewResult | null> {
-  const revision = latestRevision(source);
-  const versionIds = reviewableVersionIds(source);
-  if (!revision || !versionIds.length) return null;
-  return reviewAllImprovements(request, { agencyWorkspaceId, sourceSystemId: source.systemId, revision: revision.number, versionIds });
+  const groups = reviewableVersionGroups(source);
+  if (!groups.length) return null;
+  if (groups.length > 1) throw new Error("Select Versions for one qualified release at a time.");
+  return reviewAllImprovements(request, { agencyWorkspaceId, sourceSystemId: source.systemId, ...groups[0]! });
 }

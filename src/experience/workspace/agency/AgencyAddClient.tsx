@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, Copy, Globe2, Hammer, Loader2, RefreshCw 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { FirstClientHandoff } from "./FirstClientHandoff";
 import { Tabs } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
 import type { AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
@@ -36,6 +38,10 @@ function dateLabel(value: string) {
 
 function absolute(path: string) {
   return typeof window === "undefined" ? path : new URL(path, window.location.origin).toString();
+}
+
+function currentOwnerClaim(claim: OwnerClaim | null, client?: AgencyClientListItem) {
+  return claim && Date.parse(claim.expiresAt) > Date.now() && (!client || client.pendingClaim?.claimId === claim.claimId) ? claim : null;
 }
 
 export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId }: { agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null }) {
@@ -142,7 +148,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
 
   return <Shell agencyHref={agencyHref}>
     {result
-      ? <AddedClient result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} agencyHref={agencyHref} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
+      ? <AddedClient result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
       : <section className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]" aria-labelledby={`${id}-title`}>
         <div>
           <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-accent-text">New client</p>
@@ -206,18 +212,29 @@ function ProspectPicker({ prospects, error, added, value, onChoose }: { prospect
   </fieldset>;
 }
 
-function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim }: { result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; onClaim: (claim: OwnerClaim) => void }) {
+export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; onClaim: (claim: OwnerClaim) => void }) {
   const id = useId().replace(/:/g, "");
   const { client, scan } = result;
+  const ownerClaim = currentOwnerClaim(result.ownerClaim, currentClient);
   return <section className="mt-12" aria-labelledby={`${id}-title`}>
     <p className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-positive"><Check className="size-4" aria-hidden="true" />Client added</p>
     <h1 id={`${id}-title`} className="mt-3 break-words font-display text-[40px] font-medium leading-tight">{client.name}</h1>
-    <p className="mt-2 font-mono text-[12px] tabular-nums text-gray-muted">Owner not signed in yet · your agency holds its seat{client.replayed ? " · this client was already added" : ""}</p>
+    <p className="mt-2 font-mono text-[12px] tabular-nums text-gray-muted">{currentClient?.ownerClaimed ? "Owner claimed the business" : currentClient ? "Owner has not claimed the business" : "Owner claim not yet checked"} · {currentClient?.seatActive === false ? "Agency seat ended" : "Agency client added"}{client.replayed ? " · this client was already added" : ""}</p>
+
+    <div className="mt-8">
+      <FirstClientHandoff status={result.website.rebuildOpenToAgency ? "Ready for a website draft" : currentClient?.ownerClaimed ? "Owner claimed the business" : "Waiting for the owner to claim the business"}
+        detail={result.website.rebuildOpenToAgency ? "Build the private draft first. Review, ownership and a verified launch are separate steps; adding the client completes none of them." : "Agency rebuilding is not available here yet. The owner can start the draft in their business after accepting the claim."}
+        draft="pending" review="pending" claim={currentClient?.ownerClaimed ? "done" : currentClient ? "pending" : "unverified"} live="pending"
+        readiness="Publishing readiness has not been checked. A private draft does not put anything live."
+        action={result.website.rebuildOpenToAgency
+          ? <StPillLink href={result.website.rebuild}>Start website draft</StPillLink>
+          : <StTextButton href={currentClient?.ownerClaimed ? `/workspace?workspaceId=${encodeURIComponent(client.customerWorkspaceId)}` : "#owner-link-title"}>{currentClient?.ownerClaimed ? "Open client workspace" : ownerClaim ? "Share owner claim link" : "Prepare owner claim link"}</StTextButton>} />
+    </div>
 
     <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       <div className="min-w-0">
-        <h2 className="text-[15px] font-medium">Their website</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">Pick one now or later. Either way the owner approves before anything goes live.</p>
+        <h2 className="text-[15px] font-medium">Website options</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">Already have a site to keep? Connect it instead. Publication still needs the current approval and publishing authority.</p>
         <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">
           <li><a href={result.website.connect} className="flex min-h-16 items-center gap-4 px-1 py-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">
             <Globe2 className="size-5 shrink-0 text-accent-text" aria-hidden="true" />
@@ -247,7 +264,7 @@ function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim
         <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{client.factsSeeded} {client.factsSeeded === 1 ? "detail" : "details"} on the business record, including its name. Only the owner confirms them.</p>
       </div>
 
-      <OwnerLink result={result} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} />
+      <OwnerLink result={result} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
     </div>
 
     <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-gray-border pt-6">
@@ -272,12 +289,14 @@ export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
   </section>;
 }
 
-function OwnerLink({ result, agencyWorkspaceId, onClaim }: { result: AddAgencyClientResult; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void }) {
+function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void }) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(result.ownerClaimError ?? "");
   const [copied, setCopied] = useState(false);
-  const claim = result.ownerClaim;
+  const ownerClaimed = currentClient?.ownerClaimed ?? false;
+  const issuedClaim = result.ownerClaim;
+  const claim = currentOwnerClaim(issuedClaim, currentClient);
   const link = claim ? absolute(claim.claimPath) : "";
 
   async function create(event: FormEvent) {
@@ -296,21 +315,22 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim }: { result: AddAgencyCl
   }
 
   async function copy() {
+    if (!currentOwnerClaim(issuedClaim, currentClient)) { setError("The owner link is no longer current. Create a fresh link before sharing."); return; }
     try { await navigator.clipboard.writeText(link); setCopied(true); window.setTimeout(() => setCopied(false), 2400); }
     catch { setError("Copy didn’t work here. Select the link and copy it."); }
   }
 
   return <aside className="self-start rounded-3xl border border-gray-border bg-surface p-6" aria-labelledby="owner-link-title">
-    <h2 id="owner-link-title" className="text-[15px] font-medium">Owner link</h2>
-    {claim ? <>
-      <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">For {claim.recipientEmail}. Whoever signs in with that address becomes the owner.</p>
+    <h2 id="owner-link-title" className="text-[15px] font-medium">Owner claim link</h2>
+    {ownerClaimed ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">The owner has accepted their claim. No new owner link is needed.</p> : claim ? <>
+      <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">For {claim.recipientEmail}. The recipient signs in with that address and accepts to become the owner.</p>
       <label htmlFor="owner-link-value" className="sr-only">Owner claim link</label>
       <input id="owner-link-value" readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 font-mono text-[12px]" />
       <Button className="mt-3 w-full" onClick={() => void copy()} icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button>
       <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">Not sent.</strong> Client email is off during the rollout, so send this yourself. Works until {dateLabel(claim.expiresAt)}.</p>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">The link is shown once. Making a new one replaces it.</p>
     </> : <form onSubmit={create} noValidate className="mt-1">
-      <p className="text-[13px] leading-relaxed text-gray-muted">Make a link for the owner to take their business. Nothing is emailed; you send it.</p>
+      <p className="text-[13px] leading-relaxed text-gray-muted">{issuedClaim ? "The previously shown owner link is no longer current. Create a fresh link for the owner." : currentClient?.pendingClaim ? "An owner claim is already pending. Creating a fresh link replaces it." : "Make a link for the owner to take their business."} Nothing is emailed; you send it.</p>
       <div className="mt-4"><TextInput label="Owner’s email" type="email" autoComplete="email" maxLength={254} value={email} onChange={(event) => { setEmail(event.target.value); setError(""); }} /></div>
       <Button type="submit" className="mt-3 w-full" loading={busy}>Create owner link</Button>
     </form>}
