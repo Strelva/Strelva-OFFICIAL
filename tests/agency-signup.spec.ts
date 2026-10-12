@@ -1,8 +1,8 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AgencyOnboarding } from "../src/platform/workspaces/agency-onboarding";
 
-test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1" || process.env.STRELVA_AGENCY_SIGNUP_RELEASE !== "1",
-  "Agency signup browser checks require STRELVA_WORKSPACE_RELEASE=1 and STRELVA_AGENCY_SIGNUP_RELEASE=1.");
+test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1" || process.env.STRELVA_AGENCY_SIGNUP_RELEASE !== "1" || process.env.STRELVA_BUSINESS_SIGNUP_RELEASE !== "1",
+  "Agency signup browser checks require STRELVA_WORKSPACE_RELEASE=1, STRELVA_AGENCY_SIGNUP_RELEASE=1 and STRELVA_BUSINESS_SIGNUP_RELEASE=1 (the business choice).");
 
 /**
  * Agency front door (#258). Every API response is intercepted in the browser:

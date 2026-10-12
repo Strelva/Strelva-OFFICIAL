@@ -12,6 +12,7 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { getStoredContent } from "@/lib/storage/content-store";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { AGENCY_START_PATH, agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import { BUSINESS_SIGNUP_PATH } from "@/platform/workspaces/business-start";
 import { tenantSignInNext } from "@/platform/owner-entry/env";
 import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
@@ -94,19 +95,23 @@ export default async function SignUpPage({
   if (invite) return <StEntry brand={invite.brand} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
-  if (workspaceOpen) {
-    const asAgency = agencySignupReleaseEnabled() && searchValue(params.as) === "agency";
+  const agencyDoor = agencySignupReleaseEnabled();
+  const businessDoor = businessSignupReleaseEnabled();
+  // Opening the workspace no longer opens direct business sign-up to everyone:
+  // an invitation, an open agency door or STRELVA_BUSINESS_SIGNUP_RELEASE does.
+  const asAgency = agencyDoor && searchValue(params.as) === "agency";
+  if (workspaceOpen && (invitationTarget || asAgency || businessDoor)) {
     // ADR 0015: "I run a business" goes straight to creating that business,
     // not to a personal workspace with the business one click away in Help.
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
     const identity = await invitationEntryIdentity(invitationTarget);
     return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
-      <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencySignupReleaseEnabled() ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
+      <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencyDoor && businessDoor ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
       {identity ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/access-request">Want it done for you? Ask Strelva Agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton></StEntry>;
+  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/access-request">Want it done for you? Ask Strelva Agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton>{workspaceOpen && agencyDoor ? <StTextButton href="/sign-up?as=agency">Build for clients? Create an agency account</StTextButton> : null}</StEntry>;
 }
 
 function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {
