@@ -75,6 +75,10 @@ export const clientImportPreviewRowSchema = z.object({
   reason: z.string().max(300).optional(),
   /** Set once the row is added. */
   businessId: z.string().uuid().optional(),
+  /** Added (L2): the owner claim path for an added row with an owner email. Holds a one-time token; shown once, to the agency. */
+  ownerClaimPath: z.string().max(200).optional(),
+  /** Added (L2): a plain note on a row that is otherwise fine, e.g. a phone that was not kept. */
+  note: z.string().max(300).optional(),
 }).strict();
 export type ClientImportPreviewRow = z.infer<typeof clientImportPreviewRowSchema>;
 
@@ -82,4 +86,56 @@ export type ClientImportPreviewRow = z.infer<typeof clientImportPreviewRowSchema
 export interface ClientImportSourceAdapter {
   source: ClientImportSource;
   readRows(input: unknown): Promise<ClientImportRow[]>;
+}
+
+/*
+ * Added by lane L2 (sheet source, preview and apply). Additive only: every
+ * source posts the same rows to the same preview and apply.
+ */
+
+/** Rows per preview, and per apply request (an apply adds each row the ordinary way, so it stays small). */
+export const CLIENT_IMPORT_MAX_ROWS = 500;
+export const CLIENT_IMPORT_APPLY_BATCH = 3;
+
+/** The add limits that apply to one agency, and how much of them it has used. */
+export const clientImportLimitsSchema = z.object({
+  daily: z.number().int().min(0),
+  waitingForOwner: z.number().int().min(0),
+  /** An operator set this agency's limits. */
+  raised: z.boolean(),
+  usedToday: z.number().int().min(0),
+  waiting: z.number().int().min(0),
+}).passthrough();
+export type ClientImportLimits = z.infer<typeof clientImportLimitsSchema>;
+
+const uuid = z.string().uuid();
+
+export const clientImportPreviewInputSchema = z.object({
+  action: z.literal("preview"),
+  agencyWorkspaceId: uuid,
+  source: clientImportSourceSchema,
+  rows: z.array(clientImportRowSchema).min(1).max(CLIENT_IMPORT_MAX_ROWS),
+}).strict();
+export type ClientImportPreviewInput = z.infer<typeof clientImportPreviewInputSchema>;
+
+export const clientImportApplyInputSchema = z.object({
+  action: z.literal("apply"),
+  agencyWorkspaceId: uuid,
+  source: clientImportSourceSchema,
+  /** Only rows the agency confirmed. Each is re-checked before it is added. */
+  rows: z.array(clientImportRowSchema).min(1).max(CLIENT_IMPORT_APPLY_BATCH),
+}).strict();
+export type ClientImportApplyInput = z.infer<typeof clientImportApplyInputSchema>;
+
+export const clientImportActionSchema = z.discriminatedUnion("action", [clientImportPreviewInputSchema, clientImportApplyInputSchema]);
+
+export interface ClientImportPreview {
+  rows: ClientImportPreviewRow[];
+  limits: ClientImportLimits;
+  /** Rows that are ready and fit today's limits. */
+  canAddToday: number;
+}
+
+export interface ClientImportApplyResult {
+  rows: ClientImportPreviewRow[];
 }

@@ -244,6 +244,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261020090015": "sandbox_build_attempts",
   "20261023142000": "agency_scope_grants",
   "20261023144000": "funnel_events",
+  "20261024200000": "agency_client_add_limit_overrides",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

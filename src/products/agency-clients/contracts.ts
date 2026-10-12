@@ -20,6 +20,15 @@ export const addAgencyClientInputSchema = z.object({
   /** Where the owner claim link is addressed. Nothing is sent to it. */
   ownerEmail: email.optional(),
   idempotencyKey: uuid,
+  /**
+   * Found facts the agency already holds (Import clients carries a sheet's
+   * phone and address). Stored like scanned facts: the agency's, unconfirmed,
+   * for the owner to confirm at the claim. They win over what the scan found.
+   */
+  foundFacts: z.object({
+    phone: z.string().trim().min(3).max(40).optional(),
+    address: z.string().trim().min(1).max(200).optional(),
+  }).strict().optional(),
 }).strict().refine((input) => input.url || input.prospectId || input.name, "Enter the business's website, or choose a prospect.");
 export type AddAgencyClientInput = z.infer<typeof addAgencyClientInputSchema>;
 

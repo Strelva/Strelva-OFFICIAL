@@ -2037,6 +2037,19 @@
           "rollbackStatus": "Prepared inverse restores the prior definitions; focused local PostgreSQL contract (scripts/check-two-doors-sql.sh) only. Hosted Auth, ordered workspace SQL and production application UNRUN/held; no production application authorized."
         }
       ]
+    },
+    {
+      "id": "agency-client-import",
+      "status": "Getting started L2 Import clients and per-agency add limits: held and unqualified. Focused local PostgreSQL contract (scripts/check-agency-client-import-sql.sh) and the ordered agency workflow runner only; hosted Auth and production migration application UNRUN; no packet batch or deployment authority granted.",
+      "items": [
+        {
+          "file": "20261024200000_agency_client_import.sql",
+          "sha256": "9b65636c3662bd243a3aedc74001943e0ba3f54497ba90607270ab3bdf8609bd",
+          "rollback": "rollback-20261024200000_agency_client_import.sql",
+          "rollbackSha256": "45b013f9d268ff107406d62f7e59131a791dc573d81b1a5ca9055cf114fcf322",
+          "rollbackStatus": "Prepared inverse restores agency_add_client exactly as 20261015100000 left it and drops the limits tables and readers; refuses once any operator-set limit or its history exists. Local throwaway PostgreSQL only; production application UNRUN/held."
+        }
+      ]
     }
   ]
 }

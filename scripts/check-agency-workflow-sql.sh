@@ -50,6 +50,7 @@ psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owne
 psql "${psql_args[@]}" --file="$repo_root/tests/application-actor-snapshots.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-change-actor-privacy-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-workflow-schema.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-import-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/website-owner-agency-publish-schema.sql" >/dev/null
 if [[ "$owner_runtime_installed" == true ]]; then
   # Match the installed successor's entire captured function scope, including
