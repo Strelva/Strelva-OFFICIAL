@@ -1,0 +1,62 @@
+{
+  "base": "6ddc03f4d0f854997ff3f54481d5066625bf62fe",
+  "environment": "local isolated worktree",
+  "node": "v26.8.2",
+  "pnpm": "10.34.5",
+  "productionQualified": false,
+  "candidatePatchQualifiedAgainstCombinedCanonicalSQL": false,
+  "logs": {
+    "focused": {
+      "retainedPath": "/tmp/f01-focused.log",
+      "sha256": "c995df7e692af4d78dd367b28563c7ae0feb8e977d106e0034895367d293f878"
+    },
+    "authority": {
+      "retainedPath": "/tmp/f01-authority.log",
+      "sha256": "37e776df0216d352be74d80e4f9d8622a1505d6e12d920029d1886d687fc474f"
+    },
+    "release-tests": {
+      "retainedPath": "/tmp/f01-release-tests.log",
+      "sha256": "931f222bb54049b1afd99554adc65470e7ee57a95dedffc74e77a3b3e0bb165b"
+    },
+    "typecheck": {
+      "retainedPath": "/tmp/f01-typecheck.log",
+      "sha256": "8d5f736cdf902dac9d9b07ec4e00161047776adf9bde580b8a05d3a4b41f694c"
+    },
+    "typecheck-final": {
+      "retainedPath": "/tmp/f01-typecheck-final.log",
+      "sha256": "45090a5ad3d5fdc8d43b6d8f813d3079a7a290ab74f7d7d8ad76f85a678dd672"
+    },
+    "final-focused": {
+      "retainedPath": "/tmp/f01-final-focused.log",
+      "sha256": "edcddfb75c1c91fffba42beca7612a9745550ffae7f68b532c00e04dac105c8d"
+    },
+    "before-regression": {
+      "retainedPath": "/tmp/f01-before-regression.log",
+      "sha256": "875396f293c468f7559e68ddad72d0c8a636ed7fe25c04fff06e29d6841ed91e"
+    },
+    "lint": {
+      "retainedPath": "/tmp/f01-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "lint-final": {
+      "retainedPath": "/tmp/f01-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "custom": {
+      "retainedPath": "/tmp/f01-custom.log",
+      "sha256": "11b7bf0b4be92dcc3fb48ac3ae7f87270de10dba1bf0da8e7aa693717f3b13ef"
+    },
+    "boundaries": {
+      "retainedPath": "/tmp/f01-boundaries.log",
+      "sha256": "72a92e28f36e632453eb6ed09fddb5963dea9ba076a287e921fdae867f42b8bd"
+    },
+    "after-regression": {
+      "retainedPath": "/tmp/f01-after-regression.log",
+      "sha256": "c83285caeb1370d26224dcf5beb351c9d835e59bb5e9ffc7e641ec59912bb543"
+    },
+    "preserved-mail": {
+      "retainedPath": "/tmp/f01-preserved-mail.log",
+      "sha256": "f5df7daca39c6fd4607cfdf4b9e4178c0f835db5062b53c2ccbd7091f55281fd"
+    }
+  }
+}

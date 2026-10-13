@@ -118,14 +118,14 @@ export function workspaceContractVersion(manifest: WorkspaceManifest): string {
 
 // ── import-safe workspace checks ────────────────────────────────────────────
 
-function git(cwd: string, args: string[], trim = true): string {
-  const out = execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+function git(cwd: string, args: string[], trim = true, env?: NodeJS.ProcessEnv): string {
+  const out = execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   return trim ? out.trim() : out;
 }
 
-function gitOk(cwd: string, args: string[]): boolean {
+function gitOk(cwd: string, args: string[], env?: NodeJS.ProcessEnv): boolean {
   try {
-    execFileSync("git", args, { cwd, stdio: ["ignore", "ignore", "ignore"] });
+    execFileSync("git", args, { cwd, env, stdio: ["ignore", "ignore", "ignore"] });
     return true;
   } catch {
     return false;
@@ -133,13 +133,13 @@ function gitOk(cwd: string, args: string[]): boolean {
 }
 
 /** Describe how the checked-out revision relates to the pin (read-only git). */
-function lineage(repoPath: string, pin: string | null, actual: string): string {
+function lineage(repoPath: string, pin: string | null, actual: string, env?: NodeJS.ProcessEnv): string {
   if (!pin) return "no pin";
-  if (!gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`])) return "pin not in this clone";
-  if (gitOk(repoPath, ["merge-base", "--is-ancestor", pin, actual])) {
-    return `${git(repoPath, ["rev-list", "--count", `${pin}..${actual}`])} commit(s) ahead of the pin`;
+  if (!gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`], env)) return "pin not in this clone";
+  if (gitOk(repoPath, ["merge-base", "--is-ancestor", pin, actual], env)) {
+    return `${git(repoPath, ["rev-list", "--count", `${pin}..${actual}`], true, env)} commit(s) ahead of the pin`;
   }
-  if (gitOk(repoPath, ["merge-base", "--is-ancestor", actual, pin])) return "behind the pin";
+  if (gitOk(repoPath, ["merge-base", "--is-ancestor", actual, pin], env)) return "behind the pin";
   return "diverged from the pin";
 }
 
@@ -153,7 +153,7 @@ export function runWorkspaceChecks(
   manifest: WorkspaceManifest,
   workspaceRoot: string,
   cwd: string,
-  options: { verifyPins?: boolean; checkoutRoot?: string } = {},
+  options: { verifyPins?: boolean; checkoutRoot?: string; gitEnvironment?: NodeJS.ProcessEnv } = {},
 ): CheckResult[] {
   const results: CheckResult[] = [];
   const contractVersion = workspaceContractVersion(manifest);
@@ -170,11 +170,11 @@ export function runWorkspaceChecks(
   function checkCallSites(repo: RepoCheck, repoPath: string) {
     if (repo.v1Endpoints.length === 0 && repo.v1CallSites.length === 0) return;
     const pin = repo.compatibleCommit;
-    const pinAvailable = Boolean(pin) && gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`]);
+    const pinAvailable = Boolean(pin) && gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`], options.gitEnvironment);
     const readSource = (file: string): string | null => {
       if (pinAvailable) {
         try {
-          return git(repoPath, ["show", `${pin}:${file}`], false);
+          return git(repoPath, ["show", `${pin}:${file}`], false, options.gitEnvironment);
         } catch {
           return null;
         }
@@ -254,11 +254,11 @@ export function runWorkspaceChecks(
     record(`${repo.tenant}:repo`, true);
     if (options.verifyPins) {
       try {
-        const actual = git(repoPath, ["rev-parse", "HEAD"]);
+        const actual = git(repoPath, ["rev-parse", "HEAD"], true, options.gitEnvironment);
         record(`${repo.tenant}:release:checkout`, actual === repo.compatibleCommit,
-          `expected ${repo.compatibleCommit}; checkout is ${actual} (${lineage(repoPath, repo.compatibleCommit, actual)}). ` +
+          `expected ${repo.compatibleCommit}; checkout is ${actual} (${lineage(repoPath, repo.compatibleCommit, actual, options.gitEnvironment)}). ` +
           "Release proof needs an isolated checkout of the pin: set CUSTOM_REPO_CHECKOUTS_ROOT (docs/operations/testing-and-ci.md).");
-        const changes = git(repoPath, ["status", "--porcelain", "--untracked-files=normal"]);
+        const changes = git(repoPath, ["status", "--porcelain", "--untracked-files=normal"], true, options.gitEnvironment);
         const count = changes ? changes.split("\n").length : 0;
         record(`${repo.tenant}:release:clean`, !changes,
           `checkout has ${count} changed path(s); use an isolated checkout of the pinned revision, never reset the owner's folder`);

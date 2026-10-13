@@ -1,0 +1,11 @@
+
+> strelva@0.2.0 check:release-safety:batch8 /private/tmp/strelva-issue-528-role-path-20261008
+> tsx scripts/check-release-safety-batch8.ts --current-tail
+
+Applied baseline, batches 0-7 and pinned H/7A.
+Applied 50 remaining forward files after original batch8 RPC scope capture (complete current inventory).
+Runtime recovery round 1: 187 introduced service RPCs dark; entire forward schema/bodies/owners preserved; exact all-public rows retained; legacy auth/content/billing passed; exact catalog/ACL reproduced.
+Runtime recovery round 2: 187 introduced service RPCs dark; entire forward schema/bodies/owners preserved; exact all-public rows retained; legacy auth/content/billing passed; exact catalog/ACL reproduced.
+Local permission recovery receipt: /private/tmp/strelva-issue-528-role-path-20261008/output/release-safety/batch8-1791497256451
+(node:46790) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

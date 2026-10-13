@@ -2332,3 +2332,15 @@ inspection and names the agency workspace as the place to manage leads.
 Local DOM, route and mocked-store tests cover these contracts. Native Redis
 execution, actual Auth and desktop/phone rendering remain unproven under the
 lane brief's explicit no-server/no-browser/no-socket stop point.
+
+### October 12 · provider health queue security port
+
+[ProviderAlertsPreview](../../src/experience/workspace/agency/ProviderAlertsPreview.tsx)
+adds fictional provider-health rows to the existing `AgencyQueueList` at
+`/preview/strelva/provider-alerts`. Its ready, missing, empty and revoked fixtures
+use the current queue component and existing workspace links; they grant no
+read, provider or notification authority. The production agency read preserves
+main's qualified Library offers and ordinary agency System health before adding
+the release-gated current-provider alert projection. Local projection/cron/TLS
+units and typecheck pass; this session's dev server cannot bind a socket, so
+fresh desktop/mobile rendering and actual provider Auth remain unproven.

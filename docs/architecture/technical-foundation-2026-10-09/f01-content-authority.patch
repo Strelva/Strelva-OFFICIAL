@@ -1,0 +1,229 @@
+diff --git a/src/__tests__/content-receipts.test.ts b/src/__tests__/content-receipts.test.ts
+index f779684b2..6eb135b14 100644
+--- a/src/__tests__/content-receipts.test.ts
++++ b/src/__tests__/content-receipts.test.ts
+@@ -52,6 +52,11 @@ describe("content publication receipts", () => {
+     expect(mocks.cacheWrite).not.toHaveBeenCalled();
+     expect(mocks.settle).not.toHaveBeenCalled();
+   });
++  it("preserves the actual verified actor for authority and attribution", async () => {
++    const actor = { userId: "ab000000-0000-4000-8000-000000000001", email: "staff@agency.example.test" };
++    await setContent("hero", defaults.hero, "alpha", actor);
++    expect(mocks.atomic).toHaveBeenCalledWith("alpha", "hero", defaults.hero, actor);
++  });
+   it("records acceptance separately from matched public projection", async () => {
+     await setContent("hero", defaults.hero, "alpha");
+     expect(mocks.atomic).toHaveBeenCalledTimes(1);
+diff --git a/src/__tests__/db-content-receipts.test.ts b/src/__tests__/db-content-receipts.test.ts
+index 83eaadac2..8736f9639 100644
+--- a/src/__tests__/db-content-receipts.test.ts
++++ b/src/__tests__/db-content-receipts.test.ts
+@@ -9,6 +9,15 @@ describe("atomic content repository", () => {
+     await expect(upsertContentDataWithReceipt("alpha", "hero", { headline: "After" })).resolves.toBe("receipt-1");
+     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("write_operator_content", { p_tenant_id: "alpha", p_section: "hero", p_data: { headline: "After" } });
+   });
++  it("passes verified actor context to the authority-bearing RPC", async () => {
++    mocks.rpc.mockResolvedValue({ data: { id: "receipt-1" }, error: null });
++    const actor = { userId: "ab000000-0000-4000-8000-000000000001", email: "staff@agency.example.test" };
++    await expect(upsertContentDataWithReceipt("alpha", "hero", { headline: "After" }, actor)).resolves.toBe("receipt-1");
++    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("write_content_as_actor", {
++      p_tenant_id: "alpha", p_section: "hero", p_data: { headline: "After" },
++      p_user_id: actor.userId, p_verified_email: actor.email,
++    });
++  });
+   it("rejects unavailable storage before publication", async () => {
+     mocks.db.mockReturnValue(null);
+     await expect(upsertContentDataWithReceipt("alpha", "hero", {})).rejects.toThrow("Supabase is not configured");
+diff --git a/src/__tests__/site-editor-publish.test.ts b/src/__tests__/site-editor-publish.test.ts
+index 215603b43..436336a9c 100644
+--- a/src/__tests__/site-editor-publish.test.ts
++++ b/src/__tests__/site-editor-publish.test.ts
+@@ -1,5 +1,15 @@
+ vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import type { ActorContext } from "@/platform/infra/auth";
++
++const OWNER_ACTOR = vi.hoisted(() => ({
++  userId: "ca495000-0000-4000-8000-000000000001",
++  email: "owner@example.com",
++  name: null,
++  type: "user",
++  isSuperAdmin: false,
++  isImpersonating: false,
++} satisfies ActorContext));
+
+ const mockHeadersGet = vi.fn((key: string) => {
+   if (key === "x-tenant") return "test-tenant";
+@@ -52,7 +62,7 @@ vi.mock("@/platform/infra/auth", () => ({
+   requireTenantPermission: (...args: unknown[]) => mockRequireTenantPermission(...args),
+   isSuperAdmin: () => mockIsSuperAdmin(),
+   getActorContext: vi.fn(() =>
+-    Promise.resolve({ isImpersonating: false, email: "owner@example.com" })
++    Promise.resolve(OWNER_ACTOR)
+   ),
+ }));
+
+@@ -193,7 +203,7 @@ describe("site editor publish routes", () => {
+       publishedPageConfig: true,
+       liveSite: { status: "revalidated" },
+     });
+-    expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant");
++    expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant", OWNER_ACTOR);
+     expect(mockClearDraft).toHaveBeenCalledWith("hero", "test-tenant");
+     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
+     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
+diff --git a/src/__tests__/site-snapshots.test.ts b/src/__tests__/site-snapshots.test.ts
+index 80e0b7bac..8d5a36243 100644
+--- a/src/__tests__/site-snapshots.test.ts
++++ b/src/__tests__/site-snapshots.test.ts
+@@ -136,9 +136,26 @@ describe("site snapshots", () => {
+     expect(result.restored.status).toBe("restored");
+     expect(result.preRestore.reason).toBe("pre_restore");
+     expect(mockSetContent).toHaveBeenCalledTimes(SITE_SNAPSHOT_SECTIONS.length);
++    for (const call of mockSetContent.mock.calls) expect(call[3]).toMatchObject({
++      userId: "user_123", email: "owner@example.com",
++    });
+     expect(summaries.map((item) => item.reason)).toContain("pre_restore");
+   });
+
++  it("reports partial restore when revoked authority denies recovery too", async () => {
++    const { createSiteSnapshot, restoreSiteSnapshot, SITE_SNAPSHOT_SECTIONS } = await import("@/lib/storage/site-snapshot-store");
++    const snapshot = await createSiteSnapshot("demo", { reason: "manual", label: "Known good", author: "user" });
++    const actor = { userId: "owner-current", email: "owner@example.test", type: "user" as const, isSuperAdmin: false };
++    mockSetContent.mockResolvedValueOnce(undefined)
++      .mockRejectedValueOnce(new Error("acting_provider_no_mandate"))
++      .mockRejectedValueOnce(new Error("acting_provider_no_mandate"));
++    await expect(restoreSiteSnapshot("demo", snapshot.id, { actor })).rejects.toThrow(
++      `Restore is partially applied. Recovery could not restore these sections: ${SITE_SNAPSHOT_SECTIONS[0]}`,
++    );
++    expect(mockSetContent).toHaveBeenCalledTimes(3);
++    for (const call of mockSetContent.mock.calls) expect(call[3]).toBe(actor);
++  });
++
+   it("dedupes daily backups for the same tenant and date", async () => {
+     vi.useFakeTimers();
+     vi.setSystemTime(new Date("2026-05-16T12:00:00.000Z"));
+diff --git a/src/app/api/admin/drafts/route.ts b/src/app/api/admin/drafts/route.ts
+index 509cc168e..9128eedd4 100644
+--- a/src/app/api/admin/drafts/route.ts
++++ b/src/app/api/admin/drafts/route.ts
+@@ -113,7 +113,7 @@ export async function POST(request: Request) {
+
+     const current = await getContent(typedSection, tenant) as unknown as Record<string, unknown>;
+     const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
+-    await setContent(typedSection, parsed.data as ContentMap[typeof typedSection], tenant);
++    await setContent(typedSection, parsed.data as ContentMap[typeof typedSection], tenant, actor);
+     await appendVersion(typedSection, parsed.data, "admin", tenant, changes);
+     await recordSectionUpdate(typedSection, tenant);
+     await logActivity({
+diff --git a/src/app/api/content/[section]/route.ts b/src/app/api/content/[section]/route.ts
+index 115bc7ed2..74cfbe54a 100644
+--- a/src/app/api/content/[section]/route.ts
++++ b/src/app/api/content/[section]/route.ts
+@@ -121,7 +121,7 @@ export async function PUT(
+     const current = await getContent(s, tenant) as unknown as Record<string, unknown>;
+     const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
+
+-    await setContent(s, parsed.data as ContentMap[typeof s], tenant);
++    await setContent(s, parsed.data as ContentMap[typeof s], tenant, actor);
+     // Content is now live. Version history + the section timestamp are
+     // bookkeeping — if one throws here, DON'T 500 (that would tell the owner the
+     // save failed when it actually succeeded, and they'd retry / lose trust).
+diff --git a/src/app/api/publish/route.ts b/src/app/api/publish/route.ts
+index 646bc6181..4fbe98be1 100644
+--- a/src/app/api/publish/route.ts
++++ b/src/app/api/publish/route.ts
+@@ -110,7 +110,7 @@ export async function POST() {
+       const next = draft.data as ContentMap[typeof draft.section];
+       const changes = diffFields(current, next as unknown as Record<string, unknown>);
+
+-      await setContent(draft.section, next, tenant);
++      await setContent(draft.section, next, tenant, actor);
+       await appendVersion(draft.section, next, actor.isImpersonating ? "admin" : "user", tenant, changes);
+       await recordSectionUpdate(draft.section, tenant);
+       await logActivity({
+diff --git a/src/lib/storage/content-store.ts b/src/lib/storage/content-store.ts
+index c29233d86..506d53446 100644
+--- a/src/lib/storage/content-store.ts
++++ b/src/lib/storage/content-store.ts
+@@ -197,13 +197,14 @@ export async function getStoredContent<K extends ContentSection>(
+ export async function setContent<K extends ContentSection>(
+   section: K,
+   data: ContentMap[K],
+-  tenant: string = DEFAULT_TENANT
++  tenant: string = DEFAULT_TENANT,
++  actor?: { userId: string | null; email: string | null },
+ ): Promise<void> {
+   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
+   if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" && contentSourceIsPostgres()) {
+     let receiptId: string | null;
+     try {
+-      receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>);
++      receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>, ...(actor ? [actor] : []));
+     } catch (error) {
+       await invalidateCachedContent(section, tenant);
+       throw error;
+diff --git a/src/lib/storage/site-snapshot-store.ts b/src/lib/storage/site-snapshot-store.ts
+index 6fab941a3..3f617148d 100644
+--- a/src/lib/storage/site-snapshot-store.ts
++++ b/src/lib/storage/site-snapshot-store.ts
+@@ -390,24 +390,31 @@ export async function restoreSiteSnapshot(
+   const written: ContentSection[] = [];
+   try {
+     for (const { section, data } of toWrite) {
+-      await setContent(section, data as ContentMap[typeof section], tenantId);
++      await setContent(section, data as ContentMap[typeof section], tenantId, options.actor);
+       written.push(section);
+     }
+   } catch (err) {
++    // Recover only under the same current authority; revocation may deny
++    // recovery too. Never report full rollback when a prior section remains.
++    const recoveryFailures: ContentSection[] = [];
+     // Roll back the sections that already landed.
+     for (const section of written) {
+       const prev = previous.get(section);
+       if (prev) {
+         try {
+-          await setContent(section, prev as ContentMap[typeof section], tenantId);
++          await setContent(section, prev as ContentMap[typeof section], tenantId, options.actor);
+         } catch {
+-          // best-effort rollback; the throw below surfaces the original failure
++          recoveryFailures.push(section);
+         }
++      } else {
++        recoveryFailures.push(section);
+       }
+     }
+-    throw new Error(
+-      `Restore failed on a section write and was rolled back: ${err instanceof Error ? err.message : "unknown error"}`,
+-    );
++    const failure = err instanceof Error ? err.message : "unknown error";
++    throw new Error(recoveryFailures.length
++      ? `Restore is partially applied. Recovery could not restore these sections: ${recoveryFailures.join(", ")}. Review the current site and the pre-restore snapshot. Original failure: ${failure}`
++      : `Restore failed on a section write and was rolled back: ${failure}`);
++
+   }
+
+   const restoredAt = new Date().toISOString();
+diff --git a/src/platform/infra/db/repositories.ts b/src/platform/infra/db/repositories.ts
+index b3d56f331..4c8ed06a9 100644
+--- a/src/platform/infra/db/repositories.ts
++++ b/src/platform/infra/db/repositories.ts
+@@ -507,12 +507,16 @@ export async function upsertContentDataWithReceipt(
+   tenant: string,
+   section: string,
+   data: Record<string, unknown>,
++  actor?: { userId: string | null; email: string | null },
+ ): Promise<string | null> {
+   const db = requiredDb(`upsertContentDataWithReceipt ${tenant}/${section}`);
+   // Additive RPC is deliberately outside generated types until migration
+   // integration regenerates them. No second content write is performed here.
+   const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+-  const result = await rpc.rpc("write_operator_content", { p_tenant_id: tenant, p_section: section, p_data: data });
++  const result = await rpc.rpc(actor ? "write_content_as_actor" : "write_operator_content", {
++    p_tenant_id: tenant, p_section: section, p_data: data,
++    ...(actor ? { p_user_id: actor.userId, p_verified_email: actor.email } : {}),
++  });
+   if (result.error) throw result.error;
+   const receipt = result.data as { id?: unknown } | null;
+   // A successful RPC already committed content and receipt. A malformed

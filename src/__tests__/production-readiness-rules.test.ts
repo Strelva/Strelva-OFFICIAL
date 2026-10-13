@@ -601,8 +601,14 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(packageData.packageManager).toMatch(/^pnpm@10\./);
     expect(packageData.pnpm?.overrides?.["fast-uri"]).toBe("3.1.8");
     expect(lockfile).toContain("  fast-uri: 3.1.8");
-    expect(releaseGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
-    expect(launchGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
+    expect(releaseGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm check:supply-chain && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
+    expect(launchGate).toBe("pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm check:supply-chain && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
+    expect(packageData.scripts?.["check:supply-chain"]).toBe("node scripts/check-supply-chain.mjs");
+    const supplyChain = readFileSync(path.join(process.cwd(), "scripts/check-supply-chain.mjs"), "utf8");
+    expect(supplyChain).toContain('commandJson(["audit", "--json"])');
+    expect(supplyChain).toContain('commandJson(["audit", "--prod", "--json"])');
+    expect(supplyChain).toContain("audit_data_unavailable_or_muted");
+    expect(supplyChain).toContain("unbounded_package_audit_ignore_forbidden");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");
     // CI gates the dependency audit at HIGH+ (high advisories are patched via
     // pnpm overrides). Plain `pnpm audit` fails on any transitive moderate/low

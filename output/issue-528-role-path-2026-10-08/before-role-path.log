@@ -1,0 +1,79 @@
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+GRANT
+CREATE TABLE
+INSERT 0 1
+GRANT
+GRANT
+GRANT ROLE
+ member | inherited | can_set
+--------+-----------+---------
+ t      | f         | t
+(1 row)
+
+BEGIN
+SET
+SET
+LOCK TABLE
+REVOKE
+GRANT
+DO
+COMMIT
+ mutation_as_service
+---------------------
+ f
+(1 row)
+
+SET
+SET
+UPDATE 1
+RESET
+RESET
+       action
+---------------------
+ forged via SET ROLE
+(1 row)
+
+REVOKE ROLE
+REVOKE
+REVOKE
+DROP ROLE
+ALTER ROLE
+BEGIN
+SET
+SET
+LOCK TABLE
+REVOKE
+GRANT
+DO
+COMMIT
+   rolname    | rolcreaterole | rolsuper
+--------------+---------------+----------
+ service_role | t             | f
+(1 row)
+
+SET
+CREATE ROLE
+RESET
+CREATE ROLE
+GRANT
+GRANT
+GRANT ROLE
+BEGIN
+SET
+SET
+LOCK TABLE
+REVOKE
+GRANT
+DO
+COMMIT
+SET
+GRANT ROLE
+UPDATE 1
+RESET
+           action
+-----------------------------
+ forged via ADMIN membership
+(1 row)

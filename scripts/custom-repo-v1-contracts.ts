@@ -44,39 +44,95 @@ export type V1CallSite = {
   fixtures?: V1Fixture[];
 };
 
-type RouteContract = {
-  method: "GET" | "POST";
+export type RouteContract = {
+  method: "GET" | "POST" | "PATCH" | "DELETE";
+  /** Nested resources place tenant before the suffix. Defaults to /api/v1/<key>/{tenant}. */
+  pathTemplate?: string;
+  query?: { reads: string[]; required: string[] };
+  /** Documentation of the seam; runtime fixtures assert these semantics. */
+  auth?: "public" | "spam-pit-write-key" | "management-token-body" | "signed-preview" | "public-clicks-signed-orders";
+  successStatuses?: number[];
+  replay?: "read-only" | "request-id-optional" | "management-token" | "readback-only" | "not-idempotent" | "bounded-lead-dedup" | "click-window-and-signed-order-id";
   /** Platform route file, relative to the control-plane checkout. */
   routeFile: string;
-  /** Body fields the route reads (POST only). */
+  /** Body fields the route reads (write methods only). */
   reads?: string[];
   /** Body fields without which the route rejects the request. */
   required?: string[];
 };
 
-/** The v1 routes client repos call today, and the body fields each reads. */
+/** Consumer-facing v1 contracts. New starter resources do not imply deployed adoption. */
 export const V1_ROUTE_CONTRACTS: Record<string, RouteContract> = {
   leads: {
     method: "POST",
     routeFile: "src/app/api/v1/leads/[tenant]/route.ts",
     reads: ["name", "email", "message", "source", "website", "company", "capabilityId", "capabilityVersion", "fields"],
-    required: ["name"],
+    required: ["name"], auth: "public", successStatuses: [200], replay: "bounded-lead-dedup",
   },
   track: {
     method: "POST",
     routeFile: "src/app/api/v1/track/[tenant]/route.ts",
     reads: ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
-    required: ["event"],
+    required: ["event"], auth: "public-clicks-signed-orders", successStatuses: [200], replay: "click-window-and-signed-order-id",
   },
   "spam-pit": {
     method: "POST",
     routeFile: "src/app/api/v1/spam-pit/[tenant]/route.ts",
     reads: ["reason", "source", "name", "email", "message", "fields", "ip", "userAgent"],
-    required: [],
+    required: [], auth: "spam-pit-write-key", successStatuses: [200], replay: "not-idempotent",
   },
-  content: { method: "GET", routeFile: "src/app/api/v1/content/[tenant]/[section]/route.ts" },
-  "page-config": { method: "GET", routeFile: "src/app/api/v1/page-config/[tenant]/route.ts" },
-  "site-capabilities": { method: "GET", routeFile: "src/app/api/v1/site-capabilities/[tenant]/route.ts" },
+  content: { method: "GET", routeFile: "src/app/api/v1/content/[tenant]/[section]/route.ts", auth: "signed-preview", successStatuses: [200], replay: "read-only" },
+  "page-config": { method: "GET", routeFile: "src/app/api/v1/page-config/[tenant]/route.ts", auth: "signed-preview", successStatuses: [200], replay: "read-only" },
+  "site-capabilities": { method: "GET", routeFile: "src/app/api/v1/site-capabilities/[tenant]/route.ts", auth: "public", successStatuses: [200], replay: "read-only" },
+  inquiries: {
+    method: "GET", routeFile: "src/app/api/v1/inquiries/[tenant]/route.ts",
+    query: { reads: ["capabilityId"], required: ["capabilityId"] },
+    auth: "public", successStatuses: [200], replay: "read-only",
+  },
+  bookings: {
+    method: "GET", routeFile: "src/app/api/v1/bookings/[tenant]/route.ts",
+    query: { reads: ["capabilityId", "from", "to"], required: ["capabilityId"] },
+    auth: "public", successStatuses: [200], replay: "read-only",
+  },
+  "bookings-reservations": {
+    method: "POST", routeFile: "src/app/api/v1/bookings/[tenant]/reservations/route.ts",
+    pathTemplate: "/api/v1/bookings/{tenant}/reservations",
+    reads: ["origin", "capabilityId", "capabilityVersion", "slotId", "visitor", "requestId"],
+    // Visitor contract. origin=agent uses the separate native assistant schema.
+    required: ["capabilityId", "capabilityVersion", "slotId", "visitor"],
+    auth: "public", successStatuses: [201], replay: "request-id-optional",
+  },
+  "bookings-change": {
+    method: "PATCH", routeFile: "src/app/api/v1/bookings/[tenant]/reservations/[reservationId]/route.ts",
+    pathTemplate: "/api/v1/bookings/{tenant}/reservations/{reservationId}",
+    reads: ["managementToken", "capabilityId", "capabilityVersion", "slotId"],
+    required: ["managementToken", "capabilityId", "capabilityVersion", "slotId"],
+    auth: "management-token-body", successStatuses: [200], replay: "management-token",
+  },
+  "bookings-cancel": {
+    method: "DELETE", routeFile: "src/app/api/v1/bookings/[tenant]/reservations/[reservationId]/route.ts",
+    pathTemplate: "/api/v1/bookings/{tenant}/reservations/{reservationId}",
+    reads: ["managementToken"], required: ["managementToken"],
+    auth: "management-token-body", successStatuses: [200], replay: "management-token",
+  },
+  "bookings-readback": {
+    method: "POST", routeFile: "src/app/api/v1/bookings/[tenant]/reservations/[reservationId]/readback/route.ts",
+    pathTemplate: "/api/v1/bookings/{tenant}/reservations/{reservationId}/readback",
+    reads: ["managementToken"], required: ["managementToken"],
+    auth: "management-token-body", successStatuses: [200], replay: "readback-only",
+  },
+  collections: {
+    method: "GET", routeFile: "src/app/api/v1/collections/[tenant]/[type]/route.ts",
+    pathTemplate: "/api/v1/collections/{tenant}/{type}",
+    query: { reads: ["preview"], required: [] },
+    auth: "signed-preview", successStatuses: [200], replay: "read-only",
+  },
+  "collections-entry": {
+    method: "GET", routeFile: "src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts",
+    pathTemplate: "/api/v1/collections/{tenant}/{type}/{slug}",
+    query: { reads: ["preview"], required: [] },
+    auth: "signed-preview", successStatuses: [200], replay: "read-only",
+  },
 };
 
 export type V1CheckResult = { name: string; ok: boolean; detail?: string };
@@ -150,9 +206,15 @@ export function checkV1CallSites(input: {
       continue;
     }
     const source = resolveStringConstants(stripComments(raw));
-    const pathPattern = new RegExp(`/api/v1/${escape(site.endpoint)}/([^\\s"'\`/?]+)`, "g");
+    const template = contract?.pathTemplate ?? `/api/v1/${site.endpoint}/{tenant}`;
+    // Capture tenant only; other segments may be constants or interpolations.
+    const segment = '(?:\\$\\{[^}]+\\}|[^\\s"\'`/?]+)';
+    const pattern = template.split(/(\{[A-Za-z]+\})/).map(part =>
+      part === "{tenant}" ? `(${segment})` : /^\{[A-Za-z]+\}$/.test(part) ? segment : escape(part),
+    ).join("");
+    const pathPattern = new RegExp(pattern, "g");
     const paths = [...source.matchAll(pathPattern)];
-    push(`${label}:path`, paths.length > 0, `no /api/v1/${site.endpoint}/<tenant> path in the file`);
+    push(`${label}:path`, paths.length > 0, `no ${template} path in the file`);
     for (const match of paths) {
       const segment = match[1]!;
       const placeholder = /^(\$\{|\{|:|<)/.test(segment);
@@ -161,7 +223,7 @@ export function checkV1CallSites(input: {
       }
     }
 
-    if (contract?.method !== "POST") continue;
+    if (!contract || contract.method === "GET") continue;
     const fields = site.bodyFields ?? [];
     const missing = fields.filter((field) => !sendsField(source, field));
     push(`${label}:body-fields-sent`, missing.length === 0, `declared but not sent by the file: ${missing.join(", ")}`);

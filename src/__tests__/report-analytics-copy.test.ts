@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import { parseCopyArgs, runReportAnalyticsCopy, type CopyDeps } from "../../scripts/report-analytics-copy";
+import { prepareReportAnalyticsCopyOptions, parseCopyArgs, runReportAnalyticsCopy, type CopyDeps } from "../../scripts/report-analytics-copy";
 
+const LOCAL = { databaseUrl: "http://127.0.0.1:54321", redisUrl: "http://127.0.0.1:8079" };
 const SENT = Date.parse("2026-10-01T15:00:00.000Z");
 const config = { gscProperty: "sc-domain:gldf.example.test", ga4PropertyId: "123", updatedAt: "2026-09-01T00:00:00.000Z" };
 
@@ -29,7 +31,7 @@ describe("report and analytics state copy", () => {
     const options = parseCopyArgs([]);
     expect(options.apply).toBe(false);
     const d = deps();
-    const outcome = await runReportAnalyticsCopy({ ...options, databaseUrl: "https://abc.supabase.co" }, d.value);
+    const outcome = await runReportAnalyticsCopy({ ...options, ...LOCAL }, d.value);
     expect(d.setCadence).not.toHaveBeenCalled();
     expect(d.markSent).not.toHaveBeenCalled();
     expect(d.writeConfig).not.toHaveBeenCalled();
@@ -39,15 +41,15 @@ describe("report and analytics state copy", () => {
 
   it("refuses --apply against a non-local database without Jacob's yes", async () => {
     const d = deps();
-    await expect(runReportAnalyticsCopy({ apply: true, jacobsYes: false, databaseUrl: "https://abc.supabase.co" }, d.value))
+    await expect(runReportAnalyticsCopy({ ...LOCAL, apply: true, jacobsYes: false, databaseUrl: "https://abc.supabase.co" }, d.value))
       .rejects.toThrow("needs Jacob's yes");
-    await expect(runReportAnalyticsCopy({ apply: true, jacobsYes: false }, d.value)).rejects.toThrow("no database");
+    await expect(runReportAnalyticsCopy({ apply: true, jacobsYes: false }, d.value)).rejects.toThrow("not configured");
     expect(d.setCadence).not.toHaveBeenCalled();
   });
 
   it("applies locally, copying only what Postgres is missing", async () => {
     const d = deps({ postgres: async () => ({ cadence: "monthly", lastSentAt: SENT - 1000, hasConfig: true }) });
-    const outcome = await runReportAnalyticsCopy({ apply: true, jacobsYes: false, databaseUrl: "http://127.0.0.1:54321" }, d.value);
+    const outcome = await runReportAnalyticsCopy({ ...LOCAL, apply: true, jacobsYes: false }, d.value);
     expect(d.setCadence).not.toHaveBeenCalled();
     expect(d.writeConfig).not.toHaveBeenCalled();
     expect(d.markSent).toHaveBeenCalledWith("gldf", "2026-10-01T15:00:00.000Z");
@@ -56,7 +58,7 @@ describe("report and analytics state copy", () => {
 
   it("applies everything with Jacob's yes and reports failures", async () => {
     const d = deps({ writeConfig: async () => ({ ok: false, reason: "error: boom" }) });
-    const outcome = await runReportAnalyticsCopy({ apply: true, jacobsYes: true, databaseUrl: "https://abc.supabase.co" }, d.value);
+    const outcome = await runReportAnalyticsCopy({ ...LOCAL, apply: true, jacobsYes: true, databaseUrl: "https://abc.supabase.co" }, d.value);
     expect(d.setCadence).toHaveBeenCalledWith("gldf", "weekly");
     expect(outcome.tenants[0]?.copied).toEqual(["cadence", "lastSent"]);
     expect(outcome.tenants[0]?.failed).toEqual([{ item: "config", reason: "error: boom" }]);
@@ -65,9 +67,128 @@ describe("report and analytics state copy", () => {
 
   it("filters to one tenant and rejects unknown ones", async () => {
     const d = deps();
-    const outcome = await runReportAnalyticsCopy({ tenant: "rohlax", apply: false, jacobsYes: false }, d.value);
+    const outcome = await runReportAnalyticsCopy({ ...LOCAL, tenant: "rohlax", apply: false, jacobsYes: false }, d.value);
     expect(outcome.tenants.map((t) => t.tenantId)).toEqual(["rohlax"]);
-    await expect(runReportAnalyticsCopy({ tenant: "nobody", apply: false, jacobsYes: false }, d.value)).rejects.toThrow("No tenant");
+    await expect(runReportAnalyticsCopy({ ...LOCAL, tenant: "nobody", apply: false, jacobsYes: false }, d.value)).rejects.toThrow("No tenant");
+  });
+
+  it.each([false, true])("refuses remote Redis before any dependency in apply=%s", async (apply) => {
+    const calls = { tenants: vi.fn(async () => []), redis: vi.fn(), postgres: vi.fn(), log: vi.fn() };
+    const d = deps(calls);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, apply, jacobsYes: false, redisUrl: "https://remote.upstash.io" }, d.value))
+      .rejects.toThrow(/UPSTASH_REDIS_REST_URL.*Jacob's yes/);
+    for (const call of Object.values(calls)) expect(call).not.toHaveBeenCalled();
+    expect(d.setCadence).not.toHaveBeenCalled();
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.writeConfig).not.toHaveBeenCalled();
+  });
+
+  it("refuses remote database dry run before reading tenants", async () => {
+    const tenants = vi.fn(async () => []);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, apply: false, jacobsYes: false, databaseUrl: "https://abc.supabase.co" }, deps({ tenants }).value))
+      .rejects.toThrow(/SUPABASE_URL.*Jacob's yes/);
+    expect(tenants).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "http://localhost.remote.test", "http://preview.localhost", "http://127.1", "http://2130706433",
+    "http://0x7f000001", "http://%6cocalhost", "http://127.0.0.1.",
+  ])("does not treat a host alias as exact loopback: %s", async (databaseUrl) => {
+    const tenants = vi.fn(async () => []);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, databaseUrl, apply: false, jacobsYes: false }, deps({ tenants }).value))
+      .rejects.toThrow(/Jacob's yes/);
+    expect(tenants).not.toHaveBeenCalled();
+  });
+
+  it.each(["localhost:54321", "file:///tmp/local", "http://user:secret@localhost", "http://localhost/?token=secret", "http://localhost/#fragment", "http://localhost/path", " http://localhost", "http://localhost\n", "http://localhost\r\n", "http://localhost\t", "http://localhost\\remote.test", "http://localhost:99999"])("rejects malformed or ambiguous target even with authorization: %s", async (redisUrl) => {
+    const tenants = vi.fn(async () => []);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, redisUrl, apply: false, jacobsYes: true }, deps({ tenants }).value))
+      .rejects.toThrow(/UPSTASH_REDIS_REST_URL.*HTTP/);
+    expect(tenants).not.toHaveBeenCalled();
+  });
+
+  const malformedBracketTargets = [
+    "http://[::\n1]:8079", "http://[::\t1]:8079", "http://[::\r1]:8079",
+    "http://[:: 1]:8079", "http://[::\u00001]:8079", "http://[::\u007f1]:8079",
+    "http://[user@::1]:8079", "http://user:secret@[::1]:8079",
+  ];
+  it.each(malformedBracketTargets.flatMap((target) => [
+    { field: "databaseUrl" as const, name: "SUPABASE_URL", target },
+    { field: "redisUrl" as const, name: "UPSTASH_REDIS_REST_URL", target },
+  ]))("rejects bracketed whitespace/control/userinfo before dependencies: $field $target", async ({ field, name, target }) => {
+    const calls = { tenants: vi.fn(async () => []), redis: vi.fn(), postgres: vi.fn(), log: vi.fn() };
+    const d = deps(calls);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, [field]: target, apply: false, jacobsYes: true }, d.value))
+      .rejects.toThrow(`${name} must be an HTTP(S) base URL`);
+    for (const call of Object.values(calls)) expect(call).not.toHaveBeenCalled();
+    expect(d.setCadence).not.toHaveBeenCalled();
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.writeConfig).not.toHaveBeenCalled();
+  });
+
+  it.each(["databaseUrl", "redisUrl"] as const)("requires %s before reading", async (missing) => {
+    const tenants = vi.fn(async () => []);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, [missing]: undefined, apply: false, jacobsYes: false }, deps({ tenants }).value))
+      .rejects.toThrow(/not configured/);
+    expect(tenants).not.toHaveBeenCalled();
+  });
+
+  it.each(["http://localhost:54321", "https://127.0.0.1", "http://[::1]:54321/"])("allows explicit loopback without authorization: %s", async (databaseUrl) => {
+    const d = deps();
+    const result = await runReportAnalyticsCopy({ ...LOCAL, databaseUrl, apply: false, jacobsYes: false }, d.value);
+    expect(result.mode).toBe("dry-run");
+    expect(d.setCadence).not.toHaveBeenCalled();
+  });
+
+  it("keeps an authorized remote dry run read-only", async () => {
+    const d = deps();
+    const outcome = await runReportAnalyticsCopy({ apply: false, jacobsYes: true, databaseUrl: "https://abc.supabase.co", redisUrl: "https://remote.upstash.io" }, d.value);
+    expect(outcome.totals.copied).toBe(0);
+    expect(d.setCadence).not.toHaveBeenCalled();
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.writeConfig).not.toHaveBeenCalled();
+  });
+
+  it("preserves newer Postgres state during recovery", async () => {
+    const d = deps({ postgres: async () => ({ cadence: "monthly", lastSentAt: SENT + 1000, hasConfig: true }) });
+    const outcome = await runReportAnalyticsCopy({ ...LOCAL, apply: true, jacobsYes: false }, d.value);
+    expect(outcome.totals).toMatchObject({ cadence: 0, lastSent: 0, config: 0, copied: 0 });
+    expect(d.setCadence).not.toHaveBeenCalled();
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.writeConfig).not.toHaveBeenCalled();
+  });
+
+  it("prepares both CLI targets and refuses remote Redis dry run", () => {
+    const env = { SUPABASE_URL: LOCAL.databaseUrl, UPSTASH_REDIS_REST_URL: "https://remote.upstash.io" };
+    expect(() => prepareReportAnalyticsCopyOptions([], env)).toThrow(/UPSTASH_REDIS_REST_URL.*Jacob's yes/);
+    expect(prepareReportAnalyticsCopyOptions(["--i-have-jacobs-yes", "--json"], env)).toMatchObject({
+      databaseUrl: LOCAL.databaseUrl, redisUrl: env.UPSTASH_REDIS_REST_URL, apply: false, jacobsYes: true, json: true,
+    });
+  });
+
+  it("the direct CLI refuses remote Redis before selecting data clients", () => {
+    // No inherited credentials or store clients: exercise the actual argv/env
+    // preparation boundary without a network-capable configured client.
+    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/copy-report-analytics-state.ts", "--json"], {
+      cwd: process.cwd(), encoding: "utf8", timeout: 10_000,
+      env: { PATH: process.env.PATH, NODE_ENV: "test", SUPABASE_URL: LOCAL.databaseUrl, UPSTASH_REDIS_REST_URL: "https://remote.upstash.io" },
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("UPSTASH_REDIS_REST_URL is not an exact loopback target");
+    expect(result.stderr).toContain("needs Jacob's yes");
+    expect(result.stdout).toBe("");
+  });
+
+  it("the direct CLI refuses a missing Supabase client without tenant-cache fallback", () => {
+    const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/copy-report-analytics-state.ts", "--json"], {
+      cwd: process.cwd(), encoding: "utf8", timeout: 10_000,
+      env: { PATH: process.env.PATH, NODE_ENV: "test", SUPABASE_URL: LOCAL.databaseUrl, UPSTASH_REDIS_REST_URL: LOCAL.redisUrl },
+    });
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Supabase client unavailable; refusing tenant-cache fallback.");
+    expect(result.stdout).toBe("");
   });
 
   it("parses flags strictly", () => {
