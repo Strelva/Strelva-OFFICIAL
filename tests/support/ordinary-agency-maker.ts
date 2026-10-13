@@ -17,7 +17,8 @@ export async function ordinaryCustomerBusiness(owner: CustomerPerson, name: stri
 export async function ordinaryAgencyMaker(browser: Browser, admin: SupabaseClient, owner: CustomerPerson, workspaceId: string, existingMaker?: CustomerPerson) {
   const before = await admin.rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: owner.userId });
   expect(before.error).toBeNull();
-  expect(before.data).toBe("member");
+  // ADR 0015: a business owner makes Systems in their own business.
+  expect(before.data).toBe("owner");
   const maker = existingMaker ?? await neutralSignUp(browser, "native-agency-maker");
   try {
     const created = await maker.context.request.post("/api/workspace", { headers: { origin: localEnvironment().app },
@@ -40,7 +41,7 @@ export async function ordinaryAgencyMaker(browser: Browser, admin: SupabaseClien
     expect(authority.data).toBe("provider");
     const customer = await admin.rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: owner.userId });
     expect(customer.error).toBeNull();
-    expect(customer.data).toBe("member");
+    expect(customer.data).toBe("owner");
     return { ...maker, agencyId };
   } catch (error) {
     await maker.context.close();
