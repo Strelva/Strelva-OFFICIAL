@@ -275,7 +275,7 @@ describe("native business confirmation", () => {
     const native = { ...schedule, bookingAuthority: "business" as const };
     const onReserve = vi.fn().mockResolvedValue(receipt);
     await renderForm({ schedule: native, onReserve });
-    expect(container.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value}.`);
+    expect(container.textContent).toContain(`Times shown in ${(Intl.DateTimeFormat().resolvedOptions().timeZone === "UTC" ? "UTC" : new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")!.value)}.`);
     expect(container.textContent).not.toContain("Outlook will confirm");
     const name = container.querySelector<HTMLInputElement>('input[name="name"]')!; const email = container.querySelector<HTMLInputElement>('input[name="email"]')!;
     const phone = container.querySelector<HTMLInputElement>('input[name="phone"]')!;
@@ -313,7 +313,7 @@ describe("booking receipt next action", () => {
     const section = container.querySelector('section[aria-label="Booking receipt"]')!;
     expect(section.querySelector("h3")?.textContent).toBe("Check your email to confirm");
     expect(section.textContent).toContain("Confirm by");
-    expect(section.textContent).toContain(new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(awaitingEmail.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
+    expect(section.textContent).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone === "UTC" ? "UTC" : new Intl.DateTimeFormat(undefined, { timeZoneName: "longGeneric" }).formatToParts(new Date(awaitingEmail.confirmationExpiresAt)).find(part => part.type === "timeZoneName")!.value);
     expect(section.textContent).toContain("use its link");
     expect(section.textContent).not.toContain("Cancel booking");
     await act(async () => (section.querySelector("button") as HTMLButtonElement).click());

@@ -30,6 +30,8 @@ test("persists, reopens, and reviews a service request through local Auth and Po
       { workspace_id: agencyId, user_id: owner.userId, role: "member", created_by: agency.userId },
     ])).error).toBeNull();
 
+    // Two doors (Oct 11): an agency is recorded on the business by its provider seat; only those appear as choices.
+    expect((await admin.rpc("choose_business_provider", { p_user_id: owner.userId, p_verified_email: owner.email, p_workspace_id: businessId, p_agency_workspace_id: agencyId })).error).toBeNull();
     expect((await owner.context.request.get(`/api/workspace?workspaceId=${encodeURIComponent(businessId)}`)).status()).toBe(200);
     customerPage = await owner.context.newPage();
     customerPage.setDefaultTimeout(20_000);

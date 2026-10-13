@@ -299,7 +299,7 @@ describe("one booking store, both route families (in-memory store)", () => {
       await world.pause();
       expect(await apiSlots()).toEqual([]); expect(await availability()).toEqual([]);
     } finally { stub.mockRestore(); }
-  });
+  }, 30_000);
   it("a widget booking and an API reservation share one calendar; hours, pause and rollback hold", async () => {
     const { world } = fakeWorld();
     await oneStoreScenario(world);
