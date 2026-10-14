@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { browserServerCommand, installProofRoutes, proofRoutes, validateContextResult, validateDiscovery, validateNativeOwnership } from "../browser-ci-contexts.mjs";
+import { browserContextEnvironment, localBrowserSafetyEnvironment, recordedProductionRelease, contexts, browserServerCommand, installProofRoutes, proofRoutes, validateContextResult, validateDiscovery, validateNativeOwnership } from "../browser-ci-contexts.mjs";
 
 const manifest = { version: 1, entries: [{ file: "actual.spec.ts", context: "preview", cases: [{ title: "Actual case", project: "desktop", originalStatus: "passed" }] }] };
 const report = status => ({ suites: [{ specs: [{ file: "actual.spec.ts", title: "Actual case", tests: [{ projectName: "desktop", expectedStatus: "passed", results: [{ status }] }] }] }] });
@@ -11,7 +11,7 @@ const report = status => ({ suites: [{ specs: [{ file: "actual.spec.ts", title: 
 test("public proof retains the requested built app while fictional contexts require dev", () => {
   assert.match(browserServerCommand("public", 3119, "1"), /next start --hostname 127\.0\.0\.1 --port 3119$/);
   assert.match(browserServerCommand("public", 3119, "0"), /next dev/);
-  for (const context of ["preview", "workspace"]) assert.match(browserServerCommand(context, 3119, "1"), /next dev/);
+  for (const context of ["preview", "workspace", "recorded"]) assert.match(browserServerCommand(context, 3119, "1"), /next dev/);
   assert.throws(() => browserServerCommand("public", 3119, "invalid"), /must be 0 or 1/);
   assert.throws(() => browserServerCommand("public", "3119;echo bad", "0"), /valid loopback server port/);
 });
@@ -63,4 +63,38 @@ test("disposable routes use actual fixture bytes, have preview guards, clean up,
     mkdirSync(join(root, "src/app/preview/strelva", proofRoutes[1][0]));
     assert.throws(() => installProofRoutes(root), /Refusing to replace existing proof route/);
   } finally { rmSync(root, { recursive: true }); }
+});
+
+
+test("recorded replay preserves only observed values and labels unknowns without promoting them", () => {
+  assert(contexts.includes("recorded"));
+  assert.deepEqual(recordedProductionRelease.flags, {
+    STRELVA_WORKSPACE_RELEASE: "1", STRELVA_BUSINESS_SIGNUP_RELEASE: "1",
+    STRELVA_AGENCY_SIGNUP_RELEASE: "1", STRELVA_AGENCY_ADD_CLIENT_RELEASE: "1",
+    STRELVA_CLAIM_REVIEW_RELEASE: "1", STRELVA_WEBSITE_REBUILD_RELEASE: "1", STRELVA_NEEDS_YOU_RELEASE: "0",
+  });
+  assert.equal(recordedProductionRelease.recordedAt, "2026-10-14");
+  assert.deepEqual(recordedProductionRelease.unknown, ["Systems", "Ask", "AI cap", "email", "model calls"]);
+  const env = browserContextEnvironment("recorded");
+  assert.equal(env.STRELVA_UI_PREVIEW, "0");
+  assert.equal(env.STRELVA_WORKSPACE_RELEASE, "1");
+  assert.equal(env.STRELVA_NEEDS_YOU_RELEASE, "0");
+  for (const key of ["STRELVA_SYSTEMS_RELEASE", "STRELVA_ASK_RELEASE", "STRELVA_FREE_MONTHLY_AI_CAP_USD", "STRELVA_WEBSITE_MODEL_CALLS_ENABLED"]) {
+    assert.equal(env[key], "0");
+    assert.equal(recordedProductionRelease.flags[key], undefined);
+  }
+  for (const key of ["EMAIL_SENDING_ENABLED", "CUSTOMER_EMAIL_ENABLED", "OPERATOR_EMAILS_ENABLED", "PROSPECT_EMAILS_ENABLED"]) assert.equal(env[key], "false");
+  assert.deepEqual(browserContextEnvironment("public"), { ...localBrowserSafetyEnvironment, STRELVA_UI_PREVIEW: "0", STRELVA_WORKSPACE_RELEASE: "0" });
+  assert.deepEqual(browserContextEnvironment("preview"), { ...localBrowserSafetyEnvironment, STRELVA_UI_PREVIEW: "1", STRELVA_WORKSPACE_RELEASE: "1" });
+  assert.throws(() => browserContextEnvironment("typo"), /Unknown browser context/);
+});
+
+test("recorded replay cases are mandatory and cannot inherit public skip exemptions", () => {
+  const recorded = { version: 1, entries: [{ ...manifest.entries[0], context: "recorded", cases: [{ ...manifest.entries[0].cases[0], originalStatus: "skipped" }] }] };
+  assert.equal(validateContextResult(recorded, "recorded", report("passed")), 1);
+  assert.throws(() => validateContextResult(recorded, "recorded", report("skipped")), /Required recorded case/);
+  const rootManifest = JSON.parse(readFileSync(new URL("../browser-ci-manifest.json", import.meta.url), "utf8"));
+  assert.equal(rootManifest.entries.find(entry => entry.file === "agency-signup.spec.ts").context, "recorded");
+  assert.equal(rootManifest.entries.find(entry => entry.file === "application-review-fixture.spec.ts").context, "workspace");
+  assert.equal(rootManifest.entries.find(entry => entry.file === "release-1-0-preview-journeys.spec.ts").context, "preview");
 });

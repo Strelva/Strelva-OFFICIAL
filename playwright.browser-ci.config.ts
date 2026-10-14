@@ -4,7 +4,7 @@ import manifest from "./scripts/browser-ci-manifest.json";
 import { browserServerCommand } from "./scripts/browser-ci-contexts.mjs";
 
 const context = process.env.STRELVA_BROWSER_CI_CONTEXT;
-if (!["public", "preview", "workspace"].includes(context || "")) throw new Error("An explicit browser CI context is required.");
+if (!["public", "preview", "workspace", "recorded"].includes(context || "")) throw new Error("An explicit browser CI context is required.");
 if (process.env.PLAYWRIGHT_BASE_URL) throw new Error("Browser CI owns its loopback server; external base URLs are refused.");
 const port = process.env.PLAYWRIGHT_PORT || "3100";
 const files = manifest.entries.filter(entry => entry.context === context).map(entry => entry.file);

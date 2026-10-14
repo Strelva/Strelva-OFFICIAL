@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { version } from "../package.json";
 
 test("health endpoint works", async ({ request }) => {
   const res = await request.get("/api/health");
   expect(res.status()).toBe(200);
+  expect(await res.json()).toMatchObject({ version });
 });
 
 test("public v1 GLDF content route is unauthenticated", async ({ request }) => {
@@ -36,7 +38,14 @@ test("sign-up page renders the current create-account surface", async ({ request
   const response = await request.get("/sign-up");
   expect(response.status()).toBeLessThan(400);
   const html = await response.text();
-  expect(html).toContain("Workspace access is invite-only");
-  expect(html).toContain('href="/access-request"');
+  if (process.env.STRELVA_WORKSPACE_RELEASE === "1" && process.env.STRELVA_BUSINESS_SIGNUP_RELEASE === "1") {
+    expect(html).toContain("Create your account");
+    expect(html).toContain("I run a business");
+    expect(html).toContain("I build for clients");
+    expect(html).toContain('href="/sign-up?as=agency"');
+  } else {
+    expect(html).toContain("New accounts open soon");
+    expect(html).toContain('href="/audit"');
+  }
   expect(html).not.toContain("Dashboard signup is paused");
 });

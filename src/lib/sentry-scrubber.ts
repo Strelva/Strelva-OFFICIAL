@@ -1,3 +1,5 @@
+import { isPrivateWorkspaceLocation } from "./workspace-privacy";
+
 const REDACTED = "[Redacted]";
 const REDACTED_TOKEN = "[token]";
 
@@ -6,6 +8,8 @@ const PUBLIC_KEY_NAME = /(?:^|_)(?:ANON|PUBLIC|PUBLISHABLE)_KEY(?:_|$)/i;
 
 const SENSITIVE_HEADER_NAME = /^(?:cookie|set-cookie|authorization|proxy-authorization|www-authenticate|api-key|x-api-key|stripe-signature|x-[a-z0-9-]*(?:auth|token|secret|signature|key)[a-z0-9-]*)$/i;
 const SENSITIVE_PROPERTY_NAME = /(?:authorization|cookie|(?:access|refresh|id)?token(?:hash|digest)?|secret|password|passwd|credential|api[_-]?key|private[_-]?key|signature|session[_-]?key)/i;
+
+const PII_PROPERTY_NAME = /^(?:user|email|emailaddress|phone|phonenumber|ipaddress|remoteaddr|firstname|lastname|fullname|displayname|address|streetaddress|customername|businessname|contactname)$/i;
 
 const TOKEN_ROUTE_PREFIXES = [
   ["b"],
@@ -31,7 +35,7 @@ const TOKEN_PATTERNS = [
 ];
 
 const BEARER_VALUE = /\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi;
-const EMBEDDED_URL = /https?:\/\/[^\s"'<>]+|\/(?:[A-Za-z0-9._~!$&'()*+,;=:@%/-]+)(?:\?[^\s"'<>]*)?(?:#[^\s"'<>]*)?/gi;
+const EMBEDDED_URL = /[a-z][a-z\d+.-]*:\/\/[^\s"'<>]+|\/(?:[A-Za-z0-9._~!$&'()*+,;=:@%/\[\]-]+)(?:\?[^\s"'<>]*)?(?:#[^\s"'<>]*)?/gi;
 
 type MutableRecord = Record<string, unknown>;
 
@@ -49,13 +53,21 @@ export function readSentrySecretValues(environment: Record<string, string | unde
 }
 
 /** Scrub an event in place so every Sentry event callback can use the same policy. */
-export function scrubSentryEvent<T>(event: T, secretValues: readonly string[] = []): T {
+export function scrubSentryEvent<T>(event: T, secretValues: readonly string[] = [], privatePage = false): T {
+  const record = asRecord(event);
+  if (record && (privatePage || isPrivateSentryLocation(asRecord(record.request)?.url) || isPrivateSentryLocation(record.transaction))) {
+    scrubPrivateEvent(record);
+  }
   scrubValue(event, secretValues, new WeakSet<object>());
   return event;
 }
 
 /** Scrub a breadcrumb in place before it can be attached to an event. */
-export function scrubSentryBreadcrumb<T>(breadcrumb: T, secretValues: readonly string[] = []): T {
+export function scrubSentryBreadcrumb<T>(breadcrumb: T, secretValues: readonly string[] = [], privatePage = false): T {
+  const record = asRecord(breadcrumb);
+  if (record && (privatePage || Object.values(asRecord(record.data) ?? {}).some(isPrivateSentryLocation))) {
+    scrubPrivateBreadcrumb(record);
+  }
   scrubValue(breadcrumb, secretValues, new WeakSet<object>());
   return breadcrumb;
 }
@@ -84,7 +96,12 @@ function scrubValue(value: unknown, secretValues: readonly string[], seen: WeakS
       continue;
     }
 
-    if (SENSITIVE_PROPERTY_NAME.test(key)) {
+    if (normalizedKey === "user") {
+      delete record[key];
+      continue;
+    }
+
+    if (SENSITIVE_PROPERTY_NAME.test(key) || PII_PROPERTY_NAME.test(normalizedKey)) {
       record[key] = REDACTED;
       continue;
     }
@@ -101,6 +118,8 @@ function scrubString(value: string, secretValues: readonly string[]): string {
     if (secret) scrubbed = scrubbed.replaceAll(secret, REDACTED);
   }
 
+  scrubbed = scrubbed.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, REDACTED);
+  scrubbed = scrubbed.replace(/(?:\+?\d[\s().-]*){10,15}/g, (candidate) => candidate.replace(/\D/g, "").length >= 10 ? REDACTED : candidate);
   scrubbed = scrubbed.replace(BEARER_VALUE, `Bearer ${REDACTED}`);
   for (const pattern of TOKEN_PATTERNS) scrubbed = scrubbed.replace(pattern, REDACTED);
   scrubbed = scrubbed.replace(/\b[A-Za-z0-9_-]{32,}\b/g, (candidate) => isOpaqueToken(candidate) ? REDACTED : candidate);
@@ -122,7 +141,9 @@ function redactUrl(value: string): string {
     const parsed = new URL(value, "https://sentry.invalid");
     parsed.username = "";
     parsed.password = "";
-    parsed.pathname = redactTokenPath(parsed.pathname);
+    parsed.pathname = isPrivateSentryLocation(parsed.pathname)
+      ? privateRoute(parsed.pathname)
+      : redactTokenPath(parsed.pathname);
     parsed.search = "";
     parsed.hash = "";
 
@@ -163,4 +184,69 @@ function looksLikeToken(segment: string): boolean {
     pattern.lastIndex = 0;
     return pattern.test(decoded);
   }) || isOpaqueToken(decoded);
+}
+
+// Private work sends diagnostics, never arbitrary business content. An allowlist
+// also covers future SDK fields without silently admitting a new payload shape.
+function asRecord(value: unknown): MutableRecord | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as MutableRecord : undefined;
+}
+
+function keep(record: MutableRecord, keys: readonly string[]): void {
+  for (const key of Object.keys(record)) if (!keys.includes(key)) delete record[key];
+}
+
+function isPrivateSentryLocation(value: unknown): boolean {
+  return isPrivateWorkspaceLocation(value) || typeof value === "string" &&
+    /(?:^|\/)(?:api\/(?:workspace-[a-z-]+|agency(?:-[a-z-]+)?)|agency)(?:[/?#\s]|$)/i.test(value);
+}
+
+function privateRoute(value: string): string {
+  // No hostname, business slug, resource id or token is needed to locate code.
+  const match = value.match(/\/(?:api\/)?(?:workspace(?:-[a-z-]+)?|inquiry-workspace|business|agency(?:-[a-z-]+)?)(?=[/?#\s]|$)|\/preview\/strelva\/inquiries(?=[/?#\s]|$)/i);
+  return match ? `${match[0]}/[private]` : "/[private]";
+}
+
+function scrubPrivateBreadcrumb(record: MutableRecord): void {
+  keep(record, ["type", "category", "level", "timestamp"]);
+}
+
+function scrubPrivateEvent(record: MutableRecord): void {
+  keep(record, ["event_id", "timestamp", "start_timestamp", "platform", "release", "environment", "level", "type", "request", "transaction", "exception", "breadcrumbs", "contexts", "spans"]);
+  if (typeof record.transaction === "string") record.transaction = privateRoute(record.transaction);
+  const request = asRecord(record.request);
+  if (request) {
+    keep(request, ["method", "url"]);
+    if (typeof request.url === "string") request.url = privateRoute(request.url);
+  }
+  const exceptionRecord = asRecord(record.exception);
+  if (exceptionRecord) keep(exceptionRecord, ["values"]);
+  const values = exceptionRecord?.values;
+  if (Array.isArray(values)) for (const exception of values) {
+    const error = asRecord(exception);
+    if (!error) continue;
+    keep(error, ["type", "stacktrace"]);
+    const stack = asRecord(error.stacktrace);
+    if (stack) {
+      keep(stack, ["frames"]);
+      if (Array.isArray(stack.frames)) for (const frame of stack.frames) {
+        const source = asRecord(frame);
+        if (source) keep(source, ["filename", "abs_path", "function", "module", "lineno", "colno", "in_app"]);
+      }
+    }
+  }
+  const contexts = asRecord(record.contexts);
+  if (contexts) {
+    keep(contexts, ["trace"]);
+    const trace = asRecord(contexts.trace);
+    if (trace) keep(trace, ["trace_id", "span_id", "parent_span_id", "op", "status", "origin"]);
+  }
+  if (Array.isArray(record.breadcrumbs)) for (const breadcrumb of record.breadcrumbs) {
+    const item = asRecord(breadcrumb);
+    if (item) scrubPrivateBreadcrumb(item);
+  }
+  if (Array.isArray(record.spans)) for (const span of record.spans) {
+    const item = asRecord(span);
+    if (item) keep(item, ["trace_id", "span_id", "parent_span_id", "op", "status", "origin", "start_timestamp", "timestamp"]);
+  }
 }
