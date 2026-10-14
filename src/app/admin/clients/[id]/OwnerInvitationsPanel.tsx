@@ -75,7 +75,7 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
     finally { setBusy(false); }
   }
 
-  return <StSection title="Owner">
+  return <StSection title="Owner access">
     {load.kind === "unconverted" ? <StEmpty>Convert this site to a business before inviting its owner.</StEmpty>
       : load.kind === "denied" ? <StEmpty>An active Strelva operator with business admin membership is required.</StEmpty>
       : load.kind === "unavailable" ? <StNotice tone="critical">Owner invitation state could not be read. Refresh to try again.</StNotice>

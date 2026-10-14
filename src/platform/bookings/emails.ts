@@ -102,7 +102,7 @@ export function requestLapsedEmail(input: {
     `Hi ${first(input.booking.customer.name)}, your request for ${day} at ${time}${with_} wasn't confirmed, so that time is not booked.`,
     input.alternatives.length
       ? "These times are open right now:"
-      : input.bookAgainUrl ? "Pick another time on the website, or reply to this email to reach the business." : "Reply to this email to ask the business for another time.",
+      : input.bookAgainUrl ? "Pick another time on the website, or contact the business for help." : "Contact the business to ask for another time.",
   ];
   return {
     subject: `Your request for ${day} at ${time} wasn't confirmed`,

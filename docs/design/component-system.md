@@ -92,18 +92,16 @@ alert itself. These additions are presentation only and preserve native
 form semantics. Rules and adoption lanes:
 `StComposerBar`, `StComposerDock`.
 
-October 12 Ask-lane amendment: `StComposerDock` reserves the complete rendered
-composer and bottom-navigation inset in flow; place it after the work in its
-scroll owner, outside fixed wrappers. The leftovers amendment measures the dock's
-border box with ResizeObserver and reserves that height on the nearest actual
-scroll owner, with matching focus-scroll padding. Its negative bottom margin
-transfers the dock's flow footprint to that padding once. Shared shell phone
-tokens include the 64px navigation bar and the safe-area inset; pages without a
-dock retain navigation clearance. `data-workspace-scroll` explicitly identifies
-nested workspace and conversation scrollers. Composer-bearing AppFrame pages remain
-scrollable; the linen frame also scrolls long receipts and pages without a dock.
-Kit pages cannot shrink into the dock. `StComposerBar` Send is
-44×44 on coarse pointers. Ask history composes
+October 14 chrome amendment: `AppFrame` supplies a bounded footer slot through
+`ComposerDockTarget`; `StComposerDock` portals into that slot, outside both the
+main and any nested conversation scroller. The footer takes its natural height
+and can scroll independently above half the available work height. An empty slot
+collapses when loading, permission or other state removes the composer. Standalone
+docks remain in normal flow. No sticky positioning, negative margin or measured
+scroll padding can cover the work. Phone tokens include the 64px bottom navigation
+and safe-area inset exactly once, in the footer when present and in the scroll
+owner otherwise. `data-workspace-scroll` identifies nested workspace and Ask
+scrollers. `StComposerBar` Send is 44×44 on coarse pointers. Ask history composes
 the kit text trigger and shared GooeyDisclosure with unique controls, inert
 closed content and reduced motion. The website creation link retains only a
 validated saved-message continuation, including historical answers; its destination
@@ -1434,15 +1432,18 @@ the owned surface and an accent rule, avoiding a second name/logo block.
 Workspace identity leads the shared header. `StrelvaShell.workspaceName` is
 separate from `ownerBrand`; agency / client views can supply `brandWorkspaceId`
 for the agency's separately authorized brand. Agency credit is non-interactive.
-The platform mark appears once in the fixed header position. Plain context labels
-use this header, while selectors remain below it. `WorkspacePhoneTabs` uses
+Client and agency sidebar headers contain their own identity and no Strelva mark.
+Agency attribution comes from the current authorized serving agency; historical
+actors retain their own identity in receipts. Direct businesses have no invented
+agency credit. Plain context labels use this header, while selectors remain
+below it. `WorkspacePhoneTabs` uses
 Ask Strelva and hides Systems until released. Preview shells use explicit
 fictional account identity and `signOut={null}` to avoid real sign-out actions.
 Legacy tenant shells read the authorized owner-brand endpoint.
 Standalone `InquiryExperience.servingAgency` carries current serving identity
 separately from historical receipt actors: agency views use `[Agency] / [Business]`,
-owner views use the business name, with one header platform mark and neutral
-identity failure. A changed workspace cannot reuse the last
+owner views use the business name and neutral identity failure. A changed
+workspace cannot reuse the last
 workspace's fetched identity. Strelva controls and authority remain explicit.
 
 `AgencyBrandEditor` composes owned `TextInput` and `Button` with native file input,
@@ -2414,3 +2415,17 @@ notices and focus styles are retained. Local source/DOM tests establish these
 contracts; current desktop/mobile rendering, SQL execution, native Redis, Auth
 and hosted delivery remain coordinator acceptance work under the lane brief’s
 no-server/no-browser stop point.
+### October 14 · chrome completion
+
+Sidebar selection gives the current pinned System or agency sales page precedence
+over its parent; one link carries `aria-current="page"`. Agency Home and Verification
+have their own destinations. The public `/demo` redirects to the bounded fictional
+1.0 specimen at `/preview/strelva/demo`; it changes only React state and does not
+open the gated internal previews. Visitor payment fixtures include a fictional
+business identity and immutable example terms, and suppress real checkout. Missing
+identity and missing real terms continue to withhold payment. Payment item rows
+share one full-width divider, and visitor typography remains business-owned.
+
+Local DOM, route and unit checks are recorded in the chrome lane handoff. The
+completion brief forbids servers, builds and Playwright; desktop/phone, zoom,
+keyboard viewport and live rendering remain coordinator verification work.

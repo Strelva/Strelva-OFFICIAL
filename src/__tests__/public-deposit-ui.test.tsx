@@ -66,7 +66,7 @@ describe("business deposit presentation", () => {
 
   it("withholds payment when the public request has no business identity", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
-    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: businessDepositFixture })));
+    await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...businessDepositFixture, businessName: undefined } })));
     expect(container.textContent).toContain("The business identity is unavailable");
     expect(payButton()).toBeUndefined();
     expect(fetcher).not.toHaveBeenCalled();

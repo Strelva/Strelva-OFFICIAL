@@ -10,4 +10,6 @@
 .security > svg { flex: 0 0 14px; margin-top: 3px; }
 .state { display: flex; flex-direction: column; gap: 16px; }
 @media (max-width: 767px) { .split { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
-.line { display: contents; }
+.line { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; grid-column: 1 / -1; border-bottom: 1px solid var(--visitor-line, var(--gray-border)); }
+.line dt, .line dd { border-bottom: 0; }
+.line dt { min-width: 0; overflow-wrap: anywhere; }

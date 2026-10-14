@@ -13,15 +13,19 @@
     --st-workspace-safe-area: env(safe-area-inset-bottom, 0px);
   }
 
-  .root :is([data-frame-main], [data-workspace-scroll]):not([data-st-composer-clearance]) {
+  /* The footer includes the phone tabs. Pages without a footer reserve them
+     in their scroll owner instead. */
+  .root :is([data-frame-main], [data-workspace-scroll]) {
     box-sizing: border-box;
     padding-bottom: calc(var(--st-phone-navigation-height) + var(--st-workspace-safe-area));
     scroll-padding-bottom: calc(var(--st-phone-navigation-height) + var(--st-workspace-safe-area));
   }
 
-  /* A nested scroll owner reserves its own inset. */
-  .root [data-frame-main]:has([data-workspace-scroll], [data-st-composer-clearance]):not([data-st-composer-clearance]) {
+  .root [data-frame-main]:has([data-workspace-scroll]),
+  .root :global([data-frame-main]):has(+ [data-frame-composer]:not(:empty)),
+  .root :global([data-frame-main]):has(+ [data-frame-composer]:not(:empty)) [data-workspace-scroll] {
     padding-bottom: 0;
+    scroll-padding-bottom: 0;
   }
 }
 

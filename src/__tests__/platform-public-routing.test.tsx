@@ -22,6 +22,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_MARKETING_ORIGIN", "");
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
   vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "0");
+  vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "0");
   mocks.headers.mockResolvedValue(new Headers({ host: "app.strelva.com" }));
   mocks.user.mockResolvedValue(null);
 });
@@ -34,10 +35,20 @@ describe("platform public routing", () => {
     expect(response.headers.get("x-middleware-request-x-tenant")).toBeNull();
     expect(shouldRewriteMarketingRoot(host, "/")).toBe(true);
   });
-  it.each(["/", "/home"])("redirects %s to an explicitly configured separate marketing origin and retains acquisition", async path => {
+  it.each(["/", "/home"])("keeps the app %s on the two doors even with a separate marketing origin", async path => {
     vi.stubEnv("STRELVA_MARKETING_ORIGIN", "https://marketing.example");
     const response = await proxy(request("app.strelva.com", `${path}?ref=agency&agency=studio`));
-    expect(response.headers.get("location")).toBe("https://marketing.example/?ref=agency&agency=studio");
+    expect(response.headers.get("location")).toBeNull();
+    if (path === "/") expect(response.headers.get("x-middleware-rewrite")).toContain("/home?ref=agency&agency=studio");
+  });
+  it("retains optional marketing routing on the marketing host", async () => {
+    vi.stubEnv("STRELVA_MARKETING_ORIGIN", "https://marketing.example");
+    const response = await proxy(request("strelva.com", "/?ref=agency"));
+    expect(response.headers.get("location")).toBe("https://marketing.example/?ref=agency");
+  });
+  it.each(["/demo", "/demo/"])("takes %s to the bounded public 1.0 demo and drops legacy routing inputs", async path => {
+    const response = await proxy(request("app.strelva.com", `${path}?tenant=demo&view=settings`, { "x-tenant": "demo" }));
+    expect(response.headers.get("location")).toBe("https://app.strelva.com/preview/strelva/demo");
   });
   it.each(["https://app.strelva.com", "https://strelva.com", "https://u:p@marketing.example", "https://marketing.example/path", "javascript:alert(1)", "invalid"])("falls back safely for a looping or invalid origin %s", target => {
     expect(marketingEntryTarget("strelva.com", "", target)).toBeNull();
@@ -74,10 +85,12 @@ describe("honest two-door entry", () => {
     expect(html).toContain("coming soon"); expect(html).toContain('href="/audit"');
     expect(html).not.toContain("Request your build");
     const agency = renderToStaticMarkup(await AgenciesPage());
-    expect(agency).toContain("Agency signup is coming soon"); expect(agency).not.toContain('href="/sign-up?as=agency"');
+    expect(agency).toContain("Agency signup is coming soon"); expect(agency).toContain("Owner invitations are paused"); expect(agency).not.toContain("invite the business owner"); expect(agency).not.toContain('href="/sign-up?as=agency"');
   });
   it("opens each existing door only when its release gates permit it", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    expect(renderToStaticMarkup(<HomePage />)).not.toContain('href="/sign-up?as=business"');
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     expect(renderToStaticMarkup(<HomePage />)).toContain('href="/sign-up?as=business"');
     expect(renderToStaticMarkup(await AgenciesPage())).not.toContain('href="/sign-up?as=agency"');
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
