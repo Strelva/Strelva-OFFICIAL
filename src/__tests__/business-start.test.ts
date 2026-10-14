@@ -10,8 +10,8 @@ describe("public business starts", () => {
     expect(accountReturnTarget(`/account?next=${encodeURIComponent(href)}`)).toBe(`/account?next=${encodeURIComponent(href)}`);
   });
 
-  it("makes website delivery a reviewable service request, not a generation assignment", () => {
-    expect(businessStartAsk("website")).toBe("Have an agency build a website for my business.");
+  it("keeps website delivery as agency selection instead of an owner Ask", () => {
+    expect(businessStartAsk("website")).toBe("");
     expect(businessStartView("website")).toBe("help");
     expect(businessStartAsk("website")).not.toContain("24");
   });

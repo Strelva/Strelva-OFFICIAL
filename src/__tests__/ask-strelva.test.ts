@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -489,6 +490,22 @@ describe("startAskTurn", () => {
     expect(ASK_TOOL_IDS.some((id) => /publish|send|approve/.test(id))).toBe(false);
   });
 
+  it("saves the exact Possibility candidate links in both receipts and conversation history", async () => {
+    const h = harness({ script: async function* (tools) {
+      const output = await tools.open_possibility!.execute({ title: "Services", intent: "Explain our existing services", summary: "A clearer service page" });
+      yield { type: "tool-result", toolName: "open_possibility", output };
+      yield { type: "text-delta", text: "Prepared a service page." };
+    } });
+    h.deps.possibilities.open = async () => ({ id: "p-exact", status: "exploring", durable: true, previewHref: "/api/websites/prepared/preview?revision=2", tryHref: "/try/signed-exact-revision", reviewStatus: "needs_you" });
+    h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    const result = await run(h.deps, "Explain our existing services better");
+    const ask = result.result?.ask as { conversationId: string; items: unknown[] };
+    const expected = expect.objectContaining({ kind: "possibility", status: "opened", tryHref: "/try/signed-exact-revision", previewHref: "/api/websites/prepared/preview?revision=2" });
+    expect(ask.items).toContainEqual(expected);
+    const saved = await h.deps.history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(saved.messages.at(-1)?.result?.items).toContainEqual(expected);
+  });
+
   it("files original booking words at Asked instead of claiming a working summary-only Possibility", async () => {
     const h = harness({
       script: async function* (tools) {
@@ -512,6 +529,48 @@ describe("startAskTurn", () => {
     const result = await run(h.deps, "Change our Friday hours");
     expect(h.modelCalls).toHaveLength(0);
     expect(result.text).toContain("Which site");
+  });
+
+  it.each(["cap", "unavailable"])("records a %s budget pause as a refusal in streaming and saved history", async reason => {
+    const h = harness();
+    h.deps.history = createInMemoryAskHistory({ roleOf: () => "owner" });
+    h.deps.stream = async () => { throw reason === "cap" ? new ModelBudgetPausedError(0, 0) : new ModelBudgetUnavailableError(); };
+    const result = await run(h.deps, "What are my services?");
+    const ask = result.result?.ask as { kind: string; items: unknown[]; conversationId: string; budgetRecovery?: string };
+    expect(ask.kind).toBe("refusal");
+    expect(ask.items).toContainEqual(expect.objectContaining({ kind: "refusal", summary: reason === "cap" ? "budget_paused" : "budget_unavailable" }));
+    expect(result.text).toContain("paus");
+    expect(ask.budgetRecovery).toBe(reason === "cap" ? "agency" : undefined);
+    const conversation = await h.deps.history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
+    expect(conversation.messages.at(-1)?.result).toMatchObject({ kind: "refusal" });
+  });
+
+  it("offers a plan only to an owner with the billing release and a configured checkout", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    vi.stubEnv("STRELVA_SELF_SERVE_BILLING", "1");
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_local_fixture");
+    vi.stubEnv("STRELVA_WORKSPACE_PRICE_ID", "price_test");
+    try {
+      const h = harness();
+      h.deps.stream = async () => { throw new ModelBudgetPausedError(0, 0); };
+      expect((await run(h.deps, "What are my services?")).result).toMatchObject({ ask: { budgetRecovery: "plan" } });
+      h.downgrade();
+      expect((await run(h.deps, "What are my services?")).result).toMatchObject({ ask: { budgetRecovery: "agency" } });
+      vi.stubEnv("STRELVA_BUSINESS_BILLING", "0");
+      expect((await run(h.deps, "What are my services?")).result).toMatchObject({ ask: { budgetRecovery: "agency" } });
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("keeps already emitted work and appends an honest pause if a later model step is capped", async () => {
+    const h = harness();
+    h.deps.stream = async (_input, consume) => {
+      await consume((async function* () { yield { type: "text-delta", text: "I read your services." }; })());
+      throw new ModelBudgetPausedError(0, 0);
+    };
+    const result = await run(h.deps, "What are my services?");
+    expect(result.text).toContain("I read your services.");
+    expect(result.text).toContain("paus");
+    expect(result.result).toMatchObject({ ask: { kind: "refusal", budgetRecovery: "agency" } });
   });
 
   it("when both models fail before output, says Strelva can't answer and nothing changed", async () => {

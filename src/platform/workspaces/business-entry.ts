@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
 import { businessEntryInputSchema, businessEntryResultSchema } from "./business-entry-contract";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
+import { businessEntryReleaseFlags } from "./business-entry-releases";
 
 /** One transaction creates ownership and, when requested, saves the service brief. */
 export async function enterCustomerBusiness(actor: WorkspaceActor, raw: unknown) {
@@ -12,10 +13,11 @@ export async function enterCustomerBusiness(actor: WorkspaceActor, raw: unknown)
   const workspaceId = input.destination.kind === "existing" ? input.destination.workspaceId : null;
   const digest = createHash("sha256").update(JSON.stringify([actor.userId, name, workspaceId, input.initialRequest, ...(input.sourceCheckId ? [input.sourceCheckId] : [])])).digest("hex");
   const client = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: { message?: string } | null }> };
-  const result = await client.rpc("enter_customer_business", {
+  const result = await client.rpc("enter_customer_business_with_releases", {
     p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
     p_name: name, p_business_id: workspaceId, p_request_text: input.initialRequest,
     p_command_id: input.idempotencyKey, p_command_digest: digest,
+    p_initial_release_flags: businessEntryReleaseFlags(),
   });
   if (result.error) {
     const message = result.error.message || "";

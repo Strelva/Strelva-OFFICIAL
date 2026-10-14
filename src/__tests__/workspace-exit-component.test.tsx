@@ -51,6 +51,20 @@ describe("workspace exit request lifetime", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([false, true])("keeps billing consequences explicit with billing released %s, before and after leaving", async businessBillingReleased => {
+    const request = vi.fn<typeof fetch>().mockResolvedValue(response(options()));
+    await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request, businessBillingReleased })));
+    const billingLink = () => container.querySelector(`a[href="/workspace/billing?workspaceId=${firstWorkspace}"]`);
+    expect(Boolean(billingLink())).toBe(businessBillingReleased);
+    expect(container.textContent).toContain("does not change billing");
+    if (!businessBillingReleased) expect(container.textContent).toContain("Contact your billing provider");
+    await act(async () => root.render(null));
+    request.mockResolvedValue(response({ state: completedState(firstWorkspace), successors: [] }));
+    await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: firstWorkspace, request, businessBillingReleased })));
+    expect(Boolean(billingLink())).toBe(businessBillingReleased);
+    expect(container.textContent).toContain("does not change billing");
+  });
+
   it("does not let an older completion overwrite the newly selected workspace", async () => {
     const request: typeof fetch = (input, init) => new Promise<Response>((resolve) => {
       pending.push({ input, init, resolve });

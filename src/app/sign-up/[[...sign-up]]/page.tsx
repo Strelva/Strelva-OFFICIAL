@@ -123,6 +123,6 @@ function AccountKindChoice({ selected, next }: { selected: "business" | "agency"
   };
   return <nav aria-label="Who this account is for" className="flex flex-col gap-3">
     <p className="text-sm text-gray-muted">Who is this for?</p>
-    {(["business", "agency"] as const).map(kind => <StChoiceLink key={kind} href={href(kind)} selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"} detail={kind === "business" ? "Run your site, forms and bookings yourself. Bring in an agency anytime." : "Clients own their workspace; you work inside it."} />)}
+    {(["business", "agency"] as const).map(kind => <StChoiceLink key={kind} href={href(kind)} selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"} detail={kind === "business" ? "Start with your website and business details. Bring in an agency anytime." : "Clients own their workspace; you work inside it."} />)}
   </nav>;
 }

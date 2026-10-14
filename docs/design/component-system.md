@@ -691,6 +691,16 @@ filed request, non-owner, closed steps. Checked locally at 1280 and 390 px on
 overflow, dialog Tab stays inside. Focus drops to the page while a read is in
 flight. No signed-in browser run, screen reader or device check yet.
 
+October 14 owner completion: public check CTAs and old check setup links open
+`StartBusinessFromCheck`, retaining the website and saved check before Getting
+started. Its scoped saved-check link is authorized again on read. Home and the
+workspace navigation retain Getting started until the business has confirmed
+its own details; failed reads retain the return path. Website help intent opens
+the agency choice instead of an owner Ask, with Website / Prepare offered only
+after the owner chooses an agency. No agency is selected automatically.
+Local route and DOM tests cover these continuations; desktop/mobile rendering
+is reserved for the coordinator under the October 14 disk restriction.
+
 ## Extending the foundation
 
 Use the existing source owners and references. Keep changes small enough to
@@ -1331,13 +1341,38 @@ history distinguished from empty records. `WorkspaceExit` and
 link to the exact business's billing page; owner-only portal controls retain a
 separate cancellation review, busy/error states and fresh server payer authority.
 Hosted Stripe cancellation and actual archive completeness remain unqualified.
+October 14 exit refinement: billing consequences remain explicit before and
+after leaving; the Plan and billing action appears only while its route is
+released. Otherwise the owner is directed to the billing provider for an
+existing agreement. Local DOM tests cover both release states and receipts.
 [BusinessSetupPanel](../../src/experience/workspace/BusinessSetupPanel.tsx) retains
-the saved owner Ask/check and opens Home with its original words after setup;
+the saved owner Ask and opens Home with its original words after setup;
 unknown save outcomes recover the exact command. [BringInAgency](../../src/experience/workspace/BringInAgency.tsx)
 excludes current/proposed agencies and prepares complete scope amendments while
 active grants remain until acceptance. Decline keeps those active grants. These
 are local source/DOM contracts; ordered SQL and rendered qualification remain
 outstanding.
+
+October 14 owner completion: check entry saves the check and website through
+Getting started. Agency website entry retains only the website-help intent,
+then opens Help for explicit agency choice and consent. Bring in an agency
+uses the workspace transport, rejects malformed access reads, aborts old reads
+and clears choices on a business switch. Waiting proposals name the receiving
+agency's Queue and keep scope, price and deadline unagreed. The two-doors owner
+preview now composes the production Help request, saved requests, agency and
+platform-support sections with an isolated fictional transport. Local DOM and
+transport tests cover waiting, denied, failed and workspace-switch states;
+visual acceptance remains pending.
+
+October 14 Ask continuation: suggestions come from the authorized business
+record's verified active services, hours or description, with neutral prompts
+when facts are unavailable. Saved Possibility receipts retain their native Try
+or preview path and show Open Needs you only for a ready owner review. Budget
+pauses retain their refusal status and words through streaming and history,
+with one scoped recovery action: Choose a plan only for a configured owner
+checkout, otherwise Bring in an agency. Existing StRows, StTextButton and
+composer components are reused. Local prompt, receipt, history and DOM tests
+cover these contracts; browser verification remains pending.
 
 
 October 7, 2026, local: the System Versions panel now shows each scoped sibling’s reusable definition changes in keyboard-native disclosures, with source-baseline and local values, removed-path labels, and explicit empty/Not verified states. Private records, bindings, grants, maintenance authority and secret-shaped content are omitted by the scoped PostgreSQL projection. `sibling=ready|empty|unavailable` selects fictional comparison states in the existing preview.
@@ -2344,3 +2379,9 @@ main's qualified Library offers and ordinary agency System health before adding
 the release-gated current-provider alert projection. Local projection/cron/TLS
 units and typecheck pass; this session's dev server cannot bind a socket, so
 fresh desktop/mobile rendering and actual provider Auth remain unproven.
+
+### October 14 · owner setup navigation
+
+`WorkspaceLayout` and `BusinessHome` pass the owner-scoped Getting started link through the existing `StrelvaShell.navigation` slot. Home also shows that link in its content so it remains reachable on a phone. The snapshot derives completion from confirmed business facts or active confirmed services and no pending found facts. A name or saved website alone does not complete setup; a website is optional. Unknown reads keep the link. Provider seats, delegated access, agencies and personal workspaces receive no owner setup action. No separate completion state or storage is introduced.
+
+`WorkspaceBusinessSettings` only links Plan and billing when the server reports the billing release available. When off it shows “Price shown before you pay” and explains that plan choices are not open. The exit action is owner-only. Local route, pure projection and static-render tests cover these states; desktop/phone browser verification remains a coordinator check under this lane's no-browser restriction.

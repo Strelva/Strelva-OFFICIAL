@@ -62,6 +62,13 @@ describe("Start with this fix (owner door)", () => {
 });
 
 describe("Getting started", () => {
+  it("keeps the saved check one click away while starting from the website", async () => {
+    const check = `/workspace?workspaceId=${BUSINESS}&view=work&work=5a000000-0000-4000-8000-0000000000c1`;
+    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links: { ...links, check } }), vi.fn());
+    expect([...container.querySelectorAll("a")].find(link => link.getAttribute("href") === check)?.textContent).toBe("Open saved check");
+    expect(container.querySelector<HTMLInputElement>('input[type="url"]')!.value).toBe("https://northside.example/");
+  });
+
   it("shows the business, its website, the next steps and an honest closed step", async () => {
     await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links }), vi.fn());
     expect(container.querySelector("h1")?.textContent).toBe("Northside Bakery");

@@ -2225,6 +2225,19 @@
       ]
     },
     {
+      "id": "done-owner-signup-releases-2026-10-14",
+      "status": "Held and unqualified. Direct business initial release enrollment is source-pinned only; native SQL, inverse/reapply, populated refusal, hosted Auth and production application UNRUN. No production authority.",
+      "items": [
+        {
+          "file": "20261025120000_done_owner_signup_releases.sql",
+          "sha256": "7e658b7fb880a658821f94036fb8a12c040d0412b1a911bfa3c261b949f6063b",
+          "rollback": "rollback-20261025120000_done_owner_signup_releases.sql",
+          "rollbackSha256": "6fb9ed9b9ca9e989d4354a90688ff89d4071e76e94b7d48c4f3057a697a9891d",
+          "rollbackStatus": "Prepared inverse refuses populated initial enrollment; registered ordered fixture, empty inverse/reapply and populated refusal in check-ux-audit-sql.sh. SQL execution and hosted qualification UNRUN; no production application authorized."
+        }
+      ]
+    },
+    {
       "id": "security-provider-health-alerts-2026-10-12",
       "status": "prepared locally; unapplied; no production authority",
       "description": "Read-only current provider health alerts (#271)",

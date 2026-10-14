@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  operator: vi.fn(), creatorDraftIds: vi.fn(), makerAuthority: vi.fn(), brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  readRecord: vi.fn(), readFound: vi.fn(), operator: vi.fn(), creatorDraftIds: vi.fn(), makerAuthority: vi.fn(), brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
   pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
 }));
+vi.mock("@/platform/business-record/service", () => ({ readBusinessRecord: mocks.readRecord }));
+vi.mock("@/products/found-facts/server", () => ({ readBusinessFoundFacts: mocks.readFound }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.brandRpc }) }));
 vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: mocks.operator }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
@@ -58,6 +60,8 @@ beforeEach(() => {
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.brandRpc.mockResolvedValue({ data: null, error: null });
   mocks.operator.mockResolvedValue(false);
+  mocks.readRecord.mockResolvedValue({ facts: {}, services: [] });
+  mocks.readFound.mockResolvedValue([]);
   mocks.rate.mockResolvedValue(false);
   mocks.creatorDraftIds.mockResolvedValue([]);
   mocks.makerAuthority.mockResolvedValue(null);
@@ -327,7 +331,7 @@ describe("release-one private workspace routes", () => {
 
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
-    expect(customer.releases).toEqual({ exportSchema3: false, systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
+    expect(customer.releases).toEqual({ businessBilling: false, exportSchema3: false, systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
     expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], canWrite: true, siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
 
     mocks.systems.mockClear();
@@ -355,7 +359,7 @@ describe("release-one private workspace routes", () => {
       vi.stubEnv("STRELVA_SYSTEMS_RELEASE", value);
       const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
       expect(customer.systems).toBeUndefined();
-      expect(customer.releases).toEqual({ exportSchema3: false, systems: false, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
+      expect(customer.releases).toEqual({ businessBilling: false, exportSchema3: false, systems: false, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
       expect(customer.work).toEqual([expect.objectContaining({ id: work.id })]);
     }
     expect(mocks.systems).not.toHaveBeenCalled();
@@ -699,5 +703,42 @@ describe("create_agency: the ordinary agency path behind open signup (#258)", ()
     expect((await (await GET(new Request("https://strelva.com/api/workspace"))).json()).releases.agencySetup).toBeUndefined();
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
     expect((await (await GET(new Request("https://strelva.com/api/workspace"))).json()).releases.agencySetup).toBe(true);
+  });
+});
+
+
+describe("derived Getting started navigation", () => {
+  beforeEach(() => vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1"));
+  it("does not read setup facts or expose navigation while the owner door is off", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "0");
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    expect((await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`))).json()).gettingStarted).toBeUndefined();
+    expect(mocks.readRecord).not.toHaveBeenCalled();
+    expect(mocks.readFound).not.toHaveBeenCalled();
+  });
+  it("keeps setup reachable for a new owner, without returning raw business facts", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    const snapshot = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`))).json();
+    expect(snapshot.gettingStarted).toBe("incomplete");
+    expect(snapshot).not.toHaveProperty("facts");
+    expect(snapshot.releases.businessBilling).toBe(false);
+  });
+  it("uses confirmed details and undecided facts instead of a permanent completion flag", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    mocks.readRecord.mockResolvedValue({ facts: { description: { verified: true, value: "Family dental care" } }, services: [] });
+    const url = `https://strelva.com/api/workspace?workspaceId=${workspaceId}`;
+    expect((await (await GET(new Request(url))).json()).gettingStarted).toBe("complete");
+    mocks.readFound.mockResolvedValue([{ id: "waiting" }]);
+    expect((await (await GET(new Request(url))).json()).gettingStarted).toBe("incomplete");
+    mocks.readFound.mockRejectedValue(new Error("unavailable"));
+    expect((await (await GET(new Request(url))).json()).gettingStarted).toBe("unavailable");
+  });
+  it("reads no record or found facts through provider or delegated access", async () => {
+    for (const access of ["provider_seat", "delegated_read"]) {
+      mocks.list.mockResolvedValue([{ ...workspace, kind: "customer", access }]);
+      expect((await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`))).json()).gettingStarted).toBeUndefined();
+    }
+    expect(mocks.readRecord).not.toHaveBeenCalled();
+    expect(mocks.readFound).not.toHaveBeenCalled();
   });
 });

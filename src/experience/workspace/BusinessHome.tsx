@@ -30,6 +30,7 @@ import { NeedsYouSection, StrelvaHandledSection } from "./NeedsYouSection";
 import { decisionCount } from "./needs-you-presentation";
 import { useNeedsYou } from "./useNeedsYou";
 import { SiteSummarySection, useSiteSummary, type SiteSummaryState } from "./SiteSummarySection";
+import { ownerGettingStartedHref } from "./getting-started-status";
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
@@ -306,7 +307,10 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
   const chips = liveChips(siteSummary.state, systems, sites, systemsReleased);
   const systemsLine = business && systems.length ? [live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ") : "";
 
+  const gettingStartedHref = ownerGettingStartedHref(snapshot, appBase);
+  const gettingStartedAction = gettingStartedHref ? <StNotice><StTextButton href={gettingStartedHref}>Getting started</StTextButton> · Read your website or add business details. Nothing has to move.</StNotice> : null;
   const homePage = <div className={styles.home} aria-busy={busy || undefined}>
+    {gettingStartedAction}
     <section className={`${styles.dusk} ${styles.reveal}`} aria-labelledby="business-start-title">
       <div className={styles.duskMain}>
         <p className={styles.duskLine}>{readOnly ? systemsReleased ? "Shared with you" : "Shared workspace" : line}{(readOnly || line) ? " · " : ""}{name}</p>
@@ -358,6 +362,7 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
       <StHead title={showHandled ? STRELVA_HANDLED_LABEL : name} titleId="business-start-title"
         meta={showHandled ? "Last 7 days · what changed and who did it" : agencySeat ? `${name} · Agency access · shared workspace` : readOnly ? `${name} shared this with your agency to review.` : [decisionsWaiting === null ? "" : `${decisionsWaiting} need you`, live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ")}
         crumb={showHandled ? { label: "Home", onClick: () => setHandledWorkspaceId(null) } : undefined} />
+      {gettingStartedAction}
       {agencySeat && readLocation.deliveryCheck ? <AgencyClientDeliveryCheck state={sharedHome.state} selectedKey={readLocation.deliveryCheck} workspaceId={snapshot.workspaceId} onRetry={sharedHome.refresh} /> : null}
       {showHandled ? paperReceipts : <>
         {decisions}
@@ -405,6 +410,7 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
   </StPage></div>;
 
   return <StrelvaShell workspaceName={agencyWorkspace ? `${navigationBrand?.agencyId ? navigationBrand.name : agencyWorkspace.name} / ${name}` : name} ownerBrand={navigationBrand} brandWorkspaceId={agencyWorkspace?.id} allClients={agencyWorkspace ? { href: `${appBase}/workspace?workspaceId=${agencyWorkspace.id}&agencyView=clients` } : undefined} active={view === "needs-you" ? "needs-you" : "home"} title={view === "needs-you" ? agencySeat ? `Waiting on ${name}` : "Needs you" : name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={systemsReleased ? pinnedSystems(systems, openSystemHref, onOpenSystem) : [...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} systemsReleased={systemsReleased} notice={notice} contentId="business-home-main"
+    navigation={gettingStartedHref ? <StTextButton href={gettingStartedHref}>Getting started</StTextButton> : undefined}
     needsYou={needsYouReleased ? { count: decisionsWaiting, label: agencySeat ? `Waiting on ${name}` : undefined } : undefined}
     businessContext={business ? <WorkspaceBusinessSwitcher snapshot={snapshot} systems={systems} onSystem={onOpenSystem} busy={busy} onWorkspace={onWorkspace} onNavigate={onNavigate} /> : <label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
     {view === "needs-you" && needsYouReleased ? needsYouPage : business ? paperHome : homePage}

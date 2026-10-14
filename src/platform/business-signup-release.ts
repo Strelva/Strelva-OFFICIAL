@@ -21,8 +21,9 @@ export function businessSignupReleaseEnabled(
 export const GETTING_STARTED_PATH = "/workspace/getting-started";
 
 /** The first-run view of one business. Navigation only; the page checks access. */
-export function gettingStartedHref(workspaceId: string, requestId?: string | null): string {
+export function gettingStartedHref(workspaceId: string, requestId?: string | null, checkWorkId?: string | null): string {
   const query = new URLSearchParams({ workspaceId });
   if (requestId) query.set("request", requestId);
+  if (checkWorkId) query.set("check", checkWorkId);
   return `${GETTING_STARTED_PATH}?${query}`;
 }

@@ -3,7 +3,9 @@
 import { useMemo } from "react";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StHead, StPage } from "@/components/ui/strelva/Kit";
-import { BringInAgency } from "../BringInAgency";
+import { WorkspaceHelp as WorkspaceHelpForm } from "../WorkspaceHelpForm";
+import { WorkspaceRequestContext } from "../WorkspaceRequest";
+import type { ServiceRequest } from "@/platform/service-requests";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { AgencyProposals } from "../agency/AgencyProposals";
 
@@ -21,10 +23,27 @@ export function twoDoorsPreviewTransport(state: string): typeof fetch {
     let agencies: Array<{ agencyWorkspaceId: string; name: string; seat: boolean; ofRecord: boolean; scopes: Array<{ scope: string; level: string; status: string }> }> = state === "with-agency" ? [{ agencyWorkspaceId: NORTH, name: "North Studio", seat: true, ofRecord: true, scopes: [{ scope: "website", level: "full_control", status: "active" }, { scope: "google", level: "prepare", status: "active" }] }] : [];
     let accepted = state === "empty";
     let listed = true;
+    let requests: ServiceRequest[] = [];
     return async (input, init) => {
     const url = String(input);
     if (state === "loading") return new Promise<Response>(() => undefined);
     if (state === "error") return Response.json({ error: "Agencies couldn't be loaded. Nothing changed." }, { status: 503 });
+    if (url.startsWith("/api/service-requests")) {
+      if (url.includes("providersBusinessId=")) return Response.json({ providers: agencies.filter(agency => agency.seat).map(agency => ({ agencyWorkspaceId: agency.agencyWorkspaceId, name: agency.name, providerOfRecord: agency.ofRecord })) });
+      if (init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as { requestId?: string; request: string; outcome: string; scope: string[]; context: Record<string, unknown>; provider: ServiceRequest["provider"] };
+        const provider = body.provider;
+        const recipient = provider?.kind === "agency" && agencies.find(agency => agency.agencyWorkspaceId === provider.agencyWorkspaceId && agency.seat);
+        if (!recipient) return Response.json({ error: "Choose an agency with accepted access first." }, { status: 409 });
+        const prior = requests.find(item => item.id === body.requestId);
+        const request: ServiceRequest = { id: prior?.id ?? "d2950000-0000-4000-8000-0000000000f1", businessId: BUSINESS, status: "requested", request: body.request, outcome: body.outcome,
+          scope: body.scope, context: body.context, provider: body.provider, providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null }, installationId: null, deliveryId: null,
+          revision: (prior?.revision ?? 0) + 1, createdBy: "d2950000-0000-4000-8000-0000000000b1", createdAt: "2026-10-14T12:00:00Z", updatedAt: "2026-10-14T12:00:00Z" };
+        requests = [...requests.filter(item => item.id !== request.id), request];
+        return Response.json({ request });
+      }
+      return Response.json({ requests });
+    }
     if (url.startsWith("/api/workspace/agencies")) {
       if (init?.method === "POST") {
         const body = JSON.parse(String(init.body)) as { agencyWorkspaceId: string; scopes: Array<{ scope: string; level: string }> };
@@ -56,7 +75,7 @@ export function TwoDoorsPreview({ surface, state, mode = "light" }: { surface: "
   return <div data-workspace-theme="linen" data-workspace-mode={mode}>
     {surface === "owner"
       ? <StrelvaShell title="Harbor Dental" workspaceName="Harbor Dental" ownerBrand={state === "with-agency" ? NORTH_BRAND : undefined} signedIn signOut={null} accountName="Dr. Lin" accountDetail="Owner" systemsReleased>
-        <StPage><StHead title="What do you need?" meta="Send a request to your agency, bring one in, or contact Strelva about the platform itself." /><BringInAgency workspaceId={BUSINESS} canManage={state !== "member"} transport={transport} /></StPage>
+        <WorkspaceRequestContext.Provider value={transport}><WorkspaceHelpForm workspaceId={BUSINESS} workspaceName="Harbor Dental" canManageAgencies={state !== "member"} /></WorkspaceRequestContext.Provider>
       </StrelvaShell>
       : <StrelvaShell title="North Studio" workspaceName="North Studio" ownerBrand={NORTH_BRAND} agencyNavigation={agencyNavigation} signedIn signOut={null} accountName="Sam Rivera" accountDetail="Agency owner" systemsReleased>
         <StPage><StHead title="Queue" meta="Oldest first within each kind." /><AgencyProposals agencyWorkspaceId={NORTH} agencyName="North Studio" canManage transport={transport} /></StPage>

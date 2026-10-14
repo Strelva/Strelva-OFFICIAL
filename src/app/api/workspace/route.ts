@@ -1,4 +1,7 @@
 import { recordFunnelEvent } from "@/platform/infra/funnel";
+import { readBusinessRecord } from "@/platform/business-record/service";
+import { readBusinessFoundFacts } from "@/products/found-facts/server";
+import { gettingStartedStatus } from "@/experience/workspace/getting-started-status";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
 import { agencyAddClientReleaseEnabled, agencyImportReleaseEnabled } from "@/products/agency-clients";
@@ -254,7 +257,7 @@ export async function GET(request: Request) {
     // visible work gates delegations; Systems also need managed domains/releases.
     const [work, managedPresence, [systemsReleased, inquiryRelease, websiteRebuildReleased], exit,
       handoffs, agencyDelegations, providedClients, customerDelegations, systems, connectedSitesReleased,
-      creatorDraftIds, makerAuthority, ownerBrand, pendingAssessments] = await Promise.all([
+      creatorDraftIds, makerAuthority, ownerBrand, pendingAssessments, gettingStarted] = await Promise.all([
       visibleWork, managed, releases,
       (async () => {
         try {
@@ -284,6 +287,10 @@ export async function GET(request: Request) {
       releases.then(([released]) => released ? makeSystemsAuthority(current, selected.id) : null),
       resolveOwnerBrand(selected.id),
       selected.access === "member" ? listPendingAssessments(current, selected.id) : [],
+      businessSignupReleaseEnabled() && selected.kind === "customer" && selected.access === "member" && selected.role === "owner"
+        ? Promise.all([readBusinessRecord(current, selected.id), readBusinessFoundFacts(current, selected.id)])
+          .then(([record, found]) => gettingStartedStatus(record, found.length)).catch(() => "unavailable" as const)
+        : undefined,
     ]);
     // #241 remains undecided: a seat alone adds no inquiry entry or inbox grant.
     const inquiriesReleased = inquiryRelease && !providerSeat;
@@ -304,6 +311,7 @@ export async function GET(request: Request) {
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
       canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency" || makerAuthority === "owner",
+      ...(gettingStarted ? { gettingStarted } : {}),
       ownerBrand,
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
@@ -319,7 +327,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { businessBilling: process.env.STRELVA_BUSINESS_BILLING === "1", exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

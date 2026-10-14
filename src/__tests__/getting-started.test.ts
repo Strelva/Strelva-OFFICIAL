@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { BusinessRecordConflictError } from "@/platform/business-record/repository";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
+import { businessEntryInputSchema } from "@/platform/workspaces/business-entry-contract";
 import type { BusinessFacts } from "@/products/websites/rebuild-pipeline";
 import { WebsiteCrawlError } from "@/products/websites/rebuild-crawl";
 import { confirmationValue, foundFactsFromReading, screenFoundFact } from "@/products/getting-started/found-facts";
@@ -128,6 +129,10 @@ describe("found facts (the shared Found-fact shape)", () => {
 });
 
 describe("check to business", () => {
+  it("retains the website-audit business name instead of replacing it with its hostname", async () => {
+    const d = deps({ readAudit: vi.fn().mockResolvedValue({ url: "https://northside.example/", businessName: "Northside Bakery" }) });
+    expect(await createGettingStarted(d).readCheck(AUDIT)).toMatchObject({ name: "Northside Bakery", website: "https://northside.example/" });
+  });
   it("creates the business from the check's name, records its website as the owner's, and saves the check into it", async () => {
     const d = deps();
     const service = createGettingStarted(d);
@@ -143,6 +148,17 @@ describe("check to business", () => {
     const retry = vi.mocked(d.enterBusiness).mock.calls[1]![1] as { idempotencyKey: string };
     expect(retry.idempotencyKey).toBe(entry.idempotencyKey);
     expect(entry.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("uses the same creation command after a lost response even if the owner edits the name", async () => {
+    const d = deps();
+    const service = createGettingStarted(d);
+    await service.startFromCheck(ACTOR, { resultId: SCAN, name: "Northside Bakery" });
+    await service.startFromCheck(ACTOR, { resultId: SCAN, name: "Northside Bakery LLC" });
+    const calls = vi.mocked(d.enterBusiness).mock.calls;
+    // The existing entry command either replays or rejects changed terms under this key;
+    // it cannot insert a second business for this person's same public check.
+    expect(businessEntryInputSchema.parse(calls[1]![1]).idempotencyKey).toBe(businessEntryInputSchema.parse(calls[0]![1]).idempotencyKey);
   });
 
   it("reuses the owner's business with the same website instead of creating another", async () => {

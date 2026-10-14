@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BringInAgency } from "@/experience/workspace/BringInAgency";
-import { agencyConsentText } from "@/platform/agency-directory/contract";
+import { agencyConsentText, type AgencyScope } from "@/platform/agency-directory/contract";
 
 const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const STRELVA_AGENCY = "22222222-2222-4222-8222-222222222222";
@@ -12,16 +12,51 @@ let root: Root | undefined;
 let container: HTMLDivElement;
 afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.unstubAllGlobals(); });
 
-async function mount(transport: (input: string, init?: RequestInit) => Promise<Response>, canManage = true) {
+async function mount(transport: (input: string, init?: RequestInit) => Promise<Response>, canManage = true, initialScope?: AgencyScope) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-  await act(async () => { root!.render(createElement(BringInAgency, { workspaceId: WORKSPACE, canManage, transport })); });
+  await act(async () => { root!.render(createElement(BringInAgency, { workspaceId: WORKSPACE, canManage, transport, initialScope })); });
 }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const buttons = () => [...container.querySelectorAll("button")];
 const byText = (text: string) => buttons().find(button => button.textContent?.includes(text));
 
 describe("Bring in an agency (ADR 0015)", () => {
+  it("carries website intent without selecting an agency or sending a proposal before consent", async () => {
+    const writes = vi.fn();
+    await mount(async (_input, init) => {
+      if (init?.method) writes(init);
+      return json({ directory: [{ agencyWorkspaceId: NORTH, name: "North Studio", summary: "Websites" }], agencies: [] });
+    }, true, "website");
+    expect(byText("Send to North Studio")).toBeUndefined();
+    expect(writes).not.toHaveBeenCalled();
+    await act(async () => byText("North Studio")!.click());
+    const website = container.querySelector('[aria-label="Website for North Studio"]')!;
+    expect([...website.querySelectorAll("button")].find(button => button.textContent === "Prepare")!.getAttribute("aria-checked")).toBe("true");
+    expect(container.textContent).toContain(agencyConsentText("North Studio", [{ scope: "website", level: "prepare" }]));
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it("fails closed on malformed agency access instead of offering choices", async () => {
+    await mount(async () => json({ directory: [{ agencyWorkspaceId: NORTH, name: "North Studio", summary: "Websites" }], agencies: [{ agencyWorkspaceId: NORTH, name: "North Studio", scopes: [] }] }));
+    expect(container.textContent).toContain("Agencies couldn't be loaded");
+    expect(byText("North Studio")).toBeUndefined();
+  });
+
+  it("discards choices and aborts a pending old-business read when the workspace changes", async () => {
+    let oldSignal: AbortSignal | null | undefined;
+    let finishOld: (response: Response) => void = () => undefined;
+    await mount(async (_input, init) => {
+      oldSignal = init?.signal;
+      return new Promise<Response>(resolve => { finishOld = resolve; });
+    });
+    await act(async () => root!.render(createElement(BringInAgency, { workspaceId: NORTH, canManage: true, transport: async () => json({ directory: [], agencies: [] }) })));
+    expect(oldSignal?.aborted).toBe(true);
+    await act(async () => finishOld(json({ directory: [{ agencyWorkspaceId: STRELVA_AGENCY, name: "Old business agency", summary: "Websites" }], agencies: [] })));
+    expect(container.textContent).not.toContain("Old business agency");
+    expect(container.textContent).toContain("No other agencies are listed yet.");
+  });
+
   it("lists agencies with no default, sends the owner's scopes and consent, and waits for the agency", async () => {
     const calls: Array<{ input: string; init?: RequestInit }> = [];
     const transport = vi.fn(async (input: string, init?: RequestInit) => {

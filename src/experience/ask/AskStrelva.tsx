@@ -8,8 +8,9 @@ import { SelectInput } from "@/components/ui/TextInput";
 import { GooeyDisclosure } from "@/components/ui/motion/GooeyDisclosure";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
+import { askSuggestions } from "@/platform/ask/suggestions";
 import {
-  ASK_EXAMPLES, askErrorMessage, askHistoryFailure, readAskResult, receiptLines, resultHeadline,
+  askErrorMessage, askHistoryFailure, readAskResult, readAskSuggestions, receiptLines, resultHeadline,
   type AskConversationSummaryView, type AskMessageView, type AskTurnResult,
 } from "./ask-model";
 import styles from "./ask.module.css";
@@ -65,6 +66,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const [error, setError] = useState<string | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[] | null>(null);
   const historyId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
@@ -77,9 +79,10 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       const response = await request(`/api/workspace/ask?${params}`, { cache: "no-store" });
       if (response.status === 503) { setHistoryState(askHistoryFailure(response.status, await response.json().catch(() => null))); return; }
       if (!response.ok) { setHistoryState("unavailable"); return; }
-      const body = await response.json() as { conversations?: AskConversationSummaryView[]; canAskOnBehalf?: boolean };
+      const body = await response.json() as { conversations?: AskConversationSummaryView[]; canAskOnBehalf?: boolean; suggestions?: unknown };
       setCanAskOnBehalf(body.canAskOnBehalf === true);
       setConversations(Array.isArray(body.conversations) ? body.conversations : []);
+      setSuggestions(readAskSuggestions(body.suggestions));
       setHistoryState("ready");
     } catch {
       setHistoryState("unavailable");
@@ -183,7 +186,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   }
 
 
-  const examples = systemId ? ASK_EXAMPLES.system : ASK_EXAMPLES.home;
+  const examples = suggestions ?? askSuggestions({ businessName, systemName, aboutSystem: Boolean(systemId) });
   const blockedReason = readOnly ? readOnlyReason || "You can read this business's conversations but can't ask here." : !conversationMine ? "This conversation was started by someone else. Start a new one to ask." : null;
   const unsaved = messages.some((message) => message.result && !message.result.saved);
 
@@ -204,7 +207,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
           {message.pending && message.content && toolLabel ? <p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel}</p> : null}
           {renderResult?.(message) ?? (message.result ? <TurnReceipt result={message.result} /> : null)}
           {message.role === "assistant" && message.result?.creationAction ? <StTextButton tone="accent" href={message.result.creationAction.href}>{message.result.creationAction.label}</StTextButton> : null}
-          {message.result?.kind === "refusal" ? <div className={styles.refusalActions}>{message.result.items.some(item => item.summary === "approval_in_chat") ? <StTextButton href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</StTextButton> : null}<StTextButton href={refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>Ask for help</StTextButton></div> : null}
+          {message.result && (message.result.kind === "refusal" || message.result.budgetRecovery) ? <div className={styles.refusalActions}>{message.result.items.some(item => item.summary === "approval_in_chat") ? <StTextButton href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</StTextButton> : null}<StTextButton href={message.result.budgetRecovery === "plan" ? `/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}` : refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>{message.result.budgetRecovery === "plan" ? "Choose a plan" : message.result.items.some(item => item.summary === "budget_paused") ? "Bring in an agency" : "Ask for help"}</StTextButton></div> : null}
         </div>
       </article>)}
     </div>
@@ -239,7 +242,7 @@ function TurnReceipt({ result }: { result: AskTurnResult }) {
     {headline ? <p className={styles.receiptHeadline}>{headline}</p> : <StRows>{lines.map(line => <StRow key={line.key}
       title={<StState kind={line.tone === "failed" ? "down" : line.tone === "waiting" ? "need" : "live"}>{line.text}</StState>}
       detail={line.ref ? <StMono>Ref {line.ref}</StMono> : undefined}
-      end={line.decideHref ? <StTextButton tone="accent" href={line.decideHref}>Open Needs you</StTextButton> : undefined}
+      end={line.decideHref || line.openHref ? <div className={styles.refusalActions}>{line.openHref ? <StTextButton tone="accent" href={line.openHref}>{line.openLabel}</StTextButton> : null}{line.decideHref ? <StTextButton tone="accent" href={line.decideHref}>Open Needs you</StTextButton> : null}</div> : undefined}
     />)}</StRows>}
   </StSurface>;
 }

@@ -18,9 +18,10 @@ export function businessStartView(product: BusinessStartProduct): Exclude<Busine
   return product === "website" ? "help" : product;
 }
 
-/** Static intent only. User-written briefs and credentials never travel in this URL. */
+/** Website help goes to explicit agency selection; it never creates the owner's own Ask. */
 export function businessStartAsk(product: BusinessStartProduct): string {
-  return product === "website" ? "Have an agency build a website for my business." : "";
+  void product;
+  return "";
 }
 
 /** @deprecated Use businessStartAsk. Existing launch tooling may keep this name. */
