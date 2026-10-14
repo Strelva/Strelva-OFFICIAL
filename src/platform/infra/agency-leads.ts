@@ -10,7 +10,8 @@ local raw = redis.call('GET', KEYS[1])
 if not raw then return cjson.encode({error='missing'}) end
 local lead = cjson.decode(raw)
 local agency = ARGV[1]
-if (lead.agencyWorkspaceId and lead.agencyWorkspaceId ~= cjson.null and lead.agencyWorkspaceId ~= agency)
+if ((not lead.agencyWorkspaceId or lead.agencyWorkspaceId == cjson.null) and ARGV[10] ~= '1')
+  or (lead.agencyWorkspaceId and lead.agencyWorkspaceId ~= cjson.null and lead.agencyWorkspaceId ~= agency)
   or (lead.requestType and lead.requestType ~= cjson.null and lead.requestType ~= 'agency_service')
   or lead.statusToken ~= ARGV[2] or lead.email ~= ARGV[3] then
   return cjson.encode({error='access'})
@@ -87,14 +88,14 @@ export interface AgencyLeadReceipt { lead: DeliveryLead; workflow: LeadWorkflow;
 
 export async function persistAgencyLeadCommand(input: {
   agencyWorkspaceId: string; actorId: string; token: string; email: string;
-  idempotencyKey: string; fingerprint: string; action: "status" | "note" | "convert" | "begin" | "complete"; value: string;
+  idempotencyKey: string; fingerprint: string; allowLegacyOwnership?: boolean; action: "status" | "note" | "convert" | "begin" | "complete"; value: string;
 }): Promise<AgencyLeadReceipt | { error: string }> {
   const redis = getRedis();
   if (!redis) throw new Error("Lead storage is unavailable.");
   const receiptKey = `lead-workflow:command:${input.agencyWorkspaceId}:${input.actorId}:${input.action === "begin" || input.action === "complete" ? input.action + ":" : ""}${input.idempotencyKey}`;
   const raw = await redis.eval(AGENCY_LEAD_COMMAND_SCRIPT,
     [`lead-status:${input.token}`, `lead:${input.email}`, `lead-workflow:${input.token}`, receiptKey],
-    [input.agencyWorkspaceId, input.token, input.email, input.fingerprint, input.action, input.idempotencyKey, new Date().toISOString(), input.value, input.actorId]);
+    [input.agencyWorkspaceId, input.token, input.email, input.fingerprint, input.action, input.idempotencyKey, new Date().toISOString(), input.value, input.actorId, input.allowLegacyOwnership ? "1" : "0"]);
   const result = typeof raw === "string" ? JSON.parse(raw) : raw;
   if (!result || typeof result !== "object") throw new Error("Lead command receipt is unavailable.");
   return result as AgencyLeadReceipt | { error: string };

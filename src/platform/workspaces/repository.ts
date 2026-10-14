@@ -1,5 +1,5 @@
 import { markCreatorDraftSnapshot } from "./creator-draft-snapshot";
-import { systemsReleasedFor } from "@/platform/systems-release";
+import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -308,14 +308,14 @@ export async function ensurePersonalWorkspace(input: WorkspaceActor): Promise<Wo
 
 export async function createAgencyWorkspace(input: WorkspaceActor, name: string): Promise<Workspace> {
   const a = actor(input);
-  const { data, error } = await db().rpc("create_owned_workspace", {
+  const { data, error } = await rpc("create_agency_workspace", {
     p_user_id: a.userId, p_verified_email: a.verifiedEmail,
-    p_kind: "agency", p_name: cleanName(name),
+    p_name: cleanName(name), p_systems_enabled: systemsReleaseMayBeOn(),
   });
   if (error) workspaceDbFailure(error, "Agency workspace was not created");
-  if (!data) throw new WorkspaceStoreError("Agency workspace was not created");
-  if (!data[0]) throw new WorkspaceStoreError("Agency workspace was not created");
-  return mapWorkspace(data[0] as DbRow, "member", "owner");
+  const row = firstRow(data);
+  if (!row) throw new WorkspaceStoreError("Agency workspace was not created");
+  return mapWorkspace(row, "member", "owner");
 }
 
 async function delegatedWorkIds(userId: string, workspaceId?: string): Promise<string[]> {

@@ -24,7 +24,15 @@ function health(client: AgencyClientRow) {
   if (client.systems.some(system => system.health?.status === "blocked")) return <StState kind="down">{HEALTH_LABEL.blocked}</StState>;
   if (client.systems.some(system => system.health?.status === "degraded")) return <StState kind="need">{HEALTH_LABEL.degraded}</StState>;
   if (client.systems.length && client.systems.every(system => system.health?.status === "healthy")) return <StState kind="live">All latest checks passed</StState>;
-  return <StState kind="draft">{HEALTH_LABEL.unknown}</StState>;
+  return <StState kind="draft">No recent check</StState>;
+}
+
+function clientSummary(client: AgencyClientRow): string {
+  if (!client.systems.length) return client.reach === "agency" ? "No shared Systems yet" : "No Systems yet";
+  const locations = [...new Set(client.systems.map(system => system.versionContext).filter(Boolean))];
+  if (locations.length > 1) return `${locations.length} locations · ${client.systems.length} Systems`;
+  const first = client.systems[0]!;
+  return `${first.name}${client.systems.length > 1 ? ` · ${client.systems.length - 1} more` : ""}`;
 }
 
 /** One record per business. Last good reads belong only to this mounted agency view. */
@@ -42,11 +50,11 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
       const read = lastGood?.client || client;
       const unavailable = client.status === "unavailable";
       return { key: client.workspaceId, cells: {
-        client: <><StTextButton tone="text" onClick={() => onOpen(client.workspaceId)}>{client.name}</StTextButton>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<small className="block text-xs font-normal text-gray-muted">{read.systems.length ? read.systems.map(clientSystemLabel).join(" · ") : client.reach === "agency" ? "No shared Systems yet" : "No Systems yet"}</small>
+        client: <><StTextButton tone="text" onClick={() => onOpen(client.workspaceId)}>{client.name}</StTextButton><small className="block text-xs font-normal text-gray-muted">{clientSummary(read)}</small>
           {client.agentBookings ? <StTextButton href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`}>Booked through assistants · {client.name}</StTextButton> : null}
-          {!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</>,
+          {read.systems.length || (!unavailable && client.provider) ? <details><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Client details</summary>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<ul className="space-y-2 py-2 text-xs font-normal text-gray-muted">{read.systems.map(system => <li key={system.id}>{clientSystemLabel(system)}</li>)}</ul>{!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</details> : null}</>,
         health: unavailable ? <><StState kind="need">{client.name} could not be loaded.</StState><small className="block text-xs">{lastGood ? `Showing the last good read from ${new Date(lastGood.readAt).toLocaleString()}.` : "No last good read is available in this visit."}</small><StPill variant="soft" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</StPill></> : health(client),
-        waiting: unavailable && !lastGood ? "Unknown" : needsYouLabel(read, now),
+        waiting: unavailable && !lastGood ? "Could not be read" : read.ownerClaimWaiting ? `Waiting on ${client.name} to claim${read.needsYou.count ? ` · ${needsYouLabel(read, now)}` : ""}` : needsYouLabel(read, now),
         requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} to review` : ""}{read.improvementsStatus === "unavailable" ? ` · ${read.improvementsWaiting ? "Some improvements unavailable" : "Improvements unavailable"}` : ""}</>,
         receipt: unavailable && !lastGood ? "Unknown" : lastReceiptLabel(read.lastReceiptAt, now),
       } };
@@ -70,7 +78,7 @@ function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {
 /** Queue: oldest first within each kind, with the client's own entrance. */
 export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork, complete = true }: { complete?: boolean; items: readonly AgencyQueueItem[]; now: number; onWorkspace: (workspaceId: string) => void; onOpenClientWork: (workspaceId: string, workId: string) => void }) {
   if (!items.length) return <StEmpty>{complete ? "Nothing is waiting across clients." : "Nothing is waiting in the loaded clients. The Queue is incomplete."}</StEmpty>;
-  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
+  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email", "owner_claim"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
   return <div className="space-y-8">{groups.map(group => {
     const rows = agencyQueueOrder(items.filter(item => group.kinds.includes(item.kind)));
     if (!rows.length) return null;

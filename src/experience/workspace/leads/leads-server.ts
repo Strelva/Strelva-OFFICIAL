@@ -16,16 +16,16 @@ export class AgencyLeadError extends Error {
   constructor(message: string, readonly status: number, readonly code: string) { super(message); this.name = "AgencyLeadError"; }
 }
 
-/** Configuration selects an ordinary agency; it never supplies membership. */
+/** Every agency uses its ordinary owner/admin membership. */
 export async function leadAgency(actor: WorkspaceActor, agencyWorkspaceId: string) {
-  if (!uuid.safeParse(agencyWorkspaceId).success || agencyWorkspaceId !== strelvaAgencyWorkspaceId()) throw new WorkspaceAccessError();
+  if (!uuid.safeParse(agencyWorkspaceId).success) throw new WorkspaceAccessError();
   const agency = (await listMemberAgencies(actor)).find(item => item.id === agencyWorkspaceId);
   if (!agency || !["owner", "admin"].includes(agency.role)) throw new WorkspaceAccessError();
   return agency;
 }
 
 function belongsToAgency(lead: DeliveryLead, id: string) {
-  return (lead.agencyWorkspaceId == null || lead.agencyWorkspaceId === id)
+  return (lead.agencyWorkspaceId === id || (lead.agencyWorkspaceId == null && id === strelvaAgencyWorkspaceId()))
     && (lead.requestType === undefined || lead.requestType === "agency_service");
 }
 export async function readAgencyLeads(actor: WorkspaceActor, agencyWorkspaceId: string) {
@@ -62,7 +62,7 @@ async function persist(actor: WorkspaceActor, agencyWorkspaceId: string, token: 
   // SQL authority and Redis writes are separate transactions. Recheck immediately
   // before the atomic Redis command, and recheck ownership inside that command.
   await leadAgency(actor, agencyWorkspaceId);
-  const result = await persistAgencyLeadCommand({ agencyWorkspaceId, actorId: actor.userId, token, email: lead.email, idempotencyKey, action, value, fingerprint });
+  const result = await persistAgencyLeadCommand({ agencyWorkspaceId, actorId: actor.userId, token, email: lead.email, idempotencyKey, action, value, fingerprint, allowLegacyOwnership: agencyWorkspaceId === strelvaAgencyWorkspaceId() });
   if ("error" in result) {
     if (result.error === "corrupt") throw new WorkspaceStoreError("The saved lead history could not be confirmed.");
     if (result.error === "access" || result.error === "missing") throw new WorkspaceAccessError();

@@ -56,13 +56,14 @@ function currentOwnerClaim(claim: OwnerClaim | null, client?: AgencyClientListIt
   return claim && Date.parse(claim.expiresAt) > Date.now() && (!client || client.pendingClaim?.claimId === claim.claimId) ? claim : null;
 }
 
-export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId }: {
-  agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialLead?: InitialLead;
+export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId, emailEnabled = false }: {
+  emailEnabled?: boolean; agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialLead?: InitialLead;
   initialConversion?: AddAgencyClientInput | null; conversionHeld?: boolean; convertedBusinessWorkspaceId?: string;
 }) {
   const [source, setSource] = useState<"url" | "prospect">(initialProspectId && prospecting ? "prospect" : "url");
   const [url, setUrl] = useState(initialConversion ? initialConversion.url ?? "" : initialLead?.currentWebsite ?? "");
   const [name, setName] = useState(initialConversion ? initialConversion.name ?? "" : initialLead?.businessName.slice(0, 120) ?? "");
+  const [sendOwnerEmail, setSendOwnerEmail] = useState(false);
   const [ownerEmail, setOwnerEmail] = useState(initialConversion ? initialConversion.ownerEmail ?? "" : initialLead?.email ?? "");
   const [prospectId, setProspectId] = useState<string | null>(initialProspectId);
   const [prospects, setProspects] = useState<Prospect[] | null>(null);
@@ -138,7 +139,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
         action: "add", agencyWorkspaceId, idempotencyKey,
         ...(source === "url" ? (url.trim() ? { url: url.trim() } : {}) : { prospectId }),
         ...(name.trim() ? { name: name.trim() } : {}),
-        ...(ownerEmail.trim() ? { ownerEmail: ownerEmail.trim() } : {}),
+        ...(ownerEmail.trim() ? { ownerEmail: ownerEmail.trim(), ...(emailEnabled && sendOwnerEmail ? { sendOwnerEmail: true } : {}) } : {}),
         ...(initialLead ? { leadToken: initialLead.token } : {}),
       });
       if (!input.success) { setError("Check the business name, website and owner email."); return; }
@@ -197,7 +198,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
       {convertedBusinessWorkspaceId ? <div className="mt-6"><StPillLink href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client workspace</StPillLink></div> : null}
       <StTextButton className="mt-6" href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
     </section> : result
-      ? <><AddedClient result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} allowAnother={!initialLead} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
+      ? <><AddedClient emailEnabled={emailEnabled} result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} allowAnother={!initialLead} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
         {result.leadConversion ? <div className="mt-6" role="status"><p className="text-[13px] text-gray-muted">{result.leadConversion.status === "converted" ? "Lead converted. The client business was created." : result.leadConversion.message ?? "The client was added, but its lead status has not been confirmed."}</p>
           {result.leadConversion.status === "unconfirmed" ? <StTextButton onClick={() => void submit()} disabled={submitting}>{submitting ? "Confirming conversion" : "Confirm lead conversion"}</StTextButton> : null}
           <StTextButton href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
@@ -207,7 +208,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
         <div>
           <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-accent-text">New client</p>
           <h1 id={`${id}-title`} className="mt-3 font-display text-[40px] font-medium leading-tight">Add a client</h1>
-          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{initialLead ? "Review the details from this lead. Adding their business confirms the conversion; nothing is emailed." : "Start from the website they already have, or from someone who ran your check."}</p>
+          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{initialLead ? "Review the details from this lead. Adding their business confirms the conversion. No email is sent unless you choose it." : "Start from the website they already have, or from someone who ran your check."}</p>
           <form onSubmit={submit} className="mt-8 max-w-lg" noValidate aria-busy={submitting || undefined}>
             {prospecting && !initialLead ? <Tabs aria-label="Where this client comes from" variant="segment" value={source} onChange={(value) => { setSource(value as "url" | "prospect"); setError(""); }}
               items={[{ value: "url", label: "Website", disabled: requestHeld }, { value: "prospect", label: "Prospect", disabled: requestHeld }]} /> : null}
@@ -217,7 +218,8 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
                 ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required={!initialLead} disabled={requestHeld || submitting} maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText={initialLead ? "Optional. A business can be added before it has a website." : "We read their details and run an AI Visibility check saved in your agency. Nothing on their site changes."} />
                 : <ProspectPicker prospects={prospects} error={prospectError} added={added} value={prospectId} onChoose={choose} />}
               <TextInput label="Business name" autoComplete="organization" required={Boolean(initialLead)} disabled={requestHeld || submitting} maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
-              <TextInput label="Owner’s email" type="email" autoComplete="email" disabled={requestHeld || submitting} maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Strelva doesn’t email it yet; you’ll copy it." />
+              <TextInput label="Owner’s email" type="email" autoComplete="email" disabled={requestHeld || submitting} maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Copy and share it after adding the client." />
+              {emailEnabled ? <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={sendOwnerEmail} onChange={event => setSendOwnerEmail(event.target.checked)} />Email this owner their claim link if email is permitted</label> : null}
             </fieldset>
             {error ? <p role="alert" className="mt-4 text-[13px] text-critical">{error}</p> : null}
             {requestHeld ? <p role="status" className="mt-4 text-[13px] text-gray-muted">This request is held with its original details. Retrying checks the same client addition.</p> : null}
@@ -268,7 +270,7 @@ function ProspectPicker({ prospects, error, added, value, onChoose }: { prospect
   </fieldset>;
 }
 
-export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, allowAnother = true, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; allowAnother?: boolean; onClaim: (claim: OwnerClaim) => void }) {
+export function AddedClient({ emailEnabled = false, result, agencyWorkspaceId, agencyHref, onAnother, allowAnother = true, onClaim, currentClient }: { emailEnabled?: boolean; currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; allowAnother?: boolean; onClaim: (claim: OwnerClaim) => void }) {
   const id = useId().replace(/:/g, "");
   const { client, scan } = result;
   const ownerClaim = currentOwnerClaim(result.ownerClaim, currentClient);
@@ -320,7 +322,7 @@ export function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, 
         <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{client.factsSeeded} {client.factsSeeded === 1 ? "detail" : "details"} on the business record, including its name. Only the owner confirms them.</p>
       </div>
 
-      <OwnerLink result={result} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
+      <OwnerLink emailEnabled={emailEnabled} result={result} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
     </div>
 
     <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-gray-border pt-6">
@@ -345,8 +347,9 @@ export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
   </section>;
 }
 
-function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient }: { currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void }) {
+function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient, emailEnabled }: { emailEnabled: boolean; currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void }) {
   const [email, setEmail] = useState("");
+  const [sendEmail, setSendEmail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(result.ownerClaimError ?? "");
   const [copied, setCopied] = useState(false);
@@ -393,7 +396,7 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient }: { curr
       issuing = true;
       const body = await readJson<{ ownerClaim: OwnerClaim }>(await fetch("/api/workspace/agency-clients", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "owner_link", agencyWorkspaceId, customerWorkspaceId: result.client.customerWorkspaceId, ownerEmail: email.trim() }),
+        body: JSON.stringify({ action: "owner_link", agencyWorkspaceId, customerWorkspaceId: result.client.customerWorkspaceId, ownerEmail: email.trim(), ...(emailEnabled && sendEmail ? { sendEmail: true } : {}) }),
       }), "The owner link couldn’t be created.");
       if (!ownerClaimSchema.safeParse(body.ownerClaim).success || body.ownerClaim.customerWorkspaceId !== result.client.customerWorkspaceId || !/^\/workspace\/claim\/[A-Za-z0-9_-]+$/.test(body.ownerClaim.claimPath)) throw new Error("The issued owner link could not be confirmed.");
       setReconciled(null);
@@ -417,12 +420,13 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient }: { curr
       <label htmlFor="owner-link-value" className="sr-only">Owner claim link</label>
       <input id="owner-link-value" readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 font-mono text-[12px]" />
       <Button className="mt-3 w-full" onClick={() => void copy()} icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button>
-      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">Not sent.</strong> Client email is off during the rollout, so send this yourself. Works until {dateLabel(claim.expiresAt)}.</p>
+      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">{claim.delivery.status === "accepted" ? "Email accepted for delivery." : claim.delivery.status === "unknown" || claim.delivery.status === "sending" ? "Email delivery unconfirmed." : "Not sent."}</strong> {claim.delivery.status === "accepted" ? "You can also copy the link." : "Copy the link and share it yourself."} Works until {dateLabel(claim.expiresAt)}.</p>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">The link is shown once. Making a new one replaces it.</p>
     </> : <form onSubmit={create} noValidate className="mt-1">
-      <p className="text-[13px] leading-relaxed text-gray-muted">{issuedClaim ? "The previously shown owner link is no longer current. Create a fresh link for the owner." : "Make a link for the owner to take their business."} Nothing is emailed; you send it.</p>
+      <p className="text-[13px] leading-relaxed text-gray-muted">{issuedClaim ? "The previously shown owner link is no longer current. Create a fresh link for the owner." : "Make a link for the owner to take their business."} Copy and share it yourself, or explicitly request email when available.</p>
       {latestClient?.pendingClaim ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">An owner claim is pending for {latestClient.pendingClaim.recipientEmail}, until {dateLabel(latestClient.pendingClaim.expiresAt)}. Replacing its link ends the previous link.</p> : null}
       <div className="mt-4"><TextInput label="Owner’s email" type="email" autoComplete="email" maxLength={254} disabled={busy} value={email} onChange={(event) => { setEmail(event.target.value); if (!needsCheck) setError(""); }} /></div>
+      {emailEnabled ? <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" disabled={busy} checked={sendEmail} onChange={event => setSendEmail(event.target.checked)} />Email the owner this new link if permitted</label> : null}
       <Button type="submit" className="mt-3 w-full" loading={busy} disabled={needsCheck || latestClient?.seatActive === false}>{latestClient?.pendingClaim ? "Replace pending owner link" : "Create owner link"}</Button>
     </form>}
     <StTextButton className="mt-3" onClick={() => void refresh()} disabled={busy}>Refresh owner claim</StTextButton>

@@ -9,8 +9,8 @@ const fictionalQualification: QualificationState = { workspaceId: agency.id, can
 it("leads with submitting per-effect evidence instead of permission law", () => {
   const html = renderToStaticMarkup(createElement(AgencyVerification, { onboarding: { agency, effects: [] }, fictionalQualification }));
   expect(html).toContain("Get verified for client work");
-  expect(html.match(/Submit evidence/g)).toHaveLength(4);
-  expect(html).toContain("Every agency follows this path, including Strelva Agency");
+  expect(html.match(/<button[^>]*>Submit evidence<\/button>/g)).toHaveLength(4);
+  expect(html).toContain("Every agency follows the same review");
   expect(html).toContain("domain authority");
   expect(html).toContain("consent, exclusions and unsubscribe handling");
   expect(html).not.toContain("nothing to submit");

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockRedisStore = vi.hoisted(() => new Map<string, unknown>());
@@ -47,6 +47,8 @@ describe("access request delivery flow", () => {
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
   });
 
+  afterEach(() => { process.env = { ...originalEnv }; vi.unstubAllGlobals(); });
+
   it.each([["business_access", "/sign-up"], ["agency_access", "/sign-up?as=agency"]])("routes %s to platform entry without sales storage or notifications", async (requestType, next) => {
     const { POST } = await import("@/app/api/access-request/intake/route");
     const res = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType, email: "already@example.invalid" }) }));
@@ -60,161 +62,36 @@ describe("access request delivery flow", () => {
     expect(res.status).toBe(400); expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it.each(["11111111-1111-4111-8111-111111111111", ""])("records server-selected agency ownership only for explicit service intake (%s)", async configured => {
+  it.each(["11111111-1111-4111-8111-111111111111", ""])("refuses anonymous agency assignment even with legacy configuration (%s)", async configured => {
     process.env.STRELVA_AGENCY_WORKSPACE_ID = configured;
+    process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.example.test/fictional";
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const { getRedis } = await import("@/platform/infra/redis");
     const { POST } = await import("@/app/api/access-request/intake/route");
     const response = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({
       requestType: "agency_service", businessName: "Northside Bakery", email: "owner@bakery.example",
       agencyWorkspaceId: "22222222-2222-4222-8222-222222222222",
     }) }));
-    expect(response.status).toBe(200);
-    const raw = mockRedisStore.get("lead:owner@bakery.example");
-    const lead = JSON.parse(String(raw));
-    expect(lead).toMatchObject({ requestType: "agency_service", agencyWorkspaceId: configured || null });
-    const { getDeliveryLeadByToken } = await import("@/lib/access-request-delivery");
-    const read = await getDeliveryLeadByToken(lead.statusToken);
-    expect(read?.requestType).toBe("agency_service");
-    expect(read?.agencyWorkspaceId ?? null).toBe(configured || null);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: expect.stringContaining("No request was sent"), next: "/agencies", signIn: "/sign-up" });
+    expect(mockRedisStore.size).toBe(0); expect(getRedis).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
   });
-
-  it("creates a no-login delivery link and sends the first signup email", async () => {
+  it("preserves existing delivery records without revealing or resending their private status links", async () => {
+    mockRedisStore.set("lead:owner@bakery.example", { statusToken: "a".repeat(36) });
     const { POST } = await import("@/app/api/access-request/intake/route");
-
-    const response = await POST(new Request("http://localhost/api/access-request/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "agency_service",
-        businessName: "Demo Studio",
-        email: "Owner@Example.com",
-        location: "Buffalo, NY",
-        currentWebsite: "https://example.com",
-        description: "Build request: weekly proof",
-        referredBy: "test",
-      }),
-    }));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      success: true,
-      emailSent: true,
-    });
-    expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
-    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      from: '"Strelva" <hello@updates.strelva.com>',
-      to: "owner@example.com",
-      subject: "We received Demo Studio's site request",
-      html: expect.stringContaining(`href="${body.statusUrl}"`),
-      text: expect.stringContaining(`Track your request: ${body.statusUrl}`),
-    }));
-    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      html: expect.stringContaining("No login is needed yet"),
-      text: expect.stringContaining("No login is needed yet"),
-    }));
+    const response = await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: JSON.stringify({ requestType: "agency_service", email: "owner@bakery.example" }) }));
+    expect(response.status).toBe(409); expect(await response.json()).not.toHaveProperty("statusUrl");
+    expect(mockRedisStore.get("lead:owner@bakery.example")).toEqual({ statusToken: "a".repeat(36) });
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
-
-  it("forwards phone and the door qualifier into the Slack build alert", async () => {
-    process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.test/abc";
-    const slackFetch = vi.fn(
-      (_url: string, _init: { method: string; body: string }) =>
-        Promise.resolve(new Response(null, { status: 200 })),
-    );
-    vi.stubGlobal("fetch", slackFetch);
-
+  it("retains rate limiting and invalid-body refusal", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
-
-    const response = await POST(new Request("http://localhost/api/access-request/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "agency_service",
-        businessName: "Demo Studio",
-        email: "owner@example.com",
-        phone: "(716) 555-0100",
-        plan: "one-time",
-        description: "Build request: weekly proof",
-      }),
-    }));
-
-    expect(response.status).toBe(200);
-    expect(slackFetch).toHaveBeenCalledWith(
-      "https://hooks.slack.test/abc",
-      expect.objectContaining({ method: "POST" }),
-    );
-    const slackInit = slackFetch.mock.calls[0]?.[1];
-    const slackBody = JSON.parse(slackInit?.body ?? "{}");
-    expect(slackBody.text).toContain("New website build request");
-    expect(slackBody.text).toContain("Phone: (716) 555-0100");
-    expect(slackBody.text).toContain("Wants: One-time build");
-
-    vi.unstubAllGlobals();
-  });
-
-  it("does not report email delivery when Resend returns an API error", async () => {
-    mockSendEmail.mockResolvedValueOnce({
-      data: null,
-      error: { message: "Domain is not verified", name: "validation_error" },
-      headers: null,
-    });
-    const { POST } = await import("@/app/api/access-request/intake/route");
-
-    const response = await POST(new Request("http://localhost/api/access-request/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "agency_service",
-        businessName: "Demo Studio",
-        email: "owner@example.com",
-        description: "Build request: weekly proof",
-      }),
-    }));
-
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toMatchObject({
-      success: true,
-      emailSent: false,
-    });
-    expect(body.statusUrl).toMatch(/^https:\/\/app\.strelva\.com\/delivery\/[a-f0-9]{36}$/);
-  });
-
-  it("returns the existing status link for repeat email submissions", async () => {
-    const { POST } = await import("@/app/api/access-request/intake/route");
-
-    const firstResponse = await POST(new Request("http://localhost/api/access-request/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "agency_service",
-        businessName: "Demo Studio",
-        email: "owner@example.com",
-        description: "Build request: weekly proof",
-      }),
-    }));
-    const firstBody = await firstResponse.json();
-
-    mockSendEmail.mockClear();
-
-    const repeatResponse = await POST(new Request("http://localhost/api/access-request/intake", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "agency_service",
-        businessName: "Second Studio",
-        email: "Owner@Example.com",
-        description: "Build request: another site",
-      }),
-    }));
-
-    expect(repeatResponse.status).toBe(200);
-    const repeatBody = await repeatResponse.json();
-    expect(repeatBody).toMatchObject({
-      success: true,
-      emailSent: true,
-      repeatSubmission: true,
-      statusUrl: firstBody.statusUrl,
-    });
-    expect(mockSendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      to: "owner@example.com",
-      html: expect.stringContaining(`href="${firstBody.statusUrl}"`),
-      text: expect.stringContaining(`Track your request: ${firstBody.statusUrl}`),
-    }));
+    expect((await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: "{" }))).status).toBe(400);
+    const { isRateLimitedWindowedAsync } = await import("@/platform/infra/rate-limit");
+    vi.mocked(isRateLimitedWindowedAsync).mockResolvedValueOnce(true);
+    expect((await POST(new Request("http://localhost/api/access-request/intake", { method: "POST", body: "{}" }))).status).toBe(429);
+    expect(mockRedisStore.size).toBe(0); expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it("renders safe email copy for business names and status URLs", async () => {

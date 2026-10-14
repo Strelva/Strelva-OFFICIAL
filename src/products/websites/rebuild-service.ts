@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { WebsitePublicationAcceptedError } from "./publication-outcome";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { type BoundedStore } from "@/platform/bounded-work/repository";
@@ -577,4 +578,21 @@ export const approveWebsiteDomainRequest: typeof import("./domain-requests").web
 /** Owner-link launch uses the same lifecycle, with only reserve/publish RPCs specialized. */
 export function launchWebsiteRebuildByOwnerLink(actor: WorkspaceActor, workId: string, raw: unknown, session: OwnerLinkWebsiteSession) {
   return createWebsiteRebuildService(boundedStore, { documents: createWebsiteDocumentStore(undefined, session) }).launch(actor, workId, raw);
+}
+
+/** Full control executes the exact claimed website decision; no owner identity is borrowed. */
+export async function decideWebsiteRebuildAsAgency(actor: WorkspaceActor, workId: string, raw: unknown, decision: import("@/platform/needs-you/contracts").OwnerDecision) {
+  if (decision.decidedByKind !== "agency_session" || decision.state !== "approved" || decision.sourceLifecycle !== "website_document" || (decision.decidedActor?.kind !== "agency" || decision.decidedActor.userId !== actor.userId) || ![`${workId}:approve`, `${workId}:launch`].includes(decision.sourceId)) throw new WorkspaceAccessError();
+  const documents = createWebsiteDocumentStore(undefined, undefined, { workspaceId: decision.workspaceId, decisionId: decision.id, revisionHash: decision.revisionHash, userId: actor.userId });
+  let acceptedReceiptId: string | null = null;
+  const service = createWebsiteRebuildService(boundedStore, { documents: { ...documents, async publish(publisher, input) {
+    const published = await documents.publish(publisher, input);
+    acceptedReceiptId = (published.receipt ?? input.receipt).receiptId;
+    return published;
+  } } });
+  try { return await (decision.sourceId.endsWith(":approve") ? service.approve(actor, workId, raw) : service.launch(actor, workId, raw)); }
+  catch (error) {
+    if (acceptedReceiptId) throw new WebsitePublicationAcceptedError(workId, acceptedReceiptId);
+    throw error;
+  }
 }

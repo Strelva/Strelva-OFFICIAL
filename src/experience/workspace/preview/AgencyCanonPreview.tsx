@@ -17,7 +17,7 @@ const TITLES: Record<AgencyCanonFrame, string> = {
 };
 const INTRO: Record<AgencyCanonFrame, string> = {
   client: "Harbor Dental owns this workspace and its data. You build and request here; they can remove your access without losing anything.",
-  requests: "Every client need you’ve brought, across 3 clients. Scope is agreed before North Studio builds.",
+  requests: "Every client need you’ve brought, across 4 clients. Scope is agreed before North Studio builds.",
   approval: "Patients will fill this on your website. Nothing goes live until you approve. You can ask North Studio for changes first.",
   minutes: "130 minutes your team spent in October · logged from Requests, reviews and fixes",
   attribution: "Credit follows the source · royalty rates are not set yet",

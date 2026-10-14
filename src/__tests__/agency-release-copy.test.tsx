@@ -19,9 +19,12 @@ describe("agency release and review language", () => {
     expect(library).toContain("Release 12 + 1 local change");
     expect(library).toContain("Releases");
   });
-  it("names this month's time in the portfolio", () => {
+  it("keeps Home and Clients on the same portfolio count", () => {
     const html = renderToStaticMarkup(<AgencyPortfolioPreview surface="clients" state="ready" mode="light" />);
-    expect(html).toContain("Time this month");
+    const home = renderToStaticMarkup(<AgencyPortfolioPreview surface="home" state="ready" mode="light" />);
+    expect(html).toContain("4 clients");
+    expect(home).toContain("4 clients");
+    expect(html).not.toContain("Time this month");
     expect(html).not.toContain("Minutes · Oct");
     expect(html).not.toMatch(/\br\d+/);
   });

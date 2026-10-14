@@ -51,6 +51,7 @@ export const agencyClientRowSchema = z.object({
   status: z.enum(["ready", "unavailable"]),
   systems: z.array(agencyClientSystemSchema).max(500),
   needsYou: z.object({ count: z.number().int().min(0), oldestAt: iso.nullable() }).strict(),
+  ownerClaimWaiting: z.boolean().optional(),
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
   /** Qualified comparison availability, independent of the client/service read. */
@@ -61,7 +62,7 @@ export const agencyClientRowSchema = z.object({
 
 export const agencyQueueItemSchema = z.object({
   id: z.string().min(1).max(200),
-  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator"]),
+  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator", "owner_claim"]),
   workspaceId: uuid,
   clientName: z.string().min(1).max(120),
   title: z.string().min(1).max(300),
@@ -141,6 +142,7 @@ export const agencyLibrarySourceSchema = z.object({
 
 export const agencyLibrarySchema = z.object({
   agencyWorkspaceId: uuid,
+  reviewEnabled: z.boolean().optional(),
   sources: z.array(agencyLibrarySourceSchema).max(500),
   inquiryVersions: z.array(z.object({
     id: z.string(), tenantId: z.string(), businessName: z.string(), name: z.string(),

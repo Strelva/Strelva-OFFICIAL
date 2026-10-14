@@ -118,86 +118,14 @@ describe("getDeliveryLeads", () => {
   });
 });
 
-describe("intake route — team notification", () => {
-  it("fires the team email with every field and the default recipient on a new lead", async () => {
+describe("retired anonymous service intake", () => {
+  it("does not notify the platform's agency or save an anonymous service request", async () => {
     const { POST } = await import("@/app/api/access-request/intake/route");
-
-    const response = await POST(
-      new Request("http://localhost/api/access-request/intake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestType: "agency_service",
-          businessName: "Demo Studio",
-          email: "owner@example.com",
-          phone: "(716) 555-0100",
-          location: "Buffalo, NY",
-          currentWebsite: "https://example.com",
-          plan: "monthly",
-          referredBy: "a friend",
-          description: "Need a fresh site with booking",
-        }),
-      }),
-    );
-
-    expect(response.status).toBe(200);
-
-    const teamCall = mockSendEmail.mock.calls.find(
-      ([arg]) => typeof arg?.subject === "string" && arg.subject.startsWith("New lead:"),
-    );
-    expect(teamCall).toBeTruthy();
-    const sent = teamCall![0];
-    expect(sent.subject).toBe("New lead: Demo Studio");
-    expect(sent.to).toEqual(["jacob@strelva.com"]);
-    for (const value of [
-      "owner@example.com",
-      "(716) 555-0100",
-      "Buffalo, NY",
-      "example.com",
-      "Monthly plan",
-      "a friend",
-      "Need a fresh site with booking",
-    ]) {
-      expect(sent.html).toContain(value);
-      expect(sent.text).toContain(value);
-    }
-    expect(sent.html).toContain("https://admin.strelva.com/admin/leads");
-    expect(sent.text).toContain("https://admin.strelva.com/admin/leads");
-  });
-
-  it("does NOT fire the team email on a repeat submission", async () => {
-    const { POST } = await import("@/app/api/access-request/intake/route");
-
-    await POST(
-      new Request("http://localhost/api/access-request/intake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestType: "agency_service",
-          businessName: "Demo Studio",
-          email: "owner@example.com",
-          description: "First submission",
-        }),
-      }),
-    );
-
-    mockSendEmail.mockClear();
-
-    const repeat = await POST(
-      new Request("http://localhost/api/access-request/intake", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestType: "agency_service",
-          businessName: "Demo Studio",
-          email: "Owner@Example.com",
-          description: "Second submission",
-        }),
-      }),
-    );
-
-    const repeatBody = await repeat.json();
-    expect(repeatBody.repeatSubmission).toBe(true);
-    const teamCall = mockSendEmail.mock.calls.find(
-      ([arg]) => typeof arg?.subject === "string" && arg.subject.startsWith("New lead:"),
-    );
-    expect(teamCall).toBeUndefined();
+    const response = await POST(new Request("http://localhost/api/access-request/intake", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestType: "agency_service", businessName: "Demo Studio", email: "owner@example.test" }),
+    }));
+    expect(response.status).toBe(409); expect(await response.json()).toHaveProperty("next", "/agencies");
+    expect(mockSendEmail).not.toHaveBeenCalled(); expect(kv.size).toBe(0); expect(zset).toHaveLength(0);
   });
 });

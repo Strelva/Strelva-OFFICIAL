@@ -204,6 +204,16 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
       return json({ agencyWorkspaceId, items: rows, nextCursor: !cursor && rows.length ? { at: rows[rows.length - 1]!.openedAt, key: rows[rows.length - 1]!.key } : null });
     }
 
+    if (url.pathname === "/api/workspace/agency-proposals") {
+      if (state === "error") return json({ error: "Requests from businesses could not be loaded." }, 503);
+      if (state === "delegated") return json({ error: "Only agency owners and admins can review these requests." }, 403);
+      if (method === "POST") {
+        const body = JSON.parse(String(init?.body || "{}")) as { accept?: boolean };
+        return json({ status: body.accept ? "accepted" : "declined" });
+      }
+      return json({ proposals: [], listing: { listed: true, summary: "Websites and business tools" } });
+    }
+
     if (url.pathname === "/api/workspace/agency-clients" && method === "GET") {
       if (state === "loading") await new Promise((resolve) => setTimeout(resolve, 600_000));
       if (state === "error") return json({ error: "Clients could not be loaded." }, 503);

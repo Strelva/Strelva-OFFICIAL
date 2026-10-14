@@ -49,3 +49,28 @@ it("does not report success for a submission missing its durable request receipt
   await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
   expect(node.textContent).toContain("Outcome not confirmed"); expect(node.textContent).not.toContain("Evidence submitted.");
 });
+it("accepts evidence when no independent reviewer is available and describes the queue honestly", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response({ ...initial, independentReviewerAvailable: false })).mockImplementationOnce(async (_url, options) => {
+    const submitted = JSON.parse(options.body);
+    return response({ ...initial, independentReviewerAvailable: false, submissions: [{ id: submitted.requestId, workspaceId, agencyName: "Agency", effect: submitted.effect, evidenceUrl: submitted.evidenceUrl, evidence: submitted.evidence, submittedAt: "2026-10-14T12:00:00Z", submittedBy: "11111111-1111-4111-8111-111111111111", decision: null, reason: null, decidedBy: null, decidedAt: null }] });
+  });
+  const node = await mount(fetcher);
+  expect(node.textContent).toContain("An independent platform reviewer must be added");
+  expect(node.textContent).toContain("Not yet verified");
+  expect(node.textContent).not.toContain("Not available");
+  await fill(node);
+  await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(node.textContent).toContain("Evidence submitted to the platform review queue");
+  expect(node.textContent).toContain("In review");
+  expect(node.querySelector("form")).toBeNull();
+});
+it("withholds resubmission after a stale status read without discarding entered evidence", async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(response(initial)).mockRejectedValueOnce(new Error("Status unavailable"));
+  const node = await mount(fetcher); await fill(node);
+  await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Refresh status")!.click());
+  expect(node.textContent).toContain("displayed status may be stale");
+  expect(node.querySelector("textarea")?.value).toBe("A release and rollback rehearsal was completed.");
+  expect(node.querySelector("button[type=submit]")?.hasAttribute("disabled")).toBe(true);
+  await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

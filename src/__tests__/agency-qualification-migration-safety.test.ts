@@ -10,3 +10,14 @@ it("holds exclusive evidence locks inside the inverse transaction before checkin
   expect(inverse.trim().endsWith("commit;")).toBe(true);
   expect(inverse).toContain("agency_qualification_rollback_function_drift");
 });
+it("adds independent queue projections without replacing submission or approval authority", () => {
+  const forward = readFileSync(new URL("../../supabase/migrations/20261025134000_done_agency_qualification_queue.sql", import.meta.url), "utf8");
+  const inverse = readFileSync(new URL("../../supabase/migrations/rollback-20261025134000_done_agency_qualification_queue.sql", import.meta.url), "utf8");
+  expect(forward).toContain("'independentReviewerAvailable',exists");
+  expect(forward).toContain("sa.revoked_at is null and u.verified_at is not null");
+  expect(forward).toContain("'canReview',not exists");
+  expect(forward).not.toContain("create or replace function public.decide_agency_qualification");
+  expect(forward).not.toContain("create or replace function public.submit_agency_qualification");
+  expect(inverse).toContain("done_agency_qualification_queue_rollback_function_drift");
+  expect(inverse).not.toMatch(/drop table public\.agency_qualification/);
+});

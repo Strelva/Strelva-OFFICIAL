@@ -83,3 +83,5 @@ export const resolveWebsiteRebuildCopyReview: typeof import("./rebuild-service")
 export const launchWebsiteRebuildByOwnerLink: typeof import("./rebuild-service").launchWebsiteRebuildByOwnerLink = (...args) => import("./rebuild-service").then(module => module.launchWebsiteRebuildByOwnerLink(...args));
 
 export const approveWebsiteDomainRequest: typeof import("./rebuild-service").approveWebsiteDomainRequest = (...args) => import("./rebuild-service").then(module => module.approveWebsiteDomainRequest(...args));
+
+export const decideWebsiteRebuildAsAgency: typeof import("./rebuild-service").decideWebsiteRebuildAsAgency = (...args) => import("./rebuild-service").then(module => module.decideWebsiteRebuildAsAgency(...args));

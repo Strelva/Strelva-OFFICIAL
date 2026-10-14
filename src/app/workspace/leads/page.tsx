@@ -21,7 +21,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   }
   let agency;
   try { agency = await leadAgency(actor, workspaceId); }
-  catch { return <StrelvaShell title="" workspaceId={workspaceId}><StPage><StHead title="Leads" /><StNotice tone="critical">Only a verified owner or admin of Strelva Agency can manage this intake.</StNotice></StPage></StrelvaShell>; }
+  catch { return <StrelvaShell title="" workspaceId={workspaceId}><StPage><StHead title="Leads" /><StNotice tone="critical">Only a verified owner or admin of this agency can manage its leads.</StNotice></StPage></StrelvaShell>; }
   const brand = await resolveOwnerBrand(agency.id);
   return <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ leadsCurrent: true, leadsAvailable: true }}>
     <StPage><StHead title="Leads" crumb={{ label: "Agency clients", href: `/workspace?workspaceId=${encodeURIComponent(agency.id)}&agencyView=clients` }} />

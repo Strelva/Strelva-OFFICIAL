@@ -11,12 +11,10 @@
  * owner's address, an owner claim link. A failed assessment leaves the added
  * client and owner link intact; a repeated add recovers the same assessment.
  *
- * Nothing here sends anything. Client notifications are off during the silent
- * rollout, and whether an agency may email a client's owner is the open
- * decision R08 (#235): the claim is recorded `not_sent` / `gated` and its
- * link is returned once for the agency to deliver itself. The send seam is
- * `deliverOwnerClaim` below; the database already records
- * agency_effect_allowed(agency, 'email') on each claim for it.
+ * Copy-only is the default. Explicit claim delivery is behind its own
+ * default-off release plus the shared client-email policy; converted clients
+ * remain silent. The transactional invitation reserves an exact current claim
+ * and retains provider acceptance separately from an uncertain delivery.
  *
  * Operators keep /admin/onboard and tenant conversion. This is the agency
  * path. Off unless STRELVA_AGENCY_ADD_CLIENT_RELEASE=1 (on top of the
@@ -25,6 +23,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
+import { systemsReleaseMayBeOn } from "@/platform/systems-release";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { normalizeRebuildUrl, WebsiteCrawlError } from "@/products/websites/server";
 import {
@@ -63,6 +62,7 @@ import { runPrivateAiVisibilityAssessment, parseAiVisibilityAssessmentPayload, i
 import type { SavedWork } from "@/platform/workspaces/types";
 import type { ClientAiCheck } from "./contracts";
 import { claimReviewReleaseEnabled } from "./index";
+import { agencyClaimEmailReleased, claimEmailTransport, emailOwnerClaim } from "./claim-email";
 
 export * from "./index";
 
@@ -240,13 +240,14 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
   // The digest covers what the agency asked for, not what the scan found, so
   // a retry with the same key replays even if the site changed meanwhile.
   const digest = createHash("sha256").update(JSON.stringify([input.agencyWorkspaceId, input.name?.trim().slice(0, 120) || null, input.url ? url : null, input.prospectId ?? null])).digest("hex");
-  const client = await call(deps, "agency_add_client", {
+  const client = await call(deps, "agency_add_client_enrolled", {
     ...actorArgs(actor),
     p_agency_workspace_id: input.agencyWorkspaceId,
     // Behind the claim review, found facts wait for the owner instead of entering the record.
     p_input: { name, sourceUrl: url, prospectId: input.prospectId ?? null, facts: review ? {} : seed.facts },
     p_command_id: input.idempotencyKey,
     p_command_digest: digest,
+    p_systems_enabled: systemsReleaseMayBeOn(),
   }, agencyClientAdditionSchema, "The client couldn't be added. Retry the same request before trying again.");
   const scan = client.replayed ? { ...seed.scan, seeded: [] } : seed.scan;
   const found = review ? await stageFoundFacts(actor, client, seed, deps) : undefined;
@@ -256,7 +257,7 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
     // The client exists either way; a failed link is offered again on the result.
     try {
       ownerClaim = await issueAgencyClientOwnerClaim(actor, {
-        action: "owner_link", agencyWorkspaceId: input.agencyWorkspaceId, customerWorkspaceId: client.customerWorkspaceId, ownerEmail: input.ownerEmail,
+        action: "owner_link", agencyWorkspaceId: input.agencyWorkspaceId, customerWorkspaceId: client.customerWorkspaceId, ownerEmail: input.ownerEmail, sendEmail: input.sendOwnerEmail,
       }, deps);
     } catch (error) {
       ownerClaimError = error instanceof AgencyClientError ? error.message : "The owner link couldn't be created. Try again.";
@@ -286,14 +287,7 @@ async function stageFoundFacts(actor: WorkspaceActor, client: AgencyClientAdditi
   }
 }
 
-/**
- * The send seam. Client notifications stay off during the silent rollout and
- * agency-to-owner email is decision R08 (#235), so this never sends: the
- * claim is already recorded not_sent / gated. When R08 is decided, send here
- * through src/platform/infra/email/send.ts (audience `client`), only when
- * `claim.delivery.agencyEmailVerified` (agency_effect_allowed) holds and the
- * client-email switch is on, and record the result on the claim.
- */
+/** The copy-only path preserves the database delivery record and sends nothing. */
 export function deliverOwnerClaim(claim: OwnerClaim): OwnerClaim["delivery"] {
   return claim.delivery;
 }
@@ -311,7 +305,9 @@ export async function issueAgencyClientOwnerClaim(actor: WorkspaceActor, input: 
     p_expires_at: expiresAt.toISOString(),
   }, ownerClaimSchema, "The owner link couldn't be created. Try again.");
   const issued = { ...claim, claimPath: `${OWNER_CLAIM_PATH}${token}` };
-  return { ...issued, delivery: deliverOwnerClaim(issued) };
+  return { ...issued, delivery: input.sendEmail ? await emailOwnerClaim(actor, input.agencyWorkspaceId, issued, {
+    rpc: deps.rpc, send: claimEmailTransport, released: agencyClaimEmailReleased,
+  }) : deliverOwnerClaim(issued) };
 }
 
 export async function listAgencyClientAdditions(actor: WorkspaceActor, agencyWorkspaceId: string, deps: AgencyClientDeps = defaultDeps()): Promise<AgencyClientListItem[]> {

@@ -32,10 +32,10 @@ function store() {
     get: vi.fn(async (id: string) => records.get(id) ?? null),
     zrange: vi.fn(async () => members),
     eval: vi.fn(async (_script: string, keys: string[], args: string[]) => {
-      const [owner, requestedToken, email, fingerprint, action, commandKey, now, value, user] = args as [string, string, string, string, string, string, string, string, string];
+      const [owner, requestedToken, email, fingerprint, action, commandKey, now, value, user, allowLegacyOwnership] = args as [string, string, string, string, string, string, string, string, string, string];
       const lead = records.get(keys[0]!) as DeliveryLead | undefined;
       if (!lead) return { error: "missing" };
-      if ((lead.agencyWorkspaceId != null && lead.agencyWorkspaceId !== owner) || (lead.requestType != null && lead.requestType !== "agency_service") || lead.statusToken !== requestedToken || lead.email !== email) return { error: "access" };
+      if ((lead.agencyWorkspaceId == null && allowLegacyOwnership !== "1") || (lead.agencyWorkspaceId != null && lead.agencyWorkspaceId !== owner) || (lead.requestType != null && lead.requestType !== "agency_service") || lead.statusToken !== requestedToken || lead.email !== email) return { error: "access" };
       const prior = records.get(keys[3]!) as { fingerprint: string; result: unknown } | undefined;
       if (prior) return prior.fingerprint === fingerprint ? structuredClone(prior.result) : { error: "conflict" };
       const next = structuredClone(lead);
@@ -68,7 +68,7 @@ function store() {
       return result;
     }),
   };
-  const seed = (lead: DeliveryLead) => { records.set(`lead-status:${lead.statusToken}`, lead); records.set(`lead:${lead.email}`, lead); members.push(`lead:${lead.email}`); };
+  const seed = (lead: DeliveryLead) => { records.set(`lead-status:${lead.statusToken}`, lead); records.set(`lead:${lead.email}`, lead); if (!members.includes(`lead:${lead.email}`)) members.push(`lead:${lead.email}`); };
   return { redis, records, seed };
 }
 let memory: ReturnType<typeof store>;
@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-describe("Strelva Agency's ordinary lead authority", () => {
+describe("ordinary agency lead authority", () => {
   it("uses validated agency branding and refuses an outdated email projection as ownership proof", async () => {
     mocks.members.mockResolvedValue([{ ...member, name: "Strelva" }]);
     expect((await (await read()).json()).agency.name).toBe("Strelva Agency");
@@ -112,15 +112,44 @@ describe("Strelva Agency's ordinary lead authority", () => {
     const result = await (await post(command({ token: "b".repeat(36), status: "dismissed" }))).json();
     expect(result.legacyOwnership).toBe(true); expect(result.workflow.status).toBe("dismissed"); expect(result.lead.agencyWorkspaceId).toBeUndefined();
   });
-  it.each(["other_agency", "super_admin", "member", "no_config", "bad_config"])("refuses list, writes and conversion under %s", async mode => {
-    const id = mode === "other_agency" ? other : agency;
-    if (mode === "other_agency") mocks.members.mockResolvedValue([{ ...member, id: other }]);
+  it("allows every agency to manage explicitly owned leads and withholds unscoped history", async () => {
+    mocks.members.mockResolvedValue([{ ...member, id: other, name: "North Studio" }]);
+    mocks.brand.mockResolvedValue({ agencyId: other, name: "North Studio" });
+    expect(await (await read(other, "&availability=1")).json()).toEqual({ available: true, agencyWorkspaceId: other });
+    expect(memory.redis.zrange).not.toHaveBeenCalled();
+    memory.seed(fixture({ agencyWorkspaceId: other, requestType: "agency_service" }));
+    memory.seed(fixture({ statusToken: "b".repeat(36), email: "legacy@example.test" }));
+    expect((await (await read(other)).json()).leads).toHaveLength(1);
+    expect((await post(command({ agencyWorkspaceId: other }))).status).toBe(200);
+    expect((await post(command({ agencyWorkspaceId: other, token: "b".repeat(36) }))).status).toBe(403);
+    await expect(readAgencyLead(actor, other, "b".repeat(36))).rejects.toThrow();
+    expect(memory.redis.eval.mock.calls[0]?.[2][9]).toBe("0");
+  });
+  it.each(["no_config", "bad_config"])("retains explicit ownership with %s and refuses legacy records", async mode => {
+    vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", mode === "no_config" ? "" : "invalid");
+    memory.seed(fixture({ statusToken: "b".repeat(36), email: "legacy@example.test" }));
+    expect((await (await read()).json()).leads).toHaveLength(1);
+    expect((await post()).status).toBe(200);
+    expect((await post(command({ token: "b".repeat(36) }))).status).toBe(403);
+  });
+  it.each(["super_admin", "member", "foreign_agency"])("refuses list, writes and conversion under %s", async mode => {
     if (mode === "super_admin") { mocks.actor.mockResolvedValue({ ...actor, isSuperAdmin: true }); mocks.members.mockResolvedValue([]); }
     if (mode === "member") mocks.members.mockResolvedValue([{ ...member, role: "member" }]);
-    if (mode === "no_config" || mode === "bad_config") vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", mode === "no_config" ? "" : "invalid");
-    expect((await read(id)).status).toBe(403); expect((await post(command({ agencyWorkspaceId: id }))).status).toBe(403);
-    await expect(beginAgencyLeadConversion(actor, id, token, key, {})).rejects.toThrow();
+    if (mode === "foreign_agency") mocks.members.mockResolvedValue([{ ...member, id: other }]);
+    expect((await read()).status).toBe(403); expect((await post()).status).toBe(403);
+    await expect(beginAgencyLeadConversion(actor, agency, token, key, {})).rejects.toThrow();
     expect(memory.redis.eval).not.toHaveBeenCalled();
+  });
+  it("refuses an outside agency when canonical ownership disappears during its atomic write", async () => {
+    mocks.members.mockResolvedValue([{ ...member, id: other }]);
+    memory.seed(fixture({ agencyWorkspaceId: other, requestType: "agency_service" }));
+    const actual = memory.redis.eval.getMockImplementation()!;
+    memory.redis.eval.mockImplementationOnce(async (script, keys, args) => {
+      memory.records.set(`lead-status:${token}`, fixture());
+      return actual(script, keys, args);
+    });
+    expect((await post(command({ agencyWorkspaceId: other }))).status).toBe(403);
+    expect(memory.records.has(`lead-workflow:${token}`)).toBe(false);
   });
   it("excludes and refuses platform requests even when forged with the configured agency id", async () => {
     memory.records.set(`lead-status:${token}`, fixture({ requestType: "business_access", agencyWorkspaceId: agency }));

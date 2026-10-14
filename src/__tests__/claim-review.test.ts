@@ -60,18 +60,18 @@ describe("claim review release", () => {
 describe("addAgencyClient with and without the claim review", () => {
   it("flag off (negative control): seeds the record as before and stages nothing", async () => {
     for (const off of [undefined, false]) {
-      const d = deps({ agency_add_client: { data: receipt() } }, off);
+      const d = deps({ agency_add_client_enrolled: { data: receipt() } }, off);
       const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY }, d);
-      expect((d.rpc.mock.calls.find(([name]) => name === "agency_add_client")![1].p_input as { facts: unknown }).facts).toEqual(seed.facts);
+      expect((d.rpc.mock.calls.find(([name]) => name === "agency_add_client_enrolled")![1].p_input as { facts: unknown }).facts).toEqual(seed.facts);
       expect(names(d)).not.toContain("stage_agency_client_found_facts");
       expect(result).not.toHaveProperty("found");
     }
   });
 
   it("flag on: found facts wait for the owner instead of entering the record, and the agency prepares every area", async () => {
-    const d = deps({ agency_add_client: { data: receipt() }, stage_agency_client_found_facts: staged }, true);
+    const d = deps({ agency_add_client_enrolled: { data: receipt() }, stage_agency_client_found_facts: staged }, true);
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY }, d);
-    expect((d.rpc.mock.calls.find(([name]) => name === "agency_add_client")![1].p_input as { facts: unknown }).facts).toEqual({});
+    expect((d.rpc.mock.calls.find(([name]) => name === "agency_add_client_enrolled")![1].p_input as { facts: unknown }).facts).toEqual({});
     const stage = d.rpc.mock.calls.find(([name]) => name === "stage_agency_client_found_facts")![1];
     expect(stage).toMatchObject({ p_agency_workspace_id: AGENCY, p_customer_workspace_id: CLIENT, p_found: found });
     expect(JSON.stringify(stage.p_found)).not.toContain("verified");
@@ -79,15 +79,15 @@ describe("addAgencyClient with and without the claim review", () => {
   });
 
   it("flag on: a replayed add restages safely, a client without a website still gets pre-claim Prepare, and a staging failure keeps the client", async () => {
-    const replay = deps({ agency_add_client: { data: receipt({ replayed: true }) }, stage_agency_client_found_facts: staged }, true);
+    const replay = deps({ agency_add_client_enrolled: { data: receipt({ replayed: true }) }, stage_agency_client_found_facts: staged }, true);
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY }, replay);
     expect(names(replay)).toContain("stage_agency_client_found_facts");
 
-    const noSite = deps({ agency_add_client: { data: receipt({ sourceUrl: null }) }, stage_agency_client_found_facts: staged }, true);
+    const noSite = deps({ agency_add_client_enrolled: { data: receipt({ sourceUrl: null }) }, stage_agency_client_found_facts: staged }, true);
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", idempotencyKey: KEY }, noSite);
     expect(noSite.rpc.mock.calls.find(([name]) => name === "stage_agency_client_found_facts")![1].p_found).toEqual([]);
 
-    const failed = deps({ agency_add_client: { data: receipt() }, stage_agency_client_found_facts: { error: { message: "connection reset" } } }, true);
+    const failed = deps({ agency_add_client_enrolled: { data: receipt() }, stage_agency_client_found_facts: { error: { message: "connection reset" } } }, true);
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY }, failed);
     expect(result.client.customerWorkspaceId).toBe(CLIENT);
     expect(result.found).toMatchObject({ status: "unavailable", staged: 0 });

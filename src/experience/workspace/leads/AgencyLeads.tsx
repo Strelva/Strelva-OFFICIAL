@@ -104,7 +104,7 @@ function ScopedAgencyLeads({ agencyWorkspaceId, request }: { agencyWorkspaceId: 
     {error ? <StNotice tone="critical">{error}{stale && snapshot ? " Retained leads may be out of date. Refresh before changing anything." : ""}</StNotice> : null}
     {message ? <StNotice>{message}</StNotice> : null}
     {pending ? <StNotice>This exact request is awaiting confirmation. Its submitted terms are held.<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
-    {loading && !snapshot ? <StSkeleton label="Reading leads" /> : !snapshot ? <StEmpty>Leads are unavailable. Only a verified owner or admin of Strelva Agency can manage this intake.</StEmpty> : <>
+    {loading && !snapshot ? <StSkeleton label="Reading leads" /> : !snapshot ? <StEmpty>Leads are unavailable. Only a verified owner or admin of this agency can manage its leads.</StEmpty> : <>
       <StCopy>{snapshot.agency.name} manages these service requests. A request becomes accepted work only after scope and deadline are agreed.</StCopy>
       {!snapshot.conversionAvailable ? <StNotice>Adding a client is currently unavailable. You can still manage lead status and notes.</StNotice> : null}
       <StSection title="Leads">
@@ -141,7 +141,7 @@ function ScopedAgencyLeads({ agencyWorkspaceId, request }: { agencyWorkspaceId: 
             <div className="flex flex-wrap gap-4">
               {workflow.status === "converting" && snapshot.conversionAvailable ? disabled ? <StTextButton disabled>Continue adding client</StTextButton> : <StTextButton href={handoff(agencyWorkspaceId, token)}>Continue adding client</StTextButton>
                 : <StTextButton disabled={disabled || !snapshot.conversionAvailable || workflow.status === "converted"} onClick={() => void command({ ...terms(token), action: "convert" })}>Convert</StTextButton>}
-              {disabled ? <StTextButton disabled>Create payment link</StTextButton> : <StTextButton href={paymentLink(agencyWorkspaceId, token)}>Create payment link</StTextButton>}
+              {disabled ? <StTextButton disabled>Payment links · Coming soon</StTextButton> : <StTextButton href={paymentLink(agencyWorkspaceId, token)}>Payment links · Coming soon</StTextButton>}
               {workflow.status !== "converted" && workflow.status !== "dismissed" ? <StTextButton tone="danger" disabled={disabled} onClick={() => void command({ ...terms(token), action: "status", status: "dismissed" })}>Dismiss</StTextButton> : null}
             </div>
           </>} />;

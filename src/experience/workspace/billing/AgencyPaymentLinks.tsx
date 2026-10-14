@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StCopy, StEmpty, StField, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
+import { StCopy, StEmpty, StMono, StNotice, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { PayLinkConfig } from "@/platform/infra/pay-links";
 import type { readAgencyPaymentLinks } from "./payment-links-server";
-import { AgencyCheckoutStatus } from "./AgencyCheckoutStatus";
 
 type Snapshot = Awaited<ReturnType<typeof readAgencyPaymentLinks>>;
 const money = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(cents / 100);
@@ -17,11 +16,7 @@ function confirmedLink(value: unknown, body: Record<string, unknown>, agencyId: 
     || typeof link.createdAt !== "string" || !Number.isFinite(Date.parse(link.createdAt))) return false;
   if (body.action === "revoke") return link.slug === body.slug && (!link.agencyWorkspaceId || link.agencyWorkspaceId === agencyId)
     && typeof link.revokedAt === "string" && Number.isFinite(Date.parse(link.revokedAt)) && typeof link.revokedBy === "string";
-  return link.agencyWorkspaceId === agencyId && typeof link.agencyDisplayName === "string" && !!link.agencyDisplayName.trim()
-    && link.createdBy === body.expectedActorId && typeof link.clientName === "string" && !!link.clientName.trim()
-    && link.door === "build" && link.customCopy === String(body.description).trim() && link.businessWorkspaceId === body.businessWorkspaceId
-    && (body.slug === undefined || link.slug === body.slug)
-    && link.amountCents === body.amountCents && link.minCents === body.minCents && link.maxCents === body.maxCents;
+  return false;
 }
 
 type ProspectPrefill = { token?: string; name: string; description: string };
@@ -30,21 +25,16 @@ export function AgencyPaymentLinks({ agencyWorkspaceId, initialProspect, request
   return <ScopedPaymentLinks key={agencyWorkspaceId} agencyWorkspaceId={agencyWorkspaceId} request={request} initialProspect={initialProspect} />;
 }
 
-function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { agencyWorkspaceId: string; request: typeof fetch; initialProspect?: ProspectPrefill }) {
+function ScopedPaymentLinks({ agencyWorkspaceId, request }: { agencyWorkspaceId: string; request: typeof fetch; initialProspect?: ProspectPrefill }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const sourceScope = initialProspect?.token || "manual";
-  const [clientSelection, setClientSelection] = useState({ scope: sourceScope, id: "" });
-  const client = clientSelection.scope === sourceScope ? clientSelection.id : "";
-  const [range, setRange] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Record<string, unknown> | null>(null);
   const [revoking, setRevoking] = useState<string | null>(null);
   const flight = useRef(false);
-  const form = useRef<HTMLFormElement>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -74,8 +64,7 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { a
         throw new Error(value.error || "This request could not be confirmed. Retry the same request to check its receipt.");
       }
       setPending(null); setRevoking(null);
-      if (body.action === "create") form.current?.reset();
-      setMessage(body.action === "create" ? value.payLink.revokedAt ? "This payment link is already expired." : "Payment link saved." : "Payment link expired. New checkouts are refused; payments already started in Stripe may still complete.");
+      setMessage("Payment link expired. New checkouts are refused; payments already started in Stripe may still complete.");
       await load();
     } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "Request unconfirmed. Retry the same request to check its receipt."); }
     finally { flight.current = false; if (mounted.current) setBusy(false); }
@@ -89,32 +78,12 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { a
     <StTextButton onClick={() => void load()} disabled={busy || loading}>Refresh payment links</StTextButton>
     {error ? <StNotice tone="critical">{error}{stale && snapshot ? " Retained links may be out of date. Refresh before changing anything." : ""}</StNotice> : null}
     {message ? <StNotice>{message}</StNotice> : null}
-    {pending ? <StNotice>This exact request is awaiting confirmation. Its terms are held.{pending.action === "create" ? ` Submitted for ${String(pending.clientName)}: ${String(pending.description)}.` : ""}<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
-    {loading && !snapshot ? <StSkeleton label="Reading payment links" /> : !snapshot ? <StEmpty>Payment links are unavailable. Confirm your agency owner or admin access, then refresh.</StEmpty> : !snapshot.legacyMerchant ? <>
-      <AgencyCheckoutStatus availability={snapshot.checkoutAvailability} paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`} />
-      <StCopy>Client payment agreements use your agency&apos;s Stripe merchant account. Prepare a one-off agreement from the client&apos;s billing controls.</StCopy>
+    {pending ? <StNotice>This exact request is awaiting confirmation. Its terms are held.<StTextButton disabled={busy || loading || stale} onClick={() => void command(pending)}>Retry the same request</StTextButton></StNotice> : null}
+    {loading && !snapshot ? <StSkeleton label="Reading payment links" /> : !snapshot ? <StEmpty>Payment links are unavailable. Confirm your agency owner or admin access, then refresh.</StEmpty> : <>
+      <StNotice>Payment links · Coming soon. New payment links need your agency&apos;s Stripe Connect account. Checkout for new links is not available yet.</StNotice>
       <StTextButton href={`/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}&agencyView=clients`}>Open agency clients</StTextButton>
-    </> : <>
-      <StNotice>{snapshot.agency.name} is the merchant for these one-time payments. A payment link does not start a subscription.</StNotice>
-      <StSection title="Create a payment link">
-        <form key={sourceScope} className="grid gap-4" ref={form} onSubmit={event => {
-          event.preventDefault(); if (disabled) return;
-          const values = new FormData(event.currentTarget);
-          const clientName = snapshot.clients.find(item => item.customerWorkspaceId === client)?.name || String(values.get("clientName") || "");
-          void command({ action: "create", agencyWorkspaceId, expectedActorId: snapshot.currentActorId, idempotencyKey: crypto.randomUUID(), clientName,
-            ...(client ? { businessWorkspaceId: client } : {}), ...(values.get("slug") ? { slug: values.get("slug") } : {}),
-            description: values.get("description"), ...(range ? { minCents: Number(values.get("min")) * 100, maxCents: Number(values.get("max")) * 100 } : { amountCents: Number(values.get("amount")) * 100 }),
-          });
-        }}>
-          <StField label="Client"><select name="client" value={client} disabled={disabled} onChange={event => setClientSelection({ scope: sourceScope, id: event.target.value })}><option value="">Named prospect</option>{snapshot.clients.map(item => <option key={item.customerWorkspaceId} value={item.customerWorkspaceId}>{item.name}</option>)}</select></StField>
-          {!client ? <StTextField label="Prospect name" name="clientName" defaultValue={initialProspect?.name} required maxLength={160} disabled={disabled} /> : null}
-          <StTextField label="What this payment covers" name="description" defaultValue={initialProspect?.description} required maxLength={1000} disabled={disabled} />
-          <StField label="Amount choice" hint="USD · $50 to $10,000 · $50 steps"><select value={range ? "range" : "fixed"} disabled={disabled} onChange={event => setRange(event.target.value === "range")}><option value="fixed">Fixed amount</option><option value="range">Client chooses within a range</option></select></StField>
-          {range ? <><StTextField label="Minimum (USD)" name="min" type="number" min={50} max={10000} step={50} required disabled={disabled} /><StTextField label="Maximum (USD)" name="max" type="number" min={50} max={10000} step={50} required disabled={disabled} /></> : <StTextField label="Amount (USD)" name="amount" type="number" min={50} max={10000} step={50} required disabled={disabled} />}
-          <StTextField label="Payment address (optional)" name="slug" maxLength={100} pattern="[a-z0-9]+(-[a-z0-9]+)*" description="Generated if left empty. Use lowercase letters, numbers and hyphens." disabled={disabled} />
-          <StPill type="submit" disabled={disabled}>Create payment link</StPill>
-        </form>
-      </StSection>
+      {snapshot.legacyMerchant ? <>
+      <StCopy>Existing one-time payment links remain available below. A payment link does not start a subscription.</StCopy>
       <StSection title="Payment links">
         {!snapshot.paymentStatusAvailable ? <StNotice>Payment status could not be read. Refresh to check the payment trail.</StNotice> : null}
         {!snapshot.payLinks.length ? <StEmpty>No payment links recorded yet.</StEmpty> : <StRows label="Agency payment links">{snapshot.payLinks.map(link => {
@@ -131,6 +100,7 @@ function ScopedPaymentLinks({ agencyWorkspaceId, request, initialProspect }: { a
           </>} />;
         })}</StRows>}
       </StSection>
+      </> : null}
     </>}
   </>;
 }

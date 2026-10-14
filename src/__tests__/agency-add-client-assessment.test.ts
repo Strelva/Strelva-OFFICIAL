@@ -34,7 +34,7 @@ beforeEach(() => {
   mocks.getWork.mockResolvedValue({ id: WORK, workspaceId: AGENCY, productId: "ai_visibility", resourceKind: "private_ai_visibility_work", payload });
   mocks.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
     if (name === "authorize_agency_client_add") return { data: "owner", error: null };
-    if (name === "agency_add_client") return { data: { ...receipt, replayed: operation.status === "completed" }, error: null };
+    if (name === "agency_add_client_enrolled") return { data: { ...receipt, replayed: operation.status === "completed" }, error: null };
     if (name === "workspace_operation") {
       if (args.p_action === "checkpoint") operation = { status: "ready", work_id: null };
       if (args.p_action === "complete") operation = { status: "completed", work_id: WORK };

@@ -77,7 +77,9 @@ function documentRow(raw: Record<string,unknown>): WebsiteDocumentRevision {
 }
 export interface OwnerLinkWebsiteSession { sessionId: string; workspaceId: string; decisionId: string; revisionHash: string; recipient: string; userId: string }
 
-export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: OwnerLinkWebsiteSession): WebsiteDocumentStore {
+export interface AgencyWebsiteDecision { workspaceId: string; decisionId: string; revisionHash: string; userId: string }
+
+export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: OwnerLinkWebsiteSession, agencyDecision?: AgencyWebsiteDecision): WebsiteDocumentStore {
   async function rpc(name: string, args: Record<string,unknown>): Promise<Record<string,unknown>[]> {
     const client = db ?? getSupabase() as unknown as WebsiteDocumentRpc | null;
     if (!client) throw new WorkspaceStoreError("Website document storage is unavailable.");
@@ -87,6 +89,11 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
       if (args.p_workspace_id !== ownerLink.workspaceId || args.p_user_id !== ownerLink.userId) throw new WorkspaceAccessError();
       name = name === "reserve_website_hosted_tenant" ? "reserve_website_by_owner_link" : "publish_website_by_owner_link";
       args = { ...args, p_session_id: id.parse(ownerLink.sessionId), p_decision_id: id.parse(ownerLink.decisionId), p_revision_hash: hash.parse(ownerLink.revisionHash), p_recipient: z.string().email().parse(ownerLink.recipient) };
+    }
+    if (agencyDecision && ["approve_website_document", "reserve_website_hosted_tenant", "publish_website_document"].includes(name)) {
+      if (args.p_workspace_id !== agencyDecision.workspaceId || args.p_user_id !== agencyDecision.userId) throw new WorkspaceAccessError();
+      name = ({ approve_website_document: "approve_website_by_agency_decision", reserve_website_hosted_tenant: "reserve_website_by_agency_decision", publish_website_document: "publish_website_by_agency_decision" } as Record<string, string>)[name]!;
+      args = { ...args, p_decision_id: id.parse(agencyDecision.decisionId), p_revision_hash: hash.parse(agencyDecision.revisionHash) };
     }
     const result = await client.rpc(name,args);
     if (result.error) {
