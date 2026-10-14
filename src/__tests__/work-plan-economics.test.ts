@@ -15,7 +15,6 @@ vi.mock("@/platform/work-economics", () => ({ executeBudgetedAction: mocks.execu
 import {
   createWorkPlan,
   presentWorkPlan,
-  WorkPlanFundingRequiredError,
 } from "@/products/work-plans/server";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "owner@example.com" };
@@ -68,9 +67,11 @@ beforeEach(() => {
 });
 
 describe("planning economics boundary", () => {
-  it("rejects a model-backed plan before any provider call without an accepted funding job", async () => {
-    await expect(createWorkPlan({ actor, workspaceId, userGoal: "Make a tracker" }))
-      .rejects.toBeInstanceOf(WorkPlanFundingRequiredError);
+  it("retains a non-model starting plan without a funding job or provider call", async () => {
+    const result = await createWorkPlan({ actor, workspaceId, userGoal: "Make a tracker" });
+    expect(result.plan.status).toBe("needs_scoping");
+    expect(result.plan.summary).toContain("non-AI");
+    expect(result.planningReceipt).toBeUndefined();
     expect(mocks.executeBudgetedAction).not.toHaveBeenCalled();
   });
 
@@ -111,6 +112,20 @@ describe("planning economics boundary", () => {
       },
     }));
     expect(result.plan.estimatedCost).toBeNull();
+  });
+
+  it.each([true, false])("accounts for a retained non-model plan with noProviderCall=%s", async (noProviderCall) => {
+    mocks.executeBudgetedAction.mockImplementation(async (_actor, _input, handlers) => {
+      const measurement = await handlers.perform();
+      expect(measurement).toMatchObject({ amountCents: noProviderCall ? 0 : null, effect: noProviderCall ? "none" : "unknown" });
+      return { disposition: "performed", value: measurement.value, execution: { ...planningReceipt, amountCents: measurement.amountCents, effect: measurement.effect } };
+    });
+    const result = await createWorkPlan({ actor, workspaceId, userGoal: "Make a tracker",
+      planningEconomics: { jobId: planningReceipt.jobId, executionKey: planningReceipt.executionKey, maximumCents: 100 },
+      generate: async () => ({ output: { ...generated, status: "needs_scoping", summary: "AI planning paused. This is a non-AI starting plan.", proposedOutputs: [], supportedNativeOperationIds: [] }, generation: "non_model", noProviderCall }),
+    });
+    expect(result.plan.status).toBe("needs_scoping");
+    expect(result.planningReconciliation?.status).toBe(noProviderCall ? "settled" : "unresolved");
   });
 
   it("does not turn a durable replay into a second planning result", async () => {

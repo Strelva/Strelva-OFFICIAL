@@ -2344,3 +2344,24 @@ main's qualified Library offers and ordinary agency System health before adding
 the release-gated current-provider alert projection. Local projection/cron/TLS
 units and typecheck pass; this session's dev server cannot bind a socket, so
 fresh desktop/mobile rendering and actual provider Auth remain unproven.
+
+### October 14 · qualified sign-in methods
+
+`SupabaseSignIn` keeps the existing St* entry controls and defaults to Google.
+The server passes `emailReady` only when `STRELVA_AUTH_EMAIL_READY=1`; otherwise
+the email field and magic-link action are absent. Provider failures use plain,
+fixed copy and retain a retry path without exposing provider messages. Local
+DOM tests cover both methods, hidden email and failures. Browser and actual
+Supabase email delivery remain separate release checks.
+
+### October 14 · budget, billing and paused builds
+
+`BusinessAiBudgetSummary` keeps recorded spend, held cost, remaining budget and
+UTC reset date together. Missing budget reads and unknown costs block capped
+work; uncapped paid businesses disclose incomplete costs without claiming a
+pause. `WorkspacePlanUnavailable` shows an unset price honestly and links to
+Bring in an agency. The billing preview uses plain unavailable values rather
+than bracket tokens. Cancellation review says billing continues until Stripe
+confirms cancellation. Website rebuilds retain progress and expose Resume saved
+rebuild after budget admission pauses. DOM and service tests cover the states;
+fresh desktop/mobile rendering remains required after integration.

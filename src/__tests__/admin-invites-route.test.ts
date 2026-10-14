@@ -1,11 +1,19 @@
 vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: async ({ tenantId }: { tenantId?: string }) => ({ workspaceId: null, tenantIds: [tenantId], ownerAuthorship: null, businessName: null, replyTo: null, timeZone: null }) }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST } from "@/app/api/admin/invites/route";
 vi.mock("@/platform/agency-brand/server", () => ({
   resolveTenantBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
   resolveOwnerBrand: async () => ({ agencyId: "agency-fixture", name: "North Studio", logoUrl: "https://example.test/logo.png", accentColor: "#447a4f", replyTo: "team@north.example", credit: "runs_on_strelva" }),
   resolveAgencyEmailIdentity: async () => ({ name: "North Studio", replyTo: "team@north.example" }),
 }));
+
+const identityError = vi.hoisted(() => vi.fn());
+const staffRecord = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: (table: string) => {
+  const query = { select: () => query, eq: () => query, is: () => query, maybeSingle: async () => table === "users" ? { data: (await mockFindUserIdByEmail()) ? { id: await mockFindUserIdByEmail() } : null, error: identityError() } : { data: staffRecord(), error: identityError() } };
+  return query;
+} }) }));
 
 const mockAssignUserToTenant = vi.hoisted(() => vi.fn());
 const mockCreateInvite = vi.hoisted(() => vi.fn());
@@ -59,6 +67,8 @@ describe("admin invites route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    identityError.mockReturnValue(null);
+    staffRecord.mockReturnValue(null);
     process.env.RESEND_API_KEY = "re_test";
     process.env.RESEND_DOMAIN = "updates.strelva.com";
     mockGetTenantConfig.mockResolvedValue({
@@ -84,12 +94,11 @@ describe("admin invites route", () => {
   });
 
   it("sends invited customers both HTML and plain-text signup content", async () => {
-    const { POST } = await import("@/app/api/admin/invites/route");
 
     const response = await POST(new Request("http://localhost/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "Owner@Example.com ", tenant: " gldf " }),
+      body: JSON.stringify({ email: "Owner@Example.com ", tenant: " gldf ", reason: "Owner requested access" }),
     }));
 
     expect(response.status).toBe(200);
@@ -126,41 +135,87 @@ describe("admin invites route", () => {
       ),
     }));
     expect(mockGetActorContext).toHaveBeenCalledWith("gldf");
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(2);
     expect(mockLogAuditEvent).toHaveBeenCalledWith({
       tenant: "gldf",
       action: "invite.send",
       targetType: "user",
       targetId: "owner@example.com",
       actor: expect.objectContaining({ email: "admin@example.com" }),
-      metadata: { role: "owner", emailSent: true },
+      metadata: { role: "owner", emailSent: true, reason: "Owner requested access" },
     });
+  });
+
+  it("rejects self invitations before creating a pending grant", async () => {
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "admin@example.com", tenant: "gldf" }) }));
+    expect(response.status).toBe(403);
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+    expect(mockAssignUserToTenant).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+  it.each(["owner", "admin", "editor"])("rejects known staff %s grants", async role => {
+    mockFindUserIdByEmail.mockResolvedValue("staff_other");
+    staffRecord.mockReturnValue({ user_id: "staff_other" });
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "staff@example.com", tenant: "gldf", role, reason: "Requested access" }) }));
+    expect(response.status).toBe(403);
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+    expect(mockAssignUserToTenant).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+  it("fails closed on an unreadable account instead of creating an owner invitation", async () => {
+    identityError.mockReturnValue(new Error("private db details"));
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "owner@example.com", tenant: "gldf" }) }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("private");
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+    expect(mockAssignUserToTenant).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+  it("requires a reason before creating a pending owner invitation", async () => {
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "new@example.com", tenant: "gldf" }) }));
+    expect(response.status).toBe(400);
+    expect(mockCreateInvite).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+  it("requires a reason to assign an existing ordinary account", async () => {
+    mockFindUserIdByEmail.mockResolvedValue("customer");
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "owner@example.com", tenant: "gldf" }) }));
+    expect(response.status).toBe(400);
+    expect(mockAssignUserToTenant).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
+  });
+  it("refuses assignment when its pre-grant audit cannot persist", async () => {
+    mockFindUserIdByEmail.mockResolvedValue("customer");
+    mockLogAuditEvent.mockRejectedValueOnce(new Error("unavailable"));
+    const response = await POST(new Request("http://localhost/api/admin/invites", { method: "POST", body: JSON.stringify({ email: "owner@example.com", tenant: "gldf", reason: "Requested access" }) }));
+    expect(response.status).toBe(503);
+    expect(mockAssignUserToTenant).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it("audits assigning an already-existing user to the tenant", async () => {
     mockFindUserIdByEmail.mockResolvedValue("user_existing");
     mockAssignUserToTenant.mockResolvedValue(true);
 
-    const { POST } = await import("@/app/api/admin/invites/route");
 
     const response = await POST(new Request("http://localhost/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "Owner@Example.com ", tenant: " gldf ", role: "editor" }),
+      body: JSON.stringify({ email: "Owner@Example.com ", tenant: " gldf ", role: "editor", reason: "Owner requested editor access" }),
     }));
 
     expect(response.status).toBe(200);
     const payload = await response.json();
     expect(payload).toMatchObject({ success: true, existingUser: true });
     expect(mockSendEmail).not.toHaveBeenCalled();
-    expect(mockLogAuditEvent).toHaveBeenCalledTimes(1);
+    expect(mockLogAuditEvent).toHaveBeenCalledTimes(2);
     expect(mockLogAuditEvent).toHaveBeenCalledWith({
       tenant: "gldf",
       action: "invite.send",
       targetType: "user",
       targetId: "owner@example.com",
       actor: expect.objectContaining({ email: "admin@example.com" }),
-      metadata: { role: "editor", emailSent: false },
+      metadata: { role: "editor", emailSent: false, reason: "Owner requested editor access" },
     });
   });
 });

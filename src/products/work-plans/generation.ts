@@ -1,4 +1,5 @@
 import { Output } from "ai";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import type { ModelConfig } from "@/platform/infra/ai-models";
 import { getFallbackModel, getPrimaryModel } from "@/platform/infra/ai-models";
 import { generateModelText } from "@/platform/infra/model-calls";
@@ -22,6 +23,7 @@ const PLANNING_SYSTEM_PROMPT = [
 ].join(" ");
 
 export interface WorkPlanGenerationInput {
+  workspaceId?: string;
   userGoal: string;
   evidence: readonly WorkPlanEvidence[];
   allowedOperations: readonly WorkPlanNativeOperation[];
@@ -37,6 +39,9 @@ export interface WorkPlanGenerationInput {
 export type WorkPlanGenerationResult = {
   /** Structured plan output. This is the only value persisted as work. */
   output: unknown;
+  /** A deterministic retained plan, without a successful model generation. */
+  generation?: "non_model";
+  noProviderCall?: boolean;
   /** Present only when a provider returned an exact server-side billing receipt. */
   providerEvidence?: TrustedProviderReceipt;
 };
@@ -83,6 +88,23 @@ export function assertWorkPlanModelAdmission(models: readonly ModelConfig[], app
     throw new WorkPlanUnavailableError("The configured planning providers do not match the approved model restriction");
 }
 
+/** A safe retained starting point. It proposes no executable work or invented facts. */
+export function nonModelWorkPlan(_input: WorkPlanGenerationInput, reason = "AI planning is paused until a planning budget is accepted."): WorkPlanGenerationResult {
+  return {
+    generation: "non_model",
+    noProviderCall: true,
+    output: generatedWorkPlanSchema.parse({
+      status: "needs_scoping",
+      summary: `${reason} This is a non-AI starting plan; no work has been carried out.`,
+      proposedOutputs: [],
+      steps: [{ id: "confirm_scope", title: "Confirm the first result", description: "Review the saved goal and evidence, then choose the smallest result to prepare.", dependsOn: [], nativeOperationIds: [] }],
+      neededInputs: [{ id: "scope", label: "First result", reason: "Confirm what should change before any work is prepared.", required: true }],
+      supportedNativeOperationIds: [],
+      requiredDecisions: [{ id: "scope", question: "What should the first result accomplish?", reason: "This starting plan has not been assessed by AI and does not authorize execution." }],
+    }),
+  };
+}
+
 export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown | WorkPlanGenerationResult> {
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
   const models = configuredModels();
@@ -106,12 +128,14 @@ export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<u
   // from the answering attempt's own result; a receipt that cannot be read
   // fails that attempt, as it did before the helper.
   let providerEvidence: TrustedProviderReceipt | null = null;
+  let attempts = 0;
   try {
     const { result } = await generateModelText<{ output: unknown }>(
-      { purpose: "work_plan", actorKind: "member" },
+      { purpose: "work_plan", workspaceId: input.workspaceId ?? input.executionContext?.expectedTarget.workspaceId, actorKind: "member" },
       options(),
       {
         models,
+        wrapAttempt: async (_model, run) => { attempts++; return run(); },
         receipt: (attempt, model) => {
           providerEvidence = input.executionContext
             ? trustedReceiptFromFallbackResult(attempt, input.executionContext, model.label)
@@ -121,7 +145,13 @@ export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<u
       },
     );
     return providerEvidence ? { output: result.output, providerEvidence } : result.output;
-  } catch {
+  } catch (error) {
+    if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
+      const fallback = nonModelWorkPlan(input, error.message);
+      // A fallback admission can fail after the primary incurred a cost. Never
+      // report zero or release its accepted maximum in that case.
+      return { ...fallback, noProviderCall: attempts <= 1 };
+    }
     throw new WorkPlanUnavailableError("The planning provider did not return a plan");
   }
 }
@@ -144,15 +174,16 @@ function trustedReceiptFromFallbackResult(
   return trustedReceiptFromAiSdkResult(result, context, provider);
 }
 
-export function unwrapGeneration(value: unknown): { output: unknown; providerEvidence?: TrustedProviderReceipt } {
+export function unwrapGeneration(value: unknown): WorkPlanGenerationResult {
   if (value && typeof value === "object" && !Array.isArray(value)
     && Object.prototype.hasOwnProperty.call(value, "output")) {
-    const candidate = value as { output: unknown; providerEvidence?: unknown };
+    const candidate = value as { output: unknown; providerEvidence?: unknown; generation?: unknown; noProviderCall?: unknown };
+    const mode = candidate.generation === "non_model" ? { generation: "non_model" as const, noProviderCall: candidate.noProviderCall === true } : {};
     if (candidate.providerEvidence !== undefined) {
       const providerEvidence = trustedProviderReceiptSchemaForWorkPlan(candidate.providerEvidence);
-      return { output: candidate.output, ...(providerEvidence ? { providerEvidence } : {}) };
+      return { output: candidate.output, ...mode, ...(providerEvidence ? { providerEvidence } : {}) };
     }
-    return { output: candidate.output };
+    return { output: candidate.output, ...mode };
   }
   return { output: value };
 }

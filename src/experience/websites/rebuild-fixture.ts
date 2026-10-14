@@ -62,6 +62,15 @@ export function fixtureRebuild(scenario = "review"): RebuildView {
     };
     return record;
   }
+  if (scenario === "paused") return {
+    ...fixtureRebuild("building"), status: "paused",
+    stages: [
+      { stage: "Read website", status: "completed", message: "Source pages saved in this interface fixture" },
+      { stage: "Extract facts", status: "completed", message: "Business details keep their source quotes" },
+      { stage: "Organize content", status: "paused", message: "AI website work is paused. Bring in an agency." },
+    ],
+    error: "AI website work is paused. Bring in an agency.",
+  };
   if (scenario === "mooney") return {
     ...fixtureRebuild("review"), audit: rebuildAuditSchema.parse(mooneyAudit),
     stages: [{ stage: "Read website", status: "completed", message: `${mooneyEvidence.pages} public pages read on October 1` }, { stage: "Extract facts", status: "completed", message: `${Object.keys(mooneyFixtureDocument.facts).length} facts retain source quotes` }, { stage: "Compose pages", status: "completed", message: "Private catalog preview from public source content" }, { stage: "Check facts", status: "completed", message: `${mooneyEvidence.needsReview} decisions flagged; source support does not independently verify claims` }],

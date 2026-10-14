@@ -25,6 +25,7 @@ export type RuleId =
   | "fixed:owner_action"
   | "fixed:fact_inferred"
   | "fixed:critical_review"
+  | "fixed:review_draft"
   | "fixed:owner_only_kind"
   | "origin:owner_exact"
   | "origin:owner_asked"
@@ -44,6 +45,8 @@ export interface EvaluationInput {
   signals?: {
     /** Google star rating of the review being answered. 1-2 is critical. */
     reviewRating?: number;
+    /** Templates and unqualified historic drafts always require the owner. */
+    reviewNeedsOwner?: boolean;
     /** The current inquiry ResponsibilityPolicy's decision for this message.
      * `allow` means evidenced trust inside its pre-authorized boundary, never
      * a caller-supplied owner setting or a commitment. */
@@ -111,6 +114,7 @@ export function evaluateRoute(input: EvaluationInput): Evaluation {
   if (kind === "review.reply" && typeof input.signals?.reviewRating === "number" && input.signals.reviewRating <= 2) {
     kind = "review.reply_critical";
   }
+  if (kind === "review.reply" && input.signals?.reviewNeedsOwner) return result(kind, "owner_decides", "fixed:review_draft");
   if (kind === "fact.inferred") return result(kind, "owner_decides", "fixed:fact_inferred");
   if (kind === "access.grant" || kind === "money" || kind === "exit") return result(kind, "owner_decides", "fixed:owner_only_kind");
 

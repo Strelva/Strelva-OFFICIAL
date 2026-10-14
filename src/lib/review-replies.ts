@@ -311,10 +311,13 @@ Write a reply that will NOT be rejected by Google's filter. Rules you MUST follo
  * Does NOT store the reply in recent-replies — the caller does that after
  * queueing (so aborted drafts don't pollute the near-duplicate list).
  */
-export async function draftReviewReply(
+export interface ReviewReplyDraft { text: string; generation: "model" | "template" }
+
+/** Provenance is required before an automatic reply may be scheduled. */
+export async function draftReviewReplyWithProvenance(
   review: GoogleReviewForReply,
   tenantConfig: Pick<TenantConfig, "id" | "siteName">
-): Promise<string> {
+): Promise<ReviewReplyDraft> {
   const businessName = tenantConfig.siteName || tenantConfig.id;
   // Sanitize reviewer-supplied strings before prompt interpolation to strip
   // control characters (including newlines) that could be used to inject new
@@ -349,7 +352,7 @@ export async function draftReviewReply(
     if (firstLint.ok) {
       // Near-duplicate check
       const dup = await isNearDuplicate(tenantConfig.id, firstDraft);
-      if (!dup) return firstDraft;
+      if (!dup) return { text: firstDraft, generation: "model" };
       // If near-duplicate, attempt a second Gemini pass with an explicit
       // "write something structurally different" prompt.
     }
@@ -370,7 +373,7 @@ export async function draftReviewReply(
       const secondLint = lintReplyDraft(secondDraft);
       if (secondLint.ok) {
         const dup2 = await isNearDuplicate(tenantConfig.id, secondDraft);
-        if (!dup2) return secondDraft;
+        if (!dup2) return { text: secondDraft, generation: "model" };
       }
     } catch {
       // Second pass also failed; fall through to deterministic.
@@ -378,5 +381,10 @@ export async function draftReviewReply(
   }
 
   // ── Deterministic fallback ─────────────────────────────────────────────────
-  return buildDeterministicReply(review.reviewerName, review.rating);
+  return { text: buildDeterministicReply(safeReviewerName, review.rating), generation: "template" };
+}
+
+/** Text-only callers never gain permission to auto-post a draft. */
+export async function draftReviewReply(review: GoogleReviewForReply, tenantConfig: Pick<TenantConfig, "id" | "siteName">): Promise<string> {
+  return (await draftReviewReplyWithProvenance(review, tenantConfig)).text;
 }

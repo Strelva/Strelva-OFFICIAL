@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ACTOR = "30000000-0000-4000-8000-000000000001";
@@ -38,6 +39,16 @@ function request(body: unknown) {
 }
 
 describe("publication API refusal", () => {
+  it.each(routes)("%s reports a budget pause without claiming completion", async (_name, handler, body) => {
+    mocks.role.mockResolvedValue("owner");
+    for (const error of [new ModelBudgetPausedError(0, 0, {}), new ModelBudgetUnavailableError()]) {
+      mocks.resolve.mockRejectedValueOnce(error);
+      const response = await handler(request(body), { params: Promise.resolve({ id: "event" }) });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({ paused: true, error: error.message });
+    }
+  });
+
   it.each(routes)("%s refuses platform support before invoking client publication", async (_name, handler, body) => {
     const response = await handler(request(body), { params: Promise.resolve({ id: "event" }) });
     expect(response.status).toBe(403);

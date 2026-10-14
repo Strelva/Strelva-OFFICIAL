@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Supabase-auth coverage for src/lib/auth.ts. Asserts the two security
 // invariants: the verified-email gate and the last-owner guard.
 
+const mockStaffRead = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/infra/platform-staff-read", () => ({ readPlatformStaffStrict: mockStaffRead }));
 const mockGetSessionUser = vi.fn();
 const mockGetMembershipRole = vi.fn();
 const mockListTenantOwnerIds = vi.fn();
@@ -43,6 +45,7 @@ describe("auth — Supabase path", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStaffRead.mockResolvedValue(false);
     mockGetSessionUser.mockResolvedValue(VERIFIED);
     mockGetMembershipRole.mockResolvedValue(null);
     mockListTenantOwnerIds.mockResolvedValue([]);
@@ -113,6 +116,28 @@ describe("auth — Supabase path", () => {
     expect(mockGetPendingInvite).not.toHaveBeenCalled();
   });
 
+  it.each(["owner", "admin", "editor"])("invite claim: refuses staff with pending %s access", async role => {
+    const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
+    mockGetPendingInvite.mockResolvedValue({ tenant_id: "gldf", role });
+    mockStaffRead.mockResolvedValue(true);
+    expect(await claimPendingInviteForCurrentUser()).toBeNull();
+    expect(mockUpsertMembership).not.toHaveBeenCalled();
+    expect(mockMarkInviteClaimed).not.toHaveBeenCalled();
+  });
+  it("invite claim: leaves the invite pending when staff cannot be checked", async () => {
+    const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
+    mockGetPendingInvite.mockResolvedValue({ tenant_id: "gldf", role: "owner" });
+    mockStaffRead.mockRejectedValue(new Error("unavailable"));
+    expect(await claimPendingInviteForCurrentUser()).toBeNull();
+    expect(mockUpsertMembership).not.toHaveBeenCalled();
+    expect(mockMarkInviteClaimed).not.toHaveBeenCalled();
+  });
+  it("invite claim: permits staff viewer access only", async () => {
+    const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
+    mockGetPendingInvite.mockResolvedValue({ tenant_id: "gldf", role: "viewer" });
+    mockStaffRead.mockResolvedValue(true);
+    expect(await claimPendingInviteForCurrentUser()).toMatchObject({ role: "viewer" });
+  });
   it("invite claim: assigns membership then marks the invite claimed", async () => {
     const { claimPendingInviteForCurrentUser } = await import("@/platform/infra/auth");
     mockGetPendingInvite.mockResolvedValue({ tenant_id: "gldf", role: "editor" });

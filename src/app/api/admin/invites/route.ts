@@ -1,3 +1,5 @@
+import { getSupabase } from "@/platform/infra/db/client";
+import { readPlatformStaffStrict } from "@/platform/infra/platform-staff-read";
 import { NextResponse } from "next/server";
 import {
   CLIENT_ROLES,
@@ -67,14 +69,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { email: rawEmail, tenant, role: requestedRole } = body as {
+  const { email: rawEmail, tenant, role: requestedRole, reason: rawReason } = body as {
     email?: unknown;
     tenant?: unknown;
     role?: unknown;
+    reason?: unknown;
   };
   const email = normalizeEmail(rawEmail);
   if (!email || typeof tenant !== "string" || !tenant.trim()) {
     return NextResponse.json({ error: "Missing email or tenant" }, { status: 400 });
+  }
+  if (requestedRole !== undefined && (typeof requestedRole !== "string" || !CLIENT_ROLES.includes(requestedRole as ClientRole))) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
   const tenantId = tenant.trim();
   const role: ClientRole =
@@ -97,10 +103,39 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   }
 
-  const existingUserId = await findUserIdByEmail(email);
+  const actor = await getActorContext(tenantId);
+  if (!actor.userId || !actor.isSuperAdmin || actor.isImpersonating) {
+    return NextResponse.json({ error: "Verified platform operator required" }, { status: 403 });
+  }
+  if (actor.email?.trim().toLowerCase() === email) {
+    return NextResponse.json({ error: "Platform operators cannot invite themselves to a client." }, { status: 403 });
+  }
+  let existingUserId: string | null;
+  try {
+    // The legacy lookup is best-effort; confirm absence before preparing an
+    // invite so a failed identity read cannot become an owner invitation.
+    const foundUserId = await findUserIdByEmail(email);
+    const db = getSupabase();
+    if (!db) throw new Error("Identity check unavailable");
+    const { data: target, error } = await db.from("users").select("id").eq("email", email).maybeSingle();
+    if (error || (foundUserId && foundUserId !== target?.id)) throw new Error("Identity check unavailable");
+    existingUserId = target?.id ?? null;
+    if (existingUserId === actor.userId || (existingUserId && role !== "viewer" && await readPlatformStaffStrict(existingUserId))) {
+      return NextResponse.json({ error: "Platform staff cannot receive client content-writing access." }, { status: 403 });
+    }
+  } catch {
+    return NextResponse.json({ error: "Access checks are unavailable. Try again later." }, { status: 503 });
+  }
 
+  const reason = typeof rawReason === "string" ? rawReason.trim() : "";
+  if (!reason || reason.length > 1000) return NextResponse.json({ error: "Give a reason for this access change (up to 1000 characters)." }, { status: 400 });
   if (existingUserId) {
     const userId = existingUserId;
+    try {
+      await logAuditEvent({ tenant: tenantId, action: "tenant.assign_user_requested", targetType: "user", targetId: userId, actor, metadata: { role, email, reason, source: "invite" } });
+    } catch {
+      return NextResponse.json({ error: "Access change could not be recorded. No access was granted." }, { status: 503 });
+    }
     const assigned = await assignUserToTenant(userId, tenantId, role);
     if (!assigned) {
       return NextResponse.json({ error: "Failed to assign existing user" }, { status: 500 });
@@ -111,7 +146,7 @@ export async function POST(req: Request) {
       targetType: "user",
       targetId: email,
       actor: await getActorContext(tenantId),
-      metadata: { role, emailSent: false },
+      metadata: { role, emailSent: false, reason },
     });
     return NextResponse.json({
       success: true,
@@ -120,6 +155,11 @@ export async function POST(req: Request) {
     });
   }
 
+  try {
+    await logAuditEvent({ tenant: tenantId, action: "invite.requested", targetType: "user", targetId: email, actor, metadata: { role, reason } });
+  } catch {
+    return NextResponse.json({ error: "Invitation could not be recorded. No invitation was created." }, { status: 503 });
+  }
   const invitedBy = await getCurrentUserEmail();
   try {
     await createInvite(email, tenantId, invitedBy || undefined, role);
@@ -191,7 +231,7 @@ export async function POST(req: Request) {
       targetType: "user",
       targetId: email,
       actor: await getActorContext(tenantId),
-      metadata: { role, emailSent: sent },
+      metadata: { role, emailSent: sent, reason },
     });
 
     if (!sent) {
@@ -229,7 +269,7 @@ export async function POST(req: Request) {
     targetType: "user",
     targetId: email,
     actor: await getActorContext(tenantId),
-    metadata: { role, emailSent: false },
+    metadata: { role, emailSent: false, reason },
   });
   return NextResponse.json({
     success: true,

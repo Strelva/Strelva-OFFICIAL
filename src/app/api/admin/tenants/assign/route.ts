@@ -1,3 +1,4 @@
+import { readPlatformStaffStrict } from "@/platform/infra/platform-staff-read";
 import { NextResponse } from "next/server";
 import {
   CLIENT_ROLES,
@@ -29,14 +30,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { email: rawEmail, tenant, role: requestedRole } = body as {
+  const { email: rawEmail, tenant, role: requestedRole, reason: rawReason } = body as {
     email?: unknown;
     tenant?: unknown;
     role?: unknown;
+    reason?: unknown;
   };
   const email = normalizeEmail(rawEmail);
   if (!email || typeof tenant !== "string" || !tenant.trim()) {
     return NextResponse.json({ error: "Missing email or tenant" }, { status: 400 });
+  }
+  const reason = typeof rawReason === "string" ? rawReason.trim() : "";
+  if (!reason || reason.length > 1000) {
+    return NextResponse.json({ error: "Give a reason for this access change (up to 1000 characters)." }, { status: 400 });
+  }
+  if (requestedRole !== undefined && (typeof requestedRole !== "string" || !CLIENT_ROLES.includes(requestedRole as ClientRole))) {
+    return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
   const tenantId = tenant.trim();
   const role: ClientRole =
@@ -60,6 +69,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
+    const actor = await getActorContext(tenantId);
+    if (!actor.userId || !actor.isSuperAdmin || actor.isImpersonating) {
+      return NextResponse.json({ error: "Verified platform operator required" }, { status: 403 });
+    }
+    if (userId === actor.userId) {
+      return NextResponse.json({ error: "Platform operators cannot assign themselves to a client." }, { status: 403 });
+    }
+    // Unlike the best-effort identity reader, this boundary must hold on an
+    // unavailable staff read. Support never gains a content-writing role.
+    let staff: boolean;
+    try { staff = await readPlatformStaffStrict(userId); }
+    catch { return NextResponse.json({ error: "Access checks are unavailable. Try again later." }, { status: 503 }); }
+    if (staff && role !== "viewer") {
+      return NextResponse.json({ error: "Platform staff can only have read-only support access." }, { status: 403 });
+    }
+    // An audit failure must prevent the grant, rather than leave an unlogged
+    // assignment. The completion event below records the accepted result.
+    await logAuditEvent({ tenant: tenantId, action: "tenant.assign_user_requested", targetType: "user", targetId: userId, actor, metadata: { email, role, reason } });
+
     let assigned: boolean;
     try {
       assigned = await assignUserToTenant(userId, tenantId, role);
@@ -82,14 +110,14 @@ export async function POST(req: Request) {
       action: "tenant.assign_user",
       targetType: "user",
       targetId: userId,
-      actor: await getActorContext(tenantId),
-      metadata: { email, role },
+      actor,
+      metadata: { email, role, reason },
     });
 
     return NextResponse.json({ success: true, userId, tenant: tenantId, role });
-  } catch (err) {
+  } catch {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to assign user" },
+      { error: "Access change could not be confirmed. Refresh the member list before trying again." },
       { status: 500 }
     );
   }

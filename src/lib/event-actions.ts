@@ -1,5 +1,5 @@
 import { executeAgentPrompt } from "./agent-executor";
-import { claimEventAction, finishEventAction, getEvent, getEventRaw, markExecutionExternalAccepted, resolveEvent, updateEvent } from "./events";
+import { claimEventAction, finishEventAction, getEvent, getEventRaw, markExecutionExternalAccepted, markExecutionExternalUnconfirmed, resolveEvent, updateEvent } from "./events";
 import { updateSuggestion } from "./suggestions";
 import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
@@ -545,6 +545,10 @@ async function executeResolvedEventAction(
         ledger: "event", ledgerId: attemptId, request: { reviewId: metaReviewId } });
     }
     if (action === "approved") {
+      // Recheck provenance at dispatch, including stale timers and direct cron calls.
+      // Older drafts without provenance remain pending for an owner decision.
+      if (actorId === AUTO_REPLY_ACTOR && event.metadata.replyGeneration !== "model")
+        return { changed: false, reason: "review_reply_needs_owner" };
       const reviewId = metaReviewId;
       const replyText =
         typeof event.metadata?.draftedReply === "string"
@@ -619,7 +623,17 @@ async function executeResolvedEventAction(
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 
-  // Remaining simple cases (suggestion, etc.) — resolve then handle.
+  // A budget refusal must leave the suggestion pending. Admission happens
+  // before tools run, so no event or suggestion completion precedes it.
+  const actionPrompt = event.type === "suggestion" && typeof event.metadata?.actionPrompt === "string"
+    ? event.metadata.actionPrompt
+    : null;
+  if (action === "approved" && actionPrompt) {
+    await executeAgentPrompt(tenantId, actionPrompt, {
+      beforeToolEffect: () => markExecutionExternalUnconfirmed(eventId, "Background work may have saved changes. Review its activity and approval queue before retrying.", true),
+    });
+  }
+
   const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
   if (!resolved.changed) return { changed: false, reason: "already_resolved" };
 
@@ -634,13 +648,6 @@ async function executeResolvedEventAction(
       suggestionId,
       action === "approved" ? "accepted" : "dismissed"
     );
-  }
-
-  const actionPrompt = typeof event.metadata?.actionPrompt === "string"
-    ? event.metadata.actionPrompt
-    : null;
-  if (action === "approved" && actionPrompt) {
-    await executeAgentPrompt(tenantId, actionPrompt);
   }
 
   return { changed: true };

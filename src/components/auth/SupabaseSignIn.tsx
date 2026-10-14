@@ -10,16 +10,19 @@
 
 import { StField, StHead, StMono, StPill, StPillLink, StTextButton, StNotice } from "@/components/ui/strelva/Kit";
 import { useState, type ReactNode } from "react";
+import { signInErrorCopy } from "./sign-in-errors";
 import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 export function SupabaseSignIn({
   next = "/account",
   prefillEmail = "",
   heading,
+  emailReady = false,
 }: {
   next?: string;
   prefillEmail?: string;
   heading?: ReactNode;
+  emailReady?: boolean;
 }) {
   const [email, setEmail] = useState(prefillEmail);
   const [status, setStatus] = useState<"idle" | "google" | "sending" | "sent" | "error">("idle");
@@ -37,18 +40,19 @@ export function SupabaseSignIn({
     setError(null);
     try {
       const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
-      if (error) fail(error.message);
+      if (error) fail(signInErrorCopy(error, "google"));
     } catch { fail("Sign-in is temporarily unavailable. Try again."); }
   }
 
   async function sendMagicLink(event?: React.FormEvent) {
     event?.preventDefault();
+    if (!emailReady) return;
     const supabase = createBrowserSupabase();
     if (!supabase) return fail("Sign-in is not configured.");
     setStatus("sending"); setError(null);
     try {
       const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo() } });
-      if (error) fail(error.message);
+      if (error) fail(signInErrorCopy(error, "email"));
       else setStatus("sent");
     } catch { fail("The sign-in link could not be sent. Try again."); }
   }
@@ -68,10 +72,10 @@ export function SupabaseSignIn({
 
   return <div className="flex flex-col gap-5">
     {heading}
-    <form onSubmit={sendMagicLink} className="flex flex-col gap-5">
+    {emailReady ? <form onSubmit={sendMagicLink} className="flex flex-col gap-5">
       <StField label="Email"><input type="email" required autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@business.com" disabled={status === "sending" || status === "google"} /></StField>
       <StPill type="submit" block busy={status === "sending"} disabled={status === "google"}>Email me a sign-in link</StPill>
-    </form>
+    </form> : null}
     <StPill variant="soft" block onClick={() => void signInWithGoogle()} busy={status === "google"} disabled={status === "sending"}>Continue with Google</StPill>
     {error ? <StNotice tone="critical">{error}</StNotice> : null}
   </div>;

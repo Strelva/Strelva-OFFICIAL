@@ -119,17 +119,24 @@ async function buildSystemPrompt(
   return prompt;
 }
 
+export interface AgentExecutionOptions {
+  /** Fence retries before a tool can save or publish work; reads do not fence. */
+  beforeToolEffect?: () => Promise<void>;
+}
+
 export async function executeAgentPrompt(
   tenantId: string,
-  userMessage: string
+  userMessage: string,
+  options: AgentExecutionOptions = {},
 ): Promise<string> {
-  const result = await executeAgentPromptDetailed(tenantId, userMessage);
+  const result = await executeAgentPromptDetailed(tenantId, userMessage, options);
   return result.text;
 }
 
 export async function executeAgentPromptDetailed(
   tenantId: string,
-  userMessage: string
+  userMessage: string,
+  options: AgentExecutionOptions = {},
 ): Promise<AgentExecutionTrace> {
   addSentryBreadcrumb("agent", "Agent execution started", { tenantId, messageLength: userMessage.length });
   const template = await getTemplateManifestForTenant(tenantId);
@@ -371,6 +378,19 @@ export async function executeAgentPromptDetailed(
     tools.upload_gbp_photo = gbpTools.upload_gbp_photo;
   }
   assertAgentToolCatalog(Object.keys(tools), "background");
+  if (options.beforeToolEffect) {
+    const readOnlyTools = new Set(["read_section", "get_suggestions", "list_blog_posts"]);
+    for (const [name, definition] of Object.entries(tools)) {
+      if (readOnlyTools.has(name) || typeof definition.execute !== "function") continue;
+      const execute = definition.execute;
+      definition.execute = async (...args: unknown[]) => {
+        // A provider/tool continuation can fail after an earlier step saved work.
+        // Fence first, even when the transport's acceptance is not yet known.
+        await options.beforeToolEffect!();
+        return execute(...args);
+      };
+    }
+  }
 
   // Primary then fallback (transient failures only) through the one
   // model-call helper, which writes one cost row per provider step.

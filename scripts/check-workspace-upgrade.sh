@@ -72,7 +72,7 @@ tail_started=0
 early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
-  if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* || "$migration_name" == 20261024* ]]; then continue; fi
+  if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* || "$migration_name" == 20261024* || "$migration_name" == 20261025* ]]; then continue; fi
   # Coherence projections wrap October 20-22 readers; they follow that tail below.
   if [[ "$migration_name" == 20261023* && "$migration_name" != "20261023200000_tenant_review_approval_continuity.sql" ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then

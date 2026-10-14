@@ -69,7 +69,7 @@ export function draftsByReview(events: ReadonlyArray<{ metadata?: Record<string,
     const reviewId = typeof event.metadata.reviewId === "string" ? event.metadata.reviewId : null;
     const reply = typeof event.metadata.draftedReply === "string" ? event.metadata.draftedReply : null;
     if (!reviewId || !reply || drafts.has(reviewId)) continue;
-    drafts.set(reviewId, { reply, autoPostAt: typeof event.metadata.autoPostAt === "string" ? event.metadata.autoPostAt : null });
+    drafts.set(reviewId, { reply, autoPostAt: event.metadata.replyGeneration === "model" && typeof event.metadata.autoPostAt === "string" ? event.metadata.autoPostAt : null });
   }
   return drafts;
 }

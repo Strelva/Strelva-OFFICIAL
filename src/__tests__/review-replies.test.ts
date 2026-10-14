@@ -269,6 +269,19 @@ describe("draftReviewReply", () => {
     mockLrange.mockResolvedValue([]);
   });
 
+  it("keeps fallback provenance when budget identity cannot be confirmed", async () => {
+    mockTenantWorkspace.mockRejectedValueOnce(new Error("scope unavailable"));
+    const { draftReviewReplyWithProvenance } = await import("@/lib/review-replies");
+    expect(await draftReviewReplyWithProvenance(review, tenant)).toEqual({ text: buildDeterministicReply("Dave", 5), generation: "template" });
+    expect(mockGenerateText).not.toHaveBeenCalled();
+  });
+
+  it("records successful model provenance", async () => {
+    mockGenerateText.mockResolvedValueOnce({ text: "Dave, we got the furnace sorted quickly." });
+    const { draftReviewReplyWithProvenance } = await import("@/lib/review-replies");
+    expect(await draftReviewReplyWithProvenance(review, tenant)).toEqual({ text: "Dave, we got the furnace sorted quickly.", generation: "model" });
+  });
+
   it("uses a deterministic reply without a charged model attempt when workspace resolution fails", async () => {
     mockTenantWorkspace.mockRejectedValueOnce(new Error("scope unavailable"));
     const { draftReviewReply } = await import("@/lib/review-replies");

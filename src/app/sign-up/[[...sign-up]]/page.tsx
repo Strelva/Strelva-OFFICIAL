@@ -1,3 +1,4 @@
+import { authEmailReady } from "@/components/auth/email-readiness";
 import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { StEntry, StHead, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
@@ -92,9 +93,9 @@ export default async function SignUpPage({
   const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
   const invite = await getInviteContext(params);
 
-  if (invite) return <StEntry brand={invite.brand} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
+  if (invite) return <StEntry brand={invite.brand} helpHref="/workspace?view=help"><SupabaseSignIn emailReady={authEmailReady()} heading={<StHead title={`Create access for ${invite.siteName}`} meta={`Use ${invite.email}, the email your invitation was sent to.`} />} next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"} prefillEmail={invite.email} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   const tenantAuth = await getTenantAuthContext();
-  if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
+  if (tenantAuth) return <StEntry brand={tenantAuth.brand} brandFontFamily={tenantAuth.brandFontFamily} host={tenantAuth.host} helpHref="/workspace?view=help"><SupabaseSignIn emailReady={authEmailReady()} heading={<StHead title={`Manage ${tenantAuth.siteName}`} meta="Use the email your invitation was sent to." />} next={tenantSignInNext(tenantAuth.clientFallbackRoot)} /><p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p></StEntry>;
   const agencyDoor = agencySignupReleaseEnabled();
   const businessDoor = businessSignupReleaseEnabled();
   // Opening the workspace no longer opens direct business sign-up to everyone:
@@ -106,7 +107,7 @@ export default async function SignUpPage({
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
     const identity = await invitationEntryIdentity(invitationTarget);
     return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
-      <SupabaseSignIn key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencyDoor && businessDoor ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
+      <SupabaseSignIn emailReady={authEmailReady()} key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencyDoor && businessDoor ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
       {identity ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
       <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
     </StEntry>;

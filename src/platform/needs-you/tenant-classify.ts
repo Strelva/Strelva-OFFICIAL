@@ -33,7 +33,7 @@ export function classifyTenantEvent(event: UnifiedEvent): TenantEventClassificat
   if (event.type === "change_verify_failed") return { kind: "verify.failed", origin: "strelva", signals: {} };
   if (kind === "review_reply_draft") {
     const rating = typeof m.rating === "number" ? m.rating : undefined;
-    return { kind: "review.reply", origin: "strelva", signals: rating === undefined ? {} : { reviewRating: rating } };
+    return { kind: "review.reply", origin: "strelva", signals: { ...(rating === undefined ? {} : { reviewRating: rating }), ...(m.replyGeneration !== "model" ? { reviewNeedsOwner: true } : {}) } };
   }
   if (kind === "workspace_google_listing_draft") return { kind: "fact.inferred", origin: "owner_interpreted", signals: {} };
   if (kind === "workspace_newsletter_issue") return { kind: "customer.broadcast", origin: "owner_interpreted", signals: {} };
@@ -81,7 +81,7 @@ export function observedTenantRoute(event: UnifiedEvent): { route: Route; verify
   if (event.type === "change_verify_failed") {
     return { route: "strelva_reviews", verifyFailedLeaked: event.status === "pending" && m.reviewAudience !== "operator" };
   }
-  if (typeof m.autoPostAt === "string") return { route: "handle_after_notice", verifyFailedLeaked: false };
+  if (typeof m.autoPostAt === "string" && (event.status !== "pending" || m.replyGeneration === "model")) return { route: "handle_after_notice", verifyFailedLeaked: false };
   if (event.status === "auto_approved") return { route: "handle", verifyFailedLeaked: false };
   if (m.reviewAudience === "operator" || m.escalatedByOperator === true) return { route: "strelva_reviews", verifyFailedLeaked: false };
   return { route: "owner_decides", verifyFailedLeaked: false };

@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -66,12 +67,19 @@ export async function PATCH(
   // run as that operator.
   const decision = { tenantId: tenant, eventId: id, action: action as EventWorkflowAction, auditAction: `dashboard.queue.${action}` };
   let result;
-  if (OPERATOR_ONLY_ACTIONS.has(action as EventWorkflowAction)) {
-    const operator = decider.kind === "operator" ? decider.operator : await verifiedOperator();
-    if (!operator) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    result = await decideTenantEventAsOperator(operator, decision);
-  } else {
-    result = await decideTenantEvent(decider, decision);
+  try {
+    if (OPERATOR_ONLY_ACTIONS.has(action as EventWorkflowAction)) {
+      const operator = decider.kind === "operator" ? decider.operator : await verifiedOperator();
+      if (!operator) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      result = await decideTenantEventAsOperator(operator, decision);
+    } else {
+      result = await decideTenantEvent(decider, decision);
+    }
+  } catch (error) {
+    if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
+      return NextResponse.json({ error: error.message, paused: true }, { status: 409 });
+    }
+    throw error;
   }
   const refused = operatorRefusal(result.reason);
   if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });

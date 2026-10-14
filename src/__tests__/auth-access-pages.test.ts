@@ -1,6 +1,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import SignUpPage from "@/app/sign-up/[[...sign-up]]/page";
+import SignInPage from "@/app/sign-in/[[...sign-in]]/page";
 
 const mockGetInvite = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
@@ -9,7 +11,7 @@ const mockHeaderValues = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("@/components/auth/SupabaseSignIn", () => ({
   SupabaseSignIn: (props: Record<string, unknown>) =>
-    React.createElement("div", null, props.heading as React.ReactNode, React.createElement("pre", { "data-supabase": "sign-in" }, JSON.stringify({ next: props.next, prefillEmail: props.prefillEmail }))),
+    React.createElement("div", null, props.heading as React.ReactNode, React.createElement("pre", { "data-supabase": "sign-in" }, JSON.stringify({ next: props.next, prefillEmail: props.prefillEmail, emailReady: props.emailReady }))),
 }));
 
 vi.mock("next/headers", () => ({
@@ -52,7 +54,6 @@ describe("auth access pages", () => {
   });
 
   it("renders the invited Supabase signup for a pending invited email", async () => {
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({ email: "Owner@Example.com" }),
@@ -65,10 +66,17 @@ describe("auth access pages", () => {
     expect(html).toContain("&quot;prefillEmail&quot;:&quot;owner@example.com&quot;");
   });
 
+  it.each(["0", "1"])("passes server email readiness %s to both entry methods", async ready => {
+    vi.stubEnv("STRELVA_AUTH_EMAIL_READY", ready);
+    for (const page of [SignUpPage, SignInPage]) {
+      const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({ email: "owner@example.com" }) }));
+      expect(html).toContain(`&quot;emailReady&quot;:${ready === "1"}`);
+    }
+  });
+
   it("keeps public signup paused when there is no pending invite", async () => {
     mockGetInvite.mockResolvedValueOnce(null);
     mockHeaderValues.clear();
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({ email: "owner@example.com" }),
@@ -84,7 +92,6 @@ describe("auth access pages", () => {
   });
 
   it("renders the invited Supabase sign-in for a pending invited email", async () => {
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
 
     const html = renderToStaticMarkup(await SignInPage({
       searchParams: Promise.resolve({ email: "owner@example.com" }),
@@ -98,7 +105,6 @@ describe("auth access pages", () => {
 
   it("renders the tenant Supabase sign-in without requiring an invite query", async () => {
     mockGetInvite.mockResolvedValueOnce(null);
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
 
     const html = renderToStaticMarkup(await SignInPage({
       searchParams: Promise.resolve({}),
@@ -112,8 +118,6 @@ describe("auth access pages", () => {
   it("uses a known business display font on trusted-host entry and preserves the return", async () => {
     mockGetInvite.mockResolvedValue(null);
     mockGetStoredContent.mockResolvedValue({ fontDisplay: "Georgia, serif" });
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
     for (const page of [SignInPage, SignUpPage]) {
       const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) }));
       expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>Agency identity unavailable<\/a>/);
@@ -126,7 +130,6 @@ describe("auth access pages", () => {
     mockGetInvite.mockResolvedValue(null);
     if (theme instanceof Error) mockGetStoredContent.mockRejectedValue(theme);
     else mockGetStoredContent.mockResolvedValue(theme);
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
     const html = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({}) }));
     expect(html).toContain("Manage Great Lakes Dried Fruit");
     expect(html).not.toContain("font-family:");
@@ -135,7 +138,6 @@ describe("auth access pages", () => {
 
   it("renders the tenant Supabase signup without requiring an invite query", async () => {
     mockGetInvite.mockResolvedValueOnce(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({}),
@@ -151,8 +153,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const signIn = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({}) }));
     const signUp = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({}) }));
@@ -171,7 +171,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const business = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ next: "/workspace?save=scan_public123" }) }));
     expect(business).toContain("Who is this for?");
@@ -195,7 +194,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
     expect(html).not.toContain("Who is this for?");
@@ -209,7 +207,6 @@ describe("auth access pages", () => {
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const target = "/workspace?save=scan_public123";
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({ next: target }),
@@ -224,8 +221,6 @@ describe("auth access pages", () => {
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
     const target = "/workspace/account?continue=public";
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const signIn = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({ next: target }) }));
     const signUp = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ next: target }) }));
@@ -252,7 +247,6 @@ describe("auth access pages", () => {
       active: true,
     });
     const target = "/workspace?save=scan_public123";
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({ email: "owner@example.com", next: target }),
@@ -278,7 +272,6 @@ describe("auth access pages", () => {
       active: true,
     });
     const target = "/workspace?save=scan_public123";
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
 
     const html = renderToStaticMarkup(await SignInPage({
       searchParams: Promise.resolve({ email: "owner@example.com", next: target }),
@@ -294,7 +287,6 @@ describe("auth access pages", () => {
     mockGetInvite.mockResolvedValue(null);
     const target = "/workspace?save=scan_public123";
     const wrapped = `/account?next=${encodeURIComponent(target)}`;
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
 
     const html = renderToStaticMarkup(await SignInPage({
       searchParams: Promise.resolve({ error: "auth_callback", next: wrapped }),
@@ -320,7 +312,6 @@ describe("auth access pages", () => {
     });
     const target = "/workspace?save=scan_public123";
     const wrapped = `/account?next=${encodeURIComponent(target)}`;
-    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
 
     const html = renderToStaticMarkup(await SignInPage({
       searchParams: Promise.resolve({ email: "owner@example.com", error: "auth_callback", next: wrapped }),
@@ -335,7 +326,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({
       searchParams: Promise.resolve({ next: "https://evil.example/private" }),
@@ -349,7 +339,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     for (const next of [undefined, "/workspace?save=scan_public123", "/workspace/account?continue=public"]) {
       const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve(next ? { next } : {}) }));
@@ -367,7 +356,6 @@ describe("auth access pages", () => {
     vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
     mockHeaderValues.clear();
     mockGetInvite.mockResolvedValue(null);
-    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const closed = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({}) }));
     expect(closed).toContain("New accounts open soon");

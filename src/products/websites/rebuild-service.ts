@@ -8,7 +8,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision, type WebsiteAgencyPublishPermission } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
-import { currentDescriptionBusinessFacts, runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
+import { currentDescriptionBusinessFacts, runWebsiteRebuild, WebsiteRebuildStageError, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
 import { prepareSitePatch, prepareSiteUndo } from "./site-operations";
 import { checkWebsiteHealth } from "./site-health";
@@ -60,6 +60,7 @@ function exact(loaded: Loaded, raw: unknown) {
   return { input, candidate };
 }
 function publicFailure(error: unknown): string {
+  if (error instanceof WebsiteRebuildStageError && error.paused) return error.message.slice(0, 1000);
   if (error instanceof WorkspaceAccessError) return "Access changed while rebuilding. Reopen the workspace with an authorized account.";
   if (error instanceof WorkspaceConflictError) return error.message;
   if (error instanceof Error && /public website|business name|couldn't|could not|robots|browser to read|unreachable|description|website address/i.test(error.message)) return error.message.slice(0,1000);
@@ -160,7 +161,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     } catch (error) {
       // A lost CAS or revoked access must never overwrite a newer actor's work.
       if (error instanceof WorkspaceAccessError || error instanceof WorkspaceConflictError) throw error;
-      current = await update(actor,current,"rebuild_failed",{ status: "failed", lastError: publicFailure(error) });
+      const paused = error instanceof WebsiteRebuildStageError && error.paused;
+      current = await update(actor,current,paused ? "rebuild_paused" : "rebuild_failed",{ status: paused ? "paused" : "failed", lastError: publicFailure(error) });
       return present(current);
     }
   }
@@ -205,7 +207,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
   async function retry(actor: WorkspaceActor, workId: string, raw: unknown) {
     const input = z.object({ expectedRevision: z.number().int().nonnegative() }).strict().parse(raw);
     const loaded = await load(actor,workId);
-    if (loaded.rebuild.revision !== input.expectedRevision || !["failed","building"].includes(loaded.rebuild.status)) throw new WorkspaceConflictError("Reload the failed rebuild before retrying.");
+    if (loaded.rebuild.revision !== input.expectedRevision || !["failed","building","paused"].includes(loaded.rebuild.status)) throw new WorkspaceConflictError("Reload the failed rebuild before retrying.");
     await store.member(actor,loaded.work.workspaceId);
     return build(actor,loaded);
   }
