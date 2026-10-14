@@ -152,7 +152,7 @@ describe("booking lifecycle run", () => {
     });
     await runBookingLifecycle(p, { now: NOW });
     expect(sent[0]!.options?.bullets).toBeUndefined();
-    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Reply to this email to ask the business for another time.");
+    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Contact the business to ask for another time.");
     expect(sent[0]!.fromName).toBe("");
     expect(sent[0]!.authorship).toBe("business");
   });

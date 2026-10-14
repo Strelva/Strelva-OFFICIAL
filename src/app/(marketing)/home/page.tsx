@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { StCopy, StHead, StPage, StPillLink, StRow, StRows, StSection, StTextButton } from "@/components/ui/strelva/Kit";
-import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { businessSignupReleaseEnabled } from "@/platform/business-signup-release";
 import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 
 export const metadata: Metadata = {
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  const businessOpen = workspaceReleaseEnabled();
+  const businessOpen = businessSignupReleaseEnabled();
   const agencyOpen = agencySignupReleaseEnabled();
   return <StPage>
     <StHead title="What would you like to make possible?" meta="Make, run and keep reshaping the systems your business needs." />

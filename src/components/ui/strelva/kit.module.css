@@ -517,24 +517,11 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 .composerSend { display: grid; width: 36px; height: 36px; flex-shrink: 0; place-items: center; border: 0; border-radius: 999px; background: var(--st-accent); color: var(--st-on-accent); cursor: pointer; }
 .composerSend:disabled { opacity: 0.4; cursor: not-allowed; }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
-.composerDock { box-sizing: border-box; position: sticky; bottom: 0; z-index: 20; display: flex; flex: 0 0 auto; justify-content: center; margin-top: auto; padding-block: 24px 20px; pointer-events: none; }
-.composerDock > * { pointer-events: auto; }
-.composerDock { margin-bottom: calc(-1 * var(--st-composer-clearance, 0px)); }
-/* Standalone kit pages need a scroll owner too. Keep the complete page and
-   the dock's actual height in flow, rather than shrinking them into the frame.
-   WorkspaceLayout already supplies its own scroll owner and is unaffected. */
+.composerDock { box-sizing: border-box; display: flex; width: 100%; flex: 0 0 auto; justify-content: center; margin-top: auto; padding: 16px 24px 20px; }
+/* Without an AppFrame slot, keep both the work and dock in normal flow. */
 :global([data-frame-main]):has(.composerDock) { overflow-y: auto; }
 :global([data-frame-main]):has(> .composerDock) > * { flex-shrink: 0; }
-/* The dock measures its complete border box, including the phone tabs and
-   safe area below it. Keep that clearance in the actual scroll owner so the
-   last action can move above the bar; focus scrolling uses the same inset.
-   The negative dock margin transfers its flow space to this padding, so the
-   measured height is reserved once rather than adding a second blank tail. */
-:global([data-st-composer-clearance]) {
-  box-sizing: border-box;
-  padding-bottom: var(--st-composer-clearance, 0px);
-  scroll-padding-bottom: var(--st-composer-clearance, 0px);
-}
+
 
 /* Object with an adjacent explanation, never a dashboard card grid. */
 .split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
@@ -571,7 +558,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 textarea.composerInput { resize: none; max-height: 144px; }
 
 @media (pointer: coarse) { .composerSend { width: 44px; height: 44px; } }
-@media (max-width: 767px) { .composerDock { padding-bottom: calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); } .composerScope { display: none; } }
+@media (max-width: 767px) { .composerDock { padding-inline: 8px; padding-bottom: calc(16px + var(--st-phone-navigation-height, 0px) + var(--st-workspace-safe-area, 0px)); } .composerScope { display: none; } }
 
 /* Shared fields, switches and open tables. */
 .input { display: flex; flex-direction: column; gap: 8px; min-width: 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }

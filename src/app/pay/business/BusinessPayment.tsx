@@ -9,16 +9,16 @@ import styles from "./payment.module.css";
 import { hasPaymentTerms, paymentRefundTerms, publicPaymentRequestSchema, type PublicPaymentRequest } from "./public-payment";
 import { formatMoney } from "@/platform/connect/money-format";
 
-export default function BusinessPayment({ token, initialRequest }: { token: string; initialRequest?: PublicPaymentRequest }) {
+export default function BusinessPayment({ token, initialRequest, preview = false }: { token: string; initialRequest?: PublicPaymentRequest; preview?: boolean }) {
   const active = useRef(true);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const [request, setRequest] = useState<PublicPaymentRequest | null>(initialRequest ?? null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loading, setLoading] = useState(!initialRequest);
+  const [loading, setLoading] = useState(!initialRequest && !preview);
 
   useEffect(() => {
-    if (initialRequest) return;
+    if (initialRequest || preview) return;
     const controller = new AbortController();
     fetch(`/api/v1/payments?token=${encodeURIComponent(token)}`, { signal: controller.signal })
       .then(async response => {
@@ -28,10 +28,10 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
       .catch(() => { if (!controller.signal.aborted) setError("Payment details could not be loaded. Ask the business for a current link."); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [token, initialRequest]);
+  }, [token, initialRequest, preview]);
 
   async function pay() {
-    if (!request || request.status !== "unpaid" || !request.businessName?.trim() || !hasPaymentTerms(request) || busy) return;
+    if (preview || !request || request.status !== "unpaid" || !request.businessName?.trim() || !hasPaymentTerms(request) || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -78,7 +78,8 @@ export default function BusinessPayment({ token, initialRequest }: { token: stri
           {!termsAvailable ? <p className={visitor.notice}>Refund and cancellation terms are unavailable. Ask the business for a payment link with the agreed terms before paying.</p> : null}
           {request.status === "paid" ? <p role="status">Payment received.</p> : request.status === "expired" ? <p>This payment link has expired.</p> : request.status === "cancelled" ? <p>This request was cancelled.</p> : <p className={visitor.note}>Valid until <time dateTime={request.expiresAt}>{new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "long" }).format(new Date(request.expiresAt))}</time>.</p>}
           {!businessName ? <p className={visitor.notice}>The business identity is unavailable. Ask for a new payment link before paying.</p> : null}
-          {request.status === "unpaid" && businessName && termsAvailable ? <button className={`${visitor.button} ${visitor.block}`} type="button" disabled={busy} aria-busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</button> : null}
+          {preview ? <p className={visitor.note}>Fictional payment preview. No payment can be made here.</p> : null}
+          {request.status === "unpaid" && businessName && termsAvailable && !preview ? <button className={`${visitor.button} ${visitor.block}`} type="button" disabled={busy} aria-busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</button> : null}
           <p className={`${visitor.note} ${styles.security}`}><Lock size={14} aria-hidden="true" />Payment goes to {businessName || "the business named on this request"} through Stripe. The business handles refunds and cancellation terms.</p>
         </section> : !loading && !error ? <p className={visitor.notice}>Payment details are unavailable. Ask the business for a current payment link.</p> : null}
       </div>

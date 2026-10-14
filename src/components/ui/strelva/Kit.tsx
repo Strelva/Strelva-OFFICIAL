@@ -17,6 +17,8 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
  */
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { ComposerDockTarget } from "./ComposerDockTarget";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
 import { forwardRef, createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
@@ -379,39 +381,12 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
   </form>;
 }
 
-/** Reserves the children's full height and phone navigation clearance in flow.
- * Place after the work in its scroll owner, outside any fixed-position wrapper. */
+/** The shell gives the composer its own row, outside the scrolling work.
+ * Standalone use stays in normal flow, with no sticky or negative-margin overlap. */
 export function StComposerDock({ children }: { children: ReactNode }) {
-  const dockRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const dock = dockRef.current;
-    if (!dock) return;
-    // Native pages can own a nested scroller (Ask, Systems, the workspace).
-    // Reserve space there, rather than on an outer frame that never scrolls.
-    let scroll = dock.parentElement;
-    while (scroll && !scroll.matches("[data-workspace-scroll], [data-frame-main]")) {
-      if (/^(auto|scroll)$/.test(getComputedStyle(scroll).overflowY)) break;
-      scroll = scroll.parentElement;
-    }
-    if (!scroll) return;
-    const previous = scroll.style.getPropertyValue("--st-composer-clearance");
-    const previousPriority = scroll.style.getPropertyPriority("--st-composer-clearance");
-    const alreadyMarked = scroll.hasAttribute("data-st-composer-clearance");
-    scroll.setAttribute("data-st-composer-clearance", "");
-    const measure = () => scroll.style.setProperty("--st-composer-clearance", `${Math.ceil(dock.getBoundingClientRect().height)}px`);
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    observer?.observe(dock);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", measure);
-      if (previous) scroll.style.setProperty("--st-composer-clearance", previous, previousPriority);
-      else scroll.style.removeProperty("--st-composer-clearance");
-      if (!alreadyMarked) scroll.removeAttribute("data-st-composer-clearance");
-    };
-  }, []);
-  return <div ref={dockRef} className={styles.composerDock} data-st-composer-dock>{children}</div>;
+  const target = useContext(ComposerDockTarget);
+  const dock = <div className={styles.composerDock} data-st-composer-dock>{children}</div>;
+  return target ? createPortal(dock, target) : dock;
 }
 
 /* ---------- Forms and dense comparison ---------- */
