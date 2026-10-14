@@ -38,7 +38,7 @@ describe("live channel adapters", () => {
     expect(adapter.mode).toBe("live");
     await expect(adapter.ready!({ businessId: BIZ, effect: hostedEffect() })).resolves.toEqual({ ok: true });
     await expect(createHostedWebsiteAdapter(ports, ctx({ hosted_website: false })).ready!({ businessId: BIZ, effect: hostedEffect() }))
-      .resolves.toMatchObject({ ok: false, reason: expect.stringMatching(/not live for the hosted website/) });
+      .resolves.toMatchObject({ ok: false, reason: expect.stringMatching(/Publishing is not enabled for the hosted website/) });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "k", effect: hostedEffect() })).resolves.toEqual({ found: false });
     const result = await adapter.perform({ businessId: BIZ, effect: hostedEffect(), idempotencyKey: "k" });
     expect(result).toMatchObject({ status: "accepted", providerRef: `${WORK}:hosted-3` });
@@ -57,6 +57,33 @@ describe("live channel adapters", () => {
     await expect(adapter.perform({ businessId: BIZ, effect: hostedEffect("again", 3), idempotencyKey: "k2" })).resolves.toMatchObject({ status: "rejected", reason: expect.stringMatching(/not ready/) });
     expect(state.launches).toBe(1);
     await expect(adapter.perform({ businessId: BIZ, effect: { ...hostedEffect(), request: {} }, idempotencyKey: "k3" })).resolves.toMatchObject({ status: "rejected" });
+  });
+
+  it("rechecks an accepted hosted receipt whose delivery was pending or failed without another launch", async () => {
+    const { ports, state } = hostedPorts();
+    const verifyPublished = vi.fn(async () => ({ rebuild: { launch: { receipt: state.receipt, readBack: { status: "verified", message: "The public site now matches." } } } }));
+    const adapter = createHostedWebsiteAdapter({ ...ports, verifyPublished },ctx());
+    await adapter.perform({ businessId: BIZ, effect: hostedEffect(), idempotencyKey: "recover" });
+    for (const status of ["pending","failed"]) {
+      state.readBack = { status, message: "Not confirmed." };
+      await expect(adapter.readBack({ businessId: BIZ, providerRef: `${WORK}:hosted-3` })).resolves.toEqual({ ok: true, detail: "The public site now matches." });
+    }
+    expect(verifyPublished).toHaveBeenCalledTimes(2); expect(verifyPublished).toHaveBeenCalledWith(OWNER,WORK);
+    expect(state.launches).toBe(1); expect(state.approvals).toBe(1);
+    state.readBack = { status: "verified", message: "Already checked." };
+    await adapter.readBack({ businessId: BIZ, providerRef: `${WORK}:hosted-3` });
+    expect(verifyPublished).toHaveBeenCalledTimes(2);
+  });
+  it("keeps a failed delivery check unverified and refuses a different receipt after recovery", async () => {
+    const { ports, state } = hostedPorts();
+    const verifyPublished = vi.fn(async () => { throw new Error("Unavailable"); });
+    const adapter = createHostedWebsiteAdapter({ ...ports, verifyPublished },ctx());
+    await adapter.perform({ businessId: BIZ, effect: hostedEffect(), idempotencyKey: "recover" });
+    state.readBack = { status: "failed", message: "Not confirmed." };
+    await expect(adapter.readBack({ businessId: BIZ, providerRef: `${WORK}:hosted-3` })).resolves.toMatchObject({ ok: false });
+    const changed = createHostedWebsiteAdapter({ ...ports, verifyPublished: async () => ({ rebuild: { launch: { receipt: { ...state.receipt!, receiptId: "different-receipt" }, readBack: { status: "verified", message: "Different release." } } } }) },ctx());
+    await expect(changed.readBack({ businessId: BIZ, providerRef: `${WORK}:hosted-3` })).resolves.toEqual({ ok: false, detail: "The published version is no longer this one." });
+    expect(state.launches).toBe(1); expect(state.approvals).toBe(1);
   });
 
   it("publishes rebuilds onto the named existing tenant and retains each cutover result", async () => {

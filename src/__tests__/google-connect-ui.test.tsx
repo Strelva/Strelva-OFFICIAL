@@ -21,11 +21,22 @@ describe("Connect Google on the Google place", () => {
     expect(page).toContain("Send the owner a connect link"); expect(page).toContain("Strelva doesn&#x27;t send it");
     expect(page).not.toContain(">Connect Google<");
   });
-  it("tells a member and anyone with the flag off what's true, with no connect action", () => {
-    for (const page of [render({ viewer: "member" }), render({ enabled: false }), render({ viewer: "agency", enabled: false })]) {
-      expect(page).toContain("The business owner connects it with their own Google account.");
-      expect(page).not.toContain("<form"); expect(page).not.toContain("connect link");
+  it("tells a member the owner connects and offers no connect action", () => {
+    const page = render({ viewer: "member" });
+    expect(page).toContain("The business owner connects it with their own Google account.");
+    expect(page).not.toContain("<form");
+  });
+  it("shows Coming soon with a working Google alternative while connect is dark", () => {
+    for (const viewer of ["owner", "agency", "member"] as const) {
+      const page = render({ viewer, enabled: false });
+      expect(page).toContain("Coming soon");
+      expect(page).toContain('href="https://business.google.com/"');
+      expect(page).toContain("manage your listing directly on Google today");
+      expect(page).not.toContain("<form");
+      expect(page).not.toContain("connect link");
     }
+    expect(render({ enabled: false })).toContain("Update business details in Strelva");
+    expect(render({ enabled: false, viewer: "agency" })).not.toContain("Update business details in Strelva");
   });
   it("lists the found listings to choose from, and explains quota 0 plainly", () => {
     const page = render({ params: { connect: "choose" }, choices: { googleEmail: "owner@gmail.test", listings: [{ accountId: "accounts/1", locationId: "9", title: "Synthetic Bakery", address: "1 Main St, Buffalo" }], more: true } });

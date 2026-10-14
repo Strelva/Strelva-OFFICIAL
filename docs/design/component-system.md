@@ -57,6 +57,23 @@ releases are absent. Failed comparisons preserve known offers and display
 **Improvements unavailable** alongside an incomplete Queue. Source/unit proof
 is separate from the still-pending desktop/mobile rendered acceptance.
 
+## October 14 Systems completion (local)
+
+[BusinessArrivals](../../src/experience/systems/BusinessArrivals.tsx) composes
+`StSection`, `StRows`, `StRow`, `StNotice`, `StSkeleton` and `StTextButton` on
+business Home. It reads current authorized inquiry and booking records without
+email. Partial failures keep known records and an unknown-count notice. Loading,
+empty, transport failure, release-off and permission states are distinct; scope
+changes immediately hide the previous business. Focus and Check again refresh
+through the workspace transport. Systems remains gated; linked legacy businesses retain owner-entry gating. Native-only businesses can see bookings while owner entry is dark; inquiries wait for their destination to open.
+DOM tests cover these states; desktop/mobile rendered proof is pending the
+coordinator's post-merge browser run.
+
+Google connect while dark says Coming soon and links to Google Business Profile;
+owner-only Business details offers a second useful path. Agency form/booking
+empty states name the publication and connection prerequisites, link to website
+options and offer Refresh connections. These changes reuse the existing kit.
+
 ## Strelva 1.0 kit, October 9, 2026 (local)
 
 `src/components/ui/strelva/Kit.tsx` with `kit.module.css`, on the paper tokens
@@ -1031,7 +1048,9 @@ Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorksp
 for exact-content review, collection publication/restore, and immutable newsletter
 issues. Native website Systems use the same panel and approval controls;
 publication confirms the content store, while website rendering remains unverified.
-Native newsletter approval stays paused. Approved issue data may include a separate
+Native newsletter approval stays paused: **Save approved issue** records the snapshot,
+with **Copy approved issue** and selectable text for use in the business’s email tool.
+No live publication or email is implied by that action. Approved issue data may include a separate
 optional `delivery` projection for linked tenants: current state, accepted/suppressed
 counts, unconfirmed batches and append-only batch receipts. The view preserves
 approved words and distinguishes provider acceptance, not-sent gates and unconfirmed

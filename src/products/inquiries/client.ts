@@ -5,3 +5,6 @@ export type { PublicInquiryForm } from "../../../custom-repo-starter/inquiry-cli
 export { commitPatternInstallationAfterVerification, getPatternInstallation, listPatternInstallations, proposePatternUpdate, resolvePatternUpdate, stagePatternUpdate } from "./inquiry-pattern-updates";
 
 export type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "./linked-leads";
+
+export { systemArrivalsSchema } from "./arrivals-contract";
+export type { SystemArrivals } from "./arrivals-contract";

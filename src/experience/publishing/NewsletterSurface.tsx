@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { StEmpty, StHold, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { useState, type ReactNode } from "react";
+import { StEmpty, StField, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import type { ContentWorkspaceData } from "./ContentWorkspace";
 import styles from "./publishing.module.css";
 
@@ -17,7 +17,6 @@ export function NewsletterSurface({ data, context, busy, canApprove, command }: 
   command: (action: "approve" | "not_yet", eventId: string) => void;
 }) {
   const drafts = data.content.drafts.filter(draft => draft.status === "pending" || draft.status === "dismissed");
-  const firstPending = drafts.find(draft => draft.status === "pending")?.id;
   return <>
     {!drafts.length && !data.content.outputs.length ? <StEmpty>No issues yet. Compose an issue, then review its exact words before approving.</StEmpty> : null}
     {drafts.map((draft, index) => <article key={draft.id} aria-label={draft.title} className={styles.columns}>
@@ -36,7 +35,7 @@ export function NewsletterSurface({ data, context, busy, canApprove, command }: 
         <StState kind={draft.status === "pending" ? "need" : "draft"}>{draft.status === "pending" ? "Draft · needs your approval" : "Declined"}</StState>
         <p className={styles.copy}>Sending is paused. Approval keeps this issue and its receipt; no subscriber receives email.</p>
         {canApprove && draft.status === "pending" ? <>
-          {draft.id === firstPending ? <StHold label={busy ? "Saving approval…" : "Hold to make it live"} disabled={busy} block onAccept={() => command("approve", draft.id)} /> : <StPill variant="soft" disabled={busy} onClick={() => command("approve", draft.id)}>Make it live</StPill>}
+          <StPill disabled={busy} onClick={() => command("approve", draft.id)}>Save approved issue</StPill>
           <StTextButton disabled={busy} onClick={() => command("not_yet", draft.id)}>Not yet</StTextButton>
         </> : draft.status === "pending" ? <StNotice>Only an authorized owner can approve this issue.</StNotice> : null}
         {index === 0 && data.content.outputs[0] ? <IssueEvidence issue={data.content.outputs[0]} context={context} /> : null}
@@ -51,6 +50,15 @@ function Metric({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function IssueEvidence({ issue, context }: { issue: ContentWorkspaceData["content"]["outputs"][number]; context?: NewsletterContext }) {
+  const [copyStatus, setCopyStatus] = useState("");
+  async function copyIssue() {
+    try {
+      await navigator.clipboard.writeText(`${issue.subject}\n\n${issue.body}`);
+      setCopyStatus("Approved issue copied. Paste it into your email tool. Copying does not send email.");
+    } catch {
+      setCopyStatus("Copy is unavailable. Open Approved issue below and select its text to copy.");
+    }
+  }
   return <StSection title={issue.subject} meta={`${context?.lastIssueLabel || "Last issue"}, as far as Strelva knows`}>
       <StState kind={issue.delivery?.state === "accepted" ? "live" : issue.delivery?.state === "send_unconfirmed" ? "down" : "draft"}>
         {({ accepted: "Provider accepted · delivery not verified", send_unconfirmed: "Send outcome unconfirmed. Strelva must reconcile before retrying.", sending_pending: "Waiting to send", not_sent_gated: "Sending paused", not_sent_suppressed: "Not sent: no active subscribers" }[issue.delivery?.state || ""] || "Sending paused")}
@@ -64,6 +72,8 @@ function IssueEvidence({ issue, context }: { issue: ContentWorkspaceData["conten
       </StRows>
       <p className={styles.copy}>Strelva can&apos;t see who read it. Mail internal tools hide that. Accepted is not delivered; suppressed is not bounced or unsubscribed.</p>
       {issue.delivery?.receipts.map(receipt => <p key={receipt.id} className={styles.copy}>{receipt.detail} Accepted: <StMono>{receipt.accepted}</StMono>. Suppressed: <StMono>{receipt.suppressed}</StMono>.</p>)}
-      <details className={styles.disclosure}><summary>Approved issue · {new Date(issue.approved_at).toLocaleDateString("en-US", { timeZone: "UTC" })}</summary><p className={styles.copy}>{issue.body}</p></details>
+      <StTextButton onClick={() => void copyIssue()}>Copy approved issue</StTextButton>
+      {copyStatus ? <p role="status" className={styles.copy}>{copyStatus}</p> : null}
+      <details className={styles.disclosure}><summary>Approved issue · {new Date(issue.approved_at).toLocaleDateString("en-US", { timeZone: "UTC" })}</summary><StField label="Approved issue text"><textarea readOnly rows={8} value={`${issue.subject}\n\n${issue.body}`} /></StField></details>
     </StSection>;
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { actorPresentation } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
+import { BusinessArrivals } from "@/experience/systems/BusinessArrivals";
 import { SystemList } from "@/experience/systems/SystemList";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, HEALTH_LABEL, LIFECYCLE_LABEL, type SystemView } from "@/experience/systems/model";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
@@ -361,6 +362,7 @@ export function BusinessHome({ needs: providedNeeds, agencyHome: providedAgencyH
       {agencySeat && readLocation.deliveryCheck ? <AgencyClientDeliveryCheck state={sharedHome.state} selectedKey={readLocation.deliveryCheck} workspaceId={snapshot.workspaceId} onRetry={sharedHome.refresh} /> : null}
       {showHandled ? paperReceipts : <>
         {decisions}
+        {customer && !readOnly ? <BusinessArrivals key={snapshot.workspaceId} workspaceId={snapshot.workspaceId} appBase={appBase} /> : null}
         <StSection title={SYSTEMS_LABEL} id="home-systems" meta="Not working first" action={systems.length ? <StTextButton onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}</StTextButton> : undefined}>
           {busy || systemsLoading ? <StSkeleton label="Loading your systems" /> : systemsUnavailable ? <StNotice tone="critical">Your systems could not be loaded just now. Nothing about them has changed.</StNotice> : systems.length ? <StRows label={`${name} systems`}>
             {[...systems].sort((a, b) => ownerSystemRank(a) - ownerSystemRank(b) || a.name.localeCompare(b.name)).map(system => <StRow key={system.id} title={system.name} detail={system.detail}

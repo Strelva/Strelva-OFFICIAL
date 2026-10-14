@@ -43,7 +43,7 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
       const response = await request("/api/workspace/publishing/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, action, ...(draft ? { draft } : {}), ...(eventId ? { eventId } : {}), ...(receiptId ? { receiptId } : {}) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || data.result?.reason || "This change could not be confirmed. Reload before trying again.");
       if (action === "compose" || action === "restore") { setComposing(false); setFields({}); setSlug(""); setMessage("Saved for the owner's review. Nothing has been published or sent."); }
-      else setMessage(kind === "newsletter" && action === "approve" ? "Issue approved. Check its receipt below for sending status." : action === "not_yet" ? "Draft declined. Nothing changed." : "Published to this System's content store. Website rendering has not been checked.");
+      else setMessage(kind === "newsletter" && action === "approve" ? "Approved issue saved. Sending is paused; copy it into your email tool." : action === "not_yet" ? "Draft declined. Nothing changed." : "Published to this System's content store. Website rendering has not been checked.");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "This change could not be confirmed."); }
     finally { setBusy(false); }
