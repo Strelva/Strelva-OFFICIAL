@@ -39,6 +39,9 @@ it("reviews a native form then sends to the named business, retaining the same c
 it("names an absent connection instead of offering a send", async () => {
   const node = await render(vi.fn().mockResolvedValue(Response.json({ workspaceId, choices: [] })), "booking");
   expect(node.textContent).toContain("No connected booking service is available");
+  expect(node.textContent).toContain("First publish the business’s Strelva website");
+  expect(node.querySelector('a[href^="/workspace/site?"]')?.getAttribute("href")).toContain(workspaceId);
+  expect(button(node, "Refresh connections")).toBeDefined();
   expect(button(node, "Send to Harbor Dental")).toBeUndefined();
 });
 it("preserves connection read failures with Refresh", async () => {

@@ -64,7 +64,8 @@ export async function sendApprovedNewsletterIssues(deps: {
       if (!batch) break;
       remaining -= 1;
       const released = await (deps.released ?? (id => workspaceReleaseFlagEnabled("publishing", id)))(batch.workspaceId).catch(() => false);
-      const suppression = released ? await (deps.suppression ?? (tenant => batchEmailSuppression(deliveryPolicy(tenant))))(batch.tenantId) : "not sent: gated";
+      const suppression = released ? await (deps.suppression ?? (tenant => batchEmailSuppression(deliveryPolicy(tenant))))(batch.tenantId)
+        .catch(() => "not sent: email gates unavailable") : "not sent: gated";
       const identity = !suppression ? await (deps.identity ?? resolveEmailBusinessContext)({ workspaceId: batch.workspaceId, tenantId: batch.tenantId }).catch(() => null) : null;
       let receipt: NewsletterReceipt;
       if (suppression) {

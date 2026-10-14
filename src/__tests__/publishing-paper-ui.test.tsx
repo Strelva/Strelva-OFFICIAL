@@ -29,7 +29,7 @@ beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
 afterEach(async () => { if (root) await act(async () => root!.unmount()); root = undefined; document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 
 describe("publishing paper compositions preserve the commands", () => {
-  it("hold approval sends the exact draft ID and retains the sending pause", async () => {
+  it("saving approval sends the exact draft ID and retains the sending pause", async () => {
     const data = initial();
     const request = vi.fn<typeof fetch>(async (_url, options) => {
       if (options?.method === "POST") data.content.drafts[0]!.status = "approved";
@@ -38,16 +38,16 @@ describe("publishing paper compositions preserve the commands", () => {
     const node = await mount(<ContentWorkspace workspaceId={workspaceId} systemId="exact-system" kind="newsletter" initial={data} request={request} />);
     expect(node.textContent).toContain("The reviewed words.");
     expect(node.textContent).toContain("no subscriber receives email");
-    await act(async () => button(node, "Hold to make it live").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+    await click(node, "Save approved issue");
     expect(request).toHaveBeenCalledWith("/api/workspace/publishing/content", expect.objectContaining({ method: "POST", body: JSON.stringify({ workspaceId, systemId: "exact-system", action: "approve", eventId: "exact-draft" }) }));
-    expect(node.textContent).toContain("Issue approved. Check its receipt below for sending status.");
+    expect(node.textContent).toContain("Approved issue saved. Sending is paused; copy it into your email tool.");
     expect(node.textContent).not.toContain("Delivered successfully");
   });
 
   it("keeps the exact newsletter words on refusal and blocks another approval until reload", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ error: "Your account cannot approve." }, { status: 403 }));
     const node = await mount(<ContentWorkspace workspaceId={workspaceId} systemId="exact-system" kind="newsletter" initial={initial()} request={request} />);
-    await act(async () => button(node, "Hold to make it live").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
+    await click(node, "Save approved issue");
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Your account cannot approve.");
     expect(node.textContent).toContain("The reviewed words.");
     expect(node.querySelector("button[aria-describedby]" )).toBeNull();
@@ -56,7 +56,7 @@ describe("publishing paper compositions preserve the commands", () => {
 
   it("read-only newsletter hides approval and compose, rather than inventing authority", () => {
     const html = renderToStaticMarkup(<ContentWorkspace workspaceId={workspaceId} systemId="s" kind="newsletter" initial={initial()} readOnly />);
-    expect(html).toContain("Publishing is read only"); expect(html).not.toContain("Hold to make it live"); expect(html).not.toContain("Compose an issue");
+    expect(html).toContain("Publishing is read only"); expect(html).not.toContain("Save approved issue"); expect(html).not.toContain("Compose an issue");
   });
 
   it("not yet retains the existing not_yet command", async () => {
@@ -88,6 +88,20 @@ describe("publishing distinguishes evidence and unavailable state", () => {
     const rows = [...dom.querySelectorAll("li")].map(row => row.textContent);
     expect(rows).toContain("BouncedNot available"); expect(rows).toContain("UnsubscribedNot available");
     expect(rows).toContain("Suppressed before sending2"); expect(html).toContain("delivery not verified"); expect(html).toContain("who read it");
+  });
+
+  it.each([true, false])("copies the exact approved newsletter or offers selectable text when clipboard access is %s", async allowed => {
+    const data = initial(); data.content.drafts = [];
+    data.content.outputs = [{ id: "o", subject: "Reviewed subject", body: "Exact approved words", approved_at: "2026-09-15", state: "approved", event_id: "e", accepted_count: 0, suppressed_count: 0, failure_count: 0 }];
+    const writeText = vi.fn(async () => { if (!allowed) throw new Error("denied"); });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const node = await mount(<NewsletterSurface data={data} canApprove={false} busy={false} command={() => {}} />);
+    await click(node, "Copy approved issue");
+    expect(writeText).toHaveBeenCalledWith("Reviewed subject\n\nExact approved words");
+    expect(node.textContent).toContain(allowed ? "Copying does not send email" : "select its text to copy");
+    expect(node.querySelector("textarea")?.value).toBe("Reviewed subject\n\nExact approved words");
+    expect(node.querySelector("textarea")?.readOnly).toBe(true);
+    delete (navigator as { clipboard?: unknown }).clipboard;
   });
 
   it("marks missing outcome counts without turning customer clicks into bookings; recorded zero stays zero", () => {
