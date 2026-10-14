@@ -18,15 +18,17 @@ jobs:
   secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
       # Run the open-source gitleaks CLI directly (MIT, free). The
       # gitleaks/gitleaks-action wrapper now requires a paid license for org
       # accounts; the underlying tool does not. Scans full history against the
-      # repo's .gitleaks.toml allowlist; non-zero exit on a finding fails the job.
+      # repo's default rules plus exact reviewed .gitleaksignore fingerprints.
+      # Real historical client-secret findings deliberately still fail this job.
       - name: Scan for secrets (gitleaks OSS)
         run: |
-          docker run --rm -v "${{ github.workspace }}:/repo" \
-            zricethezav/gitleaks:latest detect \
-            --source=/repo --redact --no-banner
+          docker run --rm --network=none --read-only -v "${{ github.workspace }}:/repo:ro" \
+            ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo \
+            --config=/repo/.gitleaks.toml --gitleaks-ignore-path=/repo/.gitleaksignore \
+            --log-opts="--all" --redact=100 --no-banner

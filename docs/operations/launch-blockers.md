@@ -1,17 +1,75 @@
 # Strelva Launch Blockers
 
-> **Status: current release gate (updated 2026-09-21).** Only `Current
-> Blockers` and `Waived Blockers` determine release status. The long evidence
-> record below is historical. Current architecture and commands live in
-> `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
-> **Auth is Supabase-only (Clerk fully removed #146, 2026-07-11). Sanity removed
-> as a data source (2026-07-10). Control plane URL is `app.strelva.com`.**
+> **Status: current 1.0 release gate (updated 2026-10-14).** The October 12–13
+> go-live is recorded, with October 14 observations distinguished in the
+> [release packet](release-1.0-packet.md#current-record--october-14-2026).
+> These records authorize no production action. Earlier evidence below is historical.
 
 Last local audit: May 14, 2026. Security audit: July 30, 2026.
 
 This file tracks launch blockers that cannot be resolved by code changes alone. `pnpm check:prod` fails while this file contains unwaived blockers. A release is not complete until this file is empty or every remaining item is explicitly waived in the release note with owner approval.
 
 ## Current Blockers
+
+### Production identity and acceptance receipt
+
+- Status: blocked
+- Owner: Jacob (production access); integration coordinator (candidate checks).
+- Reference: [current release record](release-1.0-packet.md#current-record--october-14-2026).
+- Evidence: October 14 audit observed healthy app, both sign-up doors and a 0.2.0
+  health label. October 12–13 deployment and eleven conversions are recorded,
+  not reverified. Vercel access returned 403; effective flags and runtime errors
+  are unknown. Historical 392-migration and 55/55 parity claims are not fresh proof.
+- Required owner action: obtain immutable deployment/source and effective-flag
+  receipts, reconcile current migration/conversion state, and complete outside-account
+  direct/agency sign-in, claim, publication and hosted readback. Keep the eleven
+  clients silent and preserve legacy dashboard access.
+
+### Existing client AI and review safety
+
+- Status: blocked
+- Owner: trust lane (code); Jacob (live settings and client state).
+- Reference: October 14 state audit, trust-2, trust-3, gap-2.
+- Required closure: verify active legacy subscriptions retain AI entitlement;
+  verify deterministic reply fallbacks cannot auto-post; inspect live reply modes
+  and entitlement state with authorized access. No production-data fix is implied.
+
+### Authentication, paid plan and hosted-site activation
+
+- Status: blocked
+- Owner: Jacob (commercial, SMTP and DNS decisions); relevant implementation lanes.
+- Reference: October 14 state audit, owner-1, trust-1, release-9, public-4.
+- Required owner action: verify outside-account Google sign-in. Keep magic links
+  hidden until Auth email is qualified. Choose any plan price separately; no price
+  is selected here. Verify hosted subdomain routing before promising a published
+  address. Systems, Ask and AI-cap settings remain unknown, not implicitly on.
+
+### Release checks and monitoring
+
+- Status: blocked
+- Owner: gate lane (source preparation); integration coordinator (composed checks);
+  Jacob (hosted configuration and deployment).
+- Reference: [current release record](release-1.0-packet.md#current-record--october-14-2026).
+- Required closure: retain full local/hosted CI evidence, clean SQL replay and full
+  ordered upgrade, browser acceptance with the recorded six gates plus signed-in
+  journeys, and matching app/marketing 1.0.0 versions. The prepared code has no
+  build, browser, SQL or hosted pass from this constrained lane.
+- Required owner action: confirm `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from the
+  Sentry project's Client Keys / DSN, make a new production deployment, and retain
+  a controlled scrubbed-error ingestion receipt. Unset browser DSN stays off.
+
+### Public-history client revalidation secrets
+
+- Status: blocked
+- Owner: Jacob (client production rotation).
+- Reference: October 14 audit gap-4; history `dev-tenants.json` at `eb67cd15b`.
+- Required owner action: rotate the rohlax and gldf revalidation secrets through
+  the shared server/client contract, then verify signed revalidation at both
+  sites. Never copy values into this record. Their exact historical findings
+  remain unsuppressed until rotation is evidenced; 263 reviewed hashes and fake
+  fixtures are the only new fingerprint exclusions.
+
+## Historical release gate · September 21–October 7
 
 _No current blockers from the original release gate — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated._
 

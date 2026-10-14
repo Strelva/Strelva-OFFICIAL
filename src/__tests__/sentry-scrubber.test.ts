@@ -56,12 +56,12 @@ describe("Sentry data scrubbing", () => {
     expect(event.transaction).toBe("GET /api/cron/poll-instagram");
     const breadcrumb = event.breadcrumbs[0]!;
     const span = event.spans[0]!;
-    expect(breadcrumb.message).toContain("/api/workspace-export/v3/download");
+    expect(breadcrumb.message).toContain("/api/workspace-export/[private]");
     expect(breadcrumb.data.url).toBe("https://graph.instagram.test/me/media");
     expect(breadcrumb.data["http.query"]).toBeUndefined();
     expect(breadcrumb.data["http.fragment"]).toBeUndefined();
     expect(span.data["http.url"]).toBe("https://app.strelva.test/api/owner-website-preview");
-    expect(span.data["http.target"]).toBe("/api/workspace-export/v3/download");
+    expect(span.data["http.target"]).toBe("/api/workspace-export/[private]");
     expect(span.data["url.full"]).toBe("https://app.strelva.test/b/[token]");
     expect(span.data["url.query"]).toBeUndefined();
     expect(span.data["http.query"]).toBeUndefined();
@@ -80,8 +80,8 @@ describe("Sentry data scrubbing", () => {
       ["/inquiry-booking/inquiry-offer-fixture-token", "/inquiry-booking/[token]"],
       ["/try/signed-possibility-fixture-token", "/try/[token]"],
       ["/delivery/signed-delivery-fixture-token", "/delivery/[token]"],
-      ["/workspace/invitations/accept/invitation-fixture-token", "/workspace/invitations/accept/[token]"],
-      ["/api/workspace-invitations/accept/invitation-fixture-token", "/api/workspace-invitations/accept/[token]"],
+      ["/workspace/invitations/accept/invitation-fixture-token", "/workspace/[private]"],
+      ["/api/workspace-invitations/accept/invitation-fixture-token", "/api/workspace-invitations/[private]"],
       ["/api/websites/shared/share-fixture-token", "/api/websites/shared/[token]"],
     ];
 
@@ -119,5 +119,52 @@ describe("Sentry data scrubbing", () => {
     expect(secrets).not.toContain("public-anon-key-fixture-123");
     expect(secrets).not.toContain("https://public@example.test/1");
     expect(secrets).toContain("redis://user:redis-secret-fixture-123@redis.test");
+  });
+});
+
+
+describe("private Sentry diagnostics", () => {
+  it.each(["/workspace", "/business/private-company", "/api/inquiry-workspace/records/private-record", "/api/workspace-claims/private-token", "/api/agency-proposals"])("retains diagnostics without private content for %s", (url) => {
+    const event = {
+      event_id: "fictional-event-id",
+      level: "error",
+      message: "Alice Example asked about estate planning",
+      request: { url: `https://private-company.test${url}?email=alice@example.test#signed-token`, method: "POST", headers: { referer: "/private-company" }, data: { inquiry: "Alice's message" } },
+      transaction: `POST ${url}`,
+      user: { id: "private-owner", email: "alice@example.test" },
+      tags: { business: "Private Company", userId: "private-owner" },
+      extra: { draft: "Alice's proposal", nestedSecret: "redact-me" },
+      futurePayload: { privateRecord: "Alice's record" },
+      exception: { privateData: "Alice", values: [{ type: "TypeError", value: "Alice's message", stacktrace: { frames: [{ filename: "app:///src/platform/possibilities/execute.ts", function: "executePossibility", lineno: 42, colno: 4, vars: { client: "Alice" }, pre_context: ["Alice"] }] } }] },
+      contexts: { business: { name: "Private Company" }, trace: { trace_id: "fixture-trace-id", span_id: "fixture-span-id", op: "http.server", data: { body: "Alice's proposal" } } },
+      breadcrumbs: [{ category: "console", level: "error", message: "Alice's draft", data: { arguments: ["Alice's draft"] } }],
+      spans: [{ op: "db.query", span_id: "fixture-span-id", description: "SELECT Alice", data: { params: ["Alice"] } }],
+    };
+    expect(scrubSentryEvent(event)).toBe(event);
+    expect(event.event_id).toBe("fictional-event-id");
+    expect(event.exception.values[0]?.type).toBe("TypeError");
+    expect(event.exception.values[0]?.stacktrace.frames[0]).toEqual({ filename: "app:///src/platform/possibilities/execute.ts", function: "executePossibility", lineno: 42, colno: 4 });
+    expect(event.contexts.trace.op).toBe("http.server");
+    expect(event.request.method).toBe("POST");
+    expect(event.request.url).toContain("/[private]");
+    const serialized = JSON.stringify(event);
+    for (const privateValue of ["Alice", "estate planning", "alice@example.test", "private-company", "Private Company", "private-owner", "private-record", "private-token", "redact-me", "signed-token", "SELECT"]) expect(serialized).not.toContain(privateValue);
+  });
+
+  it("applies strict browser privacy even when the event has no request URL", () => {
+    const event = { message: "Alice's draft", extra: { proposal: "Alice" }, exception: { values: [{ type: "Error", value: "Alice" }] } };
+    scrubSentryEvent(event, [], true);
+    expect(event).toEqual({ exception: { values: [{ type: "Error" }] } });
+    const breadcrumb = { category: "ui.click", message: "button Alice", data: { target: "Alice" } };
+    scrubSentryBreadcrumb(breadcrumb, [], true);
+    expect(breadcrumb).toEqual({ category: "ui.click" });
+  });
+
+  it("scrubs common PII and secrets on public events without suppressing the error", () => {
+    const event = { message: "Request failed for alice@example.test at +1 (716) 555-0100", user: { email: "alice@example.test" }, extra: { phone_number: "7165550100", businessName: "Private Company", api_key: "fictional-api-key" } };
+    expect(scrubSentryEvent(event)).toBe(event);
+    expect(event.message).toBe("Request failed for [Redacted] at [Redacted]");
+    expect(event.user).toBeUndefined();
+    expect(Object.values(event.extra)).toEqual(["[Redacted]", "[Redacted]", "[Redacted]"]);
   });
 });

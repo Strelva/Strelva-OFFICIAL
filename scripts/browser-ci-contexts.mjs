@@ -2,7 +2,43 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-export const contexts = ["public", "preview", "workspace", "native", "dark", "private"];
+export const contexts = ["public", "preview", "workspace", "recorded", "native", "dark", "private"];
+// Oct 14 audit REPORT §2 records these HTTP-observed release values. This is
+// a dated local replay of known settings, never a receipt for current production.
+export const recordedProductionRelease = Object.freeze({
+  recordedAt: "2026-10-14",
+  source: "state-2026-10-14/REPORT.md#2-engineering-state",
+  flags: Object.freeze({
+    STRELVA_WORKSPACE_RELEASE: "1",
+    STRELVA_BUSINESS_SIGNUP_RELEASE: "1",
+    STRELVA_AGENCY_SIGNUP_RELEASE: "1",
+    STRELVA_AGENCY_ADD_CLIENT_RELEASE: "1",
+    STRELVA_CLAIM_REVIEW_RELEASE: "1",
+    STRELVA_WEBSITE_REBUILD_RELEASE: "1",
+    STRELVA_NEEDS_YOU_RELEASE: "0",
+  }),
+  unknown: Object.freeze(["Systems", "Ask", "AI cap", "email", "model calls"]),
+});
+
+// Safety settings for fictional local runs only. These values are not claims
+// about production: the dated receipt above keeps their production state unknown.
+export const localBrowserSafetyEnvironment = Object.freeze({
+  STRELVA_SYSTEMS_RELEASE: "0", STRELVA_ASK_RELEASE: "0",
+  STRELVA_FREE_MONTHLY_AI_CAP_USD: "0", STRELVA_WEBSITE_MODEL_CALLS_ENABLED: "0",
+  EMAIL_SENDING_ENABLED: "false", CUSTOMER_EMAIL_ENABLED: "false",
+  OPERATOR_EMAILS_ENABLED: "false", PROSPECT_EMAILS_ENABLED: "false",
+});
+
+export function browserContextEnvironment(context) {
+  assert(contexts.includes(context), `Unknown browser context ${context}.`);
+  return {
+    ...localBrowserSafetyEnvironment,
+    STRELVA_UI_PREVIEW: context === "preview" ? "1" : "0",
+    STRELVA_WORKSPACE_RELEASE: context === "public" ? "0" : "1",
+    ...(context === "recorded" ? recordedProductionRelease.flags : {}),
+  };
+}
+
 export function browserServerCommand(context, port, builtApp = "0") {
   assert(["0", "1"].includes(builtApp), "PLAYWRIGHT_BUILT_APP must be 0 or 1.");
   assert(/^\d+$/.test(String(port)) && Number(port) > 0 && Number(port) <= 65535, "A valid loopback server port is required.");

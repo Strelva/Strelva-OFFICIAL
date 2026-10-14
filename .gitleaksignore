@@ -1,0 +1,51 @@
+# Reviewed 2026-10-14: exact fixtures, source hashes, and disposable local tokens.
+# Audit: .scratch/state-2026-10-14/lanes/gap-4.md. No path or rule allowlists.
+# dev-tenants.json findings remain live pending authorized client secret rotation.
+# 47 unique line fingerprints cover 263 reviewed findings (multiple hashes per line).
+06b1a5f9d1632b90ade06a62a36f6e5eef8b2cdd:src/__tests__/sentry-scrubber.test.ts:generic-api-key:6
+06b1a5f9d1632b90ade06a62a36f6e5eef8b2cdd:src/__tests__/sentry-scrubber.test.ts:generic-api-key:97
+06b1a5f9d1632b90ade06a62a36f6e5eef8b2cdd:src/__tests__/sentry-scrubber.test.ts:jwt:8
+07ffc4496f21e378d52158f166c7927027e33fbe:src/__tests__/google-binding-copy.test.ts:generic-api-key:9
+0aff07fed518493019b33fc61b6bbdbb4a531232:src/__tests__/production-readiness-rules.test.ts:generic-api-key:46
+1cd5feb0fe83e8e1e58f9c2cc50467c857aeac2b:scripts/tests/no-login-journey-window.node-test.mjs:jwt:85
+25ae87390b5d18fba7f765738cb0150614c59f38:src/__tests__/production-readiness-snapshot.test.ts:stripe-access-token:282
+273e86c45905caf3a9887a71d296b8412698f4ca:src/__tests__/booking-manage-link.test.ts:generic-api-key:6
+2b72bd770923dff7e8d0ed5fb7a7462ed8627bcd:src/__tests__/secret-encryption.test.ts:generic-api-key:41
+3033e054de8a0af14f67cddfac8ef25047b7dea3:src/__tests__/google-owner-connect.test.ts:generic-api-key:196
+3120dd705fe04b700ad90a90bd8c9b856e500010:src/__tests__/work-plan-context.test.ts:generic-api-key:181
+3120dd705fe04b700ad90a90bd8c9b856e500010:tests/work-allowances-schema.sql:generic-api-key:67
+3120dd705fe04b700ad90a90bd8c9b856e500010:tests/work-allowances-schema.sql:generic-api-key:74
+9408f9b5c91b5f5e3a3cd7932274c26bdf4f99e9:src/__tests__/scrubbed-copy-e2e.test.ts:generic-api-key:103
+aa2bf2300c1d139b6ef047c37982a87efbd5d8d5:output/issue-528-audit-2026-10-08/proof.json:generic-api-key:24
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23469
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23512
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23559
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23664
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23707
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:23754
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:29497
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:29540
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-sql.log:generic-api-key:29587
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final.log:generic-api-key:871
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final.log:generic-api-key:914
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final.log:generic-api-key:961
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final2.log:generic-api-key:871
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final2.log:generic-api-key:914
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final2.log:generic-api-key:961
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final3.log:generic-api-key:871
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final3.log:generic-api-key:914
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade-final3.log:generic-api-key:961
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade.log:generic-api-key:872
+ada8064d8b6a2fec3d819bb840274cbdafed6673:.scratch/agency-approval-compat/atomic-workspace-upgrade.log:generic-api-key:962
+af0e53fc541fcbb6df332a12f582e5e92600fb9b:output/issue-528-audit-2026-10-08/proof.json:generic-api-key:24
+b16a2e5a0a13099719a613b0e29f5c856ec25c13:docs/operations/ask-native-source-proof-2026-10-09/24f-full-type-fail-source-before.json:generic-api-key:1
+b16a2e5a0a13099719a613b0e29f5c856ec25c13:docs/operations/ask-native-source-proof-2026-10-09/24f-full-type-fail-source-before.json:sentry-access-token:1
+b16a2e5a0a13099719a613b0e29f5c856ec25c13:docs/operations/ask-native-source-proof-2026-10-09/24f-full-type-fail-source-end.json:generic-api-key:1
+b16a2e5a0a13099719a613b0e29f5c856ec25c13:docs/operations/ask-native-source-proof-2026-10-09/24f-full-type-fail-source-end.json:sentry-access-token:1
+b4c382e3785f001667f2e44b7028cd4d4de15e25:output/issue-528-audit-2026-10-08/proof.json:generic-api-key:22
+c3dbbb0e977a6d3725359d8f2dda7f6ddeb26279:src/__tests__/export-v3-and-outcomes.test.ts:generic-api-key:110
+c3dbbb0e977a6d3725359d8f2dda7f6ddeb26279:src/__tests__/export-v3-and-outcomes.test.ts:stripe-access-token:120
+cc0416f4462613effbae34b4ce17ea95c8edaaa5:output/issue-528-audit-2026-10-08/proof.json:generic-api-key:22
+da7758f38d1acf82fd3cd8974e06c0bc7946395c:src/__tests__/tracker-experiment.test.ts:generic-api-key:23
+fc9e42619f951161a1ae1ae626ad0d5af3bfefd4:src/__tests__/production-readiness-snapshot.test.ts:generic-api-key:131
+fc9e42619f951161a1ae1ae626ad0d5af3bfefd4:src/__tests__/production-readiness-snapshot.test.ts:stripe-access-token:230

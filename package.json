@@ -1,6 +1,6 @@
 {
   "name": "strelva",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@10.34.5",
   "scripts": {
@@ -59,7 +59,8 @@
     "test:qualification": "node --test scripts/tests/qualification.node-test.mjs",
     "check:supply-chain": "node scripts/check-supply-chain.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "test:supply-chain": "node --test scripts/tests/supply-chain.node-test.mjs"
+    "test:supply-chain": "node --test scripts/tests/supply-chain.node-test.mjs",
+    "check:migration-order": "node --test scripts/tests/migration-order.node-test.mjs && node scripts/check-migration-order.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",

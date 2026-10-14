@@ -62,7 +62,8 @@
       "expiresAt": "2026-10-23",
       "reason": "Existing unpatched stack-exhaustion advisory via ESLint fast-glob/micromatch; bounded to development audit, never a production exemption.",
       "source": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
-      "priorDecision": "docs/operations/reborn-integration-audit-2026-10-05.md"
+      "priorDecision": "docs/operations/reborn-integration-audit-2026-10-05.md",
+      "lastVerifiedAt": "2026-10-14"
     }
   ],
   "licenseClasses": {

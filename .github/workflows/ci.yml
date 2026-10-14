@@ -26,13 +26,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: pnpm
@@ -63,59 +63,45 @@ jobs:
           sudo install -d /usr/share/postgresql-common/pgdg
           sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-18
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-18 redis-server
           echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       - name: Install ripgrep (check scripts use rg)
         run: command -v rg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq ripgrep)
 
-      - name: Workspace ownership SQL
+      - name: Qualify PostgreSQL 18 tools
+        run: bash scripts/check-postgres-tools.sh >> "$GITHUB_PATH"
+
+      - name: Release gate policy regressions
+        run: node --test scripts/tests/release-gate-ci.node-test.mjs scripts/tests/supply-chain.node-test.mjs scripts/tests/temp-postgres-env.node-test.mjs
+      - name: Migration ordering
+        run: pnpm check:migration-order
+
+      - name: Workspace SQL and full ordered upgrade
         run: |
-          postgres_bin_dir="/opt/homebrew/opt/postgresql@18/bin"
-          [ -x "$postgres_bin_dir/initdb" ] || postgres_bin_dir="/usr/lib/postgresql/18/bin"
-          if [ ! -x "$postgres_bin_dir/initdb" ]; then
-            postgres_bin_dir="$(pg_config --bindir 2>/dev/null || true)"
-          fi
-          if [ -z "$postgres_bin_dir" ] || [ ! -x "$postgres_bin_dir/initdb" ]; then
-            echo "PostgreSQL server binaries are unavailable (need initdb, pg_ctl, postgres, psql)." >&2
-            exit 1
-          fi
-          for postgres_command in initdb pg_ctl postgres psql; do
-            if [ ! -x "$postgres_bin_dir/$postgres_command" ]; then
-              echo "PostgreSQL server command is unavailable: $postgres_command" >&2
-              exit 1
-            fi
-          done
-          export PATH="$postgres_bin_dir:$PATH"
           pnpm check:workspace-sql
+          pnpm check:workspace-upgrade
 
       - name: Test (with coverage gate)
         run: pnpm test:coverage
 
-      - name: Audit dependencies
-        # Fail only on actionable HIGH+ advisories. Plain `pnpm audit` fails on
-        # ANY transitive moderate/low (mostly Sanity-CLI/build-tooling deps not
-        # reachable in the production runtime), so it could never pass and kept
-        # CI permanently red. High+ are patched via pnpm overrides.
-        run: pnpm audit --audit-level high
+      - name: Audit dependencies and supply-chain policy
+        # Date-bounded development exception only; production HIGH+ always fails.
+        run: pnpm check:supply-chain
 
       - name: Build
         run: pnpm build
 
-      # The Playwright e2e smoke (~2.5 min, the most expensive part) runs only on a
-      # NON-DRAFT pull request. It skips draft-PR pushes (iterate cheaply — fast
-      # checks only) and main pushes (the PR already validated the same squashed
-      # tree). lint/typecheck/vitest/build above still run on every event. The
-      # ready_for_review activity is listed above so marking a draft ready runs the
-      # e2e gate before merge.
+      # Run browser gates on main pushes, manual runs, and ready PRs. Draft PRs
+      # retain the inexpensive checks above; ready_for_review enables browsers.
       - name: Cache Playwright browsers
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
         id: playwright-cache
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright browsers
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
         # On a cache hit only install the OS deps (fast); the ~100MB chromium
         # download is restored from cache. On a miss, install both.
         run: |
@@ -126,7 +112,7 @@ jobs:
           fi
 
       - name: Smoke tests
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
         # Runs against `next dev` (see playwright.config.ts), matching the
         # fixture-backed public/auth-gate route harness. It does not contact a
         # production provider. The webServer timeout is sized for cold
@@ -134,7 +120,7 @@ jobs:
         run: pnpm smoke
 
       - name: Workspace browser acceptance (fixture-backed)
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
         run: pnpm smoke:workspace
         env:
           CI: true
@@ -142,7 +128,7 @@ jobs:
           REB_DEV_UNGATED_ACCESS: "0"
 
       - name: Surface smoke
-        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.draft == false)
         # Ungated console coverage — needs the dev super-admin bypass ON
         # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces) to
         # reach the /admin console and resolve the owner dashboard, whereas the public

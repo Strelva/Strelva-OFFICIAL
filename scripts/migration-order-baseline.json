@@ -1,0 +1,1576 @@
+{
+  "source": "be68287b5",
+  "recordedAt": "2026-10-14",
+  "ceiling": "20261024800001",
+  "note": "Retained versions are immutable ordered identifiers, including future dates and historical invalid hours. New additions must use valid UTC timestamps above the ceiling. This inventory proves no production application.",
+  "migrations": [
+    {
+      "version": "20260618213606",
+      "name": "initial_schema"
+    },
+    {
+      "version": "20260618224329",
+      "name": "schema_completeness"
+    },
+    {
+      "version": "20260618230459",
+      "name": "drop_legacy_stub"
+    },
+    {
+      "version": "20260619120000",
+      "name": "auth_provisioning_trigger"
+    },
+    {
+      "version": "20260619130000",
+      "name": "fix_provisioning_email_confirm"
+    },
+    {
+      "version": "20260619140000",
+      "name": "rls"
+    },
+    {
+      "version": "20260620120000",
+      "name": "cms_collections_reviews_suggestions"
+    },
+    {
+      "version": "20260713194947",
+      "name": "atomic_site_metric_increment"
+    },
+    {
+      "version": "20260713201159",
+      "name": "harden_database_security_boundaries"
+    },
+    {
+      "version": "20260714170959",
+      "name": "add_tenant_commercial_plan"
+    },
+    {
+      "version": "20260714183000",
+      "name": "align_domain_identifier_types"
+    },
+    {
+      "version": "20260714200746",
+      "name": "onboarding_firebreak"
+    },
+    {
+      "version": "20260714203408",
+      "name": "domain_uniqueness_real_columns"
+    },
+    {
+      "version": "20260714205130",
+      "name": "lifecycle_check_constraints"
+    },
+    {
+      "version": "20260714210000",
+      "name": "governed_work_tables"
+    },
+    {
+      "version": "20260715150000",
+      "name": "identity_spine_expand"
+    },
+    {
+      "version": "20260715160000",
+      "name": "tenant_slug_on_update_cascade"
+    },
+    {
+      "version": "20260719200000",
+      "name": "add_tenant_billing_type"
+    },
+    {
+      "version": "20260722210000",
+      "name": "site_metric_summary"
+    },
+    {
+      "version": "20260729180000",
+      "name": "org_layer_phase0_accounts"
+    },
+    {
+      "version": "20260802120000",
+      "name": "report_snapshots"
+    },
+    {
+      "version": "20260905190000",
+      "name": "release_one_workspaces"
+    },
+    {
+      "version": "20260908120000",
+      "name": "workspace_result_recovery"
+    },
+    {
+      "version": "20260908150000",
+      "name": "enterprise_customers"
+    },
+    {
+      "version": "20260911100000",
+      "name": "inquiry_capability_workspace"
+    },
+    {
+      "version": "20260911150000",
+      "name": "tracker_work_updates"
+    },
+    {
+      "version": "20260911200000",
+      "name": "job_economics"
+    },
+    {
+      "version": "20260911210000",
+      "name": "document_work"
+    },
+    {
+      "version": "20260911220000",
+      "name": "work_plan_output_execution"
+    },
+    {
+      "version": "20260912010000",
+      "name": "budgeted_execution"
+    },
+    {
+      "version": "20260912110000",
+      "name": "bounded_product_work"
+    },
+    {
+      "version": "20260912120000",
+      "name": "work_context_participation"
+    },
+    {
+      "version": "20260912143000",
+      "name": "product_learning_work"
+    },
+    {
+      "version": "20260912160000",
+      "name": "work_responsibilities"
+    },
+    {
+      "version": "20260912180000",
+      "name": "work_plan_application_output"
+    },
+    {
+      "version": "20260912190000",
+      "name": "tracker_record_coordination"
+    },
+    {
+      "version": "20260912200000",
+      "name": "tracker_handoff_isolation"
+    },
+    {
+      "version": "20260914010000",
+      "name": "handoff_destinations"
+    },
+    {
+      "version": "20260914020000",
+      "name": "application_releases"
+    },
+    {
+      "version": "20260914021000",
+      "name": "application_source_updates"
+    },
+    {
+      "version": "20260914030000",
+      "name": "application_use_access"
+    },
+    {
+      "version": "20260914040000",
+      "name": "standing_responsibilities"
+    },
+    {
+      "version": "20260914041000",
+      "name": "standing_execution"
+    },
+    {
+      "version": "20260915010000",
+      "name": "offering_installations"
+    },
+    {
+      "version": "20260915030000",
+      "name": "operational_assignments"
+    },
+    {
+      "version": "20260915040000",
+      "name": "work_allowances"
+    },
+    {
+      "version": "20260915050000",
+      "name": "agent_access"
+    },
+    {
+      "version": "20260915060000",
+      "name": "offering_websites"
+    },
+    {
+      "version": "20260918010000",
+      "name": "provider_delivery"
+    },
+    {
+      "version": "20260918120000",
+      "name": "public_continuation_imports"
+    },
+    {
+      "version": "20260918130000",
+      "name": "workspace_invitations"
+    },
+    {
+      "version": "20260918140000",
+      "name": "workspace_payer_transitions"
+    },
+    {
+      "version": "20260918150000",
+      "name": "workspace_exports"
+    },
+    {
+      "version": "20260919010000",
+      "name": "service_requests"
+    },
+    {
+      "version": "20260919020000",
+      "name": "application_select_fields"
+    },
+    {
+      "version": "20260920010000",
+      "name": "application_date_fields"
+    },
+    {
+      "version": "20260920010100",
+      "name": "application_record_edits"
+    },
+    {
+      "version": "20260920010200",
+      "name": "application_edit_field_preservation"
+    },
+    {
+      "version": "20260920020000",
+      "name": "onboarding_work"
+    },
+    {
+      "version": "20260920020100",
+      "name": "onboarding_attachment_immutability"
+    },
+    {
+      "version": "20260920030000",
+      "name": "agency_provider_delivery"
+    },
+    {
+      "version": "20260920030100",
+      "name": "agency_work_access"
+    },
+    {
+      "version": "20260920030200",
+      "name": "agency_application_draft_authority"
+    },
+    {
+      "version": "20260920030201",
+      "name": "agency_application_draft_authority_fix"
+    },
+    {
+      "version": "20260920040000",
+      "name": "offering_inquiry_workspace"
+    },
+    {
+      "version": "20260920050000",
+      "name": "custom_application_lifecycle"
+    },
+    {
+      "version": "20260920050100",
+      "name": "custom_application_economics"
+    },
+    {
+      "version": "20260920060000",
+      "name": "content_version_request_id"
+    },
+    {
+      "version": "20260920060100",
+      "name": "content_version_request_index"
+    },
+    {
+      "version": "20260920070000",
+      "name": "workspace_calendar_connections"
+    },
+    {
+      "version": "20260920070100",
+      "name": "workspace_calendar_event_receipts"
+    },
+    {
+      "version": "20260920080000",
+      "name": "subscription_allowance_entitlements"
+    },
+    {
+      "version": "20260920080100",
+      "name": "trusted_provider_receipts"
+    },
+    {
+      "version": "20260920080200",
+      "name": "precise_provider_receipts"
+    },
+    {
+      "version": "20260920100000",
+      "name": "workspace_exit"
+    },
+    {
+      "version": "20260920100100",
+      "name": "workspace_export_v2"
+    },
+    {
+      "version": "20260920100200",
+      "name": "workspace_exit_export_boundaries"
+    },
+    {
+      "version": "20260920110000",
+      "name": "inquiry_workspace_exit"
+    },
+    {
+      "version": "20260920120000",
+      "name": "websites"
+    },
+    {
+      "version": "20260920121000",
+      "name": "agency_managed_website_draft_authority"
+    },
+    {
+      "version": "20260920122000",
+      "name": "public_website_bookings"
+    },
+    {
+      "version": "20260920123000",
+      "name": "public_website_booking_fingerprints"
+    },
+    {
+      "version": "20260921173000",
+      "name": "service_delivery_commitments"
+    },
+    {
+      "version": "20260921220000",
+      "name": "customer_business_entry"
+    },
+    {
+      "version": "20260928130000",
+      "name": "business_effort_minutes"
+    },
+    {
+      "version": "20260930120000",
+      "name": "revoke_public_execute_internal_functions"
+    },
+    {
+      "version": "20261001120000",
+      "name": "website_documents"
+    },
+    {
+      "version": "20261001130000",
+      "name": "domain_registration_attempt"
+    },
+    {
+      "version": "20261001140000",
+      "name": "agency_website_document_drafts"
+    },
+    {
+      "version": "20261002120000",
+      "name": "business_record"
+    },
+    {
+      "version": "20261004120000",
+      "name": "systems"
+    },
+    {
+      "version": "20261005090000",
+      "name": "tenant_leads"
+    },
+    {
+      "version": "20261005100000",
+      "name": "restrict_legacy_tenant_client_access"
+    },
+    {
+      "version": "20261005120000",
+      "name": "workspace_authority_helpers"
+    },
+    {
+      "version": "20261005120100",
+      "name": "workspace_authority_write_rpcs"
+    },
+    {
+      "version": "20261007100000",
+      "name": "atomic_tenant_teardown"
+    },
+    {
+      "version": "20261007101000",
+      "name": "provider_website_launch_authority"
+    },
+    {
+      "version": "20261007110000",
+      "name": "business_ownership"
+    },
+    {
+      "version": "20261007120000",
+      "name": "needs_you"
+    },
+    {
+      "version": "20261007130000",
+      "name": "workspace_release_flags"
+    },
+    {
+      "version": "20261007140000",
+      "name": "model_call_log"
+    },
+    {
+      "version": "20261007150000",
+      "name": "system_versions"
+    },
+    {
+      "version": "20261007150100",
+      "name": "agency_client_overview"
+    },
+    {
+      "version": "20261007150200",
+      "name": "platform_agency_workspace"
+    },
+    {
+      "version": "20261007155000",
+      "name": "make_real_activations"
+    },
+    {
+      "version": "20261007160000",
+      "name": "operator_queue"
+    },
+    {
+      "version": "20261007160100",
+      "name": "business_effort_tenant_links"
+    },
+    {
+      "version": "20261007170000",
+      "name": "workspace_account_bindings"
+    },
+    {
+      "version": "20261007180000",
+      "name": "business_billing"
+    },
+    {
+      "version": "20261007181000",
+      "name": "tenant_client_records"
+    },
+    {
+      "version": "20261007182000",
+      "name": "workspace_export_v3"
+    },
+    {
+      "version": "20261007183000",
+      "name": "business_outcomes"
+    },
+    {
+      "version": "20261007190000",
+      "name": "document_revisions"
+    },
+    {
+      "version": "20261007190100",
+      "name": "onboarding_revisions"
+    },
+    {
+      "version": "20261007190200",
+      "name": "application_version_history"
+    },
+    {
+      "version": "20261007192000",
+      "name": "make_systems_authority"
+    },
+    {
+      "version": "20261007192100",
+      "name": "internal_tool_links"
+    },
+    {
+      "version": "20261007194000",
+      "name": "tenant_report_and_analytics_state"
+    },
+    {
+      "version": "20261008110000",
+      "name": "ask_conversations"
+    },
+    {
+      "version": "20261008111000",
+      "name": "website_change_receipts"
+    },
+    {
+      "version": "20261008123000",
+      "name": "listing_readback_queue"
+    },
+    {
+      "version": "20261008124000",
+      "name": "needs_you_policy_settings"
+    },
+    {
+      "version": "20261008130000",
+      "name": "system_possibilities"
+    },
+    {
+      "version": "20261008131000",
+      "name": "make_real_live"
+    },
+    {
+      "version": "20261008140000",
+      "name": "tenant_lead_reads"
+    },
+    {
+      "version": "20261008141000",
+      "name": "booking_store"
+    },
+    {
+      "version": "20261008150000",
+      "name": "website_linked_tenant_publication"
+    },
+    {
+      "version": "20261008150100",
+      "name": "website_domain_owner_approval"
+    },
+    {
+      "version": "20261008151000",
+      "name": "connected_sites"
+    },
+    {
+      "version": "20261008160000",
+      "name": "convert_separate_business"
+    },
+    {
+      "version": "20261008161000",
+      "name": "release_flags_agency_workspaces"
+    },
+    {
+      "version": "20261009100000",
+      "name": "strelva_service_actor"
+    },
+    {
+      "version": "20261009110000",
+      "name": "booking_lifecycle"
+    },
+    {
+      "version": "20261009113000",
+      "name": "inquiry_records"
+    },
+    {
+      "version": "20261009130000",
+      "name": "strelva_handled_decisions"
+    },
+    {
+      "version": "20261009131000",
+      "name": "make_real_owner_link"
+    },
+    {
+      "version": "20261009140000",
+      "name": "make_real_owner_link_flag"
+    },
+    {
+      "version": "20261009150000",
+      "name": "reader_rpc_volatility"
+    },
+    {
+      "version": "20261009151000",
+      "name": "provider_seats"
+    },
+    {
+      "version": "20261009152000",
+      "name": "agency_verifications"
+    },
+    {
+      "version": "20261009153000",
+      "name": "platform_service_actor"
+    },
+    {
+      "version": "20261009154000",
+      "name": "payer_party"
+    },
+    {
+      "version": "20261009160000",
+      "name": "business_effort_coverage"
+    },
+    {
+      "version": "20261010100000",
+      "name": "owner_invitation_claim"
+    },
+    {
+      "version": "20261010102000",
+      "name": "owner_decision_links"
+    },
+    {
+      "version": "20261010102100",
+      "name": "website_owner_link_launch"
+    },
+    {
+      "version": "20261010103000",
+      "name": "ask_business_fact_drafts"
+    },
+    {
+      "version": "20261010104000",
+      "name": "owner_decision_website_preview"
+    },
+    {
+      "version": "20261010110000",
+      "name": "website_cutover_undo"
+    },
+    {
+      "version": "20261010113000",
+      "name": "website_system_releases"
+    },
+    {
+      "version": "20261010114000",
+      "name": "website_domain_requests"
+    },
+    {
+      "version": "20261010115000",
+      "name": "website_model_admission"
+    },
+    {
+      "version": "20261010115500",
+      "name": "website_business_facts"
+    },
+    {
+      "version": "20261010115700",
+      "name": "website_native_fact_reviews"
+    },
+    {
+      "version": "20261010120000",
+      "name": "inquiry_workspace_replies"
+    },
+    {
+      "version": "20261010121000",
+      "name": "inquiry_outcome_proof"
+    },
+    {
+      "version": "20261010122000",
+      "name": "inquiry_weekly_outcomes"
+    },
+    {
+      "version": "20261010123000",
+      "name": "inquiry_context_notices"
+    },
+    {
+      "version": "20261010124000",
+      "name": "connected_inquiry_records"
+    },
+    {
+      "version": "20261010125000",
+      "name": "inquiry_urgent_decisions"
+    },
+    {
+      "version": "20261010125500",
+      "name": "inquiry_inbox"
+    },
+    {
+      "version": "20261010125600",
+      "name": "inquiry_reply_purpose"
+    },
+    {
+      "version": "20261010125700",
+      "name": "inquiry_cache_presence"
+    },
+    {
+      "version": "20261010125800",
+      "name": "connected_inquiry_owner_notices"
+    },
+    {
+      "version": "20261010125900",
+      "name": "inquiry_export_before_teardown"
+    },
+    {
+      "version": "20261010125910",
+      "name": "inquiry_decision_notice_claims"
+    },
+    {
+      "version": "20261010125915",
+      "name": "inquiry_decision_notice_events"
+    },
+    {
+      "version": "20261010125920",
+      "name": "tenant_lead_parity_completeness"
+    },
+    {
+      "version": "20261010125925",
+      "name": "inquiry_member_replies"
+    },
+    {
+      "version": "20261010125930",
+      "name": "inquiry_business_facts"
+    },
+    {
+      "version": "20261010125935",
+      "name": "inquiry_operator_authority"
+    },
+    {
+      "version": "20261010125940",
+      "name": "inquiry_booking_handoff"
+    },
+    {
+      "version": "20261010125950",
+      "name": "inquiry_operator_review"
+    },
+    {
+      "version": "20261010125955",
+      "name": "inquiry_operator_revocation"
+    },
+    {
+      "version": "20261010130000",
+      "name": "booking_parity"
+    },
+    {
+      "version": "20261010131000",
+      "name": "booking_access"
+    },
+    {
+      "version": "20261010132000",
+      "name": "booking_updates"
+    },
+    {
+      "version": "20261010133000",
+      "name": "booking_calendar_mirror"
+    },
+    {
+      "version": "20261010134000",
+      "name": "booking_inquiry_offers"
+    },
+    {
+      "version": "20261010135000",
+      "name": "booking_setup"
+    },
+    {
+      "version": "20261010135500",
+      "name": "booking_receipt_history"
+    },
+    {
+      "version": "20261010135900",
+      "name": "booking_receipt_lifecycle"
+    },
+    {
+      "version": "20261010135910",
+      "name": "booking_owner_evidence"
+    },
+    {
+      "version": "20261010135920",
+      "name": "booking_service_policies"
+    },
+    {
+      "version": "20261010135940",
+      "name": "booking_manual"
+    },
+    {
+      "version": "20261010135945",
+      "name": "booking_cancellation_cutoff"
+    },
+    {
+      "version": "20261010135950",
+      "name": "booking_calendar_health"
+    },
+    {
+      "version": "20261010135955",
+      "name": "booking_exit_admission"
+    },
+    {
+      "version": "20261010135956",
+      "name": "booking_native_workspace"
+    },
+    {
+      "version": "20261010140000",
+      "name": "google_listing_controls"
+    },
+    {
+      "version": "20261010141000",
+      "name": "publishing_release_flags"
+    },
+    {
+      "version": "20261010142000",
+      "name": "workspace_publishing_content"
+    },
+    {
+      "version": "20261010143000",
+      "name": "publishing_reconnect"
+    },
+    {
+      "version": "20261010150000",
+      "name": "internal_tool_submit_notices"
+    },
+    {
+      "version": "20261010150100",
+      "name": "internal_tool_use_links"
+    },
+    {
+      "version": "20261010150200",
+      "name": "internal_tool_notice_delivery"
+    },
+    {
+      "version": "20261010150300",
+      "name": "catalog_tool_evidence"
+    },
+    {
+      "version": "20261010150400",
+      "name": "internal_tool_use_edits"
+    },
+    {
+      "version": "20261010152000",
+      "name": "catalog_report_receipts"
+    },
+    {
+      "version": "20261010153000",
+      "name": "newsletter_contacts"
+    },
+    {
+      "version": "20261010154000",
+      "name": "system_work_plan_authority"
+    },
+    {
+      "version": "20261010155000",
+      "name": "failed_system_plan_request"
+    },
+    {
+      "version": "20261010155100",
+      "name": "internal_tool_member_submit"
+    },
+    {
+      "version": "20261010155200",
+      "name": "internal_tool_use_link_labels"
+    },
+    {
+      "version": "20261010160000",
+      "name": "agency_authoring"
+    },
+    {
+      "version": "20261010161000",
+      "name": "operator_google_attempts"
+    },
+    {
+      "version": "20261010161100",
+      "name": "operator_effort_context"
+    },
+    {
+      "version": "20261010161200",
+      "name": "operator_content_receipts"
+    },
+    {
+      "version": "20261010161300",
+      "name": "review_reply_reservations"
+    },
+    {
+      "version": "20261010161400",
+      "name": "operator_complete_sources"
+    },
+    {
+      "version": "20261010162000",
+      "name": "complete_client_record_stores"
+    },
+    {
+      "version": "20261010162100",
+      "name": "tenant_receipt_retention"
+    },
+    {
+      "version": "20261010162200",
+      "name": "inquiry_delivery_records"
+    },
+    {
+      "version": "20261010163000",
+      "name": "agency_operator_overview"
+    },
+    {
+      "version": "20261010163100",
+      "name": "version_management"
+    },
+    {
+      "version": "20261010163200",
+      "name": "version_owner_grants"
+    },
+    {
+      "version": "20261010163300",
+      "name": "version_native_applications"
+    },
+    {
+      "version": "20261010163400",
+      "name": "version_sibling_changes"
+    },
+    {
+      "version": "20261010164000",
+      "name": "finite_job_adapters"
+    },
+    {
+      "version": "20261010165000",
+      "name": "tenant_business_context"
+    },
+    {
+      "version": "20261010165500",
+      "name": "business_portability"
+    },
+    {
+      "version": "20261010165600",
+      "name": "exit_handoff_evidence"
+    },
+    {
+      "version": "20261010165700",
+      "name": "export_recovery"
+    },
+    {
+      "version": "20261010165800",
+      "name": "unbounded_export_archive"
+    },
+    {
+      "version": "20261010165900",
+      "name": "export_build_access"
+    },
+    {
+      "version": "20261010170000",
+      "name": "deprovision_retained_after_inquiry_export"
+    },
+    {
+      "version": "20261011100000",
+      "name": "workspace_newsletter_sender"
+    },
+    {
+      "version": "20261011100100",
+      "name": "newsletter_backfill_identity"
+    },
+    {
+      "version": "20261011101000",
+      "name": "business_booking_email"
+    },
+    {
+      "version": "20261011102000",
+      "name": "native_publishing_targets"
+    },
+    {
+      "version": "20261011120000",
+      "name": "business_policies"
+    },
+    {
+      "version": "20261011133700",
+      "name": "business_facts_owner_decision"
+    },
+    {
+      "version": "20261011140000",
+      "name": "agent_booking_visibility"
+    },
+    {
+      "version": "20261011150000",
+      "name": "public_booking_admission"
+    },
+    {
+      "version": "20261011153000",
+      "name": "operator_owner_decisions"
+    },
+    {
+      "version": "20261011160000",
+      "name": "agency_team"
+    },
+    {
+      "version": "20261011170000",
+      "name": "agency_prospects"
+    },
+    {
+      "version": "20261011180000",
+      "name": "provider_disconnect_receipts"
+    },
+    {
+      "version": "20261012010000",
+      "name": "tenant_track_signing_keys"
+    },
+    {
+      "version": "20261012110000",
+      "name": "business_pages"
+    },
+    {
+      "version": "20261012120000",
+      "name": "track_signing_key_rotation"
+    },
+    {
+      "version": "20261012180000",
+      "name": "agency_brand"
+    },
+    {
+      "version": "20261013110000",
+      "name": "public_facts_read_confirmed"
+    },
+    {
+      "version": "20261013115000",
+      "name": "booking_reads_confirmed_facts"
+    },
+    {
+      "version": "20261013120000",
+      "name": "owner_recipient_trust"
+    },
+    {
+      "version": "20261013130000",
+      "name": "ask_confirms_owner_facts"
+    },
+    {
+      "version": "20261013210000",
+      "name": "agent_booking_admission"
+    },
+    {
+      "version": "20261013220000",
+      "name": "provider_seat_tenant_conversion"
+    },
+    {
+      "version": "20261013230000",
+      "name": "readonly_reader_authority"
+    },
+    {
+      "version": "20261014030000",
+      "name": "make_real_compensation_claims"
+    },
+    {
+      "version": "20261014100000",
+      "name": "client_resource_mandates"
+    },
+    {
+      "version": "20261014110000",
+      "name": "owner_decision_effects"
+    },
+    {
+      "version": "20261014112000",
+      "name": "acting_provider_gates"
+    },
+    {
+      "version": "20261014120000",
+      "name": "legacy_calendar_revoke_result"
+    },
+    {
+      "version": "20261015100000",
+      "name": "agency_add_client"
+    },
+    {
+      "version": "20261015110000",
+      "name": "super_admin_grants"
+    },
+    {
+      "version": "20261015111000",
+      "name": "website_owner_agency_publish"
+    },
+    {
+      "version": "20261016110000",
+      "name": "operator_action_approvals"
+    },
+    {
+      "version": "20261017110000",
+      "name": "inquiry_lead_retention"
+    },
+    {
+      "version": "20261017111000",
+      "name": "inquiry_retention_lifecycle"
+    },
+    {
+      "version": "20261017120000",
+      "name": "owner_decision_operator_refusal"
+    },
+    {
+      "version": "20261018110000",
+      "name": "provider_seat_website_access"
+    },
+    {
+      "version": "20261018120000",
+      "name": "connected_site_schema_conflicts"
+    },
+    {
+      "version": "20261018130000",
+      "name": "provider_seat_readonly_website_authority"
+    },
+    {
+      "version": "20261018131000",
+      "name": "owner_decision_runtime_authority"
+    },
+    {
+      "version": "20261019100000",
+      "name": "actor_rpc_service_boundary"
+    },
+    {
+      "version": "20261020090000",
+      "name": "allowance_payer_parties"
+    },
+    {
+      "version": "20261020090001",
+      "name": "payer_transition_controls"
+    },
+    {
+      "version": "20261020090002",
+      "name": "agency_billing_accounts"
+    },
+    {
+      "version": "20261020090003",
+      "name": "agency_billing_intents"
+    },
+    {
+      "version": "20261020090004",
+      "name": "agency_billing_receipt_terms"
+    },
+    {
+      "version": "20261020090005",
+      "name": "allowance_payer_writer_authority"
+    },
+    {
+      "version": "20261020090006",
+      "name": "connect_money"
+    },
+    {
+      "version": "20261020090007",
+      "name": "revenue_splits"
+    },
+    {
+      "version": "20261020090008",
+      "name": "provider_change_money_export"
+    },
+    {
+      "version": "20261020090009",
+      "name": "payment_requests"
+    },
+    {
+      "version": "20261020090010",
+      "name": "money_reconciliation"
+    },
+    {
+      "version": "20261020090011",
+      "name": "collection_and_payout_reservations"
+    },
+    {
+      "version": "20261020090012",
+      "name": "invoice_payer_receipts"
+    },
+    {
+      "version": "20261020090013",
+      "name": "recovery_payouts"
+    },
+    {
+      "version": "20261020090014",
+      "name": "reconciliation_reviews"
+    },
+    {
+      "version": "20261020090015",
+      "name": "sandbox_build_evidence"
+    },
+    {
+      "version": "20261020090016",
+      "name": "agent_inquiries"
+    },
+    {
+      "version": "20261020090017",
+      "name": "agent_profile"
+    },
+    {
+      "version": "20261020090018",
+      "name": "agent_oauth"
+    },
+    {
+      "version": "20261020090019",
+      "name": "agent_channel_policy"
+    },
+    {
+      "version": "20261020090020",
+      "name": "agent_confirmed_provenance"
+    },
+    {
+      "version": "20261020090021",
+      "name": "creator_packages"
+    },
+    {
+      "version": "20261020090022",
+      "name": "package_install_scope"
+    },
+    {
+      "version": "20261020090023",
+      "name": "offering_source_versions"
+    },
+    {
+      "version": "20261020090024",
+      "name": "package_management"
+    },
+    {
+      "version": "20261020090025",
+      "name": "system_bundles"
+    },
+    {
+      "version": "20261020090026",
+      "name": "package_readonly_authority"
+    },
+    {
+      "version": "20261020090027",
+      "name": "bundle_native_lifecycle"
+    },
+    {
+      "version": "20261020090028",
+      "name": "recurring_responsibilities"
+    },
+    {
+      "version": "20261020090029",
+      "name": "calendar_revoke_compatibility"
+    },
+    {
+      "version": "20261020090030",
+      "name": "money_export_readonly_authority"
+    },
+    {
+      "version": "20261020090031",
+      "name": "provider_change_cancel"
+    },
+    {
+      "version": "20261020090032",
+      "name": "responsibility_month_evidence"
+    },
+    {
+      "version": "20261020090033",
+      "name": "business_attributions"
+    },
+    {
+      "version": "20261020090034",
+      "name": "split_attribution_receipts"
+    },
+    {
+      "version": "20261020090035",
+      "name": "creator_maintenance_identity"
+    },
+    {
+      "version": "20261020090036",
+      "name": "bundle_maintenance"
+    },
+    {
+      "version": "20261020090037",
+      "name": "provider_completion_cleanup"
+    },
+    {
+      "version": "20261020090038",
+      "name": "newsletter_backfill_audit"
+    },
+    {
+      "version": "20261020090039",
+      "name": "platform_operator_read_audit"
+    },
+    {
+      "version": "20261020090040",
+      "name": "neutral_service_requests"
+    },
+    {
+      "version": "20261020111000",
+      "name": "audit_service_role_append_only"
+    },
+    {
+      "version": "20261021090031",
+      "name": "agent_booking_outcomes"
+    },
+    {
+      "version": "20261021091000",
+      "name": "access_review"
+    },
+    {
+      "version": "20261021093000",
+      "name": "agency_release_flag_ceiling"
+    },
+    {
+      "version": "20261021094000",
+      "name": "provider_client_queue"
+    },
+    {
+      "version": "20261021095000",
+      "name": "native_business_billing_home"
+    },
+    {
+      "version": "20261021096000",
+      "name": "agency_release_flag_lock_order"
+    },
+    {
+      "version": "20261021100000",
+      "name": "investigation_paged_history"
+    },
+    {
+      "version": "20261021100100",
+      "name": "order_external_identity"
+    },
+    {
+      "version": "20261021100200",
+      "name": "google_receipt_key_read"
+    },
+    {
+      "version": "20261021100300",
+      "name": "investigation_history_export"
+    },
+    {
+      "version": "20261021100400",
+      "name": "google_make_real_flag"
+    },
+    {
+      "version": "20261021100500",
+      "name": "google_grant_generation"
+    },
+    {
+      "version": "20261021100600",
+      "name": "google_receipt_intent"
+    },
+    {
+      "version": "20261021100700",
+      "name": "google_provider_payload_retention"
+    },
+    {
+      "version": "20261021100800",
+      "name": "tenant_connection_generation"
+    },
+    {
+      "version": "20261021100900",
+      "name": "google_review_content_retention"
+    },
+    {
+      "version": "20261021101000",
+      "name": "google_make_real_service_authority"
+    },
+    {
+      "version": "20261021110000",
+      "name": "enterprise_units"
+    },
+    {
+      "version": "20261021111000",
+      "name": "enterprise_standards"
+    },
+    {
+      "version": "20261021112000",
+      "name": "home_finder_native"
+    },
+    {
+      "version": "20261021112100",
+      "name": "enterprise_home_finder_portability"
+    },
+    {
+      "version": "20261021112200",
+      "name": "home_finder_configuration"
+    },
+    {
+      "version": "20261021130000",
+      "name": "agent_payment_attempt_readback"
+    },
+    {
+      "version": "20261021130100",
+      "name": "custom_sandbox_runtime_qualification"
+    },
+    {
+      "version": "20261021131000",
+      "name": "agent_oauth_connection_context"
+    },
+    {
+      "version": "20261021131100",
+      "name": "agent_oauth_renewable"
+    },
+    {
+      "version": "20261021131200",
+      "name": "agent_website_tools"
+    },
+    {
+      "version": "20261021132000",
+      "name": "money_effect_admission"
+    },
+    {
+      "version": "20261021132100",
+      "name": "agent_payment_exit_admission"
+    },
+    {
+      "version": "20261021140000",
+      "name": "native_google_lifecycle"
+    },
+    {
+      "version": "20261021140100",
+      "name": "native_google_hash_portability"
+    },
+    {
+      "version": "20261021140200",
+      "name": "native_google_recovery_receipt_grouping"
+    },
+    {
+      "version": "20261021181000",
+      "name": "application_actor_snapshots"
+    },
+    {
+      "version": "20261022090000",
+      "name": "guarded_tenant_teardown"
+    },
+    {
+      "version": "20261022090100",
+      "name": "tenant_cleanup_receipts"
+    },
+    {
+      "version": "20261022120000",
+      "name": "agency_created_application_authority"
+    },
+    {
+      "version": "20261022123000",
+      "name": "private_definition_versions"
+    },
+    {
+      "version": "20261022130000",
+      "name": "tenant_newsletter_teardown_hold"
+    },
+    {
+      "version": "20261022170000",
+      "name": "creator_maintenance_operations"
+    },
+    {
+      "version": "20261022171000",
+      "name": "checkout_final_admission"
+    },
+    {
+      "version": "20261022172000",
+      "name": "governed_money_operations"
+    },
+    {
+      "version": "20261022173000",
+      "name": "neutral_creator_version_money"
+    },
+    {
+      "version": "20261022174000",
+      "name": "private_source_exit_admission"
+    },
+    {
+      "version": "20261022174500",
+      "name": "private_source_exit_lock_order"
+    },
+    {
+      "version": "20261022175000",
+      "name": "reward_durable_mutations"
+    },
+    {
+      "version": "20261022175050",
+      "name": "legacy_google_creation_defaults"
+    },
+    {
+      "version": "20261022175100",
+      "name": "legacy_google_operation_authority"
+    },
+    {
+      "version": "20261022182000",
+      "name": "booking_settings_atomic_patch"
+    },
+    {
+      "version": "20261022183000",
+      "name": "lifetime_system_kind"
+    },
+    {
+      "version": "20261022190000",
+      "name": "agency_client_read_projection"
+    },
+    {
+      "version": "20261023103000",
+      "name": "coherence_agency_library"
+    },
+    {
+      "version": "20261023123000",
+      "name": "public_booking_confirmation_identity"
+    },
+    {
+      "version": "20261023123500",
+      "name": "public_payment_business_identity"
+    },
+    {
+      "version": "20261023130000",
+      "name": "provider_change_actor_privacy"
+    },
+    {
+      "version": "20261023140000",
+      "name": "two_doors_agency_requests"
+    },
+    {
+      "version": "20261023141000",
+      "name": "two_doors_owner_makes_systems"
+    },
+    {
+      "version": "20261023142000",
+      "name": "two_doors_bring_in_an_agency"
+    },
+    {
+      "version": "20261023143000",
+      "name": "two_doors_business_ai_budget"
+    },
+    {
+      "version": "20261023144000",
+      "name": "two_doors_funnel_events"
+    },
+    {
+      "version": "20261023200000",
+      "name": "tenant_review_approval_continuity"
+    },
+    {
+      "version": "20261024121000",
+      "name": "ux_trust_email_context"
+    },
+    {
+      "version": "20261024121500",
+      "name": "ux_trust_ui_ai_budget_reservations"
+    },
+    {
+      "version": "20261024122000",
+      "name": "ux_owner_setup_ask"
+    },
+    {
+      "version": "20261024122300",
+      "name": "ux_owner_agency_access"
+    },
+    {
+      "version": "20261024122400",
+      "name": "ux_owner_export_history"
+    },
+    {
+      "version": "20261024122500",
+      "name": "ux_agency_qualification"
+    },
+    {
+      "version": "20261024123100",
+      "name": "ux_agency_full_control_decisions"
+    },
+    {
+      "version": "20261024123500",
+      "name": "ux_chrome_recorded_actors"
+    },
+    {
+      "version": "20261024123600",
+      "name": "ux_chrome_ask_receipt_identity"
+    },
+    {
+      "version": "20261024124500",
+      "name": "ux_visitor_booking_receipts"
+    },
+    {
+      "version": "20261024124600",
+      "name": "ux_visitor_payment_terms"
+    },
+    {
+      "version": "20261024124700",
+      "name": "ux_integration_booking_actor"
+    },
+    {
+      "version": "20261024131000",
+      "name": "ux_owner2_checkout"
+    },
+    {
+      "version": "20261024131100",
+      "name": "ux_owner2_payment_terms"
+    },
+    {
+      "version": "20261024132000",
+      "name": "ux_agency_proposal_identity"
+    },
+    {
+      "version": "20261024132100",
+      "name": "ux_agency_native_pages"
+    },
+    {
+      "version": "20261024132400",
+      "name": "ux_agency2_decision_recovery"
+    },
+    {
+      "version": "20261024200000",
+      "name": "agency_client_import"
+    },
+    {
+      "version": "20261024300000",
+      "name": "claim_review"
+    },
+    {
+      "version": "20261024400000",
+      "name": "google_found_facts_and_read_grant"
+    },
+    {
+      "version": "20261024500000",
+      "name": "inquiry_forwarding"
+    },
+    {
+      "version": "20261024600000",
+      "name": "agency_source_connections"
+    },
+    {
+      "version": "20261024710000",
+      "name": "publishing_reconnect_account_match"
+    },
+    {
+      "version": "20261024800001",
+      "name": "provider_health_alerts"
+    }
+  ]
+}

@@ -24,8 +24,9 @@ function workspaceResponse() {
   return {
     actor: { email: "owner@example.com", localPreview: false },
     workspaceId,
-    workspaces: [{ id: workspaceId, name: "Harbor Plumbing", kind: "customer", access: "member" }],
+    workspaces: [{ id: workspaceId, name: "Harbor Plumbing", kind: "customer", access: "member", role: "owner" }],
     work: [{ id: workId, workspaceId, title: initialSpec.title, productId: "applications", resourceKind: "application", payload: null, input: {}, createdAt: at }],
+    canMakeSystems: true,
     handoffs: [],
     delegations: [],
     products: [{ id: "applications", name: "Applications", description: "Local proof", availability: "available" }],
@@ -239,17 +240,20 @@ test("review fixture connects a prepared request result, owner use, employee use
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
   await expect(page.getByRole("heading", { name: "Equipment requests", exact: true })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
   const firstReview = page.locator("details").filter({ hasText: "Review changes" });
   await expect(firstReview).toBeVisible();
   await expect(firstReview.getByText("This is the first proposed draft. Review it before publishing.", { exact: true })).toBeVisible();
   await firstReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(firstReview.getByText("Checks for draft 1", { exact: true })).toBeVisible();
-  await firstReview.getByRole("button", { name: "Publish", exact: true }).click();
+  await firstReview.getByRole("button", { name: "Make it live", exact: true }).click();
   await expect(page.getByText(/Release 1 is live/)).toBeVisible();
 
+  await page.getByRole("tab", { name: "Use", exact: true }).click();
   await page.getByLabel("Equipment needed", { exact: true }).fill("Pipe inspection camera");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(page.getByText("Pipe inspection camera", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Sharing", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Give someone a link", exact: true })).toBeVisible();
   await page.getByLabel("Recipient email", { exact: true }).fill("employee@example.com");
   await page.getByRole("button", { name: "Issue access link", exact: true }).click();
@@ -264,7 +268,8 @@ test("review fixture connects a prepared request result, owner use, employee use
   await expect(page.getByText("Replacement pipe cutter", { exact: true })).toBeVisible();
 
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
-  await page.getByText("Edit proposed app", { exact: true }).click();
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.getByText("Edit proposed internal tool", { exact: true }).click();
   await page.getByLabel("Label for Equipment needed", { exact: true }).fill("Equipment and job");
   await page.getByRole("button", { name: "Save new draft", exact: true }).click();
 
@@ -272,7 +277,7 @@ test("review fixture connects a prepared request result, owner use, employee use
   await expect(secondReview.getByText('Field changed: "Equipment and job"; label changes from "Equipment needed" to "Equipment and job".', { exact: true })).toBeVisible();
   await secondReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(secondReview.getByText("Passed: Existing records fit this version", { exact: true })).toBeVisible();
-  await secondReview.getByRole("button", { name: "Publish", exact: true }).click();
+  await secondReview.getByRole("button", { name: "Make it live", exact: true }).click();
   await expect(page.getByText(/Release 2 is live/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("application-review-fixture.png"), fullPage: true });
 
@@ -281,21 +286,13 @@ test("review fixture connects a prepared request result, owner use, employee use
   await expect(page.getByText("Pipe inspection camera", { exact: true })).toBeVisible();
   await expect(page.getByText("Replacement pipe cutter", { exact: true })).toBeVisible();
 
-  const rollback = await page.evaluate(async id => {
-    const response = await fetch("/api/bounded-work", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productId: "applications",
-        action: "command",
-        workId: id,
-        command: { kind: "rollback_release", expectedDesignRevision: 1, expectedReleaseVersion: 2, version: 1 },
-      }),
-    });
-    return { status: response.status, body: await response.json() };
-  }, workId);
-  expect(rollback.status).toBe(200);
-  expect(rollback.body.payload.release.version).toBe(1);
+  await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
+  await page.getByRole("tab", { name: "Edit", exact: true }).click();
+  await page.getByText("Restore a release from History", { exact: true }).click();
+  await page.getByLabel("Release in History", { exact: true }).selectOption("1");
+  await page.getByRole("button", { name: "Restore release from History", exact: true }).click();
+  await expect(page.getByText(/Release 1 is live/)).toBeVisible();
+  expect(state.payload.release?.version).toBe(1);
 
   await page.goto(`/apps/${workId}`);
   await expect(page.getByLabel("Equipment needed", { exact: true })).toBeVisible();
@@ -304,11 +301,12 @@ test("review fixture connects a prepared request result, owner use, employee use
 
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
   await expect(page.getByText(/Release 1 is live/)).toBeVisible();
+  await page.getByRole("tab", { name: "Sharing", exact: true }).click();
   await page.getByRole("button", { name: "Revoke link", exact: true }).click();
   await expect(page.getByText("Access revoked for employee@example.com", { exact: true })).toBeVisible();
 
   await page.goto(`/apps/${workId}`);
-  await expect(page.getByRole("heading", { name: "This application link is unavailable", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This internal tool link is unavailable", exact: true })).toBeVisible();
   await expect(page.locator('p[role="alert"]')).toContainText("no longer available");
 
   expect(state.payload.records).toHaveLength(2);

@@ -3,6 +3,23 @@
 Strelva uses [Semantic Versioning](https://semver.org/) and releases the app and
 marketing site in lockstep. Their `package.json` versions must always match.
 
+## 1.0.0 - Unreleased
+
+- Open separate business and agency entry paths into the workspace, with Systems,
+  Connections, Possibilities and Versions behind their existing release gates.
+- Prepare agency client import, owner claim review and governed website publication.
+- Preserve managed website service and the existing client API during the workspace transition.
+- Add a browser gate for the six release flags observed on October 14, ordered
+  database-upgrade CI, and narrowly reviewed secret-scan exclusions.
+- Report scrubbed workspace failures in server and browser monitoring; browser
+  reporting stays off until its public DSN is configured.
+- Report the checked-in 1.0.0 version from health when no deployment override is set.
+
+This is the prepared source cut, not a production deployment or tag receipt.
+October 12–13 go-live claims and October 14 observations are recorded separately
+in the [release packet](docs/operations/release-1.0-packet.md). Existing client
+email, owner entry, production settings, prices and rollout authority are unchanged.
+
 ## 0.2.1 - Unreleased
 
 - Keep every client website lead in Postgres as well as Redis, so leads survive the 90-day and 500-lead Redis window. A failed copy never changes the visitor's response; it waits in Redis and an hourly job retries it.
