@@ -12,7 +12,7 @@ vi.mock("@/platform/workspaces", () => ({
   saveWork: mocks.saveWork,
 }));
 
-import { createWorkPlan, WorkPlanUnavailableError, WorkPlanUnsupportedOperationError } from "@/products/work-plans";
+import { createWorkPlan, WorkPlanUnsupportedOperationError } from "@/products/work-plans";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "owner@example.com" };
@@ -85,13 +85,18 @@ describe("work plan generation", () => {
     expect(mocks.saveWork).not.toHaveBeenCalled();
   });
 
-  it("reports unavailable when the opt-in path has no configured model", async () => {
+  it("retains a non-model starting plan when no model or budget is configured", async () => {
     vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
     vi.stubEnv("AI_FALLBACK_PROVIDER", "");
     vi.stubEnv("AI_FALLBACK_MODEL", "");
 
-    await expect(createWorkPlan(input)).rejects.toBeInstanceOf(WorkPlanUnavailableError);
-    expect(mocks.saveWork).not.toHaveBeenCalled();
+    mocks.saveWork.mockImplementation(async (_actor, _workspace, saved) => ({ payload: saved.payload }));
+    const result = await createWorkPlan(input);
+    expect(result.plan.status).toBe("needs_scoping");
+    expect(result.plan.summary).toContain("non-AI");
+    expect(result.plan.proposedOutputs).toEqual([]);
+    expect(result.plan.metadata.workspaceId).toBe(workspaceId);
+    expect(mocks.saveWork).toHaveBeenCalledOnce();
   });
 
   it("persists a validated plan with actor and revision metadata", async () => {

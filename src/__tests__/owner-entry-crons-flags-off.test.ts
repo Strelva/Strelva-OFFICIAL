@@ -36,6 +36,13 @@ const mocks = vi.hoisted(() => ({
   tenantBrand: vi.fn(),
 }));
 
+// These tests exercise legacy cron behavior; listing policy has separate coverage.
+// Keep the lazy workspace port from importing the entire listing product mid-test.
+vi.mock("@/products/google-listing/server", () => ({
+  listingDraftingAllowed: vi.fn(async () => true),
+  noteTenantListingRead: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mocks.tenantBrand }));
 
 vi.mock("@/lib/workspace-ports", async (importOriginal) => ({
@@ -75,7 +82,7 @@ vi.mock("@/lib/google-access", () => ({
 vi.mock("@/lib/events", () => ({ addEvent: mocks.addEvent }));
 vi.mock("@/lib/reviews", () => ({ addReview: mocks.addReview }));
 vi.mock("@/lib/review-alert", () => ({ maybeAlertNewReview: mocks.reviewAlert }));
-vi.mock("@/lib/review-replies", () => ({ draftReviewReply: mocks.reply, storeRecentReply: mocks.recentReply }));
+vi.mock("@/lib/review-replies", () => ({ draftReviewReplyWithProvenance: mocks.reply, storeRecentReply: mocks.recentReply }));
 vi.mock("@/lib/reviews/reply-voice", () => ({
   getReplyVoice: vi.fn(async () => ({ mode: "approve" })),
   defaultReplyVoice: () => ({ mode: "approve" }),
@@ -134,7 +141,7 @@ beforeEach(() => {
   mocks.addEvent.mockResolvedValue({ id: "test-draft" });
   mocks.addReview.mockResolvedValue({ id: "test-review" });
   mocks.reviewAlert.mockResolvedValue(undefined);
-  mocks.reply.mockResolvedValue("Thank you for your review.");
+  mocks.reply.mockResolvedValue({ text: "Thank you for your review.", generation: "model" });
   mocks.recentReply.mockResolvedValue(undefined);
   mocks.scan.mockResolvedValue({ scanned: [{ tenant: tenant.id, grade: "C", score: 70 }], failed: [], deferred: 0 });
   mocks.summaries.mockResolvedValue({ [tenant.id]: { grade: "B", overallScore: 82 } });

@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -512,6 +513,14 @@ describe("startAskTurn", () => {
     const result = await run(h.deps, "Change our Friday hours");
     expect(h.modelCalls).toHaveLength(0);
     expect(result.text).toContain("Which site");
+  });
+
+  it.each([new ModelBudgetPausedError(0, 0, {}), new ModelBudgetUnavailableError()])("shows the actual budget pause without a retry loop", async error => {
+    const h = harness();
+    h.deps.stream = async () => { throw error; };
+    const result = await run(h.deps, "What are my services?");
+    expect(result.text.trim()).toBe(error.message);
+    expect(result.result).toMatchObject({ ask: { kind: "answer", items: [] } });
   });
 
   it("when both models fail before output, says Strelva can't answer and nothing changed", async () => {

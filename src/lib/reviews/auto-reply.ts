@@ -22,7 +22,7 @@ import { AUTO_REPLY_ACTOR, resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
-import { draftReviewReply, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
+import { draftReviewReplyWithProvenance, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
 import { mapPool } from "../concurrency";
 import { autoReplyAllowed } from "./auto-reply-rule";
 
@@ -91,10 +91,11 @@ export async function draftReplyBacklog(
       // A prior owner dismissal is a durable per-review veto — never re-draft it.
       if (await isReviewReplyDeclined(t.id, reviewId)) continue;
       try {
-        const reply = await draftReviewReply(
+        const draft = await draftReviewReplyWithProvenance(
           { reviewId, reviewerName: r.author, rating: r.rating, comment: r.text },
           t,
         );
+        const reply = draft.text;
         await addEvent({
           tenantId: t.id,
           source: "ai",
@@ -109,8 +110,9 @@ export async function draftReplyBacklog(
             rating: r.rating,
             author: r.author,
             draftedReply: reply,
+            replyGeneration: draft.generation,
             // 1 and 2 star replies always go to the owner, even in auto mode.
-            ...(voice.mode === "auto" && autoReplyAllowed(r.rating)
+            ...(voice.mode === "auto" && draft.generation === "model" && autoReplyAllowed(r.rating)
               ? { autoPostAt: new Date(nowMs + AUTO_POST_DELAY_MS).toISOString() }
               : {}),
           },
@@ -149,6 +151,7 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
     );
     for (const e of pending) {
       if (e.metadata?.kind !== "review_reply_draft" || !googleReviewContentLive(e.metadata.providerContent, nowMs)) continue;
+      if (e.metadata?.replyGeneration !== "model") continue; // unknown and template drafts need the owner
       if (e.metadata?.autoPostFailed === true) continue; // gave up after the cap
       // A draft stamped before the rating rule still goes to the owner.
       if (!autoReplyAllowed(e.metadata?.rating)) continue;

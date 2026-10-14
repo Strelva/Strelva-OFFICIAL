@@ -9,8 +9,8 @@ export const rebuildAuditSchema = z.object({ scope: z.literal("html"), before: a
 export { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema } from "@/products/websites/client";
 export const rebuildViewSchema = z.object({
   workId: z.string(), workspaceId: z.string(), tenantId: z.string().nullable().default(null), revision: z.number(), title: z.string(),
-  status: z.enum(["building", "review", "approved", "published", "failed"]),
-  stages: z.array(z.object({ stage: z.string(), status: z.enum(["pending", "running", "completed", "failed"]), message: z.string().optional() })),
+  status: z.enum(["building", "review", "approved", "published", "failed", "paused"]),
+  stages: z.array(z.object({ stage: z.string(), status: z.enum(["pending", "running", "completed", "failed", "paused"]), message: z.string().optional() })),
   skippedPaths: z.array(rebuildSkippedPathSchema).max(200).default([]),
   candidate: z.object({ revision: z.number(), contentHash: z.string(), previewHref: z.string(), pageCount: z.number(), hasForms: z.boolean().default(false), facts: z.record(z.string(), factSchema), unmappedPages: z.array(z.string()).default([]) }).nullable(),
   capabilitySelection: websiteCapabilitySelectionSchema.nullable().default(null),

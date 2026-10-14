@@ -1,4 +1,4 @@
-import { ModelBudgetPausedError } from "@/platform/infra/business-ai-budget";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import type { AskWorkspaceDraftPort } from "./workspace-drafts";
 import type { AskNativeSystemPort } from "./native-systems";
 import type { ModelMessage, Tool } from "ai";
@@ -340,7 +340,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       } catch (error) {
         if (!emitted) {
           // A paused budget says so plainly (ADR 0015); anything else stays generic.
-          replyText = error instanceof ModelBudgetPausedError ? error.message : NO_ANSWER;
+          replyText = (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) ? error.message : NO_ANSWER;
           try { emit(replyText); } catch { /* client gone */ }
         }
       } finally {

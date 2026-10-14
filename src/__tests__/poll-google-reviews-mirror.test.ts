@@ -32,7 +32,7 @@ vi.mock("@/lib/events", () => ({ addEvent: mockAddEvent }));
 vi.mock("@/lib/reviews", () => ({ addReview: mockAddReview }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/review-replies", () => ({
-  draftReviewReply: mockDraftReviewReply,
+  draftReviewReplyWithProvenance: mockDraftReviewReply,
   storeRecentReply: mockStoreRecentReply,
 }));
 vi.mock("@/platform/infra/monitoring", () => ({ alert: mockAlert }));
@@ -71,7 +71,7 @@ beforeEach(() => {
     expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   });
   mockAddEvent.mockResolvedValue({ id: "evt" });
-  mockDraftReviewReply.mockResolvedValue("drafted reply");
+  mockDraftReviewReply.mockResolvedValue({ text: "drafted reply", generation: "model" });
   mockStoreRecentReply.mockResolvedValue(undefined);
   mockUpdateLastSynced.mockResolvedValue(undefined);
   mockRecordHeartbeat.mockResolvedValue(undefined);

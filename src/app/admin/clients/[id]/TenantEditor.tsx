@@ -49,6 +49,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
 
   // Assign-user form
   const [assignEmail, setAssignEmail] = useState("");
+  const [assignReason, setAssignReason] = useState("");
   const [assignRole, setAssignRole] = useState<"owner" | "admin" | "editor" | "viewer">("owner");
   const [assigning, setAssigning] = useState(false);
   const [assignNote, setAssignNote] = useState<string | null>(null);
@@ -155,18 +156,19 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
 
   async function assign() {
     setAssignNote(null);
-    if (!assignEmail.trim()) return;
+    if (!assignEmail.trim() || !assignReason.trim()) return;
     setAssigning(true);
     try {
       const res = await fetch("/api/admin/tenants/assign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: assignEmail.trim(), tenant: form.id, role: assignRole }),
+        body: JSON.stringify({ email: assignEmail.trim(), tenant: form.id, role: assignRole, reason: assignReason.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       setAssignNote(`✓ ${assignEmail} assigned as ${assignRole}`);
       setAssignEmail("");
+      setAssignReason("");
       await fetchMembers();
     } catch (err) {
       setAssignNote(err instanceof Error ? err.message : "Assign failed");
@@ -206,7 +208,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       const res = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.ownerEmail.trim(), tenant: form.id, role: "owner" }),
+        body: JSON.stringify({ email: form.ownerEmail.trim(), tenant: form.id, role: "owner", reason: assignReason.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
@@ -557,6 +559,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         </div>
 
         <div className="border-t border-glass-border pt-3">
+        <Field label="Reason for access change" value={assignReason} onChange={setAssignReason} placeholder="Why this person needs access" />
         <Field label="Email" value={assignEmail} onChange={setAssignEmail} placeholder="owner@business.com" />
         <div>
           <label htmlFor={roleSelectId} className="block text-xs text-gray-muted mb-1">Role</label>
@@ -578,7 +581,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
         )}
         <button
           onClick={() => void assign()}
-          disabled={assigning || !assignEmail.trim()}
+          disabled={assigning || !assignEmail.trim() || !assignReason.trim()}
           className="rounded-md border border-glass-border px-4 py-2 text-sm text-warm-white hover:bg-gray-bg disabled:opacity-40"
         >
           {assigning ? "Assigning…" : "Assign user"}

@@ -19,14 +19,14 @@ export const rebuildFactInputSchema = rebuildSelectionSchema.extend({
   action: z.enum(["confirm", "edit", "remove"]), text: z.string().trim().min(1).max(500).optional(),
 }).refine(value => value.action !== "edit" || Boolean(value.text), "Supply the corrected fact text");
 export const rebuildStageSchema = z.object({
-  stage: z.string().min(1).max(80), status: z.enum(["pending", "running", "completed", "failed"]), message: z.string().max(1000), at: instant,
+  stage: z.string().min(1).max(80), status: z.enum(["pending", "running", "completed", "failed", "paused"]), message: z.string().max(1000), at: instant,
 }).strict();
 export const rebuildSkippedPathSchema = z.object({
   url: z.string().url().max(2048), reason: z.enum(["robots", "external", "limit", "unreachable", "javascript_only", "not_html"]),
 }).strict();
 export const websiteRebuildSchema = z.object({
   version: z.literal(2), revision: z.number().int().nonnegative(), title: z.string().trim().min(1).max(160), input: rebuildInputSchema,
-  status: z.enum(["building", "review_ready", "approved", "published", "failed"]), stages: z.array(rebuildStageSchema).max(100),
+  status: z.enum(["building", "review_ready", "approved", "published", "failed", "paused"]), stages: z.array(rebuildStageSchema).max(100),
   checkpoint: z.unknown().nullable(),
   sourceAudit: rebuildAuditSnapshotSchema.nullable().default(null),
   audit: rebuildAuditSchema.nullable().default(null),

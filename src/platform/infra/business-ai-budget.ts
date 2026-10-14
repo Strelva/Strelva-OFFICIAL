@@ -1,18 +1,25 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { ModelCallPurpose } from "./model-call-log";
+import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
 
 /** Optional payer limit (ADR 0015). Platform work and public probes are exempt. */
 export class ModelBudgetPausedError extends Error {
-  constructor(readonly spentUsd: number, readonly capUsd: number) {
-    super("This business has used its available usage for this period. Building pauses until the next period or a higher limit.");
+  constructor(readonly spentUsd: number, readonly capUsd: number, environment: Record<string, string | undefined> = process.env) {
+    const reason = capUsd === 0
+      ? "Building is paused because this business has no included building usage."
+      : "Building is paused because this work would exceed this period’s budget.";
+    const next = selfServeBillingConfig(environment).enabled
+      ? "Open Plan and billing to choose a plan."
+      : "Bring in an agency to continue with help.";
+    super(`${reason} ${next}`);
     this.name = "ModelBudgetPausedError";
   }
 }
 
 export class ModelBudgetUnavailableError extends Error {
   constructor() {
-    super("Usage could not be confirmed. Building is paused while we check the budget.");
+    super("Usage could not be confirmed. Building is paused. Open Plan and billing to check your usage.");
     this.name = "ModelBudgetUnavailableError";
   }
 }
@@ -87,12 +94,15 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
   if (!context.workspaceId) throw new ModelBudgetUnavailableError();
   const raw = await (deps.read ?? readBusinessAiBudget)(context.workspaceId).catch(() => null);
   const parsed = budgetSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.unknownCostCalls > 0) throw new ModelBudgetUnavailableError();
+  if (!parsed.success) throw new ModelBudgetUnavailableError();
   const budget = parsed.data;
   const cap = businessAiCapUsd(budget, environment);
+  // An uncapped paid relationship needs a valid entitlement read, not a known
+  // dollar total. Unknown historical costs still prevent capped admission.
   if (cap === null) return null;
+  if (budget.unknownCostCalls > 0) throw new ModelBudgetUnavailableError();
   const committed = Number(budget.spentUsd) + Number(budget.reservedUsd);
-  if (committed >= cap) throw new ModelBudgetPausedError(committed, cap);
+  if (committed >= cap) throw new ModelBudgetPausedError(committed, cap, environment);
   let maximumCostUsd: string | undefined;
   try { maximumCostUsd = typeof context.maximumCostUsd === "function" ? context.maximumCostUsd() : context.maximumCostUsd; }
   catch { throw new ModelBudgetUnavailableError(); }
@@ -106,7 +116,7 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
     const current = result.data.budget;
     const currentCap = businessAiCapUsd(current, environment);
     if (currentCap === null) throw new ModelBudgetUnavailableError();
-    throw new ModelBudgetPausedError(Number(current.spentUsd) + Number(current.reservedUsd), currentCap);
+    throw new ModelBudgetPausedError(Number(current.spentUsd) + Number(current.reservedUsd), currentCap, environment);
   }
   if (!result.data.reservationId) throw new ModelBudgetUnavailableError();
   return result.data.reservationId;

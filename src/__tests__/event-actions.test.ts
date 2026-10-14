@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 
 const mockGetEvent = vi.fn();
 const mockResolveEvent = vi.fn();
@@ -17,6 +18,7 @@ const mockUpdateBusinessHours = vi.fn();
 const mockCreateGbpPost = vi.fn();
 const mockPublishReviewReply = vi.fn();
 const mockMarkExecutionExternalAccepted = vi.fn();
+const mockMarkExecutionExternalUnconfirmed = vi.fn();
 const mockExecuteInquiryPublication = vi.fn();
 const mockAuthorizeInquiryPublicationActor = vi.fn();
 const mockIsInquiryMessageReviewEvent = vi.fn();
@@ -35,6 +37,7 @@ vi.mock("../lib/events", () => ({
   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
   markExecutionExternalAccepted: (...args: unknown[]) => mockMarkExecutionExternalAccepted(...args),
+  markExecutionExternalUnconfirmed: (...args: unknown[]) => mockMarkExecutionExternalUnconfirmed(...args),
 }));
 
 vi.mock("@/products/inquiries/server", () => ({
@@ -256,6 +259,31 @@ describe("resolveEventAction", () => {
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_inquiry_publish", "dismissed", { actor: "user" });
   });
 
+  it.each([new ModelBudgetPausedError(0, 0, {}), new ModelBudgetUnavailableError()])("leaves capped suggestions pending when admission refuses: %s", async (error) => {
+    mockGetEvent.mockResolvedValue({ id: "paused-suggestion", tenantId: "tenant-a", type: "suggestion", status: "pending",
+      metadata: { suggestionId: "sug-paused", actionPrompt: "Update the hero" } });
+    mockExecuteAgentPrompt.mockRejectedValueOnce(error);
+    await expect(resolveEventAction("tenant-a", "paused-suggestion", "approved")).rejects.toBe(error);
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+    expect(mockUpdateSuggestion).not.toHaveBeenCalled();
+    expect(mockFinishEventAction).toHaveBeenCalledWith("paused-suggestion", "attempt_1", { state: "failed", reason: error.message.slice(0, 200) });
+  });
+
+  it("fences a dispatched suggestion tool before a later budget refusal", async () => {
+    mockGetEvent.mockResolvedValue({ id: "partial-suggestion", tenantId: "tenant-a", type: "suggestion", status: "pending",
+      metadata: { suggestionId: "sug-partial", actionPrompt: "Update the hero" } });
+    const error = new ModelBudgetPausedError(1, 1, {});
+    mockExecuteAgentPrompt.mockImplementationOnce(async (_tenant, _prompt, options) => {
+      await options.beforeToolEffect();
+      throw error;
+    });
+    await expect(resolveEventAction("tenant-a", "partial-suggestion", "approved")).rejects.toBe(error);
+    expect(mockMarkExecutionExternalUnconfirmed).toHaveBeenCalledWith("partial-suggestion", expect.stringContaining("Review its activity"), true);
+    expect(mockMarkExecutionExternalUnconfirmed.mock.invocationCallOrder[0]).toBeLessThan(mockFinishEventAction.mock.invocationCallOrder[0]!);
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+    expect(mockUpdateSuggestion).not.toHaveBeenCalled();
+  });
+
   it("executes an approved pending suggestion once", async () => {
     mockGetEvent.mockResolvedValue({
       id: "evt_1",
@@ -273,7 +301,8 @@ describe("resolveEventAction", () => {
 
     expect(result).toEqual({ changed: true });
     expect(mockUpdateSuggestion).toHaveBeenCalledWith("tenant-a", "sug_1", "accepted");
-    expect(mockExecuteAgentPrompt).toHaveBeenCalledWith("tenant-a", "Update Saturday class");
+    expect(mockExecuteAgentPrompt).toHaveBeenCalledWith("tenant-a", "Update Saturday class", { beforeToolEffect: expect.any(Function) });
+    expect(mockExecuteAgentPrompt.mock.invocationCallOrder[0]).toBeLessThan(mockResolveEvent.mock.invocationCallOrder[0]!);
   });
 
   it("approves queued agent preview content from durable event metadata when draft cache is missing", async () => {

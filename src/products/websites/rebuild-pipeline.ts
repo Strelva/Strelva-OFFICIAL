@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
 import { z } from "zod";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { generateModelObject } from "@/platform/infra/model-calls";
 import { factSchema, safeSitePathSchema, siteDocumentSchema, type Fact, type SiteDocument } from "./site-document";
 import { crawlWebsite, normalizeRebuildUrl, type CrawledPage, type CrawlResult, type PageFetcher, type SourceRef } from "./rebuild-crawl";
@@ -15,7 +16,7 @@ export const websiteRebuildInputSchema = z.union([
 ]);
 export type WebsiteRebuildInput = z.infer<typeof websiteRebuildInputSchema>;
 export type RebuildStage = "crawl" | "extract" | "write" | "compose" | "verify";
-export interface RebuildEvent { stage: RebuildStage; status: "running" | "completed" | "failed"; message: string; at: string; counts?: Record<string, number> }
+export interface RebuildEvent { stage: RebuildStage; status: "running" | "completed" | "failed" | "paused"; message: string; at: string; counts?: Record<string, number> }
 export interface BusinessFacts { name: string; nameFactId: string; category?: string; facts: Record<string, Fact>; services: string[]; people: string[]; contact: string[]; hours: string[]; locations: string[]; reviews: string[]; claims: string[]; descriptionClaimLines?: string[][]; brandColors: string[]; oldPaths: string[]; sourcePages: Array<{ sourceId: string; url: string; title: string; factIds: string[]; contentTruncated?: boolean }> }
 export interface ContentBlock { id: string; type: "heading" | "paragraph" | "service" | "person" | "contact" | "hours" | "location" | "review"; text: string; factIds: string[] }
 export interface RebuildPageContent { path: string; title: string; sourceIds: string[]; blocks: ContentBlock[] }
@@ -24,7 +25,7 @@ export interface RebuildCheckpoint { version: 1; inputHash: string; crawl?: Craw
 export interface RebuildResult { document: SiteDocument; crawl?: CrawlResult; facts: BusinessFacts; content: RebuildContent; events: RebuildEvent[]; checkpoint: RebuildCheckpoint; pageMapping: Array<{ sourceUrl: string; targetPath: string; carriedOver: boolean }>; summary: { pages: number; facts: number; supported: number; needsReview: number; highRisk: number } }
 export interface RebuildOptions { checkpoint?: RebuildCheckpoint; fetchPage?: PageFetcher; writer?: RebuildWriter; composers?: SiteComposer[]; verifier?: SiteVerifier; rehostAssets?: (assets: CrawlResult["assets"], crawl: CrawlResult) => Promise<SiteDocument["assets"]>; onSourcePage?: (page: CrawledPage) => Promise<void> | void; onEvent?: (event: RebuildEvent) => Promise<void> | void; onCheckpoint?: (checkpoint: RebuildCheckpoint) => Promise<void> | void; now?: () => string }
 export type RebuildWriter = (facts: BusinessFacts, baseline: RebuildContent) => Promise<unknown>;
-export class WebsiteRebuildStageError extends Error { constructor(public readonly stage: RebuildStage, public readonly checkpoint: RebuildCheckpoint, public readonly cause: unknown) { super(cause instanceof Error ? cause.message : "Website rebuild failed. Retry this stage."); this.name = "WebsiteRebuildStageError"; } }
+export class WebsiteRebuildStageError extends Error { get paused(): boolean { return this.cause instanceof ModelBudgetPausedError || this.cause instanceof ModelBudgetUnavailableError; } constructor(public readonly stage: RebuildStage, public readonly checkpoint: RebuildCheckpoint, public readonly cause: unknown) { super(cause instanceof Error ? cause.message : "Website rebuild failed. Retry this stage."); this.name = "WebsiteRebuildStageError"; } }
 
 export class WebsiteDescriptionCapacityError extends Error {
   constructor() { super("Your description has too many separate details. Combine shorter lines and build a new preview; no contact details were dropped."); this.name = "WebsiteDescriptionCapacityError"; }
@@ -247,7 +248,7 @@ export async function runWebsiteRebuild(rawInput: WebsiteRebuildInput, options: 
     const prior = structuredClone(checkpoint);
     await emit(name, "running", name === "crawl" ? "Reading your current website" : name === "extract" ? "Finding business facts and sources" : name === "write" ? "Organizing your content" : name === "compose" ? "Composing your new pages" : "Checking every fact");
     try { const message = await task(); if (Buffer.byteLength(JSON.stringify(checkpoint)) > 1_500_000) throw new Error("This rebuild exceeds the saved-work size limit. Describe the business to continue."); checkpoint.completedStages.push(name); await emit(name, "completed", message); await options.onCheckpoint?.(structuredClone(checkpoint)); }
-    catch (error) { if (Buffer.byteLength(JSON.stringify(checkpoint)) > 1_500_000) { checkpoint.crawl = prior.crawl; checkpoint.facts = prior.facts; checkpoint.content = prior.content; checkpoint.document = prior.document; checkpoint.completedStages = prior.completedStages; } await emit(name, "failed", error instanceof Error ? error.message : "Stage failed. Retry to continue."); await options.onCheckpoint?.(structuredClone(checkpoint)); throw new WebsiteRebuildStageError(name, structuredClone(checkpoint), error); }
+    catch (error) { if (Buffer.byteLength(JSON.stringify(checkpoint)) > 1_500_000) { checkpoint.crawl = prior.crawl; checkpoint.facts = prior.facts; checkpoint.content = prior.content; checkpoint.document = prior.document; checkpoint.completedStages = prior.completedStages; } await emit(name, error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError ? "paused" : "failed", error instanceof Error ? error.message : "Stage failed. Retry to continue."); await options.onCheckpoint?.(structuredClone(checkpoint)); throw new WebsiteRebuildStageError(name, structuredClone(checkpoint), error); }
   };
   await stage("crawl", async () => { if ("url" in input) checkpoint.crawl = compactCrawl(await crawlWebsite(input.url, { fetchPage: options.fetchPage, onPage: async (page) => { await options.onSourcePage?.(page); await emit("crawl", "running", `Read ${page.title || new URL(page.url).pathname}`); } })); return checkpoint.crawl ? `Read ${checkpoint.crawl.pages.length} pages` : "Using your business description"; });
   await stage("extract", async () => { checkpoint.facts = extractBusinessFacts(input, checkpoint.crawl); if (checkpoint.crawl) checkpoint.crawl.pages = checkpoint.crawl.pages.map((page) => ({ ...page, html: "" })); return `Found ${Object.keys(checkpoint.facts.facts).length} facts, ${checkpoint.facts.services.length} services and ${checkpoint.facts.reviews.length} review excerpts`; });

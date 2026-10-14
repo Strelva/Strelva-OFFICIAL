@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { createWebsiteRebuildService } from "@/products/websites/rebuild-service";
 import type { resolvePublishedWebsiteCapabilities } from "@/products/websites/published-capabilities";
 import { extractBusinessFacts, currentDescriptionBusinessFacts, runWebsiteRebuild, writeSourceContent, type RebuildOptions } from "@/products/websites/rebuild-pipeline";
@@ -80,6 +81,22 @@ function harness(options: { pipelineOptions?: RebuildOptions; checkLiveFailure?:
 }
 
 describe("website rebuild service lifecycle and durable recovery", () => {
+  it.each([new ModelBudgetPausedError(0, 0), new ModelBudgetUnavailableError()])("persists a cap pause and retries the checkpoint without losing earlier stages", async (refusal) => {
+    let refused = true;
+    const h = harness({ pipelineOptions: { writer: async (_facts, baseline) => { if (refused) throw refusal; return { pages: baseline.pages }; } } });
+    const paused = await h.create();
+    expect(paused.rebuild.status).toBe("paused");
+    expect(paused.rebuild.lastError).toBe(refusal.message);
+    expect(paused.rebuild.stages.at(-1)).toMatchObject({ stage: "write", status: "paused" });
+    expect(paused.rebuild.candidate).toBeNull();
+    expect(paused.rebuild.checkpoint).toMatchObject({ completedStages: ["crawl", "extract"] });
+    refused = false;
+    const resumed = await h.service.retry(actor, paused.workId, { expectedRevision: paused.rebuild.revision });
+    expect(resumed.rebuild.status).toBe("review_ready");
+    expect(resumed.rebuild.lastError).toBeNull();
+    expect(resumed.rebuild.stages.filter(stage => stage.stage === "extract" && stage.status === "completed")).toHaveLength(1);
+  });
+
   it("runs the actual description pipeline through saved review, approval and hosted publication", async () => {
     const h = harness(); const reviewed = await h.create();
     expect(reviewed.rebuild.status).toBe("review_ready"); expect(reviewed.rebuild.stages.filter(stage => stage.status === "completed").map(stage => stage.stage)).toEqual(["crawl","extract","write","compose","verify"]);

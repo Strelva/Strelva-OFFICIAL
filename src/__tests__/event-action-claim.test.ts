@@ -13,7 +13,7 @@ const redis = {
 
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 
-import { claimEventAction, finishEventAction, markExecutionExternalAccepted } from "@/lib/events";
+import { claimEventAction, finishEventAction, markExecutionExternalAccepted, markExecutionExternalUnconfirmed } from "@/lib/events";
 
 describe("event action claim", () => {
   beforeEach(() => {
@@ -86,6 +86,24 @@ describe("event action claim", () => {
       acquired: false,
       reason: "action_reconciliation_required",
     });
+  });
+
+  it("keeps a dispatched background tool non-retryable after a later budget pause", async () => {
+    const first = await claimEventAction("evt_1", "approved", "owner");
+    expect(first.acquired).toBe(true);
+    if (!first.acquired) return;
+    await markExecutionExternalUnconfirmed("evt_1", "Background work may have saved changes. Review before retrying.", true);
+    await finishEventAction("evt_1", first.attemptId, { state: "failed", reason: "Building is paused" });
+    expect((store.get("event:evt_1") as { metadata: { execution: { state: string; reason: string } } }).metadata.execution)
+      .toMatchObject({ state: "external_unconfirmed", reason: expect.stringContaining("Review before retrying") });
+    await expect(claimEventAction("evt_1", "approved", "owner")).resolves.toEqual({ acquired: false, reason: "action_reconciliation_required" });
+  });
+
+  it("refuses tool dispatch if its recovery fence cannot be saved", async () => {
+    await claimEventAction("evt_1", "approved", "owner");
+    store.set("event-lock:evt_1", "other-writer");
+    await expect(markExecutionExternalUnconfirmed("evt_1", "Background work may have saved changes.", true))
+      .rejects.toThrow("Nothing has been dispatched");
   });
 
   it("preserves a bounded event TTL when execution metadata changes", async () => {

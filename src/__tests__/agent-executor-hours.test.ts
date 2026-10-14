@@ -26,6 +26,7 @@ const mockSendSlackNotification = vi.fn((..._args: unknown[]) => Promise.resolve
 type ExecutorTools = Record<string, { execute: (args: unknown) => Promise<unknown> }>;
 
 let mockCapturedTools: ExecutorTools = {};
+let mockAfterToolError: Error | null = null;
 
 vi.mock("ai", () => ({
   tool: (def: unknown) => def,
@@ -39,6 +40,7 @@ vi.mock("ai", () => ({
       ],
     };
     const output = await opts.tools.update_business_hours!.execute(input);
+    if (mockAfterToolError) throw mockAfterToolError;
     return {
       text: "done",
       finishReason: "stop",
@@ -155,6 +157,7 @@ describe("agent-executor update_business_hours", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAddEvent.mockResolvedValue({ id: "evt_hours_1" });
+    mockAfterToolError = null;
   });
 
   it("queues a gbp_hours_draft pending event and never writes to Google directly", async () => {
@@ -198,6 +201,19 @@ describe("agent-executor update_business_hours", () => {
 
     expect(Object.keys(mockCapturedTools)).toContain("update_business_hours");
     expect(mockBillingWorkspace).toHaveBeenCalledExactlyOnceWith("gldf");
+  });
+
+  it("fences a tool before dispatch and propagates a later budget refusal", async () => {
+    const { ModelBudgetPausedError } = await import("@/platform/infra/business-ai-budget");
+    const error = new ModelBudgetPausedError(1, 1, {});
+    const beforeToolEffect = vi.fn(async () => {});
+    mockAfterToolError = error;
+    const { executeAgentPromptDetailed } = await import("@/lib/agent-executor");
+    await expect(executeAgentPromptDetailed("gldf", "Update our hours", { beforeToolEffect })).rejects.toBe(error);
+    expect(beforeToolEffect).toHaveBeenCalledOnce();
+    expect(mockAddEvent).toHaveBeenCalledOnce();
+    expect(beforeToolEffect.mock.invocationCallOrder[0]).toBeLessThan(mockAddEvent.mock.invocationCallOrder[0]!);
+    expect(mockUpdateBusinessHours).not.toHaveBeenCalled();
   });
 
   it("pauses without trusted business scope before running tools", async () => {

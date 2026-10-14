@@ -38,7 +38,7 @@ export default async function ReviewsPage() {
     if (!rid || !reply) continue;
     preDrafts[rid] = {
       reply,
-      autoPostAt: typeof e.metadata?.autoPostAt === "string" ? e.metadata.autoPostAt : null,
+      autoPostAt: e.metadata?.replyGeneration === "model" && typeof e.metadata?.autoPostAt === "string" ? e.metadata.autoPostAt : null,
     };
   }
 

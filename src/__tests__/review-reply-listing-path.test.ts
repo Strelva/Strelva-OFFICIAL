@@ -116,7 +116,7 @@ function setup(over: Partial<TenantReplyDeps> = {}, google = fakeGoogle(), recei
 
 const reviewDraft = (metadata: Record<string, unknown> = {}) => ({
   id: "evt_rr", tenantId: "tenant-a", type: "review", status: "pending", body: "Thank you!",
-  metadata: { kind: "review_reply_draft", reviewId: "rev_9", draftedReply: "Thank you!", rating: 5, ...metadata },
+  metadata: { kind: "review_reply_draft", replyGeneration: "model", reviewId: "rev_9", draftedReply: "Thank you!", rating: 5, ...metadata },
 });
 
 beforeEach(() => {
@@ -210,6 +210,23 @@ describe("review reply approve on the listing System", () => {
     expect(result).toEqual({ changed: true, reason: "accepted_unverified" });
     expect(google.writes).toHaveLength(1);
     expect(mockMark).toHaveBeenCalledWith("evt_rr");
+  });
+
+  it.each(["template", undefined, "unknown"])("refuses automatic dispatch for %s provenance even with a stale timer", async (replyGeneration) => {
+    mockGetEvent.mockResolvedValue(reviewDraft({ replyGeneration, autoPostAt: "2026-01-01T00:00:00Z" }));
+    const { google, receipts } = setup();
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", AUTO_REPLY_ACTOR))
+      .toEqual({ changed: false, reason: "review_reply_needs_owner" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+    expect(mockMark).not.toHaveBeenCalled();
+  });
+
+  it("lets the owner approve a template explicitly", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft({ replyGeneration: "template" }));
+    const { google } = setup();
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", "owner-user-1")).toEqual({ changed: true });
+    expect(google.writes).toEqual(["Thank you!"]);
   });
 
   it("auto mode posts under the auto-reply policy, never as an owner approval", async () => {

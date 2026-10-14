@@ -1,3 +1,4 @@
+import { readPlatformStaffStrict } from "@/platform/infra/platform-staff-read";
 import { NextResponse } from "next/server";
 import { isInspecting } from "@/platform/infra/inspect-mode";
 import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
@@ -318,6 +319,12 @@ export async function claimPendingInviteForCurrentUser(
   if (!invite) return null;
 
   const role = normalizeRole(invite.role, "owner");
+  if (role !== "viewer") {
+    // Recheck at claim time, including invitations issued before a staff grant.
+    // A pending invite must never turn platform support into a content writer.
+    try { if (await readPlatformStaffStrict(user.id)) return null; }
+    catch { return null; }
+  }
   const existingRole = await getMembershipRole(user.id, invite.tenant_id);
   const needsAssignment =
     !existingRole || !roleMeetsMinimum(normalizeRole(existingRole), role);
