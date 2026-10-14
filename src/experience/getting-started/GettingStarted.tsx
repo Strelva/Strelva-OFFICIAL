@@ -16,6 +16,8 @@ export interface GettingStartedLinks {
   connect: string | null;
   /** A request filed to the business's agency at setup. */
   request: string | null;
+  /** The authorized saved check that started this business. */
+  check?: string | null;
 }
 
 function deviceTimeZone(): string | undefined {
@@ -43,6 +45,7 @@ export function GettingStarted({ business, links }: { business: GettingStartedBu
 
   return <StPage>
     <StHead crumb={{ label: "Business home", href: links.home }} title={business.name} meta={website ? <>Website <a className="underline underline-offset-4" href={website} target="_blank" rel="noopener noreferrer">{sourceLabel(website)}</a></> : "No website on your business yet."} />
+    {links.check ? <StNotice action={<StTextButton href={links.check}>Open saved check</StTextButton>}>Your check is saved in this business. Start with the details below, then return to its recommended fix.</StNotice> : null}
     {links.request ? <StNotice action={<StTextButton href={links.request}>Open request</StTextButton>}>Your request went to your agency. Nothing is agreed until they reply with scope and timing.</StNotice> : null}
     <StSection title="Start from what you already have" meta="Nothing has to move">
       <UseCurrentWebsite business={business} website={website} revision={revision} detailsHref={links.details} onSaved={(next, savedWebsite) => { setRevision(next); if (savedWebsite) setWebsite(savedWebsite); }} />

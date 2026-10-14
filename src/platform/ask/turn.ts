@@ -1,4 +1,5 @@
 import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
+import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
 import type { AskWorkspaceDraftPort } from "./workspace-drafts";
 import type { AskNativeSystemPort } from "./native-systems";
 import type { ModelMessage, Tool } from "ai";
@@ -196,6 +197,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       const items: AskReceiptItem[] = [];
       let resultKind: AskResultKind = "answer";
       let creationAction: { kind: "website" | "booking"; label: string; href: string } | null = null;
+      let budgetRecovery: "plan" | "agency" | null = null;
       const onReceipt = (item: AskReceiptItem) => {
         items.push(item);
         if (item.kind !== "refusal") resultKind = item.kind;
@@ -338,9 +340,12 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           () => emitted,
         );
       } catch (error) {
-        if (!emitted) {
-          // A paused budget says so plainly (ADR 0015); anything else stays generic.
-          replyText = (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) ? error.message : NO_ANSWER;
+        if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
+          onReceipt({ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: error instanceof ModelBudgetPausedError ? "budget_paused" : "budget_unavailable" });
+          if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
+          try { say(`${replyText ? "\n\n" : ""}${error.message}`); } catch { /* client gone */ }
+        } else if (!emitted) {
+          replyText = NO_ANSWER;
           try { emit(replyText); } catch { /* client gone */ }
         }
       } finally {
@@ -349,12 +354,12 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           try {
             await deps.history.append(actor, {
               workspaceId: request.workspaceId, conversationId, systemId: request.systemId ?? null, role: "assistant",
-              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId, ...(creationAction ? { creationAction } : {}) },
+              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}) },
             });
           } catch { saved = false; }
         }
         try {
-          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved, ...(creationAction ? { creationAction } : {}) } })}\n`);
+          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved, ...(creationAction ? { creationAction } : {}), ...(budgetRecovery ? { budgetRecovery } : {}) } })}\n`);
         } catch { /* client gone */ }
       }
     },

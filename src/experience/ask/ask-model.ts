@@ -23,6 +23,9 @@ export interface AskReceiptItemView {
   actor?: RecordedActor | null;
   /** Recorded recipient of this Request, never the current viewer’s agency. */
   agencyName?: string | null;
+  /** Exact saved candidate links supplied by the preparation port. */
+  previewHref?: string;
+  tryHref?: string;
   needsYou?: { route: string; itemRef: string | null; decideAt: string | null };
 }
 
@@ -32,6 +35,7 @@ export interface AskTurnResult {
   systemId: string | null;
   conversationId: string | null;
   saved: boolean;
+  budgetRecovery?: "plan" | "agency";
   creationAction?: { kind: "website" | "booking"; label: string; href: string };
 }
 
@@ -96,6 +100,8 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
       summary: text(entry.summary, 300),
       actor: recordedActor(entry.actor),
       agencyName: text(entry.agencyName, 120).trim() || null,
+      ...(sameAppPath(text(entry.previewHref, 4096)) ? { previewHref: sameAppPath(text(entry.previewHref, 4096)) } : {}),
+      ...(sameAppPath(text(entry.tryHref, 4096)) ? { tryHref: sameAppPath(text(entry.tryHref, 4096)) } : {}),
       ...(needs ? { needsYou: { route: text(needs.route, 40), itemRef: typeof needs.itemRef === "string" ? needs.itemRef : null, decideAt: typeof needs.decideAt === "string" ? needs.decideAt : null } } : {}),
     }];
   }).slice(0, 20) : [];
@@ -106,6 +112,7 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
     systemId: typeof value.systemId === "string" ? value.systemId : null,
     conversationId: typeof value.conversationId === "string" ? value.conversationId : null,
     saved: value.saved === true,
+    ...((value.budgetRecovery === "plan" || value.budgetRecovery === "agency") ? { budgetRecovery: value.budgetRecovery } : {}),
     ...(creationAction ? { creationAction } : {}),
   };
 }
@@ -117,13 +124,17 @@ export interface ReceiptLine {
   text: string;
   /** Where the decision is made, when someone has one to make. A same-app path only. */
   decideHref?: string;
+  openHref?: string;
+  openLabel?: string;
   /** Ids, for the operator and for support. */
   ref?: string;
 }
 
 /** Only same-app paths become links; anything else is dropped. */
 export function sameAppPath(value: string | null | undefined): string | undefined {
-  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return undefined;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || /[\u0000-\u0020\u007f]/.test(value)) return undefined;
+  const parsed = new URL(value, "https://strelva.invalid");
+  if (parsed.origin !== "https://strelva.invalid" || parsed.pathname !== value.split(/[?#]/)[0]) return undefined;
   return value;
 }
 
@@ -150,7 +161,8 @@ export function receiptLines(result: AskTurnResult): ReceiptLine[] {
       return [{ key, tone: "waiting", text: `Drafted: ${item.summary || "a change"}. ${route ?? "It is not live."}`, decideHref: sameAppPath(item.needsYou?.decideAt), ref }];
     }
     if (item.kind === "possibility") {
-      return [{ key, tone: "done", text: `Opened a Possibility: ${item.summary || "an alternative"}. Nothing live changed. Make real is a separate step.`, ref }];
+      const openHref = sameAppPath(item.tryHref) ?? sameAppPath(item.previewHref);
+      return [{ key, tone: "done", text: `Opened a Possibility: ${item.summary || "an alternative"}. Nothing live changed. Make it live is a separate step.`, ...(openHref ? { openHref, openLabel: item.tryHref ? "Try it" : "Open preview" } : {}), decideHref: sameAppPath(item.needsYou?.decideAt), ref }];
     }
     return [{ key, tone: "done", text: `Request filed${item.agencyName ? ` for ${item.agencyName}` : ""}: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.${item.actor ? ` Filed by ${actorLabel(item.actor)}.` : ""}`, ref }];
   });
@@ -162,10 +174,11 @@ export function resultHeadline(result: AskTurnResult): string | null {
   return null;
 }
 
-export const ASK_EXAMPLES = {
-  home: ["What changed on my site this month?", "How many inquiries came in this week?", "Add estate planning consults to our services"],
-  system: ["What does the homepage say right now?", "Put the holiday gift boxes at the top of the homepage", "Add a private events page"],
-} as const;
+/** The route returns at most three bounded prompts, never raw contact or payer data. */
+export function readAskSuggestions(raw: unknown): string[] | null {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 3 || raw.some(value => typeof value !== "string" || !value.trim() || value.length > 300 || /[\u0000-\u001f\u007f]/.test(value))) return null;
+  return [...new Set(raw as string[])];
+}
 
 /** Errors from the route, in words the person can act on. */
 export function askErrorMessage(status: number, fallback: string | null): string {

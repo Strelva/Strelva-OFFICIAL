@@ -19,8 +19,7 @@ function message(body: unknown, fallback: string): string {
 }
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
-/** With `gettingStarted` (STRELVA_BUSINESS_SIGNUP_RELEASE, decided by the page), a help or website
- * start lands on the business's Getting started view instead of its Home. */
+/** Direct setup opens Getting started. Website help opens agency selection. */
 export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), initialName = "", sourceCheckId, gettingStarted = false, navigate = href => window.location.assign(href) }: { initialRequest?: string; initialName?: string; sourceCheckId?: string; startProduct?: BusinessStartProduct; gettingStarted?: boolean; navigate?: (href: string) => void }) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
@@ -74,7 +73,7 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
     let command: BusinessEntryInput;
     try {
       if (!pending && selected !== "new" && !choices.businesses.some(item => item.id === selected)) throw new Error("Unknown business");
-      command = pending || businessEntryInputSchema.parse({ destination: selected === "new" ? { kind: "new", name } : { kind: "existing", workspaceId: selected }, initialRequest: request.trim() || null, ...(sourceCheckId ? { sourceCheckId } : {}), idempotencyKey: crypto.randomUUID() });
+      command = pending || businessEntryInputSchema.parse({ destination: selected === "new" ? { kind: "new", name } : { kind: "existing", workspaceId: selected }, initialRequest: startProduct === "website" ? null : request.trim() || null, ...(sourceCheckId ? { sourceCheckId } : {}), idempotencyKey: crypto.randomUUID() });
       sessionStorage.setItem(key, JSON.stringify(command));
     } catch { setError("Check the business name and request, and allow session storage. Nothing was sent."); return; }
     mutation.current = true; setPending(command); setSaving(true); setError("");
@@ -106,8 +105,13 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
         throw new Error("Your ask is saved, but it could not be carried to Home. Allow session storage, then retry this setup.");
       }
       sessionStorage.removeItem(key); setPending(null);
-      // A typed request opened an Ask conversation: Home shows it. Otherwise a help or website start lands on Getting started.
-      if (gettingStarted && !result.data.askConversationId && (startProduct === "help" || startProduct === "website")) {
+      // Choosing help never assigns an agency or files the owner's intent as an Ask.
+      if (startProduct === "website") {
+        navigate(`/workspace?${new URLSearchParams({ workspaceId: result.data.workspaceId, view: "help", intent: "website" })}`);
+        return;
+      }
+      // Keep a saved Ask draft for Home, after the owner has the first-run context.
+      if (gettingStarted && startProduct === "help") {
         navigate(gettingStartedHref(result.data.workspaceId, result.data.requestId));
         return;
       }
@@ -122,10 +126,10 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
     <StHead title="Which business is this for?" /><StCopy>Use a business you manage or create one. No website purchase is required. Existing personal work stays separate.</StCopy>
     {choices.businesses.length ? <SelectInput label="Business" value={selected} disabled={locked} onChange={event => setSelected(event.target.value)} options={[{value:"new",label:"Create a new business"},...choices.businesses.map(item=>({value:item.id,label:item.name}))]} /> : null}
     {selected === "new" ? <StTextField label="Business name" value={name} maxLength={120} required disabled={locked} onChange={event => setName(event.target.value)} /> : null}
-    {startProduct === "help" || startProduct === "website" || request ? <TextArea label="What do you want to do?" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
+    {startProduct !== "website" && (startProduct === "help" || request) ? <TextArea label="What do you want to do?" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
     {pending ? <StNotice>Your setup is saved for recovery. Retrying will not create another business.</StNotice> : null}
     {error ? <StNotice tone="critical">{error}</StNotice> : null}
-    <StPill type="submit" busy={saving} disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry safely" : request.trim() ? "Save business and ask" : "Continue with this business"}</StPill>
-    <StCopy muted>Your words are saved as your own ask when no agency is selected. Saving does not accept a price or deadline, start delivery, grant agency access, or send email.</StCopy>
+    <StPill type="submit" busy={saving} disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry safely" : startProduct === "website" ? "Continue to agencies" : request.trim() ? "Save business and ask" : "Continue with this business"}</StPill>
+    <StCopy muted>{startProduct === "website" ? "Next, choose an agency and review what it can do. A website proposal is sent only after you choose. Nothing is agreed until scope, timing and price are confirmed." : "Your words are saved as your own ask when no agency is selected. Saving does not accept a price or deadline, start delivery, grant agency access, or send email."}</StCopy>
   </form>;
 }

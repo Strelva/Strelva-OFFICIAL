@@ -7,6 +7,21 @@ it("preserves website creation and saved website destinations through sign-in", 
 });
 const workspaceId = "22222222-2222-4222-8222-222222222222";
 describe("workspace return destination", () => {
+  it("carries website help only into agency selection, with no agency chosen", () => {
+    const href = `/workspace?workspaceId=${workspaceId}&view=help&intent=website`;
+    expect(workspaceReturnTarget(href)).toBe(href);
+    expect(readWorkspaceLocation(new URLSearchParams(href.split("?")[1]))).toEqual({ workspaceId, view: "help", intent: "website" });
+    expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=home&intent=website`)).toBeNull();
+    expect(workspaceReturnTarget(`${href}&intent=website`)).toBeNull();
+    expect(workspaceLocationHref(href, { workspaceId, view: "home" })).not.toContain("intent");
+  });
+  it("retains the saved check and filed request through Getting started sign-in", () => {
+    const href = `/workspace/getting-started?workspaceId=${workspaceId}&check=${workspaceId}&request=${workspaceId}`;
+    expect(workspaceReturnTarget(href)).toBe(href);
+    expect(workspaceReturnTarget(href.replace(`check=${workspaceId}`, "check=scan_public"))).toBeNull();
+    expect(workspaceReturnTarget(`${href}&check=${workspaceId}`)).toBeNull();
+    expect(workspaceReturnTarget(`${href}&url=https://evil.example`)).toBeNull();
+  });
   it("preserves an exact result and workspace through sign-in", () => {
     const target = `/workspace?workspaceId=${workspaceId}&work=saved-result&view=work`;
     expect(workspaceReturnTarget(target)).toBe(target);

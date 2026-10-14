@@ -20,6 +20,28 @@ async function submit() { await act(async()=>node.querySelector("form")!.dispatc
 function setupResponse() { return { workspaceId, requestId:null, askConversationId:conversationId, agencyRequired:true, alreadyCreated:false }; }
 function transport(reply: (input: string, init?: RequestInit)=>Promise<Response>) { return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => init?.method !== "POST" ? Response.json({actorId,actorEmail,businesses:[]}) : reply(String(input),init)); }
 describe("owner setup keeps the complete ask and check",()=>{
+ it("opens Getting started with a typed Ask safely retained for Home",async()=>{
+  const navigate=vi.fn();const request=transport(async()=>Response.json(setupResponse()));
+  await render(createElement(WorkspaceRequestContext.Provider,{value:request},createElement(BusinessSetupPanel,{initialName:"Juniper",initialRequest:"Fix our hours",gettingStarted:true,navigate})));
+  await submit();expect(navigate).toHaveBeenCalledWith(`/workspace/getting-started?workspaceId=${workspaceId}`);
+  expect(readRequestDraft(sessionStorage,requestDraftKey({actorEmail,workspaceId}))).toBe("Fix our hours");
+ });
+ it("website help chooses an agency after setup without creating the owner's Ask",async()=>{
+  const navigate=vi.fn();const request=transport(async()=>Response.json({...setupResponse(),askConversationId:null}));
+  await render(createElement(WorkspaceRequestContext.Provider,{value:request},createElement(BusinessSetupPanel,{initialName:"Juniper",startProduct:"website",gettingStarted:true,navigate})));
+  expect(node.querySelector("textarea")).toBeNull();expect(node.textContent).toContain("Continue to agencies");
+  await submit();const posted=JSON.parse(String(request.mock.calls.find(call=>call[1]?.method==="POST")?.[1]?.body));
+  expect(posted.initialRequest).toBeNull();expect(navigate).toHaveBeenCalledWith(`/workspace?workspaceId=${workspaceId}&view=help&intent=website`);
+  expect(readRequestDraft(sessionStorage,requestDraftKey({actorEmail,workspaceId}))).toBe("");
+ });
+ it("website setup retry retains its exact business command and sends no agency proposal early",async()=>{
+  const navigate=vi.fn();let failed=true;const request=transport(async()=>{if(failed){failed=false;throw new Error("Response lost");}return Response.json({...setupResponse(),askConversationId:null});});
+  await render(createElement(WorkspaceRequestContext.Provider,{value:request},createElement(BusinessSetupPanel,{initialName:"Juniper",startProduct:"website",navigate})));
+  await submit();expect(navigate).not.toHaveBeenCalled();const pending=sessionStorage.getItem(`strelva:business-entry:${actorId}`);
+  await submit();expect(request.mock.calls.filter(call=>call[1]?.method==="POST").map(call=>call[1]?.body)).toEqual([pending,pending]);
+  expect(request.mock.calls.some(call=>String(call[0])==="/api/workspace/agencies")).toBe(false);
+  expect(navigate).toHaveBeenCalledWith(`/workspace?workspaceId=${workspaceId}&view=help&intent=website`);
+ });
  it("saves the ask and report before opening Home with the fix prefilled",async()=>{
   const navigate=vi.fn(); const request=transport(async input=>Response.json(input==="/api/workspace/businesses"?setupResponse():{work:{id:checkWorkId,workspaceId}}));
   await render(createElement(WorkspaceRequestContext.Provider,{value:request},createElement(BusinessSetupPanel,{initialName:"Juniper",initialRequest:"Fix our hours",sourceCheckId:"scan_example",navigate})));

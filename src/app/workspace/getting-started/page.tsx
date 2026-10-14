@@ -8,6 +8,7 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { readPlace } from "@/platform/owner-entry/place-state";
 import { gettingStarted } from "@/products/getting-started/server";
 import { connectedSitesReleasedFor } from "@/products/connected-sites/server";
+import { getWork } from "@/platform/workspaces/repository";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 
 export const dynamic = "force-dynamic";
@@ -22,16 +23,18 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
   const workspaceId = typeof params.workspaceId === "string" && UUID.test(params.workspaceId) ? params.workspaceId : null;
   if (!workspaceId) redirect("/workspace");
   const requestId = typeof params.request === "string" && UUID.test(params.request) ? params.request : null;
+  const checkWorkId = typeof params.check === "string" && UUID.test(params.check) ? params.check : null;
   const user = await getSessionUser().catch(() => null);
-  if (!user?.id || !user.email || !user.email_confirmed_at) redirect(`/sign-in?next=${encodeURIComponent(gettingStartedHref(workspaceId))}`);
+  if (!user?.id || !user.email || !user.email_confirmed_at) redirect(`/sign-in?next=${encodeURIComponent(gettingStartedHref(workspaceId, requestId, checkWorkId))}`);
   const actor = { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() };
   const state = await readPlace("getting-started", workspaceId, async () => {
-    const [business, google, connect] = await Promise.all([
+    const [business, google, connect, check] = await Promise.all([
       gettingStarted.read(actor, workspaceId),
       publishingEnabledForWorkspace(workspaceId, actor).catch(() => false),
       connectedSitesReleasedFor(actor, workspaceId).catch(() => false),
+      checkWorkId ? getWork(actor, checkWorkId).catch(() => null) : null,
     ]);
-    return { business, google, connect };
+    return { business, google, connect, check: check?.workspaceId === workspaceId && ["website_audit", "ai_visibility"].includes(check.productId) ? check.id : null };
   });
   const home = `/workspace?${new URLSearchParams({ workspaceId })}`;
   // Content goes straight into the shell (as Help does); an extra scroll wrapper squeezes the sidebar.
@@ -43,6 +46,7 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
         // L4 owns the fresh Connect Google start there and brings the owner back here.
         google: state.data.google ? `/workspace/google?${new URLSearchParams({ workspaceId, returnTo: gettingStartedHref(workspaceId) })}` : null,
         connect: state.data.connect ? `/workspace/site?${new URLSearchParams({ workspaceId, entry: "connect" })}` : null,
+        check: state.data.check ? `/workspace?${new URLSearchParams({ workspaceId, view: "work", work: state.data.check })}` : null,
         request: requestId ? `/workspace/delivery/${requestId}` : null,
       }} />
         : <div className="mx-auto w-full max-w-2xl px-4 py-12 md:px-8">

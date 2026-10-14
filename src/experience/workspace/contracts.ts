@@ -138,6 +138,8 @@ export interface WorkspaceProduct {
 }
 
 export interface WorkspaceSnapshot {
+  /** Derived from confirmed business facts and pending found facts; never a durable onboarding flag. */
+  gettingStarted?: "complete" | "incomplete" | "unavailable";
   /** Current server-resolved maker authority; writes independently recheck it. */
   canMakeSystems?: boolean;
   ownerBrand?: OwnerBrand;
@@ -173,6 +175,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** The workspace billing route is available; absent means no billing link. */
+  businessBilling?: boolean;
   /** Full schema-3 export archive; absent keeps the bounded legacy snapshot label. */
   exportSchema3?: boolean;
   /** Renewable owner assistant connections: STRELVA_MCP_OAUTH and workspace release. */

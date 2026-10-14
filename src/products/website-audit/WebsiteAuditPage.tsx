@@ -237,7 +237,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialBusiness = "", initia
             {fix.guides?.map(guide => <StTextButton key={guide.slug} href={`/guides/${guide.slug}`}>Fix it: {auditDisplayCopy(guide.title)}</StTextButton>)}
           </StRow>)}</StRows> : <StEmpty>No fixes were flagged in the checks that completed.</StEmpty>}</StSection>
           <StCopy muted>This assessment does not change your website or activate monitoring.</StCopy>
-          {saved ? <StState kind="live">Saved privately to this workspace</StState> : reportId && workspaceEnabled ? <StPillLink href={`/workspace/business/new?check=${encodeURIComponent(reportId)}`}>Start with this fix</StPillLink> : <StCopy muted>Account saving is unavailable for this result. You can still export it.</StCopy>}
+          {saved ? <StState kind="live">Saved privately to this workspace</StState> : reportId && workspaceEnabled ? <StPillLink href={`/workspace?save=${encodeURIComponent(reportId)}`}>Start with this fix</StPillLink> : <StCopy muted>Account saving is unavailable for this result. You can still export it.</StCopy>}
           {result.agency ? <StTextButton href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer">Get this fixed by {result.agency.name}</StTextButton> : null}
           <div className={styles.actions}><StPill variant="soft" onClick={handleDownloadReport} busy={reportLoading}>{reportLoading ? "Preparing…" : "Save as PDF"}</StPill>{!saved ? <StTextButton onClick={handleReset}>Check another site</StTextButton> : null}</div>
           {error ? <StNotice tone="critical">{auditDisplayCopy(error)}</StNotice> : null}

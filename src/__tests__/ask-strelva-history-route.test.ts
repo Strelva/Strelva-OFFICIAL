@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ operator: vi.fn(async () => false), actor: vi.fn(), rpc: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
+const mocks = vi.hoisted(() => ({ operator: vi.fn(async () => false), actor: vi.fn(), rpc: vi.fn(), record: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
+
+vi.mock("@/platform/business-record/service", async importOriginal => ({ ...await importOriginal<typeof import("@/platform/business-record/service")>(), readBusinessRecord: (...args: unknown[]) => mocks.record(...args) }));
 
 vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: () => mocks.operator() }));
@@ -26,7 +28,7 @@ const CONVERSATION = "44444444-4444-4444-8444-444444444444";
 const get = (query: string) => GET(new Request(`http://localhost/api/workspace/ask?${query}`));
 
 describe("GET /api/workspace/ask (conversation history)", () => {
-  beforeEach(() => { mocks.operator.mockReset(); mocks.operator.mockResolvedValue(false); mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
+  beforeEach(() => { mocks.operator.mockReset(); mocks.operator.mockResolvedValue(false); mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.record.mockReset(); mocks.record.mockResolvedValue(null); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
   afterEach(() => { for (const key of ENV) delete process.env[key]; });
 
   it("is off with the release and reads no session", async () => {
@@ -47,6 +49,7 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       expect((await get("workspaceId=nope")).status).toBe(400);
       expect((await get(`workspaceId=${WS}&systemId=x`)).status).toBe(400);
       expect(mocks.rpc).not.toHaveBeenCalled();
+      expect(mocks.record).not.toHaveBeenCalled();
     });
 
     it("lists conversations for the business, filtered by System", async () => {
@@ -58,6 +61,25 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       expect(body.conversations).toHaveLength(1);
       expect(body.canAskOnBehalf).toBe(false);
       expect(mocks.rpc).toHaveBeenCalledWith("list_ask_conversations", expect.objectContaining({ p_workspace_id: WS, p_system_id: CONVERSATION }));
+    });
+
+    it("returns fact-grounded suggestions only after authorized history access", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.rpc.mockResolvedValue({ data: [], error: null });
+      mocks.record.mockResolvedValue({ facts: { display_name: { value: "Harbor Dental" } }, services: [{ name: "Dental cleaning", active: true, verified: true }] });
+      const body = await (await get(`workspaceId=${WS}`)).json();
+      expect(body.suggestions).toContain("Draft a clearer explanation of our Dental cleaning service.");
+      expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ userId: "cccccccc-0000-4000-8000-000000000001" }), WS);
+      expect(body).not.toHaveProperty("record");
+    });
+
+    it("a record outage keeps conversation history readable with no guessed facts", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.rpc.mockResolvedValue({ data: [], error: null });
+      mocks.record.mockRejectedValue(new Error("Record unavailable"));
+      const response = await get(`workspaceId=${WS}`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).not.toHaveProperty("suggestions");
     });
 
     it("enables asked-on-behalf only for a verified Strelva operator", async () => {
@@ -79,12 +101,14 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       expect((await get(`workspaceId=${WS}`)).status).toBe(503);
       expect(mocks.systemsFor).toHaveBeenCalledWith(expect.objectContaining({ userId: "cccccccc-0000-4000-8000-000000000001" }), WS);
       expect(mocks.rpc).not.toHaveBeenCalled();
+      expect(mocks.record).not.toHaveBeenCalled();
     });
 
     it("answers a non-member as forbidden and a store failure as unavailable", async () => {
       mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
       mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "ask_history_access_denied" } });
       expect((await get(`workspaceId=${WS}`)).status).toBe(403);
+      expect(mocks.record).not.toHaveBeenCalled();
       mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "connection refused" } });
       expect((await get(`workspaceId=${WS}`)).status).toBe(503);
     });

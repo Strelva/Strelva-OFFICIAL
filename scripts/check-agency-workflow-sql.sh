@@ -67,7 +67,7 @@ rehearse_owner_operator_boundary() {
   cmp "$cluster_root/owner-boundary-current-before.catalog" "$cluster_root/owner-boundary-current-reapplied.catalog"
 }
 while IFS= read -r migration; do
-  [[ "$(basename "$migration")" == 20261024* ]] && continue
+  [[ "$(basename "$migration")" == 20261024* || "$(basename "$migration")" == 20261025* ]] && continue
   if [[ "$(basename "$migration")" == "20261015120000_owner_link_provider_identity.sql" ]]; then
     psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-before.hashes"
   fi

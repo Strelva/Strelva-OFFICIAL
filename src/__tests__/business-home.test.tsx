@@ -46,9 +46,9 @@ const noop = () => undefined;
 function renderHome(items: WorkspaceWork[] = [
   work("Review urgency field", { productId: "operations", resourceKind: "responsibility", operation: { status: "needs_attention", reason: "Review the proposed change." } }),
   work("Opening checklist"),
-], systemsReleased = false) {
+], systemsReleased = false, snapshotExtra: Partial<WorkspaceSnapshot> = {}) {
   return renderToStaticMarkup(createElement(BusinessHome, {
-    snapshot: snapshot(items),
+    snapshot: { ...snapshot(items), ...snapshotExtra },
     sites: [],
     unassignedSites: [],
     siteAssignmentsKnown: true,
@@ -240,5 +240,16 @@ describe("business home", () => {
     expect(html).toContain("Open Opening checklist");
     expect(html).not.toContain("What changed");
     expect(html).not.toContain("All requests");
+  });
+});
+
+
+describe("Getting started on owner Home", () => {
+  it.each([false, true])("keeps a scoped setup link in navigation and Home with Systems %s", systemsReleased => {
+    const html = renderHome([], systemsReleased, { gettingStarted: "incomplete", releases: { systems: systemsReleased, businessSignup: true } });
+    expect(html).toContain('/workspace/getting-started?workspaceId=business-1');
+    expect(html).toContain("Read your website or add business details");
+    expect(renderHome([], systemsReleased, { gettingStarted: "complete", releases: { systems: systemsReleased, businessSignup: true } })).not.toContain('/workspace/getting-started?');
+    expect(renderHome([], systemsReleased, { gettingStarted: "incomplete", releases: { systems: systemsReleased, businessSignup: false } })).not.toContain('/workspace/getting-started?');
   });
 });

@@ -31,6 +31,8 @@ export interface AskReceiptItem {
   summary: string;
   actor?: RecordedActor | null;
   agencyName?: string | null;
+  previewHref?: string;
+  tryHref?: string;
   needsYou?: AskNeedsYouRouting;
 }
 
@@ -409,7 +411,8 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             candidate: input.candidate,
             words: ctx.lastUserText, origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf,
           });
-          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft` });
+          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft`, previewHref: opened.previewHref, tryHref: opened.tryHref,
+            ...(opened.reviewStatus === "needs_you" ? { needsYou: { route: "owner_decides" as const, itemRef: opened.id, decideAt: `/workspace?workspaceId=${encodeURIComponent(ctx.workspaceId)}&view=needs-you` } } : {}) });
           if (input.candidate?.kind === "inquiry-follow-up-rule") return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared the exact follow-up rule and passed its isolated native rehearsal. Try shows the full wording, timing, attempts and test results. ${opened.reviewStatus === "needs_you" ? "The owner's decision is in Needs you." : "The saved alternative is waiting for Needs you synchronization."} Nothing live changed and no message was sent.` };
           return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working ${input.candidate?.kind === "existing-booking-page" ? "booking-page Possibility for this site's existing configured service" : "page-set Possibility"}. ${input.candidate?.kind === "existing-booking-page" ? "Try it uses configured test times; no real booking is made." : "Open the preview to navigate its pages."} ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
         } catch (error) {

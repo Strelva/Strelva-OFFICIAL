@@ -30,8 +30,9 @@ export interface WorkspaceLocation {
   offering?: string;
   template?: string;
   save?: string;
+  intent?: "website";
 }
-const LOCATION_KEYS = ["workspaceId", "decision", "deliveryCheck", "view", "work", "system", "search", "standingId", "assignmentId", "tenantId", "inquiryView", "inquiryRequest", "inquiryRecord", "row", "offering", "template", "save", "trackerWork"] as const;
+const LOCATION_KEYS = ["workspaceId", "decision", "deliveryCheck", "view", "work", "system", "search", "standingId", "assignmentId", "tenantId", "inquiryView", "inquiryRequest", "inquiryRecord", "row", "offering", "template", "save", "intent", "trackerWork"] as const;
 
 /** Read old links leniently, but never carry a detail into an incompatible place. */
 export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocation {
@@ -45,15 +46,20 @@ export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocatio
       : key === "deliveryCheck" ? /^(listing|outside|website):[0-9a-f-]{36}$/.test(value)
       : key === "row" ? RECORD_ID.test(value)
       : key === "search" ? value === "1"
+      : key === "intent" ? value === "website"
       : key === "save" ? /^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(value)
       : ID.test(value);
-    if (valid) location[key] = value;
+    if (valid) {
+      if (key === "intent") location.intent = "website";
+      else location[key] = value;
+    }
   }
   if (params.has("work") && !location.work) location.unavailableWork = true;
   // Legacy responsibility links did not always include a view. Their identity wins.
   if ((location.standingId || location.assignmentId) && !location.view) location.view = "operations";
   if (location.view !== "operations" && location.view !== "ongoing") { delete location.standingId; delete location.assignmentId; }
   if (["system", "ask", "start", "products", "requests", "settings", "help", "needs-you"].includes(location.view || "") || location.standingId || location.assignmentId) { delete location.work; delete location.unavailableWork; }
+  if (location.view !== "help") delete location.intent;
   if (location.view !== "needs-you" || !location.workspaceId) delete location.decision;
   if ((location.view && location.view !== "home") || !location.workspaceId) delete location.deliveryCheck;
   if (location.view !== "system" && location.view !== "ask") delete location.system;
@@ -118,9 +124,10 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const target = new URL(value, "https://workspace.invalid");
     const params = target.searchParams;
     const workspaceId = params.get("workspaceId");
-    const allowed = place[1] === "results" ? ["workspaceId", "range", "from", "to"] : ["workspaceId"];
+    const allowed = place[1] === "results" ? ["workspaceId", "range", "from", "to"] : place[1] === "getting-started" ? ["workspaceId", "request", "check"] : ["workspaceId"];
     if ((target.hash && !((place[1] === "results" && target.hash === "#site-health") || (place[1] === "business-details" && target.hash === "#ownership"))) || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
       || !workspaceId || !UUID.test(workspaceId)) return null;
+    for (const key of ["request", "check"]) if (params.has(key) && !UUID.test(params.get(key) || "")) return null;
     const range = params.get("range");
     if (range !== null && !["live", "week", "month", "custom"].includes(range)) return null;
     for (const key of ["from", "to"]) {
@@ -216,6 +223,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       : key === "system" ? !UUID.test(item) || !["system", "ask"].includes(params.get("view") || "")
       : key === "search" ? item !== "1" || !["work", "apps"].includes(params.get("view") || "")
       : key === "row" ? !RECORD_ID.test(item) || params.get("view") !== "tracker" || !params.get("work")
+      : key === "intent" ? item !== "website" || params.get("view") !== "help"
       : key === "save" ? !/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(item)
       : key === "view" ? !VIEWS.has(item) : true) return null;
   }
