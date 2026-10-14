@@ -16,55 +16,21 @@ async function render(request: typeof fetch, initialProspect?: { token?: string;
   await act(async () => root.render(<AgencyPaymentLinks agencyWorkspaceId={agency} request={request} initialProspect={initialProspect} />));
   return node;
 }
-it("prefills a server-authorized lead as a named prospect for review", async () => {
-  const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())), { name: "Northside Bakery", description: "Agreed website work" });
-  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Northside Bakery");
-  expect(node.querySelector<HTMLInputElement>('[name="description"]')?.value).toBe("Agreed website work");
-  expect(node.querySelector<HTMLInputElement>('[name="amount"]')?.value).toBe("");
-});
 const button = (node: HTMLElement, label: string) => [...node.querySelectorAll("button")].find(item => item.textContent === label)!;
-async function submit(node: HTMLElement) {
-  (node.querySelector('[name="clientName"]') as HTMLInputElement).value = "Prospect Coffee";
-  (node.querySelector('[name="description"]') as HTMLInputElement).value = "Agreed build";
-  (node.querySelector('[name="amount"]') as HTMLInputElement).value = "500";
-  await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+async function expire(node: HTMLElement) {
+  await act(async () => button(node, "Expire link").click());
+  await act(async () => button(node, "Confirm expire").click());
 }
-function saved(body: Record<string, unknown>) {
-  return { ...legacy, clientName: body.clientName, slug: "saved-coffee", agencyWorkspaceId: agency, agencyDisplayName: "Strelva Agency", createdBy: actor, customCopy: body.description, amountCents: body.amountCents, minCents: body.minCents, maxCents: body.maxCents, businessWorkspaceId: body.businessWorkspaceId };
-}
-
-it("refreshes a different lead's prefill while retaining an earlier uncertain command verbatim", async () => {
-  const bodies: Record<string, unknown>[] = [];
-  const request = vi.fn<typeof fetch>(async (_url, init) => {
-    if (init?.method !== "POST") return Response.json(snapshot());
-    bodies.push(JSON.parse(String(init.body)));
-    if (bodies.length === 1) throw new Error("Lost response");
-    return Response.json({ payLink: saved(bodies[0]!) });
-  });
-  const node = await render(request, { token: "a".repeat(36), name: "First lead", description: "First scope" });
-  await submit(node);
-  await act(async () => roots.at(-1)!.render(<AgencyPaymentLinks agencyWorkspaceId={agency} request={request} initialProspect={{ token: "b".repeat(36), name: "Second lead", description: "Second scope" }} />));
-  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Second lead");
-  expect(node.querySelector<HTMLInputElement>('[name="description"]')?.value).toBe("Second scope");
-  expect(button(node, "Create payment link").disabled).toBe(true);
-  expect(node.textContent).toContain("Submitted for Prospect Coffee: Agreed build");
-  await act(async () => button(node, "Retry the same request").click());
-  expect(bodies[1]).toEqual(bodies[0]);
-  expect(node.querySelector<HTMLInputElement>('[name="clientName"]')?.value).toBe("Second lead");
+it.each([true, false])("shows the same Coming soon state for legacy merchant %s without a creation form", async legacyMerchant => {
+  const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ legacyMerchant }))));
+  expect(node.querySelector("form")).toBeNull(); expect(button(node, "Create payment link")).toBeUndefined();
+  expect(node.textContent).toContain("Coming soon"); expect(node.textContent).toContain("Stripe Connect");
 });
-
 it("shows paid status and historical attribution without inventing the old actor", async () => {
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())));
   expect(node.textContent).toContain("Created before agency ownership was recorded · Actor not recorded");
   expect(node.textContent).not.toContain("old@example.test"); expect(node.textContent).toContain("Paid $500");
   expect(button(node, "Copy link")).toBeTruthy();
-});
-it.each(["coming_soon", "setup_required", "unavailable", "ready"])("other agencies see %s Connect state without legacy controls", async status => {
-  const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ legacyMerchant: false, checkoutAvailability: { status }, payLinks: [] }))));
-  expect(node.querySelector("form")).toBeNull(); expect(button(node, "Create payment link")).toBeUndefined();
-  expect(node.textContent).toContain("Stripe merchant account");
-  if (status === "coming_soon") expect(node.textContent).toContain("Coming soon");
-  if (status === "setup_required") expect(node.querySelector('a[href*="/workspace/payments"]')).toBeTruthy();
 });
 it("recovers a denied initial read with GET only", async () => {
   const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({ error: "Access denied" }, { status: 403 })).mockResolvedValueOnce(Response.json(snapshot({ payLinks: [], paidPayments: {} })));
@@ -76,25 +42,23 @@ it("labels payment uncertainty and expired records, with no copy or expire actio
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ payLinks: [{ ...legacy, revokedAt: "2026-10-12" }], paidPayments: {}, paymentStatusAvailable: false }))));
   expect(node.textContent).toContain("Payment status unavailable"); expect(node.textContent).toContain("Expired"); expect(button(node, "Copy link")).toBeUndefined(); expect(button(node, "Expire link")).toBeUndefined();
 });
-it("holds exact create terms after a lost response and retries with the same idempotency key", async () => {
+it("holds exact expiration terms after a lost response and retries the same key", async () => {
   const bodies: Record<string, unknown>[] = [];
   const request = vi.fn<typeof fetch>(async (_url, init) => {
     if (init?.method !== "POST") return Response.json(snapshot());
     const body = JSON.parse(String(init.body)); bodies.push(body);
     if (bodies.length === 1) throw new Error("Response lost");
-    return Response.json({ payLink: saved(body) });
+    return Response.json({ payLink: { ...legacy, revokedAt: "2026-10-12", revokedBy: actor } });
   });
-  const node = await render(request); await submit(node);
-  expect(button(node, "Create payment link").disabled).toBe(true); expect((node.querySelector('[name="amount"]') as HTMLInputElement).value).toBe("500");
-  await act(async () => button(node, "Refresh payment links").click()); expect(bodies).toHaveLength(1); expect(button(node, "Create payment link").disabled).toBe(true);
+  const node = await render(request); await expire(node);
+  await act(async () => button(node, "Refresh payment links").click()); expect(bodies).toHaveLength(1);
   await act(async () => button(node, "Retry the same request").click());
-  expect(bodies[1]).toEqual(bodies[0]); expect(bodies[0]).toMatchObject({ amountCents: 50000, description: "Agreed build", agencyWorkspaceId: agency });
-  expect(node.textContent).toContain("Payment link saved"); expect(button(node, "Create payment link").disabled).toBe(false);
+  expect(bodies[1]).toEqual(bodies[0]); expect(node.textContent).toContain("Payment link expired");
 });
-it("does not confirm an incomplete successful command response", async () => {
+it("does not confirm an incomplete expiration response", async () => {
   const request = vi.fn<typeof fetch>(async (_url, init) => Response.json(init?.method === "POST" ? { payLink: { slug: "unexpected" } } : snapshot()));
-  const node = await render(request); await submit(node);
-  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Create payment link").disabled).toBe(true); expect(node.textContent).not.toContain("Payment link saved");
+  const node = await render(request); await expire(node);
+  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Confirm expire").disabled).toBe(true);
 });
 it("requires an explicit expire review and preserves the server's first revocation receipt", async () => {
   const request = vi.fn<typeof fetch>(async (_url, init) => {
@@ -120,7 +84,7 @@ it("keeps an uncertain request held when later authorization is refused", async 
     if (request.mock.calls.filter(([, config]) => config?.method === "POST").length === 1) throw new Error("Response lost");
     return Response.json({ error: "Access changed" }, { status: 403 });
   });
-  const node = await render(request); await submit(node);
+  const node = await render(request); await expire(node);
   await act(async () => button(node, "Retry the same request").click());
-  expect(node.textContent).toContain("Access changed"); expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Create payment link").disabled).toBe(true);
+  expect(node.textContent).toContain("Access changed"); expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Confirm expire").disabled).toBe(true);
 });

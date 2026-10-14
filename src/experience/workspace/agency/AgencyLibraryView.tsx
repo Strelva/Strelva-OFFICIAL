@@ -86,7 +86,7 @@ export function AgencyLibraryView({
   }, [agencyWorkspaceId, refresh, attempt]);
 
   const review = useCallback(async (source: AgencyLibrarySource, versionIds = reviewableVersionIds(source)) => {
-    if (reviewing.current.has(source.systemId) || refreshing || refreshError) return;
+    if (state.status !== "ready" || state.library.reviewEnabled !== true || reviewing.current.has(source.systemId) || refreshing || refreshError) return;
     reviewing.current.add(source.systemId);
     setReviews((current) => ({ ...current, [source.systemId]: { status: "running" } }));
     const results: AgencyBulkReviewResult[] = [];
@@ -107,16 +107,17 @@ export function AgencyLibraryView({
       if (scope.current === agencyWorkspaceId) await refresh();
       reviewing.current.delete(source.systemId);
     }
-  }, [request, agencyWorkspaceId, refresh, refreshing, refreshError]);
+  }, [request, agencyWorkspaceId, refresh, refreshing, refreshError, state]);
 
   if (state.status === "loading") return <div className="space-y-4" role="status" aria-label="Loading the library"><StSkeleton width="48%" label="Loading the library" /><StSkeleton width="72%" /></div>;
   if (state.status === "error") return <StNotice tone="critical"><p>The library could not be loaded. Nothing was changed.</p><StTextButton onClick={() => setAttempt(value => value + 1)}>Retry</StTextButton></StNotice>;
   if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <div className="space-y-4"><StTextButton disabled={refreshing} onClick={() => void refresh()}>Refresh Library</StTextButton><StEmpty>No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</StEmpty>{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div>;
   const selectedSource = state.library.sources.find(source => source.systemId === selectedSourceId) ?? state.library.sources[0];
   return <div className="space-y-9"><div><StTextButton disabled={refreshing || Object.values(reviews).some(review => review.status === "running")} onClick={() => void refresh()}>Refresh Library</StTextButton>{refreshing ? <p role="status" className="text-sm text-gray-muted">Refreshing the Library…</p> : null}{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div><p className="text-sm text-gray-muted">Library holds your sources. Qualified releases shared with clients appear in their Apps. Each client gets its own Version, records, Connections and approval.</p>
+    {state.library.reviewEnabled !== true ? <StNotice>Owner reviews are paused. Your saved sources and client Versions remain available. Strelva will turn reviews on for you.</StNotice> : null}
     {selectedSource ? <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)]">
       <StRows label="Sources">{state.library.sources.map(source => <StRow key={source.systemId} title={source.name} detail={latestRevision(source)?.summary || "No release published yet"} selected={source.systemId === selectedSource.systemId} onClick={() => setSelectedSourceId(source.systemId)} end={<StMono>{latestRevision(source) ? `Release ${latestRevision(source)!.number}` : "Draft"} · {source.versions.length} {source.versions.length === 1 ? "use" : "uses"}</StMono>} />)}</StRows>
-      <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} held={refreshing || Boolean(refreshError)} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
+      <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
     </div> : null}
     <InquiryLibraryVersions library={state.library} />
   </div>;
@@ -127,8 +128,8 @@ export function InquiryLibraryVersions({ library }: { library: AgencyLibrary }) 
     {library.inquiryVersions?.length ? <StSection title="Inquiry Versions"><StRows label="Inquiry Versions">{library.inquiryVersions.map(version => <StRow key={version.id} title={`${version.businessName} · ${version.name}`} detail={<><span>Source Release {version.sourceRevision} · this Version’s Release {version.currentRelease}</span><br />{version.improvement === "blocked" ? "A source update needs a choice about local changes." : version.improvement === "auto_applicable" ? "A source update is available for review." : "Based on the accepted source revision. Local changes keep their own release."}</>} end={<StTextButton href={`/business/${encodeURIComponent(version.tenantId)}?view=patterns`}>Open {version.businessName}’s inquiry form</StTextButton>} />)}</StRows><StLabel>Updates use the existing inquiry review and testing steps. Each business owner approves going live.</StLabel></StSection> : null}</>;
 }
 
-function LibrarySource({ request, source, review, onReview, held, onChanged }: {
-  request: typeof fetch; source: AgencyLibrarySource; review: ReviewState | undefined; onReview: (versionIds?: string[]) => void; held: boolean; onChanged: () => void;
+function LibrarySource({ request, source, review, onReview, held, onChanged, reviewEnabled }: {
+  reviewEnabled: boolean; request: typeof fetch; source: AgencyLibrarySource; review: ReviewState | undefined; onReview: (versionIds?: string[]) => void; held: boolean; onChanged: () => void;
 }) {
   const latest = latestRevision(source);
   const readyIds = useMemo(() => reviewableVersionIds(source), [source]);
@@ -149,7 +150,7 @@ function LibrarySource({ request, source, review, onReview, held, onChanged }: {
       {source.versions.length ? <StRows label={`Versions of ${source.name}`}>{source.versions.map(version => <VersionRow key={version.versionId} version={version} selection={bulk ? { checked: selectedIds.includes(version.versionId), disabled: held || !readyIds.includes(version.versionId) || review?.status === "running", onChange: () => setSelectedIds(current => current.includes(version.versionId) ? current.filter(id => id !== version.versionId) : [...current, version.versionId]) } : undefined} />)}</StRows> : <StEmpty>No client has a Version of this yet.</StEmpty>}
     </StSection>
     {bulk ? <StSurface label="Prepare selected improvements"><div className="flex flex-wrap items-center justify-between gap-4"><div className="max-w-sm space-y-2"><StLabel>What each owner will read</StLabel><p className="text-sm">{reviewableVersionGroups(source, selectedIds).map(group => source.revisions.find(revision => revision.number === group.revision)?.summary || `Release ${group.revision}`).join(" · ") || "Select a qualified improvement."}</p><StLabel>Each selected Version gets its own Needs you item. Ready drafts are updated now. Conflicts and missing Connections are skipped; no live client changes until its owner approves.</StLabel></div><StPill disabled={held || !selectedIds.length || review?.status === "running"} busy={review?.status === "running"} onClick={() => onReview(selectedIds)}>Prepare {selectedIds.length} {selectedIds.length === 1 ? "offer" : "offers"}</StPill></div></StSurface> : null}
-    {review ? <ReviewResult source={source} review={review} /> : null}
+    {review ? <ReviewResult reviewEnabled={reviewEnabled} source={source} review={review} /> : null}
     <SourcePackageControls request={request} workspaceId={source.workspaceId} systemId={source.systemId} onChanged={onChanged} />
   </div>;
 }
@@ -163,14 +164,14 @@ function VersionRow({ version, selection }: { version: AgencyLibraryVersion; sel
   </StRow>;
 }
 
-function ReviewResult({ source, review }: { source: AgencyLibrarySource; review: ReviewState }) {
+function ReviewResult({ source, review, reviewEnabled }: { reviewEnabled: boolean; source: AgencyLibrarySource; review: ReviewState }) {
   if (review.status === "running") return <div role="status"><StLabel>Preparing an improvement for each ready Version…</StLabel><StSkeleton /></div>;
   if (review.status === "error") return <StNotice tone="critical">{review.message}</StNotice>;
-  return <>{review.message ? <StNotice tone="critical">{review.message}</StNotice> : null}{review.results.map(result => <ReviewReleaseResult key={result.revision} source={source} result={result} />)}</>;
+  return <>{review.message ? <StNotice tone="critical">{review.message}</StNotice> : null}{review.results.map(result => <ReviewReleaseResult reviewEnabled={reviewEnabled} key={result.revision} source={source} result={result} />)}</>;
 }
 
-function ReviewReleaseResult({ source, result }: { source: AgencyLibrarySource; result: AgencyBulkReviewResult }) {
+function ReviewReleaseResult({ source, result, reviewEnabled }: { reviewEnabled: boolean; source: AgencyLibrarySource; result: AgencyBulkReviewResult }) {
   const lines = reviewAllLines(source, result);
   const prepared = lines.filter(line => line.outcome === "prepared").length;
-  return <StSection title={`${prepared} prepared for Release ${result.revision}`}><p role="status" className="text-sm text-gray-muted">Each owner approves their own.</p><StRows label="Review all results">{lines.map(line => <StRow key={line.versionId} title={line.clientName} detail={<>{line.outcome === "prepared" ? line.decisionId ? `Prepared. Waiting on ${line.clientName}.` : line.detail || "Draft prepared. No owner decision was returned." : reviewLineLabel(line)}<br />{source.versions.find(version => version.versionId === line.versionId)?.systemName}</>} end={line.decisionId && source.versions.some(version => version.versionId === line.versionId) ? <StTextButton href={`/workspace/version-review?${new URLSearchParams({ workspaceId: line.workspaceId, systemId: source.versions.find(version => version.versionId === line.versionId)!.systemId, decisionId: line.decisionId })}`}>Open prepared review</StTextButton> : null} lead={<StState kind={line.outcome === "prepared" ? "live" : line.outcome === "failed" ? "down" : "need"}>{line.outcome === "prepared" ? "Prepared" : line.outcome === "failed" ? "Could not prepare" : "Skipped"}</StState>} />)}</StRows></StSection>;
+  return <StSection title={`${prepared} prepared for Release ${result.revision}`}><p role="status" className="text-sm text-gray-muted">Each owner approves their own.</p><StRows label="Review all results">{lines.map(line => <StRow key={line.versionId} title={line.clientName} detail={<>{line.outcome === "prepared" ? line.decisionId ? `Prepared. Waiting on ${line.clientName}.` : line.detail || "Draft prepared. No owner decision was returned." : reviewLineLabel(line)}<br />{source.versions.find(version => version.versionId === line.versionId)?.systemName}</>} end={reviewEnabled && line.decisionId && source.versions.some(version => version.versionId === line.versionId) ? <StTextButton href={`/workspace/version-review?${new URLSearchParams({ workspaceId: line.workspaceId, systemId: source.versions.find(version => version.versionId === line.versionId)!.systemId, decisionId: line.decisionId })}`}>Open prepared review</StTextButton> : null} lead={<StState kind={line.outcome === "prepared" ? "live" : line.outcome === "failed" ? "down" : "need"}>{line.outcome === "prepared" ? "Prepared" : line.outcome === "failed" ? "Could not prepare" : "Skipped"}</StState>} />)}</StRows></StSection>;
 }

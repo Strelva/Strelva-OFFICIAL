@@ -10,6 +10,30 @@ const key = { workspaceId: "61000000-0000-4000-8000-000000000002", workId: "6100
 function document() { return siteDocumentSchema.parse({ version: 2, siteName: "A sourced business", theme: { palette: "light", typeScale: "standard" }, pages: [{ path: "/", title: "Home", description: "Description", root: "root" }], nodes: { root: { id: "root", type: "Section", variant: "container", props: {}, children: ["hero"], factIds: [] }, hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Business title" }, children: [], factIds: [] } }, facts: {}, assets: {}, redirects: [], provenance: { composer: "rules" } }); }
 function row(doc = document()) { return { workspace_id: key.workspaceId, website_work_id: key.workId, revision: 1, content_hash: siteDocumentHash(doc), document: doc, created_by: actor.userId, created_at: "2026-10-01T12:00:00Z" }; }
 
+describe("exact agency website decision transport", () => {
+  const decision = { workspaceId: key.workspaceId, decisionId: "61000000-0000-4000-8000-000000000004", revisionHash: "b".repeat(64), userId: actor.userId };
+  it("specializes approval only with the exact claim, preserving ordinary read authority", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [row()], error: null });
+    const store = createWebsiteDocumentStore({ rpc }, undefined, decision);
+    await store.approve(actor, { ...key, revision: 1, contentHash: row().content_hash });
+    expect(rpc.mock.calls.map(call => call[0])).toEqual(["read_website_documents", "approve_website_by_agency_decision"]);
+    expect(rpc).toHaveBeenLastCalledWith("approve_website_by_agency_decision", expect.objectContaining({ p_decision_id: decision.decisionId, p_revision_hash: decision.revisionHash, p_user_id: actor.userId, p_revision: 1, p_content_hash: row().content_hash }));
+  });
+  it("never carries an agency decision into another workspace or identity", async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [row()], error: null });
+    const store = createWebsiteDocumentStore({ rpc }, undefined, { ...decision, workspaceId: decision.decisionId });
+    await expect(store.approve(actor, { ...key, revision: 1, contentHash: row().content_hash })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0]![0]).toBe("read_website_documents");
+  });
+  it("does not fall back to an owner RPC after claim refusal", async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: [row()], error: null }).mockResolvedValueOnce({ data: null, error: { message: "owner_decision_owner_only" } });
+    await expect(createWebsiteDocumentStore({ rpc }, undefined, decision).approve(actor, { ...key, revision: 1, contentHash: row().content_hash })).rejects.toBeInstanceOf(WorkspaceStoreError);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).not.toHaveBeenCalledWith("approve_website_document", expect.anything());
+  });
+});
+
 describe("immutable site document", () => {
   it("hashes the same semantic map independent of property insertion order", () => { const doc = document(); const reordered = structuredClone({ ...doc, nodes: { hero: doc.nodes.hero!, root: doc.nodes.root! } }); expect(siteDocumentHash(reordered)).toBe(siteDocumentHash(doc)); reordered.nodes.hero!.props = { title: "Changed" }; expect(siteDocumentHash(reordered)).not.toBe(siteDocumentHash(doc)); });
   it("rejects unknown catalog props, dangerous links, missing facts and assets", () => {

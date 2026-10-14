@@ -77,6 +77,11 @@ export function deliverySourceAdapters(): SourceAdapter[] {
         const service = await websites();
         return service ? service.listWebsiteRebuilds(actor, workspaceId) : [];
       },
+      async decideAgency(actor, workId, selection, decision) {
+        const service = await websites();
+        if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+        return service.decideWebsiteRebuildAsAgency(actor, workId, selection, decision);
+      },
       async approve(actor, workId, selection) {
         const service = await websites();
         if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");

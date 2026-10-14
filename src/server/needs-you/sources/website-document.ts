@@ -11,17 +11,19 @@
  *   Admins may decide it unless it would be the site's first launch.
  * - `launch`: an approved candidate not yet published. Approve runs
  *   `launchWebsiteRebuild` (publish_website_document); launch is owner only
- *   in SQL (`website_document_assert_launch_owner`). A failed public
+ *   in the owner route. Full control uses the exact claimed-decision RPCs,
+ *   retaining current publication verification and resource permission. A failed public
  *   read-back after publication is `done_unverified` and never retried.
  *
  * A candidate with unresolved facts proposes those facts first. Copy too long
  * for an email is reviewed in the complete signed preview;
  * a truncated preview never grants confirmation. Not yet and expiry change nothing.
  */
+import { WebsitePublicationAcceptedError } from "@/products/websites/server";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { WebsiteRebuildRecord } from "@/products/websites/client";
 import { siteIdSchema, unresolvedSiteFacts } from "@/products/websites/client";
-import { OWNER_ONLY_KINDS, type ChangeKind, type ProposedItem } from "@/platform/needs-you/contracts";
+import { OWNER_ONLY_KINDS, type ChangeKind, type ProposedItem, type OwnerDecision } from "@/platform/needs-you/contracts";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
 import type { ServiceSession } from "@/platform/needs-you/service-actor";
 import { itemTitle, memberActor, proposeAsMember, revisionOf, splitSource, unchangedOutcome, workspaceHref } from "@/platform/needs-you/sources/shared";
@@ -34,6 +36,7 @@ export interface WebsiteDocumentPorts {
   launch(actor: WorkspaceActor, workId: string, selection: WebsiteSelection): Promise<WebsiteRebuildRecord>;
   confirmFact?(actor: WorkspaceActor, workId: string, factId: string, selection: WebsiteSelection): Promise<WebsiteRebuildRecord>;
   confirmCopy?(actor: WorkspaceActor, workId: string, nodeId: string, selection: WebsiteSelection): Promise<WebsiteRebuildRecord>;
+  decideAgency?(actor: WorkspaceActor, workId: string, selection: WebsiteSelection, decision: OwnerDecision): Promise<WebsiteRebuildRecord>;
   launchByOwnerLink?(actor: WorkspaceActor, workId: string, selection: WebsiteSelection, session: ServiceSession): Promise<WebsiteRebuildRecord>;
 }
 
@@ -154,6 +157,14 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
           const item = websiteDocumentItem(row);
           return [...(ports.confirmFact ? websiteDocumentFactItems(row) : []), ...(ports.confirmCopy ? websiteDocumentCopyItems(row) : []), ...(item ? [item] : [])];
         })),
+    async review(ctx, item) {
+      if (!ctx.actor) return null;
+      const found = await find(ctx.actor, ctx.workspaceId, item.sourceId);
+      if (!found || websiteRevision(found.record, found.stage) !== item.revisionHash) return null;
+      // The complete immutable document, including theme, links and metadata;
+      // no truncated copy can become an approval.
+      return [JSON.stringify(found.record.rebuild.candidate!.document, null, 2)];
+    },
     async currentRevision(ctx, sourceId) {
       if (!ctx.actor) return null;
       const found = await find(ctx.actor, ctx.workspaceId, sourceId);
@@ -168,6 +179,8 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
         const found = await find(actor, ctx.workspaceId, item.sourceId);
         if (!found) return { outcome: "done", reason: "already_resolved" };
         if (websiteRevision(found.record, found.stage) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
+        const agency = item.decidedByKind === "agency_session";
+        if (agency && (!ports.decideAgency || found.factId || found.nodeId)) return { outcome: "failed", reason: "agency_execution_unavailable" };
         if (found.factId) {
           if (!ports.confirmFact) return { outcome: "failed", reason: "fact_confirmation_unavailable" };
           const saved = await ports.confirmFact(actor, found.record.workId, found.factId, selection(found.record));
@@ -187,11 +200,11 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
           return { outcome: "done", receiptRef: `website_document:${saved.workId}:copy:${found.nodeId}:${saved.rebuild.candidate.revision}` };
         }
         if (found.stage === "approve") {
-          const saved = await ports.approve(actor, found.record.workId, selection(found.record));
+          const saved = agency ? await ports.decideAgency!(actor, found.record.workId, selection(found.record), item) : await ports.approve(actor, found.record.workId, selection(found.record));
           return { outcome: "done", receiptRef: `website_document:${saved.workId}:approved:${saved.rebuild.approvedCandidateRevision ?? ""}` };
         }
         const service = by.kind === "owner_link" ? by.service : null;
-        const launched = service?.purpose === "owner_decision_link"
+        const launched = agency ? await ports.decideAgency!(actor, found.record.workId, selection(found.record), item) : service?.purpose === "owner_decision_link"
           ? await (async () => {
             if (!ports.launchByOwnerLink) throw new Error("owner_link_launch_unavailable");
             return ports.launchByOwnerLink(actor, found.record.workId, selection(found.record), service);
@@ -204,7 +217,8 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
         return launched.rebuild.launch.readBack?.status === "verified"
           ? { outcome: "done", receiptRef }
           : { outcome: "done_unverified", reason: (launched.rebuild.launch.readBack?.message ?? "read_back_pending").slice(0, 500), receiptRef };
-      } catch {
+      } catch (error) {
+        if (error instanceof WebsitePublicationAcceptedError) return { outcome: "done_unverified", reason: error.message, receiptRef: `website_document:${error.workId}:${error.receiptId}` };
         return { outcome: "failed", reason: "resolver_failed" };
       }
     },

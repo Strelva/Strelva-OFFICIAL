@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   acceptOwnerClaim,
   addAgencyClient,
@@ -27,6 +27,8 @@ const scored = { business: "Northside Bakery", url: "https://northside-bakery.ex
 const assessment: SavedWork = { id: WORK, workspaceId: AGENCY, productId: "ai_visibility", resourceKind: "private_ai_visibility_work",
   title: "Northside Bakery", payload: { ...scored, privateSecret: "must-not-return" }, input: {}, createdBy: actor.userId,
   createdAt: "2026-10-07T12:00:00.000Z", updatedAt: "2026-10-07T12:00:00.000Z" };
+
+afterEach(() => vi.unstubAllEnvs());
 
 const receipt = (overrides: Record<string, unknown> = {}) => ({
   additionId: "a9000000-0000-4000-8000-0000000000d1", agencyWorkspaceId: AGENCY, customerWorkspaceId: CLIENT, name: "Northside Bakery",
@@ -57,6 +59,26 @@ describe("agency add client release", () => {
 });
 
 describe("addAgencyClient", () => {
+  it.each([
+    ["1", "workspace", true], ["1", "1", true], ["1", "0", false],
+    ["1", undefined, false], ["1", "true", false], ["0", "workspace", false],
+  ])("inherits only the server Systems policy (workspace %s, Systems %s)", async (workspace, systems, enabled) => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", workspace);
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", systems);
+    const d = deps({ agency_add_client_enrolled: { data: receipt({ sourceUrl: null }) } });
+    const input = { action: "add" as const, agencyWorkspaceId: AGENCY, name: "Northside Bakery", idempotencyKey: KEY, systemsEnabled: true };
+    await addAgencyClient(actor, input, d);
+    expect(d.rpc.mock.calls[1]).toEqual(["agency_add_client_enrolled", expect.objectContaining({ p_systems_enabled: enabled })]);
+  });
+
+  it("fails closed when atomic client enrollment is unavailable", async () => {
+    const d = deps({ agency_add_client_enrolled: { error: { message: "client release history unavailable" } } });
+    await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", idempotencyKey: KEY }, d))
+      .rejects.toMatchObject({ status: 503, code: "unavailable" });
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client_enrolled"]);
+    expect(d.assess).not.toHaveBeenCalled();
+  });
+
   it("refuses unauthorized actors before prospect reads or any crawl", async () => {
     const d = deps({ authorize_agency_client_add: { error: { message: "agency_client_access_denied" } } });
     await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY,
@@ -71,13 +93,13 @@ describe("addAgencyClient", () => {
     expect(d.seed).not.toHaveBeenCalled();
   });
   it("adds from a URL with unconfirmed scanned facts, then issues an owner link that is never sent", async () => {
-    const d = deps({ agency_add_client: { data: receipt() }, issue_agency_client_owner_claim: { data: claim } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt() }, issue_agency_client_owner_claim: { data: claim } });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", name: "Northside Bakery",
       ownerEmail: "pat@northside-bakery.example", idempotencyKey: KEY }, d);
 
     expect(d.seed).toHaveBeenCalledWith("https://northside-bakery.example/");
     const [name, args] = d.rpc.mock.calls[1]!;
-    expect(name).toBe("agency_add_client");
+    expect(name).toBe("agency_add_client_enrolled");
     expect(args).toMatchObject({
       p_user_id: actor.userId, p_verified_email: "owner@agency.example.test", p_agency_workspace_id: AGENCY, p_command_id: KEY,
       p_input: { name: "Northside Bakery", sourceUrl: "https://northside-bakery.example/", prospectId: null,
@@ -105,7 +127,7 @@ describe("addAgencyClient", () => {
   });
 
   it("names the business from the site when the agency left the name blank", async () => {
-    const d = deps({ agency_add_client: { data: receipt({ name: "Northside Bakery & Cafe" }) } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt({ name: "Northside Bakery & Cafe" }) } });
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "https://northside-bakery.example", idempotencyKey: KEY }, d);
     expect(d.rpc.mock.calls[1]![1]).toMatchObject({ p_input: { name: "Northside Bakery & Cafe" } });
   });
@@ -113,7 +135,7 @@ describe("addAgencyClient", () => {
   it("adds a prospect from the agency's own list, using its business and website", async () => {
     const d = deps({
       agency_prospect_list: { data: [{ id: PROSPECT, business: "Lakeview Dental", url: "https://lakeview-dental.example", email: "dr@lakeview-dental.example", name: "Dr. Lee" }] },
-      agency_add_client: { data: receipt({ sourceKind: "prospect", prospectId: PROSPECT, name: "Lakeview Dental" }) },
+      agency_add_client_enrolled: { data: receipt({ sourceKind: "prospect", prospectId: PROSPECT, name: "Lakeview Dental" }) },
     });
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, prospectId: PROSPECT, idempotencyKey: KEY }, d);
     expect(d.rpc.mock.calls[1]).toEqual(["agency_prospect_list", { p_workspace_id: AGENCY, p_user_id: actor.userId, p_email: actor.verifiedEmail }]);
@@ -138,7 +160,7 @@ describe("addAgencyClient", () => {
   });
 
   it("adds by name alone and reads nothing", async () => {
-    const d = deps({ agency_add_client: { data: receipt({ sourceUrl: null }) } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt({ sourceUrl: null }) } });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Corner Barber", idempotencyKey: KEY }, d);
     expect(d.seed).not.toHaveBeenCalled();
     expect(result.scan.status).toBe("not_requested");
@@ -155,36 +177,36 @@ describe("addAgencyClient", () => {
     ["agency_client_idempotency_conflict", 409],
     ["something else", 503],
   ])("maps the database refusal %s to %i", async (code, status) => {
-    const d = deps({ agency_add_client: { error: { message: code } } });
+    const d = deps({ agency_add_client_enrolled: { error: { message: code } } });
     const error = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "X", idempotencyKey: KEY }, d).catch((cause) => cause);
     expect(error).toBeInstanceOf(AgencyClientError);
     expect(error.status).toBe(status);
   });
 
   it("pins retry identity to the request when the site's inferred name changes", async () => {
-    const d = deps({ agency_add_client: { data: receipt() } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt() } });
     const input = { action: "add" as const, agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY };
     await addAgencyClient(actor, input, d);
     d.seed.mockResolvedValueOnce({ scan: { status: "scanned", seeded: [], name: "A changed website name", message: null }, facts: {} });
     await addAgencyClient(actor, input, d);
-    const writes = d.rpc.mock.calls.filter(([name]) => name === "agency_add_client");
+    const writes = d.rpc.mock.calls.filter(([name]) => name === "agency_add_client_enrolled");
     expect(writes[0]![1].p_command_digest).toEqual(writes[1]![1].p_command_digest);
     expect(writes[1]![1]).toMatchObject({ p_input: { name: "A changed website name" } });
   });
 
 
   it("on replay returns the saved client, seeds nothing new and issues no second link", async () => {
-    const d = deps({ agency_add_client: { data: receipt({ replayed: true }) } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt({ replayed: true }) } });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", name: "Northside Bakery",
       ownerEmail: "pat@northside-bakery.example", idempotencyKey: KEY }, d);
     expect(result.client.replayed).toBe(true);
     expect(result.scan.seeded).toEqual([]);
     expect(result.ownerClaim).toBeNull();
-    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client"]);
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client_enrolled"]);
   });
 
   it("keeps the added client when its owner link fails, and says so", async () => {
-    const d = deps({ agency_add_client: { data: receipt() }, issue_agency_client_owner_claim: { error: { message: "agency_client_claim_invalid" } } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt() }, issue_agency_client_owner_claim: { error: { message: "agency_client_claim_invalid" } } });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", ownerEmail: "pat@northside-bakery.example", idempotencyKey: KEY }, d);
     expect(result.client.customerWorkspaceId).toBe(CLIENT);
     expect(result.ownerClaim).toBeNull();
@@ -192,12 +214,12 @@ describe("addAgencyClient", () => {
   });
 
   it("rejects a malformed database answer instead of trusting it", async () => {
-    const d = deps({ agency_add_client: { data: { customerWorkspaceId: CLIENT } } });
+    const d = deps({ agency_add_client_enrolled: { data: { customerWorkspaceId: CLIENT } } });
     await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "X", idempotencyKey: KEY }, d)).rejects.toMatchObject({ status: 503, code: "malformed" });
   });
 
   it.each(["provider unavailable", "daily budget", "storage failed", "workspace access denied"])("retains the added client and owner link when its check fails: %s", async (reason) => {
-    const d = deps({ agency_add_client: { data: receipt() }, issue_agency_client_owner_claim: { data: claim } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt() }, issue_agency_client_owner_claim: { data: claim } });
     d.assess.mockRejectedValue(new Error(reason));
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", url: "northside-bakery.example", ownerEmail: claim.recipientEmail, idempotencyKey: KEY }, d);
     expect(result.client.customerWorkspaceId).toBe(CLIENT);
@@ -207,13 +229,13 @@ describe("addAgencyClient", () => {
   });
 
   it("uses the saved name and URL on a replay, and reuses the same assessment operation", async () => {
-    const d = deps({ agency_add_client: { data: receipt({ replayed: true }) } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt({ replayed: true }) } });
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Changed name", url: "changed.example", idempotencyKey: KEY }, d);
     expect(d.assess).toHaveBeenCalledWith({ actor, workspaceId: AGENCY, input: { business: "Northside Bakery", url: receipt().sourceUrl }, requestId: KEY });
   });
 
   it("refuses assessment rows from another workspace without exposing them", async () => {
-    const d = deps({ agency_add_client: { data: receipt() } });
+    const d = deps({ agency_add_client_enrolled: { data: receipt() } });
     d.assess.mockResolvedValue({ ...assessment, workspaceId: CLIENT });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", idempotencyKey: KEY }, d);
     expect(result.aiCheck.status).toBe("unavailable");

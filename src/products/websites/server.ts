@@ -575,3 +575,5 @@ export type { SiteResults } from "./linked-results";
 export { readAgencyPageChoices, sendAgencyNativePage } from "./agency-page-server";
 
 export type { BusinessFacts } from "./rebuild-pipeline";
+
+export { WebsitePublicationAcceptedError } from "./publication-outcome";

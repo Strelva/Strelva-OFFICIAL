@@ -1498,7 +1498,7 @@
     {
       "batch": "19",
       "status": "private literal #293 AG11 preparation; unmerged; not production-authorized",
-      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34–36 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
+      "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34\u201336 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",
       "items": [
         {
           "file": "20261020090037_provider_completion_cleanup.sql",
@@ -2261,6 +2261,47 @@
           "rollback": "rollback-20261025110000_done_trust_legacy_ai.sql",
           "rollbackSha256": "b523d50441370b2c08692d3a139885c7c3e8953846da5b36b31b0f7e77ce9f59",
           "rollbackStatus": "Function-only inverse preserves model-call and reservation rows. Ordered disposable SQL, inverse/reapply and native fixture UNRUN; coordinator must run scripts/check-ux-audit-sql.sh."
+        }
+      ]
+    },
+    {
+      "id": "complete-agency-2026-10-14",
+      "status": "Held and unapplied. Agency signup/client Systems enrollment, explicit default-off owner claim email, scoped website/domain decisions and independent qualification review. Source and local unit/DOM proof only; scripts/check-done-agency-sql.sh authored and unrun. Native SQL, populated recovery, authenticated browser and hosted delivery remain required. No release flag/default, provider or production application authorized.",
+      "items": [
+        {
+          "file": "20261025131000_done_agency_signup_systems.sql",
+          "sha256": "76c8a3524ad41cd812ca82abf9e6537502c60289c3d59f826a4527cf4cb1e45f",
+          "rollback": "rollback-20261025131000_done_agency_signup_systems.sql",
+          "rollbackSha256": "5dfa3605edb0b33e913adc3669b752a8abf23a4c927dec7abd578d14099584ad",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261025131100_done_agency_client_systems.sql",
+          "sha256": "a772f88d9a4cdc2ca8e782ca7a8805399b5f20505b4db4e1591ead8a3bdb18d1",
+          "rollback": "rollback-20261025131100_done_agency_client_systems.sql",
+          "rollbackSha256": "b9057e1cef254abbe1bb532ac2fed48f3506736187e2d92cd74de48f6607b5ba",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261025132000_done_agency_claim_email.sql",
+          "sha256": "15ae9639084a766c9a6fd38273e58ad7ca1069e1b60b07fb0021c56219644278",
+          "rollback": "rollback-20261025132000_done_agency_claim_email.sql",
+          "rollbackSha256": "a02bba0151e1993a3c50edf322600e8336166ac9cd4a5904f5dd477966db17f9",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261025133000_done_agency_website_decisions.sql",
+          "sha256": "8613ba70c7ff75d217ab2ef45c6aa977da6d5ea6fefcb39942c0e6c9ea2fbd3a",
+          "rollback": "rollback-20261025133000_done_agency_website_decisions.sql",
+          "rollbackSha256": "4a371775c33754d5654dfe5cab1f2c607ec7498db8d781d99c3df14b49409e5c",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
+        },
+        {
+          "file": "20261025134000_done_agency_qualification_queue.sql",
+          "sha256": "0cf5d54229282853929e38b3e01b0a2c19001fa0512cb565f8f1d3c102d1a218",
+          "rollback": "rollback-20261025134000_done_agency_qualification_queue.sql",
+          "rollbackSha256": "e43a2fbd3b40f983ea987986a310013133028014665e5ec006811c9f16b69561",
+          "rollbackStatus": "Prepared inverse only; ordered disposable SQL, populated refusal, concurrency and reapply qualification UNRUN/held. No production application authorized."
         }
       ]
     }

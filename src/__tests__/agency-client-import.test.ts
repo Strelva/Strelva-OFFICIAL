@@ -193,19 +193,19 @@ describe("applyClientImport", () => {
 describe("found facts on the ordinary add", () => {
   it("stores a sheet's phone and address as unconfirmed agency facts over the scan's, and drops invalid ones", async () => {
     const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) => ({ data: name === "authorize_agency_client_add" ? "owner"
-      : name === "agency_add_client" ? { additionId: AGENCY, agencyWorkspaceId: AGENCY, customerWorkspaceId: OTHER_AGENCY, name: "Northside Bakery", sourceKind: "url",
+      : name === "agency_add_client_enrolled" ? { additionId: AGENCY, agencyWorkspaceId: AGENCY, customerWorkspaceId: OTHER_AGENCY, name: "Northside Bakery", sourceKind: "url",
         sourceUrl: "https://northside.example/", prospectId: null, factsSeeded: 4, seatId: null, addedBy: actor.userId, addedAt: "2026-10-12T12:00:00.000Z", replayed: false } : null, error: null }));
     const d = { rpc, seed: vi.fn(async () => ({ scan: { status: "scanned" as const, seeded: ["phone", "email"], name: null, message: null },
       facts: { phone: { value: "(716) 555-0000" }, email: { value: "hello@northside.example" } } })), token: () => "t".repeat(43), now: () => new Date(), assess: vi.fn(async () => { throw new Error("off"); }) } satisfies AgencyClientDeps;
     const added = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside.example", name: "Northside Bakery",
       idempotencyKey: clientImportIdempotencyKey(AGENCY, "sheet", "site:northside.example"), foundFacts: { phone: "(716) 555-0142", address: "12 Main St" } }, d);
-    const args = rpc.mock.calls.find(([name]) => name === "agency_add_client")![1] as { p_input: { facts: Record<string, unknown> }; p_command_digest: string };
+    const args = rpc.mock.calls.find(([name]) => name === "agency_add_client_enrolled")![1] as { p_input: { facts: Record<string, unknown> }; p_command_digest: string };
     expect(args.p_input.facts).toEqual({ phone: { value: "(716) 555-0142" }, email: { value: "hello@northside.example" }, address: { value: { formatted: "12 Main St" } } });
     expect(added.scan.seeded).toEqual(["phone", "email", "address"]);
 
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside.example", name: "Northside Bakery",
       idempotencyKey: clientImportIdempotencyKey(AGENCY, "sheet", "site:northside.example"), foundFacts: { phone: "123" } }, d);
-    const second = rpc.mock.calls.filter(([name]) => name === "agency_add_client")[1]![1] as typeof args;
+    const second = rpc.mock.calls.filter(([name]) => name === "agency_add_client_enrolled")[1]![1] as typeof args;
     expect(second.p_input.facts.phone).toEqual({ value: "(716) 555-0000" });
     // Found facts are not part of the request digest: a re-import with edited facts still replays.
     expect(second.p_command_digest).toBe(args.p_command_digest);

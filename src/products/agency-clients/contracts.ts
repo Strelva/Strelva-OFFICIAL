@@ -20,8 +20,10 @@ export const addAgencyClientInputSchema = z.object({
   prospectId: uuid.optional(),
   /** Agency-owned intake identity; the server checks access before creating a business. */
   leadToken: z.string().regex(/^[a-f0-9]{36}$/).optional(),
-  /** Where the owner claim link is addressed. Nothing is sent to it. */
+  /** Where the owner claim link is addressed. Delivery requires an explicit opt-in. */
   ownerEmail: email.optional(),
+  /** Only an explicit reviewed send; imports keep this absent. */
+  sendOwnerEmail: z.boolean().optional(),
   idempotencyKey: uuid,
   /**
    * Found facts the agency already holds (Import clients carries a sheet's or
@@ -49,15 +51,17 @@ export const issueOwnerClaimInputSchema = z.object({
   agencyWorkspaceId: uuid,
   customerWorkspaceId: uuid,
   ownerEmail: email,
+  /** Explicit consent for this delivery; defaults off. */
+  sendEmail: z.boolean().optional(),
 }).strict();
 export type IssueOwnerClaimInput = z.infer<typeof issueOwnerClaimInputSchema>;
 
 export const agencyClientActionSchema = z.union([addAgencyClientInputSchema, issueOwnerClaimInputSchema]);
 
-/** How the owner link reached the owner. Today always not_sent / gated (decision R08, #235). */
+/** How the owner link reached the owner. Copy-only remains the default; provider acceptance is distinct from unknown delivery. */
 export const ownerClaimDeliverySchema = z.object({
-  status: z.literal("not_sent"),
-  reason: z.literal("gated"),
+  status: z.enum(["not_sent", "sending", "accepted", "unknown"]),
+  reason: z.string(),
   decision: z.string(),
   agencyEmailVerified: z.boolean(),
 }).passthrough();

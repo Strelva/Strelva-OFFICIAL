@@ -5,6 +5,7 @@
  * own command (the mocked port), never a second write path.
  */
 import { randomUUID } from "node:crypto";
+import { WebsitePublicationAcceptedError } from "@/products/websites/publication-outcome";
 import { describe, expect, it, vi } from "vitest";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
 import { KIND_RULES } from "@/platform/needs-you/contracts";
@@ -94,6 +95,51 @@ function websitePorts(rows: WebsiteRebuildRecord[]) {
 }
 
 describe("website documents", () => {
+  it("shows the complete immutable document, and refuses a changed review", async () => {
+    const row = website();
+    const ports = websitePorts([row]);
+    const adapter = websiteDocumentAdapter(ports);
+    const item = await proposeOne(adapter);
+    expect(await adapter.review!(ctx, item)).toEqual([JSON.stringify(row.rebuild.candidate!.document, null, 2)]);
+    expect(await adapter.review!(ctx, { ...item, revisionHash: "b".repeat(64) })).toBeNull();
+    expect(await adapter.review!({ workspaceId: WS }, item)).toBeNull();
+  });
+
+  it.each(["approve", "launch"] as const)("consumes the exact agency claim for website %s without an owner executor", async stage => {
+    const row = website(stage === "launch" ? { status: "approved", approvedCandidateRevision: 2 } : {});
+    const ports = websitePorts([row]);
+    const decideAgency = vi.fn().mockResolvedValue(stage === "approve" ? website({ status: "approved", approvedCandidateRevision: 2 }) : website({ status: "published", launch: { receipt: { receiptId: "agency-receipt" }, readBack: null } as never }));
+    const adapter = websiteDocumentAdapter({ ...ports, decideAgency });
+    const item = { ...await proposeOne(adapter), decidedByKind: "agency_session" };
+    expect(await adapter.resolve(ctx, item, "approve", session)).toMatchObject({ outcome: stage === "launch" ? "done_unverified" : "done" });
+    expect(decideAgency).toHaveBeenCalledWith(OWNER, row.workId, { expectedRevision: 4, candidateRevision: 2, candidateContentHash: HASH }, item);
+    expect(ports.approve).not.toHaveBeenCalled();
+    expect(ports.launch).not.toHaveBeenCalled();
+    decideAgency.mockRejectedValueOnce(new Error("grant revoked"));
+    expect(await adapter.resolve(ctx, item, "approve", session)).toEqual({ outcome: "failed", reason: "resolver_failed" });
+    expect(await adapter.resolve(ctx, item, "not_yet", session)).toEqual({ outcome: "done", reason: "Not yet" });
+    expect(decideAgency).toHaveBeenCalledTimes(2);
+  });
+
+  it("retains an accepted agency publication when later bookkeeping fails", async () => {
+    const row = website({ status: "approved", approvedCandidateRevision: 2 });
+    const ports = websitePorts([row]);
+    const decideAgency = vi.fn().mockRejectedValue(new WebsitePublicationAcceptedError(row.workId, "accepted-native-receipt"));
+    const adapter = websiteDocumentAdapter({ ...ports, decideAgency });
+    const item = { ...await proposeOne(adapter), decidedByKind: "agency_session" };
+    expect(await adapter.resolve(ctx, item, "approve", session)).toMatchObject({ outcome: "done_unverified", receiptRef: `website_document:${row.workId}:accepted-native-receipt` });
+    expect(decideAgency).toHaveBeenCalledTimes(1);
+    expect(ports.launch).not.toHaveBeenCalled();
+  });
+
+  it("refuses an agency claim when the source has no exact agency executor", async () => {
+    const ports = websitePorts([website()]);
+    const adapter = websiteDocumentAdapter(ports);
+    const item = { ...await proposeOne(adapter), decidedByKind: "agency_session" };
+    expect(await adapter.resolve(ctx, item, "approve", session)).toEqual({ outcome: "failed", reason: "agency_execution_unavailable" });
+    expect(ports.approve).not.toHaveBeenCalled();
+  });
+
   it("proposes approve for a clean review-ready preview and resolves through approveWebsiteRebuild", async () => {
     const ports = websitePorts([website()]);
     const adapter = websiteDocumentAdapter(ports);

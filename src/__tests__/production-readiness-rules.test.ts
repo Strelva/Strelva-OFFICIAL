@@ -1079,8 +1079,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
     expect(accessRequest).toContain("isRateLimitedWindowedAsync");
     expect(accessRequest).not.toContain("isRateLimitedWindowed(");
-    expect(accessRequest).toContain("normalizedEmail");
-    expect(accessRequest).toContain("safeDescription");
+    expect(accessRequest).toContain('next: "/agencies"');
+    expect(accessRequest).not.toContain("saveDeliveryLead");
+    expect(accessRequest).not.toContain("sendNewIntakeLeadEmail");
     expect(accessRequest).toContain("readJsonObject(req)");
     expect(accessRequest).toContain("Invalid request body");
 

@@ -65,109 +65,66 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-describe("ordinary agency legacy merchant payment links", () => {
-  it("creates, lists its own and old records with scoped paid status, then expires without losing ownership", async () => {
+describe("neutral agency payment links", () => {
+  it.each([agency, other])("refuses new payment links for agency %s before any storage write", async id => {
+    mocks.list.mockResolvedValue([{ ...member, id }]);
+    const response = await post(create({ agencyWorkspaceId: id }));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Stripe Connect") });
+    expect(memory.redis.eval).not.toHaveBeenCalled(); expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("preserves scoped historical links, paid status and idempotent expiration", async () => {
     memory.seed(oldLink); memory.seed({ ...oldLink, slug: "foreign", agencyWorkspaceId: other });
-    const response = await post(create({ businessWorkspaceId: client })); expect(response.status).toBe(200);
-    const { payLink } = await response.json();
-    expect(payLink).toMatchObject({ agencyWorkspaceId: agency, agencyDisplayName: "Strelva Agency", createdBy: userId, businessWorkspaceId: client, clientName: "Client Coffee", leadSlug: `business-${client}` });
-    expect(payLink.createdAt).toBeTruthy(); expect(payLink.tenantId).toBeUndefined();
-    expect(mocks.rpc).toHaveBeenCalledWith("read_agency_provider_seats", { p_user_id: userId, p_verified_email: actor.verifiedEmail, p_agency_workspace_id: agency });
-    mocks.payments.mockResolvedValue([{ paySlug: payLink.slug, amountCents: 50000, createdAt: "2026-10-12" }, { paySlug: "foreign", amountCents: 100000, createdAt: "2026-10-12" }]);
+    mocks.payments.mockResolvedValue([{ paySlug: oldLink.slug, amountCents: 50000, createdAt: "2026-10-12" }, { paySlug: "foreign", amountCents: 100000, createdAt: "2026-10-12" }]);
     const listed = await (await read()).json();
-    expect(listed.payLinks.map((link: PayLinkConfig) => link.slug)).toEqual([payLink.slug, "old-link"]);
-    expect(Object.keys(listed.paidPayments)).toEqual([payLink.slug]);
-    const revoke = { action: "revoke", agencyWorkspaceId: agency, slug: payLink.slug, idempotencyKey: other };
+    expect(listed.payLinks.map((link: PayLinkConfig) => link.slug)).toEqual([oldLink.slug]);
+    expect(Object.keys(listed.paidPayments)).toEqual([oldLink.slug]);
+    const revoke = { action: "revoke", agencyWorkspaceId: agency, slug: oldLink.slug, idempotencyKey: key };
     const first = await (await post(revoke)).json(); const second = await (await post(revoke)).json();
-    expect(second).toEqual(first); expect(first.payLink).toMatchObject({ revokedBy: userId, agencyWorkspaceId: agency }); expect(first.payLink.revokedAt).toBeTruthy();
-    expect((await (await read()).json()).payLinks).toHaveLength(2);
-    expect(memory.redis.eval).toHaveBeenCalledWith(PAY_LINK_COMMAND_SCRIPT, [expect.stringMatching(/^reb:paylink:command:/), `${PAY_LINK_PREFIX}${payLink.slug}`, PAY_LINK_INDEX_KEY], expect.any(Array));
+    expect(second).toEqual(first); expect(first.payLink.revokedBy).toBe(userId);
+    expect(first.payLink.revokedAt).toBeTruthy(); expect(first.payLink.agencyWorkspaceId).toBeUndefined();
+    expect((await (await read()).json()).payLinks).toHaveLength(1);
+    expect(memory.redis.eval).toHaveBeenCalledWith(PAY_LINK_COMMAND_SCRIPT, [expect.stringMatching(/^reb:paylink:command:/), `${PAY_LINK_PREFIX}${oldLink.slug}`, PAY_LINK_INDEX_KEY], expect.any(Array));
     expect(memory.redis.srem).not.toHaveBeenCalled();
   });
-  it("supports ordinary agency admins and named prospects without a client seat", async () => {
-    mocks.list.mockResolvedValue([{ ...member, role: "admin" }]);
-    const result = await post(create()); expect(result.status).toBe(200); expect(mocks.rpc).not.toHaveBeenCalled();
-    expect((await result.json()).payLink.clientName).toBe("Acme Coffee");
-  });
-  it("shows another agency's Connect state and refuses legacy creation/revocation", async () => {
-    mocks.list.mockResolvedValue([{ ...member, id: other, name: "Other Studio" }]); mocks.availability.mockResolvedValue({ status: "setup_required" });
-    const value = await (await read(other)).json(); expect(value).toMatchObject({ legacyMerchant: false, checkoutAvailability: { status: "setup_required" }, payLinks: [] });
+  it("keeps other agencies away from the legacy merchant's records", async () => {
+    memory.seed(oldLink); mocks.list.mockResolvedValue([{ ...member, id: other, name: "Other Studio" }]);
+    const value = await (await read(other)).json(); expect(value).toMatchObject({ legacyMerchant: false, payLinks: [], paidPayments: {} });
     expect(mocks.redis).not.toHaveBeenCalled();
-    expect((await post(create({ agencyWorkspaceId: other }))).status).toBe(403);
-    expect((await post({ action: "revoke", agencyWorkspaceId: other, idempotencyKey: key, slug: "old-link" })).status).toBe(403);
+    expect((await post({ action: "revoke", agencyWorkspaceId: other, idempotencyKey: key, slug: oldLink.slug })).status).toBe(403);
     expect(memory.redis.eval).not.toHaveBeenCalled();
   });
-  it("refuses an operator with no ordinary agency membership and ordinary members", async () => {
-    mocks.actor.mockResolvedValue({ ...actor, type: "super_admin", isSuperAdmin: true });
-    mocks.list.mockResolvedValue([]); expect((await post(create())).status).toBe(403); expect((await read()).status).toBe(403);
+  it("refuses platform staff without membership, members, changed actors and cross-site writes", async () => {
+    mocks.actor.mockResolvedValue({ ...actor, isSuperAdmin: true }); mocks.list.mockResolvedValue([]);
+    expect((await post(create())).status).toBe(403); expect((await read()).status).toBe(403);
     mocks.list.mockResolvedValue([{ ...member, role: "member" }]); expect((await post(create())).status).toBe(403);
+    mocks.list.mockResolvedValue([member]); expect((await post(create({ expectedActorId: other }))).status).toBe(403);
+    expect((await post(create(), { origin: "https://attacker.example.test" })).status).toBe(403);
     expect(memory.redis.eval).not.toHaveBeenCalled();
   });
-  it("rechecks owner/admin authority after the client read and before the Redis write", async () => {
-    mocks.list.mockResolvedValueOnce([member]).mockResolvedValue([{ ...member, role: "member" }]);
-    expect((await post(create({ businessWorkspaceId: client }))).status).toBe(403);
+  it("rechecks authority immediately before historical expiration", async () => {
+    memory.seed(oldLink); mocks.list.mockResolvedValueOnce([member]).mockResolvedValue([{ ...member, role: "member" }]);
+    expect((await post({ action: "revoke", agencyWorkspaceId: agency, slug: oldLink.slug, idempotencyKey: key })).status).toBe(403);
     expect(memory.redis.eval).not.toHaveBeenCalled();
   });
-  it("captures validated agency identity instead of the raw workspace label and holds missing identity", async () => {
-    mocks.list.mockResolvedValue([{ ...member, name: "Strelva" }]);
-    expect((await (await post(create())).json()).payLink.agencyDisplayName).toBe("Strelva Agency");
-    mocks.brand.mockResolvedValue({ agencyId: null, name: "Agency identity unavailable" });
-    expect((await post(create({ idempotencyKey: other }))).status).toBe(503); expect(memory.records.size).toBe(1);
-  });
-  it("requires confirmed email and defaults closed when the merchant config or release flag is absent", async () => {
-    mocks.actor.mockResolvedValue(null); expect((await post(create())).status).toBe(401);
-    mocks.actor.mockResolvedValue(actor); vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", "");
-    expect((await post(create())).status).toBe(403); expect((await (await read()).json()).legacyMerchant).toBe(false);
-    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0"); expect((await read()).status).toBe(503); expect((await post(create())).status).toBe(503);
-    expect(memory.redis.eval).not.toHaveBeenCalled();
-  });
-  it("rejects client selection outside this agency's active seats and forged ownership/tenant input", async () => {
-    expect((await post(create({ businessWorkspaceId: other }))).status).toBe(403);
-    expect((await post(create({ tenantId: "foreign" }))).status).toBe(400);
-    expect((await post(create({ createdBy: other }))).status).toBe(400);
+  it("fails closed for foreign links, missing merchant configuration, identity, storage and release", async () => {
     memory.seed({ ...oldLink, agencyWorkspaceId: other });
-    expect((await post({ action: "revoke", agencyWorkspaceId: agency, idempotencyKey: key, slug: oldLink.slug })).status).toBe(403);
+    const revoke = { action: "revoke", agencyWorkspaceId: agency, slug: oldLink.slug, idempotencyKey: key };
+    expect((await post(revoke)).status).toBe(403);
+    vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", ""); expect((await post(revoke)).status).toBe(403);
+    expect((await (await read()).json()).legacyMerchant).toBe(false);
+    vi.stubEnv("STRELVA_AGENCY_WORKSPACE_ID", agency); mocks.brand.mockResolvedValue({ agencyId: null });
+    expect((await read()).status).toBe(503);
+    mocks.redis.mockReturnValue(null); expect((await read()).status).toBe(503);
+    mocks.actor.mockResolvedValue(null); expect((await post(revoke)).status).toBe(401);
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0"); expect((await read()).status).toBe(503); expect((await post(revoke)).status).toBe(503);
     expect(memory.redis.eval).not.toHaveBeenCalled();
   });
-  it.each([{ amountCents: 4999 }, { amountCents: 1000001 }, { amountCents: 7501 }, { amountCents: 50000.5 },
-    { amountCents: undefined, minCents: 100000, maxCents: 50000 }, { amountCents: undefined, minCents: 5000 },
-    { minCents: 5000, maxCents: 10000 }, { slug: "bad_slug" }, { slug: "rohlax" }, { slug: "index" }])("rejects guardrail violation %j", async fields => {
-    expect((await post(create(fields))).status).toBe(400); expect(memory.redis.eval).not.toHaveBeenCalled();
-  });
-  it("accepts a stepped range at the guardrail endpoints", async () => {
-    expect((await post(create({ amountCents: undefined, minCents: 5000, maxCents: 1000000 }))).status).toBe(200);
-  });
-  it("replays create after a lost readback and rejects a changed body or competing slug", async () => {
-    memory.redis.get.mockRejectedValueOnce(new Error("lost response"));
-    expect((await post(create({ slug: "coffee" }))).status).toBe(503);
-    const first = await (await post(create({ slug: "coffee" }))).json();
-    const second = await (await post(create({ slug: "coffee" }))).json(); expect(second).toEqual(first); expect(memory.records.size).toBe(1);
-    expect((await post(create({ slug: "different" }))).status).toBe(409);
-    expect((await post(create({ slug: "coffee", amountCents: 100000 }))).status).toBe(409);
-    expect((await post(create({ slug: "coffee", idempotencyKey: other }))).status).toBe(409); expect(memory.records.size).toBe(1);
-  });
-  it("retains the first client name and invoice after an identical retry across a client rename", async () => {
-    const first = await (await post(create({ businessWorkspaceId: client }))).json();
-    mocks.rpc.mockResolvedValue({ data: [{ customerWorkspaceId: client, name: "Renamed Coffee" }], error: null });
-    const second = await (await post(create({ businessWorkspaceId: client }))).json();
-    expect(second).toEqual(first); expect(memory.records.size).toBe(1);
-  });
-  it("does not revive an expired link when its create command is replayed", async () => {
-    const config = (await (await post(create())).json()).payLink;
-    await post({ action: "revoke", agencyWorkspaceId: agency, idempotencyKey: other, slug: config.slug });
-    expect((await (await post(create())).json()).payLink.revokedAt).toBeTruthy();
-  });
-  it("reports failed payment reads and missing storage honestly", async () => {
+  it("reports failed payment reads separately from unpaid and rejects forged command ownership", async () => {
     memory.seed(oldLink); mocks.payments.mockRejectedValue(new Error("unavailable"));
     expect((await (await read()).json()).paymentStatusAvailable).toBe(false);
-    mocks.redis.mockReturnValue(null); expect((await read()).status).toBe(503); expect((await post(create())).status).toBe(503);
-  });
-  it("binds browser retries to the original signed-in actor without granting actor authority", async () => {
-    expect((await post(create({ expectedActorId: other }))).status).toBe(403); expect(memory.redis.eval).not.toHaveBeenCalled();
-    expect((await post(create({ expectedActorId: userId }))).status).toBe(200);
-  });
-  it("refuses cross-site writes before reading authority or storage", async () => {
-    expect((await post(create(), { origin: "https://attacker.example.test" })).status).toBe(403);
-    expect(mocks.actor).not.toHaveBeenCalled(); expect(memory.redis.eval).not.toHaveBeenCalled();
+    expect((await post(create({ tenantId: "foreign" }))).status).toBe(400);
+    expect((await post(create({ createdBy: other }))).status).toBe(400);
+    expect(memory.redis.eval).not.toHaveBeenCalled();
   });
 });

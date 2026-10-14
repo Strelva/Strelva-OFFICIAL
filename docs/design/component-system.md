@@ -1978,13 +1978,25 @@ retains its existing default. `agencyView` persists the selected agency surface
 in the URL and restores it on Back.
 
 [AgencyHome](../../src/experience/workspace/AgencyHome.tsx) uses `StPage`,
-`StHead`, the responsive table and a scoped `StComposerBar`. Queue rows group
-by kind, oldest first within each group. Clients first-column names use `StTextButton tone="text"` (ink, 14/600), with muted domain/detail below. Responsibility/availability controls
-remain available in each provider client's disclosure. A failed client read
-shows its last successful row from this mounted agency session, visibly stale;
-without a last read it says so and reports Unknown. Cache entries never become
-extra client rows or cross agency scope. No cross-navigation durable cache or
-automatic retry interval is claimed.
+`StHead`, the responsive portfolio table and a scoped `StComposerBar` in both
+release states. In the workspace the sidebar owns Clients, Queue, Library and
+Team; standalone embeds retain tabs. Build is a Clients action, and Prepare a
+release is a Library action. Client totals come from the same paged server read.
+The heading explicitly names loaded client Queue items, rather than implying
+that proposal or delivery-check inboxes are included in that count. System
+summaries stay compact; their lifecycle, location and health details are inside
+Client details alongside responsibility/availability controls. A failed client
+read shows its last successful row from this mounted agency session, visibly
+stale; cache entries never add client rows or cross agency scope. No recent
+health evidence says “No recent check”.
+
+Queue rows group by kind, oldest first within each group. Pending owner claims
+appear independently of Needs you and email. Businesses asking the agency in
+appear in Queue; the directory listing editor is under Team. Private agency
+work and assigned drafts stay available in a disclosure. The canon portfolio
+preview composes the same `AgencyClientList` and `AgencyQueueList`, with four
+fictional clients across Home and Clients. Rendered desktop/mobile verification
+of the October 14 composition remains pending; no production claim is made.
 
 Library revisions, selected-ready bulk offers, Version overrides/accounts/releases,
 team, effect verification, owner review and provider-change controls now compose
@@ -2204,9 +2216,10 @@ and production proof remain outstanding under the audit's disk stop point.
 ### October 12 · platform support and ordinary agency boundary (fix pass 2)
 
 [AccessRequestPage](../../src/components/marketing/AccessRequestPage.tsx) starts
-with business account, agency account, agency directory and an explicit Strelva
-Agency service choice. Account entry never opens the sales form. The chosen
-service form retains its pending, error and confirmation states.
+with business account, agency account and the neutral agency directory. The
+October 14 neutrality pass removes the Strelva Agency service form; agency work
+starts with explicit agency selection and a signed-in proposal. Anonymous intake
+never assigns a lead, sends email or posts a sales alert.
 
 Operator client records use the existing kit for read-only goals, business facts
 and automation policy. Report cadence, platform email pauses and release controls
@@ -2314,59 +2327,33 @@ refusals preserve correction. The recovery performs GET only. Existing St*
 primitives and styling remain in use. Unit evidence is local; rendered desktop/
 mobile verification is deferred under the audit’s explicit browser stop point.
 
-### October 12 · agency Payment links
+### October 14 · neutral agency Payment links and Leads
 
 [AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
-composes `StField`, `StTextField`, `StPill`, `StRows`, `StRow`, `StState`,
-`StNotice` and text actions inside the agency shell. The sidebar and agency
-billing link to `/workspace/payment-links?workspaceId=…`. Verified ordinary
-agency owners/admins use the configured legacy merchant account; other agencies
-see their existing Connect readiness and client-agreement path.
+uses the existing kit rows, notices and text actions. Every agency sees
+**Payment links · Coming soon**, with Stripe Connect named as the prerequisite.
+No agency can create a new link on Strelva's legacy merchant account. Existing
+legacy links retain their paid trail, copy/open controls and explicit expiration
+review for the configured historical agency's verified owners/admins. No Stripe
+setting or existing record changes. Unknown expiration outcomes hold the exact
+request and key; Refresh only reads. Payment-read failures remain unavailable
+rather than unpaid. Historical records never acquire a current actor.
 
-Fixed and ranged amounts use USD and $50 steps. Copy, explicit expiration
-review, paid status and retained historical ownership appear in open rows.
-Unconfirmed commands hold the exact submitted terms and retry key; Refresh
-only reads. Incomplete success responses retain that hold. Payment-read outages
-remain unavailable rather than unpaid. Agency identity is captured through the
-existing validated brand resolver; historical records never acquire a current
-actor. Local DOM and route tests cover these contracts. Desktop/phone rendering,
-real Auth and native Redis script execution remain coordinator acceptance work
-under the audit's no-server/no-browser stop point.
-
-### October 12 · Strelva Agency lead management
-
-[AgencyLeads](../../src/experience/workspace/leads/AgencyLeads.tsx) composes the
-existing St* rows, fields, notices, states and text actions in agency chrome.
-Only the configured agency's ordinary verified owners/admins see its Leads
-place beside Payment links. The shared shell reads membership-only admission;
-unknown admission and member roles hide the place. The agency identity uses the
-existing validated brand resolver. Other agencies receive no lead-feed claim.
-
-Rows retain request context, historical ownership qualification, canonical
-status and appended notes. Empty, loading, error, permission and stale states
-retain Refresh. Uncertain writes hold the exact submitted body and key; Refresh
-only reads. Convert opens the ordinary agency add-client flow through an opaque
-lead token. Preparing that form stays Converting; confirmed client creation is
-Converted. Release-disabled client creation holds that action.
+[AgencyLeads](../../src/experience/workspace/leads/AgencyLeads.tsx) uses the same
+ordinary verified owner/admin admission for every agency. Scoped leads are
+visible only to their explicitly recorded agency. Unscoped historical leads
+remain available only to the configured historical agency, and the atomic Redis
+command rechecks that boundary. Platform support never gains lead authority.
+Rows preserve request context, lifecycle, notes and stale/unknown command states.
+Convert enters the existing add-client flow through an opaque authorized lead
+token; it becomes Converted only after confirmed client creation. Payment links
+are labeled Coming soon rather than offering new link creation.
 
 [AgencyAddClient](../../src/experience/workspace/agency/AgencyAddClient.tsx)
-receives server-authorized lead prefill, including a name-only client when no
-website exists. It requires a reviewed business name and uses the existing URL
-normalizer before reserving conversion. Lost replies and reloads recover the
-original actor's persisted request and key; an unavailable or foreign request
-stays held. A confirmed business with an unconfirmed lead update retains both
-facts and offers exact-request recovery. No owner email is sent.
-
-[AgencyPaymentLinks](../../src/experience/workspace/billing/AgencyPaymentLinks.tsx)
-receives lead name and bounded scope text through the same authorized server
-read. Changing the source token resets the draft fields and client selection,
-while an earlier uncertain payment command retains its submitted terms and key.
-Prices remain a separate review. The admin lead list remains disabled support
-inspection and names the agency workspace as the place to manage leads.
-
-Local DOM, route and mocked-store tests cover these contracts. Native Redis
-execution, actual Auth and desktop/phone rendering remain unproven under the
-lane brief's explicit no-server/no-browser/no-socket stop point.
+retains authorized lead prefill and exact-request conversion recovery. No owner
+email is sent. Local DOM and route tests cover this behavior; native Redis,
+actual Auth and desktop/phone rendering remain coordinator acceptance work
+under the lane brief's no-server/no-browser stop point.
 
 ### October 12 · provider health queue security port
 
@@ -2405,3 +2392,25 @@ fresh desktop/mobile rendering remains required after integration.
 `WorkspaceLayout` and `BusinessHome` pass the owner-scoped Getting started link through the existing `StrelvaShell.navigation` slot. Home also shows that link in its content so it remains reachable on a phone. The snapshot derives completion from confirmed business facts or active confirmed services and no pending found facts. A name or saved website alone does not complete setup; a website is optional. Unknown reads keep the link. Provider seats, delegated access, agencies and personal workspaces receive no owner setup action. No separate completion state or storage is introduced.
 
 `WorkspaceBusinessSettings` only links Plan and billing when the server reports the billing release available. When off it shows “Price shown before you pay” and explains that plan choices are not open. The exit action is owner-only. Local route, pure projection and static-render tests cover these states; desktop/phone browser verification remains a coordinator check under this lane's no-browser restriction.
+### October 14 · complete agency door
+
+AgencyAddClient keeps copying owner claim links as the default. The optional
+email checkbox appears only with the default-off
+`STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE` switch. Sending also needs current
+agency email verification, a current agency-added client and the shared
+client email policy. A historically tenant-linked business is always excluded.
+The owner invitation uses platform transactional mail on `updates.strelva.com`;
+it grants no client sending mandate. Accepted, unconfirmed and suppressed sends
+have distinct copy; refreshing a claim never repeats a send. Imports remain
+copy-only. AgencyLibraryView receives server-qualified review availability;
+while Needs you is off it retains source/Version reads, holds preparation and
+withholds review links. No release defaults changed.
+
+AgencyVerification uses plain task names and separates verification status from
+evidence submission. A sole operator who belongs to the agency can submit
+evidence but cannot approve it; the platform review queue names the need for an
+independent reviewer and disables self-review. Existing St* fields, rows,
+notices and focus styles are retained. Local source/DOM tests establish these
+contracts; current desktop/mobile rendering, SQL execution, native Redis, Auth
+and hosted delivery remain coordinator acceptance work under the lane brief’s
+no-server/no-browser stop point.

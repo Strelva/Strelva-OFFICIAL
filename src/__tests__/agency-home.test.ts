@@ -249,3 +249,11 @@ describe("agency home", () => {
     expect(html).not.toContain("Loading clients");
   });
 });
+
+
+it("preserves the server's incomplete Queue verdict even when every client page is loaded", () => {
+  const combined = combineAgencyPages([{ cursor: null, page: page([row(1)], { queueComplete: false }) }]);
+  expect(combined.clients).toHaveLength(1);
+  expect(combined.nextCursor).toBeNull();
+  expect(combined.queueComplete).toBe(false);
+});

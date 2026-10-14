@@ -17,10 +17,6 @@ beforeEach(() => {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-async function input(selector: string, value: string) {
-  const field = container.querySelector<HTMLInputElement>(selector)!;
-  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value); field.dispatchEvent(new Event("input", { bubbles: true })); });
-}
 async function click(text: string) {
   const button = Array.from(container.querySelectorAll("button")).find(value => value.textContent?.startsWith(text))!;
   expect(button).toBeTruthy(); await act(async () => button.click());
@@ -37,26 +33,20 @@ describe("L13 retained entry and report actions", () => {
     expect(container.querySelector('a[href="/sign-up?as=agency"]')?.textContent).toContain("Open my agency account");
     expect(container.querySelector('a[href="/agencies"]')?.textContent).toContain("Find an agency");
     expect(fetch).not.toHaveBeenCalled();
-    await click("Ask Strelva Agency to do it for you");
-    expect(container.querySelector("form")).not.toBeNull();
-    expect(document.activeElement?.textContent).toContain("Request your build");
-    await click("Choose another path");
-    expect(container.querySelector("form")).toBeNull();
-    expect(document.activeElement?.textContent).toContain("What do you need?");
-    expect(fetch).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Ask Strelva Agency");
+    expect(container.querySelectorAll("button")).toHaveLength(0);
   });
 
-  it("keeps intake details on failure and preserves the existing trimmed API input", async () => {
-    const fetch = vi.fn().mockResolvedValue(response({ error: "Please try again later." }, 503)); vi.stubGlobal("fetch", fetch);
-    await act(async () => root.render(createElement(AccessRequestPage)));
-    await click("Ask Strelva Agency to do it for you");
-    await input("#business-name", " Fictional business "); await input("#email", " OWNER@example.invalid ");
-    await act(async () => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
-    expect(fetch).toHaveBeenCalledWith("/api/access-request/intake", expect.objectContaining({ method: "POST" }));
-    expect(JSON.parse(fetch.mock.calls[0]![1].body)).toMatchObject({ requestType: "agency_service", businessName: "Fictional business", email: "owner@example.invalid", referredBy: "preview-source", description: "Build request." });
-    expect(container.querySelector<HTMLInputElement>("#business-name")?.value).toBe(" Fictional business ");
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Please try again later.");
-    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+  it("keeps check context beside the neutral directory without submitting a request", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    await act(async () => root.render(<AccessRequestPage
+      carried={{ businessName: "Fictional business", currentWebsite: "https://fictional.example.test" }}
+      initialFeedback={{ state: "success", message: "Old service feedback" }}
+    />));
+    expect(container.textContent).toContain("Fictional business");
+    expect(container.querySelector('a[href="/agencies"]')).toBeTruthy();
+    expect(container.querySelector("form")).toBeNull(); expect(fetch).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("Old service feedback");
   });
 
   it("sends unsigned owner claims to the same sign-in continuation without claiming", async () => {

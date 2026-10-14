@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
 
 /** "Review all": prepares each ready Version for its own business's approval. Releases nothing. */
 export async function POST(request: Request) {
+  if (!needsYouReleaseEnabled()) return workspaceJson({ error: "Owner reviews are paused. Your saved sources remain available; nothing changed." }, 503);
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
   if (!systemsReleaseMayBeOn()) return workspaceJson({ error: "The library is not enabled. Nothing changed." }, 503);
   const guarded = workspaceWriteGuard(request);

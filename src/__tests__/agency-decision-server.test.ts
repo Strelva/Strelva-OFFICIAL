@@ -55,9 +55,10 @@ describe("agency scoped decision projection", () => {
 
 describe("agency exact outcome recovery", () => {
   const agency = "c0000000-0000-4000-8000-000000000001";
-  it("withholds unsupported source execution from the agency read", async () => {
-    mocks.rpc.mockResolvedValue({ data: [item, ...["website_document", "website_domain", "make_real"].map(sourceLifecycle => ({ ...item, sourceLifecycle }))], error: null });
-    expect(await readAgencyDecisions(ACTOR, WS, agency)).toEqual([item]);
+  it("admits website approval, launch and domain execution while withholding private confirmation and Possibilities", async () => {
+    const supported = [item, { ...item, sourceLifecycle: "website_document", sourceId: "work:approve" }, { ...item, sourceLifecycle: "website_document", sourceId: "work:launch" }, { ...item, sourceLifecycle: "website_domain" }];
+    mocks.rpc.mockResolvedValue({ data: [...supported, { ...item, sourceLifecycle: "website_document", sourceId: "work:fact.owner" }, { ...item, sourceLifecycle: "website_document", sourceId: "work:copy.contact" }, { ...item, sourceLifecycle: "make_real" }], error: null });
+    expect(await readAgencyDecisions(ACTOR, WS, agency)).toEqual(supported);
   });
   it("reads one exact reviewed outcome through the scoped RPC", async () => {
     const finished = { ...item, state: "approved", outcome: "done_unverified", decidedActor: { kind: "agency", agencyId: agency, displayName: "Outside Agency" } };

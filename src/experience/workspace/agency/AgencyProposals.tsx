@@ -12,7 +12,7 @@ type Transport = (input: string, init?: RequestInit) => Promise<Response>;
  * listed where businesses choose one. Nothing changes for a business until
  * an owner or admin of the agency accepts. Listing is opt-in and unranked.
  */
-export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, transport = fetch }: { agencyWorkspaceId: string; agencyName: string; canManage: boolean; transport?: Transport }) {
+export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, transport = fetch, showListing = true, listingOnly = false, onAccepted }: { agencyWorkspaceId: string; agencyName: string; canManage: boolean; transport?: Transport; showListing?: boolean; listingOnly?: boolean; onAccepted?: () => void }) {
   const [state, setState] = useState<{ loading: boolean; error: string; proposals: Proposal[] }>({ loading: canManage, error: "", proposals: [] });
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -52,6 +52,7 @@ export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, tran
     if (await post("/api/workspace/agency-proposals", { agencyId: agencyWorkspaceId, businessId: proposal.businessWorkspaceId, proposalId: proposal.proposalId, accept }, proposal.proposalId, accept ? "accepted" : "declined")) {
       setState(current => ({ ...current, proposals: current.proposals.filter(item => item.proposalId !== proposal.proposalId) }));
       setMessage(accept ? `${proposal.businessName} is now a client. Assign someone from Team to work on it.` : `You declined ${proposal.businessName}. Nothing changed for them.`);
+      if (accept) onAccepted?.();
     } else setResponseUnconfirmed(true);
   }
   async function saveListing(next: boolean) {
@@ -63,7 +64,7 @@ export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, tran
 
   if (!canManage) return null;
   return <>
-    <StSection title="Businesses asking you in" meta="A business chose what you can do. Nothing changes for them until you accept." action={<StTextButton disabled={Boolean(busy)} onClick={() => void load()}>Refresh requests</StTextButton>}>
+    {!listingOnly ? <StSection title="Businesses asking you in" meta="A business chose what you can do. Nothing changes for them until you accept." action={<StTextButton disabled={Boolean(busy)} onClick={() => void load()}>Refresh requests</StTextButton>}>
       {state.loading ? <><p role="status">Loading requests from businesses…</p><StSkeleton label="Loading requests from businesses" /></>
         : state.error ? <StNotice tone="critical" action={<StTextButton onClick={() => void load()}>Try again</StTextButton>}>{state.error}</StNotice>
           : state.proposals.length ? <StRows label="Businesses asking you in">{state.proposals.map(proposal => <StRow key={proposal.proposalId} title={proposal.businessName}
@@ -72,11 +73,11 @@ export function AgencyProposals({ agencyWorkspaceId, agencyName, canManage, tran
             <small className="block text-xs text-gray-muted">{proposal.consent}</small>
           </StRow>)}</StRows>
             : <StEmpty>No businesses are waiting on you.</StEmpty>}
-    </StSection>
-    <StSection title="Your listing" meta="Businesses bring in agencies from one list, in name order. Strelva Agency is listed the same way.">
+    </StSection> : null}
+    {showListing ? <StSection title="Your listing" meta="Businesses bring in agencies from one list, in name order. Strelva Agency is listed the same way.">
       <StInput label="What your agency does" hint="One line, shown next to your name." maxLength={280} value={summary} onChange={event => setSummary(event.target.value)} />
       <div className="flex items-center gap-3"><StToggle label={`List ${agencyName}`} checked={listed} disabled={busy === "listing" || (!listed && !summary.trim())} reason={!summary.trim() ? "Add one line first." : undefined} onChange={next => void saveListing(next)} /><span className="text-sm">{listed ? `${agencyName} is listed` : `List ${agencyName}`}</span></div>
-    </StSection>
+    </StSection> : null}
     {message ? <p role="status">{message}</p> : null}
   </>;
 }

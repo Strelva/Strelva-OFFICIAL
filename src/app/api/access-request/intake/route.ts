@@ -1,174 +1,26 @@
 import { NextResponse } from "next/server";
 import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
-import {
-  buildDeliveryStatusUrl,
-  createDeliveryStatusToken,
-  getExistingLeadToken,
-  saveDeliveryLead,
-  type DeliveryPlan,
-} from "@/lib/access-request-delivery";
-import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
-import { strelvaAgencyWorkspaceId } from "@/platform/workspaces/strelva-agency";
-import { OPERATOR_URL } from "@/platform/infra/brand";
-import { scoreLeadSpam } from "@/lib/lead-spam";
 
 export async function POST(req: Request) {
   if (await isRateLimitedWindowedAsync(rateLimitKey(req, "access-request-intake"), 5, 3600_000)) {
     return NextResponse.json({ error: "Too many submissions" }, { status: 429 });
   }
-
   const body = await readJsonObject(req);
-  if (!body) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
-  }
+  if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 
-  // Account access is platform entry, not consent to agency sales. These typed
-  // routes never create a delivery lead or send a sales notification.
+  // Account access never grants consent to sales or chooses an agency.
   if (body.requestType === "business_access" || body.requestType === "agency_access") {
     return NextResponse.json({ success: true, requestType: body.requestType,
       next: body.requestType === "agency_access" ? "/sign-up?as=agency" : "/sign-up" });
   }
-  if (body.requestType !== "agency_service") {
-    return NextResponse.json({ error: "Choose business access, agency access, or explicitly request Strelva Agency's service." }, { status: 400 });
-  }
-
-  const { businessName, description, location, email, phone, currentWebsite, plan, referredBy } = body;
-
-  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
-  const normalizedBusinessName = typeof businessName === "string" ? businessName.trim().slice(0, 160) : "";
-
-  if (!normalizedBusinessName || !normalizedEmail) {
-    return NextResponse.json({ error: "Business name and email are required" }, { status: 400 });
-  }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-    return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
-  }
-
-  const safeDescription = typeof description === "string" ? description.trim().slice(0, 2000) : "";
-  const safeLocation = typeof location === "string" ? location.trim().slice(0, 200) : "";
-  const safePhone = typeof phone === "string" ? phone.trim().slice(0, 40) : "";
-  const safeCurrentWebsite = typeof currentWebsite === "string" ? currentWebsite.trim().slice(0, 300) : "";
-  const safeReferredBy = typeof referredBy === "string" ? referredBy.trim().slice(0, 200) : "";
-  const planValue: DeliveryPlan | null = plan === "one-time" || plan === "monthly" ? plan : null;
-  const planLabel = planValue === "one-time" ? "One-time build" : planValue === "monthly" ? "Monthly plan" : "Not sure";
-  // Spam gate. Public unauthenticated intake — bots POST gibberish straight to
-  // this endpoint (bypassing the marketing form's honeypot). Two zero-friction
-  // signals: an optional `company` honeypot (a real form leaves it empty) and a
-  // content score over the gibberish signature. Return a success shape on a hit
-  // so the bot can't tell it was dropped and adapt; a real submission never trips
-  // either (verified against the live spam sample + real leads).
-  const honeypot = typeof body.company === "string" ? body.company.trim() : "";
-  const spam = scoreLeadSpam({
-    businessName: normalizedBusinessName,
-    description: safeDescription,
-    location: safeLocation,
-    currentWebsite: safeCurrentWebsite,
-    email: normalizedEmail,
-  });
-  if (honeypot || spam.isSpam) {
-    console.warn("[access-request] dropped suspected spam", {
-      email: normalizedEmail,
-      honeypot: honeypot.length > 0,
-      score: spam.score,
-      signals: spam.signals,
-    });
-    return NextResponse.json({ success: true });
-  }
-
-  const now = new Date().toISOString();
-  const existingStatusToken = await getExistingLeadToken(normalizedEmail);
-  const statusToken = existingStatusToken || createDeliveryStatusToken();
-  const requestOrigin = new URL(req.url).origin;
-  const statusUrl = buildDeliveryStatusUrl(requestOrigin, statusToken);
-
-  if (existingStatusToken) {
-    const emailSent = await sendDeliveryStatusEmail({
-      businessName: normalizedBusinessName,
-      email: normalizedEmail,
-      statusUrl,
-      logPrefix: "[access-request]",
-    });
-
+  if (body.requestType === "agency_service") {
+    // Agency work uses the signed-in, explicitly selected proposal path. Keep
+    // the historical public route from privately assigning leads to an agency.
     return NextResponse.json({
-      success: true,
-      statusUrl,
-      emailSent,
-      repeatSubmission: true,
-    });
+      error: "Choose an agency from the directory, then sign in to send your request. No request was sent.",
+      next: "/agencies", signIn: "/sign-up",
+    }, { status: 409 });
   }
-
-  const slackUrl = process.env.SLACK_WEBHOOK_URL;
-  if (slackUrl) {
-    try {
-      await fetch(slackUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: `New website build request:\n*${normalizedBusinessName}*\n${safeDescription || "No description"}\n${safeLocation || "No location"}\n${normalizedEmail}\nPhone: ${safePhone || "None"}\nWants: ${planLabel}\nCurrent site: ${safeCurrentWebsite || "None"}\nReferred by: ${safeReferredBy || "Direct"}`,
-        }),
-      });
-    } catch {
-      // Slack notification is best-effort.
-    }
-  }
-
-  const leadData = {
-    businessName: normalizedBusinessName,
-    requestType: "agency_service",
-    agencyWorkspaceId: strelvaAgencyWorkspaceId(),
-    description: safeDescription || null,
-    location: safeLocation || null,
-    email: normalizedEmail,
-    phone: safePhone || null,
-    currentWebsite: safeCurrentWebsite || null,
-    plan: planValue,
-    referredBy: safeReferredBy || null,
-    statusToken,
-    deliveryStatus: "received" as const,
-    submittedAt: now,
-    statusUpdatedAt: now,
-  };
-
-  const leadPersisted = await saveDeliveryLead(leadData);
-  if (!leadPersisted) {
-    console.error("[access-request] Delivery status storage is not configured.");
-    return NextResponse.json(
-      { error: "Delivery tracking is not configured. Email jacob@strelva.com and we will get you added." },
-      { status: 503 },
-    );
-  }
-
-  const emailSent = await sendDeliveryStatusEmail({
-    businessName: normalizedBusinessName,
-    email: normalizedEmail,
-    statusUrl,
-    logPrefix: "[access-request]",
-  });
-
-  // Notify the team on every genuinely-new lead. Slack-independent: this fires
-  // with no env configured (recipients default to jacob@strelva.com), closing
-  // the "lands in a DB nobody watches" gap. Best-effort — a failed team email
-  // never fails the intake response.
-  const leadsUrl = new URL(
-    "/admin/leads",
-    OPERATOR_URL,
-  ).toString();
-  await sendNewIntakeLeadEmail({
-    lead: {
-      businessName: normalizedBusinessName,
-      description: safeDescription || null,
-      location: safeLocation || null,
-      email: normalizedEmail,
-      phone: safePhone || null,
-      currentWebsite: safeCurrentWebsite || null,
-      plan: planValue,
-      planLabel,
-      referredBy: safeReferredBy || null,
-    },
-    leadsUrl,
-    logPrefix: "[access-request]",
-  });
-
-  return NextResponse.json({ success: true, statusUrl, emailSent });
+  return NextResponse.json({ error: "Choose business access, agency access, or an agency from the directory." }, { status: 400 });
 }

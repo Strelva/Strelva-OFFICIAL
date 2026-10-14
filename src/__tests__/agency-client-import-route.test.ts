@@ -32,7 +32,7 @@ beforeEach(() => {
   mocks.rate.mockResolvedValue(false);
   mocks.rpc.mockImplementation(async (name: string) => ({
     data: name === "authorize_agency_client_add" ? "owner" : name === "agency_client_import_preview" ? { addedCommandIds: [], sameHost: [], limits }
-      : name === "agency_add_client" ? receipt : name === "issue_agency_client_owner_claim" ? claim : null,
+      : name === "agency_add_client_enrolled" ? receipt : name === "issue_agency_client_owner_claim" ? claim : null,
     error: null,
   }));
 });
@@ -72,7 +72,7 @@ describe("POST /api/workspace/agency-clients/import", () => {
     const body = await response.json();
     expect(body.rows[0]).toMatchObject({ state: "added", businessId: CLIENT });
     expect(body.rows[0].ownerClaimPath).toMatch(/^\/workspace\/claim\/[A-Za-z0-9_-]{43}$/);
-    const add = mocks.rpc.mock.calls.find(([name]) => name === "agency_add_client")![1];
+    const add = mocks.rpc.mock.calls.find(([name]) => name === "agency_add_client_enrolled")![1];
     expect(add.p_command_id).toBe(clientImportIdempotencyKey(AGENCY, "sheet", "name:corner plumbing"));
     expect(add.p_input.facts).toEqual({ phone: { value: "(716) 555-0199" } });
     const issued = mocks.rpc.mock.calls.find(([name]) => name === "issue_agency_client_owner_claim")![1];

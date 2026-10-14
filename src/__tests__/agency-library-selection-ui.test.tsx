@@ -9,7 +9,7 @@ const agencyWorkspaceId = "11111111-1111-4111-8111-111111111111";
 const sourceId = "33333333-3333-4333-8333-333333333333";
 const clientId = "22222222-2222-4222-8222-222222222222";
 function library(): AgencyLibrary {
-  return { agencyWorkspaceId, sources: [{
+  return { agencyWorkspaceId, reviewEnabled: true, sources: [{
     systemId: sourceId, workspaceId: agencyWorkspaceId, name: "Intake", hidden: false,
     revisions: [1, 2, 3].map(number => ({ number, label: null, summary: number === 3 ? "Unreviewed change" : "Reviewed change", publishedAt: "2026-10-12T00:00:00Z" })),
     versions: Array.from({ length: 7 }, (_, index) => ({
@@ -48,6 +48,16 @@ beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
 afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 
 describe("agency Library ready Version selection", () => {
+  it.each([false, undefined])("holds preparation and review links when review availability is %s", async reviewEnabled => {
+    const current = library(); current.reviewEnabled = reviewEnabled;
+    const request = vi.fn<typeof fetch>(async () => Response.json(current));
+    const node = await render(request);
+    expect(node.textContent).toContain("Owner reviews are paused");
+    const prepare = button(node, "Prepare offers for 1 client") || [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Prepare offers"));
+    expect(prepare?.disabled).toBe(true);
+    expect(node.querySelector('a[href*="version-review"]')).toBeNull();
+    expect(request.mock.calls.every(([, init]) => init?.method !== "POST")).toBe(true);
+  });
   it("sends only selected ready Versions and keeps conflicts and missing accounts skipped", async () => {
     const request = vi.fn(transport());
     const node = await render(request);

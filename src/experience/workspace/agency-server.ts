@@ -1,4 +1,6 @@
 import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
+import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
+import { agencyClientListItemSchema } from "@/products/agency-clients/contracts";
 /**
  * Server reads behind the agency surface. Each one runs under the signed-in
  * actor; Postgres rechecks access on every row.
@@ -86,8 +88,37 @@ export async function readAgencyClientsPage(
   } else {
     library = { agencyWorkspaceId, sources: [] };
   }
-  const overview = await addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library));
+  const overview = await addAgencyClaimQueue(actor, await addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library)), db);
   return operatorQueueReleaseEnabled() ? addAgencyProviderAlerts(actor, overview, db) : overview;
+}
+
+/** Claim status is in-app work even while owner email and Needs you are off.
+ * The existing additions RPC rechecks agency membership; only clients in the
+ * current scoped page are projected, with no owner email or claim token. */
+export async function addAgencyClaimQueue(actor: WorkspaceActor, page: AgencyClientsPage, db: VersionsDb, enabled = agencyAddClientReleaseEnabled(), now = Date.now()): Promise<AgencyClientsPage> {
+  if (!enabled) return page;
+  try {
+    const additions = z.array(agencyClientListItemSchema).parse(await rpc(db, "list_agency_client_additions", {
+      ...actorArgs(actor), p_agency_workspace_id: uuid.parse(page.agencyWorkspaceId),
+    }, "Owner claim status could not be loaded."));
+    if (additions.some(item => item.agencyWorkspaceId !== page.agencyWorkspaceId)) throw new Error("Agency scope changed.");
+    const visible = new Map(page.clients.filter(client => client.status === "ready").map(client => [client.workspaceId, client]));
+    const queue = page.queue.filter(item => item.kind !== "owner_claim");
+    for (const addition of additions) {
+      const client = visible.get(addition.customerWorkspaceId);
+      if (!client || !addition.seatActive || addition.ownerClaimed) continue;
+      const activeLink = addition.pendingClaim && Date.parse(addition.pendingClaim.expiresAt) > now;
+      queue.push({ id: `owner-claim:${addition.additionId}`, kind: "owner_claim", workspaceId: client.workspaceId,
+        clientName: client.name, title: `Waiting on ${client.name} to claim`, systemId: null, workId: null,
+        since: addition.addedAt, label: activeLink ? "Share the owner's claim link" : "Create a new owner claim link",
+        href: `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(page.agencyWorkspaceId)}` });
+    }
+    const gaps = [...(page.queueGaps ?? []), ...(additions.length >= 200 ? ["Owner claims: only the latest 200 added clients were checked."] : [])];
+    const waiting = new Set(queue.filter(item => item.kind === "owner_claim").map(item => item.workspaceId));
+    return { ...page, clients: page.clients.map(client => ({ ...client, ownerClaimWaiting: waiting.has(client.workspaceId) })), queue, queueGaps: gaps, queueComplete: !page.nextCursor && !gaps.length && page.queueComplete !== false };
+  } catch {
+    return { ...page, queueComplete: false, queueGaps: [...new Set([...(page.queueGaps ?? []), "Owner claims: status could not be read."])] };
+  }
 }
 
 const sourcesSchema = z.object({
@@ -127,7 +158,7 @@ async function readQualifiedLibrarySources(actor: WorkspaceActor, agencyWorkspac
   const sources = await readAgencyVersionSources(actor, agencyWorkspaceId, db);
   const { versions, actor: pending } = services(actor, db);
   const versionActor: VersionActor = await pending;
-  const result: AgencyLibrary = { agencyWorkspaceId, sources: [] };
+  const result: AgencyLibrary = { agencyWorkspaceId, sources: [], reviewEnabled: needsYouReleaseEnabled() };
   for (const source of sources) {
     const rows: AgencyLibraryVersion[] = [];
     for (const item of source.versions.filter(includeVersion)) {

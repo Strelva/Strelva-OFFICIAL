@@ -5,9 +5,9 @@ import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "
 import { needsYouService } from "../needs-you-server";
 import { NeedsYouRefusedError, type NeedsYouStore } from "@/platform/needs-you/repository";
 
-/** These source resolvers still require a business-owner claim for execution. */
-export function agencyDecisionExecutionSupported(item: Pick<OwnerDecision, "sourceLifecycle">): boolean {
-  return item.sourceLifecycle !== "website_document" && item.sourceLifecycle !== "website_domain" && item.sourceLifecycle !== "make_real";
+/** Possibilities and private fact confirmation retain their owner-only resolver. */
+export function agencyDecisionExecutionSupported(item: Pick<OwnerDecision, "sourceLifecycle" | "sourceId">): boolean {
+  return item.sourceLifecycle !== "make_real" && (item.sourceLifecycle !== "website_document" || /:(approve|launch)$/.test(item.sourceId));
 }
 
 type Db = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> };

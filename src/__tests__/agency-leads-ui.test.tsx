@@ -55,10 +55,10 @@ it("renders owned lead work in agency chrome with honest legacy attribution and 
   expect(page).toContain('&quot;leadsCurrent&quot;:true'); expect(page).toContain('&quot;leadsAvailable&quot;:true');
 });
 
-it.each(["unset setting", "another agency", "super-admin without membership"])("denied page for %s exposes no lead feed or tool", async () => {
+it.each(["no membership", "ordinary member", "super-admin without membership"])("denied page for %s exposes no lead feed or tool", async () => {
   pageMocks.agency.mockRejectedValueOnce(new Error("Not authorized"));
   const page = renderToStaticMarkup(await LeadsPage({ searchParams: Promise.resolve({ workspaceId: agency }) }));
-  expect(page).toContain("Only a verified owner or admin of Strelva Agency");
+  expect(page).toContain("Only a verified owner or admin of this agency");
   expect(page).not.toContain("Reading leads"); expect(page).not.toContain("Refresh leads"); expect(page).not.toContain("Convert");
   expect(pageMocks.brand).not.toHaveBeenCalled();
 });
