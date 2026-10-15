@@ -1,3 +1,5 @@
+import { getActorContext } from "@/platform/infra/auth";
+import { assertTenantGoogleConnectionEligible } from "@/products/google-listing/server";
 /**
  * Google OAuth Initiation Route
  *
@@ -40,6 +42,10 @@ export async function GET() {
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
 
+  const context = await getActorContext(tenant);
+  if (!context.userId || !context.email || !["user", "super_admin"].includes(context.type)) return NextResponse.json({error:"Access denied"},{status:403});
+  try { await assertTenantGoogleConnectionEligible({userId:context.userId,verifiedEmail:context.email},tenant); }
+  catch (error) { return NextResponse.json({error:error instanceof Error ? error.message : "Google Business Profile is coming soon."},{status:409}); }
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 

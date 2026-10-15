@@ -1,3 +1,5 @@
+import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { assertGoogleBindingEligible, assertGoogleConnectionEligible, guardGoogleClient } from "./connection-policy";
 import type { GoogleGrant } from "@/lib/google-access";
 import type { GoogleListingClient, GoogleLocationRef } from "./client";
 import type { ListingAuthority, ListingReceipt } from "./contracts";
@@ -42,11 +44,12 @@ export type TenantReplyResult =
   | { status: "failed" | "refused"; reason: string; receipt?: ListingReceipt };
 
 export interface TenantReplyDeps {
+  actor?(authority: ListingAuthority): Promise<WorkspaceActor | null>;
   releaseEnabled(): boolean;
   bindingTarget(tenantId: string): Promise<{ workspaceId: string } | null>;
   grant(tenantId: string): Promise<GoogleGrant | null>;
   location(tenantId: string, grant: GoogleGrant): Promise<GoogleLocationRef | null>;
-  accessToken(grant: GoogleGrant): Promise<string | null>;
+  accessToken(grant: GoogleGrant, actor?: WorkspaceActor | null): Promise<string | null>;
   client(accessToken: string): GoogleListingClient;
   pace?(client: GoogleListingClient, workspaceId: string, locationId: string): GoogleListingClient;
   receipts(): ListingReceiptStore;
@@ -101,11 +104,18 @@ export async function postTenantReviewReply(input: {
     deps.notify(`Review reply not sent for *${input.tenantId}* (reviewId=${input.reviewId}): ${reason}`);
     return { status: "failed", reason };
   };
+  const connectionActor = await deps.actor?.(input.authority) ?? null;
+  try { await assertGoogleConnectionEligible(connectionActor, input.workspaceId); }
+  catch (error) { return { status: "refused", reason: error instanceof Error ? error.message : "Google Business Profile is coming soon." }; }
   // Checks before the write send nothing and leave no receipt, as before.
   const grant = await deps.grant(input.tenantId).catch(() => null);
   if (!grant || grant.status !== "connected") return fail("no_connected_google_account");
+  if (grant.bindingId) {
+    try { await assertGoogleBindingEligible(connectionActor, input.workspaceId, grant.bindingId); }
+    catch (error) { return {status:"refused",reason:error instanceof Error ? error.message : "Reconnect Google."}; }
+  }
   if (grant.scopes && !grant.scopes.includes(GBP_MANAGE_SCOPE)) return fail("missing_gbp_write_scope");
-  const token = await deps.accessToken(grant).catch(() => null);
+  const token = await deps.accessToken(grant, connectionActor).catch(() => null);
   if (!token) return fail("token_refresh_failed");
   const located = await deps.location(input.tenantId, grant).catch(() => null);
   const locationId = located ? locationIdOf(located.locationId) : null;
@@ -124,6 +134,7 @@ export async function postTenantReviewReply(input: {
   const tracked: GoogleListingClient = {
     ...rawClient,
     async updateReply(location, reviewId, comment) {
+      await assertGoogleConnectionEligible(connectionActor, input.workspaceId);
       let admission: { settle(responseStatus: number): Promise<void> } | undefined;
       try { admission = await deps.beforeReplyDispatch?.(location, reviewId, comment, dispatchReceiptId); }
       catch { return { ok: false, kind: "auth", status: 403, detail: "Review authority changed. Nothing sent." }; }
@@ -136,9 +147,11 @@ export async function postTenantReviewReply(input: {
       return result;
     },
   };
-  const client = deps.pace ? deps.pace(tracked, input.workspaceId, locationId) : tracked;
+  const checked = guardGoogleClient(tracked, () => grant.bindingId ? assertGoogleBindingEligible(connectionActor, input.workspaceId, grant.bindingId) : assertGoogleConnectionEligible(connectionActor, input.workspaceId));
+  const client = deps.pace ? deps.pace(checked, input.workspaceId, locationId) : checked;
   try {
     const outcome = await postReviewReply({
+      connectionActor,
       workspaceId: input.workspaceId,
       bindingId: grant.bindingId && grant.workspaceId === input.workspaceId ? grant.bindingId : null,
       location: { accountId: located.accountId, locationId },
@@ -196,6 +209,14 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
     import("@/lib/slack"),
   ]);
   return {
+    actor: async authority => {
+      if (!("actor" in authority)) return null;
+      const match = /^(?:agency-staff:[0-9a-f-]{36}:|operator:)?([0-9a-f-]{36})$/i.exec(authority.actor);
+      if (!match) return null;
+      const { getSupabase } = await import("@/platform/infra/db/client");
+      const user = await getSupabase()?.from("users").select("email,verified_at").eq("id", match[1]!).maybeSingle();
+      return user?.data?.email && user.data.verified_at ? {userId:match[1]!,verifiedEmail:user.data.email} : null;
+    },
     releaseEnabled: () => publishingReleaseEnabled(),
     bindingTarget: async (tenantId) => {
       const { tenantReleaseFlagEnabled } = await import("@/platform/release-flags/store");
@@ -203,7 +224,7 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
     },
     grant: (tenantId) => access.getGoogleGrant(tenantId),
     location: (tenantId, grant) => access.getGoogleLocation(tenantId, grant),
-    accessToken: (grant) => access.getValidGoogleAccessToken(grant),
+    accessToken: (grant, actor) => access.getValidGoogleAccessToken(grant, Date.now(), actor),
     client: (token) => createHttpGoogleListingClient(token),
     pace: (client, workspaceId, locationId) => paceGoogleWrites(client, workspaceId, locationId),
     receipts: () => createSupabaseReceiptStore(),

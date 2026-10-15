@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { recordConnectionHolder } from "@/platform/connections/holders";
+import { connectionEligibilityFor } from "@/platform/connections/server";
+import { readProviderAccess } from "@/platform/connections/access";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import { getSupabase } from "@/platform/infra/db/client";
 import { isWorkspaceAuthorityFailure, workspaceRoleAllows } from "@/platform/workspaces/permissions";
@@ -296,10 +300,15 @@ export async function saveWorkspaceCalendarConnection(
   input: CalendarConnectionInput,
   credentials: { accessToken: string; refreshToken?: string; scopes?: string[]; tokenExpiresAt?: string | null },
   status: "authorized" | "connected" = "connected",
+  recordHolder = true,
 ): Promise<CalendarConnection> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
   await assertWorkspaceCalendarWriteAllowed(workspaceId);
   const value = calendarConnectionInputSchema.parse(input);
+  if (value.provider === "google") {
+    const eligibility = await connectionEligibilityFor(actor, {provider:"google_calendar",businessWorkspaceId:workspaceId});
+    if (!eligibility.eligible) throw new WorkspaceConflictError(eligibility.message);
+  }
   const timeZone = validTimeZone(value.timeZone);
   if (!credentials.accessToken.trim()) throw new WorkspaceStoreError("Calendar authorization is incomplete.");
   const { data, error } = await db().rpc("save_workspace_calendar_connection", {
@@ -319,7 +328,9 @@ export async function saveWorkspaceCalendarConnection(
   if (error) rpcFailure(error, "Calendar connection could not be saved.", CALENDAR_MANAGER_MESSAGE);
   const row = firstRow(data);
   if (!row) failure(null, "Calendar connection could not be saved.");
-  return mapConnection(row);
+  const saved = mapConnection(row);
+  if (saved.provider === "google" && recordHolder) await recordConnectionHolder({ref:`google_calendar:${saved.id}`,provider:"google_calendar",workspaceId,accountHolder:{kind:"business",workspaceId},accessThrough:readProviderAccess("google_calendar").through,actor,commandId:randomUUID()});
+  return saved;
 }
 
 export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, input: CalendarConnectionInput): Promise<CalendarConnection> {
@@ -332,7 +343,7 @@ export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor
     refreshToken: existing.refreshToken,
     scopes: existing.scopes,
     tokenExpiresAt: existing.tokenExpiresAt,
-  });
+  }, "connected", false);
 }
 
 export interface CalendarDisconnectResult {

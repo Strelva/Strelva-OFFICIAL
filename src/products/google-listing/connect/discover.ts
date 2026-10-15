@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible } from "../connection-policy";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
@@ -37,16 +38,18 @@ export interface DiscoverDeps {
   /** Owner, release and configuration checks. Throws when this business can't connect Google here. */
   admit(actor: WorkspaceActor, workspaceId: string): Promise<void>;
   fetcher?: typeof fetch;
+  callbackPath?: string;
 }
 
-function oauthClient(origin: string) {
+function oauthClient(origin: string, callbackPath = DISCOVER_CALLBACK_PATH) {
   if (new URL(origin).origin !== process.env.NEXT_PUBLIC_APP_URL || !process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) throw new WorkspaceConflictError("Google sign-in isn't set up here yet.");
-  return { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, redirect: `${origin}${DISCOVER_CALLBACK_PATH}` };
+  return { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET, redirect: `${origin}${callbackPath}` };
 }
 
 export async function beginGoogleDiscovery(actor: WorkspaceActor, workspaceId: string, origin: string, deps: DiscoverDeps): Promise<{ url: string; nonce: string }> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   await deps.admit(actor, z.string().uuid().parse(workspaceId));
-  const client = oauthClient(origin), nonce = newNonce();
+  const client = oauthClient(origin, deps.callbackPath), nonce = newNonce();
   const state = signPayload("google-discover-state-v1", { workspaceId, ownerId: actor.userId, nonceHash: hashValue(nonce) }, TEN_MINUTES);
   const params = new URLSearchParams({ client_id: client.clientId, redirect_uri: client.redirect, response_type: "code", scope: `openid email ${MANAGE}`, access_type: "online", prompt: "select_account", state });
   return { url: `https://accounts.google.com/o/oauth2/v2/auth?${params}`, nonce };
@@ -72,9 +75,11 @@ const text = (value: unknown, max: number) => typeof value === "string" ? value.
 export async function finishGoogleDiscovery(actor: WorkspaceActor, state: string, nonce: string, code: string, origin: string, deps: DiscoverDeps): Promise<DiscoveryResult> {
   const claims = verifyPayload("google-discover-state-v1", state, stateSchema);
   if (!claims || claims.ownerId !== actor.userId || !nonce || claims.nonceHash !== hashValue(nonce)) throw new WorkspaceAccessError("This Google sign-in has expired or belongs to another session. Start again.");
+  await assertGoogleConnectionEligible(actor, claims.workspaceId);
   await deps.admit(actor, claims.workspaceId);
   if (!code || code.length > 4096) return { status: "refused", workspaceId: claims.workspaceId };
-  const fetcher = deps.fetcher ?? fetch, client = oauthClient(origin);
+  const fetcher: typeof fetch = async (...args) => { await assertGoogleConnectionEligible(actor, claims.workspaceId); return (deps.fetcher ?? fetch)(...args); };
+  const client = oauthClient(origin, deps.callbackPath);
   const exchanged = await fetcher("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: client.clientId, client_secret: client.clientSecret, redirect_uri: client.redirect, grant_type: "authorization_code" }), signal: AbortSignal.timeout(10_000) });
   if (!exchanged.ok) return { status: "refused", workspaceId: claims.workspaceId };
   const tokens = z.object({ access_token: z.string().min(1), scope: z.string() }).passthrough().safeParse(await exchanged.json().catch(() => null));

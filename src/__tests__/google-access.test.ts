@@ -1,3 +1,4 @@
+vi.mock("@/platform/account-bindings/google-policy", async original => ({...await original<object>(),assertGoogleGrantEligible:async()=>{}}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The Google grant adapter: binding first, Redis fallback, dual-write on

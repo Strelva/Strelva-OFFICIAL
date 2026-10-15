@@ -1,3 +1,7 @@
+// Explicit approved platform access for these existing provider-flow fixtures.
+vi.mock("@/platform/connections/access", () => ({readProviderAccess: () => ({provider:"google_business_profile",through:{kind:"platform"},approval:"approved"})}));
+vi.mock("@/platform/connections/server", () => ({connectionEligibilityFor: async () => ({eligible:true,through:{kind:"platform"}})}));
+vi.mock("@/platform/connections/holders", () => ({recordConnectionHolder: async () => {}, readConnectionHolders: async (workspaceId: string) => ({get: () => ({accountHolder:{kind:"business",workspaceId},accessThrough:{kind:"platform"}})})}));
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
@@ -12,7 +16,7 @@ vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: 
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: mocks.override }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
 vi.mock("@/lib/google-access", () => ({ recordGoogleConnection: mocks.record, beginGoogleReconnectOperation: mocks.begin }));
-vi.mock("@/platform/account-bindings/store", () => ({ googleBindingsEnabled: () => process.env.STRELVA_GOOGLE_BINDINGS === "1", bindingEncryptionReady: () => !!process.env.SECRETS_ENC_KEY, upsertGoogleBinding: mocks.upsert }));
+vi.mock("@/platform/account-bindings/store", () => ({ assertGoogleBindingEligible:async()=>{},googleConnectionEligibility:async()=>({eligible:true,through:{kind:"platform"}}), googleBindingsEnabled: () => process.env.STRELVA_GOOGLE_BINDINGS === "1", bindingEncryptionReady: () => !!process.env.SECRETS_ENC_KEY, upsertGoogleBinding: mocks.upsert }));
 
 import { publishingDecisionDeliveryAllowed, publishingNoticesEnabled, requiresGoogleReapprovalAfterReconnect } from "@/platform/needs-you/publishing-delivery";
 import { chaseGoogleReconnectNotices, finishGoogleReconnect, GOOGLE_RECONNECT_COOKIE, reconnectHash, reconnectStore, signReconnectToken, verifyReconnectToken, type ReconnectTarget } from "@/products/publishing/reconnect";

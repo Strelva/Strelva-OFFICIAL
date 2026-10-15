@@ -1,3 +1,7 @@
+// Explicit approved platform access for these existing provider-flow fixtures.
+vi.mock("@/platform/connections/access", () => ({readProviderAccess: () => ({provider:"google_business_profile",through:{kind:"platform"},approval:"approved"})}));
+vi.mock("@/platform/connections/server", () => ({connectionEligibilityFor: async () => ({eligible:true,through:{kind:"platform"}})}));
+vi.mock("@/platform/connections/holders", () => ({recordConnectionHolder: async () => {}, readConnectionHolders: async (workspaceId: string) => ({get: () => ({accountHolder:{kind:"business",workspaceId},accessThrough:{kind:"platform"}})})}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -7,7 +11,7 @@ const mocks = vi.hoisted(() => ({ rpc: vi.fn(), release: vi.fn(), record: vi.fn(
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: mocks.release }));
 vi.mock("@/lib/google-access", () => ({ recordGoogleConnection: mocks.record, beginGoogleReconnectOperation: mocks.begin }));
-vi.mock("@/platform/account-bindings/store", () => ({ googleBindingsEnabled: () => true, bindingEncryptionReady: () => true, upsertGoogleBinding: mocks.upsert }));
+vi.mock("@/platform/account-bindings/store", () => ({ assertGoogleBindingEligible:async()=>{},googleConnectionEligibility:async()=>({eligible:true,through:{kind:"platform"}}), googleBindingsEnabled: () => true, bindingEncryptionReady: () => true, upsertGoogleBinding: mocks.upsert }));
 
 import { finishGoogleReconnect, GoogleReconnectRefused, GOOGLE_RECONNECT_COOKIE, RECONNECT_DIFFERENT_ACCOUNT, RECONNECT_NO_IDENTITY, RECONNECT_UNKNOWN_ACCOUNT,
   reconnectHash, signReconnectToken, type ReconnectTarget } from "@/products/publishing/reconnect";

@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { recordConnectionHolder } from "@/platform/connections/holders";
+import { readProviderAccess } from "@/platform/connections/access";
+import { assertGoogleConnectionEligible, googleConnectionEligibility } from "../connection-policy";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
@@ -37,9 +41,10 @@ const stateSchema = z.object({ workspaceId: z.string().uuid(), ownerId: z.string
 
 export interface ReadGrantDeps { fetcher?: typeof fetch; enabled?: (actor: WorkspaceActor, workspaceId: string) => Promise<boolean>; owner?: (actor: WorkspaceActor, workspaceId: string) => Promise<boolean> }
 export async function readGrantAvailable(actor: WorkspaceActor, workspaceId: string): Promise<boolean> {
-  return googleReadGrantEnabled() && bindingEncryptionReady() && await publishingEnabledForWorkspace(workspaceId, actor);
+  return googleReadGrantEnabled() && bindingEncryptionReady() && await publishingEnabledForWorkspace(workspaceId, actor) && (await googleConnectionEligibility(actor, workspaceId)).eligible;
 }
 async function admit(actor: WorkspaceActor, workspaceId: string, deps: ReadGrantDeps) {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   if (!(await (deps.enabled ?? readGrantAvailable)(actor, workspaceId))) throw new WorkspaceConflictError("Search Console and Analytics aren't open for this business yet.");
   if (!(await (deps.owner ?? isBusinessOwner)(actor, workspaceId))) throw new WorkspaceAccessError("Only the business owner connects Search Console and Analytics.");
 }
@@ -63,7 +68,8 @@ export async function finishReadGrant(actor: WorkspaceActor, state: string, nonc
   await admit(actor, claims.workspaceId, deps);
   const refused = { status: "refused" as const, workspaceId: claims.workspaceId };
   if (!code || code.length > 4096) return refused;
-  const fetcher = deps.fetcher ?? fetch, config = client(origin);
+  const fetcher: typeof fetch = async (...args) => { await assertGoogleConnectionEligible(actor, claims.workspaceId); return (deps.fetcher ?? fetch)(...args); };
+  const config = client(origin);
   const exchanged = await fetcher("https://oauth2.googleapis.com/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ code, client_id: config.clientId, client_secret: config.clientSecret, redirect_uri: config.redirect, grant_type: "authorization_code" }), signal: AbortSignal.timeout(10_000) });
   if (!exchanged.ok) return refused;
   const tokens = z.object({ access_token: z.string().min(1), refresh_token: z.string().min(1), scope: z.string(), expires_in: z.number().positive().max(86400) }).safeParse(await exchanged.json().catch(() => null));
@@ -79,15 +85,18 @@ export async function finishReadGrant(actor: WorkspaceActor, state: string, nonc
     refreshTokenCiphertext: encryptForBinding(tokens.data.refresh_token), accessTokenCiphertext: encryptForBinding(tokens.data.access_token),
     tokenExpiresAt: new Date(Date.now() + tokens.data.expires_in * 1000).toISOString(),
   });
+  await recordConnectionHolder({ref:`google_business_profile:read-grant:${claims.workspaceId}`,provider:"google_business_profile",workspaceId:claims.workspaceId,accountHolder:{kind:"business",workspaceId:claims.workspaceId},accessThrough:readProviderAccess("google_business_profile").through,actor,commandId:randomUUID()});
   return { status: "connected", workspaceId: claims.workspaceId };
 }
 
 /** A current access token for this business's read grant, refreshed when needed. Null when not connected or Google refuses. */
 async function readToken(actor: WorkspaceActor, workspaceId: string): Promise<{ grant: store.ReadGrant; token: string } | null> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const grant = await store.googleReadGrant(actor, workspaceId, "secrets");
   if (!grant || grant.status !== "connected" || !grant.refreshTokenCiphertext) return null;
   const fresh = grant.accessTokenCiphertext && grant.tokenExpiresAt && Date.parse(grant.tokenExpiresAt) > Date.now() + 60_000;
   if (fresh) return { grant, token: decryptSecret(grant.accessTokenCiphertext!) };
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const refreshed = await refreshGoogleTokens(decryptSecret(grant.refreshTokenCiphertext));
   if (!refreshed.ok) return null;
   await store.googleReadGrant(actor, workspaceId, "token", { accessTokenCiphertext: encryptForBinding(refreshed.tokens.accessToken), tokenExpiresAt: new Date(Date.now() + (refreshed.tokens.expiresIn ?? 3600) * 1000).toISOString() });
@@ -101,6 +110,7 @@ export interface ReadGrantView {
   ga4: { granted: boolean; property: string | null };
 }
 export async function readGrantView(actor: WorkspaceActor, workspaceId: string): Promise<ReadGrantView> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const grant = await store.googleReadGrant(actor, workspaceId, "read");
   const connected = grant?.status === "connected";
   return { connected, googleEmail: connected ? grant!.googleEmail : null,

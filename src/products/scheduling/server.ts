@@ -191,3 +191,5 @@ export {
 export type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "./public-booking";
 
 export { readVisitorPresentationTime, readVisitorInquiryReceipt, readVisitorConfirmation } from "./public-visitor-receipt";
+
+export { googleCalendarConnectionSource } from "./calendar/connection-source";

@@ -2317,6 +2317,19 @@
           "rollbackStatus": "Guarded inverse restores exact reader definitions and refuses later source, ACL, helper or caller changes. Local empty inverse/reapply and successor refusal verified; no customer rows removed. No production application authorized."
         }
       ]
+    },
+    {
+      "id": "connections-google-2026-10-14",
+      "status": "Held and unapplied; SQL runner authored but UNRUN. No production authority.",
+      "items": [
+        {
+          "file": "20261026110000_conn_google_agency_oauth.sql",
+          "sha256": "fea5e9e22f632f27e127ab43752e280b3ef38a8dcd57ebe0e388b29693fcba62",
+          "rollback": "rollback-20261026110000_conn_google_agency_oauth.sql",
+          "rollbackSha256": "e675c203275831f51e70ca73dbf2119f915e070ccba5300c6b8a479691b8a647",
+          "rollbackStatus": "Empty inverse/reapply prepared. Populated attempts refuse inverse; SQL execution remains UNRUN."
+        }
+      ]
     }
   ]
 }

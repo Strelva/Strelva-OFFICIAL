@@ -215,6 +215,7 @@ export interface LegacyGoogleOperationInput {
   location?: { accountId: string; locationId: string; title?: string | null };
 }
 export interface GoogleBindingsPort {
+  assertGoogleGrantEligible(grant: {workspaceId:string|null;bindingId:string|null}, actor?: VerifiedActor | null): Promise<void>;
   readLegacyGoogleOperation(tenantId: string, startedAt: string): Promise<LegacyGoogleOperationPin>;
   commitLegacyGoogleBindingOperation(pin: LegacyGoogleOperationPin, input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;
   applyLegacyGoogleOperation(actor: { userId: string; verifiedEmail: string }, pin: LegacyGoogleOperationPin, kind: "oauth" | "location", input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;

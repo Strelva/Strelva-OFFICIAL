@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { connectionEligibilityFor } from "@/platform/connections/server";
+import { recordConnectionHolder } from "@/platform/connections/holders";
+import { readProviderAccess } from "@/platform/connections/access";
 import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -134,10 +138,17 @@ export async function commitLegacyGoogleBindingOperation(pin: LegacyGoogleOperat
 
 /** Current settings authority and all durable records commit in one transaction. */
 export async function applyLegacyGoogleOperation(actor: { userId: string; verifiedEmail: string }, pin: LegacyGoogleOperationPin, kind: "oauth" | "location", input: LegacyGoogleOperationInput, db?: AccountBindingsDb | null): Promise<{ status: "applied"; bindingId: string | null }> {
-  return call("apply_legacy_google_operation", {
+  if (kind === "oauth") {
+    if (!pin.workspaceId) throw new AccountBindingStoreError("Link this tenant to its business before connecting Google.", "unconfigured");
+    const eligibility = await connectionEligibilityFor(actor, {provider:"google_business_profile",businessWorkspaceId:pin.workspaceId});
+    if (!eligibility.eligible) throw new AccountBindingStoreError(eligibility.message, "unconfigured");
+  }
+  const result = await call("apply_legacy_google_operation", {
     p_user_id: z.string().uuid().parse(actor.userId), p_verified_email: z.string().trim().email().parse(actor.verifiedEmail),
     p_pin: legacyGooglePinSchema.parse(pin), p_kind: z.enum(["oauth", "location"]).parse(kind), p_input: legacyGoogleOperationPayload(input),
   }, data => legacyGoogleResultSchema.parse(data), db ?? accountBindingsDb());
+  if (kind === "oauth" && pin.workspaceId && result.bindingId) await recordConnectionHolder({ref:`google_business_profile:${result.bindingId}`,provider:"google_business_profile",workspaceId:pin.workspaceId,accountHolder:{kind:"business",workspaceId:pin.workspaceId},accessThrough:readProviderAccess("google_business_profile").through,actor,commandId:randomUUID()});
+  return result;
 }
 
 async function call<T>(name: string, args: Record<string, unknown>, parse: (data: unknown) => T, db = accountBindingsDb()): Promise<T> {
@@ -223,3 +234,5 @@ export async function upsertGoogleLocation(
     p_binding_id: bindingId, p_account_id: location.accountId, p_location_id: location.locationId, p_title: location.title ?? null,
   }, () => undefined, db ?? accountBindingsDb());
 }
+
+export { assertGoogleGrantEligible, assertGoogleBindingEligible, googleConnectionEligibility } from "./google-policy";

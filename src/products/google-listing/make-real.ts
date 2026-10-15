@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible } from "./connection-policy";
 import { assertCurrentNativeGoogleGrant } from "./native/contracts";
 import { googleMakeRealDraftDigest } from "./make-real-draft";
 export { googleMakeRealDraftDigest } from "./make-real-draft";
@@ -19,6 +20,7 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
  const ports:GoogleMakeRealPorts={
  forService:context=>createGoogleMakeRealPorts(context),
  async inspect(actor,businessId,request){
+  await assertGoogleConnectionEligible(actor,businessId);
   if(request.nativeGrant) await assertCurrentNativeGoogleGrant(businessId,request.locationId,request.nativeGrant);
   if (service) {
    const checked=await checkGoogleMakeRealService({workspaceId:businessId,actorId:googleServiceActor(service),request,context:service});
@@ -51,7 +53,7 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
   const event=await (await tenantPublishingPorts()).getEventRaw(request.eventId);
   const draft=event?.metadata?.draft as {action:string;post?:{summary:string};hours?:unknown;record?:unknown;reviewId?:string;text?:string}|undefined;
   if(!draft)throw new Error("The Google draft is unavailable.");
-  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant);
+  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant,actor);
   const receipt=receiptId?await ctx.receipts.get(receiptId,businessId):null;
   let matched=false;
   const {hoursMatch,hoursToGoogle,infoMatches,infoToGoogle}=await import("./record");
@@ -71,7 +73,7 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
  },
  async verifyUndo(actor,businessId,request,receiptId){
   await ports.inspect(actor,businessId,request);
-  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant);
+  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant,actor);
   const original=await ctx.receipts.get(receiptId,businessId);
   const db=getSupabase();
   const inverse=original?.undoneByReceiptId?await ctx.receipts.get(original.undoneByReceiptId,businessId):original&&db?await readGoogleMakeRealReceipt(`undo:${original.id}`,async key=>{
@@ -122,7 +124,7 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
   if(state.receipt?.id!==receiptId)throw new Error("Google undo receipt changed.");
   const actorId=googleServiceActor(service);
   await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});
-  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant);
+  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId,request.nativeGrant,actor);
   const recheck=async()=>{
    const current=await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});
    if(current.bindingId!==ctx.bindingId)throw new Error("Google undo binding changed.");
