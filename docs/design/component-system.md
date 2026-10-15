@@ -36,6 +36,11 @@ alternative, never a bare suggestion or research Proposal. Library and Apps
 share qualified reusable definitions without client data or grants;
 starters and managed services remain separately identified.
 
+October 14 integration also applies **Make it live** to the inquiry request
+flow heading and shape/rehearsal prerequisite copy. These copy changes preserve
+exact-release checks and publish authority; local units pass, with rendered
+proof deferred to the coordinator.
+
 October 12 approval copy uses **Make it live**, or **Hold to make it live** for
 press-and-hold controls. **Make real** stays the concept name, never a button.
 Private preview approval and launch preparation remain distinct actions where
@@ -65,7 +70,7 @@ business Home. It reads current authorized inquiry and booking records without
 email. Partial failures keep known records and an unknown-count notice. Loading,
 empty, transport failure, release-off and permission states are distinct; scope
 changes immediately hide the previous business. Focus and Check again refresh
-through the workspace transport. Systems remains gated; linked legacy businesses retain owner-entry gating. Native-only businesses can see bookings while owner entry is dark; inquiries wait for their destination to open.
+through the workspace transport. Systems remains gated; converted legacy businesses retain owner-entry gating. A current verified creator-owner of a business enrolled by direct signup can open its places through that atomic creation receipt, including after adding a hosted website. Inquiry activity uses that same destination eligibility plus its independent inquiry release. Native-only businesses without this owner eligibility can still see bookings while owner entry is dark.
 DOM tests cover these states; desktop/mobile rendered proof is pending the
 coordinator's post-merge browser run.
 
@@ -1999,8 +2004,12 @@ in the URL and restores it on Back.
 
 [AgencyHome](../../src/experience/workspace/AgencyHome.tsx) uses `StPage`,
 `StHead`, the responsive portfolio table and a scoped `StComposerBar` in both
-release states. In the workspace the sidebar owns Clients, Queue, Library and
-Team; standalone embeds retain tabs. Build is a Clients action, and Prepare a
+release states. With Systems released, the workspace opens agency Home with
+the agency name and its scoped portfolio; Clients is a separate destination
+using the same mounted client read. The sidebar highlights the selected place
+and returning Home clears the Clients URL selection. In the workspace the
+sidebar owns Home, Clients, Queue, Library and Team; standalone embeds retain
+tabs. Build is a Clients action, and Prepare a
 release is a Library action. Client totals come from the same paged server read.
 The heading explicitly names loaded client Queue items, rather than implying
 that proposal or delivery-check inboxes are included in that count. System

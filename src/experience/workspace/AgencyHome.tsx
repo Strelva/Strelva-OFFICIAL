@@ -34,7 +34,7 @@ type ClientsState =
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-export type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
+export type AgencyView = "home" | "clients" | "queue" | "library" | "team" | "build" | "package";
 
 /** Last successful rows are held in component state and never cross agency scope. */
 function rememberReads(previous: ReadonlyMap<string, AgencyLastGoodRead>, pages: readonly AgencyLoadedPage[]): Map<string, AgencyLastGoodRead> {
@@ -98,9 +98,9 @@ export function AgencyHome({
   const released = systemsReleased(snapshot);
   const [now] = useState(() => Date.now());
   const [localView, setView] = useState<AgencyView>(() => {
-    if (typeof window === "undefined") return "clients";
+    if (typeof window === "undefined") return "home";
     const selected = new URLSearchParams(window.location.search).get("agencyView");
-    return ["clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "clients";
+    return ["home", "clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "home";
   });
   const view = released ? controlledView ?? localView : "clients";
   const [ask, setAsk] = useState("");
@@ -312,8 +312,8 @@ export function AgencyHome({
     onViewChange?.(next);
   };
 
-  return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
-    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} client {combined.queue.length === 1 ? "item" : "items"} loaded{!combined.queueComplete ? " · Queue incomplete" : ""}</> : null}</>} actions={<>
+  return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "home" || view === "clients" ? "wide" : "column"}>
+    <StHead title={view === "home" ? agencyName : view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} client {combined.queue.length === 1 ? "item" : "items"} loaded{!combined.queueComplete ? " · Queue incomplete" : ""}</> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
       {snapshot.releases?.agencyImportClients ? <StPillLink variant="soft" href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Import clients</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
@@ -326,6 +326,7 @@ export function AgencyHome({
         value={view}
         onChange={choose}
         items={[
+          { value: "home", label: "Home", ...tab("home") },
           { value: "clients", label: "Clients", ...tab("clients") },
           { value: "queue", label: "Queue", ...tab("queue") },
           { value: "library", label: "Library", ...tab("library") },
@@ -333,11 +334,11 @@ export function AgencyHome({
           ...(current?.role === "owner" || current?.role === "admin" ? [{ value: "build", label: "Build", ...tab("build") }, { value: "package", label: "Package", ...tab("package") }] : []),
         ]}
       /> : null}
-      {released && controlledView && (current?.role === "owner" || current?.role === "admin") ? <div className="flex gap-4">{view === "clients" ? <StPill variant="soft" onClick={() => choose("build")}>Build for a client</StPill> : view === "library" ? <StPill variant="soft" onClick={() => choose("package")}>Prepare a release</StPill> : null}</div> : null}
+      {released && controlledView ? <div className="flex gap-4">{view === "home" ? <StPill variant="soft" onClick={() => choose("clients")}>View clients</StPill> : null}{current?.role === "owner" || current?.role === "admin" ? view === "home" || view === "clients" ? <StPill variant="soft" onClick={() => choose("build")}>Build for a client</StPill> : view === "library" ? <StPill variant="soft" onClick={() => choose("package")}>Prepare a release</StPill> : null : null}</div> : null}
       {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
     </div>
 
-    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab("clients").panelId} tabId={tab("clients").id} active={view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab(view === "home" ? "home" : "clients").panelId} tabId={tab(view === "home" ? "home" : "clients").id} active={view === "home" || view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {clientList}
       {!released ? <StSection title="Needs attention across clients">{queueList}<AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} /><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /></StSection> : null}
     </AgencyPanel>
@@ -379,5 +380,5 @@ export function AgencyHome({
 /** The shell owns navigation in the real workspace. Standalone embeds keep tabs. */
 function AgencyPanel({ labelled, id, tabId, active, className, children }: { labelled: boolean; id: string; tabId: string; active: boolean; className?: string; children: ReactNode }) {
   if (!active) return null;
-  return labelled ? <section id={id} aria-label={id.includes("queue") ? "Queue" : id.includes("library") ? "Library" : id.includes("team") ? "Team" : id.includes("build") ? "Build for a client" : id.includes("package") ? "Prepare a release" : "Clients"} className={className}>{children}</section> : <TabsPanel id={id} tabId={tabId} active className={className}>{children}</TabsPanel>;
+  return labelled ? <section id={id} aria-label={id.includes("home") ? "Home" : id.includes("queue") ? "Queue" : id.includes("library") ? "Library" : id.includes("team") ? "Team" : id.includes("build") ? "Build for a client" : id.includes("package") ? "Prepare a release" : "Clients"} className={className}>{children}</section> : <TabsPanel id={id} tabId={tabId} active className={className}>{children}</TabsPanel>;
 }

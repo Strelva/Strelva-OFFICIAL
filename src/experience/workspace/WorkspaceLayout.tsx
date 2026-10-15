@@ -102,9 +102,9 @@ interface Props {
 }
 
 function initialAgencyView(): AgencyView {
-  if (typeof window === "undefined") return "clients";
+  if (typeof window === "undefined") return "home";
   const view = new URLSearchParams(window.location.search).get("agencyView");
-  return ["clients", "queue", "library", "team", "build", "package"].includes(view || "") ? view as AgencyView : "clients";
+  return ["home", "clients", "queue", "library", "team", "build", "package"].includes(view || "") ? view as AgencyView : "home";
 }
 
 function initialSection(): StrelvaSection {
@@ -263,9 +263,15 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
 
   function navigate(next: StrelvaSection, prefillHelp?: string, focusSearch = false) {
     if (next === "access") { openAccess(); return; }
+    if (next === "home" && current?.kind === "agency") setAgencyView("home");
     setStartOpen(false); setSection(next); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(next === "help" ? prefillHelp : undefined); setWebsiteHandoff(null);
     if (next === "ongoing") onOngoing(); else onHome();
     navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: next === "home" ? undefined : next, search: focusSearch && next === "work" ? "1" : undefined });
+    if (next === "home" && current?.kind === "agency") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("agencyView");
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }
   function openSystem(id: string) {
     setStartOpen(false); setSection("system"); setSystemId(id); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null);
@@ -508,8 +514,8 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
 
   const agencyNavigationEnabled = current?.kind === "agency" && current.access !== "delegated_read" && systemsReleased;
   const chooseAgencyView = (view: AgencyView) => {
-    setAgencyView(view);
     navigate("home");
+    setAgencyView(view);
     const url = new URL(window.location.href);
     url.searchParams.set("agencyView", view);
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
@@ -526,7 +532,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
       ? systems.map(system => ({ id: `site-${system.id}`, title: system.name, detail: `${SYSTEM_KIND_LABEL[system.kind]} · ${LIFECYCLE_LABEL[system.lifecycle]} · ${HEALTH_LABEL[system.health.state]}`, href: systemLink(system.id), onOpen: () => openSystem(system.id) }))
       : assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
   ];
-  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell workspaceName={clientAgency ? `${navigationBrand?.agencyId ? navigationBrand.name : clientAgency.name} / ${current?.name || "Workspace"}` : current?.kind === "agency" && navigationBrand?.agencyId ? navigationBrand.name : current?.name} allClients={clientAgency ? { href: `${appBase || ""}/workspace?workspaceId=${clientAgency.id}&agencyView=clients` } : undefined} agencyNavigation={agencyNavigationEnabled ? { leadsAvailable: current?.role === "owner" || current?.role === "admin" ? undefined : false, active: agencyView === "library" || agencyView === "package" ? "library" : agencyView === "queue" ? "queue" : agencyView === "team" ? "team" : "clients", onNavigate: chooseAgencyView } : undefined} ownerBrand={navigationBrand} brandWorkspaceId={clientAgency?.id} appBase={appBase} signOut={signOut}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell workspaceName={clientAgency ? `${navigationBrand?.agencyId ? navigationBrand.name : clientAgency.name} / ${current?.name || "Workspace"}` : current?.kind === "agency" && navigationBrand?.agencyId ? navigationBrand.name : current?.name} allClients={clientAgency ? { href: `${appBase || ""}/workspace?workspaceId=${clientAgency.id}&agencyView=clients` } : undefined} agencyNavigation={agencyNavigationEnabled ? { leadsAvailable: current?.role === "owner" || current?.role === "admin" ? undefined : false, active: agencyView === "library" || agencyView === "package" ? "library" : agencyView === "queue" ? "queue" : agencyView === "team" ? "team" : agencyView === "home" ? "home" : "clients", onNavigate: chooseAgencyView } : undefined} ownerBrand={navigationBrand} brandWorkspaceId={clientAgency?.id} appBase={appBase} signOut={signOut}
     workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased} needsYou={needsYouPlace ? { count: null, label: readEligibility.agency ? `Waiting on ${current?.name || "the business"}` : undefined } : undefined}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={home && section === "system" ? systems.find(item => item.id === systemId)?.name || "System" : !home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Internal tool" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}

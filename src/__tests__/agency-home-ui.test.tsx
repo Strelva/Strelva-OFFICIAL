@@ -54,7 +54,7 @@ const library: AgencyLibrary = {
   }],
 };
 
-async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn(), view?: "clients" | "queue" | "library") {
+async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn(), view?: "home" | "clients" | "queue" | "library") {
   const node = document.createElement("div"); document.body.appendChild(node);
   const root = createRoot(node); roots.push(root);
   await act(async () => {
@@ -287,6 +287,18 @@ it("lets the real sidebar own navigation and keeps Build accessible beside the p
   expect(node.querySelector('h1')?.textContent).toBe("Clients");
   expect(node.textContent).toContain("2 clients");
   expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
+});
+
+it("opens a distinct agency Home with the same scoped portfolio and a Clients action", async () => {
+  const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
+  const { node } = await render(request, true, vi.fn(), "home");
+  expect(node.querySelector("h1")?.textContent).toBe("Strelva");
+  expect(node.querySelector('section[aria-label="Home"]')).not.toBeNull();
+  expect(node.querySelector('[role="tablist"]')).toBeNull();
+  expect(node.textContent).toContain("2 clients");
+  expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(2);
+  expect(button(node, "View clients")).toBeDefined();
+  expect(clientCalls(request)).toHaveLength(1);
 });
 
 it("keeps the Queue focused on waiting claims and incoming proposals instead of listing settings", async () => {
