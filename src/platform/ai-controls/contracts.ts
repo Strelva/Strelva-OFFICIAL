@@ -56,6 +56,10 @@ export const agencyAiControlsViewSchema = z.object({
 }).strict();
 export type AgencyAiControlsView = z.infer<typeof agencyAiControlsViewSchema>;
 
+/** What the server enforces, sent with every read so a screen can explain a limit it does not set itself. */
+const enforcementFields = { budgetEnforced: z.boolean(), freeCapUsd: z.number().nullable().optional() };
+export const agencyAiControlsResponseSchema = agencyAiControlsViewSchema.extend(enforcementFields).strict();
+
 export const operatorAiControlsHistorySchema = z.object({
   at: z.string(),
   kind: z.enum(["agency", "operator"]),
@@ -65,6 +69,7 @@ export const operatorAiControlsHistorySchema = z.object({
 }).strict();
 export const operatorAiControlsViewSchema = aiControlsClientSchema.extend({ history: z.array(operatorAiControlsHistorySchema).max(20) }).strict();
 export type OperatorAiControlsView = z.infer<typeof operatorAiControlsViewSchema>;
+export const operatorAiControlsResponseSchema = operatorAiControlsViewSchema.extend(enforcementFields).strict();
 
 export const aiControlsScopeSchema = z.object({ agencyWorkspaceId: z.string().uuid(), workspaceId: z.string().uuid().nullable() }).strict();
 

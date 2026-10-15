@@ -95,6 +95,16 @@ _Avoid_: r12, r12+1, Package r13, Source revisions (on screen)
 The agency's usage column for the current month's recorded time.
 _Avoid_: Minutes · Oct (as the column label)
 
+**Usage this month**:
+Estimated cost of Strelva work for one business in the current period, at list
+prices.
+_Avoid_: AI spend, tokens, credits (on screen)
+
+**Usage limit**:
+A monthly ceiling on usage for one business, set by its agency or by Strelva.
+Work pauses when it is reached and resumes when the period resets.
+_Avoid_: cap, budget (on agency screens)
+
 **Version** _(label open)_:
 The same System adapted to another context, such as a location, client or
 segment, with lineage to its source. Across businesses, each Version is that
