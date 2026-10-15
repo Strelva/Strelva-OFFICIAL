@@ -20,11 +20,16 @@ import {
 } from "@/platform/ask";
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
 import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
+import { withWebsiteChangeRequests } from "./site-requests";
 import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
 import { createAskPossibilityPort } from "./possibilities-server";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
-import { readServiceRequestProviders } from "@/platform/service-requests/provider-options";
+import { readServiceRequestProviders, readSiteChangeProvider } from "@/platform/service-requests/provider-options";
+import { systemOriginId } from "@/platform/systems/invariants";
+import { getTenantConfig } from "@/lib/tenants";
+import { siteEditingFor } from "@/products/websites/client";
+import { sitesByCodeReleased } from "@/products/websites/server";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { createSupabaseSystemStore, listBusinessSystems } from "@/platform/systems";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
@@ -100,8 +105,21 @@ export async function POST(request: Request) {
     if (await isRateLimitedAsync(`ask:${actor.userId}`, 30)) return workspaceJson({ error: "Too many requests. Try again in a minute." }, 429);
     const body = await readWorkspaceBody(request, 150_000);
     // ADR 0015: a Request goes to the business's recorded agency, never a default one.
-    const requests = createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore),
-      async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId)));
+    const serviceRequests = new ServiceRequestService(PostgresServiceRequestStore);
+    // With sites_by_code on, a code change to a repo site files as a website Request a coding agent can pick up.
+    const requests = withWebsiteChangeRequests(createServiceRequestAdapter(serviceRequests,
+      async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId))), {
+      released: (workspaceId) => sitesByCodeReleased(workspaceId, { operator: false, tester: false, userId: actor.userId }),
+      async repoSite(current, workspaceId, systemId) {
+        const snapshot = await readExistingSystemsSnapshot(current, workspaceId);
+        const site = snapshot.managedWebsites.find((item) => systemOriginId(workspaceId, { kind: "tenant", ref: item.tenantStableId }) === systemId);
+        if (!site) return null;
+        const config = await getTenantConfig(site.tenantId).catch(() => undefined);
+        return { tenantStableId: site.tenantStableId, editing: siteEditingFor(config ?? { id: site.tenantId }) };
+      },
+      provider: readSiteChangeProvider,
+      execute: (current, command) => serviceRequests.execute(current, command),
+    });
     const needsYou = askNeedsYou(actor);
     const deps: AskTurnDeps = {
       isOperator: await isSuperAdmin(),

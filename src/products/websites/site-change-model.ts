@@ -88,16 +88,20 @@ export type RecordSiteChange = z.infer<typeof recordSiteChangeSchema>;
 /** The service-request command that files "Ask for a change" on a website System. */
 export function siteChangeRequestCommand(input: {
   provider: { kind: "agency"; agencyWorkspaceId: string }; workspaceId: string; systemId: string; tenantStableId: string; editing: "native" | "request"; words: string; page?: string; idempotencyKey: string;
+  /** Set when Ask files it for the person; `outcome` is then what Ask understood. */
+  origin?: "ask_strelva"; outcome?: string;
 }) {
   const words = input.words.trim().slice(0, 3_000);
+  const outcome = input.origin ? (input.outcome?.trim().slice(0, 3_000) || words) : words;
   return {
     action: "save" as const,
     businessId: input.workspaceId,
     status: "requested" as const,
     request: words,
-    outcome: words,
+    outcome,
     context: {
       source: "website_change",
+      ...(input.origin ? { origin: input.origin } : {}),
       systemId: input.systemId,
       tenantStableId: input.tenantStableId,
       implementation: input.editing === "request" ? "custom_repo" : "custom_repo_content",
