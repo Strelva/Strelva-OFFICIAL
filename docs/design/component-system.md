@@ -2554,3 +2554,28 @@ setup links. Old responses remain readable without inventing eligibility.
 `/preview/strelva/connections?state=coming-soon` exercises an empty business
 with unavailable Google access. Source/DOM tests cover this additive evidence;
 rendered desktop/mobile acceptance remains with the coordinator.
+
+### October 15 · Care plan reports
+
+[CareReportDocument](../../src/experience/care-reports/CareReportDocument.tsx) is
+a report as a printable page, built from the kit's head, sections, rows and
+states. Props: the snapshot (facts plus the agency note), the live brand, the
+Release number (null is a draft), the list of Releases with a link builder, and
+the audience. The agency name comes from a live brand read, never from the saved
+snapshot, and an unavailable identity shows as it is. Print keeps the document
+and drops the page header, back link, Release list and buttons
+(`data-print-hide`). `DOCUMENT_PRINT_CSS`
+([print.ts](../../src/experience/workspace/billing/print.ts)) is shared with
+MoneyDocument.
+
+[AgencyCareReports](../../src/experience/care-reports/AgencyCareReports.tsx) is
+the Clients section: a month control, one action to prepare every client's
+report, and a table of what each client has so far, its report and its email
+state. It renders nothing while the App is off.
+[CareReportEditor](../../src/experience/care-reports/CareReportEditor.tsx) holds
+the draft, a note, Hold to share, the Releases with Open and Email, and the copy
+and link controls; staff see none of the controls that change anything.
+[AgencyClientTime](../../src/experience/care-reports/AgencyClientTime.tsx) records
+minutes inside Responsibility and availability, each with an id made once per
+entry so a retry is recorded once. Previews: `/preview/strelva/care-report` and
+`/preview/strelva/agency-care-reports`.

@@ -67,6 +67,19 @@ describe("built-in App release server", () => {
     expect(connections).toEqual([expect.objectContaining({ provider: "resend", access: "act", optional: false })]);
   });
 
+  it("leaves Care plan reports unavailable without a single flag read", async () => {
+    const rpc = fakeFlags();
+    expect(await readBuiltInAppRelease("care_reports", WS, undefined, {})).toEqual({ appId: "care_reports", available: false });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("makes Care plan reports available with both switches and a row set on", async () => {
+    fakeFlags({ care_reports: "on" });
+    const state = await readBuiltInAppRelease("care_reports", WS, undefined, { STRELVA_WORKSPACE_RELEASE: "1", STRELVA_CARE_REPORTS_RELEASE: "workspace" });
+    expect(state).toMatchObject({ available: true, release: 1 });
+    expect(state.available && state.requiredConnections).toEqual([expect.objectContaining({ provider: "resend", optional: true })]);
+  });
+
   it("throws on an unknown key", async () => {
     await expect(builtInAppReleaseReached("bookings", "bookings.nope", WS)).rejects.toThrow("Unknown Release key");
     expect(() => builtInAppReleaseMayReach("bookings", "bookings.nope")).toThrow();
@@ -75,7 +88,7 @@ describe("built-in App release server", () => {
   it("reads every App in catalog order", async () => {
     fakeFlags();
     const states = await readBuiltInAppReleases(WS, undefined, {});
-    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync"]);
+    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync", "care_reports"]);
   });
 
   it("answers the early gate from env alone", () => {

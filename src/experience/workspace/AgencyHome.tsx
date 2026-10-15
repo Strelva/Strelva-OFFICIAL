@@ -28,6 +28,7 @@ import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
 import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPill, StPillLink, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import type { AgencyLastGoodRead } from "./agency/AgencyViews";
+import { AgencyCareReports } from "@/experience/care-reports/AgencyCareReports";
 
 type ClientsState =
   | { status: "loading" }
@@ -237,6 +238,8 @@ export function AgencyHome({
     : <AgencyClientList
         clients={combined!.clients}
         agencyWorkspaceId={snapshot.workspaceId}
+        viewerEmail={snapshot.actor.email}
+        canManage={current?.role === "owner" || current?.role === "admin"}
         request={request}
         lastGoodReads={storedClients?.key.startsWith(`${snapshot.workspaceId}:`) ? storedClients.lastGoodReads : undefined}
         total={combined!.total}
@@ -340,6 +343,7 @@ export function AgencyHome({
 
     <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab(view === "home" ? "home" : "clients").panelId} tabId={tab(view === "home" ? "home" : "clients").id} active={view === "home" || view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {clientList}
+      {clients.status === "ready" && (view === "clients" || !released) ? <AgencyCareReports agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} request={request} /> : null}
       {!released ? <StSection title="Needs attention across clients">{queueList}<AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} /><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /></StSection> : null}
     </AgencyPanel>
 

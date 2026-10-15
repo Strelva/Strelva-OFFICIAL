@@ -8,6 +8,7 @@ import { AgencyClientDecisions } from "./AgencyClientDecisions";
 import { AgencyClientEvents } from "./AgencyClientEvents";
 import { AgencyClientUsage } from "./AgencyClientUsage";
 import { ListingsSyncSummary } from "@/experience/listings-sync/ListingsSyncSummary";
+import { AgencyClientTime } from "@/experience/care-reports/AgencyClientTime";
 import { AgencyUsageSummary } from "./AgencyUsageSummary";
 import { StBeacon, StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 import { lapseLabel } from "@/platform/owner-reach/model";
@@ -41,10 +42,10 @@ function clientSummary(client: AgencyClientRow): string {
 }
 
 /** One record per business. Last good reads belong only to this mounted agency view. */
-export function AgencyClientList({ clients, total, agencyName, hasMore, loadingMore, moreError, retrying, now, onOpen, onRetryPage, onMore, agencyWorkspaceId, request, lastGoodReads }: {
+export function AgencyClientList({ clients, total, agencyName, hasMore, loadingMore, moreError, retrying, now, onOpen, onRetryPage, onMore, agencyWorkspaceId, viewerEmail, canManage, request, lastGoodReads }: {
   clients: ClientRow[]; total: number; agencyName: string; hasMore: boolean; loadingMore: boolean; moreError: boolean;
   retrying: ReadonlySet<number>; now: number; onOpen: (workspaceId: string) => void; onRetryPage: (pageIndex: number) => void;
-  onMore: () => void; agencyWorkspaceId?: string; request?: typeof fetch; lastGoodReads?: ReadonlyMap<string, AgencyLastGoodRead>;
+  onMore: () => void; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch; lastGoodReads?: ReadonlyMap<string, AgencyLastGoodRead>;
 }) {
   const [reviewing, setReviewing] = useState<string | null>(null);
   const reviewClient = clients.find(client => client.workspaceId === reviewing && client.status === "ready" && client.provider);
@@ -57,7 +58,7 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
       return { key: client.workspaceId, cells: {
         client: <><StTextButton tone="text" onClick={() => onOpen(client.workspaceId)}>{client.name}</StTextButton><small className="block text-xs font-normal text-gray-muted">{clientSummary(read)}</small>
           {client.agentBookings ? <StTextButton href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`}>Booked through assistants · {client.name}</StTextButton> : null}
-          {read.systems.length || (!unavailable && client.provider) ? <details><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Client details</summary>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<ul className="space-y-2 py-2 text-xs font-normal text-gray-muted">{read.systems.map(system => <li key={system.id}>{clientSystemLabel(system)}</li>)}</ul>{!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} clientName={client.name} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</details> : null}</>,
+          {read.systems.length || (!unavailable && client.provider) ? <details><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Client details</summary>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<ul className="space-y-2 py-2 text-xs font-normal text-gray-muted">{read.systems.map(system => <li key={system.id}>{clientSystemLabel(system)}</li>)}</ul>{!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} clientName={client.name} agencyWorkspaceId={agencyWorkspaceId} viewerEmail={viewerEmail} canManage={canManage} request={request} /></> : null}</details> : null}</>,
         health: unavailable ? <><StState kind="need">{client.name} could not be loaded.</StState><small className="block text-xs">{lastGood ? `Showing the last good read from ${new Date(lastGood.readAt).toLocaleString()}.` : "No last good read is available in this visit."}</small><StPill variant="soft" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</StPill></> : health(client),
         waiting: unavailable && !lastGood ? "Could not be read" : <>{read.ownerClaimWaiting ? `Waiting on ${client.name} to claim${read.needsYou.count ? ` · ${needsYouLabel(read, now)}` : ""}` : needsYouLabel(read, now)}<OwnerReachLines client={read} agencyWorkspaceId={agencyWorkspaceId} /></>,
         requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} to review` : ""}{read.improvementsStatus === "unavailable" ? ` · ${read.improvementsWaiting ? "Some improvements unavailable" : "Improvements unavailable"}` : ""}</>,
@@ -89,9 +90,9 @@ function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRo
   </span>;
 }
 
-function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; request?: typeof fetch }) {
+function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, viewerEmail, canManage, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch }) {
   const [open, setOpen] = useState(false);
-  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <ListingsSyncSummary workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
+  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <ListingsSyncSummary workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientTime agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} viewerEmail={viewerEmail} canManage={canManage} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
 }
 
 function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {

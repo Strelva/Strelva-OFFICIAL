@@ -94,6 +94,15 @@ unchanged and honest. Bookings and Recaps list it as optional.
 `pnpm app-releases` prints the catalog; `pnpm app-releases --workspace <uuid>`
 prints where one business stands.
 
+## Apps added after 1.0.0
+
+An App that did not ship in 1.0.0 takes its presence gates in `availability`
+and declares Release 1 with `shippedIn: null` until it deploys. Availability is
+not a Release, so `flagReleaseMeaning` returns null for its flag. Care plan
+reports is the example: it needs `STRELVA_WORKSPACE_RELEASE=1` (the env gate,
+listed first so no flag row is read while that is off) and the `care_reports`
+workspace flag.
+
 ## Events
 
 An App can react to what happens at a business: an inquiry arrives, a booking is

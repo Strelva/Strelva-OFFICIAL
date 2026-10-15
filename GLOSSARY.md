@@ -152,6 +152,12 @@ makes the thing itself or brings in an agency first; there is no default
 recipient.
 _Avoid_: Work (as a business-screen noun), start request, ticket, obligation
 
+**Care plan report**:
+An agency's monthly report of the work it did for one client: checked changes,
+Requests done, inquiries and bookings, site checks and time recorded. It goes
+out under the agency's name; each shared copy is a numbered Release.
+_Avoid_: proof-of-work email, statement, invoice
+
 **Running** _(label open)_:
 What is kept true over time under stated limits, named by the condition being
 maintained rather than the machinery that maintains it.
@@ -484,7 +490,7 @@ _Avoid_: Version, History
 
 **Built-in App**:
 An App the platform ships in code to every business (Bookings, Inquiries, Recaps,
-Documents, Ask Strelva, Internal tools, Listings in sync), declared in `src/platform/app-releases`.
+Documents, Ask Strelva, Internal tools, Listings in sync, Care plan reports), declared in `src/platform/app-releases`.
 Its Releases are numbered and turned on by release flags; turning a Release's
 flag off returns the business to the Release before it. Credited to Strelva, never
 to an agency.

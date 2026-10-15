@@ -1,8 +1,12 @@
 import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPillLink, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import type { RecapView, SiteRecaps } from "@/products/recaps/server";
+import type { OwnerCareReportItem } from "@/platform/care-reports";
+import { careMonthLabel, careShortDate } from "@/platform/care-reports/model";
 import styles from "@/experience/publishing/publishing.module.css";
 
 export type RecapPeriodFilter = "all" | "week" | "month";
+/** Reports an agency shared with this business. Absent while Care plan reports is off. */
+export type OwnerCareReportsState = { kind: "ready"; items: OwnerCareReportItem[] } | { kind: "unavailable" };
 export type WorkspaceRecapsState = { kind: "ready"; sites: SiteRecaps[] } | { kind: "loading" } | { kind: "permission" } | { kind: "error" };
 
 /** Confirmed bookings and additional loop context remain fixture-only. */
@@ -45,12 +49,23 @@ export function RecapOutcome({ recap, outcome, siteName }: { recap: RecapView; o
   </article>;
 }
 
-export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string }) {
+function AgencyReports({ workspaceId, reports }: { workspaceId: string; reports: OwnerCareReportsState }) {
+  return <StSection title="Reports from your agency">
+    {reports.kind === "unavailable" ? <StNotice>Agency reports couldn&apos;t load. Reload to try again.</StNotice>
+      : !reports.items.length ? <StEmpty>No reports from your agency yet.</StEmpty>
+        : <StRows label="Reports from your agency">{reports.items.map(item => <StRow key={item.reportId} title={`${careMonthLabel(item.month)} report`}
+          detail={`From ${item.agencyName} · Release ${item.latestRelease.number} · shared ${careShortDate(item.latestRelease.publishedAt)}`}
+          end={<StTextButton href={`/workspace/care-reports/${item.reportId}?workspaceId=${encodeURIComponent(workspaceId)}`}>Open</StTextButton>} />)}</StRows>}
+  </StSection>;
+}
+
+export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel, careReports }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string; careReports?: OwnerCareReportsState }) {
   const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
   const filterHref = (value: RecapPeriodFilter) => `${preview ? "/preview/strelva/recaps" : "/workspace/recaps"}?workspaceId=${encodeURIComponent(workspaceId)}${value === "all" ? "" : `&period=${value}`}`;
   return <main className={styles.paper} data-dashboard data-workspace-theme="linen"><StPage>
     <StHead crumb={{ label: "Back to Home", href: homeHref }} title="Recaps" meta={<>What Strelva saw on your site each week and month.{releaseLabel ? <> · <StMono>{releaseLabel}</StMono></> : null}</>} />
     {state.kind === "loading" ? <><StSkeleton label="Loading recaps" width="70%" /><StSkeleton /></> : state.kind === "permission" ? <StNotice tone="critical"><strong>These recaps belong to another business</strong><p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p><StTextButton href="/workspace">Open your workspace</StTextButton></StNotice> : state.kind === "error" ? <StNotice tone="critical"><strong>Recaps couldn&apos;t load</strong><p>Your saved recaps are kept. Reload the page to try again.</p><StTextButton href={filterHref(period)}>Reload recaps</StTextButton></StNotice> : <>
+      {careReports ? <AgencyReports workspaceId={workspaceId} reports={careReports} /> : null}
       <nav aria-label="Recap period" className={styles.actions}>{FILTERS.map(filter => <StPillLink key={filter.value} current={period === filter.value} variant="soft" href={filterHref(filter.value)}>{filter.label}{period === filter.value ? " · selected" : ""}</StPillLink>)}</nav>
       {!state.sites.length ? <StEmpty>No site is connected to this business yet. Recaps start once a website is connected or published here.</StEmpty> : state.sites.map(site => {
         const recaps = site.recaps.filter(recap => period === "all" || recap.period === period);
