@@ -35,6 +35,7 @@ Strelva remains the control plane; the custom repo is the public website runtime
 | `dynamic-page-route.template.tsx` | Template for `app/[...slug]/page.tsx` — renders ANY page from the platform's page config (new pages become a data op, no per-page code) |
 | `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
 | `CLAUDE.strelva.md` | The block a client repo pastes into its `CLAUDE.md` or `AGENTS.md`: how its coding agent picks up, reports and waits on Strelva Requests |
+| `intake-client.ts` + `StrelvaIntake.tsx` | The Strelva App form for a connected code site (Dental intake): self-contained, no imports from Strelva |
 | `README.md` | This file |
 
 ## Changes through your coding agent
@@ -46,6 +47,23 @@ the deploy. The owner decides in Strelva (Needs you); the agent cannot approve.
 Strelva records each deploy as a Release after checking the commit the live site
 declares in its capabilities manifest (`release.commitSha`, `contentSource`), so
 keep the starter's capabilities route in place.
+
+## Strelva Apps on a code site
+
+A Strelva App (today: Dental intake) puts a form on the site that the business
+makes live in Strelva. The form is Strelva's, not the repo's: its fields, its
+insurance list and its tooth-pain message come from the business's live Release
+and confirmed facts.
+
+1. Connect the site in Strelva (Website, then connect) and verify it with the meta tag.
+2. Copy `intake-client.ts` and `StrelvaIntake.tsx` and render it on the visit page:
+   `<StrelvaIntake baseUrl="https://app.strelva.com" siteKey="sk_pub_…" appId="dental_intake" />`.
+   The section renders on the server with `data-strelva-app` and `data-strelva-site`, so Strelva's
+   check of the live page can see it.
+3. The owner makes it live in Strelva (Needs you). Until then the component shows "This form isn't available right now."
+
+Coding agents must not add, remove or reword fields: change the form in Strelva. Do not put
+patient questions of your own next to it, and never collect medical details.
 
 ## Versioned inquiry capability
 
