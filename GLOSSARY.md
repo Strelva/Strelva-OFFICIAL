@@ -484,7 +484,7 @@ _Avoid_: Version, History
 
 **Built-in App**:
 An App the platform ships in code to every business (Bookings, Inquiries, Recaps,
-Documents, Ask Strelva, Internal tools), declared in `src/platform/app-releases`.
+Documents, Ask Strelva, Internal tools, Listings in sync), declared in `src/platform/app-releases`.
 Its Releases are numbered and turned on by release flags; turning a Release's
 flag off returns the business to the Release before it. Credited to Strelva, never
 to an agency.

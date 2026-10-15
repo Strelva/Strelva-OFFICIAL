@@ -6,7 +6,8 @@ describe("pnpm app-releases", () => {
   it("prints every App with Release 1", () => {
     const text = formatCatalog();
     expect(text).toContain("Bookings · latest Release 1");
-    for (const app of BUILT_IN_APPS) expect(text).toContain(`${app.name} · latest Release 1`);
+    for (const app of BUILT_IN_APPS) expect(text).toContain(`${app.name} · latest Release ${app.releases.length}`);
+    expect(text).toContain("Release 2 listings_sync.google_fix · not shipped · gates: env STRELVA_LISTINGS_SYNC_GOOGLE_FIX=1");
     expect(text).toContain("Release 1 inquiries.baseline");
     expect(text).toContain("resend");
   });
