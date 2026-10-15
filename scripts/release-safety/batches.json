@@ -2421,6 +2421,73 @@
           "rollbackStatus": "Refuses once any link or money document exists; exact empty inverse/reapply proven locally."
         }
       ]
+    },
+    {
+      "id": "owner-reach-2026-10-15",
+      "status": "Held and unapplied. Owner reach reads, staff-address refusal on agency owner claims (issue_agency_client_owner_claim redefined from 20261015100000) and the operator's read-only owner reach report. SQL fixture: scripts/check-owner-reach-sql.sh. No production, owner email or flag change authorized.",
+      "items": [
+        {
+          "file": "20261027100000_owner_reach.sql",
+          "sha256": "1c836506b0b762c7c9ab57c490c1b06da4d418e20b73efde86c4c12887049793",
+          "rollback": "rollback-20261027100000_owner_reach.sql",
+          "rollbackSha256": "43ac6331bb1bab044114862746313bb6705a5925bbbf297fa0611c03fd071565",
+          "rollbackStatus": "Drops the owner reach reads and restores issue_agency_client_owner_claim without the staff refusal."
+        }
+      ]
+    },
+    {
+      "id": "dedupe-flows-2026-10-15",
+      "status": "Held and unapplied. Policy owner-decision records, find-open-by-source read and the provider client queue v3 reader behind STRELVA_ONE_APPROVAL_PATH, STRELVA_AUTO_POST_DECISION_RECORD and STRELVA_ONE_QUEUE. SQL fixtures: tests/dedupe-flows-owner-decisions-schema.sql and tests/dedupe-flows-queue-schema.sql. No production or flag change authorized.",
+      "items": [
+        {
+          "file": "20261027110000_dedupe_flows_owner_decisions.sql",
+          "sha256": "bf81f5b6ec1950f2e5a25f075f8df1cbc14b7aa3179e668751617b368f680a27",
+          "rollback": "rollback-20261027110000_dedupe_flows_owner_decisions.sql",
+          "rollbackSha256": "ce59c211f28d88b7e0b5a70089477fb37b70cff843e5cc1ab59840fd50dee80c",
+          "rollbackStatus": "Drops the policy decision functions; policy rows are receipts only and their source events keep their own receipt."
+        },
+        {
+          "file": "20261027111000_provider_client_queue_v3.sql",
+          "sha256": "746e1fa5dc26a3e177b30912667fdb9565c5e99dac004dca4bca0e9e6f6a086e",
+          "rollback": "rollback-20261027111000_provider_client_queue_v3.sql",
+          "rollbackSha256": "2d0f76f80b5d33476b67bb8c5e85cd3f8bd1348785b1af30ef9955b24e112068",
+          "rollbackStatus": "Drops read_provider_client_queue_v3; the v2 reader stays."
+        }
+      ]
+    },
+    {
+      "id": "sites-by-code-2026-10-15",
+      "status": "Held and unapplied. sites_by_code release flag, content-source backfill (writes tenant data for gldf, rohlax and rhm-innovations; apply before the code that reads customRepo.contentSource), coding-agent website change tools and code Releases. SQL fixture: scripts/check-sites-by-code-sql.sh. No production, OAuth client registration, owner email or flag change authorized.",
+      "items": [
+        {
+          "file": "20261027120000_sites_by_code_flag.sql",
+          "sha256": "d38779a579f58144070cc20a1b863d0b08f40ef83bfcd5f39f7d7fa764c0f31e",
+          "rollback": "rollback-20261027120000_sites_by_code_flag.sql",
+          "rollbackSha256": "6ec2ff669b755c36ff73351a1259236e6e46dd180e3095251773d68e6bd6d5ac",
+          "rollbackStatus": "Deletes the sites_by_code flag rows, ceilings and change history, then restores the prior workspace_release_flag_names."
+        },
+        {
+          "file": "20261027120100_site_content_source_backfill.sql",
+          "sha256": "7d49f519a4a6ed9129ea7cc86dedf486ff5544160e1b8bb51a2d3897ac1c49f0",
+          "rollback": "rollback-20261027120100_site_content_source_backfill.sql",
+          "rollbackSha256": "3c335f1aed6cdcfecc483bf511c93eb096de318bed972c55fe1823920b72b81f",
+          "rollbackStatus": "Roll back the code that reads customRepo.contentSource first; afterwards the three tenants read as request (Ask for a change)."
+        },
+        {
+          "file": "20261027120200_site_change_agent_tools.sql",
+          "sha256": "b419ecb14996fdab446b2da9a3e551e4da3476c48613336d728709a618b2b63d",
+          "rollback": "rollback-20261027120200_site_change_agent_tools.sql",
+          "rollbackSha256": "9f585a8f9f36687f16b6f7dcc093d7690869e986e338e6161b8aeca04056f174",
+          "rollbackStatus": "Refuses when a later migration changed the restored functions or their ACLs; agent-recorded receipts keep their rows without provenance columns."
+        },
+        {
+          "file": "20261027120300_website_code_releases.sql",
+          "sha256": "b79af0af09af91f25b52a82c36ab55f44497738d7eae61cd19a9e667dbb76bfb",
+          "rollback": "rollback-20261027120300_website_code_releases.sql",
+          "rollbackSha256": "5e72a3d47718a9e35a6cc5c79831192ca47d4006cf2c294bb9eefc43ce230607",
+          "rollbackStatus": "Refuses when reconcile_website_system_releases changed later; with recorded code releases present it refuses unless sites_by_code.allow_drop = '1'."
+        }
+      ]
     }
   ]
 }

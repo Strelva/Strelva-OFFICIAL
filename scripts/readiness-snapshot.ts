@@ -106,7 +106,6 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
-  "20261027120300": "website_code_releases",
   // Full-model additions: private/denied probes remain unknown.
   "20261022175100": "legacy_google_operation_watermarks",
   "20261022173000": "creator_version_paid_periods",
@@ -264,6 +263,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261026110000": "conn_google_agency_oauth_attempts",
   "20261026170000": "business_ai_controls",
   "20261026180000": "agency_pay_links",
+  "20261027120300": "website_code_releases",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
