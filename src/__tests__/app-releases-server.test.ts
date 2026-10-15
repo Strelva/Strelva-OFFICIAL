@@ -72,10 +72,10 @@ describe("built-in App release server", () => {
     expect(() => builtInAppReleaseMayReach("bookings", "bookings.nope")).toThrow();
   });
 
-  it("reads all six Apps in catalog order", async () => {
+  it("reads every App in catalog order", async () => {
     fakeFlags();
     const states = await readBuiltInAppReleases(WS, undefined, {});
-    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools"]);
+    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync"]);
   });
 
   it("answers the early gate from env alone", () => {

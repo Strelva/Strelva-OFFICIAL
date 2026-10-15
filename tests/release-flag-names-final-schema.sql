@@ -23,6 +23,9 @@ begin
   if to_regclass('public.app_events') is not null then
     select array_agg(key order by key) into expected from unnest(expected||array['app_events']) key;
   end if;
+  if to_regclass('public.listing_sync_checks') is not null then
+    select array_agg(key order by key) into expected from unnest(expected||array['listings_sync']) key;
+  end if;
   if actual is distinct from expected then
     raise exception 'release flag allowlist drifted: expected %, got %', expected, actual;
   end if;

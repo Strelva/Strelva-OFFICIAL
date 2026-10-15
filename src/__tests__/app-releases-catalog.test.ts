@@ -31,11 +31,22 @@ describe("built-in App catalog", () => {
     expect(() => assertBuiltInAppCatalog()).not.toThrow();
   });
 
-  it("makes Release 1 the ungated 1.0.0 baseline for every App", () => {
+  it("makes Release 1 the ungated baseline for every App, 1.0.0 for the 1.0 Apps", () => {
+    const ADDED_AFTER_1_0 = new Set(["listings_sync"]);
     for (const item of BUILT_IN_APPS) {
       expect(item.releases[0]!.gates, item.id).toEqual([]);
-      expect(item.releases[0]!.shippedIn, item.id).toBe("1.0.0");
+      expect(item.releases[0]!.shippedIn, item.id).toBe(ADDED_AFTER_1_0.has(item.id) ? null : "1.0.0");
+      if (ADDED_AFTER_1_0.has(item.id)) expect(item.availability.some(gate => gate.kind === "workspace_flag"), item.id).toBe(true);
     }
+  });
+
+  it("declares Listings in sync behind its own flag, with the fact.confirmed subscription on both Releases", () => {
+    const listings = builtInApp("listings_sync");
+    expect(listings.availability).toEqual([{ kind: "workspace_flag", flag: "listings_sync" }]);
+    expect(rollbackPlan(listings, 2).scope).toBe("everywhere");
+    expect(builtInAppForMakeRealChannel("google_listing")).toBeNull();
+    expect(releasesGatedByFlag("listings_sync")).toEqual([]);
+    for (const r of listings.releases) expect(r.eventSubscriptions).toEqual([{ event: "fact.confirmed", handler: "queue_check", scope: "business_record" }]);
   });
 
   it("labels Releases with GLOSSARY words", () => {
