@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const publishTenantSections = vi.hoisted(() => vi.fn());
 const publishLinked = vi.hoisted(() => vi.fn());
 const observeWorkRelease = vi.hoisted(() => vi.fn());
-vi.mock("@/products/websites/publish/tenant-sections", () => ({
-  publishTenantSections,
-  isSectionWriteFailure: () => false,
-  writeTenantSections: vi.fn(),
-}));
+
 vi.mock("@/products/websites/index", () => ({ publishWebsiteRebuildOntoLinkedSite: publishLinked }));
 vi.mock("@/products/websites/system-releases", () => ({ observeWebsiteWorkRelease: observeWorkRelease }));
 
@@ -16,26 +11,17 @@ import { publishWebsite, type WebsitePublishCommand } from "@/products/websites/
 const actor = { userId: "aaaaaaaa-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const WORKSPACE = "bbbbbbbb-0000-4000-8000-000000000001";
 const WORK = "cccccccc-0000-4000-8000-000000000001";
-const sections = { tenantId: "tenant-a", writes: [{ section: "hero" as const, data: { title: "New" } as never }], author: "user" as const, versions: "strict" as const, clearDrafts: "none" as const };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  publishTenantSections.mockResolvedValue({ status: "published", sections: ["hero"], pageConfig: false, revalidation: Promise.resolve() });
   publishLinked.mockResolvedValue({ workId: WORK, workspaceId: WORKSPACE, rebuild: { status: "published" }, cutover: [] });
 });
 
 describe("publishWebsite", () => {
-  it("tenant_sections hands its input to the section publisher untouched and returns its receipt as the detail", async () => {
-    const outcome = await publishWebsite({ via: "tenant_sections", input: sections });
-    expect(publishTenantSections).toHaveBeenCalledWith(sections);
-    expect(outcome.via).toBe("tenant_sections");
-    expect(outcome.releaseObserved).toBe("recorded");
-    expect(outcome.detail).toBe(await publishTenantSections.mock.results[0]!.value);
-  });
-
-  it("a section publish another caller already took records no Release", async () => {
-    publishTenantSections.mockResolvedValue({ status: "already_resolved" });
-    expect(await publishWebsite({ via: "tenant_sections", input: sections })).toEqual({ via: "tenant_sections", releaseObserved: "not_applicable", detail: { status: "already_resolved" } });
+  it("has no tenant_sections variant: tenant sections publish through the tenant model (src/lib/publish-tenant-sections)", () => {
+    // @ts-expect-error tenant_sections is not a way to publish through this workspace facade
+    const command: WebsitePublishCommand = { via: "tenant_sections", input: {} };
+    expect(command.via).toBe("tenant_sections");
   });
 
   it("site_document publishes the rebuild with the caller's exact arguments and returns the same detail", async () => {

@@ -86,4 +86,6 @@ export const workspacePortLoaders = {
   publishingContent: () => import("@/products/publishing/server"),
 
   aiControls: () => import("@/platform/ai-controls/service"),
+
+  tenantEventDecisions: () => import("@/server/needs-you/tenant-event-decision"),
 };

@@ -1,29 +1,19 @@
 /**
- * One way to put a website live. Each route that publishes (tenant sections
- * from the content API, an approved event or the agent; an approved rebuild
- * onto a linked site) calls publishWebsite, so the receipt and the Release it
- * records come from one place. The heavy rebuild service loads only when a
- * rebuild is published.
+ * Putting a linked website live from the workspace. An approved rebuild onto a
+ * linked site publishes here, so its receipt and the Release it records come
+ * from one place. The heavy rebuild service loads only when a rebuild is
+ * published.
+ *
+ * Tenant sections (the content API, an approved event and the agent) publish
+ * through src/lib/publish-tenant-sections.ts instead: that publisher writes the
+ * tenant model, and src/lib never imports a workspace layer (Strelva Reborn
+ * section 7), so the two cannot share one module.
  */
-import { publishTenantSections } from "./tenant-sections";
 import type { WebsitePublishCommand, WebsitePublishDetail, WebsitePublishOutcome } from "./contracts";
 
-export {
-  isSectionWriteFailure,
-  publishTenantSections,
-  writeTenantSections,
-  type PublishTenantSectionsInput,
-  type TenantPublishReceipt,
-  type TenantSectionWrite,
-} from "./tenant-sections";
 export type { SiteDocumentPublishDetail, WebsitePublishCommand, WebsitePublishDetail, WebsitePublishOutcome } from "./contracts";
 
 export async function publishWebsite<C extends WebsitePublishCommand>(command: C): Promise<WebsitePublishOutcome<C>> {
-  if (command.via === "tenant_sections") {
-    // appendVersion records the Release through observeTenantContentVersion.
-    const detail = await publishTenantSections(command.input);
-    return { via: command.via, releaseObserved: detail.status === "published" ? "recorded" : "not_applicable", detail } as WebsitePublishOutcome<C>;
-  }
   // The rebuild service invalidates the published document, revalidates and
   // reads back. The document store observes the Release when it commits; this
   // heals it for a replayed publish, where the store is not called again.

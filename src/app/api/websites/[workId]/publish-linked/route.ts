@@ -1,5 +1,5 @@
 import { workspaceJson } from "@/platform/workspaces/http";
-import { publishWebsite } from "@/products/websites/publish";
+import { publishWebsite } from "@/products/websites/server";
 import { rebuildHttp } from "../../rebuild-http";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

@@ -567,6 +567,7 @@ export { siteRequestBrief, siteRequestNextStep, siteRequestNextStepWords, siteRe
 export { siteChangeOwnerEmailEnabled } from "./site-change-email";
 export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type DeclaredTenant, type ReadBack, type SiteDeclaration, type SiteDeclarationPorts, type SiteReleaseCheck } from "./site-declaration";
 export { observeWebsiteSystemRelease } from "./system-releases";
+export { publishWebsite, type WebsitePublishCommand, type WebsitePublishOutcome } from "./publish";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";
 export { codeAgentReleased } from "./code-agent-release";
 

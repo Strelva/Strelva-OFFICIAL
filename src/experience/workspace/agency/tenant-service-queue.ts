@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
-import { getActiveTenants } from "@/lib/tenants";
 import { QUEUE_KIND_LABELS, type QueueTenant } from "@/platform/operator-queue/contracts";
 import type { SourceRead } from "@/platform/operator-queue/project";
 import { oneQueueEnabled } from "@/platform/provider-client-queue/release";
 import { readEventKinds, readMaintenanceDigests, readSiteDrafts, readUnkeptLeads } from "@/server/operator-queue/sources";
+import { defaultQueueDependencies } from "@/server/operator-queue/service";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AgencyClientsPage, AgencyQueueItem } from "../agency-clients";
 
@@ -33,7 +33,8 @@ export const defaultTenantServiceDeps: TenantServiceDeps = {
     if (error || !data) throw new Error("Tenant links could not be read");
     return data.map(row => ({ workspaceId: String(row.workspace_id), tenantStableId: String(row.tenant_stable_id) }));
   },
-  tenants: async () => (await getActiveTenants()).map(tenant => ({ id: tenant.id, siteName: tenant.siteName, stableId: tenant.stableId })),
+  // The operator queue reads the same active tenants; reuse it rather than import the tenant model here.
+  tenants: () => defaultQueueDependencies.readTenants(),
   readEventKinds: tenants => readEventKinds(tenants, null),
   readSiteDrafts,
   readMaintenanceDigests,

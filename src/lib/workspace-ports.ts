@@ -366,6 +366,31 @@ export interface AiControlsPort {
   readTenantAiControls(tenantId: string): Promise<TenantAiControlsState | { unavailable: true } | null>;
 }
 
+// ── Tenant event decisions through Needs you (src/server/needs-you/tenant-event-decision) ─
+
+/** A Needs you policy record's outcome for one due auto-post (STRELVA_AUTO_POST_DECISION_RECORD). */
+export type AutoPostPolicyStatus = "done" | "done_unverified" | "failed" | "already_handled" | "owner_decides" | "unsupported";
+
+export interface TenantEventDecisionsPort {
+  /** STRELVA_ONE_APPROVAL_PATH, with Needs you released. */
+  oneApprovalPathEnabled(): boolean;
+  /** One signed-in decision recorded through the business's Needs you item; anything that path does not cover runs `fallback`. */
+  decideTenantEventOnce(input: {
+    tenantId: string;
+    eventId: string;
+    workspaceId?: string;
+    action: "approved" | "dismissed";
+    by: { kind: "session" | "agency"; actor: VerifiedActor };
+    fallback: () => Promise<{ changed: boolean; reason?: string }>;
+  }): Promise<{ changed: boolean; reason?: string; decisionId?: string }>;
+  /**
+   * Record a due auto-post as a policy decision. "direct": the tenant has no
+   * business, the event has no policy item, or Needs you is off, so the caller
+   * posts through its own resolver. Throws when the record cannot be written.
+   */
+  recordAutoPostPolicyDecision(tenantId: string, event: UnifiedEvent): Promise<"direct" | { status: AutoPostPolicyStatus }>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
@@ -389,6 +414,7 @@ export interface WorkspacePorts {
   websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
   publishingContent(): Promise<PublishingContentPort>;
   aiControls(): Promise<AiControlsPort>;
+  tenantEventDecisions(): Promise<TenantEventDecisionsPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

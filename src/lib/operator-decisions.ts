@@ -1,8 +1,8 @@
 /** Tenant decision authority. Owners and authorized agency staff decide content; platform support only triages requests or marks a quote as required. */
 import { getTenantAgencySeat } from "@/platform/infra/db/repositories";
-import { oneApprovalPathEnabled } from "@/platform/needs-you/release";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { getEventRaw } from "./events";
+import { workspacePorts } from "./workspace-ports";
 import { resolveEventAction, type EventWorkflowAction } from "./event-actions";
 import { logAuditEvent, type AuditLogEntry } from "./storage";
 import type { UnifiedEvent } from "./types";
@@ -43,7 +43,7 @@ async function throughNeedsYou(
   fallback: () => Promise<DecisionResult>,
 ): Promise<DecisionResult> {
   if ((input.action !== "approved" && input.action !== "dismissed") || !by.email) return fallback();
-  const { decideTenantEventOnce } = await import("@/server/needs-you/tenant-event-decision");
+  const { decideTenantEventOnce } = await workspacePorts().tenantEventDecisions();
   return decideTenantEventOnce({
     tenantId: input.tenantId,
     eventId: input.eventId,
@@ -166,7 +166,7 @@ export async function decideTenantEvent(
   if (decider.kind === "operator") return decideTenantEventAsOperator(decider.operator, input);
   if (decider.kind === "agency_staff") return decideTenantEventAsAgencyStaff(decider.staff, input);
   // The owner's own decision records through Needs you when the business has one.
-  if (!oneApprovalPathEnabled()) return resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId);
+  if (!(await workspacePorts().tenantEventDecisions()).oneApprovalPathEnabled()) return resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId);
   const user = await getSessionUser().catch(() => null);
   return throughNeedsYou(input, { kind: "session", userId: decider.actorId, email: user?.id === decider.actorId ? user.email ?? null : null },
     () => resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId));

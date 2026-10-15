@@ -7,8 +7,9 @@
  * another route) runs `fallback`, the resolver the caller used before.
  */
 import { oneApprovalPathEnabled } from "@/platform/needs-you/release";
-import type { DecideResult } from "@/platform/needs-you/service";
+import type { DecideResult, NeedsYouService } from "@/platform/needs-you/service";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import type { tenantEventPolicyItem } from "@/platform/needs-you/adapters";
 
 export type TenantEventDecisionResult = { changed: boolean; reason?: string; decisionId?: string };
 
@@ -64,4 +65,25 @@ export async function decideTenantEventOnce(input: TenantEventDecisionInput): Pr
     by: input.by,
   });
   return decisionToEventResult(result);
+}
+
+export { oneApprovalPathEnabled };
+
+/**
+ * A due review auto-post for a business with a workspace, recorded as a policy
+ * decision (route handle_after_notice) so What changed shows it once. "direct"
+ * leaves the post to the caller's own resolver: no business holds the tenant,
+ * the event is not a policy item, or Needs you is off. A failed write throws.
+ */
+export async function recordAutoPostPolicyDecision(tenantId: string, event: Parameters<typeof tenantEventPolicyItem>[0]): Promise<"direct" | { status: Awaited<ReturnType<NeedsYouService["recordPolicyDecision"]>>["status"] }> {
+  const { releaseWorkspaceForTenant } = await import("@/platform/release-flags/store");
+  const workspaceId = await releaseWorkspaceForTenant(tenantId);
+  if (!workspaceId) return "direct";
+  const { tenantEventPolicyItem } = await import("@/platform/needs-you/adapters");
+  const item = tenantEventPolicyItem(event);
+  if (!item) return "direct";
+  const { needsYouService, needsYouReleaseEnabled } = await import("./server");
+  if (!needsYouReleaseEnabled()) return "direct";
+  const recorded = await needsYouService().recordPolicyDecision({ workspaceId, item, policy: "auto_reply_policy" });
+  return { status: recorded.status };
 }

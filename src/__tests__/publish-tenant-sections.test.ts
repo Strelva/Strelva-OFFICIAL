@@ -23,7 +23,7 @@ vi.mock("@/lib/content-revalidation", () => ({ clientRevalidationTargetForSectio
 vi.mock("@/lib/verify-live", () => ({ scheduleVerification }));
 vi.mock("@/lib/workspace-ports", () => ({ workspacePorts: () => ({ websitePublicationReadback: async () => ({ observeAcceptedNativePublish: observe }) }) }));
 
-import { isSectionWriteFailure, publishTenantSections, writeTenantSections } from "@/products/websites/publish/tenant-sections";
+import { isSectionWriteFailure, publishTenantSections, writeTenantSections } from "@/lib/publish-tenant-sections";
 
 const hero = { section: "hero" as const, data: { title: "New" } as never };
 const services = { section: "services" as const, data: { items: [] } as never };

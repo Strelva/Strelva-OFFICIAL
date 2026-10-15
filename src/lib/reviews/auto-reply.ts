@@ -151,15 +151,8 @@ async function autoPostThroughDecision(tenantId: string, event: UnifiedEvent): P
   const direct = () => resolveEventAction(tenantId, event.id, "approved", AUTO_REPLY_ACTOR);
   if (!autoPostDecisionRecordEnabled()) return direct();
   try {
-    const { releaseWorkspaceForTenant } = await import("@/platform/release-flags/store");
-    const workspaceId = await releaseWorkspaceForTenant(tenantId);
-    if (!workspaceId) return direct();
-    const { tenantEventPolicyItem } = await import("@/platform/needs-you/adapters");
-    const item = tenantEventPolicyItem(event);
-    if (!item) return direct();
-    const { needsYouService, needsYouReleaseEnabled } = await import("@/server/needs-you/server");
-    if (!needsYouReleaseEnabled()) return direct();
-    const recorded = await needsYouService().recordPolicyDecision({ workspaceId, item, policy: "auto_reply_policy" });
+    const recorded = await (await workspacePorts().tenantEventDecisions()).recordAutoPostPolicyDecision(tenantId, event);
+    if (recorded === "direct") return direct();
     switch (recorded.status) {
       case "done":
       case "done_unverified": return { changed: true };
