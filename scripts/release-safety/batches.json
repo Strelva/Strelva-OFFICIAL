@@ -2508,6 +2508,19 @@
           "rollbackStatus": "Drops the 13 triggers and their functions; touches no data."
         }
       ]
+    },
+    {
+      "id": "care-reports-2026-10-15",
+      "status": "Held and unapplied. Care plan reports: monthly agency report per client, numbered Releases of a report (append-only), revocable share links, held email delivery records and agency client time. SQL fixture scripts/check-care-reports-sql.sh passed on a disposable local cluster (2026-10-15). No production, email, provider or flag change authorized.",
+      "items": [
+        {
+          "file": "20261028100400_care_reports.sql",
+          "sha256": "0b7a28b9d04c66c5df9eb0767fbd62ada2566c0f05af70d169ac4bf62e254344",
+          "rollback": "rollback-20261028100400_care_reports.sql",
+          "rollbackSha256": "22db7070eddcb5d0e9fe8c56bb960f3b0f87232e48ddb87f2690dada6909f5bb",
+          "rollbackStatus": "Refuses with care_reports_rollback_populated once any report, published Release or time entry exists; otherwise drops the functions and tables and restores the flag-name list without care_reports."
+        }
+      ]
     }
   ]
 }

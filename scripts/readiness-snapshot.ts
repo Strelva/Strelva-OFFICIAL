@@ -265,6 +265,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261026180000": "agency_pay_links",
   "20261027120300": "website_code_releases",
   "20261028100000": "app_events",
+  "20261028100400": "care_reports",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
