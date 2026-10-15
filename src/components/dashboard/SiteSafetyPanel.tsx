@@ -80,7 +80,11 @@ export function SiteSafetyPanel({ snapshots: initialSnapshots }: SiteSafetyPanel
         const next = prev.map((s) => (s.id === snapshotId ? { ...s, ...restored } : s));
         return preRestore ? [preRestore, ...next] : next;
       });
-      setMessage("Site restored. A backup from right before the restore was saved too.");
+      setMessage(
+        body.liveSite?.status === "failed"
+          ? "Site restored. Your live site did not refresh yet; Strelva retries automatically."
+          : "Site restored. A backup from right before the restore was saved too."
+      );
     });
   }
 

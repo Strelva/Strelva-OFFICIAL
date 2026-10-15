@@ -75,6 +75,9 @@ export {
   getLatestSiteSnapshot,
   getSiteSnapshots,
   restoreSiteSnapshot,
+  SiteSnapshotBackupFailedError,
+  SiteSnapshotNotFoundError,
+  SiteSnapshotRestoreFailedError,
   SITE_SNAPSHOT_SECTIONS,
 } from "./site-snapshot-store";
 export type {

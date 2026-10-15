@@ -59,6 +59,26 @@ export interface CreateSiteSnapshotOptions {
   actor?: Pick<ActorContext, "userId" | "email" | "type" | "isSuperAdmin">;
 }
 
+export class SiteSnapshotNotFoundError extends Error {
+  name = "SiteSnapshotNotFoundError";
+}
+
+/** The safety backup before a restore could not be saved, so nothing changed. */
+export class SiteSnapshotBackupFailedError extends Error {
+  name = "SiteSnapshotBackupFailedError";
+}
+
+export class SiteSnapshotRestoreFailedError extends Error {
+  name = "SiteSnapshotRestoreFailedError";
+  constructor(
+    message: string,
+    readonly rolledBack: boolean,
+    readonly sectionsNeedingAttention: ContentSection[],
+  ) {
+    super(message);
+  }
+}
+
 function snapshotsKey(): string {
   return "__siteSnapshots";
 }
@@ -177,6 +197,14 @@ async function pgInsertSnapshot(snapshot: SiteSnapshot): Promise<void> {
   }, null);
 }
 
+/** Unlike pgInsertSnapshot, a failed insert throws: a restore needs its backup. */
+async function pgInsertSnapshotStrict(snapshot: SiteSnapshot): Promise<void> {
+  const db = getSupabase();
+  if (!db) throw new Error("Supabase is not configured");
+  const { error } = await db.from("site_snapshots").insert(snapshotToInsert(snapshot));
+  if (error) throw error;
+}
+
 async function pgListSnapshotSummaries(
   tenantId: string,
   limit: number,
@@ -193,21 +221,22 @@ async function pgListSnapshotSummaries(
   }, []);
 }
 
-async function pgGetSnapshot(
+/** Throws on an outage, so a database failure never reads as "not found". */
+async function pgGetSnapshotStrict(
   tenantId: string,
   snapshotId: string,
 ): Promise<SiteSnapshot | null> {
-  return safe<SiteSnapshot | null>(async (db) => {
-    const { data, error } = await db
-      .from("site_snapshots")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .eq("id", snapshotId)
-      .limit(1)
-      .maybeSingle();
-    if (error || !data) return null;
-    return mapPgSnapshotRow(data);
-  }, null);
+  const db = getSupabase();
+  if (!db) throw new Error("Supabase is not configured");
+  const { data, error } = await db
+    .from("site_snapshots")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("id", snapshotId)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapPgSnapshotRow(data) : null;
 }
 
 async function pgUpdateSnapshotStatus(
@@ -265,6 +294,7 @@ async function updateDevSnapshotStatus(
 export async function createSiteSnapshot(
   tenantId: string = DEFAULT_TENANT,
   options: CreateSiteSnapshotOptions,
+  { required = false }: { required?: boolean } = {},
 ): Promise<SiteSnapshot> {
   const now = new Date().toISOString();
   const snapshot: SiteSnapshot = {
@@ -281,7 +311,8 @@ export async function createSiteSnapshot(
   };
 
   if (dataSourceIsPostgres()) {
-    await pgInsertSnapshot(snapshot);
+    if (required) await pgInsertSnapshotStrict(snapshot);
+    else await pgInsertSnapshot(snapshot);
   }
 
   if (!dataSourceIsPostgres()) {
@@ -320,7 +351,7 @@ async function getSnapshotForRestore(
     // unset, or during the prod → dev-file fallback window) could return a
     // snapshot belonging to a different tenant whose id happens to match the
     // requested snapshotId (cross-tenant data leak via the shared dev-file).
-    return pgGetSnapshot(tenantId, snapshotId);
+    return pgGetSnapshotStrict(tenantId, snapshotId);
   }
 
   const store = await readDevContent(tenantId);
@@ -357,10 +388,10 @@ export async function restoreSiteSnapshot(
   tenantId: string,
   snapshotId: string,
   options: { actor?: Pick<ActorContext, "userId" | "email" | "type" | "isSuperAdmin"> } = {},
-): Promise<{ restored: SiteSnapshotSummary; preRestore: SiteSnapshotSummary }> {
+): Promise<{ restored: SiteSnapshotSummary; preRestore: SiteSnapshotSummary; restoredSections: ContentSection[] }> {
   const snapshot = await getSnapshotForRestore(tenantId, snapshotId);
   if (!snapshot) {
-    throw new Error("Site snapshot not found.");
+    throw new SiteSnapshotNotFoundError("Site snapshot not found.");
   }
 
   // The sections we will write. Snapshots can legitimately hold partial
@@ -373,12 +404,20 @@ export async function restoreSiteSnapshot(
     toWrite.push({ section, data: data as ContentMap[ContentSection] });
   }
 
-  const preRestore = await createSiteSnapshot(tenantId, {
-    reason: "pre_restore",
-    label: `Before restoring ${snapshot.label}`,
-    author: options.actor?.isSuperAdmin ? "admin" : "user",
-    actor: options.actor,
-  });
+  let preRestore: SiteSnapshot;
+  try {
+    preRestore = await createSiteSnapshot(tenantId, {
+      reason: "pre_restore",
+      label: `Before restoring ${snapshot.label}`,
+      author: options.actor?.isSuperAdmin ? "admin" : "user",
+      actor: options.actor,
+    }, { required: true });
+  } catch (err) {
+    console.error("[site-snapshots] pre-restore backup failed", err);
+    throw new SiteSnapshotBackupFailedError(
+      "Could not save a backup before restoring, so nothing was changed. Try again.",
+    );
+  }
 
   // Capture current content for each section we are about to overwrite, so a
   // mid-write failure can roll the site back to its pre-restore state rather
@@ -395,19 +434,28 @@ export async function restoreSiteSnapshot(
       written.push(section);
     }
   } catch (err) {
-    // Roll back the sections that already landed.
+    console.error("[site-snapshots] restore write failed; rolling back", err);
+    // Roll back the sections that already landed, and say honestly which
+    // ones could not be put back.
+    const needsAttention: ContentSection[] = [];
     for (const section of written) {
       const prev = previous.get(section);
-      if (prev) {
-        try {
-          await setContent(section, prev as ContentMap[typeof section], tenantId);
-        } catch {
-          // best-effort rollback; the throw below surfaces the original failure
-        }
+      if (!prev) {
+        needsAttention.push(section);
+        continue;
+      }
+      try {
+        await setContent(section, prev as ContentMap[typeof section], tenantId);
+      } catch {
+        needsAttention.push(section);
       }
     }
-    throw new Error(
-      `Restore failed on a section write and was rolled back: ${err instanceof Error ? err.message : "unknown error"}`,
+    throw new SiteSnapshotRestoreFailedError(
+      needsAttention.length
+        ? `Restore failed and these sections could not be put back: ${needsAttention.join(", ")}.`
+        : "Restore failed and your site was put back the way it was.",
+      needsAttention.length === 0,
+      needsAttention,
     );
   }
 
@@ -423,5 +471,6 @@ export async function restoreSiteSnapshot(
   return {
     restored: { ...snapshotSummary(snapshot), status: "restored", restoredAt },
     preRestore: snapshotSummary(preRestore),
+    restoredSections: toWrite.map((item) => item.section),
   };
 }
