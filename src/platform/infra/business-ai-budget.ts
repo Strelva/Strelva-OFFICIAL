@@ -84,7 +84,7 @@ export async function reserveBusinessAiBudget(workspaceId: string, maximumCostUs
  * reservation into that attempt's log rows. Missing bounds or unavailable state
  * pause capped work. Failed/unknown calls retain their full reservation until reset.
  */
-export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpose; workspaceId?: string | null; maximumCostUsd?: string | (() => string | undefined) }, deps: {
+export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpose; workspaceId?: string | null; maximumCostUsd?: string | (() => string | undefined); ceilingSource?: "qualified" | "list_price" }, deps: {
   environment?: Record<string, string | undefined>;
   read?: (workspaceId: string) => Promise<BusinessAiBudget | null>;
   reserve?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null) => Promise<BusinessAiReservation | null>;

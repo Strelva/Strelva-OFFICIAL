@@ -59,3 +59,14 @@ export function estimateModelCost(
   const usd = (usage.inputTokens * price.inputUsdPerMillion + usage.outputTokens * price.outputUsdPerMillion) / 1_000_000;
   return { costUsd: usd.toFixed(8), source: "estimate", priceTableVersion: version };
 }
+
+/**
+ * Most thinking tokens one provider request may spend, by model label. Google's
+ * documented maximum thinking budget for Gemini 2.5 Flash; recorded 2026-10-15,
+ * not verified against a bill. The list-price ceiling adds it on top of
+ * maxOutputTokens, so the ceiling holds whether or not the provider counts
+ * thinking inside maxOutputTokens.
+ */
+export const MODEL_MAX_THINKING_TOKENS: Readonly<Record<string, number>> = {
+  "google/gemini-2.5-flash": 24_576,
+};
