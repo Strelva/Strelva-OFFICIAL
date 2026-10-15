@@ -29,10 +29,11 @@ import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
+export { checkClientSites, connectClientSite, detectClientSites, readAgencyClientSites } from "./agency-sites";
 export { readConnectedSiteChangeHandled } from "./changes-handled";
 export { askConnectedSiteChange, checkConnectedSiteChange, connectedSiteChangeView, markConnectedSiteChangeDone, planConnectedSiteChange } from "./changes";
 export { connectedSiteChangesStore, createConnectedSiteChangesStore, setConnectedSiteChangesStoreForTests, type ConnectedSiteChangesStore } from "./changes-store";
-export { checkConnectedSite, fetchLiveSitePage, fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
+export { checkConnectedSite, fetchLiveSitePage, fetchSiteFingerprint, recordDetectedBuilder, type SiteFingerprint } from "./site-checks";
 import { fetchLiveSitePage } from "./site-checks";
 export { connectedSiteChangeOwnerEmailEnabled, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "./keep-your-site-release";
 

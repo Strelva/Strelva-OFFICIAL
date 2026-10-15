@@ -11,3 +11,7 @@ export {
   connectedSiteChangeReleaseRowSchema, connectedSiteChangeReviewSchema, connectedSiteChangeSchema, connectedSiteChangeStage, connectedSiteChangeStepSchema, connectedSiteChangesViewSchema, pendingConnectedSiteRequestSchema, planInputSchema,
   type ConnectedSiteChange, type ConnectedSiteChangeReleaseRow, type ConnectedSiteChangeReview, type ConnectedSiteChangeStage, type ConnectedSiteChangeStep, type ConnectedSiteChangesView, type PendingConnectedSiteRequest, type PlanInput,
 } from "./change-model";
+export {
+  CLIENT_BULK_LIMIT, DETECTION_STALE_MS, agencyClientSiteRowSchema, agencyClientSitesPageSchema, clientAddress, clientBuiltWith, clientSiteHealth,
+  type AgencyClientSiteRow, type AgencyClientSitesPage, type AgencyClientSitesView, type ClientDetection, type ClientSite,
+} from "./agency-sites-model";

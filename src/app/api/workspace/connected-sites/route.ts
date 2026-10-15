@@ -3,8 +3,7 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { PLATFORMS } from "@/products/connected-sites/contracts";
-import { detectSitePlatform } from "@/products/connected-sites/client";
-import { ConnectedSiteInputError, checkConnectedSite, connectSite, connectedSitesReleaseEnabled, connectedSitesReleasedFor, keepYourSiteReleasedFor, presentConnectedSite, readConnectedSites, verifySite } from "@/products/connected-sites/server";
+import { ConnectedSiteInputError, checkConnectedSite, connectSite, connectedSitesReleaseEnabled, connectedSitesReleasedFor, keepYourSiteReleasedFor, presentConnectedSite, readConnectedSites, recordDetectedBuilder, verifySite } from "@/products/connected-sites/server";
 import { connectedSitesStore } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
@@ -66,12 +65,7 @@ export async function POST(request: Request) {
       const keep = await keepYourSiteReleasedFor(actor, body.workspaceId);
       const site = await verifySite(actor, body.workspaceId, body.siteId, {
         store,
-        ...(keep ? {
-          observe: (verified, html) => {
-            const detected = detectSitePlatform({ html });
-            return store.recordCheck(actor, body.workspaceId, verified.id, { result: "present", platform: detected.platform === "unknown" ? null : detected.platform, evidence: detected.evidence });
-          },
-        } : {}),
+        ...(keep ? { observe: recordDetectedBuilder(actor, body.workspaceId, store) } : {}),
       });
       return workspaceJson({ site: presentConnectedSite(site) });
     }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AgencyImportClients } from "@/experience/workspace/agency/AgencyImportClients";
 import { agencyImportReleaseEnabled } from "@/products/agency-clients";
 import { ghlImportReleaseEnabled } from "@/products/agency-clients/server";
+import { keepYourSiteMayBeOn } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Import clients", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -23,6 +24,7 @@ export default async function AgencyImportClientsPage({ searchParams }: { search
   return <AgencyImportClients
     agencyWorkspaceId={workspaceId}
     highLevel={highLevelOn}
+    keepYourSite={keepYourSiteMayBeOn()}
     initialSource={highLevelOn && source === "highlevel" ? "highlevel" : undefined}
     initialNotice={highLevelOn && highlevel === "connected" ? "HighLevel is connected. Read your sub-accounts to preview them." : undefined}
     initialError={highLevelOn && typeof highlevelError === "string" ? highlevelError.slice(0, 300) : undefined}

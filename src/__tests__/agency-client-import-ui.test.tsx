@@ -84,6 +84,20 @@ describe("Import clients page", () => {
     expect(button("Download CSV")).toBeTruthy();
   });
 
+  it.each([[false, false], [true, true]])("points to Client websites after an import only when keep your site could be on (%s)", async (keepYourSite, shown) => {
+    await act(async () => root.render(<AgencyImportClients agencyWorkspaceId={AGENCY} keepYourSite={keepYourSite} />));
+    await type(container.querySelector("textarea")!, "northside.example\n");
+    await click("Read the list");
+    await click("Check rows");
+    await click("Add 1 client");
+    expect(container.textContent).toContain("Import finished");
+    const notice = "See which of these clients’ sites are on Wix, Squarespace, WordPress and others in Clients → Client websites.";
+    expect(container.textContent?.includes(notice)).toBe(shown);
+    const link = [...container.querySelectorAll("a")].find(item => item.textContent === "Open Client websites");
+    expect(Boolean(link)).toBe(shown);
+    if (link) expect(link.getAttribute("href")).toBe(`/workspace?workspaceId=${AGENCY}&view=clients`);
+  });
+
   it("keeps a failed batch's rows reported and retryable", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));

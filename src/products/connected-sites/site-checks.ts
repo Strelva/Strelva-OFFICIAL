@@ -56,3 +56,14 @@ export async function checkConnectedSite(
     evidence: detection.evidence,
   });
 }
+
+/**
+ * Passed to verifySite as `observe`: once the host is proven, remember what the
+ * page said it is built with. Best effort; the proof stands either way.
+ */
+export function recordDetectedBuilder(actor: WorkspaceActor, businessId: string, store: ConnectedSitesStore = connectedSitesStore()) {
+  return (site: ConnectedSite, html: string) => {
+    const detected = detectSitePlatform({ html });
+    return store.recordCheck(actor, businessId, site.id, { result: "present", platform: detected.platform === "unknown" ? null : detected.platform, evidence: detected.evidence });
+  };
+}

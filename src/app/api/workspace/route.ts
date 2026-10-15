@@ -47,7 +47,7 @@ import { listProvidedClients } from "@/platform/workspaces/business-ownership";
 import { oauthEnabled } from "@/platform/agent-channel/oauth";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
-import { connectedSitesReleasedFor } from "@/products/connected-sites/server";
+import { connectedSitesReleasedFor, keepYourSiteMayBeOn } from "@/products/connected-sites/server";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -327,7 +327,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { businessBilling: process.env.STRELVA_BUSINESS_BILLING === "1", exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { businessBilling: process.env.STRELVA_BUSINESS_BILLING === "1", exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}), ...(keepYourSiteMayBeOn() ? { keepYourSite: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

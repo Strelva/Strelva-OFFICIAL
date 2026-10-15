@@ -10,6 +10,8 @@ import {
   connectedSiteChangeReleaseRowSchema, connectedSiteChangeReviewSchema, connectedSiteChangeSchema, connectedSiteChangesViewSchema,
   type ConnectedSiteChange, type ConnectedSiteChangeReleaseRow, type ConnectedSiteChangeReview, type ConnectedSiteChangesView, type PlanInput,
 } from "./change-model";
+import { agencyClientSitesPageSchema, clientDetectionSchema, type AgencyClientSitesPage, type ClientDetection } from "./agency-sites-model";
+import type { SitePlatform } from "./contracts";
 import { ConnectedSiteInputError } from "./store";
 
 export interface ConnectedSiteChangesRpc { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> }
@@ -47,6 +49,9 @@ export interface ConnectedSiteChangesStore {
   reviews(actor: WorkspaceActor, workspaceId: string): Promise<ConnectedSiteChangeReview[]>;
   forRequest(actor: WorkspaceActor, requestId: string): Promise<{ workspaceId: string; systemId: string } | null>;
   releases(actor: WorkspaceActor, workspaceId: string, sinceIso: string): Promise<ConnectedSiteChangeReleaseRow[]>;
+  /** Keep your site, agency Client websites: what a client's live page says it is built with. */
+  recordDetection(actor: WorkspaceActor, workspaceId: string, input: { siteUrl: string; siteHost: string; platform: SitePlatform; evidence: string[]; reachable: boolean }): Promise<ClientDetection>;
+  agencyClientSites(actor: WorkspaceActor, agencyWorkspaceId: string, cursor?: { name: string; id: string } | null, limit?: number): Promise<AgencyClientSitesPage>;
 }
 
 /** The plan an agency saves, as SQL reads it (keys exactly as validated there). */
@@ -98,6 +103,18 @@ export function createConnectedSiteChangesStore(db?: ConnectedSiteChangesRpc): C
     },
     async releases(actor, workspaceId, sinceIso) {
       return z.array(connectedSiteChangeReleaseRowSchema).parse(await rpc("read_connected_site_change_releases", { ...base(actor, workspaceId), p_since: sinceIso }) ?? []);
+    },
+    async recordDetection(actor, workspaceId, input) {
+      return clientDetectionSchema.parse(await rpc("record_connected_site_detection", {
+        ...base(actor, workspaceId), p_site_url: input.siteUrl, p_site_host: input.siteHost, p_platform: input.platform,
+        p_evidence: input.evidence.slice(0, 5).map(item => item.slice(0, 120)), p_reachable: input.reachable,
+      }));
+    },
+    async agencyClientSites(actor, agencyWorkspaceId, cursor, limit = 100) {
+      return agencyClientSitesPageSchema.parse(await rpc("read_agency_client_sites", {
+        p_agency_workspace_id: uuid.parse(agencyWorkspaceId), ...identity(actor),
+        p_after_name: cursor?.name ?? null, p_after_id: cursor ? uuid.parse(cursor.id) : null, p_limit: limit,
+      }));
     },
   };
 }
