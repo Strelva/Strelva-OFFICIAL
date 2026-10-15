@@ -257,7 +257,14 @@ _Avoid_: admin access, white-label, delegation (on screen)
 **Inquiry**:
 One end customer's request to a business, with its handling status and assignee.
 Customer Inquiry is the full term.
+An Intake App's request is an Inquiry like any other.
 _Avoid_: lead (the stored copy), submission, prospect, record
+
+**Intake App**:
+A built-in App that turns a website form into an Inquiry and, when the business has
+Bookings, a proposed visit the owner confirms in Needs you. Dental intake is the
+first.
+_Avoid_: template, intake template, form builder
 
 **Agency handoff**:
 An owner-authorized change of serving agency that names the business and both
@@ -484,7 +491,7 @@ _Avoid_: Version, History
 
 **Built-in App**:
 An App the platform ships in code to every business (Bookings, Inquiries, Recaps,
-Documents, Ask Strelva, Internal tools), declared in `src/platform/app-releases`.
+Documents, Ask Strelva, Internal tools, Dental intake), declared in `src/platform/app-releases`.
 Its Releases are numbered and turned on by release flags; turning a Release's
 flag off returns the business to the Release before it. Credited to Strelva, never
 to an agency.

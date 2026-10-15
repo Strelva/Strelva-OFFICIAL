@@ -93,6 +93,15 @@ Full steps: `gohighlevel-import-2026-10-12.md`, steps 1 to 10.
 - **Keys.** `RESEND_API_KEY`; `RESEND_DOMAIN` (default `updates.strelva.com`); `RESEND_WEBHOOK_SECRET` for delivery events at `/api/webhooks/resend`.
 - **Client and customer email stays OFF.** Adding the key does not send to clients: sending is gated by `EMAIL_SENDING_ENABLED` and `CUSTOMER_EMAIL_ENABLED`, which this page does not change. Without the key, a send is skipped and the missing key is logged once.
 
+## Dental intake (no provider key)
+
+Dental intake needs no outside account of its own. Its switches, all default off:
+
+- `STRELVA_VERTICAL_INTAKE_RELEASE` (default off; `workspace` for per-business rows). Needs `STRELVA_WORKSPACE_RELEASE=1` and connected sites. Prod stays off until Jacob answers the health-information question in `docs/capabilities/apps/dental-intake.md`.
+- `STRELVA_INTAKE_SENSITIVE_FIELDS` (default off; needs `SECRETS_ENC_KEY`). Lets an office ask for an insurance member ID. Held until a business associate agreement path exists.
+- `STRELVA_INTAKE_OWNER_EMAIL` (default off; needs `EMAIL_SENDING_ENABLED` too). The owner's own Needs you emails about it. Patients are never emailed by this App.
+- **Before and after.** With the switch off, the Inquiries page and Business details look as they do today. With it on and no member ID switch, the form never asks for one.
+
 ## Yelp
 
 No Strelva key. The owner pastes their own Yelp Fusion API key and business ID.
