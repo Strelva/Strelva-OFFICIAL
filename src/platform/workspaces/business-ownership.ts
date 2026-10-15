@@ -172,7 +172,11 @@ function trustedRecipient(state: OwnerInvitationState): string | null {
   return trusted ? recipient.email.trim().toLowerCase() : null;
 }
 
-/** Issue an approved owner invitation without sending email during the silent rollout. */
+/**
+ * Issue an approved owner invitation without sending email during the silent rollout.
+ * Call issueWorkspaceInvitation (invitations.ts) with an operator issuer: it is the one entry and
+ * adds delivery. This is its operator step.
+ */
 export async function inviteBusinessOwner(actor: WorkspaceActor, workspaceId: string, options: InviteOwnerOptions): Promise<OwnerInvitationResult> {
   const normalizedOperator = operatorEmail.parse(actor.verifiedEmail);
   const state = await readOwnerInvitationState(normalizedOperator, workspaceId);

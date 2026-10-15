@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   actor: vi.fn(),
-  create: vi.fn(),
+  issue: vi.fn(),
   list: vi.fn(),
   inspect: vi.fn(),
   accept: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock("@/platform/workspaces/invitations", async importOriginal => {
   const original = await importOriginal<typeof import("@/platform/workspaces/invitations")>();
   return {
     ...original,
-    createWorkspaceInvitation: mocks.create,
+    issueWorkspaceInvitation: mocks.issue,
     listWorkspaceInvitations: mocks.list,
     inspectWorkspaceInvitation: mocks.inspect,
     acceptWorkspaceInvitation: mocks.accept,
@@ -54,7 +54,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   mocks.actor.mockResolvedValue(actor);
   mocks.list.mockResolvedValue([invitation]);
-  mocks.create.mockResolvedValue({ invitation, token });
+  mocks.issue.mockResolvedValue({ invitation, acceptUrl: `https://app.example.test/workspace/invitations/accept/${token}`, delivery: { status: "not_sent", reason: "release_off" } });
   mocks.inspect.mockResolvedValue({ ...invitation, workspaceName: "Example Business", recipientEmail: "p•••••@example.test" });
   mocks.accept.mockResolvedValue({ invitationId: invitation.id, workspaceId: invitation.workspaceId, workspaceName: "Example Business", invitedRole: "member", appliedRole: "member", status: "accepted", alreadyAccepted: false });
   mocks.revoke.mockResolvedValue("revoked");
@@ -72,7 +72,9 @@ describe("workspace invitation HTTP boundary", () => {
       workspaceId: invitation.workspaceId, recipientEmail: invitation.recipientEmail, role: "member",
     }));
     expect(created.status).toBe(201);
-    expect(await created.json()).toEqual({ invitation, token });
+    expect(mocks.issue).toHaveBeenCalledWith({ workspaceId: invitation.workspaceId, recipientEmail: invitation.recipientEmail, role: "member", issuer: { kind: "member", actor } });
+    // The token stays for existing callers; the response also says nothing was emailed.
+    expect(await created.json()).toEqual({ invitation, token, acceptUrl: `https://app.example.test/workspace/invitations/accept/${token}`, delivery: { status: "not_sent", reason: "release_off" } });
   });
 
   it("rejects signed-out and cross-origin owner mutations", async () => {
@@ -80,7 +82,7 @@ describe("workspace invitation HTTP boundary", () => {
     mocks.actor.mockResolvedValueOnce(null);
     expect((await route.POST(mutation("https://strelva.com/api/workspace-invitations", {}))).status).toBe(401);
     expect((await route.POST(new Request("https://strelva.com/api/workspace-invitations", { method: "POST", headers: { origin: "https://evil.example", "content-type": "application/json" }, body: "{}" }))).status).toBe(403);
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.issue).not.toHaveBeenCalled();
   });
 
   it("exposes only the bounded token preview before authentication", async () => {

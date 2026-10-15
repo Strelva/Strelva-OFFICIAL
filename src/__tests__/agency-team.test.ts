@@ -8,7 +8,7 @@ const deps = vi.hoisted(() => ({
 }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: deps.rpc }) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
-vi.mock("@/platform/workspaces/invitations", () => ({ createWorkspaceInvitation: deps.invite, revokeWorkspaceInvitation: deps.revoke }));
+vi.mock("@/platform/workspaces/invitations", () => ({ issueWorkspaceInvitation: deps.invite, revokeWorkspaceInvitation: deps.revoke }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => deps.enabled }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleaseMayBeOn: () => deps.enabled, systemsReleasedFor: deps.released }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
@@ -24,7 +24,7 @@ beforeEach(() => {
   deps.enabled = true; deps.released.mockReset().mockResolvedValue(true); deps.limited.mockReset().mockResolvedValue(false);
   deps.rpc.mockReset().mockImplementation(async (name) => ({ data: name === "read_agency_team" ? agencyTeamFixture()
     : name === "bulk_set_agency_client_staff" ? { results: [{ agencyWorkspaceId: TEAM_AGENCY, customerWorkspaceId: TEAM_CLIENT, userId: TEAM_STAFF, active: true, changed: true }] } : { ok: true }, error: null }));
-  deps.invite.mockReset().mockResolvedValue({ token: "a".repeat(43), invitation: {} }); deps.revoke.mockReset().mockResolvedValue("revoked");
+  deps.invite.mockReset().mockResolvedValue({ acceptUrl: `https://app.example.test/workspace/invitations/accept/${"a".repeat(43)}`, invitation: {}, delivery: { status: "not_sent", reason: "release_off" } }); deps.revoke.mockReset().mockResolvedValue("revoked");
 });
 
 describe("agency Team route and RPC boundary", () => {
@@ -59,7 +59,7 @@ describe("agency Team route and RPC boundary", () => {
   it("uses existing invitations and refuses owner elevation or nonmanager invitations", async () => {
     const body = { action: "invite", workspaceId: TEAM_AGENCY, recipientEmail: "Sam@Example.test", role: "member" };
     expect((await send(body)).status).toBe(200);
-    expect(deps.invite).toHaveBeenCalledWith({ userId: TEAM_OWNER, verifiedEmail: "owner@agency.example.test" }, { workspaceId: TEAM_AGENCY, recipientEmail: "sam@example.test", role: "member" });
+    expect(deps.invite).toHaveBeenCalledWith({ workspaceId: TEAM_AGENCY, recipientEmail: "sam@example.test", role: "member", issuer: { kind: "member", actor: { userId: TEAM_OWNER, verifiedEmail: "owner@agency.example.test" } } });
     expect((await send({ ...body, role: "owner" })).status).toBe(400);
     deps.rpc.mockResolvedValue({ data: { ...agencyTeamFixture(), canManage: false }, error: null });
     expect((await send(body)).status).toBe(403); expect(deps.invite).toHaveBeenCalledTimes(1);
