@@ -20,7 +20,7 @@ export function BusinessAiBudgetSummary({ budget, capUsd, enforced }: { budget: 
       <StRow value="Remaining budget" title={!known || budget.unknownCostCalls > 0 ? "Unavailable" : capUsd === null ? "No spending limit recorded" : remaining === null ? "Unavailable" : dollars(remaining)} />
       <StRow value="Resets" title={known ? new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(budget.resetsAt)) + " (UTC)" : "Unavailable"} />
     </StRows>
-    {enforced ? <StNotice tone={!known || budget.unknownCostCalls > 0 ? "critical" : undefined}>{!known ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : budget.unknownCostCalls > 0 ? capUsd === null ? "Some past calls have no confirmed cost. Recorded spend is incomplete. No spending limit is recorded for this business." : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : "Budgeted calls reserve their maximum cost before running. Reserved amounts stay committed until the reset date, including calls whose outcome is not confirmed."}</StNotice> : <StNotice>{enforced === false ? "Usage limits are not enabled here." : "Your current usage limit has not been confirmed."} Your plan’s price and included usage are shown before you pay.</StNotice>}
+    {enforced ? <StNotice tone={!known || budget.unknownCostCalls > 0 ? "critical" : undefined}>{!known ? "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : budget.unknownCostCalls > 0 ? capUsd === null ? "Some past calls have no confirmed cost. Recorded spend is incomplete. No spending limit is recorded for this business." : "Usage could not be confirmed. Budgeted building stays paused until the budget can be checked." : "Budgeted calls reserve their maximum cost before running. Reserved amounts stay committed until the reset date, including calls whose outcome is not confirmed."}</StNotice> : <StNotice>{enforced === false ? "Usage limits are not enabled here." : "Your current usage limit has not been confirmed."} No plan price is published yet. Nothing is charged until you see one and agree to it.</StNotice>}
   </StSection>;
 }
 
@@ -50,7 +50,7 @@ export function StartWorkspacePlan({ workspaceId, budget = null, capUsd = null, 
 
 /** An unconfigured sale never renders a checkout control or an invented price. */
 export function WorkspacePlanUnavailable({ workspaceId }: { workspaceId: string }) {
-  return <StSection title="Your plan" meta="Price shown before you pay. Self-serve plans are not available yet.">
+  return <StSection title="Your plan" meta="No plan price is published yet. Self-serve plans are not available yet.">
     <StTextButton href={`/workspace?view=help&workspaceId=${encodeURIComponent(workspaceId)}`}>Bring in an agency</StTextButton>
   </StSection>;
 }
