@@ -20,6 +20,7 @@ import {
 } from "@/platform/ask";
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
 import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
+import { withConnectedSiteChangeRequests } from "./connected-site-requests";
 import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
 import { createAskPossibilityPort } from "./possibilities-server";
@@ -100,8 +101,9 @@ export async function POST(request: Request) {
     if (await isRateLimitedAsync(`ask:${actor.userId}`, 30)) return workspaceJson({ error: "Too many requests. Try again in a minute." }, 429);
     const body = await readWorkspaceBody(request, 150_000);
     // ADR 0015: a Request goes to the business's recorded agency, never a default one.
-    const requests = createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore),
-      async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId)));
+    // A change asked about a connected-site System is a connected-site Request (keep your site); everything else files as before.
+    const requests = withConnectedSiteChangeRequests(createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore),
+      async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId))));
     const needsYou = askNeedsYou(actor);
     const deps: AskTurnDeps = {
       isOperator: await isSuperAdmin(),
