@@ -39,6 +39,11 @@ vi.mock("@/lib/pay-links", async () => {
   };
 });
 
+vi.mock("@/platform/infra/pay-links", async () => {
+  const actual = await vi.importActual<typeof import("@/platform/infra/pay-links")>("@/platform/infra/pay-links");
+  return { ...actual, getRedisPayLink: mockGetPayLink, getPayLink: mockGetPayLink };
+});
+
 vi.mock("@/lib/revenue", () => ({ listBuildPayments: mockListBuildPayments }));
 
 vi.mock("@/platform/infra/rate-limit", () => ({

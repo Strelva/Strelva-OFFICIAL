@@ -341,7 +341,7 @@ export async function savePayLink(
   await redis.sadd(PAY_LINK_INDEX_KEY, config.slug);
 }
 
-export async function getPayLink(slug: string): Promise<PayLinkConfig | null> {
+export async function getRedisPayLink(slug: string): Promise<PayLinkConfig | null> {
   const normalized = normalizePayLinkSlug(slug);
   if (!normalized || normalized === "index") return null;
   const redis = getRedis();
@@ -349,6 +349,9 @@ export async function getPayLink(slug: string): Promise<PayLinkConfig | null> {
   const key = `${PAY_LINK_PREFIX}${normalized}`;
   return redis.get<PayLinkConfig>(key);
 }
+
+/** Existing callers keep this name. It reads Redis only; the Postgres read is in agency-pay-links/public. */
+export const getPayLink = getRedisPayLink;
 
 /**
  * List every minted pay link for authorized support or scoped agency readers. Reads the slug index set, then the

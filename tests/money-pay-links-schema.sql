@@ -61,6 +61,8 @@ begin
  perform pg_temp.mp_raises('select public.begin_agency_pay_link_checkout(''range-one'',10000)','agency_pay_link_expired');
  perform pg_temp.mp_assert(public.read_public_agency_pay_link('range-one')->>'status'='expired','revoked status');
  perform pg_temp.mp_raises(pg_temp.cmd(b,ub,'mpl-b-owner@example.test',jsonb_build_object('action','revoke','idempotencyKey',gen_random_uuid(),'fingerprint','rv2','slug','site-one')),'agency_pay_link_denied');
+ perform public.agency_pay_link_command(jsonb_build_object('agencyWorkspaceId',a,'action','revoke','idempotencyKey',gen_random_uuid(),'fingerprint','rv3','slug','site-one'),ua,'mpl-a-owner@example.test');
+ perform pg_temp.mp_assert(public.read_public_agency_pay_link('site-one')->>'status'='paid','a paid link stays paid after it is revoked');
  -- Backfill.
  perform pg_temp.mp_assert(public.backfill_legacy_agency_pay_link('{"slug":"old-one","clientName":"Old","door":"build","amountCents":9000}'::jsonb,'hash1',a)='inserted','backfill inserts');
  perform pg_temp.mp_assert(public.backfill_legacy_agency_pay_link('{"slug":"old-one","clientName":"Old","door":"build","amountCents":9000}'::jsonb,'hash1',a)='unchanged','backfill is idempotent');

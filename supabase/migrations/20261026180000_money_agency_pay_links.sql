@@ -93,7 +93,7 @@ language sql stable security definer set search_path=public,pg_temp as $$
   'currency',l.currency,'agencyDisplayName',l.agency_display_name,'createdBy',l.created_by,'createdAt',l.created_at,
   'revokedAt',l.revoked_at,'revokedBy',l.revoked_by,'checkoutGeneration',l.checkout_generation,
   'legacyTenantId',l.legacy_tenant_id,'leadSlug',l.lead_slug,'returnUrl',l.return_url,
-  'status',case when l.revoked_at is not null then 'expired' when exists(select 1 from public.agency_pay_link_paid(l.id)) then 'paid' else 'open' end,
+  'status',case when exists(select 1 from public.agency_pay_link_paid(l.id)) then 'paid' when l.revoked_at is not null then 'expired' else 'open' end,
   'paidAt',(select x.paid_at from public.agency_pay_link_paid(l.id) x),'paidAmountCents',(select x.amount_cents from public.agency_pay_link_paid(l.id) x),
   'invoiceNumber',(select d.number from public.money_documents d where d.source_kind='agency_pay_link' and d.source_id=l.id and d.kind='invoice'),
   'receiptNumber',(select d.number from public.money_documents d where d.source_kind='agency_pay_link' and d.source_id=l.id and d.kind='payment_receipt' order by d.number desc limit 1));

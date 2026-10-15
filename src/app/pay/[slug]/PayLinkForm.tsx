@@ -10,7 +10,7 @@ const STEP_DOLLARS = 50;
 export interface PayLinkFormProps {
   slug: string;
   /** Door this link sells — drives the reassurance copy under the amount. */
-  door: "build" | "managed_start";
+  door?: "build" | "managed_start";
   /** Fixed price in cents, when the link is a fixed-amount link. */
   amountCents?: number;
   /** Range bounds in cents, when the link is a slider link. */
@@ -32,7 +32,7 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
   const pct = max > min ? ((amount - min) / (max - min)) * 100 : 100;
   const amountLabel = formatWholeDollarsUsd(Math.round(amount * 100));
 
-  const reassurance = payLinkReassurance({ door, amountCents, minCents, maxCents });
+  const reassurance = door ? payLinkReassurance({ door, amountCents, minCents, maxCents }) : null;
 
   async function startCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -139,7 +139,7 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
       {/* Amount hero — tracks the slider live */}
       <div className="flex flex-col items-center text-center">
         <span className="text-[13px] font-medium text-[#6e6e73]">
-          {door === "build" ? "Your website build" : "Your start payment"}
+          {door === "build" ? "Your website build" : door ? "Your start payment" : "Amount"}
         </span>
         <div className="mt-1.5 flex items-start justify-center text-[#1d1d1f]">
           <span className="mt-[10px] text-[26px] font-semibold">$</span>
@@ -172,12 +172,12 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
       )}
 
       {/* Door-specific reassurance */}
-      <div className="mt-6 rounded-2xl border border-white/60 bg-white/35 px-4 py-3 text-center text-[13px] leading-5 text-[#6e6e73]">
+      {reassurance ? <div className="mt-6 rounded-2xl border border-white/60 bg-white/35 px-4 py-3 text-center text-[13px] leading-5 text-[#6e6e73]">
         {reassurance}
-      </div>
+      </div> : null}
 
-      {/* Email */}
-      <label className="mt-4 block">
+      {/* Email: legacy links only. Receipts for agency links come from the agency's own Stripe settings. */}
+      {door ? <label className="mt-4 block">
         <span className="mb-1.5 block text-[13px] font-medium text-[#6e6e73]">
           Email for your receipt
         </span>
@@ -188,7 +188,7 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
           placeholder="you@example.com"
           className="h-12 w-full rounded-2xl border border-white/70 bg-white/45 px-4 text-[15px] text-[#1d1d1f] outline-none transition-colors placeholder:text-[#9a9aa0] focus:border-[#1d1d1f]/25 focus:bg-white/80"
         />
-      </label>
+      </label> : null}
 
       {error && (
         <p className="mt-4 rounded-2xl border border-[#f0c9b8] bg-[#fff4ee]/80 px-4 py-2.5 text-center text-[13px] text-[#b23a16]">

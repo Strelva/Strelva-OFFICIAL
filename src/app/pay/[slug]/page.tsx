@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { StEntry, StHead, StNotice } from "@/components/ui/strelva/Kit";
 import { PayLinkForm } from "./PayLinkForm";
-import { getPayLink, formatPayLinkAmount } from "@/lib/pay-links";
+import { formatPayLinkAmount } from "@/lib/pay-links";
+import { resolvePublicPayLink } from "@/platform/agency-pay-links/public";
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+import { ConnectedPayLink } from "./ConnectedPayLink";
 import { payLinkDoorBadge, payLinkDoorTerms } from "@/lib/pay-link-copy";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +18,12 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const config = await getPayLink(slug);
+  const resolved = await resolvePublicPayLink(slug);
+  if (resolved?.kind === "connected") {
+    if (resolved.link.status === "expired") return { title: { absolute: "Payment link expired" }, robots: { index: false, follow: false } };
+    return { title: { absolute: `Pay ${resolved.link.agencyDisplayName || "your agency"}` }, robots: { index: false, follow: false }, referrer: "no-referrer" };
+  }
+  const config = resolved?.config;
   if (config?.revokedAt) return { title: { absolute: "Payment link expired" } };
   if (!config) {
     return { title: { absolute: "Not found" } };
@@ -28,10 +36,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function PayLinkPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const config = await getPayLink(slug);
-  if (!config) {
+  const resolved = await resolvePublicPayLink(slug);
+  if (!resolved) {
     notFound();
   }
+  if (resolved.kind === "connected") {
+    const { link } = resolved;
+    const sp = await searchParams;
+    const brand = await resolveOwnerBrand(link.agencyWorkspaceId ?? "");
+    // Public fields only: never who created or revoked the link.
+    return <ConnectedPayLink brand={brand} payment={sp?.payment} link={{ slug: link.slug, clientName: link.clientName, description: link.description ?? "", amountCents: link.amountCents, minCents: link.minCents, maxCents: link.maxCents, currency: link.currency, status: link.status, receiptNumber: link.receiptNumber }} />;
+  }
+  const config = resolved.config;
 
   if (config.revokedAt) return <StEntry brand={config.agencyDisplayName || "Strelva Agency"}><StHead title="Payment link expired" /><StNotice>This payment link has expired. Ask the agency for a new link. Payments already started in Stripe may still complete.</StNotice></StEntry>;
 

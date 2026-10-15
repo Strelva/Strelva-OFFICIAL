@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
-  getPayLink,
   resolvePayLinkChargeCents,
   formatPayLinkAmount,
   isFixedAmount,
@@ -11,6 +10,10 @@ import {
 } from "@/lib/pay-links";
 import { payLinkProductName, payLinkProductDescription } from "@/lib/pay-link-copy";
 import { getStripe } from "@/lib/billing";
+import { AgencyPayLinkClosedError } from "@/platform/agency-pay-links";
+import { startAgencyPayLinkCheckout } from "@/platform/agency-pay-links/checkout";
+import { resolvePublicPayLink } from "@/platform/agency-pay-links/public";
+import { PayLinkValidationError } from "@/lib/pay-links";
 
 function getRequestOrigin(req: NextRequest): string {
   // Trusted origin only — the Stripe success/cancel redirect carries the session
@@ -43,10 +46,25 @@ export async function POST(
     );
   }
 
-  const config = await getPayLink(slug);
-  if (!config) {
+  const resolved = await resolvePublicPayLink(slug);
+  if (!resolved) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // Connected links charge on the agency's own Stripe account. Errors are worded here, never echoed.
+  if (resolved.kind === "connected") {
+    const body = await readJsonObject(req);
+    if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    try {
+      return NextResponse.json(await startAgencyPayLinkCheckout({ slug, submittedAmount: body.amount, origin: getRequestOrigin(req) }));
+    } catch (err) {
+      if (err instanceof AgencyPayLinkClosedError) return NextResponse.json({ error: err.message }, { status: err.status });
+      if (err instanceof PayLinkValidationError) return NextResponse.json({ error: err.message }, { status: 400 });
+      if (err instanceof Error && err.message.includes("merchant is not ready")) return NextResponse.json({ error: "This agency cannot take payments right now. Nothing was charged." }, { status: 503 });
+      return NextResponse.json({ error: "Checkout could not be opened. Nothing was charged." }, { status: 500 });
+    }
+  }
+  const config = resolved.config;
 
   if (config.revokedAt) {
     return NextResponse.json({ error: "This payment link has expired. Ask the agency for a new link." }, { status: 410 });
