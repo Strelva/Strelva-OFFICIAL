@@ -316,9 +316,11 @@ begin
   return jsonb_build_object(
     'viewer', jsonb_build_object('role', v_role,
       'isOwner', exists(select 1 from public.workspace_memberships m where m.workspace_id = p_workspace_id and m.user_id = p_user_id and m.role = 'owner'),
-      'actingAgencyId', v_agency, 'agencyName', v_brand),
+      'actingAgencyId', v_agency, 'agencyName', v_brand,
+      'businessName', (select w.name from public.workspaces w where w.id = p_workspace_id)),
     'site', jsonb_build_object('id', v_site.id, 'siteHost', v_site.site_host, 'siteUrl', v_site.site_url,
-      'platform', coalesce(nullif(v_site.platform, 'unknown'), v_site.detected_platform, 'unknown')),
+      'platform', coalesce(nullif(v_site.platform, 'unknown'), v_site.detected_platform, 'unknown'),
+      'nextReleaseNumber', (select coalesce(max(r.number), 0) + 1 from public.system_revisions r where r.system_id = p_system_id)),
     'requests', coalesce((select jsonb_agg(jsonb_build_object('id', q.id, 'request', q.request_text, 'outcome', q.outcome, 'page', q.context->>'page',
         'accepted', q.provider_acceptance, 'revision', q.revision, 'createdAt', q.created_at) order by q.created_at desc, q.id)
       from (select r.* from public.service_requests r

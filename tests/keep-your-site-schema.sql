@@ -58,7 +58,7 @@ begin
  v:=public.list_connected_site_changes(c.ws,c.owner,'owner@kys.example.test',c.sys);
  perform pg_temp.ok(jsonb_array_length(v->'requests')=2,'owner sees both requests');
  perform pg_temp.ok((v->'viewer'->>'isOwner')::boolean and v->'viewer'->>'agencyName'='Agency' and v->'viewer'->>'actingAgencyId' is null,'owner viewer');
- perform pg_temp.ok(v->'site'->>'platform'='wix' and v->'site'->>'siteHost'='bakery.example','site platform');
+ perform pg_temp.ok(v->'site'->>'platform'='wix' and v->'site'->>'siteHost'='bakery.example' and (v->'site'->>'nextReleaseNumber')::int=2 and v->'viewer'->>'businessName'='Bakery','site platform, next Release and business name');
  v:=public.list_connected_site_changes(c.ws,c.staff,'staff@kys.example.test',c.sys);
  perform pg_temp.ok(v->'viewer'->>'actingAgencyId'='27400000-0000-4000-8000-000000000020','agency viewer acting id');
  perform pg_temp.denied(format('select public.list_connected_site_changes(%L,%L,%L,%L)',c.ws,c.stranger,'stranger@kys.example.test',c.sys),'workspace_access_denied');

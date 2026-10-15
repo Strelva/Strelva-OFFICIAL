@@ -70,6 +70,10 @@ export interface ConnectedSiteDetail {
   /** Last 30 days, by kind (visit, call_click, ...). */
   activity: Record<string, number>;
   inquiries: Array<{ id: string; name: string; email: string | null; message: string | null; capturedAt: string }>;
+  /** Keep your site only (flag on for this business): install health, what it is built with, and the changes section. */
+  health?: { state: string; label: string; detail: string; tone: "live" | "need" | "draft" | "down" };
+  platform?: { value: string; label: string; detected: boolean };
+  keepYourSite?: boolean;
 }
 
 export interface WebsiteSystemDetail {
@@ -182,6 +186,9 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
 
   if (input.connectedSite && !input.connectedSite.verified) {
     waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines shown under Connected site, publish your site, then check. Nothing is collected until then.", at: null, href: null });
+  }
+  if (input.connectedSite?.health?.state === "stopped") {
+    waiting.unshift({ id: `health:${input.connectedSite.siteId}`, kind: "decision", title: `${input.connectedSite.siteHost} stopped reporting`, detail: input.connectedSite.health.detail, at: null, href: null });
   }
   return { systemId: input.systemId, ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
 }

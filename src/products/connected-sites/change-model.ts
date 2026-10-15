@@ -42,8 +42,8 @@ export const pendingConnectedSiteRequestSchema = z.object({
 export type PendingConnectedSiteRequest = z.infer<typeof pendingConnectedSiteRequestSchema>;
 
 export const connectedSiteChangesViewSchema = z.object({
-  viewer: z.object({ role: z.string(), isOwner: z.boolean(), actingAgencyId: z.string().uuid().nullable(), agencyName: z.string().nullable() }),
-  site: z.object({ id: z.string().uuid(), siteHost: z.string(), siteUrl: z.string(), platform: z.string(), platformLabel: z.string().optional() }),
+  viewer: z.object({ role: z.string(), isOwner: z.boolean(), actingAgencyId: z.string().uuid().nullable(), agencyName: z.string().nullable(), businessName: z.string().nullable().optional() }),
+  site: z.object({ id: z.string().uuid(), siteHost: z.string(), siteUrl: z.string(), platform: z.string(), platformLabel: z.string().optional(), nextReleaseNumber: z.number().int().positive().optional() }),
   requests: z.array(pendingConnectedSiteRequestSchema),
   changes: z.array(connectedSiteChangeSchema),
 });

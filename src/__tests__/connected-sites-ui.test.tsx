@@ -41,6 +41,33 @@ describe("a connected site on its website System page", () => {
   });
 });
 
+describe("keep your site on the website System page", () => {
+  const kept = (overrides: Partial<ConnectedSiteDetail> = {}) => connected({ verified: true, install: null, lastEventAt: "2026-10-07T12:00:00Z", keepYourSite: true,
+    health: { state: "reporting", label: "Installed and reporting", detail: "Last visit Oct 7.", tone: "live" }, platform: { value: "wix", label: "Wix", detected: true }, ...overrides });
+  it("shows install health, what the site is built with and a live re-check", () => {
+    const page = panels(kept());
+    expect(page).toContain("Installed and reporting");
+    expect(page).toContain("Last visit Oct 7.");
+    expect(page).toContain("Built with");
+    expect(page).toContain("Wix (found on the live page)");
+    expect(page).toContain("Check the live site");
+    expect(page).not.toContain(">Connected<");
+  });
+  it("offers no re-check to someone who cannot change the connection", () => {
+    expect(panels(kept(), true)).not.toContain("Check the live site");
+  });
+  it("says a builder was not recognized", () => {
+    expect(panels(kept({ platform: undefined }))).toContain("Not recognized");
+  });
+  it("is exactly today's panel when the flag is off", () => {
+    const page = panels(connected({ verified: true, install: null }));
+    expect(page).toContain("Connected");
+    expect(page).not.toContain("Built with");
+    expect(page).not.toContain("Check the live site");
+    expect(page).not.toContain("Changes on this site");
+  });
+});
+
 describe("bringing the website a business already has", () => {
   const roots: ReturnType<typeof createRoot>[] = [];
   beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("crypto", { randomUUID, subtle: { digest: async (_algorithm: string, bytes: Uint8Array) => Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer } }); });
@@ -65,6 +92,14 @@ describe("bringing the website a business already has", () => {
     await act(async () => { [...node.querySelectorAll("button")].find(item => item.textContent?.includes("Check my site"))!.click(); });
     expect(node.textContent).toContain("bakery.example is connected");
     expect(node.querySelector(`a[href*="system=${site.systemId}"]`)).toBeTruthy();
+  });
+  it("preselects the guide for what the live page says the site is built with, without changing the saved platform", async () => {
+    const node = await mount((async () => new Response("{}", { status: 500 })) as unknown as typeof fetch, { initialSites: [{ ...site, platform: "unknown", detectedPlatform: "wix" }] });
+    expect(node.textContent).toContain("Looks like Wix, from the live page.");
+    expect(node.querySelector<HTMLSelectElement>("select#" + [...node.querySelectorAll("label")].find(item => item.textContent === "Your site is built with")!.getAttribute("for"))!.value).toBe("wix");
+    expect(node.textContent).toContain("Wix");
+    const plain = await mount((async () => new Response("{}", { status: 500 })) as unknown as typeof fetch, { initialSites: [{ ...site, platform: "squarespace", detectedPlatform: "wix" }] });
+    expect(plain.textContent).not.toContain("from the live page.");
   });
   it("shows the server's refusal and changes nothing", async () => {
     const node = await mount((async () => new Response(JSON.stringify({ error: "We couldn't find your verification tag or Strelva script on the live page yet." }), { status: 409 })) as unknown as typeof fetch, { initialSites: [site] });

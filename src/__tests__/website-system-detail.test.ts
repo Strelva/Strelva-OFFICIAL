@@ -125,6 +125,39 @@ describe("website System page loader", () => {
       connectedSites: async () => connectedOverview(siteHost),
     });
   }
+  describe("keep your site", () => {
+    const withKeep = (siteHost = "gldf.example.test") => {
+      const s = connectedSources(siteHost);
+      const overview = connectedOverview(siteHost);
+      overview.sites[0] = { ...overview.sites[0]!, platform: "unknown", detectedPlatform: "wix", lastEventAt: "2026-09-01T00:00:00Z", lastCheckedAt: "2026-10-05T00:00:00Z", lastCheckResult: "missing" };
+      s.connectedSites = async () => overview;
+      s.serviceRequests = vi.fn(async () => [
+        { id: "75000000-0000-4000-8000-000000000010", status: "requested", outcome: "Menu page", createdAt: "2026-10-01T00:00:00Z", context: { tenantId: "gldf" }, deliveryCommitment: null },
+        { id: "75000000-0000-4000-8000-000000000012", status: "requested", outcome: "Update the Saturday hours", createdAt: "2026-10-02T00:00:00Z", context: { tenantId: "gldf", source: "connected_site_change", systemId: siteId }, deliveryCommitment: null },
+      ]);
+      return s;
+    };
+    it("with the flag on, a stopped site adds a waiting item, health and what it is built with", async () => {
+      const s = withKeep();
+      s.keepYourSite = async () => true;
+      const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+      expect(detail.connectedSite).toMatchObject({ keepYourSite: true, health: { state: "stopped", label: "Stopped reporting", tone: "down" }, platform: { value: "wix", label: "Wix", detected: true } });
+      expect(detail.waiting[0]).toMatchObject({ id: `health:${connectedId}`, kind: "decision", title: "gldf.example.test stopped reporting", href: null });
+    });
+    it("excludes connected-site change Requests, which render in their own section", async () => {
+      const on = withKeep(); on.keepYourSite = async () => true;
+      expect((await readWebsiteSystemDetail(actor, businessId, siteId, on))!.requests.map(item => item.title)).toEqual(["Menu page"]);
+      const off = withKeep();
+      expect((await readWebsiteSystemDetail(actor, businessId, siteId, off))!.requests.map(item => item.title)).toEqual(["Update the Saturday hours", "Menu page"]);
+    });
+    it("with the flag off, the connected site block is today's, without the new fields", async () => {
+      const s = withKeep();
+      s.keepYourSite = async () => false;
+      const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+      expect(detail.connectedSite).toEqual({ siteId: connectedId, siteHost: "gldf.example.test", verified: true, install: null, lastEventAt: "2026-09-01T00:00:00Z", activity: {}, inquiries: [] });
+      expect(detail.waiting.map(item => item.id)).not.toContain(`health:${connectedId}`);
+    });
+  });
   it("shows current hosted routing status after a connected site rebuild, keeping one row per hostname", async () => {
     const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, connectedSources()))!;
     expect(detail.domains).toEqual([{ hostname: "gldf.example.test", state: "misconfigured", label: "DNS misconfigured",
