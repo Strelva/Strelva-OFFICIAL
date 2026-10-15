@@ -20,6 +20,8 @@ import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
+import { RequiredConnections } from "./RequiredConnections";
+import { useConnectionRead } from "./use-connection-read";
 import {
   CONNECTION_KIND_LABEL, HEALTH_LABEL, INCOMING_CONNECTION_LABEL, LIFECYCLE_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
@@ -200,7 +202,7 @@ export function SystemPage(props: SystemPageProps) {
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
 export function hasContext(system: SystemView): boolean {
   return Boolean(system.storedVersionId || system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
-    || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length);
+    || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length || system.builtInApp?.requiredConnections.length);
 }
 
 function ActivationsPanel({ system }: { system: SystemView }) {
@@ -447,7 +449,14 @@ function SystemContextSections(props: SystemPageProps & { system: SystemView; si
     {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!props.readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={props.onPrepared} onAskRestore={props.onAskRestore}>{history}</WebsiteHistoryPanel>
       : system.history?.length || system.storedVersionId ? <HistoryPanel system={system}>{history}</HistoryPanel> : null}
   </>;
-  return system.storedVersionId ? <SystemVersionManagement workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? props.readOnly} compose={compose} /> : compose({});
+  const needs = system.builtInApp?.requiredConnections.length ? <BuiltInNeeds workspaceId={props.workspaceId} requirements={system.builtInApp.requiredConnections} /> : null;
+  return system.storedVersionId ? <SystemVersionManagement workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? props.readOnly} compose={compose} /> : <>{compose({})}{needs}</>;
+}
+
+/** What a built-in App's current Release needs, with each Connection's real state. Reads Connections only when it renders. */
+function BuiltInNeeds({ workspaceId, requirements }: { workspaceId: string; requirements: NonNullable<SystemView["builtInApp"]>["requiredConnections"] }) {
+  const needs = useConnectionRead(workspaceId, useWorkspaceRequest(), true);
+  return <RequiredConnections requirements={requirements} read={needs.read} workspaceId={workspaceId} retry={needs.retry} footer="Required accounts are checked again when you make it live." />;
 }
 
 function SystemNeedsYou({ system, state, agencyState, businessName, workspaceId, appBase = "" }: { system: SystemView; state?: NeedsYouState; agencyState?: AgencyClientHomeState; businessName?: string; workspaceId: string; appBase?: string }) {

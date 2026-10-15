@@ -22,7 +22,7 @@ export function worksWith(requirements: readonly RequiredConnection[], provider:
 }
 
 /** Installation creates a Draft; availability here never grants release authority. */
-export function RequiredConnections({ requirements, read, workspaceId, retry, holderNames = new Map() }: { requirements: readonly RequiredConnection[]; read: ConnectionRead; workspaceId: string; retry: () => void; holderNames?: ReadonlyMap<string, string> }) {
+export function RequiredConnections({ requirements, read, workspaceId, retry, holderNames = new Map(), footer = "Installs as Draft. Required accounts and access are checked again before you make it live." }: { requirements: readonly RequiredConnection[]; read: ConnectionRead; workspaceId: string; retry: () => void; holderNames?: ReadonlyMap<string, string>; footer?: string }) {
   if (!requirements.length) return <StSection title="Needs"><StLabel>No outside accounts.</StLabel></StSection>;
   return <StSection title="Needs">
     {read.status === "loading" ? <p role="status" className="text-sm text-gray-muted">Checking this business’s Connections…</p> : null}
@@ -48,6 +48,6 @@ export function RequiredConnections({ requirements, read, workspaceId, retry, ho
         {failed ? <><br /><span>This provider could not be checked. Read Connections again before making it live.</span></> : unavailable ? <><br /><span>{denied?.message ?? (connection && connectionNextStep(connection))}</span></> : !connected && read.status === "ready" ? <><br /><StTextButton href={`/workspace?${new URLSearchParams({ workspaceId, view: "connections" })}`}>{reconnect ? "Reconnect" : "Connect"} {provider.label} to confirm access</StTextButton></> : null}
       </>} end={<StState kind={connected ? "live" : "draft"}>{state}</StState>} />;
     })}</StRows>
-    <StLabel>Installs as Draft. Required accounts and access are checked again before you make it live.</StLabel>
+    <StLabel>{footer}</StLabel>
   </StSection>;
 }
