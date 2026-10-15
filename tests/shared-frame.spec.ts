@@ -24,7 +24,7 @@ test("preserves managed navigation and keeps chat as the single conversation rou
   await page.goto(managedPath("/dashboard/chat"), { waitUntil: "domcontentloaded" });
 
   // The global shell and tenant-specific controls remain separate landmarks.
-  const dashboardNav = page.getByLabel("Strelva navigation");
+  const dashboardNav = page.getByRole("complementary", { name: /navigation$/ });
   await expect(dashboardNav).toBeVisible();
   await expect(dashboardNav.getByRole("navigation", { name: / website$/ })).toBeVisible();
   await expect(dashboardNav.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("href", managedPath("/dashboard"));
@@ -99,7 +99,7 @@ test("keeps the existing navigation reachable when the shared frame collapses it
   const expand = page.getByRole("button", { name: "Expand navigation" });
   await expect(expand).toBeVisible();
   await expand.click();
-  await expect(page.getByRole("link", { name: "Strelva home", exact: true })).toHaveAttribute("href", managedBase ? "/preview/strelva/workspace" : "/workspace");
+  await expect(page.getByRole("link", { name: "Workspace home", exact: true })).toHaveAttribute("href", managedBase ? "/preview/strelva/workspace" : "/workspace");
   await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/shared-frame-collapsed-desktop.png", fullPage: true });
 });
@@ -111,9 +111,9 @@ test("keeps global and website navigation together on mobile", async ({ page }) 
   await page.goto(managedPath("/dashboard/site"), { waitUntil: "domcontentloaded" });
   const trigger = page.getByRole("button", { name: "Open navigation", exact: true });
   await trigger.click();
-  const navigation = page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
+  const navigation = page.getByRole("dialog", { name: /navigation$/ });
   await expect(navigation).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Strelva home", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Workspace home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Website", exact: true })).toBeVisible();
   await navigation.getByRole("link", { name: "Analytics", exact: true }).click();
   await expect(navigation).toBeHidden();

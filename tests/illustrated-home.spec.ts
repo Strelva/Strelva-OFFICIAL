@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires isolated local interface fixtures.");
 
-const navigation = (page: import("@playwright/test").Page) => page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+const navigation = (page: import("@playwright/test").Page) => page.getByRole("complementary", { name: /navigation$/ });
 
 test("request-first Home opens saved work on desktop and mobile", async ({ page }, info) => {
   for (const width of [1440, 390]) {
@@ -103,7 +103,7 @@ test("Home keeps decisions, allowance, business switching and site assignment re
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Requests", "Running", "All files and results", "Business details", "People & access", "Help"]) {
+  for (const label of ["Home", "Requests", "Running", "Files and results", "Business details", "People & access", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
     for (const name of ["Home", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
@@ -125,7 +125,7 @@ test("mobile navigation traps focus and opens search without background interact
   await page.goto("/preview/strelva?scenario=business");
   const trigger = page.getByRole("button", { name: "Open navigation", exact: true });
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
+  const dialog = page.getByRole("dialog", { name: /navigation$/ });
   await expect(dialog).toBeVisible();
   for (let i = 0; i < 24; i += 1) {
     await page.keyboard.press("Tab");
@@ -139,7 +139,7 @@ test("mobile navigation traps focus and opens search without background interact
   await expect(page.getByRole("combobox", { name: /Search/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await trigger.click();
-  await navigation(page).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Assign to this business", exact: true }).click();

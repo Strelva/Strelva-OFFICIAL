@@ -90,7 +90,7 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("heading", { name: "No matching work" })).toBeVisible();
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).getByRole("button", { name: "Home Finder: Explore example", exact: true }).click();
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
@@ -106,12 +106,12 @@ test("shared navigation remains available while opening and finding work", async
 
 test("shared workspace resumes inquiry work inside the one Strelva frame", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=managed");
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Inquiry work: Start", exact: true }).click();
   await page.getByRole("button", { name: "Open Buffalo Realty", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Inquiries" })).toBeVisible();
-  await expect(page.getByLabel("Strelva navigation", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("complementary", { name: /navigation$/ })).toHaveCount(1);
   await expect(page.getByRole("navigation", { name: "Inquiry navigation", exact: true })).toHaveCount(0);
   await page.getByRole("navigation", { name: "Inquiries", exact: true }).getByRole("button", { name: "New", exact: true }).click();
   await page.getByLabel("What should your inquiry form do?").fill("Collect quote requests and route them to the recorded inbox.");
@@ -139,10 +139,10 @@ test("a business owner can assign an authorized website from Home and keep websi
   await expect(handoff).toContainText("Assign a website to Harbor Dental");
   await expect(handoff).toContainText("Domains, connections, and billing stay in that website's native controls.");
   await handoff.getByRole("button", { name: "Assign Harbor Dental to Harbor Dental" }).click();
-  await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Website and apps", exact: true }).getByRole("link", { name: "Harbor Dental", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /navigation$/ }).getByRole("region", { name: "Website and apps", exact: true }).getByRole("link", { name: "Harbor Dental", exact: true })).toBeVisible();
   await expect(page.getByTestId("website-assignment-handoff")).toHaveCount(0);
 
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Business details", exact: true }).click();
+  await page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: "Business details", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Business information", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "People and access", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Work", exact: true })).toBeVisible();
@@ -186,7 +186,7 @@ test("a business owner can propose a future payer and the exact addressee can ac
   });
 
   await page.goto("/preview/strelva?scenario=business");
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Business details", exact: true }).click();
+  await page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: "Business details", exact: true }).click();
   const payer = page.getByRole("region", { name: "Payer for future jobs" });
   await expect(payer).toContainText("Existing budgets, reservations, recorded costs, and unresolved holds keep their original payer and limit.");
   await payer.getByLabel("Verified payer email").fill("successor@harbordental.example");
@@ -214,7 +214,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
     await allowance.screenshot({ path: "output/product-experience/work-allowance-desktop.png" });
   }
 
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Useful outcomes for this business." })).toBeVisible();
   await expect(page.getByText("Start work that is available here, or request setup when it needs a connected service or release decision.")).toBeVisible();
@@ -246,7 +246,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect.poll(() => page.locator("#workspace-main").evaluate((main) => main.getBoundingClientRect().left)).toBe(0);
-  const mobileNavigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+  const mobileNavigation = page.getByRole("complementary", { name: /navigation$/ });
   await expect(mobileNavigation).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Install Staff request application" })).toBeVisible();
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
@@ -328,14 +328,14 @@ test("direct customer can inspect an offering setup and its local allowance", as
 
   await page.getByRole("button", { name: "Back to Apps" }).click();
   await page.setViewportSize({ width: 1280, height: 900 });
-  const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+  const navigation = page.getByRole("complementary", { name: /navigation$/ });
   await navigation.getByRole("link", { name: "Home", exact: true }).click();
   const pinned = navigation.getByRole("region", { name: "Website and apps", exact: true });
   await expect(pinned.getByRole("link", { name: "Staff requests", exact: true })).toBeVisible();
   await pinned.getByRole("link", { name: "Staff requests", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Back to Apps" }).click();
-  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation.getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
   await installedStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
@@ -365,7 +365,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
 test("empty workspace can create an explicitly fictional local assessment", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=empty");
   await expect(page.getByRole("heading", { name: "No saved result yet.", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   const assessment = page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" });
   await expect(assessment).toContainText("Available to start");
@@ -381,26 +381,26 @@ test("empty workspace can create an explicitly fictional local assessment", asyn
   await expect(page.getByText(/These scores are fictional/)).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
-  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("link", { name: "Workspace home", exact: true }).click();
   await expect(page.getByRole("heading", { name: "No saved result yet.", exact: true })).toBeVisible();
 });
 
 test("mobile navigation closes on Escape and selection, and does not overflow", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=agency");
-  await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /navigation$/ })).toBeVisible();
   for (const width of [320, 360, 768, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     await expect.poll(() => page.locator("html").evaluate(root => root.scrollWidth <= window.innerWidth)).toBe(true);
   }
   await page.setViewportSize({ width: 360, height: 800 });
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-  const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+  const navigation = page.getByRole("complementary", { name: /navigation$/ });
   await expect(navigation).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-  await navigation.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await navigation.getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
@@ -435,7 +435,7 @@ test("agency home names a client that failed to load and loads it on retry", asy
 test("shared read-only work cannot start an assessment", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=read-only");
   await expect(page.getByRole("heading", { name: "Review what was shared." })).toBeVisible();
-  await page.getByRole("link", { name: "All files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "Files and results", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Useful outcomes for this workspace.", exact: true })).toBeVisible();
   await expect(page.getByText("This work-share does not include business-wide offering access.", { exact: false })).toBeVisible();
@@ -452,7 +452,7 @@ test("preview account navigation remains local and exposes no real sign-out", as
   });
   await page.goto("/preview/strelva?scenario=managed");
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toHaveCount(0);
-  const account = page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: /alex.*alex@example.com/i });
+  const account = page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: /alex.*alex@example.com/i });
   await expect(account).toHaveAttribute("href", "/preview/strelva/workspace/account");
   await account.click();
   await expect(page).toHaveURL(/\/preview\/strelva\/workspace\/account/);
@@ -473,7 +473,7 @@ test("preview controls reserve viewport space so the account stays visible", asy
   for (const width of [320, 360, 768, 1280, 1600]) {
     await page.setViewportSize({ width, height: 720 });
     if (width < 1024) await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-    const account = page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: /alex.*alex@example.com/i });
+    const account = page.getByRole("complementary", { name: /navigation$/ }).getByRole("link", { name: /alex.*alex@example.com/i });
     await expect(account).toBeInViewport({ ratio: 1 });
     if (width < 1024) await page.keyboard.press("Escape");
   }
