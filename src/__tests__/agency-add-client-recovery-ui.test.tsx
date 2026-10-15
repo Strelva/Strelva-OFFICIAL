@@ -60,7 +60,7 @@ describe("add-client recovery", () => {
       .mockResolvedValueOnce(Response.json({ error: "Clients unavailable" }, { status: 503 })));
     await mount(); await click("Refresh");
     expect(container.textContent).toContain("Northside Bakery");
-    expect(container.textContent).toContain("link for owner@example.com");
+    expect(container.textContent).toContain("Link for owner@example.com");
     expect(container.textContent).toContain("Last successful read");
     expect(container.textContent).toContain("Clients unavailable");
   });

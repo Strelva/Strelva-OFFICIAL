@@ -444,9 +444,7 @@ function claimStatus(client: AgencyClientListItem): string {
   if (client.ownerClaimed) return "Owner signed in";
   const claim = client.pendingClaim;
   if (!claim) return "No owner link";
-  if (claim.delivery.status === "not_sent") return `Claim not sent · link for ${claim.recipientEmail}`;
-  if (claim.delivery.status === "accepted") return `Claim email sent · ${claim.recipientEmail}`;
-  return "Claim email unconfirmed";
+  return `${ownerClaimDeliveryCopy(claim.delivery).headline} Link for ${claim.recipientEmail}`;
 }
 
 /** A fresh link for a client added earlier; the old one was shown once and cannot be copied again. */

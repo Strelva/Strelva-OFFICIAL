@@ -40,7 +40,7 @@ describe("fresh owner link for an earlier client", () => {
   it("says the claim was not sent and keeps the form closed until asked", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ clients: [client] })));
     await mount();
-    expect(container.textContent).toContain("Claim not sent · link for owner@door.example.test");
+    expect(container.textContent).toContain("Claim not sent: email to owners is off. Link for owner@door.example.test");
     expect(button("New owner link")).toBeDefined();
     expect(container.textContent).not.toContain("Create owner link");
     expect(container.textContent).not.toContain("Replace pending owner link");
