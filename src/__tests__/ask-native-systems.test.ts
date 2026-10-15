@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { createApplicationService } from "@/products/applications/server";
+vi.mock("@/platform/system-versions/required-connections", () => ({ assertRequiredConnections: vi.fn(async () => {}) }));
 import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 import { createAskNativeSystemPort } from "@/app/api/workspace/ask/native-systems-server";
 import { askNativeChangeSchema, AskNativePreparationIncompleteError } from "@/platform/ask/native-systems";

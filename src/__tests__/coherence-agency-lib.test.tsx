@@ -19,7 +19,7 @@ const actor = { userId: versionId, verifiedEmail: "maya@example.test" };
 beforeEach(() => { vi.clearAllMocks(); mocks.actor.mockResolvedValue(actor); mocks.version.mockResolvedValue({ versionId, label: "Harbor Dental intake" }); mocks.decision.mockResolvedValue({ id: decisionId, workspaceId, systemId, sourceLifecycle: "version_release", sourceId: versionId, title: "Put the updated intake live", detail: "New intake questions", state: "open", approveEffect: "The updated form goes live", notYetEffect: "The current form stays" }); });
 describe("agency Library coherence", () => {
   it("presents identical plain-language declarations for both consumers", () => {
-    const html = renderToStaticMarkup(<PackageDeclaration declaration={{ recordsRead: ["application.records", "business.contacts"], recordsWritten: [], businessRecordFields: [], outsideEffects: ["publish"], bindingKinds: ["booking_calendar"], dataLeavingBusiness: [] }} />);
+    const html = renderToStaticMarkup(<PackageDeclaration declaration={{ requiredConnections: [], recordsRead: ["application.records", "business.contacts"], recordsWritten: [], businessRecordFields: [], outsideEffects: ["publish"], bindingKinds: ["booking_calendar"], dataLeavingBusiness: [] }} />);
     expect(html).toContain("Internal tool records, Business contacts"); expect(html).toContain("Business calendar"); expect(html).toContain("Public website publication"); expect(html).not.toContain("booking_calendar");
   });
   it("preserves the System destination on installation receipts", () => {

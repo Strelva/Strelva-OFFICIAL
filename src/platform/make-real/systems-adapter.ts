@@ -47,6 +47,8 @@ export interface SystemStoreLiveSystemsOptions {
   actor: WorkspaceActor;
   /** Descriptor for Systems a Possibility introduces. Kind is not identity. */
   introducedKind?: string;
+  /** Production binding checks installed App needs before moving any pointer. */
+  assertConnections?(actor: WorkspaceActor, ref: SystemRef): Promise<void>;
 }
 
 /** SystemStore command ids are UUIDs; Make real keys are `activation:step`. */
@@ -135,6 +137,7 @@ export function createSystemStoreLiveSystems(options: SystemStoreLiveSystemsOpti
 
     async activate(raw, revisionId, expectedCurrent) {
       const ref = bare(raw);
+      await options.assertConnections?.(actor, ref);
       const system = await swap(ref, revisionId, expectedCurrent);
       if (system.lifecycle === "draft") {
         await store.transitionLifecycle(actor, ref, system.changeNumber, "live");

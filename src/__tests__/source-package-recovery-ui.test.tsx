@@ -19,7 +19,7 @@ describe("source package immutable uncertain command recovery", () => {
   beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
   afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
   it("uses the shared declaration words for the agency source revision", async () => {
-    const declaration = { recordsRead: ["application.records", "business.contacts"], recordsWritten: ["internal_tool.notices"], businessRecordFields: ["owner_recipient.email"], outsideEffects: ["email"], bindingKinds: ["booking_calendar"], dataLeavingBusiness: ["people.email"] };
+    const declaration = { requiredConnections: [], recordsRead: ["application.records", "business.contacts"], recordsWritten: ["internal_tool.notices"], businessRecordFields: ["owner_recipient.email"], outsideEffects: ["email"], bindingKinds: ["booking_calendar"], dataLeavingBusiness: ["people.email"] };
     const request = vi.fn<typeof fetch>(async () => response({ ...view(), revision: { ...view().revision, declaration } }));
     const { node } = await mount(request);
     for (const label of ["Internal tool records", "Business contacts", "Submission email notices", "Owner email", "Business email", "Business calendar", "Staff emails"]) expect(node.textContent).toContain(label);

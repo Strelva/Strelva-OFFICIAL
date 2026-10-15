@@ -8,6 +8,7 @@ import { commitPatternInstallationAfterVerification } from "./inquiry-pattern-up
 import { inquiryRecordsEnabled, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
 import { readInquiryDecisionEvent } from "@/server/needs-you/server";
+import { assertInstalledInquiryConnections } from "@/platform/system-versions/recorded-actor-connections";
 type UnifiedEvent = Parameters<typeof tenantEventRevision>[0];
 
 interface PublicationActorInput {
@@ -62,6 +63,7 @@ export interface InquiryPublicationResult {
  */
 export async function executeInquiryPublication(input: PublicationActorInput & {
   authorizeActor?: (input: PublicationActorInput) => Promise<{ allowed: boolean; reason?: string }>;
+  assertConnections?: typeof assertInstalledInquiryConnections;
 }): Promise<InquiryPublicationResult> {
   // Per site: a converted tenant follows its business's row. Publishing feeds
   // the public form, which visitors see, so `operators` doesn't count here.
@@ -85,6 +87,14 @@ export async function executeInquiryPublication(input: PublicationActorInput & {
     }
     const calculated = await calculatePublication(snapshot, claim, acceptanceId);
     if ("reason" in calculated) return { accepted: false, verified: false, reason: calculated.reason };
+    // Imported and bundle inquiry Systems retain their native publish path.
+    // Check their declared email connection immediately before the live CAS;
+    // accepted receipt recovery and undo must remain available after a loss.
+    const installations = (snapshot.state as InquiryEngineState & { patternInstallations?: Array<{ capabilityId: string }> }).patternInstallations;
+    if (claim.action === "make_live" && installations?.some(item => item.capabilityId === claim.capabilityId)) {
+      try { await (input.assertConnections ?? assertInstalledInquiryConnections)(claim.actorId, claim.businessId); }
+      catch (error) { return { accepted: false, verified: false, reason: error instanceof Error ? error.message : "Open Connections and check email sending before making it live." }; }
+    }
     try {
       const committed = await repository.compareAndSwap({ tenantId: claim.tenantId, businessId: claim.businessId, expectedRevision: snapshot.revision, actorId: claim.actorId, state: calculated.state });
       if (!committed.changed) {

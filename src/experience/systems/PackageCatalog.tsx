@@ -7,6 +7,10 @@ import { systemHref } from "./model";
 import { BundlePackageInstall } from "./BundlePackageInstall";
 import { PackageInstallDelegation } from "./PackageInstallDelegation";
 import { Button } from "@/components/ui/Button";
+import { RequiredConnections, WorksWithFilter, worksWith, type ConnectionRead } from "./RequiredConnections";
+import { providerDefinition } from "@/platform/connections/providers";
+import { connectionsResponseSchema } from "@/experience/connections/model";
+import { type ConnectionProvider } from "@/platform/connections/contracts";
 import { TextInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { packageCatalogSchema, type PackageListing } from "@/platform/system-versions/listing-contracts";
@@ -14,12 +18,25 @@ const receiptSchema = z.object({ workspaceId: z.string().uuid(), systemId: z.str
 function failure(value: unknown, fallback: string) { return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : fallback; }
 /** Qualified revisions only. Installation prepares a business-owned draft;
  * accounts and the owner's live decision remain in the existing Version flow. */
-export function PackageCatalog(props: { workspaceId: string; canInstall: boolean; canGrantInstall?: boolean; requestOverride?: typeof fetch }) {
+export function PackageCatalog(props: { workspaceId: string; canInstall: boolean; canGrantInstall?: boolean; requestOverride?: typeof fetch; holderNames?: ReadonlyMap<string, string> }) {
  return <ScopedPackageCatalog key={props.workspaceId} {...props}/>;
 }
-function ScopedPackageCatalog({ workspaceId, canInstall, canGrantInstall = false, requestOverride }: { workspaceId: string; canInstall: boolean; canGrantInstall?: boolean; requestOverride?: typeof fetch }) {
+function ScopedPackageCatalog({ workspaceId, canInstall, canGrantInstall = false, requestOverride, holderNames }: { workspaceId: string; canInstall: boolean; canGrantInstall?: boolean; requestOverride?: typeof fetch; holderNames?: ReadonlyMap<string, string> }) {
   const workspaceRequest = useWorkspaceRequest(), request = requestOverride ?? workspaceRequest;
   const [listings, setListings] = useState<PackageListing[] | null>(null), [error, setError] = useState(""), [attempt, setAttempt] = useState(0);
+  const [provider, setProvider] = useState<ConnectionProvider | "">("");
+  const [connectionRead, setConnectionRead] = useState<ConnectionRead>({ status: "loading" });
+  const [connectionAttempt, setConnectionAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    void request(`/api/workspace/connections?${new URLSearchParams({ workspaceId })}`, { credentials: "same-origin", signal: controller.signal }).then(async response => {
+      if (!response.ok) { if (!controller.signal.aborted) setConnectionRead({ status: "error", permission: response.status === 403 }); return; }
+      const parsed = connectionsResponseSchema.parse(await response.json());
+      if (parsed.connections.some(row => row.workspaceId !== workspaceId)) throw new Error("Connections returned for another workspace.");
+      if (!controller.signal.aborted) setConnectionRead({ status: "ready", ...parsed });
+    }).catch(() => { if (!controller.signal.aborted) setConnectionRead({ status: "error", permission: false }); });
+    return () => controller.abort();
+  }, [request, workspaceId, connectionAttempt]);
   useEffect(() => {
     const controller = new AbortController();
     void request(`/api/workspace/packages?${new URLSearchParams({ workspaceId })}`, { credentials: "same-origin", signal: controller.signal }).then(async response => {
@@ -38,10 +55,12 @@ function ScopedPackageCatalog({ workspaceId, canInstall, canGrantInstall = false
     {error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button size="sm" variant="secondary" onClick={() => { setListings(null); setError(""); setAttempt(value => value + 1); }}>Retry internal tools</Button></div> : null}
     {listings?.length === 0 ? <p className="text-sm text-gray-muted">No qualified internal tools are available for this business yet.</p> : null}
     {!canInstall ? <p className="text-sm text-gray-muted">The business owner controls permission to add a draft.</p> : null}
-    <ul className="space-y-5">{listings?.map(listing => <li key={listing.revision.source.revisionId}><ListedPackage key={`${workspaceId}:${listing.revision.source.revisionId}`} workspaceId={workspaceId} listing={listing} canGrantInstall={canGrantInstall} canInstall={canInstall} request={request} /></li>)}</ul>
+    {listings?.length ? <WorksWithFilter value={provider} onChange={setProvider} /> : null}
+    {listings?.length && !listings.some(listing => worksWith(listing.revision.declaration.requiredConnections, provider)) ? <p role="status" className="text-sm text-gray-muted">No Apps work with {provider ? providerDefinition(provider).label : "this connection"} yet. Choose another connection.</p> : null}
+    <ul className="space-y-5">{listings?.filter(listing => worksWith(listing.revision.declaration.requiredConnections, provider)).map(listing => <li key={listing.revision.source.revisionId}><ListedPackage key={`${workspaceId}:${listing.revision.source.revisionId}`} workspaceId={workspaceId} listing={listing} canGrantInstall={canGrantInstall} canInstall={canInstall} request={request} connectionRead={connectionRead} holderNames={holderNames} retryConnections={() => { setConnectionRead({ status: "loading" }); setConnectionAttempt(value => value + 1); }} /></li>)}</ul>
   </section>;
 }
-function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, request }: { workspaceId: string; listing: PackageListing; canInstall: boolean; canGrantInstall: boolean; request: typeof fetch }) {
+function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, request, connectionRead, retryConnections, holderNames }: { workspaceId: string; listing: PackageListing; canInstall: boolean; canGrantInstall: boolean; request: typeof fetch; connectionRead: ConnectionRead; retryConnections: () => void; holderNames?: ReadonlyMap<string, string> }) {
   const [name, setName] = useState(listing.name), [busy, setBusy] = useState(false), [error, setError] = useState(""), [receipt, setReceipt] = useState<z.infer<typeof receiptSchema> | null>(null);
   const pending = useRef<string | null>(null), inFlight = useRef(false);
   async function install() {
@@ -61,6 +80,7 @@ function ListedPackage({ workspaceId, listing, canInstall, canGrantInstall, requ
   const declaration = listing.revision.declaration, supported = listing.revision.definition.kind === "internal_app";
   return <article className="space-y-4 rounded-2xl border border-gray-border p-5">
     <header><h3 className="text-base font-medium text-warm-black">{listing.name}</h3><p className="mt-1 text-sm text-gray-muted">{listing.source.listingState === "clients" ? `From ${listing.creatorName} · ` : ""}Made by {listing.creatorName} · Release {listing.revision.source.number}</p><p className="mt-2 text-sm">{listing.revision.summary}</p></header>
+    <RequiredConnections requirements={declaration.requiredConnections} read={connectionRead} workspaceId={workspaceId} retry={retryConnections} holderNames={holderNames} />
     <details>
       <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Connections, permissions and review details</summary>
       <PackageDeclaration declaration={declaration} />

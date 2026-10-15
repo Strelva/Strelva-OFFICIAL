@@ -4,7 +4,7 @@ import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import"
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { JsonObject, JsonValue } from "./compare";
 import type { SystemRef } from "./refs";
-import { packageDeclarationSchema, revisionQualificationSchema } from "./declaration";
+import { packageDeclarationSchema, packageRevisionConnectionsReadSchema, revisionQualificationSchema } from "./declaration";
 import type { ConnectionOwnership, VersionStore } from "./store";
 import {
   VERSION_CONTEXT_KINDS,
@@ -86,7 +86,7 @@ const sourceSchema = z.object({
   creatorWorkspaceId: uuid.optional(), listingState: z.enum(["private", "clients", "listed"]).optional(), availableTo: z.array(uuid).optional(),
 }).strict();
 
-const revisionSchema = z.object({
+const revisionSchema = packageRevisionConnectionsReadSchema.pipe(z.object({
   source: z.object({ businessId: uuid, systemId: uuid, revisionId: uuid, number: z.number().int().positive() }).strict(),
   label: z.string().max(40).optional(),
   summary: z.string(),
@@ -96,7 +96,7 @@ const revisionSchema = z.object({
   publishedBy: uuid,
   publishedAt: iso,
   creatorWorkspaceId: uuid.optional(), declaration: packageDeclarationSchema.optional(), qualification: revisionQualificationSchema.nullable().optional(),
-}).strict();
+}).strict());
 
 const lineageSchema = z.object({
   id: uuid,

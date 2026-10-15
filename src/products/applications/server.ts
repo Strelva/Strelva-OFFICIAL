@@ -7,6 +7,7 @@ import {
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
+import { assertRequiredConnections } from "@/platform/system-versions/required-connections";
 import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, submitRecordWithLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
@@ -220,6 +221,8 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const db = durableDb(store);
     const permission = await load(store, actor, id);
     await ensureManager(store, actor, permission.work);
+    await assertRequiredConnections({ actor, workspaceId: permission.work.workspaceId,
+      requiredConnections: [{ provider: "resend", access: "act", optional: false, purpose: "Send System email to approved recipients" }] });
     if (db) {
       await durableRpc(db, "publish_application_candidate", {
         p_work_id: id,

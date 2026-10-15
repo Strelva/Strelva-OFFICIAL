@@ -84,7 +84,7 @@ export function screenWordProblems(source, filename) {
       allowances.push({ line, word: match[1].trim().toLowerCase() });
     }
   }
-  const words = businessScreen.test(filename) ? [...retired, "capability"] : retired;
+  const words = businessScreen.test(filename) ? [...retired, "capability", "integration"] : retired;
   function report(node, word, value, index = 0) {
     const start = ts.isJsxText(node) ? node.pos : node.getStart(tree) + 1;
     const line = tree.getLineAndCharacterOfPosition(start + index).line;

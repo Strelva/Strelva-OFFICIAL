@@ -6,11 +6,15 @@ import { recordInquiryEvidence } from "@/products/inquiries/receive";
 const native=vi.hoisted(()=>({rpc:vi.fn(async()=>0)}));
 vi.mock("@/platform/infra/inquiry-records",async original=>({...await original<typeof import("@/platform/infra/inquiry-records")>(),inquiryRecordsRpc:native.rpc}));
 
-async function prepared() {
+async function prepared(imported = false) {
   const repository = new InMemoryInquiryRepository();
   const engine = new InquiryEngine({ businessId: "business-one" });
-  const work = engine.start({ actorId: "owner-one", intent: "Collect seller inquiries", destination: "owner@example.invalid", emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: "2026-09-11T14:00:00Z" } });
+  let work = engine.start({ actorId: "owner-one", intent: "Collect seller inquiries", destination: "owner@example.invalid", emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: "2026-09-11T14:00:00Z" } });
   engine.acceptShape(work.id, { actorId: "owner-one" });
+  if (imported) {
+    const definition = { ...engine.getWork(work.id).draft!, businessId: "source-business" };
+    work = engine.copyPattern(definition.id, { sourceCapabilityId: definition.id, sourceDefinition: definition, sourceBusinessId: "source-business", targetBusinessId: "business-one", targetActorId: "owner-one", destination: "owner@example.invalid", emailConnection: { status: "connected", consent: "explicit", lastCheckedAt: "2026-09-11T14:00:00Z" } });
+  }
   engine.runRehearsal(work.id);
   engine.approvePublish(work.id, { actorId: "owner-one" });
   const ready = engine.getWork(work.id);
@@ -25,6 +29,25 @@ async function prepared() {
 describe("governed inquiry publication transaction", () => {
   beforeEach(() => {native.rpc.mockClear();vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1");});
   afterEach(() => vi.unstubAllEnvs());
+
+  it("holds installed inquiry publication before the live CAS when its Connection check fails", async () => {
+    const { input, repository, claim } = await prepared(true);
+    const commit = vi.spyOn(repository, "compareAndSwap");
+    const assertConnections = vi.fn(async () => { throw new Error("Reconnect email in Connections."); });
+    expect(await executeInquiryPublication({ ...input, assertConnections })).toEqual({ accepted: false, verified: false, reason: "Reconnect email in Connections." });
+    expect(assertConnections).toHaveBeenCalledWith(claim.actorId, claim.businessId);
+    expect(commit).not.toHaveBeenCalled();
+    expect((await repository.getPublicationClaim(input.tenantId, claim.id))?.status).toBe("claimed");
+  });
+
+  it("allows installed inquiry publication with eligible email and preserves accepted recovery after loss", async () => {
+    const { input } = await prepared(true);
+    const assertConnections = vi.fn(async () => {});
+    expect(await executeInquiryPublication({ ...input, assertConnections })).toEqual({ accepted: true, verified: true });
+    assertConnections.mockRejectedValue(new Error("Email disconnected later"));
+    expect(await executeInquiryPublication({ ...input, assertConnections })).toEqual({ accepted: true, verified: true });
+    expect(assertConnections).toHaveBeenCalledTimes(1);
+  });
 
   it("commits the public definition and its receipt, verifies it and never repeats the command", async () => {
     const { input, repository, work, claim } = await prepared();

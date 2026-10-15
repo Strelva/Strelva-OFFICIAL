@@ -444,6 +444,16 @@ describe("the version_release source and the release gate", () => {
     expect((await w.versions.readVersion(w.vOwner, w.lineage.id)).currentRelease).toBeNull();
   });
 
+  it("keeps the plain Connections next step when a live release is blocked", async () => {
+    const w = await versionsWorld();
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    const { ports } = versionPorts(w, mem, { release: async () => { throw Object.assign(new Error("Open Connections and reconnect email before making it live."), { name: "RequiredConnectionsError" }); } });
+    const ny = service(mem.store, [versionReleaseAdapter(ports)]);
+    const item = (await ny.list(owner, VBIZ)).items[0]!;
+    const result = await ny.decide({ workspaceId: VBIZ, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "session", actor: owner } });
+    expect(result).toMatchObject({ status: "failed", item: { outcomeReason: "Open Connections and reconnect email before making it live." } });
+  });
+
   it("a lapse releases nothing", async () => {
     const w = await versionsWorld();
     const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });

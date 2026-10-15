@@ -7,9 +7,12 @@ import type { VersionsDb } from "@/platform/system-versions/supabase-store";
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "native-owner@example.test" };
 async function fixture() {
   const businessId = crypto.randomUUID(), systemId = crypto.randomUUID();
-  const versionActor = { userId: actor.userId, memberships: [{ businessId, role: "owner" as const }] };
+  const versionActor = { ...actor, memberships: [{ businessId, role: "owner" as const }] };
   const store = createInMemoryVersionStore();
-  const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership() });
+  const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership(), requiredConnections: {
+    connectionEligibilityFor: async () => ({ eligible: true, through: { kind: "platform" } }),
+    listWorkspaceConnections: async () => ({ connections: [{ ref: "resend:fixture", provider: "resend", workspaceId: businessId, accountLabel: "Fictional sending account", accountHolder: { kind: "platform" }, accessThrough: { kind: "platform" }, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] }], sourceErrors: [] }),
+  } });
   const revision = await versions.publishSourceRevision(versionActor, { source: { businessId, systemId }, definition: { kind: "internal_app", title: "Intake", fields: [{id:"problem",label:"Problem",type:"text",required:true}],components:[{kind:"form",fields:["problem"]}] }, summary: "First" });
   if (!store.recordQualification) throw new Error("The native fixture requires qualification storage.");
   await store.recordQualification(versionActor, {revisionId:revision.source.revisionId,status:"qualified",evidence:["shareable_definition","declaration_match","rehearsal","prior_revision_compare"].map(check=>({revisionId:revision.source.revisionId,check:check as "shareable_definition"|"declaration_match"|"rehearsal"|"prior_revision_compare",status:"passed" as const,note:"Fictional exact native receipt"})),humanReview:{state:"approved",reviewerId:actor.userId,reviewedAt:new Date().toISOString(),note:"Fixture review"}});

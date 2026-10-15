@@ -151,3 +151,18 @@ describe("Queue/Clients share the qualified Library offer", () => {
     expect(result.clients[0]!.improvementsWaiting).toBe(0);
   });
 });
+
+it("reads source required connections without changing the immutable revision", async () => {
+  const { store, db, source } = await setup();
+  const before = await store.getRevision(actor, source, 3);
+  const library = await readAgencyLibrary(workspaceActor, agency, db);
+  expect(library.sources[0]!.revisions.at(-1)!.requiredConnections).toEqual(expect.arrayContaining([expect.objectContaining({ provider: "resend", access: "act" })]));
+  expect(await store.getRevision(actor, source, 3)).toEqual(before);
+});
+it("keeps declarations unknown when an authorized source read fails", async () => {
+  const { store, db } = await setup();
+  vi.spyOn(store, "listRevisions").mockRejectedValue(new Error("Source unavailable"));
+  const library = await readAgencyLibrary(workspaceActor, agency, db);
+  expect(library.sources[0]!.revisions.every(revision => revision.requiredConnections === undefined)).toBe(true);
+  expect(library.sources[0]!.versions).toHaveLength(1);
+});

@@ -1,3 +1,4 @@
+import { effectivePackageBehavior } from "@/platform/system-versions/declaration";
 import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
 import { agencyClientListItemSchema } from "@/products/agency-clients/contracts";
@@ -154,9 +155,10 @@ export async function readAgencyVersionSources(actor: WorkspaceActor, agencyWork
 /** Shared qualified comparisons for Library and the paged Queue/Clients read. */
 async function readQualifiedLibrarySources(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb,
   includeVersion: (item: z.infer<typeof sourcesSchema>["sources"][number]["versions"][number]) => boolean = () => true,
+  includeDeclarations = false,
 ): Promise<AgencyLibrary> {
   const sources = await readAgencyVersionSources(actor, agencyWorkspaceId, db);
-  const { versions, actor: pending } = services(actor, db);
+  const { versions, store, actor: pending } = services(actor, db);
   const versionActor: VersionActor = await pending;
   const result: AgencyLibrary = { agencyWorkspaceId, sources: [], reviewEnabled: needsYouReleaseEnabled() };
   for (const source of sources) {
@@ -189,9 +191,18 @@ async function readQualifiedLibrarySources(actor: WorkspaceActor, agencyWorkspac
         });
       }
     }
+    // Read through the existing authorized store. Never rewrite older revisions.
+    let declarations = new Map<number, ReturnType<typeof effectivePackageBehavior>["requiredConnections"]>();
+    if (includeDeclarations) try {
+      const revisions = await store.listRevisions(versionActor, { businessId: source.workspaceId, systemId: source.systemId });
+      declarations = new Map(revisions.flatMap(revision => {
+        try { return [[revision.source.number, effectivePackageBehavior(revision.definition, revision.requires.bindingKinds).requiredConnections] as const]; }
+        catch { return []; }
+      }));
+    } catch { /* An unreadable declaration remains unknown, not an empty dependency list. */ }
     result.sources.push({
       systemId: source.systemId, workspaceId: source.workspaceId, name: source.name, hidden: source.hidden,
-      revisions: source.revisions.map((revision) => ({ number: revision.number, label: revision.label, summary: revision.summary, publishedAt: revision.publishedAt })),
+      revisions: source.revisions.map((revision) => ({ number: revision.number, label: revision.label, summary: revision.summary, publishedAt: revision.publishedAt, ...(declarations.has(revision.number) ? { requiredConnections: declarations.get(revision.number)! } : {}) })),
       versions: rows,
     });
   }
@@ -199,7 +210,7 @@ async function readQualifiedLibrarySources(actor: WorkspaceActor, agencyWorkspac
 }
 
 export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()): Promise<AgencyLibrary> {
-  const result = await readQualifiedLibrarySources(actor, agencyWorkspaceId, db);
+  const result = await readQualifiedLibrarySources(actor, agencyWorkspaceId, db, () => true, true);
   if (inquiryReleaseMayBeOn() && await inquiryReleaseEnabledForWorkspace(agencyWorkspaceId, { userId: actor.userId, operator: false, tester: false })) {
     try {
       // Source access is the agency's own current links; target access is the

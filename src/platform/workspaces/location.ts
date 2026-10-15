@@ -6,7 +6,7 @@ const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const RECORD_ID = /^[a-z0-9_.:-]{1,200}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VIEWS = new Set(["home", "needs-you", "system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
+const VIEWS = new Set(["home", "needs-you", "system", "requests", "customers", "apps", "work", "ongoing", "settings", "connections", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 /** Complete navigation hints. No data, request contents, or authority belong here. */
@@ -58,7 +58,7 @@ export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocatio
   // Legacy responsibility links did not always include a view. Their identity wins.
   if ((location.standingId || location.assignmentId) && !location.view) location.view = "operations";
   if (location.view !== "operations" && location.view !== "ongoing") { delete location.standingId; delete location.assignmentId; }
-  if (["system", "ask", "start", "products", "requests", "settings", "help", "needs-you"].includes(location.view || "") || location.standingId || location.assignmentId) { delete location.work; delete location.unavailableWork; }
+  if (["system", "ask", "start", "products", "requests", "settings", "connections", "help", "needs-you"].includes(location.view || "") || location.standingId || location.assignmentId) { delete location.work; delete location.unavailableWork; }
   if (location.view !== "help") delete location.intent;
   if (location.view !== "needs-you" || !location.workspaceId) delete location.decision;
   if ((location.view && location.view !== "home") || !location.workspaceId) delete location.deliveryCheck;

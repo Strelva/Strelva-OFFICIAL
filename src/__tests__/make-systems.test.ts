@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import type { MakeSystemsAuthority } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceMakeSystemsError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { createApplicationService } from "@/products/applications/server";
 import { createCustomApplicationService } from "@/products/custom-applications/server";
+vi.mock("@/platform/system-versions/required-connections", () => ({ assertRequiredConnections: vi.fn(async () => {}) }));
 
 const actorFor = (userId: string): WorkspaceActor => ({ userId, verifiedEmail: `${userId}@example.com` });
 const operator = actorFor("operator");

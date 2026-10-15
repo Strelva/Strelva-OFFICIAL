@@ -12,6 +12,7 @@ import {
 import { sameSystem, type SystemRef, type SystemRevisionRef } from "./refs";
 import { assertPackageDeclaration, automatedRevisionQualification, effectivePackageBehavior, isRevisionQualified, type PackageDeclaration, type PackageRehearsalReceipt } from "./declaration";
 import type { ConnectionOwnership, VersionStore } from "./store";
+import { assertRequiredConnections, type RequiredConnectionsPort } from "./required-connections";
 import {
   VERSION_CONTEXT_KINDS,
   VersionAccessError,
@@ -37,6 +38,7 @@ export interface SystemVersionsDeps {
   now?: () => string;
   id?: (prefix: string) => string;
   rehearsePackage?: (revision: SourceRevision) => PackageRehearsalReceipt;
+  requiredConnections?: RequiredConnectionsPort;
 }
 
 function overlaps(left: string, right: string): boolean {
@@ -494,6 +496,17 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!baselineForLocks) throw new VersionAccessError();
       assertLockedDefinition(componentRevision(lineage, baselineForLocks), definition);
       if (!needsRelease) throw new VersionValidationError("Nothing changed since the current release.");
+      // Older unqualified lineage snapshots can describe historical runtimes
+      // outside the closed package adapters. Every supported package derives its
+      // needs again, including published revisions with no stored declaration.
+      if (["internal_app", "offering", "inquiry_pattern", "website_section", "bundle"].includes(String(definition.kind))) {
+        const requirements = effectivePackageBehavior(definition, baselineForLocks.requires.bindingKinds).requiredConnections;
+        if (requirements.some(item => !item.optional)) {
+          if (!actor.verifiedEmail) throw new VersionAccessError("Sign in to check this business's Connections before making it live.");
+          await assertRequiredConnections({ actor: { userId: actor.userId, verifiedEmail: actor.verifiedEmail }, workspaceId: lineage.version.businessId,
+            requiredConnections: requirements, connectionRefs: lineage.bindings.map(binding => binding.connectionId) }, deps.requiredConnections);
+        }
+      }
       return save(actor, {
         ...lineage,
         releases: [...lineage.releases, {

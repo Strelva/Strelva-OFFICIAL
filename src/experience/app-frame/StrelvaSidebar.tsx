@@ -4,7 +4,7 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleAlert, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, Library, ListChecks, Mail, MapPin, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleAlert, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, Library, ListChecks, Mail, MapPin, MessageSquareText, Plug, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -37,11 +37,13 @@ const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> =
 const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "settings", icon: Building2 },
   { id: "access", icon: KeyRound },
+  { id: "connections", icon: Plug },
   { id: "help", icon: CircleHelp },
 ];
 
 interface Props {
   agencyNavigation?: AgencyNavigation;
+  connectionsAvailable?: boolean;
   ownerBrand?: OwnerBrand;
   /** Authorized workspace name, separate from the agency brand. */
   workspaceName?: string;
@@ -79,7 +81,7 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ agencyNavigation, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients }: Props) {
+export function StrelvaSidebar({ connectionsAvailable = false, agencyNavigation, ownerBrand, workspaceName, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou, allClients }: Props) {
   const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
   const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : PLACE_LABELS.filesAndResults;
   const contextName = plainWorkspaceName(businessContext);
@@ -131,7 +133,7 @@ export function StrelvaSidebar({ agencyNavigation, ownerBrand, workspaceName, ac
       {contextualNavigation ? <div className={styles.contextual}>{contextualNavigation}</div> : null}
     </div>
     <div className={styles.footer}>
-      <nav aria-label="Business menu">{BUSINESS_ITEMS.map(item)}</nav>
+      <nav aria-label="Business menu">{BUSINESS_ITEMS.filter(entry => entry.id !== "connections" || connectionsAvailable).map(item)}</nav>
       {signedIn ? <>
         <Link className={styles.account} href={href("account")} aria-current={place === "account" ? "page" : undefined} onClick={onCloseMobile}>
           <span className={styles.avatar} aria-hidden="true">{accountName.slice(0, 1).toUpperCase()}</span>

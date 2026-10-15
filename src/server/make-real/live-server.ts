@@ -35,6 +35,7 @@ import type { ReadyPlan } from "@/platform/needs-you/sources/make-real";
 import { createSupabaseActivationRepository } from "@/platform/make-real/supabase-repository";
 import { createSupabaseRevisionContent } from "@/platform/make-real/supabase-content";
 import { createSystemStoreLiveSystems } from "@/platform/make-real/systems-adapter";
+import { assertInstalledSystemConnections } from "@/platform/system-versions/live-system-connections";
 
 /** Systems must be on for the workspace, and the channel's own key. */
 export async function makeRealChannelEnabled(workspaceId: string, channel: MakeRealChannel): Promise<boolean> {
@@ -97,7 +98,7 @@ export function createServerLiveMakeReal(google: GoogleMakeRealPorts) {
   return createLiveMakeRealService({
     possibilities: (actor) => createSupabasePossibilityRepository(actor),
     activations: (actor) => createSupabaseActivationRepository(actor),
-    live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
+    live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor, assertConnections: assertInstalledSystemConnections }),
     adapters: (actor, workspaceId, service) => liveChannelAdapters(actor, workspaceId, google, service),
     approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
     recordService: recordServiceAction,
