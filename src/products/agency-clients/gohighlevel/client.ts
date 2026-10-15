@@ -32,7 +32,7 @@ export const GHL_MESSAGES: Record<GhlErrorCode, string> = {
   insufficient_access: "HighLevel didn't allow Strelva to read your sub-accounts. Reconnect and approve every requested access, and check that your HighLevel plan includes API access.",
   rate_limited: "HighLevel asked Strelva to slow down. Nothing was added. Try the import again in a minute.",
   unavailable: "HighLevel couldn't be reached. Nothing was added. Try again shortly.",
-  not_configured: "Importing from HighLevel isn't available yet.",
+  not_configured: "HighLevel isn't set up on Strelva yet.",
   malformed: "HighLevel sent something Strelva couldn't read. Nothing was added.",
 };
 

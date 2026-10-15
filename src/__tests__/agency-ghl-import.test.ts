@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { clientImportRowSchema } from "@/products/agency-clients/import-contract";
 import { createGoHighLevelImportAdapter, ghlLocationToRow, listGhlSubAccounts } from "@/products/agency-clients/gohighlevel/adapter";
 import { GhlApiError, GhlClient, GhlPacer, type GhlTokenSource } from "@/products/agency-clients/gohighlevel/client";
-import { ghlImportReleaseEnabled, GHL_SCOPES } from "@/products/agency-clients/gohighlevel/config";
+import { ghlImportReleaseEnabled, ghlSetupReady, GHL_SCOPES } from "@/products/agency-clients/gohighlevel/config";
 import { consumeGhlOAuthState, createGhlOAuthState, exchangeGhlCode, ghlAuthorizationUrl } from "@/products/agency-clients/gohighlevel/oauth";
 import type { GhlConnectionStore, GhlConnectionWithSecrets, GhlStoredEvent } from "@/products/agency-clients/gohighlevel/repository";
 import { supabaseGhlConnectionStore } from "@/products/agency-clients/gohighlevel/repository";
@@ -64,6 +64,16 @@ describe("GoHighLevel import flag", () => {
     expect(ghlImportReleaseEnabled({ STRELVA_GHL_IMPORT_RELEASE: "1" })).toBe(true);
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
     expect(ghlImportReleaseEnabled({ STRELVA_GHL_IMPORT_RELEASE: "1" })).toBe(false);
+  });
+});
+
+describe("HighLevel setup readiness", () => {
+  const full = { HIGHLEVEL_CLIENT_ID: "a", HIGHLEVEL_CLIENT_SECRET: "b", SECRETS_ENC_KEY: "c", OAUTH_STATE_SECRET: "d", APP_URL: "https://x.test" };
+  it("needs both client keys, plus the encryption key, state secret and app URL", () => {
+    expect(ghlSetupReady(full)).toBe(true);
+    for (const name of Object.keys(full)) expect(ghlSetupReady({ ...full, [name]: "" })).toBe(false);
+    expect(ghlSetupReady({})).toBe(false);
+    expect(ghlSetupReady({ ...full, OAUTH_STATE_SECRET: "", INTERNAL_API_SECRET: "e" })).toBe(true);
   });
 });
 

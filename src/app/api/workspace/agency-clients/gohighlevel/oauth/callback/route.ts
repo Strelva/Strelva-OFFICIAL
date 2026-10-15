@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
-import { agencyClientsRedirect } from "../../shared";
+import { agencyImportRedirect } from "../../shared";
 import { connectGhlAgency, consumeGhlOAuthState, ghlImportReleaseEnabled, ghlRedirectUri, GhlImportError, GHL_STATE_COOKIE } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 
 function finish(appUrl: string, workspaceId: string | undefined, outcome: { connected: true } | { error: string }): NextResponse {
-  const response = NextResponse.redirect(agencyClientsRedirect(appUrl, workspaceId, outcome));
+  const response = NextResponse.redirect(agencyImportRedirect(appUrl, workspaceId, outcome));
   response.cookies.set(GHL_STATE_COOKIE, "", { path: "/api/workspace/agency-clients/gohighlevel/oauth", maxAge: 0 });
   return response;
 }
