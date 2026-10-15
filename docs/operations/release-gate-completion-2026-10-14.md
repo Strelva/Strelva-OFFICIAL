@@ -35,8 +35,11 @@ entry names one package, its exact license string and exact versions, a use
 The list is empty. `@sentry/cli` 2.58.5 (FSL-1.1-MIT, build-time only, nine
 platform packages) and `gsap` 3.14.2 (GSAP Standard License, ships in client
 website components) need Jacob's approval before any entry is added. The
-registry audit was not run in this lane (no network calls to the registry
-without Jacob's allowance).
+registry audit did run locally on October 15 (`pnpm check:supply-chain`,
+read-only registry traffic): status `blocked`, issues exactly
+`license_review_required:@sentry/cli`, `license_review_required:@sentry/cli-darwin`
+and `license_review_required:gsap`. `audit.all` has 1 finding, braces, excepted;
+`audit.production` has 0. The block is the unreviewed licenses above, not an advisory.
 
 October 15, secret scan. Locally, Gitleaks reports exactly two findings:
 `eb67cd15b278cf5e4da33d358f1e68919c047ad1:dev-tenants.json:generic-api-key:23`

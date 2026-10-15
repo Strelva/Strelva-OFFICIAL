@@ -67,8 +67,11 @@ separate release decision.
 - **Secret scan.** The Security job is red on exactly two `dev-tenants.json`
   findings from `eb67cd15b`. Add their fingerprints to `.gitleaksignore` now, or
   keep it red until the database copy of both secrets is re-encrypted and read back.
-- **Registry audit.** `pnpm check:supply-chain` was not run here (it calls the npm
-  registry audit). Braces is excepted until 2026-10-23.
+- **Registry audit.** `pnpm check:supply-chain` ran locally on 2026-10-15: status
+  `blocked`, issues exactly `license_review_required:@sentry/cli`,
+  `license_review_required:@sentry/cli-darwin` and `license_review_required:gsap`.
+  `audit.all` has 1 finding (braces, excepted until 2026-10-23); `audit.production`
+  has 0. Closing it needs the license approvals above.
 - **Cron.** Domain verification now runs every five minutes (unflagged).
   `payment-holds` runs every 10 minutes but records no heartbeat, so the watchdog
   does not cover it.
