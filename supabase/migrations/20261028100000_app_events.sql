@@ -493,8 +493,9 @@ begin
       values (p_subscriber, p_workspace_id, ev.id, ev.sequence, ev.type, ev.subject_kind, ev.subject_id, ev.area,
         ev.payload, ev.occurred_at, c.attempts + 1, left(p_error, 500))
       on conflict (subscriber, event_id) do nothing;
+    -- The lease stays: the Event is set aside, so the lane carries on with the next one in this run.
     update public.app_event_cursors set delivered_through = greatest(delivered_through, ev.sequence), attempts = 0,
-        last_error = left(p_error, 500), lease_token = null, lease_until = null, updated_at = clock_timestamp()
+        last_error = left(p_error, 500), updated_at = clock_timestamp()
       where subscriber = p_subscriber and workspace_id = p_workspace_id;
     return 'dead';
   end if;

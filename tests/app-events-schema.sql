@@ -378,10 +378,13 @@ begin
   perform pg_temp.ae_assert(public.app_event_fail('app:bookings:test', ws, tok, ev2, 'handler failed again', false, 2, 60) = 'dead', '(e) the second failure at max 2 is dead');
   perform pg_temp.ae_assert((select count(*) = 1 from public.app_event_dead_letters where subscriber = 'app:bookings:test' and event_id = ev2 and sequence = base + 2),
     '(e) a dead letter snapshot exists');
-  perform pg_temp.ae_assert((select delivered_through = base + 2 and attempts = 0 from public.app_event_cursors where subscriber = 'app:bookings:test'),
-    '(e) the cursor advances past the dead event');
+  perform pg_temp.ae_assert((select delivered_through = base + 2 and attempts = 0 and lease_token = tok from public.app_event_cursors where subscriber = 'app:bookings:test'),
+    '(e) the cursor advances past the dead event and the lease stays for the rest of the run');
+  perform pg_temp.ae_assert(public.app_event_ack('app:bookings:test', ws, tok, base + 3), '(e) the next event is delivered under the same lease');
+  perform public.app_event_release('app:bookings:test', ws, tok);
+  perform pg_temp.ae_emit(ws, 'booking.changed', 'lc-5');
   lanes := public.app_event_claim_lanes(array['app:bookings:test'], 10, 60, 10);
-  perform pg_temp.ae_assert(jsonb_array_length(lanes->0->'events') = 1 and (lanes->0->'events'->0->>'sequence')::bigint = base + 3, '(e) the next event follows the dead one');
+  perform pg_temp.ae_assert(jsonb_array_length(lanes->0->'events') = 1 and (lanes->0->'events'->0->>'sequence')::bigint = base + 4, '(e) the next claim starts after the dead event');
   tok := (lanes->0->>'leaseToken')::uuid;
   perform pg_temp.ae_assert(public.app_event_skip('app:bookings:test', ws, tok) = pg_temp.ae_last_seq(ws), '(e) skip returns the end');
   perform pg_temp.ae_assert((select delivered_through = pg_temp.ae_last_seq(ws) and lease_token is null from public.app_event_cursors where subscriber = 'app:bookings:test'),

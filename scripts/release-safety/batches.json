@@ -2495,7 +2495,7 @@
       "items": [
         {
           "file": "20261028100000_app_events.sql",
-          "sha256": "c1edb26e9febd7174523bf05dc3cd41db4c988cd59fe5aec65ef433fe57cab11",
+          "sha256": "b8284dda4ec55053017349460ceb463f0dc16a3cd4c6406c36e355bd91086420",
           "rollback": "rollback-20261028100000_app_events.sql",
           "rollbackSha256": "e9a3879656d2e441ef20ec5ab5982fefcdae7a464aa5c681dfe63c1e17e2a88f",
           "rollbackStatus": "Run the sources rollback first. Refuses with app_events_rollback_has_data while events, dead letters or webhook endpoints exist unless app_events.allow_drop = '1', which also drops them; otherwise deletes the app_events flag rows and drops the outbox objects."
