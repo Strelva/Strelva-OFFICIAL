@@ -16,10 +16,15 @@ if [[ -n "${ACCESS_REVIEW_BASE_DUMP:-}" && -f "$ACCESS_REVIEW_BASE_DUMP" ]]; the
   psql "${psql_args[@]}" --file="$ACCESS_REVIEW_BASE_DUMP" >/dev/null
 else
   source "$review_repo_root/scripts/check-workspace-sql.sh"
-  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260908150000_enterprise_customers.sql"
   if [[ -n "${ACCESS_REVIEW_BASE_DUMP:-}" ]]; then
     pg_dump --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --no-owner --file="$ACCESS_REVIEW_BASE_DUMP"
   fi
+fi
+# The workspace source now composes enterprise mappings and access review in
+# its own current-schema proof. Restore only the unused review predecessor
+# before testing installation atomicity; its guard refuses retained receipts.
+if [[ "$(psql "${psql_args[@]}" -Atc "select to_regprocedure('public.read_access_review(uuid,uuid,text,boolean)') is not null")" == t ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021091000_access_review.sql"
 fi
 psql "${psql_args[@]}" -At --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/access-before.txt"
 # Inject a failure after the new functions exist but before ACLs/commit.

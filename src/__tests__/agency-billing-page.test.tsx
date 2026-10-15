@@ -12,7 +12,7 @@ vi.mock("@/platform/agency-billing", () => ({ commandAgencyInvoice: mocks.invoic
 vi.mock("@/platform/connect/checkout-availability", () => ({ readCheckoutAvailability: mocks.availability }));
 vi.mock("@/platform/infra/business-ai-budget", () => ({ readBusinessAiBudget: mocks.budget, businessAiCapUsd: mocks.cap }));
 import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
-import { BusinessAiBudgetSummary, StartWorkspacePlan } from "@/experience/workspace/billing/StartWorkspacePlan";
+import { BusinessAiBudgetSummary, StartWorkspacePlan, WorkspacePlanUnavailable } from "@/experience/workspace/billing/StartWorkspacePlan";
 import BillingPage from "@/app/workspace/billing/page";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
@@ -111,4 +111,27 @@ it("shows unavailable projection after budget or cap failures without breaking a
   mocks.cap.mockImplementationOnce(() => { throw new Error("invalid cap"); });
   const failedCap = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
   expect(propsFor(failedCap, BusinessAiBudgetSummary)).toMatchObject({ budget: null, capUsd: null });
+});
+
+it("offers agency help while the plan is unconfigured, without a checkout control", async () => {
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, WorkspacePlanUnavailable)).toMatchObject({ workspaceId: "business" });
+  expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
+});
+it("never offers a second plan to an entitled legacy business without a native billing record", async () => {
+  mocks.budget.mockResolvedValue({ spentUsd: "0.20", reservedUsd: "0.10", subscribed: true });
+  mocks.checkout.mockReturnValue({ enabled: true });
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, WorkspacePlanUnavailable)).toBeUndefined();
+  expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
+  expect(propsFor(page, BusinessAiBudgetSummary)).toBeDefined();
+});
+
+it("does not offer a potentially duplicate plan while paid entitlement cannot be read", async () => {
+  mocks.checkout.mockReturnValue({ enabled: true });
+  mocks.budget.mockResolvedValue(null);
+  const page = await BillingPage({ searchParams: Promise.resolve({ workspaceId: "business" }) });
+  expect(propsFor(page, StartWorkspacePlan)).toBeUndefined();
+  expect(propsFor(page, WorkspacePlanUnavailable)).toBeUndefined();
+  expect(propsFor(page, BusinessAiBudgetSummary)).toMatchObject({ budget: null });
 });

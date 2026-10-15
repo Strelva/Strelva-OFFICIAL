@@ -28,7 +28,7 @@ import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/platform/infra/redis";
 import { listingDraftingAllowed, noteTenantListingRead } from "@/products/google-listing/server";
-import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
+import { draftReviewReplyWithProvenance, storeRecentReply } from "@/lib/review-replies";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
 import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";
 import { buildApproveUrl } from "@/lib/approve-link";
@@ -214,7 +214,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     const replyMode = (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode;
     if (replyMode !== "off" && await listingDraftingAllowed(tenantId, locationId)) {
       try {
-        draftedReply = await draftReviewReply(
+        const draft = await draftReviewReplyWithProvenance(
           {
             reviewId: review.reviewId,
             reviewerName: review.reviewer.displayName,
@@ -224,6 +224,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
           tenant
         );
 
+        draftedReply = draft.text;
         const draftEvent = await addEvent({
           tenantId,
           source: "ai",
@@ -240,9 +241,10 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
             rating,
             author: review.reviewer.displayName,
             draftedReply,
+            replyGeneration: draft.generation,
             reviewCreatedAt: review.createTime,
             // 1 and 2 star replies always go to the owner, even in auto mode.
-            ...(replyMode === "auto" && autoReplyAllowed(rating)
+            ...(replyMode === "auto" && draft.generation === "model" && autoReplyAllowed(rating)
               ? { autoPostAt: new Date(Date.now() + AUTO_POST_DELAY_MS).toISOString() }
               : {}),
           },

@@ -111,7 +111,7 @@
     },
     {
       "file": "agency-signup.spec.ts",
-      "context": "public",
+      "context": "recorded",
       "cases": [
         {
           "title": "the per-account cap is explained where the name was entered",
@@ -350,7 +350,7 @@
     },
     {
       "file": "application-review-fixture.spec.ts",
-      "context": "public",
+      "context": "workspace",
       "cases": [
         {
           "title": "review fixture connects a prepared request result, owner use, employee use, release review, rollback, and revocation",
@@ -2054,11 +2054,58 @@
       ]
     },
     {
+      "file": "recorded-release.spec.ts",
+      "context": "recorded",
+      "cases": [
+        {
+          "title": "recorded open doors preserve sign-in destinations without granting access",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "recorded agency and rebuild gates still require a confirmed actor",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "recorded Needs you stays dark and disposable previews stay hidden",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
       "file": "release-1-0-flags-off-authenticated-local.spec.ts",
       "context": "public",
       "cases": [
         {
           "title": "with every 1.0 flag off, a converted business's owner sees the workspace as before 1.0",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        }
+      ]
+    },
+    {
+      "file": "release-1-0-preview-journeys.spec.ts",
+      "context": "preview",
+      "cases": [
+        {
+          "title": "1.0 owner reads website facts and explicitly adds selected details at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "1.0 owner reviews the exact form and confirms its own live action at 1440px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "1.0 owner reads website facts and explicitly adds selected details at 390px",
+          "project": "desktop",
+          "originalStatus": "skipped"
+        },
+        {
+          "title": "1.0 owner reviews the exact form and confirms its own live action at 390px",
           "project": "desktop",
           "originalStatus": "skipped"
         }

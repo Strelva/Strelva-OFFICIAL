@@ -4,6 +4,8 @@ import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { systemsReleasedFor } from "@/platform/systems-release";
+import { readBusinessRecord } from "@/platform/business-record/service";
+import { askSuggestions } from "@/platform/ask/suggestions";
 import {
   AskConversationNotFoundError,
   askReleaseMayBeOn,
@@ -179,7 +181,11 @@ export async function GET(request: Request) {
     const history = createSupabaseAskHistory();
     if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
     const conversations = await history.list(actor, { workspaceId, systemId, limit: 20 });
-    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin() });
+    // History membership and release checks precede the record read. Missing facts
+    // never prevent reading conversations or introduce another business's facts.
+    const record = await readBusinessRecord(actor, workspaceId).catch(() => null);
+    const suggestions = record ? askSuggestions({ record, businessName: typeof record.facts.display_name?.value === "string" ? record.facts.display_name.value : undefined, aboutSystem: Boolean(systemId), ...(systemId ? { systemName: "this System" } : {}) }) : undefined;
+    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin(), ...(suggestions ? { suggestions } : {}) });
   } catch (error) {
     if (error instanceof AskConversationNotFoundError) return workspaceJson({ error: error.message }, 404);
     return workspaceHttpFailure(error);

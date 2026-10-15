@@ -55,16 +55,16 @@ describe("/api/workspace/getting-started", () => {
   });
 
   it("starts the business from a check and points at Getting started", async () => {
-    mocks.start.mockResolvedValue({ workspaceId: BUSINESS, workId: "w1", reused: false, alreadyCreated: false });
+    mocks.start.mockResolvedValue({ workspaceId: BUSINESS, workId: "5a000000-0000-4000-8000-0000000000c1", reused: false, alreadyCreated: false });
     const response = await post({ action: "start_from_check", resultId: "scan_abc", name: "Northside Bakery" });
     expect(response.status).toBe(201);
-    expect(await response.json()).toMatchObject({ workspaceId: BUSINESS, location: `/workspace/getting-started?workspaceId=${BUSINESS}` });
+    expect(await response.json()).toMatchObject({ workspaceId: BUSINESS, location: `/workspace/getting-started?workspaceId=${BUSINESS}&check=5a000000-0000-4000-8000-0000000000c1` });
     expect(mocks.start).toHaveBeenCalledWith(ACTOR, { action: "start_from_check", resultId: "scan_abc", name: "Northside Bakery" });
     expect(mocks.funnel).toHaveBeenCalledWith("business_created", BUSINESS, { workspaceId: BUSINESS });
   });
 
   it("answers 200 without a new business event on a retry or reuse", async () => {
-    mocks.start.mockResolvedValue({ workspaceId: BUSINESS, workId: "w1", reused: true, alreadyCreated: true });
+    mocks.start.mockResolvedValue({ workspaceId: BUSINESS, workId: "5a000000-0000-4000-8000-0000000000c1", reused: true, alreadyCreated: true });
     expect((await post({ action: "start_from_check", resultId: "scan_abc", name: "Northside Bakery" })).status).toBe(200);
     expect(mocks.funnel).not.toHaveBeenCalledWith("business_created", expect.anything(), expect.anything());
   });

@@ -1,10 +1,9 @@
 "use client";
 
 import { AgencyProposals } from "./agency/AgencyProposals";
-import Link from "next/link";
 
-import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, Plus, RefreshCw, Users } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, RefreshCw, Users } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
 import type { AgencyApplicationDraftWork, AgencyManagedWebsiteDraftWork } from "@/platform/offerings";
 import { Tabs, TabsPanel } from "@/components/ui/Tabs";
@@ -12,7 +11,7 @@ import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { systemsReleased } from "@/experience/systems/model";
-import { daysWaiting, loadAgencyClients } from "./agency-clients";
+import { loadAgencyClients } from "./agency-clients";
 import {
   agencyCreditPeriods,
   combineAgencyPages,
@@ -35,7 +34,7 @@ type ClientsState =
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-export type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
+export type AgencyView = "home" | "clients" | "queue" | "library" | "team" | "build" | "package";
 
 /** Last successful rows are held in component state and never cross agency scope. */
 function rememberReads(previous: ReadonlyMap<string, AgencyLastGoodRead>, pages: readonly AgencyLoadedPage[]): Map<string, AgencyLastGoodRead> {
@@ -99,11 +98,11 @@ export function AgencyHome({
   const released = systemsReleased(snapshot);
   const [now] = useState(() => Date.now());
   const [localView, setView] = useState<AgencyView>(() => {
-    if (typeof window === "undefined") return "clients";
+    if (typeof window === "undefined") return "home";
     const selected = new URLSearchParams(window.location.search).get("agencyView");
-    return ["clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "clients";
+    return ["home", "clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "home";
   });
-  const view = controlledView ?? localView;
+  const view = released ? controlledView ?? localView : "clients";
   const [ask, setAsk] = useState("");
   const [libraryOpened, setLibraryOpened] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -232,7 +231,6 @@ export function AgencyHome({
   const readyApplicationDrafts = applicationDrafts ?? [];
   const readyWebsiteDrafts = websiteDrafts ?? [];
   const retry = () => setAttempt((value) => value + 1);
-  const oldestQueueWait = combined?.queue.length ? Math.max(...combined.queue.map((item) => daysWaiting(item.since, now) ?? 0)) : null;
 
   const clientList = clients.status === "loading" ? <AgencyClientsLoading />
     : clients.status === "error" ? <AgencyClientsError onRetry={retry} />
@@ -255,7 +253,7 @@ export function AgencyHome({
 
   const queueList = clients.status === "loading" ? <p role="status" className="border-y border-gray-border py-5 text-[13px] text-gray-muted">Checking work across clients…</p>
     : clients.status === "error" ? <AgencyClientsError onRetry={retry} />
-    : <AgencyQueueList complete={!combined!.nextCursor && combined!.clients.length >= combined!.total && !combined!.queueGaps.length} items={combined!.queue} now={now} onWorkspace={onWorkspace} onOpenClientWork={onOpenClientWork} />;
+    : <AgencyQueueList complete={combined!.queueComplete} items={combined!.queue} now={now} onWorkspace={onWorkspace} onOpenClientWork={onOpenClientWork} />;
 
   const serviceRequests = <section aria-labelledby={`${id}-service-requests`}>
     <h2 id={`${id}-service-requests`} className={sectionTitle}>Service requests</h2>
@@ -304,63 +302,7 @@ export function AgencyHome({
     <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">These are recorded work-allowance units, not cash payments.</p>
   </section> : null;
 
-  const header = <header className="max-w-2xl border-b border-gray-border pb-8">
-    <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">{agencyName}</p>
-    <h1 className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black sm:text-[32px]">Client work</h1>
-    <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Each client is shown with the access you have in that business. Clients keep ownership and control access.</p>
-    {canUseTools && (snapshot.releases?.agencyAddClient || snapshot.releases?.agencySetup || snapshot.releases?.agencyProspecting) ? <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
-      {snapshot.releases?.agencyAddClient ? <a href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 text-[13px] font-medium text-on-accent hover:bg-accent/85"><Plus size={15} aria-hidden="true" />Add a client</a> : null}
-      {snapshot.releases?.agencyImportClients ? <a href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Import clients<ArrowRight size={15} aria-hidden="true" /></a> : null}
-      {snapshot.releases?.agencySetup ? <a href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Agency setup and verification<ArrowRight size={15} aria-hidden="true" /></a> : null}
-      {snapshot.releases?.agencyProspecting ? <a href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">View prospects<ArrowRight size={15} aria-hidden="true" /></a> : null}
-    </div> : null}
-    {released && canUseTools && ["owner", "admin"].includes(current?.role || "") ? <Link className="mt-5 inline-flex min-h-12 items-center text-sm underline" href={`/workspace/version-sources?workspaceId=${snapshot.workspaceId}`}>Create or share a reusable application</Link> : null}
-    {combined ? <p className="mt-4 font-mono text-[12px] tabular-nums text-warm-black" aria-live="polite">
-      {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} {released ? "in the queue" : "need attention"}{oldestQueueWait ? ` · oldest waiting ${oldestQueueWait} ${oldestQueueWait === 1 ? "day" : "days"}` : ""}
-    </p> : null}
-  </header>;
-
-  if (!canUseTools) {
-    if (released) return <StPage><StHead title="Clients" meta={agencyName} /><StNotice>{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</StNotice>{privateWork}</StPage>;
-    return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || undefined}>
-      {header}
-      <p className="border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</p>
-      {privateWork}
-    </div>;
-  }
-
-  if (!released) {
-    return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || clients.status === "loading" || undefined}>
-      {header}
-      <div className="mt-10">{serviceRequests}</div>
-      <div className="mt-10">{applicationDraftSection}</div>
-      <div className="mt-10">{websiteDraftSection}</div>
-      <section className="mt-10" aria-labelledby={`${id}-attention`}>
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-          <div>
-            <h2 id={`${id}-attention`} className={sectionTitle}>Needs attention across clients</h2>
-            <p className={sectionNote}>Oldest first. Each item opens the client’s own work.</p>
-          </div>
-          {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
-        </div>
-        {queueList}
-      {combined ? <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>Loaded {combined.clients.length} of {combined.total} clients</StMono>{combined.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients for Queue</StPill> : null}</div> : null}
-      {clients.status === "ready" && clients.moreError ? <StNotice tone="critical">More clients could not be loaded. The Queue is incomplete.</StNotice> : null}
-        <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
-      </section>
-      <section className="mt-12" aria-labelledby={`${id}-clients`}>
-        <div className="pb-3"><h2 id={`${id}-clients`} className={sectionTitle}>Clients</h2><p className={sectionNote}>Opening a client keeps you inside the access that client granted.</p></div>
-        {clientList}
-      </section>
-      {privateWork}
-      <section className="mt-12" aria-labelledby={`${id}-access`}>
-        <h2 id={`${id}-access`} className={sectionTitle}>Team and access</h2>
-        {accessNote}
-      </section>
-      {current?.role === "owner" ? <StSection id="agency-brand" title="Agency brand"><AgencyBrandEditor workspaceId={snapshot.workspaceId} request={request} /></StSection> : null}
-      {creditSection}
-    </div>;
-  }
+  if (!canUseTools) return <StPage><StHead title="Clients" meta={agencyName} /><StNotice>{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</StNotice>{privateWork}</StPage>;
 
   const tab = (value: AgencyView) => ({ id: `${id}-${value}-tab`, panelId: `${id}-${value}-panel` });
   const choose = (value: string) => {
@@ -370,36 +312,39 @@ export function AgencyHome({
     onViewChange?.(next);
   };
 
-  return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
-    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · <StMono>Loaded {combined.clients.length} of {combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
+  return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "home" || view === "clients" ? "wide" : "column"}>
+    <StHead title={view === "home" ? agencyName : view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Prepare a release"} meta={<>{agencyName}{combined ? <> · {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} client {combined.queue.length === 1 ? "item" : "items"} loaded{!combined.queueComplete ? " · Queue incomplete" : ""}</> : null}</>} actions={<>
       {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
       {snapshot.releases?.agencyImportClients ? <StPillLink variant="soft" href={`/workspace/agency/clients/import?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Import clients</StPillLink> : null}
       {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
       {snapshot.releases?.agencyProspecting ? <StTextButton href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`}>Prospects</StTextButton> : null}
     </>} />
-    <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-      <Tabs
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {released && !controlledView ? <Tabs
         aria-label="Agency views"
         variant="segment"
         value={view}
         onChange={choose}
         items={[
+          { value: "home", label: "Home", ...tab("home") },
           { value: "clients", label: "Clients", ...tab("clients") },
           { value: "queue", label: "Queue", ...tab("queue") },
           { value: "library", label: "Library", ...tab("library") },
           { value: "team", label: "Team", ...tab("team") },
           ...(current?.role === "owner" || current?.role === "admin" ? [{ value: "build", label: "Build", ...tab("build") }, { value: "package", label: "Package", ...tab("package") }] : []),
         ]}
-      />
+      /> : null}
+      {released && controlledView ? <div className="flex gap-4">{view === "home" ? <StPill variant="soft" onClick={() => choose("clients")}>View clients</StPill> : null}{current?.role === "owner" || current?.role === "admin" ? view === "home" || view === "clients" ? <StPill variant="soft" onClick={() => choose("build")}>Build for a client</StPill> : view === "library" ? <StPill variant="soft" onClick={() => choose("package")}>Prepare a release</StPill> : null : null}</div> : null}
       {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
     </div>
 
-    <TabsPanel id={tab("clients").panelId} tabId={tab("clients").id} active={view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab(view === "home" ? "home" : "clients").panelId} tabId={tab(view === "home" ? "home" : "clients").id} active={view === "home" || view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {clientList}
-    </TabsPanel>
+      {!released ? <StSection title="Needs attention across clients">{queueList}<AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} /><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /></StSection> : null}
+    </AgencyPanel>
 
-    <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
-      <AgencyProposals agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} />
+    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+      <AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} />
       <p className="mb-4 text-sm text-gray-muted">Oldest first within each kind. Open the client’s own System or work.</p>
       {queueList}
       {combined ? <div className="flex flex-wrap items-center justify-between gap-3 pt-4"><StMono>Loaded {combined.clients.length} of {combined.total} clients</StMono>{combined.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients for Queue</StPill> : null}</div> : null}
@@ -411,22 +356,29 @@ export function AgencyHome({
         {applicationDraftSection}
         {websiteDraftSection}
       </div>
-    </TabsPanel>
+    </AgencyPanel>
 
-    <TabsPanel id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest release. Nothing reaches a client until its owner approves.</p>
       {libraryOpened || view === "library" ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
       {(libraryOpened || view === "library") && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
-    </TabsPanel>
+    </AgencyPanel>
 
-    <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
+    <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {view === "team" ? <AgencyTeamView key={snapshot.workspaceId} workspaceId={snapshot.workspaceId} /> : null}
+      {view === "team" ? <AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} listingOnly /> : null}
       {view === "team" && current?.role === "owner" ? <StSection id="agency-brand" title="Agency brand"><AgencyBrandEditor workspaceId={snapshot.workspaceId} request={request} /></StSection> : null}
       {accessNote}
-    </TabsPanel>
+    </AgencyPanel>
 
-    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} />{view === "build" && combined?.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients to build for</StPill> : null}</TabsPanel> : null}
-    {privateWork}
+    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} />{view === "build" && combined?.nextCursor ? <StPill variant="soft" busy={clients.status === "ready" && clients.loadingMore} onClick={loadMore}>Load more clients to build for</StPill> : null}</AgencyPanel> : null}
+    <details className="mt-12"><summary className="min-h-11 cursor-pointer py-2 text-sm text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Private agency work and assignments</summary>{privateWork}{view !== "queue" ? <div className="mt-8 space-y-10">{serviceRequests}{applicationDraftSection}{websiteDraftSection}</div> : null}{!released ? <StSection title="Team and access">{accessNote}{current?.role === "owner" ? <StSection id="agency-brand" title="Agency brand"><AgencyBrandEditor workspaceId={snapshot.workspaceId} request={request} /></StSection> : null}</StSection> : null}</details>
     {creditSection}
   </StPage><StComposerDock><StComposerBar scope={agencyName} placeholder="Bring a client need and build it here" value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></StComposerDock></div>;
+}
+
+/** The shell owns navigation in the real workspace. Standalone embeds keep tabs. */
+function AgencyPanel({ labelled, id, tabId, active, className, children }: { labelled: boolean; id: string; tabId: string; active: boolean; className?: string; children: ReactNode }) {
+  if (!active) return null;
+  return labelled ? <section id={id} aria-label={id.includes("home") ? "Home" : id.includes("queue") ? "Queue" : id.includes("library") ? "Library" : id.includes("team") ? "Team" : id.includes("build") ? "Build for a client" : id.includes("package") ? "Prepare a release" : "Clients"} className={className}>{children}</section> : <TabsPanel id={id} tabId={tabId} active className={className}>{children}</TabsPanel>;
 }

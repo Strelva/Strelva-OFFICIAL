@@ -172,7 +172,7 @@ describe("createAgencyWorkspace failures", () => {
     await expect(createAgencyWorkspace(actor, "Sixth")).rejects.toThrow(types.WORKSPACE_LIMIT_MESSAGE);
     rpc.mockResolvedValueOnce({ data: null, error: { message: "verified_identity_required" } });
     await expect(createAgencyWorkspace(actor, "Northside")).rejects.toBeInstanceOf(types.WorkspaceAccessError);
-    expect(rpc).toHaveBeenCalledWith("create_owned_workspace", { p_user_id: USER, p_verified_email: "owner@northside.example", p_kind: "agency", p_name: "Northside" });
+    expect(rpc).toHaveBeenCalledWith("create_agency_workspace", { p_user_id: USER, p_verified_email: "owner@northside.example", p_name: "Northside", p_systems_enabled: expect.any(Boolean) });
     vi.doUnmock("@/platform/infra/db/client");
   });
 });

@@ -85,6 +85,23 @@
   overflow: hidden;
 }
 
+.workColumn {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.composerSlot {
+  flex: 0 0 auto;
+  max-height: 50%;
+  overflow-y: auto;
+}
+
+.composerSlot:empty { display: none; }
+
 .main {
   display: flex;
   min-width: 0;
@@ -200,7 +217,7 @@
 }
 
 @media (max-width: 767px) {
-  .frame[data-right-rail-open="true"] .main {
+  .frame[data-right-rail-open="true"] .workColumn {
     display: none;
   }
 

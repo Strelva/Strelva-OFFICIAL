@@ -102,6 +102,12 @@ begin
     array['exact_application_draft'], array['staff_app'], 'agency-authoring-install', repeat('a', 64), owner_id, owner_id
   );
 
+  -- Accepted work is bound to a current seat and explicitly staffed actor.
+  insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
+    values(customer_id,agency_id,'owner',owner_id);
+  insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by)
+    values(agency_id,customer_id,operator_id,owner_id);
+
   select * into assignment from public.offer_agency_operational_assignment(
     owner_id, 'agency-authoring-owner@example.test', responsibility_id, agency_id,
     'agency-authoring-operator@example.test', 'agency', expiry, 'agency-authoring-assignment'

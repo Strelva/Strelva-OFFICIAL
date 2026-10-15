@@ -229,7 +229,7 @@ export function StrelvaBookingForm({
   return (
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
-      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. Your booking is confirmed on the business's ${schedule.provider === "outlook" ? "Outlook" : "Google"} calendar.`}</p>
+      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time to request from the business. You’ll see whether it needs confirmation." : "Choose a time to book with the business."}</p>
       {native && !testOnly ? <p>{visitorZoneLabel === "time zone unavailable" ? "Time zone unavailable." : `Times shown in ${visitorZoneLabel}.`}</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>

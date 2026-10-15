@@ -22,7 +22,8 @@ contract() { psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-forwarding-
 
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2); do
-  [[ "$migration" == "$forward" ]] || apply "$migration"
+  [[ "$(basename "$migration")" < "$(basename "$forward")" ]] || break
+  apply "$migration"
 done
 fingerprint before
 apply "$forward"
@@ -46,4 +47,13 @@ apply "$forward"
 fingerprint reapplied
 diff -u "$cluster_root/after.txt" "$cluster_root/reapplied.txt" >&2 || { printf 'Inquiry forwarding reapply differs from the first apply.\n' >&2; exit 1; }
 contract
-printf 'Inquiry forwarding SQL contract passed (forward, populated refusal, exact rollback, reapply).\n'
+
+# Rehearse the inverse at its own ordered boundary before installing successors
+# that depend on the forwarding reader. Then prove the composed current schema.
+for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | awk -F/ '{print $NF"\t"$0}' | sort | cut -f2); do
+  [[ "$(basename "$migration")" > "$(basename "$forward")" ]] || continue
+  apply "$migration"
+done
+contract
+node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+printf 'Inquiry forwarding SQL contract passed (ordered-boundary forward, populated refusal, exact rollback/reapply, current successors and read-only RPCs).\n'

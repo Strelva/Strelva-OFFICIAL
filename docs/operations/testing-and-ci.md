@@ -1,6 +1,6 @@
 # Testing & CI
 
-Two test layers, and two Playwright "smoke" modes that differ by the dev-access bypass.
+Unit/integration checks, ordered SQL replay and browser contexts prove different parts of the release. The dev-access bypass remains explicit.
 
 ## Vitest (unit + integration)
 
@@ -63,7 +63,10 @@ an assertion that fictional proof routes are hidden. Preview cases use their
 own loopback `next dev` with previews enabled. Three documented architecture
 fixtures are copied only into absent temporary routes, guarded against non-dev
 or preview-off access, and removed on success, failure or interruption. Workspace
-fixture cases use a separate workspace-on context. Each context owns its app;
+fixture cases use a separate workspace-on context. The `recorded` context uses
+the six release flags observed on in the October 14 audit and Needs you off;
+unknown production values are not inferred. It exercises the two doors and
+signed-out release gating without providers, preview fixtures or auth bypass. Each context owns its app;
 external `PLAYWRIGHT_BASE_URL` values are refused. Existing CI retries, timeouts,
 assertions and the default `testIgnore` list are unchanged.
 
@@ -75,7 +78,7 @@ prerequisites fail; fictional UI results never replace native evidence. Existing
 specs originally skipped in the public context retain their original guards.
 
 For independent diagnosis run `node scripts/check-browser-ci.mjs --context`
-with `public`, `preview`, `workspace`, `native`, `dark` or `private`. Passing one
+with `public`, `preview`, `workspace`, `recorded`, `native`, `dark` or `private`. Passing one
 context is not a passing `pnpm smoke`. `pnpm smoke:workspace` and
 `pnpm smoke:surfaces` remain separate mandatory checks in `check-ci.sh`.
 The ordinary focused Playwright command still uses `playwright.config.ts` and
@@ -96,6 +99,21 @@ The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_AC
   titles) — content comes from `gldf-content-defaults`, the operational stores stay empty —
   so it needs no DB/Redis/prod. The owner **Today** page is the exception (its verdict + activity
   feed are backend-driven), so its smoke is a render-check only.
+
+## Release gate consistency
+
+Push and nightly qualify PostgreSQL 18 tools through
+`scripts/check-postgres-tools.sh`, then run both `check:workspace-sql` and
+`check:workspace-upgrade`. Never edit a deployed migration to accommodate a
+mismatched replay environment. `check:migration-order` preserves historical
+identifiers and requires valid later timestamps for new forward files.
+
+Main pushes, manual CI runs and ready PRs run browser gates; draft PRs keep the
+source checks. `check:supply-chain` enforces dated advisory exceptions and
+production audit policy. Gitleaks remains pinned and retains the two real
+public-history client revalidation findings until rotation is proved. See the
+[October 14 gate preparation](release-gate-completion-2026-10-14.md) for limits,
+remaining execution and the exact exception expiry.
 
 ## Focused money and apps SQL
 
@@ -473,13 +491,16 @@ or a provider accuracy benchmark.
 
 The generated local artifacts are:
 
-- [Measurement and unresolved claims](../../output/website-rebuild-spike-2026-10-01/evidence.json).
-- [Source, template and catalog comparison](../../output/website-rebuild-spike-2026-10-01/index.html).
-- [Strict runtime HTML audit](../../output/website-rebuild-spike-2026-10-01/runtime-audit.json).
-- [Audit input URLs, byte counts and SHA-256 hashes](../../output/website-rebuild-spike-2026-10-01/runtime-audit-inputs.json).
-- [Raw source HTML](../../output/website-rebuild-spike-2026-10-01/raw-source.html) and
-  [planned non-preview HTML](../../output/website-rebuild-spike-2026-10-01/planned.html).
-- [Canonical audit module comparison with well-known files](../../output/website-rebuild-spike-2026-10-01/audit.json).
+These historical artifact paths are not retained in this checkout. Their
+reported results are historical claims until the original receipts are recovered.
+
+- Measurement and unresolved claims (`output/website-rebuild-spike-2026-10-01/evidence.json`).
+- Source, template and catalog comparison (`output/website-rebuild-spike-2026-10-01/index.html`).
+- Strict runtime HTML audit (`output/website-rebuild-spike-2026-10-01/runtime-audit.json`).
+- Audit input URLs, byte counts and SHA-256 hashes (`output/website-rebuild-spike-2026-10-01/runtime-audit-inputs.json`).
+- Raw source HTML (`output/website-rebuild-spike-2026-10-01/raw-source.html`) and
+  planned non-preview HTML (`output/website-rebuild-spike-2026-10-01/planned.html`).
+- Canonical audit module comparison with well-known files (`output/website-rebuild-spike-2026-10-01/audit.json`).
 
 Use the raw source and planned non-preview artifacts for the runtime audit.
 `original.html` is a sanitized display snapshot and `catalog.html` is a private
@@ -497,19 +518,19 @@ response or verified custom domain is implied by either artifact. The planned
 `https://mooney.strelva.com` URL is not published.
 
 The pinned Next.js 16.3.6 local validation is recorded in the
-[check receipt](../../output/website-rebuild-spike-2026-10-01/checks/receipt.json)
+check receipt (`output/website-rebuild-spike-2026-10-01/checks/receipt.json`)
 and its logs. The installed dependencies were restored with
 `pnpm install --frozen-lockfile`; no package or lockfile changes were made.
-The final [full check log](../../output/website-rebuild-spike-2026-10-01/checks/check.log)
+The final full check log (`output/website-rebuild-spike-2026-10-01/checks/check.log`)
 records passing lint, typecheck, 516 test suites, 3,927 tests with one skipped,
 and a successful build. Product boundaries, ontology and version synchronization
 also passed. The receipt records source, migration, artifact and log hashes.
 
-- [Manifest-pinned client compatibility log](../../output/website-rebuild-spike-2026-10-01/checks/custom-repos-pinned.log):
+- Manifest-pinned client compatibility log (`output/website-rebuild-spike-2026-10-01/checks/custom-repos-pinned.log`):
   58/58 checks passed in isolated clean GLDF and Rohlax worktrees at the exact
   release-manifest revisions. This does not execute live client journeys.
-- [Workspace SQL log](../../output/website-rebuild-spike-2026-10-01/checks/workspace-sql.log)
-  and [full-schema upgrade rehearsal](../../output/website-rebuild-spike-2026-10-01/checks/workspace-upgrade.log):
+- Workspace SQL log (`output/website-rebuild-spike-2026-10-01/checks/workspace-sql.log`)
+  and full-schema upgrade rehearsal (`output/website-rebuild-spike-2026-10-01/checks/workspace-upgrade.log`):
   both passed on isolated PostgreSQL 18 clusters. The fixtures cover immutable
   documents and receipt history, native ownership, agency publication denial,
   revoked access, atomic candidate updates, crawl retention and competing intake.
@@ -518,10 +539,10 @@ also passed. The receipt records source, migration, artifact and log hashes.
   reuses accepted delivery scope and existing expiring draft grants. SQL proves
   atomic edits, source-fact preservation, descendant scope checks, stale
   selectors, revoked/expired authority and denial of owner commands.
-- [Desktop/mobile interaction evidence](../../output/website-rebuild-spike-2026-10-01/ui-proof/evidence.json),
-  [locked-version reflow and hash checks](../../output/website-rebuild-spike-2026-10-01/ui-proof/locked-evidence.json),
-  [publication/domain evidence](../../output/website-rebuild-spike-2026-10-01/ui-proof/domain-evidence.json),
-  and [agency editing evidence](../../output/website-rebuild-spike-2026-10-01/ui-proof/agency-evidence.json):
+- Desktop/mobile interaction evidence (`output/website-rebuild-spike-2026-10-01/ui-proof/evidence.json`),
+  locked-version reflow and hash checks (`output/website-rebuild-spike-2026-10-01/ui-proof/locked-evidence.json`),
+  publication/domain evidence (`output/website-rebuild-spike-2026-10-01/ui-proof/domain-evidence.json`),
+  and agency editing evidence (`output/website-rebuild-spike-2026-10-01/ui-proof/agency-evidence.json`):
   browser-rendered synthetic fixtures at 1280, 390 and 320 pixels, plus keyboard
   review. Exact long TXT values remain intact; page widths fit their viewports.
   Empty, loading, failure, read-only, managed, factual review, publication

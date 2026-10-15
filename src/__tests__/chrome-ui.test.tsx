@@ -22,7 +22,7 @@ describe("workspace chrome identity", () => {
     const html = sidebar(name, brand);
     expect(html).toContain(`aria-label="${name} home"`);
     expect(html.match(/Runs on Strelva/g)).toHaveLength(1);
-    expect(html.match(/aria-label="Strelva platform"/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Strelva platform"');
     expect(html).not.toContain("Contact your agency");
     expect(html).not.toContain(">Strelva<");
     expect(html).toContain(">Jo<");

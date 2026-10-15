@@ -174,14 +174,17 @@ export async function markExecutionExternalAccepted(
   }).catch(() => {});
 }
 
-/** A publishing transport failed after dispatch; the provider may hold it.
- * Preserve uncertainty separately from acceptance and refuse any new write. */
-export async function markExecutionExternalUnconfirmed(id: string): Promise<void> {
-  await updateEvent(id, event => {
+/** Preserve uncertain provider acceptance, or fence a background tool before
+ * dispatch. Background work requires a confirmed marker before its effect. */
+export async function markExecutionExternalUnconfirmed(id: string, reason = "Google write needs reconciliation before retry.", requireConfirmed = false): Promise<void> {
+  const marked = await updateEvent(id, event => {
     const execution = event.metadata?.execution;
     if (!execution || execution.state !== "processing") return event;
-    return { ...event, metadata: { ...event.metadata, execution: { ...execution, state: "external_unconfirmed", reason: "Google write needs reconciliation before retry." } } };
+    return { ...event, metadata: { ...event.metadata, execution: { ...execution, state: "external_unconfirmed", reason: reason.slice(0, 200) } } };
   });
+  if (requireConfirmed && !["external_unconfirmed", "external_accepted"].includes(String(marked.event?.metadata?.execution?.state))) {
+    throw new Error("Background work could not save its recovery receipt. Nothing has been dispatched.");
+  }
 }
 
 export async function finishEventAction(

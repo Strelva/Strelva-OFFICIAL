@@ -60,6 +60,9 @@ begin
   item := public.open_owner_decision(business,jsonb_build_object('kind','system.go_live','route','owner_decides','title','Website publishing',
     'approveEffect','The website goes live.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId','website:launch',
     'revisionHash',h,'actor',jsonb_build_object('kind','agency','displayName','Recorded Designer')));
+  -- This reference deliberately has no native saved-work candidate. It
+  -- remains refused after done_agency_website_decisions; real exact native
+  -- approval/launch and domain execution are exercised in that fixture.
   publication := (item->>'id')::uuid;
   perform pg_temp.ux_assert(item->'actor'->>'displayName' = 'Recorded Designer','explicit proposing actor survives');
   item := public.open_owner_decision(business,jsonb_build_object('kind','system.go_live','route','owner_decides','title','App release',

@@ -14,7 +14,8 @@ create role service_role nologin bypassrls;
 create role authenticated nologin;
 create role anon nologin;
 create table public.workspaces(id uuid primary key);
-create table public.tenants(id text primary key, stable_id uuid unique);
+create table public.tenants(id text primary key, stable_id uuid unique, subscription_status text not null default 'none');
+create table public.tenant_workspace_links(tenant_stable_id uuid references public.tenants(stable_id), workspace_id uuid references public.workspaces(id));
 create table public.work_allowance_subscription_entitlements(id uuid primary key default gen_random_uuid(), workspace_id uuid references public.workspaces(id), spending_cap_cents int, period_start timestamptz, period_end timestamptz, status text);
 insert into public.workspaces values ('11111111-1111-4111-8111-111111111111'), ('22222222-2222-4222-8222-222222222222');
 SQL
@@ -24,7 +25,10 @@ psql "${args[@]}" -f supabase/migrations/20261024121500_ux_trust_ui_ai_budget_re
 # Empty inverse and reapply prove installation can be backed out before use.
 psql "${args[@]}" -f supabase/migrations/rollback-20261024121500_ux_trust_ui_ai_budget_reservations.sql >/dev/null
 psql "${args[@]}" -f supabase/migrations/20261024121500_ux_trust_ui_ai_budget_reservations.sql >/dev/null
+psql "${args[@]}" -f supabase/migrations/20261025110000_done_trust_legacy_ai.sql >/dev/null
 psql "${args[@]}" <<'SQL'
+insert into public.tenants values ('budget-race-fixture','33333333-3333-4333-8333-333333333333','past_due');
+insert into public.tenant_workspace_links values ('33333333-3333-4333-8333-333333333333','22222222-2222-4222-8222-222222222222');
 do $$ declare b jsonb; r jsonb; count_stored int; begin
  b := public.business_ai_budget('11111111-1111-4111-8111-111111111111');
  if b->>'spentUsd' <> '0' or b->>'reservedUsd' <> '0' or b->>'resetsAt' is null then raise exception 'empty_read_failed %',b; end if;
@@ -48,7 +52,7 @@ SQL
 psql "${args[@]}" -At <<'SQL' > "$cluster_root/first" &
 begin;
 select public.reserve_business_ai_budget('22222222-2222-4222-8222-222222222222', .6, 1)->>'status';
-select pg_sleep(1);
+select pg_sleep(3);
 commit;
 SQL
 first_pid=$!
@@ -60,6 +64,12 @@ for attempt in $(seq 1 100); do
   sleep .01
 done
 [[ "$first_reserved" == true ]] || { printf 'First budget reservation did not reach its held transaction.\n' >&2; wait "$first_pid"; exit 1; }
+# The admitted transaction must fence webhook changes to the linked legacy
+# relationship until its hold commits, even while the tenant is not entitled.
+if psql "${args[@]}" -c "set lock_timeout='200ms'; update public.tenants set subscription_status='active' where id='budget-race-fixture'" > "$cluster_root/tenant-update" 2>&1; then
+  printf 'Legacy subscription changed during budget admission.\n' >&2; exit 1
+fi
+rg -q 'lock timeout' "$cluster_root/tenant-update"
 psql "${args[@]}" -At -c "select public.reserve_business_ai_budget('22222222-2222-4222-8222-222222222222', .6, 1)->>'status'" > "$cluster_root/second"
 wait "$first_pid"
 rg -q '^reserved$' "$cluster_root/first"
@@ -68,4 +78,4 @@ if psql "${args[@]}" -f supabase/migrations/rollback-20261024121500_ux_trust_ui_
   echo 'ERROR populated inverse was allowed'; exit 1
 fi
 rg -q 'business_ai_budget_rollback_has_reservations' "$cluster_root/rollback"
-echo 'PASS migration, empty rollback/reapply, populated rollback refusal, held cost, cross-workspace refusal, grants and concurrent admission'
+echo 'PASS migration, empty rollback/reapply, populated rollback refusal, held cost, cross-workspace refusal, grants, concurrent admission and legacy subscription lock'

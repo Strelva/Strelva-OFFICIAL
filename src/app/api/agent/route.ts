@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
@@ -272,17 +273,19 @@ Only use tools for manifest-supported sections and actions. If the user requests
         // Both models failed (or the client disconnected). If nothing was
         // streamed, send a plain-English line so the chat doesn't go silent.
         if (!emittedToClient) {
-          logger.error("[agent-chat] Chat turn failed with no fallback recovery", {
-            tenant,
-            error: err instanceof Error ? err.message : "unknown",
-          });
-          // Surface to Sentry — a total AI-turn failure (both models down) is
-          // otherwise console-only and invisible in production.
-          trackError(err, { tenant, op: "agent.chat" });
+          const budgetPaused = err instanceof ModelBudgetPausedError || err instanceof ModelBudgetUnavailableError;
+          if (!budgetPaused) {
+            logger.error("[agent-chat] Chat turn failed with no fallback recovery", {
+              tenant,
+              error: err instanceof Error ? err.message : "unknown",
+            });
+            // Provider outages still report; an expected admission pause is not an outage.
+            trackError(err, { tenant, op: "agent.chat" });
+          }
           try {
             controller.enqueue(
               encoder.encode(
-                "Strelva can't answer right now. Nothing was changed. Please try again in a moment."
+                budgetPaused ? err.message : "Strelva can't answer right now. Nothing was changed. Please try again in a moment."
               )
             );
           } catch {

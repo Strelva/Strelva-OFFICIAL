@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -45,7 +46,10 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true, changed: result.changed });
-  } catch {
+  } catch (error) {
+    if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
+      return NextResponse.json({ error: error.message, paused: true }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
   }
 }

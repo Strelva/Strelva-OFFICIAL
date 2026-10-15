@@ -634,11 +634,9 @@ export default async function proxy(req: NextRequest) {
     return applySecurityHeaders(NextResponse.redirect(url), req);
   }
 
-  // Public demo entry: /demo -> the demo tenant's dashboard (read-only, no auth).
+  // Public, fictional 1.0 demo. Internal previews keep their existing gate.
   if (pathname === "/demo" || pathname === "/demo/") {
-    const url = req.nextUrl.clone();
-    url.pathname = "/client/demo/dashboard";
-    return applySecurityHeaders(NextResponse.redirect(url), req);
+    return applySecurityHeaders(NextResponse.redirect(new URL("/preview/strelva/demo", req.url)), req);
   }
 
   const ownershipSettingsRedirectPath = getOwnershipSettingsRedirectPath(pathname);

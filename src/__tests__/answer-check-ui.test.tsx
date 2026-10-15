@@ -27,7 +27,7 @@ it("does not invent an answer or wrong-claim count from a saved citation boolean
   const html = renderToStaticMarkup(createElement(AiVisibilityResultView, { result: { ...answerCheckFixture, verdict: "Gemini named this business in one answer." }, scanId: "scan_ab123", shareUrl: null, workspaceEnabled: true, onReset() {} }));
   expect(html).toContain("Its full answer and claim-by-claim accuracy were not saved.");
   expect(html).not.toContain("things wrong");
-  expect(html).toContain("/workspace/business/new?check=scan_ab123");
+  expect(html).toContain("/workspace?save=scan_ab123");
 });
 it("keeps unavailable measurement separate from grades and missing signals", () => {
   const html = renderToStaticMarkup(createElement(AiVisibilityResultView, { result: { ...answerCheckFixture, measurementStatus: "unavailable", readinessMeasured: false, signals: [] }, scanId: null, shareUrl: null, onReset() {} }));

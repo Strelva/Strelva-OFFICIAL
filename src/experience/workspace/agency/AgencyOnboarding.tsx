@@ -158,8 +158,8 @@ const STEP_TITLES: Record<AgencyOnboardingStep["id"], string> = {
 /** Qualification is effect-scoped; evidence never grants client authority. */
 export function AgencyVerification({ onboarding, fictionalQualification }: { onboarding: Pick<Onboarding, "agency" | "effects">; fictionalQualification?: QualificationState }) {
   return <>
-    <StHead title="Get verified for client work" meta="Choose an effect, submit evidence, then follow the operator’s review here." />
-    <StNotice>Verification unlocks an effect for your agency. Client access, owner decisions and release gates still apply. Every agency follows this path, including Strelva Agency.</StNotice>
+    <StHead title="Get verified for client work" meta="Show how your agency safely publishes websites, updates Google, sends email or handles payments. An independent platform reviewer checks your evidence." />
+    <StNotice>Verification confirms what your agency can do safely. Client permissions, owner decisions and release settings still apply. Every agency follows the same review.</StNotice>
     <AgencyQualification workspaceId={onboarding.agency.id} fictionalQualification={fictionalQualification} />
   </>;
 }

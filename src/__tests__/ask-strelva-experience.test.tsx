@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
-import { askHistoryFailure, askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
+import { askHistoryFailure, askErrorMessage, readAskResult, readAskSuggestions, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { sectionFromView, sectionTitle } from "@/experience/app-frame/workspace-places";
 
@@ -67,7 +67,9 @@ describe("Ask Strelva in the workspace", () => {
   it("renders the empty state with examples and the no-approval rule", () => {
     const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Great Lakes Dried Fruit", systemId: SYSTEM, systemName: "greatlakesdriedfruit.com", request: (async () => new Response("{}")) as typeof fetch }));
     expect(html).toContain("About greatlakesdriedfruit.com.");
-    expect(html).toContain("Put the holiday gift boxes at the top of the homepage");
+    expect(html).toContain("What does greatlakesdriedfruit.com do today?");
+    expect(html).not.toContain("estate planning");
+    expect(html).not.toContain("holiday gift boxes");
     expect(html).toContain("Saying yes here never approves anything. Approvals happen in Needs you.");
     expect(html).toContain("Loading conversations");
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
@@ -87,6 +89,47 @@ describe("Ask Strelva in the workspace", () => {
     const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", readOnly: true, readOnlyReason: "Work in this workspace has stopped.", request: (async () => new Response("{}")) as typeof fetch }));
     expect(html).toContain('placeholder="Work in this workspace has stopped."');
     expect(html).toMatch(/<textarea[^>]*disabled/);
+  });
+});
+
+describe("Ask continuations", () => {
+  it("keeps exact Try links in streamed and historical Possibility receipts", () => {
+    const item = { kind: "possibility", status: "opened", toolId: "open_possibility", ids: ["p1"], summary: "Services", previewHref: "/api/websites/draft/preview?revision=1", tryHref: "/try/signed-revision", needsYou: { route: "owner_decides", itemRef: "p1", decideAt: `/workspace?workspaceId=${WS}&view=needs-you` } };
+    for (const raw of [{ ask: { kind: "possibility", items: [item], saved: true } }, { kind: "possibility", items: [item], saved: true }]) {
+      const result = readAskResult(raw)!;
+      expect(receiptLines(result)[0]).toMatchObject({ openHref: "/try/signed-revision", openLabel: "Try it" });
+      const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Harbor Dental", initialMessages: [{ id: "p", role: "assistant", content: "Ready to try.", result }] }));
+      expect(html).toContain('href="/try/signed-revision"');
+      expect(html).toContain(`href="/workspace?workspaceId=${WS}&amp;view=needs-you"`);
+      expect(html).toContain("Make it live is a separate step");
+    }
+  });
+  it.each(["https://evil.example/try", "//evil.example/try", "/\\evil.example", "/try/../../outside", "/try/\nunsafe"])("drops unsafe candidate links %s", tryHref => {
+    const result = readAskResult({ kind: "possibility", items: [{ kind: "possibility", status: "opened", tryHref }] })!;
+    expect(receiptLines(result)[0]?.openHref).toBeUndefined();
+  });
+  it("uses the native preview when an isolated Try link is unavailable", () => {
+    const result = readAskResult({ kind: "possibility", items: [{ kind: "possibility", status: "opened", previewHref: "/api/websites/draft/preview?revision=1" }] })!;
+    expect(receiptLines(result)[0]).toMatchObject({ openHref: "/api/websites/draft/preview?revision=1", openLabel: "Open preview" });
+  });
+  it("gives a paused turn one agency step and never calls it an answer", () => {
+    const result = readAskResult({ kind: "refusal", saved: true, items: [{ kind: "refusal", status: "refused", toolId: "classifier", summary: "budget_paused" }] })!;
+    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Harbor Dental", initialMessages: [{ id: "pause", role: "assistant", content: "Building is paused.", result }] }));
+    expect(html).toContain("Bring in an agency");
+    expect(html).toContain(`workspaceId=${WS}&amp;view=help`);
+    expect(html).not.toContain("Answered from what Strelva read");
+  });
+  it("uses only the server's bounded configured-plan target for a budget pause", () => {
+    const result = readAskResult({ kind: "refusal", saved: true, budgetRecovery: "plan", items: [{ kind: "refusal", status: "refused", summary: "budget_paused" }] })!;
+    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Harbor Dental", initialMessages: [{ id: "pause", role: "assistant", content: "Choose a plan to continue.", result }] }));
+    expect(html).toContain(`href="/workspace/billing?workspaceId=${WS}"`);
+    expect(html).toContain("Choose a plan");
+    expect(html).not.toContain("Bring in an agency");
+    expect(readAskResult({ kind: "refusal", budgetRecovery: "https://evil.example" })?.budgetRecovery).toBeUndefined();
+  });
+  it("rejects malformed or excessive server prompts", () => {
+    expect(readAskSuggestions(["Good prompt"])).toEqual(["Good prompt"]);
+    for (const raw of [[], [""], ["x".repeat(301)], ["a", "b", "c", "d"], ["bad\nprompt"], [123], null]) expect(readAskSuggestions(raw)).toBeNull();
   });
 });
 

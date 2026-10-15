@@ -204,7 +204,8 @@ describe("agent reply_to_review tool", () => {
     mockBillingWorkspace.mockResolvedValue(null);
     mockCapturedTools = {};
     const response = await runAgent({ name: "reply_to_review", args: { reviewId: "rev_google_1", reply: "Thanks" } });
-    expect(response).toContain("Nothing was changed");
+    expect(response).toContain("Usage could not be confirmed. Building is paused.");
+    expect(response).toContain("Open Plan and billing to check your usage.");
     expect(mockBillingWorkspace).toHaveBeenCalledExactlyOnceWith("test-tenant");
     expect(mockCapturedTools).toEqual({});
     expect(mockAddEvent).not.toHaveBeenCalled();

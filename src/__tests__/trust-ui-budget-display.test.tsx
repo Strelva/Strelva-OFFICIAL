@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
-import { BusinessAiBudgetSummary, StartWorkspacePlan } from "@/experience/workspace/billing/StartWorkspacePlan";
+import { BusinessAiBudgetSummary, StartWorkspacePlan, WorkspacePlanUnavailable } from "@/experience/workspace/billing/StartWorkspacePlan";
 
 const budget = { spentUsd: "3.50", reservedUsd: "1.25", capCents: 1000, subscribed: true, since: "2026-10-01T00:00:00Z", resetsAt: "2026-11-01T00:00:00Z", unknownCostCalls: 0 };
 it("shows spend, conservative reservations, remaining cap and its recorded reset date", () => {
@@ -22,4 +22,20 @@ it("unpriced historical calls make remaining usage unavailable instead of sugges
   const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={{ ...budget, unknownCostCalls: 1 }} capUsd={10} enforced />);
   expect(html).not.toContain("$5.25"); expect(html).toContain("Usage could not be confirmed");
   expect(html).toContain("$3.50");
+});
+
+it("unconfigured plans show honest pricing and an available agency path without checkout", () => {
+  const html = renderToStaticMarkup(<WorkspacePlanUnavailable workspaceId="business one" />);
+  expect(html).toContain("Price shown before you pay");
+  expect(html).toContain("Self-serve plans are not available yet");
+  expect(html).toContain("/workspace?view=help&amp;workspaceId=business%20one");
+  expect(html).not.toContain("Start your plan");
+  expect(html).not.toContain("[price]");
+});
+
+it("unknown historical spend is disclosed without falsely pausing an uncapped paid business", () => {
+  const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={{ ...budget, capCents: null, unknownCostCalls: 1 }} capUsd={null} enforced />);
+  expect(html).toContain("Recorded spend is incomplete");
+  expect(html).toContain("No spending limit is recorded");
+  expect(html).not.toContain("stays paused");
 });

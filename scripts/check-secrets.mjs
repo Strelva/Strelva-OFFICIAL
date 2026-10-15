@@ -28,8 +28,8 @@ export function runScan({ native, source, reportDir, fixture, staged }) {
   if (fixture) common.push("--no-git");
   if (staged) common.push("--staged");
   const args = native
-    ? [...common, `--source=${source}`, `--config=${root}/.gitleaks.toml`, `--report-path=${report}`]
-    : ["run", "--rm", "--network=none", "--read-only", "-v", `${source}:/repo:ro`, "-v", `${root}/.gitleaks.toml:/config.toml:ro`, "-v", `${reportDir}:/report`, policy.scanner.image, ...common, "--source=/repo", "--config=/config.toml", "--report-path=/report/scan.json"];
+    ? [...common, `--source=${source}`, `--config=${root}/.gitleaks.toml`, `--gitleaks-ignore-path=${root}/.gitleaksignore`, `--report-path=${report}`]
+    : ["run", "--rm", "--network=none", "--read-only", "-v", `${source}:/repo:ro`, "-v", `${root}/.gitleaks.toml:/config.toml:ro`, "-v", `${root}/.gitleaksignore:/ignore:ro`, "-v", `${reportDir}:/report`, policy.scanner.image, ...common, "--source=/repo", "--config=/config.toml", "--gitleaks-ignore-path=/ignore", "--report-path=/report/scan.json"];
   const result = spawnSync(native ? "gitleaks" : "docker", args, { encoding: "utf8", timeout: 120_000, maxBuffer: 1_000_000, stdio: ["ignore", "pipe", "pipe"] });
   if (result.error || ![0, 1].includes(result.status)) {
     throw Object.assign(new Error("secret_scan_unavailable"), {

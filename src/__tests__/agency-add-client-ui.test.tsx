@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AgencyClientAiCheck } from "@/experience/workspace/agency/AgencyAddClient";
+import { AgencyAddClient, AgencyClientAiCheck } from "@/experience/workspace/agency/AgencyAddClient";
 import type { ClientAiCheck } from "@/products/agency-clients/contracts";
 
 const href = "/workspace?workspaceId=agency&work=assessment";
@@ -47,5 +47,18 @@ describe("agency client AI check", () => {
     const html = renderToStaticMarkup(<AgencyClientAiCheck check={{ status: "not_requested" }} />);
     expect(html).toContain("No website given");
     expect(html).not.toContain("href=");
+  });
+});
+
+
+describe("agency owner-link email choice", () => {
+  it("keeps email absent by default and available only when the server releases it", () => {
+    const props = { agencyWorkspaceId: "00000000-0000-4000-8000-000000000010", prospecting: false, initialProspectId: null };
+    const off = renderToStaticMarkup(<AgencyAddClient {...props} />);
+    const on = renderToStaticMarkup(<AgencyAddClient {...props} emailEnabled />);
+    expect(off).not.toContain("Email this owner their claim link");
+    expect(on).toContain("Email this owner their claim link if email is permitted");
+    expect(on).not.toMatch(/type="checkbox"[^>]*checked/);
+    expect(off).toContain("Copy and share it after adding the client");
   });
 });

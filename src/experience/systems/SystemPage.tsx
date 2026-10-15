@@ -337,20 +337,20 @@ async function requestMakeReal(request: typeof fetch, workspaceId: string, possi
     }
     const error = z.object({ error: z.string() }).safeParse(body);
     if (response.status === 403) return { kind: "permission", message: error.success ? error.data.error : "Only an owner of this business can make a possibility real." };
-    return { kind: "error", message: `${error.success ? error.data.error : "Make real could not be confirmed."} Reload this System to check what landed before trying another change.` };
+    return { kind: "error", message: `${error.success ? error.data.error : "Making this change live could not be confirmed."} Reload this System to check what landed before trying another change.` };
   } catch {
-    return { kind: "error", message: "The response to Make real was lost. It may have started. Reload this System to check what landed before trying another change." };
+    return { kind: "error", message: "The response to making this change live was lost. It may have started. Reload this System to check what landed before trying another change." };
   }
 }
 
 function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; onAsk: (request: string) => void; title: string }) {
-  if (outcome.kind === "live") return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
+  if (outcome.kind === "live") return <div role="status" className={styles.makeRealNotice} aria-label="Live change result">
     <h3>{outcome.headline}</h3>
     <p>{outcome.started ? "This change has started. Reload this System to see what landed and what still needs attention." : "Reload this System to check the current outcome before trying another change."}</p>
   </div>;
   if (outcome.kind !== "result") return <p role={outcome.kind === "error" ? "alert" : "status"} className={styles.makeRealNotice}>{outcome.message}</p>;
   const { result } = outcome;
-  return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
+  return <div role="status" className={styles.makeRealNotice} aria-label="Live change result">
     <h3>{result.headline}</h3>
     <p>{makeRealSummary(result)}</p>
     {result.done.length ? <><h3>Done in the isolated copy</h3><ul>{result.done.map(item => <li key={item.label}>{item.label}</li>)}</ul></> : null}
@@ -384,7 +384,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
     {system.possibilities.length ? <StRows>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
       const execution = possibility.executionAvailability ?? "unavailable";
-      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
+      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : execution === "unavailable" ? "Live execution is unavailable for this Possibility. You can still open and compare it." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current live change request to finish." : undefined;
       return <StRow key={possibility.id} title={possibility.title} detail={possibility.summary}>
         <StState kind="draft">{POSSIBILITY_STATUS_LABEL[possibility.status]}</StState>
         {possibility.staleReason ? <small role="note">{possibility.staleReason} A fresh check is needed.</small> : null}

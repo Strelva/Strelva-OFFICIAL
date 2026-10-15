@@ -107,8 +107,13 @@ describe.skipIf(process.env.STRELVA_AGENCY_LEADS_REDIS_PROOF !== "1" || !isolate
 
   it("supports historical sales leads while reporting their missing recorded agency ownership", async () => {
     seed({ agencyWorkspaceId: undefined, requestType: undefined });
-    expect(await command()).toMatchObject({ legacyOwnership: true, lead: { statusToken: token } });
+    expect(await command({ allowLegacyOwnership: true })).toMatchObject({ legacyOwnership: true, lead: { statusToken: token } });
     expect(saved().lead.agencyWorkspaceId).toBeUndefined();
+  });
+
+  it("refuses unscoped history without the server-derived historical-owner allowance", async () => {
+    seed({ agencyWorkspaceId: undefined, requestType: undefined }); const before = snapshot();
+    expect(await command()).toEqual({ error: "access" }); expect(snapshot()).toEqual(before);
   });
 
   it("keeps the canonical lead, email projection and workflow in parity through every settable state and handoff", async () => {

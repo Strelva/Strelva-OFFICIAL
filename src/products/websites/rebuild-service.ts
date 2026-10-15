@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { WebsitePublicationAcceptedError } from "./publication-outcome";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { type BoundedStore } from "@/platform/bounded-work/repository";
@@ -8,10 +9,11 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision, type WebsiteAgencyPublishPermission } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
-import { currentDescriptionBusinessFacts, runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
+import { currentDescriptionBusinessFacts, runWebsiteRebuild, WebsiteRebuildStageError, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
 import { prepareSitePatch, prepareSiteUndo } from "./site-operations";
 import { checkWebsiteHealth } from "./site-health";
+import { currentHostedUrl } from "./hosted-routing";
 import { rebuildFactInputSchema, rebuildInputSchema, rebuildSelectionSchema, websiteRebuildSchema, type WebsiteRebuild, type WebsiteRebuildRecord } from "./rebuild-contracts";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { changeHostedDomain, readHostedDomains } from "./rebuild-domains";
@@ -60,6 +62,7 @@ function exact(loaded: Loaded, raw: unknown) {
   return { input, candidate };
 }
 function publicFailure(error: unknown): string {
+  if (error instanceof WebsiteRebuildStageError && error.paused) return error.message.slice(0, 1000);
   if (error instanceof WorkspaceAccessError) return "Access changed while rebuilding. Reopen the workspace with an authorized account.";
   if (error instanceof WorkspaceConflictError) return error.message;
   if (error instanceof Error && /public website|business name|couldn't|could not|robots|browser to read|unreachable|description|website address/i.test(error.message)) return error.message.slice(0,1000);
@@ -160,7 +163,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     } catch (error) {
       // A lost CAS or revoked access must never overwrite a newer actor's work.
       if (error instanceof WorkspaceAccessError || error instanceof WorkspaceConflictError) throw error;
-      current = await update(actor,current,"rebuild_failed",{ status: "failed", lastError: publicFailure(error) });
+      const paused = error instanceof WebsiteRebuildStageError && error.paused;
+      current = await update(actor,current,paused ? "rebuild_paused" : "rebuild_failed",{ status: paused ? "paused" : "failed", lastError: publicFailure(error) });
       return present(current);
     }
   }
@@ -205,7 +209,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
   async function retry(actor: WorkspaceActor, workId: string, raw: unknown) {
     const input = z.object({ expectedRevision: z.number().int().nonnegative() }).strict().parse(raw);
     const loaded = await load(actor,workId);
-    if (loaded.rebuild.revision !== input.expectedRevision || !["failed","building"].includes(loaded.rebuild.status)) throw new WorkspaceConflictError("Reload the failed rebuild before retrying.");
+    if (loaded.rebuild.revision !== input.expectedRevision || !["failed","building","paused"].includes(loaded.rebuild.status)) throw new WorkspaceConflictError("Reload the failed rebuild before retrying.");
     await store.member(actor,loaded.work.workspaceId);
     return build(actor,loaded);
   }
@@ -348,13 +352,34 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     node.verification = { ...node.verification, supported: true, confidence: 1, needsReview: false };
     return present(await saveCandidate(actor,loaded,siteDocumentSchema.parse(document),"copy_review_confirmed"));
   }
+  /** Recheck delivery without repeating an accepted publication. Current durable
+   * routing owns the destination, including tenant renames and hosting cutovers. */
+  async function verifyPublished(actor: WorkspaceActor, workId: string) {
+    let loaded = await load(actor,workId);
+    const tenantId = await routeTenant(actor,loaded);
+    const row = tenantId ? await documents.published(tenantId) : null;
+    if (!row || row.workspaceId !== loaded.work.workspaceId || row.workId !== workId || !row.receipt) throw new WorkspaceConflictError("This website has no current published revision to check.");
+    const candidate = loaded.rebuild.candidate;
+    if (!candidate || row.revision !== candidate.revision || row.contentHash !== candidate.contentHash) throw new WorkspaceConflictError("The published website differs from this preview. Open the current published release before checking it.");
+    const receipt = row.receipt;
+    if (loaded.rebuild.launch.receipt?.receiptId !== receipt.receiptId || loaded.rebuild.status !== "published") loaded = await update(actor,loaded,"publish_reconciled",{ status: "published", tenantId, launch: { receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; checking the public site." } } });
+    try { await invalidatePublishedSiteDocument(tenantId!); await (dependencies.revalidate ?? (async () => { revalidatePath("/","layout"); }))(); } catch { /* Publication is committed; observation is separate. */ }
+    const url = currentHostedUrl({ tenantId: tenantId!, receipt });
+    let readBack: WebsiteRebuild["launch"]["readBack"];
+    try {
+      readBack = dependencies.checkLive ? await dependencies.checkLive(row,url) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId: tenantId!, revision: row.revision, contentHash: row.contentHash, url }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Published, but we couldn't confirm the public document yet." }; })();
+    } catch { readBack = { status: "failed", checkedAt: now(), message: "Published, but we couldn't confirm the public document yet." }; }
+    return present(await update(actor,loaded,"hosted_read_back",{ launch: { receipt, readBack } }));
+  }
   async function launch(actor: WorkspaceActor, workId: string, raw: unknown) {
     let loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
-    if (loaded.rebuild.launch.receipt?.status === "published" && loaded.rebuild.launch.receipt.artifactHash === candidate.contentHash && loaded.rebuild.launch.receipt.candidateRevision === candidate.revision) return present(loaded.rebuild.status === "published" ? loaded : await update(actor,loaded,"publish_reconciled",{ status:"published" }));
     const routedTenant = await routeTenant(actor,loaded);
     if (routedTenant) {
       const published = await documents.published(routedTenant);
-      if (published?.workId === workId && published.revision === candidate.revision && published.contentHash === candidate.contentHash && published.receipt) return present(await update(actor,loaded,"publish_reconciled",{ status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } }));
+      if (published?.workspaceId === loaded.work.workspaceId && published.workId === workId && published.revision === candidate.revision && published.contentHash === candidate.contentHash && published.receipt) {
+        if (loaded.rebuild.status === "published" && loaded.rebuild.launch.receipt?.receiptId === published.receipt.receiptId && loaded.rebuild.launch.readBack?.status === "verified") return present(loaded);
+        return verifyPublished(actor,workId);
+      }
     }
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
     await assertCurrentCapabilities(actor,loaded);
@@ -410,6 +435,11 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     try { await invalidatePublishedSiteDocument(tenantId); await (dependencies.revalidate ?? (async () => { revalidatePath("/","layout"); }))(); } catch { /* Cache and read-back are separate from the publication. */ }
     const readUrl = committedReceipt.providerUrl;
     let readBack: WebsiteRebuild["launch"]["readBack"] = loaded.rebuild.launch.readBack;
+    if (replay && readBack?.status !== "verified") {
+      const checked = await verifyPublished(actor,workId);
+      loaded = { ...loaded, rebuild: checked.rebuild };
+      readBack = checked.rebuild.launch.readBack;
+    }
     if (!replay) try {
       readBack = dependencies.checkLive ? await dependencies.checkLive(row,readUrl) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId, revision: row.revision, contentHash: row.contentHash, url: readUrl }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Published, but we couldn't confirm the public document yet." }; })();
     } catch { readBack = { status: "failed", checkedAt: now(), message: "Published, but we couldn't confirm the public document yet." }; }
@@ -551,7 +581,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     prepared.document.capabilities = projection;
     return present(await saveCandidate(actor, { ...loaded, rebuild: { ...loaded.rebuild, publishedCapabilitySelection: input.selection } }, siteDocumentSchema.parse(prepared.document), "ask_booking_page_prepared"));
   }
-  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions, prepareBookingPage, prepareExistingPages };
+  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, verifyPublished, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions, prepareBookingPage, prepareExistingPages };
 }
 export const websiteRebuildService = createWebsiteRebuildService();
 export const createWebsiteRebuild = websiteRebuildService.create;
@@ -567,6 +597,7 @@ export const prepareExistingWebsitePages = websiteRebuildService.prepareExisting
 export const prepareWebsiteBookingPage = websiteRebuildService.prepareBookingPage;
 export const publishWebsiteRebuildOntoLinkedSite = websiteRebuildService.publishOntoLinkedTenant;
 export const undoWebsiteRebuild = websiteRebuildService.undo;
+export const verifyPublishedWebsiteRebuild = websiteRebuildService.verifyPublished;
 export const websiteRebuildDomain = websiteRebuildService.domain;
 export const initializeRebuildHandoff = websiteRebuildService.initializeHandoff;
 export const connectWebsiteRebuildCapabilities = websiteRebuildService.connectCapabilities;
@@ -577,4 +608,21 @@ export const approveWebsiteDomainRequest: typeof import("./domain-requests").web
 /** Owner-link launch uses the same lifecycle, with only reserve/publish RPCs specialized. */
 export function launchWebsiteRebuildByOwnerLink(actor: WorkspaceActor, workId: string, raw: unknown, session: OwnerLinkWebsiteSession) {
   return createWebsiteRebuildService(boundedStore, { documents: createWebsiteDocumentStore(undefined, session) }).launch(actor, workId, raw);
+}
+
+/** Full control executes the exact claimed website decision; no owner identity is borrowed. */
+export async function decideWebsiteRebuildAsAgency(actor: WorkspaceActor, workId: string, raw: unknown, decision: import("@/platform/needs-you/contracts").OwnerDecision) {
+  if (decision.decidedByKind !== "agency_session" || decision.state !== "approved" || decision.sourceLifecycle !== "website_document" || (decision.decidedActor?.kind !== "agency" || decision.decidedActor.userId !== actor.userId) || ![`${workId}:approve`, `${workId}:launch`].includes(decision.sourceId)) throw new WorkspaceAccessError();
+  const documents = createWebsiteDocumentStore(undefined, undefined, { workspaceId: decision.workspaceId, decisionId: decision.id, revisionHash: decision.revisionHash, userId: actor.userId });
+  let acceptedReceiptId: string | null = null;
+  const service = createWebsiteRebuildService(boundedStore, { documents: { ...documents, async publish(publisher, input) {
+    const published = await documents.publish(publisher, input);
+    acceptedReceiptId = (published.receipt ?? input.receipt).receiptId;
+    return published;
+  } } });
+  try { return await (decision.sourceId.endsWith(":approve") ? service.approve(actor, workId, raw) : service.launch(actor, workId, raw)); }
+  catch (error) {
+    if (acceptedReceiptId) throw new WebsitePublicationAcceptedError(workId, acceptedReceiptId);
+    throw error;
+  }
 }

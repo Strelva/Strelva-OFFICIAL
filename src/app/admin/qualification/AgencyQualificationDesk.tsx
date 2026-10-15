@@ -64,7 +64,7 @@ export function AgencyQualificationDesk() {
     <StTextButton disabled={busy} onClick={() => setAttempt(value => value + 1)}>Reload decisions</StTextButton>
     {message ? <StNotice tone={uncertain ? "critical" : undefined}>{message}</StNotice> : null}
     {!current ? <StSkeleton label="Loading agency submissions" /> : current.error ? <StNotice tone="critical">{current.error} Availability has not been confirmed. The displayed records may be stale.</StNotice> : null}
-    {current?.submissions && !latest.length ? <StEmpty>No agency evidence is waiting. Agencies submit from their Verification page.</StEmpty> : current ? latest.map(item => <DecisionForm key={item.id} submission={item} disabled={busy || uncertain || refreshing || !!current.error} onDecide={decide} />) : null}
+    {current?.submissions && !latest.length ? <StEmpty>No agency evidence is waiting. Agencies submit from their Verification page.</StEmpty> : current ? latest.map(item => <DecisionForm key={item.id} submission={item} disabled={busy || uncertain || refreshing || !!current.error || item.canReview !== true} onDecide={decide} />) : null}
     {(current?.submissions?.length ?? 0) > latest.length ? <StRows>{current!.submissions!.filter(item => !latest.includes(item)).map(item => <StRow key={item.id} title={`${item.agencyName} · ${qualificationRequirements[item.effect].name}`} detail={`${item.decision ?? "In review"} · ${item.reason ?? "No decision recorded"}`} />)}</StRows> : null}
   </>;
 }
@@ -80,7 +80,8 @@ function DecisionForm({ submission, disabled, onDecide }: { submission: Qualific
       <a className="text-sm underline underline-offset-4" href={submission.evidenceUrl} target="_blank" rel="noopener noreferrer">Open submitted evidence</a>
       <p className="text-sm text-gray-muted">Submitted {new Date(submission.submittedAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC by {submission.submittedBy}</p>
       {submission.reason ? <p className="text-sm">Last operator decision: {submission.reason} · {submission.decidedBy}</p> : null}
-      <form className="space-y-4" onSubmit={event => { event.preventDefault(); void onDecide(submission.id, decision, reason); }}>
+      {submission.canReview !== true ? <StNotice>{submission.canReview === false ? "You belong to this agency. Its evidence stays in the platform review queue for an independent reviewer; you cannot record its decision." : "Review permission could not be confirmed. Reload decisions before recording a decision."}</StNotice> : null}
+      <form className="space-y-4" onSubmit={event => { event.preventDefault(); if (!disabled) void onDecide(submission.id, decision, reason); }}>
         <SelectInput label="Availability for this effect" options={decisions} value={decision} disabled={disabled} onChange={event => setDecision(event.target.value)} />
         <TextArea label="Evidence checked and next action" value={reason} onChange={event => setReason(event.target.value)} required minLength={10} maxLength={500} disabled={disabled} />
         <StPill type="submit" disabled={disabled}>Record qualification decision</StPill>

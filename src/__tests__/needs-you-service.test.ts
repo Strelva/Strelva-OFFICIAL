@@ -90,7 +90,7 @@ function memoryStore(clock: { now: number }) {
 
 function ev(over: Partial<UnifiedEvent>): UnifiedEvent {
   return { id: "evt-1", tenantId: "fixture-firm", source: "ai", type: "review", title: "Drafted reply for Dana's 4-star review", body: "Thank you, Dana!", status: "pending",
-    createdAt: "2026-10-05T09:02:00Z", metadata: { kind: "review_reply_draft", rating: 4, reviewId: "r1" }, ...over };
+    createdAt: "2026-10-05T09:02:00Z", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 4, reviewId: "r1" }, ...over };
 }
 
 let clock: { now: number };
@@ -141,7 +141,7 @@ beforeEach(() => {
 describe("Needs you items from the tenant model", () => {
   it("opens one item per owner-visible pending event and nothing for operator or auto-post asks", async () => {
     events.set("evt-2", ev({ id: "evt-2", metadata: { kind: "agent_preview", governanceReason: "marketing_copy", reviewAudience: "operator" }, type: "content_update" }));
-    events.set("evt-3", ev({ id: "evt-3", metadata: { kind: "review_reply_draft", rating: 5, autoPostAt: "2026-10-06T21:00:00Z" } }));
+    events.set("evt-3", ev({ id: "evt-3", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 5, autoPostAt: "2026-10-06T21:00:00Z" } }));
     events.set("evt-4", ev({ id: "evt-4", type: "change_verify_failed", metadata: {} }));
     const { items } = await service().list(OWNER, WS);
     expect(items.map(i => i.sourceId)).toEqual(["fixture-firm:evt-1"]);
@@ -183,7 +183,7 @@ describe("deciding", () => {
 
   it("refuses a link once the reply changed since the email, and opens the new revision", async () => {
     const { svc, item } = await opened();
-    events.set("evt-1", ev({ body: "Thanks so much, Dana!", metadata: { kind: "review_reply_draft", rating: 4, reviewId: "r1", draftedReply: "edited" } }));
+    events.set("evt-1", ev({ body: "Thanks so much, Dana!", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 4, reviewId: "r1", draftedReply: "edited" } }));
     const result = await svc.decide({ workspaceId: WS, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test" } });
     expect(result.status).toBe("changed");
     expect(resolveEventAction).not.toHaveBeenCalled();

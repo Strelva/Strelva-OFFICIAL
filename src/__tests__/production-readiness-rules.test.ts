@@ -610,11 +610,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(supplyChain).toContain("audit_data_unavailable_or_muted");
     expect(supplyChain).toContain("unbounded_package_audit_ignore_forbidden");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");
-    // CI gates the dependency audit at HIGH+ (high advisories are patched via
-    // pnpm overrides). Plain `pnpm audit` fails on any transitive moderate/low
-    // — mostly unfixable Sanity-CLI build-tooling deps not reachable in the
-    // production runtime — so it could never pass and kept CI permanently red.
-    expect(ci).toContain("pnpm audit --audit-level high");
+    // CI uses the dated development-only advisory exception policy, while
+    // separately rejecting every production HIGH+ finding and muted response.
+    expect(ci).toContain("pnpm check:supply-chain");
+    expect(ci).not.toContain("run: pnpm audit --audit-level high");
     expect(ci).toContain("REB_DEV_UNGATED_ACCESS");
     expect(designKit).toContain("pnpm audit");
     expect(designKit).toContain("pnpm check:release");
@@ -1080,8 +1079,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
 
     expect(accessRequest).toContain("isRateLimitedWindowedAsync");
     expect(accessRequest).not.toContain("isRateLimitedWindowed(");
-    expect(accessRequest).toContain("normalizedEmail");
-    expect(accessRequest).toContain("safeDescription");
+    expect(accessRequest).toContain('next: "/agencies"');
+    expect(accessRequest).not.toContain("saveDeliveryLead");
+    expect(accessRequest).not.toContain("sendNewIntakeLeadEmail");
     expect(accessRequest).toContain("readJsonObject(req)");
     expect(accessRequest).toContain("Invalid request body");
 

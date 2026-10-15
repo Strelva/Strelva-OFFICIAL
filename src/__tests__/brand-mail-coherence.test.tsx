@@ -189,7 +189,7 @@ describe("neutral owner navigation identity", () => {
     expect(html).toContain('aria-label="Workspace navigation"');
     expect(html).toContain("Agency identity unavailable");
     expect(html).toContain('aria-label="Workspace home"');
-    expect(html).toContain('aria-label="Strelva platform"');
+    expect(html).not.toContain('aria-label="Strelva platform"');
     expect(html).not.toContain('aria-label="Strelva home"');
     expect(html).not.toContain('>Strelva</span>');
   });

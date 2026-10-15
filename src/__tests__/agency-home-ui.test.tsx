@@ -41,6 +41,7 @@ const page = (clients: AgencyClientRow[], extra: Partial<AgencyClientsPage> = {}
   { agencyWorkspaceId: AGENCY, clients, queue: [], team: [], total: clients.length, nextCursor: null, providersRead: true, ...extra });
 
 const library: AgencyLibrary = {
+  reviewEnabled: true,
   agencyWorkspaceId: AGENCY,
   sources: [{
     systemId: uuid("53000000", 1), workspaceId: AGENCY, name: "Inquiry intake", hidden: false,
@@ -53,12 +54,12 @@ const library: AgencyLibrary = {
   }],
 };
 
-async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn()) {
+async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn(), view?: "home" | "clients" | "queue" | "library") {
   const node = document.createElement("div"); document.body.appendChild(node);
   const root = createRoot(node); roots.push(root);
   await act(async () => {
     root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(AgencyHome, {
-      snapshot: snapshot(systems), busy: false, onWorkspace, onOpenClientWork: vi.fn(), onOpenWork: vi.fn(), onStart: vi.fn(),
+      view, snapshot: snapshot(systems), busy: false, onWorkspace, onOpenClientWork: vi.fn(), onOpenWork: vi.fn(), onStart: vi.fn(),
     })));
   });
   await settle();
@@ -274,4 +275,40 @@ describe("Import clients entry (flagged)", () => {
     const legacy = await renderWith({ systems: false, agencyAddClient: true, agencyImportClients: true });
     expect(importLinks(legacy).map((link) => link.textContent)).toEqual(["Import clients"]);
   });
+});
+
+
+it("lets the real sidebar own navigation and keeps Build accessible beside the portfolio", async () => {
+  const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
+  const { node } = await render(request, true, vi.fn(), "clients");
+  expect(node.querySelector('[role="tablist"]')).toBeNull();
+  expect(node.querySelector('[role="tabpanel"]')).toBeNull();
+  expect(button(node, "Build for a client")).toBeDefined();
+  expect(node.querySelector('h1')?.textContent).toBe("Clients");
+  expect(node.textContent).toContain("2 clients");
+  expect(request.mock.calls.some(([url]) => String(url).includes("agency-proposals"))).toBe(false);
+});
+
+it("opens a distinct agency Home with the same scoped portfolio and a Clients action", async () => {
+  const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
+  const { node } = await render(request, true, vi.fn(), "home");
+  expect(node.querySelector("h1")?.textContent).toBe("Strelva");
+  expect(node.querySelector('section[aria-label="Home"]')).not.toBeNull();
+  expect(node.querySelector('[role="tablist"]')).toBeNull();
+  expect(node.textContent).toContain("2 clients");
+  expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(2);
+  expect(button(node, "View clients")).toBeDefined();
+  expect(clientCalls(request)).toHaveLength(1);
+});
+
+it("keeps the Queue focused on waiting claims and incoming proposals instead of listing settings", async () => {
+  const request = router({ clients: () => Response.json(page([row(1)], { queue: [{ id: "claim-1", kind: "owner_claim", workspaceId: row(1).workspaceId, clientName: "Client 1", title: "Waiting on Client 1 to claim", workId: null, systemId: null, since: "2026-10-14T12:00:00Z" }] })) });
+  const original = request.getMockImplementation()!;
+  request.mockImplementation(async (input, init) => String(input).includes("agency-proposals") ? Response.json({ proposals: [{ proposalId: "a".repeat(64), businessWorkspaceId: row(2).workspaceId, businessName: "New business", consent: "Owner consent", proposedAt: "2026-10-14T12:00:00Z", scopes: [{ scope: "website", level: "prepare" }] }], listing: { listed: true, summary: "Business tools" } }) : original(input, init));
+  const { node } = await render(request, true, vi.fn(), "queue");
+  expect(node.textContent).toContain("Waiting on Client 1 to claim");
+  expect(node.textContent).toContain("New business");
+  expect(node.textContent).toContain("Website · Prepare");
+  expect(node.textContent).not.toContain("Your listing");
+  expect(button(node, "Accept")).toBeDefined();
 });

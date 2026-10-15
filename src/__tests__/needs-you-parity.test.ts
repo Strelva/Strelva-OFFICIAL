@@ -21,9 +21,9 @@ const history: UnifiedEvent[] = [
   // Governance published a factual update with no review.
   ev({ type: "content_update", status: "auto_approved", metadata: { section: "hours" } }),
   // Review replies: auto mode 5 stars, auto mode 1 star, approve mode 4 stars.
-  ev({ type: "review", status: "approved", metadata: { kind: "review_reply_draft", rating: 5, autoPostAt: "2026-10-01T20:00:00Z" } }),
-  ev({ type: "review", status: "pending", metadata: { kind: "review_reply_draft", rating: 1, autoPostAt: "2026-10-01T20:00:00Z" } }),
-  ev({ type: "review", status: "pending", metadata: { kind: "review_reply_draft", rating: 4 } }),
+  ev({ type: "review", status: "approved", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 5, autoPostAt: "2026-10-01T20:00:00Z" } }),
+  ev({ type: "review", status: "pending", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 1, autoPostAt: "2026-10-01T20:00:00Z" } }),
+  ev({ type: "review", status: "pending", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 4 } }),
   // Google drafts the owner asked for in chat, and one Strelva proposed.
   ev({ type: "content_update", status: "pending", metadata: { kind: "gbp_post_draft", reviewAudience: "owner" } }),
   ev({ type: "content_update", status: "pending", metadata: { kind: "gbp_photo_draft", reviewAudience: "operator" } }),
@@ -95,6 +95,12 @@ describe("tenant event classification", () => {
     expect(classifyTenantEvent(at(13))).toBeNull();
     expect(classifyTenantEvent(at(14))).toBeNull();
     expect(classifyTenantEvent(at(15))).toBeNull();
+  });
+
+  it.each(["template", undefined])("routes a stale-timer %s draft to the owner", (replyGeneration) => {
+    const event = ev({ type: "review", status: "pending", metadata: { kind: "review_reply_draft", replyGeneration, rating: 5, autoPostAt: "2026-10-01T20:00:00Z" } });
+    expect(observedTenantRoute(event).route).toBe("owner_decides");
+    expect(replayTenantParity({ ...settings, replyMode: "auto" }, [event]).rows[0]).toMatchObject({ observed: "owner_decides", evaluated: "owner_decides" });
   });
 
   it("observes today's route from what the event records", () => {

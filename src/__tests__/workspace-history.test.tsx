@@ -204,7 +204,7 @@ it("agency client work opens a new history entry and Back restores the agency", 
     return Response.json({ ...data, releases: { ...data.releases, systems: true } });
   }) as typeof fetch;
   const node = await render(request);
-  const tab = [...node.querySelectorAll<HTMLButtonElement>("[role='tab']")].find(item => item.textContent?.startsWith("Queue"))!;
+  const tab = [...node.querySelectorAll<HTMLAnchorElement>("aside a")].find(item => item.textContent?.trim() === "Queue")!;
   expect(tab).toBeDefined();
   await act(async () => tab.click()); await settle();
   const open = [...node.querySelectorAll<HTMLButtonElement>("button")].find(item => item.textContent?.startsWith("Open saved assessment"))!;

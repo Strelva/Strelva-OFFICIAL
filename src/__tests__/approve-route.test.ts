@@ -94,6 +94,19 @@ describe("GET /api/approve (confirm step — must NOT mutate)", () => {
 });
 
 describe("POST /api/approve (the real resolve)", () => {
+  it.each(["paused", "unavailable"])("shows an honest budget pause: %s", async kind => {
+    const { ModelBudgetPausedError, ModelBudgetUnavailableError } = await import("@/platform/infra/business-ai-budget");
+    const error = kind === "paused" ? new ModelBudgetPausedError(0, 0, {}) : new ModelBudgetUnavailableError();
+    const { signApproveToken } = await import("@/lib/approve-link");
+    mockResolveEventAction.mockRejectedValueOnce(error);
+    const response = await postReq(signApproveToken(claims));
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain("Building is paused");
+    expect(html).not.toContain("Completion recorded");
+    expect(html).not.toContain("We hit a snag");
+  });
+
   it("shows the recorded legacy receipt and keeps an accepted effect non-retryable on failed read-back", async () => {
     const { signApproveToken } = await import("@/lib/approve-link");
     mockGetEventRaw.mockResolvedValue({ tenantId: "gldf", title: "North Studio posted the review reply", metadata: { actor: { kind: "agency", displayName: "North Studio" } } });

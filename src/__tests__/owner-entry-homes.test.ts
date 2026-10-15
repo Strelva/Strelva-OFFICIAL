@@ -148,7 +148,7 @@ describe("Reviews reads the same stores as /dashboard/reviews", () => {
     placeId: async () => "PLACE",
     replyMode: async () => "auto",
     pendingDrafts: async () => [
-      { metadata: { kind: "review_reply_draft", reviewId: "gbp_1", draftedReply: "Thanks, Jane!", autoPostAt: "2026-09-02T12:00:00Z" } },
+      { metadata: { kind: "review_reply_draft", replyGeneration: "model", reviewId: "gbp_1", draftedReply: "Thanks, Jane!", autoPostAt: "2026-09-02T12:00:00Z" } },
       { metadata: { kind: "review_reply_draft", reviewId: "gbp_2", draftedReply: "ignored, already replied" } },
       { metadata: { kind: "something_else", reviewId: "gbp_1" } },
     ],
@@ -400,4 +400,9 @@ describe("Business details", () => {
     expect(await saveBusinessDetails(ACTOR, WS, 4, form({ phone: "716-555-0100" }), saveDeps({ patch: async () => { throw new Error("pg"); } }))).toEqual({ outcome: "failed" });
     expect(await saveBusinessDetails(ACTOR, WS, 4, form({ display_name: "Lakeshore" }), saveDeps())).toEqual({ outcome: "unchanged" });
   });
+});
+
+it.each(["template", undefined])("does not promise an automatic post for %s provenance", (replyGeneration) => {
+  const drafts = draftsByReview([{ metadata: { kind: "review_reply_draft", replyGeneration, reviewId: "held", draftedReply: "Draft for review", autoPostAt: "2026-09-02T12:00:00Z" } }]);
+  expect(drafts.get("held")).toEqual({ reply: "Draft for review", autoPostAt: null });
 });

@@ -8,8 +8,8 @@ import { ProviderEvidenceUnavailableError } from "@/platform/work-economics/prov
 import { assertCanSaveWork, saveWork, type PersistedWorkPlanOutput, type WorkspaceActor } from "@/platform/workspaces";
 import { createWorkPlanRequestSchema, WORK_PLAN_PRODUCT_ID, WORK_PLAN_RESOURCE_KIND, workPlanOutputExecutionReceiptSchema, workPlanOutputExecutionSchema, type WorkPlanEvidence, type WorkPlanOutputExecution, type WorkPlanRecord, type CreateWorkPlanRequest } from "./contracts";
 import { prepareWorkPlanContext, preparedWorkPlanContextSchema } from "./context";
-import { WorkPlanUnavailableError, WorkPlanFundingRequiredError, WorkPlanGenerationReplayError, WorkPlanInvalidOutputError } from "./errors";
-import { type WorkPlanGenerationInput, type WorkPlanGenerator, planningEnabled, configuredModels, assertWorkPlanModelAdmission, defaultGenerate, unwrapGeneration } from "./generation";
+import { WorkPlanUnavailableError, WorkPlanGenerationReplayError, WorkPlanInvalidOutputError } from "./errors";
+import { type WorkPlanGenerationInput, type WorkPlanGenerator, planningEnabled, configuredModels, assertWorkPlanModelAdmission, defaultGenerate, nonModelWorkPlan, unwrapGeneration } from "./generation";
 import { normalizePlan } from "./domain";
 import { nativeOperationCatalog } from "./native-output";
 
@@ -51,12 +51,6 @@ export async function createWorkPlan(input: {
     if (request.planningEconomics.fundingWorkspaceId !== undefined && request.planningEconomics.fundingWorkspaceId !== fundingWorkspaceId) throw new WorkspaceAccessError();
   } else if (request.planningEconomics?.fundingWorkspaceId && request.planningEconomics.fundingWorkspaceId !== request.workspaceId) throw new WorkspaceAccessError();
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
-  if (!input.generate && !request.planningEconomics) {
-    // Preserve the existing unavailable state when no model is configured, but
-    // never let a configured provider run without an explicit funding boundary.
-    if (!configuredModels().length) throw new WorkPlanUnavailableError("No planning model is configured");
-    throw new WorkPlanFundingRequiredError();
-  }
 
   if (!input.generate && request.planningEconomics?.approvedModelLabels)
     assertWorkPlanModelAdmission(configuredModels(), request.planningEconomics.approvedModelLabels);
@@ -75,6 +69,7 @@ export async function createWorkPlan(input: {
 
   const catalog = nativeOperationCatalog();
   const generationInput = {
+    workspaceId: request.workspaceId,
     userGoal: request.userGoal,
     evidence,
     allowedOperations: catalog,
@@ -109,19 +104,29 @@ export async function createWorkPlan(input: {
         await authorize();
         if (systemsMaker && await workPlanFundingWorkspace(input.actor, request.workspaceId) !== fundingWorkspaceId) throw new WorkspaceAccessError();
       },
-      perform: async () => ({
-        value: await (input.generate ?? defaultGenerate)({ ...generationInput, executionContext }),
-        // Provider token usage is not a trusted dollar amount. Keep the accepted
-        // maximum held until an independently verified receipt exists.
-        amountCents: null,
-        effect: "accepted" as const,
-      }),
+      perform: async () => {
+        const value = await (input.generate ?? defaultGenerate)({ ...generationInput, executionContext });
+        const generation = unwrapGeneration(value);
+        const localOnly = generation.noProviderCall === true;
+        return {
+          value,
+          // Only proven pre-provider refusal can release the accepted maximum.
+          amountCents: localOnly ? 0 : null,
+          effect: localOnly ? "none" as const : generation.generation === "non_model" ? "unknown" as const : "accepted" as const,
+        };
+      },
     });
     if (result.disposition === "replayed") throw new WorkPlanGenerationReplayError();
     const generation = unwrapGeneration(result.value);
     generated = generation.output;
     planningReceipt = result.execution;
-    if (generation.providerEvidence) {
+    if (generation.generation === "non_model") {
+      planningReconciliation = generation.noProviderCall ? { status: "settled" } : {
+        status: "unresolved",
+        code: "provider_billing_unavailable",
+        message: "AI planning paused after an earlier provider attempt. Its cost is unconfirmed, so the accepted maximum remains held.",
+      };
+    } else if (generation.providerEvidence) {
       try {
         planningReceipt = (await recordTrustedProviderReceipt(executionContext, generation.providerEvidence)).execution;
         planningReconciliation = { status: "settled" };
@@ -144,9 +149,9 @@ export async function createWorkPlan(input: {
       };
     }
   } else {
-    // Custom generators are the deterministic local test/fixture seam. The
-    // production path above cannot invoke a configured model without funding.
-    generated = await input.generate!(generationInput);
+    // A local starting plan remains available without spending or funding.
+    // Custom generators retain the existing deterministic test/fixture seam.
+    generated = unwrapGeneration(await (input.generate ?? nonModelWorkPlan)(generationInput)).output;
   }
   const createdAt = (input.now ?? (() => new Date()))().toISOString();
   const plan = normalizePlan(generated, {

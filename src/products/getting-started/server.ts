@@ -36,7 +36,7 @@ export interface GettingStartedDeps {
   patchRecord: typeof patchBusinessRecord;
   enterBusiness: typeof enterCustomerBusiness;
   readScan: (resultId: string) => Promise<unknown>;
-  readAudit: (resultId: string) => Promise<{ url: string } | null>;
+  readAudit: (resultId: string) => Promise<{ url: string; businessName?: string } | null>;
   saveScan: (input: { actor: WorkspaceActor; workspaceId: string; resultId: string }) => Promise<{ work: { id: string } }>;
   saveAudit: (input: { actor: WorkspaceActor; workspaceId: string; resultId: string }) => Promise<{ id: string }>;
   crawl: typeof crawlWebsite;
@@ -78,7 +78,7 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     if (id.startsWith("audit_")) {
       const audit = await deps.readAudit(id).catch(() => null);
       const website = normalizeBusinessWebsite(audit?.url);
-      return audit ? { resultId: id, kind: "website_audit", name: null, website } : null;
+      return audit ? { resultId: id, kind: "website_audit", name: audit.businessName?.trim().slice(0, 120) || null, website } : null;
     }
     const stored = await deps.readScan(id).catch(() => null);
     const result = stored && typeof stored === "object" ? parseAiVisibilityAssessmentPayload((stored as { result?: unknown }).result) : null;
@@ -129,7 +129,7 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     if (!workspaceId) {
       const entered = await deps.enterBusiness(actor, {
         destination: { kind: "new", name }, initialRequest: null,
-        idempotencyKey: uuidFrom(["getting-started:check", actor.userId, check.resultId, name.toLowerCase()]),
+        idempotencyKey: uuidFrom(["getting-started:check", actor.userId, check.resultId]),
       });
       workspaceId = entered.workspaceId;
       alreadyCreated = entered.alreadyCreated;

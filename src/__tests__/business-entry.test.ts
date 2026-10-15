@@ -7,9 +7,22 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => mocks.availabl
 const actor = { userId: "b9100000-0000-4000-8000-000000000001", verifiedEmail: "Owner@Example.test" };
 const id = "b9100000-0000-4000-8000-000000000002";
 const input = { destination: {kind:"new",name:"Juniper"}, initialRequest:"Have Strelva build our website.", idempotencyKey:"b9100000-0000-4000-8000-000000000003" };
-beforeEach(() => { mocks.available=true; mocks.rpc.mockReset().mockResolvedValue({data:{workspaceId:id,requestId:null,alreadyCreated:false},error:null}); });
+beforeEach(() => { vi.unstubAllEnvs(); mocks.available=true; mocks.rpc.mockReset().mockResolvedValue({data:{workspaceId:id,requestId:null,alreadyCreated:false},error:null}); });
 describe("ordinary customer business entry",()=>{
-  it("uses one actor-bound RPC for ownership and the optional request", async()=>{await enterCustomerBusiness(actor,input);expect(mocks.rpc).toHaveBeenCalledOnce();expect(mocks.rpc.mock.calls[0]).toMatchObject(["enter_customer_business",{p_user_id:actor.userId,p_verified_email:"owner@example.test",p_name:"Juniper",p_business_id:null,p_request_text:input.initialRequest,p_command_id:input.idempotencyKey}]);});
+  it("uses one actor-bound RPC for ownership, releases and the optional request", async()=>{await enterCustomerBusiness(actor,input);expect(mocks.rpc).toHaveBeenCalledOnce();expect(mocks.rpc.mock.calls[0]).toMatchObject(["enter_customer_business_with_releases",{p_user_id:actor.userId,p_verified_email:"owner@example.test",p_name:"Juniper",p_business_id:null,p_request_text:input.initialRequest,p_command_id:input.idempotencyKey}]);});
+  it("passes only server-selected releases and keeps the retry digest stable across rollout changes",async()=>{
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE","1"); vi.stubEnv("STRELVA_SYSTEMS_RELEASE","workspace");
+    await enterCustomerBusiness(actor,input);
+    const before=mocks.rpc.mock.calls[0]![1];
+    expect(before.p_initial_release_flags).toContain("systems");
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE","0"); await enterCustomerBusiness(actor,input);
+    expect(mocks.rpc.mock.calls[1]![1].p_initial_release_flags).not.toContain("systems");
+    expect(mocks.rpc.mock.calls[1]![1].p_command_digest).toBe(before.p_command_digest);
+  });
+  it("rejects browser-supplied release selection",async()=>{
+    await expect(enterCustomerBusiness(actor,{...input,initialReleaseFlags:["systems"]})).rejects.toThrow();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("preserves command digest for retries, changes it when request or actor changes",async()=>{await enterCustomerBusiness(actor,input);await enterCustomerBusiness(actor,input);await enterCustomerBusiness(actor,{...input,initialRequest:"Another request"});await enterCustomerBusiness({...actor,userId:id},input);const hashes=mocks.rpc.mock.calls.map(c=>c[1].p_command_digest);expect(hashes[0]).toBe(hashes[1]);expect(new Set(hashes).size).toBe(3);});
   it("selects an existing business without implicitly creating another",async()=>{await enterCustomerBusiness(actor,{...input,destination:{kind:"existing",workspaceId:id},initialRequest:null});expect(mocks.rpc.mock.calls[0]![1]).toMatchObject({p_business_id:id,p_name:null,p_request_text:null});});
   it.each([{...input,destination:{kind:"new",name:" "}}, {...input,destination:{kind:"existing",workspaceId:"bad"}}, {...input,idempotencyKey:"bad"}, {...input,initialRequest:"x".repeat(3001)}, {...input,destination:{kind:"new",name:"Business",role:"owner"}}, {...input,provider:{kind:"agency"}}])("rejects malformed or expanded inputs before storage",async raw=>{expect(businessEntryInputSchema.safeParse(raw).success).toBe(false);await expect(enterCustomerBusiness(actor,raw)).rejects.toThrow();expect(mocks.rpc).not.toHaveBeenCalled();});

@@ -6,6 +6,7 @@ import type { ServiceRequest, ServiceRequestAgency } from "@/platform/service-re
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { BringInAgency } from "./BringInAgency";
+import type { AgencyScope } from "@/platform/agency-directory/contract";
 import { useServiceRequestProviders } from "./useServiceRequestProviders";
 import { ServiceRequestDeliveryCompletion } from "./ServiceRequestDeliveryCompletion";
 import { StEmpty, StHead, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
@@ -38,6 +39,7 @@ export interface WorkspaceHelpProps {
   onSaved?: (request: ServiceRequest) => void;
   /** An owner may bring in and end agencies (ADR 0015); others see the list. */
   canManageAgencies?: boolean;
+  initialAgencyScope?: AgencyScope;
 }
 
 function requestKey(): string {
@@ -81,7 +83,7 @@ function responseMessage(value: unknown, fallback: string): string {
   return fallback;
 }
 
-export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved, canManageAgencies = false }: WorkspaceHelpProps) {
+export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved, canManageAgencies = false, initialAgencyScope }: WorkspaceHelpProps) {
   const [request, setRequest] = useState(initialRequest);
   const [outcome, setOutcome] = useState("");
   const suppliedRecipients = useMemo(() => agencyOptions === undefined ? providerOptions : agencyOptions.map(option => ({ label: option.label, provider: option.agency })), [agencyOptions, providerOptions]);
@@ -320,7 +322,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService: _hasManagedSer
       {deliveryContextError ? <StNotice tone="critical">{deliveryContextError} <StTextButton onClick={openDeliveryControls}>Try again</StTextButton></StNotice> : null}
     </StSection> : null}
     {editingRequest && deliveryContext ? <ServiceRequestDeliveryCompletion request={editingRequest} installation={deliveryContext.installation} responsibilities={deliveryContext.responsibilities} onRequestUpdated={updated => { setEditingRequest(updated); setSaved(updated); setSavedRequests(current => current.map(item => item.id === updated.id ? updated : item)); }} /> : null}
-    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} /> : <StSection title="Want it done for you?">
+    {workspaceId ? <BringInAgency workspaceId={workspaceId} canManage={canManageAgencies} initialScope={initialAgencyScope} /> : <StSection title="Want it done for you?">
       <p className={styles.copy}>Open your business in Strelva to bring in an agency. You choose what it can do, and it accepts before anything changes.</p>
     </StSection>}
     <StSection title="Working for a client?">

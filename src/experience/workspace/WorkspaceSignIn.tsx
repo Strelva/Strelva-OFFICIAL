@@ -1,3 +1,4 @@
+import { authEmailReady } from "@/components/auth/email-readiness";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import type { ReactNode } from "react";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
@@ -9,7 +10,7 @@ export function WorkspaceSignIn({ next = "/workspace", failed = false, title = "
     <AuthDocumentTitle title={title} />
     {children}
     {failed ? <StNotice tone="critical">Sign-in did not complete. Try again to return to your saved work.</StNotice> : null}
-    <SupabaseSignIn next={next} prefillEmail={prefillEmail} heading={<StHead title={title} meta={description} />} />
+    <SupabaseSignIn emailReady={authEmailReady()} next={next} prefillEmail={prefillEmail} heading={<StHead title={title} meta={description} />} />
     {brand ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
     <StTextButton href={`/sign-up?next=${encodeURIComponent(next)}`}>New here? Create an account</StTextButton>
   </StEntry>;

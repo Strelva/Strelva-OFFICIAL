@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { ComposerDockTarget } from "@/components/ui/strelva/ComposerDockTarget";
 import styles from "./app-frame.module.css";
 
 export interface AppFrameProps {
@@ -141,6 +142,7 @@ export function AppFrame({
   contentId = "app-frame-main",
   className,
 }: AppFrameProps) {
+  const [composerTarget, setComposerTarget] = useState<HTMLDivElement | null>(null);
   const controlledNavigation = navigationCollapsed !== undefined;
   const [storedNavigationCollapsed, setStoredNavigationCollapsed] = useState(defaultNavigationCollapsed);
   const closeRailRef = useRef<HTMLButtonElement>(null);
@@ -329,9 +331,14 @@ export function AppFrame({
           className={styles.columns}
           data-right-rail={railIsOpen ? "open" : "closed"}
         >
-          <main id={contentId} tabIndex={-1} className={styles.main} data-frame-main inert={mobileRailModal || undefined}>
-            {children}
-          </main>
+          <ComposerDockTarget.Provider value={composerTarget}>
+            <div className={styles.workColumn} inert={mobileRailModal || undefined}>
+              <main id={contentId} tabIndex={-1} className={styles.main} data-frame-main inert={mobileRailModal || undefined}>
+                {children}
+              </main>
+              <div ref={setComposerTarget} className={styles.composerSlot} data-frame-composer />
+            </div>
+          </ComposerDockTarget.Provider>
           {rightRail && (
             <aside
               id={rightRailId}

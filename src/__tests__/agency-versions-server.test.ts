@@ -40,6 +40,13 @@ const SOURCE = "a0000000-0000-4000-8000-0000000000c1";
 const VERSION = "a0000000-0000-4000-8000-0000000000d1";
 
 describe("agency routes", () => {
+  it("holds Library preparation while owner reviews are off", async () => {
+    vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "0");
+    const response = await postLibrary(new Request(`${ORIGIN}/api/workspace/agency-library`, { method: "POST", headers: { origin: ORIGIN, "content-type": "application/json" }, body: JSON.stringify({ action: "review_all", workspaceId: AGENCY, sourceSystemId: SOURCE, revision: 2, versionIds: [VERSION] }) }));
+    expect(response.status).toBe(503);
+    expect(deps.review).not.toHaveBeenCalled();
+    expect((await response.json()).error).toContain("Owner reviews are paused");
+  });
   beforeEach(() => {
     deps.user = { id: "11111111-1111-4111-8111-111111111111", email: "Ops@Example.test", email_confirmed_at: "2026-10-01" };
     deps.clients.mockReset().mockResolvedValue({ agencyWorkspaceId: AGENCY, clients: [], queue: [], team: [], total: 0, nextCursor: null, providersRead: false });
@@ -48,6 +55,7 @@ describe("agency routes", () => {
     deps.limited.mockReset().mockResolvedValue(false);
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+    vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
   });
   afterEach(async () => {
     vi.unstubAllEnvs();

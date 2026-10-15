@@ -1,5 +1,61 @@
 # Strelva 1.0 release packet
 
+## Current record · October 14, 2026
+
+This section supersedes the October 7 status summary below. It records supplied
+October 12–13 go-live facts and the October 14 state audit; this lane performed
+no production read or write. The historical commands are retained for recovery,
+not offered as the next execution plan. Do not replay completed or possibly
+completed conversions from an old checklist.
+
+- **Recorded, October 12–13:** the 1.0 app went live, and eleven existing clients
+  were converted. The supplied deployment identifier is
+  `dpl_9ZxngAkwr4f3wWSC1QExZ6cbdqLH`; the supplied source is `8d9dc15e7`.
+  Neither is an immutable deployment-to-source receipt verified by this lane.
+  The recorded 392 production migrations and 55/55 storefront parity receipt
+  likewise require their private receipt before being treated as current proof.
+- **Observed by the October 14 audit:** app health was healthy and reported
+  `0.2.0`; sign-up displayed both doors. Add-client, claim review and website
+  rebuild rendered. These observations support workspace, business sign-up,
+  agency sign-up, agency add-client, claim review and website rebuild being on;
+  they are not an environment export. Needs you returned 404. Systems, Ask,
+  import, model-call, cap and email settings remain unverified.
+- **Observed by that audit:** Vercel denied access to the `strelva` scope (403).
+  Current deployment identity, immutable source, runtime error volume, effective
+  flag receipt, production migration inventory and completed outside-account
+  sign-in are unknown. Unknown errors do not mean zero errors.
+- **Recorded operating constraint:** the eleven clients remain silent: no
+  client email, owner invitations or workspace owner entry is authorized. Keep
+  legacy `/dashboard` available. No flag, price, SMTP, DNS or secret changes are
+  authorized by this source preparation.
+- **Prepared here:** `package.json` is 1.0.0; health reads that version unless
+  `APP_VERSION` explicitly overrides it. The changelog entry remains Unreleased
+  until deployment and tag receipts exist. Marketing must use the same version
+  before the coordinated cut. No release tag or deployment was made here.
+
+The October 7 HOLD and pending decision text below are historical evidence;
+they cannot establish today's conversion status or grant authority. Before any
+further migration or conversion, reconcile the actual catalog and conversion
+receipts against the candidate and obtain the separate required approval.
+
+### Current release gates
+
+See [launch blockers](launch-blockers.md#current-blockers) for owners and closure
+evidence. Required next proof: composed typecheck/units, clean database replay
+and full ordered upgrade, built-app browser contexts including `recorded`,
+ordinary-account direct and agency journeys, and authenticated hosted readback.
+The browser `recorded` profile reproduces only the six observed-on gates; it
+keeps unknown flags off and does not claim to reproduce every production value.
+
+The secret scan intentionally retains two historical `dev-tenants.json`
+revalidation findings until both live client secrets are rotated and verified.
+The 47 exact fingerprint suppressions covering 263 reviewed hashes and
+disposable fixtures do not waive those findings. Sentry needs server DSN and public browser DSN configuration followed
+by a new deployment and a controlled scrubbed-error receipt. The source changes
+alone prove no hosted delivery, error ingestion or database replay.
+
+### Historical preparation · October 6–7
+
 Created: 2026-10-06 against `integrate/reborn-1.0` at `9e0bd441`.
 Updated: 2026-10-06 on `w2/release-hardening`: findings 3, 5, 6, 8, 10 and
 11 are fixed in code and proven locally (tests and SQL checks), never in
@@ -15,10 +71,10 @@ Updated: 2026-10-07 for the agency model (company ADR 0012, accepted Oct 7),
 using audit H, "What ADR 0012 breaks or changes in the in-flight 1.0 release"
 (Oct 7; local evidence in `strelva/.scratch/agency-1.0/audit/H-release-impact.md`),
 tracked in [#315](https://github.com/Strelva/Strelva-OFFICIAL/issues/315).
-Status: steps 0–4 done Oct 7; later steps prepared, not executed by this
-amendment. Every remaining production step is a separate yes.
+Historical status (October 7 amendment): steps 0–4 done Oct 7; later
+steps prepared, not executed by that amendment. Every remaining production step is a separate yes.
 
-**HOLD: steps 11–12 (S5 and conversions) until batch 7A lands.** The hold
+**Historical October 7 HOLD: steps 11–12 (S5 and conversions) until batch 7A lands.** The hold
 decision [#234](https://github.com/Strelva/Strelva-OFFICIAL/issues/234) is
 **pending**, not decided. This packet records the required stop; it does not
 record Jacob's approval of the hold or authorize any production action.

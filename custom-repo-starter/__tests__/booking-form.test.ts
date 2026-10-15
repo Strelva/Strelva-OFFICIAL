@@ -66,7 +66,8 @@ describe("native booking form", () => {
   it("renders a provider-backed schedule without an iframe or provider identifier", async () => {
     await renderForm();
     expect(container.textContent).toContain("Consultation times");
-    expect(container.textContent).toContain("Your booking is confirmed on the business's Outlook calendar");
+    expect(container.textContent).toContain("Choose a time to book with the business.");
+    expect(container.textContent).not.toMatch(/Outlook|Google/);
     expect(container.querySelector("iframe")).toBeNull();
     expect(container.textContent).not.toContain("fixture-");
   });

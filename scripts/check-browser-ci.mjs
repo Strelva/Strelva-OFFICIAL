@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { installProofRoutes, validateContextResult, validateDiscovery, validateNativeOwnership } from "./browser-ci-contexts.mjs";
+import { browserContextEnvironment, recordedProductionRelease, installProofRoutes, validateContextResult, validateDiscovery, validateNativeOwnership } from "./browser-ci-contexts.mjs";
 import { journeyProfile } from "./full-model-journey-profile.mjs";
 import { privateAuthorityProfile } from "./private-authority-journey-window.mjs";
 
@@ -11,8 +11,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "scripts/browser-ci-manifest.json"), "utf8"));
 const work = mkdtempSync(join(tmpdir(), "strelva-browser-ci-"));
 const requested = process.argv.slice(2);
-if (requested.length && (requested.length !== 2 || requested[0] !== "--context" || !["public", "preview", "workspace", "native", "dark", "private"].includes(requested[1]))) throw new Error("Use --context public|preview|workspace|native|dark|private for independent qualification; no argument runs all mandatory contexts.");
-const stages = requested.length ? [requested[1]] : ["public", "preview", "workspace", "native", "dark", "private"];
+if (requested.length && (requested.length !== 2 || requested[0] !== "--context" || !["public", "preview", "workspace", "recorded", "native", "dark", "private"].includes(requested[1]))) throw new Error("Use --context public|preview|workspace|recorded|native|dark|private for independent qualification; no argument runs all mandatory contexts.");
+const stages = requested.length ? [requested[1]] : ["public", "preview", "workspace", "recorded", "native", "dark", "private"];
 let active;
 let cleanup = () => undefined;
 let interrupted = false;
@@ -27,9 +27,9 @@ if (!["0", "1"].includes(publicBuiltApp)) throw new Error("PLAYWRIGHT_BUILT_APP 
 
 // Existing empty values override Next's dotenv loading. Keep this list aligned
 // with check-ci.sh; no caller credential or provider configuration is admitted.
-const empty = ["DATA_SOURCE", "CONTENT_SOURCE", "TENANTS_SOURCE", "REB_DEV_TENANT", "SCAFFOLD_DEV_TENANT", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_PAGESPEED_API_KEY", "SERP_API_KEY", "RESEND_API_KEY", "SLACK_WEBHOOK_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "BLOB_READ_WRITE_TOKEN", "VERCEL_TOKEN", "VERCEL_API_TOKEN", "INTERNAL_API_SECRET", "CRON_SECRET", "OAUTH_STATE_SECRET", "APPROVE_LINK_SECRET", "SECRETS_ENC_KEY", "VERCEL_ENV", "PLAYWRIGHT_BASE_URL", "PLAYWRIGHT_CHANNEL"];
+const empty = ["APP_VERSION", "NEXT_PUBLIC_SENTRY_DSN", "SENTRY_DSN", "DATA_SOURCE", "CONTENT_SOURCE", "TENANTS_SOURCE", "REB_DEV_TENANT", "SCAFFOLD_DEV_TENANT", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_PAGESPEED_API_KEY", "SERP_API_KEY", "RESEND_API_KEY", "SLACK_WEBHOOK_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "BLOB_READ_WRITE_TOKEN", "VERCEL_TOKEN", "VERCEL_API_TOKEN", "INTERNAL_API_SECRET", "CRON_SECRET", "OAUTH_STATE_SECRET", "APPROVE_LINK_SECRET", "SECRETS_ENC_KEY", "VERCEL_ENV", "PLAYWRIGHT_BASE_URL", "PLAYWRIGHT_CHANNEL"];
 const env = Object.fromEntries(["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LC_ALL"].filter(name => process.env[name] !== undefined).map(name => [name, process.env[name]]));
-Object.assign(env, Object.fromEntries(empty.map(name => [name, ""])), { CI: process.env.CI || "", REB_DEV_UNGATED_ACCESS: "0", SCAFFOLD_DEV_UNGATED_ACCESS: "0", STRELVA_UI_PREVIEW: "0", STRELVA_WORKSPACE_RELEASE: "0", STRELVA_CUSTOMERS_RELEASE: "0", PLAYWRIGHT_BUILT_APP: "0", CUSTOM_DOMAIN_MAP: "{}", NEXT_TELEMETRY_DISABLED: "1" });
+Object.assign(env, Object.fromEntries(empty.map(name => [name, ""])), { CI: process.env.CI || "", REB_DEV_UNGATED_ACCESS: "0", SCAFFOLD_DEV_UNGATED_ACCESS: "0", ...browserContextEnvironment("public"), STRELVA_CUSTOMERS_RELEASE: "0", PLAYWRIGHT_BUILT_APP: "0", CUSTOM_DOMAIN_MAP: "{}", NEXT_TELEMETRY_DISABLED: "1" });
 if (process.env.PLAYWRIGHT_PORT) {
   if (!/^\d+$/.test(process.env.PLAYWRIGHT_PORT) || Number(process.env.PLAYWRIGHT_PORT) < 1 || Number(process.env.PLAYWRIGHT_PORT) > 65535) throw new Error("A valid local browser port is required.");
   env.PLAYWRIGHT_PORT = process.env.PLAYWRIGHT_PORT;
@@ -48,6 +48,7 @@ function run(command, args, environment, capture = false) {
 
 try {
   console.log(`Browser CI evidence: ${work}`);
+  writeFileSync(join(work, "recorded-production-release.json"), JSON.stringify(recordedProductionRelease, null, 2));
   const discovery = JSON.parse(await run("pnpm", ["exec", "playwright", "test", "--list", "--reporter=json"], env, true));
   writeFileSync(join(work, "original-discovery.json"), JSON.stringify(discovery));
   const inventory = validateDiscovery(manifest, discovery);
@@ -66,7 +67,7 @@ try {
     const resultPath = join(work, `${context}-results.json`);
     try {
       await run("pnpm", ["exec", "playwright", "test", "--config=playwright.browser-ci.config.ts", "--reporter=line,json"], {
-        ...env, PLAYWRIGHT_BUILT_APP: context === "public" ? publicBuiltApp : "0", STRELVA_BROWSER_CI_CONTEXT: context, STRELVA_UI_PREVIEW: context === "preview" ? "1" : "0", STRELVA_WORKSPACE_RELEASE: context === "public" ? "0" : "1", PLAYWRIGHT_JSON_OUTPUT_FILE: resultPath,
+        ...env, PLAYWRIGHT_BUILT_APP: context === "public" ? publicBuiltApp : "0", STRELVA_BROWSER_CI_CONTEXT: context, ...browserContextEnvironment(context), PLAYWRIGHT_JSON_OUTPUT_FILE: resultPath,
       });
       const count = validateContextResult(manifest, context, JSON.parse(readFileSync(resultPath, "utf8")));
       console.log(`Qualified ${context}: ${count} recorded cases; required cases passed.`);

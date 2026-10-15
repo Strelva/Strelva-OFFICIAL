@@ -18,6 +18,17 @@ async function mount(element: ReturnType<typeof createElement>) {
 }
 function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => (item.getAttribute("aria-label") ?? item.textContent?.trim()) === name)!; }
 describe("website rebuild review", () => {
+  it("shows the saved pause reason and resumes the retained rebuild", async () => {
+    const record = fixtureRebuild("paused");
+    const mutate = vi.fn(async () => record);
+    const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate };
+    await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(record.error!);
+    expect(container.textContent).not.toContain("Retry failed stage");
+    await act(async () => button("Resume saved rebuild").click());
+    expect(mutate).toHaveBeenCalledWith(record, "retry");
+  });
+
   it("reviews one flagged source fact at a time and advances after its saved confirmation", async () => {
     const record = fixtureRebuild();
     const mutate = vi.fn(async (current: typeof record, action: string, extra?: { factId?: string }) => {

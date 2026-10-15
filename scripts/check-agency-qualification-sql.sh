@@ -18,12 +18,17 @@ while IFS= read -r migration; do
   if [[ "$migration" == "$forward" ]]; then psql "${psql_args[@]}" -Atc "$query" >"$cluster_root/before.hash"; fi
   if ! psql "${psql_args[@]}" --file="$migration" >"$cluster_root/migration.log" 2>&1; then printf 'Ordered migration failed: %s\n' "$migration" >&2; cat "$cluster_root/migration.log" >&2; exit 1; fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261025134000_done_agency_qualification_queue.sql" >/dev/null
 psql "${psql_args[@]}" --file="$rollback" >/dev/null
 psql "${psql_args[@]}" -Atc "$query" >"$cluster_root/after.hash"
 cmp "$cluster_root/before.hash" "$cluster_root/after.hash"
 psql "${psql_args[@]}" --file="$forward" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261025134000_done_agency_qualification_queue.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-qualification-independent-review-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-full-control-decisions-schema.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/tests/done-agency-website-decisions-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-qualification-schema.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261025134000_done_agency_qualification_queue.sql" >/dev/null
 if psql "${psql_args[@]}" --file="$rollback" >"$cluster_root/refusal.log" 2>&1; then printf 'Populated qualification rollback unexpectedly succeeded\n' >&2; exit 1; fi
 if ! rg -q agency_qualification_populated_rollback_refused "$cluster_root/refusal.log"; then cat "$cluster_root/refusal.log" >&2; exit 1; fi
 printf 'Agency qualification and Full control: ordered migrations, empty rollback/reapply, submission/decision authority, READ ONLY, revocation and populated rollback refusal passed locally.\n'

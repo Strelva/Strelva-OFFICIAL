@@ -140,3 +140,19 @@ describe("export label matches available data", () => {
     expect(html).not.toContain("Export all workspace data");
   });
 });
+
+
+describe("owner plan and exit destinations", () => {
+  it.each([false, true])("only links the available billing route: %s", businessBillingReleased => {
+    const html = renderToStaticMarkup(createElement(WorkspaceBusinessSettings, { workspace: { id: "business-id", kind: "customer", access: "member", role: "owner", name: "Juniper" }, sites: [], siteAssignmentState: "known", accountHref: "/workspace/account", businessBillingReleased }));
+    expect(html.includes('/workspace/billing?workspaceId=business-id')).toBe(businessBillingReleased);
+    if (!businessBillingReleased) expect(html).toContain("Price shown before you pay");
+    expect(html).toContain('/workspace/export?workspaceId=business-id');
+    expect(html).toContain('/workspace/exit?workspaceId=business-id');
+  });
+  it("does not offer an owner exit action to a read-only visitor", () => {
+    const html = renderToStaticMarkup(createElement(WorkspaceBusinessSettings, { workspace: { id: "business-id", kind: "customer", access: "provider_seat", name: "Juniper" }, sites: [], siteAssignmentState: "known", accountHref: "/workspace/account", businessBillingReleased: true }));
+    expect(html).not.toContain('/workspace/billing?workspaceId=business-id');
+    expect(html).not.toContain('/workspace/exit?workspaceId=business-id');
+  });
+});

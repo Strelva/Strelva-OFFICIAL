@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import type { QualificationState } from "../src/experience/workspace/agency/qualification-model";
 import type { AgencyOnboarding } from "../src/platform/workspaces/agency-onboarding";
 
 test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1" || process.env.STRELVA_AGENCY_SIGNUP_RELEASE !== "1" || process.env.STRELVA_BUSINESS_SIGNUP_RELEASE !== "1",
@@ -12,6 +13,17 @@ test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1" || process.env.STRELVA_A
 
 const AGENCY_ID = "5a000000-0000-4000-8000-000000000010";
 const shots = process.env.AGENCY_SIGNUP_SHOTS;
+
+// The checklist now embeds the same qualification UI used by the agency.
+// Keep this a local presentation fixture: no provider, Auth or verification write.
+let qualification: QualificationState;
+test.beforeEach(async ({ page }) => {
+  qualification = {
+    workspaceId: AGENCY_ID, canSubmit: true, submissions: [],
+    effects: (["publish", "google", "email", "payments"] as const).map(effect => ({ effect, available: false })),
+  };
+  await page.route("**/api/agency-qualification**", route => fulfill(route, { qualification }));
+});
 
 const onboarding = (over: Partial<AgencyOnboarding> = {}): AgencyOnboarding => ({
   agency: { id: AGENCY_ID, name: "Northside Web Care", role: "owner" },
@@ -45,13 +57,13 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     test("sign-up asks business or agency and the agency path leads to setup", async ({ page }) => {
       await page.goto("/sign-up");
       const choice = page.getByRole("navigation", { name: "Who this account is for" });
-      await expect(choice.getByRole("link", { name: "I run a business" })).toHaveAttribute("aria-current", "page");
-      await expect(page.getByRole("heading", { name: "Start your work here." })).toBeVisible();
+      await expect(choice.getByRole("link", { name: /^I run a business/ })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
       await expect(page.getByText("Request your build")).toHaveCount(0);
-      await choice.getByRole("link", { name: "I run an agency" }).click();
+      await choice.getByRole("link", { name: /^I build for clients/ }).click();
       await expect(page).toHaveURL(/\/sign-up\?as=agency$/);
-      await expect(page.getByRole("heading", { name: "Run your client work in Strelva." })).toBeVisible();
-      await expect(choice.getByRole("link", { name: "I run an agency" })).toHaveAttribute("aria-current", "page");
+      await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+      await expect(choice.getByRole("link", { name: /^I build for clients/ })).toHaveAttribute("aria-current", "page");
       await noHorizontalScroll(page);
       if (shots) {
         // A fresh load, so the capture is not mid colour transition from the client navigation.
@@ -73,7 +85,7 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
       });
 
       await page.goto("/workspace/agency/start");
-      await expect(page.getByRole("heading", { name: "Name your agency." })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Name your agency" })).toBeVisible();
       if (shots) await page.screenshot({ path: `${shots}/create-${viewport.name}.png`, fullPage: true });
       await page.getByRole("button", { name: "Create agency" }).click();
       await expect(page.locator("main").getByRole("alert")).toHaveText("Enter your agency’s name.");
@@ -83,14 +95,12 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
       await expect(page.getByRole("heading", { name: "Northside Web Care", level: 1 })).toBeVisible();
       expect(created).toEqual({ action: "create_agency", name: "Northside Web Care" });
       await expect(page).toHaveURL(new RegExp(`/workspace/agency/start\\?workspaceId=${AGENCY_ID}$`));
-      await expect(page.getByText("1 of 4 done · 0 of 4 effects verified")).toBeVisible();
-      const verification = page.getByRole("list", { name: "Verification" });
-      await expect(verification.getByRole("listitem")).toHaveCount(4);
-      for (const name of ["Publishing", "Google", "Email", "Payments"]) await expect(verification.getByText(name, { exact: true })).toBeVisible();
-      await expect(verification.getByText("Not verified")).toHaveCount(4);
+      await expect(page.getByText("1 of 4 setup steps done · 0 of 4 effects verified")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Get verified for client work", exact: true })).toBeVisible();
+      for (const name of ["Publishing", "Google", "Email", "Payments"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(page.getByText("Not available", { exact: true })).toHaveCount(4);
       await expect(page.getByRole("link", { name: "Invite a teammate" })).toHaveAttribute("href", `/workspace/invitations?workspaceId=${AGENCY_ID}`);
-      await expect(page.locator('[aria-current="step"]')).toContainText("Invite your team");
-      await expect(page.getByText("Adding clients opens here next.")).toBeVisible();
+      await expect(page.getByRole("link", { name: "Add your first client", exact: true })).toHaveAttribute("href", `/workspace/agency/clients/new?workspaceId=${AGENCY_ID}`);
       await noHorizontalScroll(page);
       if (shots) await page.screenshot({ path: `${shots}/checklist-${viewport.name}.png`, fullPage: true });
     });
@@ -136,6 +146,8 @@ test("another agency's checklist is refused, and a failed read can be retried", 
 });
 
 test("a member sees verification but cannot invite, and a verified effect reads as verified", async ({ page }) => {
+  qualification.canSubmit = false;
+  qualification.effects[0]!.available = true;
   await page.route("**/api/agency-onboarding**", (route) => fulfill(route, { onboarding: onboarding({
     agency: { id: AGENCY_ID, name: "Northside Web Care", role: "member" }, members: 3, pendingInvitations: null,
     effects: (["publish", "google", "email", "payments"] as const).map((effect) => ({ effect, verified: effect === "publish", recordedAt: null })),
@@ -150,6 +162,7 @@ test("a member sees verification but cannot invite, and a verified effect reads 
   await page.goto(`/workspace/agency/start?workspaceId=${AGENCY_ID}`);
   await expect(page.getByText("Only an owner of Northside Web Care can invite people.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Invite a teammate" })).toHaveCount(0);
-  await expect(page.getByRole("list", { name: "Verification" }).getByText("Verified", { exact: true })).toHaveCount(1);
-  await expect(page.locator('[aria-current="step"]')).toContainText("Add your first client");
+  await expect(page.getByText("Verified", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Submit evidence", exact: true })).toHaveCount(0);
+  await expect(page.getByText("An owner or admin of Northside Web Care adds clients.", { exact: true })).toBeVisible();
 });

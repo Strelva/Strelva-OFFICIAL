@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,18 +15,12 @@ import { WebsiteEntry } from "@/experience/websites/WebsiteEntry";
 import { websiteEntryPath } from "@/experience/websites/site-navigation";
 
 const WS = "11111111-1111-4111-8111-111111111111";
-let root: Root | undefined;
-let container: HTMLDivElement | undefined;
-afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); root = undefined; vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
-async function openAgencyForm(node: React.ReactElement) {
-  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-  await act(async () => root!.render(node));
-  expect(container.querySelector("form")).toBeNull();
-  const choose = [...container.querySelectorAll("button")].find(button => button.textContent?.includes("Ask Strelva Agency to do it for you"));
-  expect(choose).toBeTruthy();
-  await act(async () => choose!.click());
-  return container;
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+function expectNeutralAgencyEntry(html: string) {
+  expect(html).toContain('href="/agencies"');
+  expect(html).toContain("Find an agency");
+  expect(html).not.toContain("Strelva Agency");
+  expect(html).not.toContain("<form");
 }
 const inputValues = (html: string) => [...html.matchAll(/<input[^>]*>/g)].map(match => match[0].match(/value="([^"]*)"/)?.[1] ?? "");
 
@@ -42,19 +35,21 @@ beforeEach(() => {
 });
 
 describe("one website, typed once", () => {
-  it("prefills the access request from the check that sent the person there", async () => {
-    const form = await openAgencyForm(await AccessRequest({ searchParams: Promise.resolve({ ref: "ai-visibility", scan: "scan_abc" }) }));
+  it("carries the check's business and website into the neutral account and agency entry", async () => {
+    const html = renderToStaticMarkup(await AccessRequest({ searchParams: Promise.resolve({ ref: "ai-visibility", scan: "scan_abc" }) }));
+    expectNeutralAgencyEntry(html);
     expect(mocks.readCheck).toHaveBeenCalledWith("scan_abc");
-    expect(form.querySelector<HTMLInputElement>("#business-name")!.value).toBe("Northside Bakery");
-    expect(form.querySelector<HTMLInputElement>("#current-website")!.value).toBe("https://northside.example/");
+    expect(html).toContain("Northside Bakery");
+    expect(html).toContain("https://northside.example/");
   });
 
-  it("leaves the access request blank when the owner door is off (negative control)", async () => {
+  it("does not read or carry the check when the owner door is off (negative control)", async () => {
     vi.stubEnv("STRELVA_BUSINESS_SIGNUP_RELEASE", "0");
-    const form = await openAgencyForm(await AccessRequest({ searchParams: Promise.resolve({ ref: "ai-visibility", scan: "scan_abc" }) }));
+    const html = renderToStaticMarkup(await AccessRequest({ searchParams: Promise.resolve({ ref: "ai-visibility", scan: "scan_abc" }) }));
+    expectNeutralAgencyEntry(html);
     expect(mocks.readCheck).not.toHaveBeenCalled();
-    expect(form.querySelector<HTMLInputElement>("#business-name")!.value).toBe("");
-    expect(form.querySelector<HTMLInputElement>("#current-website")!.value).toBe("");
+    expect(html).not.toContain("Northside Bakery");
+    expect(html).not.toContain("https://northside.example/");
   });
 
   it("preserves the prefilled business and website through the legacy AI-check redirect", async () => {

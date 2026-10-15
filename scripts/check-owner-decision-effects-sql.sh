@@ -79,7 +79,9 @@ hold_owner_session() {
  done
  [[ "$ready" == 1 ]] || { cat "$cluster_root/holder.log" >&2; echo 'Owner effect holder did not acquire authority.' >&2; exit 1; }
 }
-revoke="select public.record_agency_verification('oe-revoker@example.test','$agency','publish','unverified','{}','Race fixture revocation')"
+# Prepare independent fictional qualification evidence for the current policy.
+psql "${psql_args[@]}" -c "insert into public.users(id,email,verified_at) values('b2100000-0000-4000-8000-000000000098','oe-agency-manager@example.test',now()); insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values('$agency','b2100000-0000-4000-8000-000000000098','owner','b2100000-0000-4000-8000-000000000098'); select public.submit_agency_qualification('b2100000-0000-4000-8000-000000000098','oe-agency-manager@example.test','$agency','b2100000-0000-4000-8000-000000000097','publish','https://example.test/owner-effects-proof','Fictional publisher recovery proof')" >/dev/null
+revoke="select public.decide_agency_qualification('oe-revoker@example.test','b2100000-0000-4000-8000-000000000097','unavailable','Race fixture revocation')"
 hold_owner_session
 if PGOPTIONS='-c lock_timeout=150ms' psql "${psql_args[@]}" -c "$revoke" >"$cluster_root/race-revoke.log" 2>&1; then
  echo 'Agency revocation raced an effect already holding authority.' >&2; exit 1
@@ -91,7 +93,7 @@ if psql "${psql_args[@]}" -c "select public.strelva_service_session('$ws','$sid'
  echo 'Revoked effect session was still usable.' >&2; exit 1
 fi
 rg -q 'strelva_service_access_denied' "$cluster_root/revoked-session.log"
-psql "${psql_args[@]}" -c "select public.record_agency_verification('oe-revoker@example.test','$agency','publish','verified','{\"note\":\"race fixture restored\"}',null)" >/dev/null
+psql "${psql_args[@]}" -c "select public.decide_agency_qualification('oe-revoker@example.test','b2100000-0000-4000-8000-000000000097','verified','Race fixture independently requalified')" >/dev/null
 psql "${psql_args[@]}" -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('$ws','b2100000-0000-4000-8000-000000000099','owner','b2100000-0000-4000-8000-000000000099')" >/dev/null
 end_assignment="select public.end_business_provider('b2100000-0000-4000-8000-000000000099','oe-revoker@example.test','$ws','Race fixture end')"
 hold_owner_session

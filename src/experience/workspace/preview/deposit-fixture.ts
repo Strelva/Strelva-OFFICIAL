@@ -23,5 +23,6 @@ export type DepositPreviewState = typeof depositPreviewStates[number];
 /** Fictional shared-token request for local presentation/contract tests only. */
 export const businessDepositFixture: PublicPaymentRequest = {
   id: "a2830000-0000-4000-8000-000000000011", workspaceId: "a2830000-0000-4000-8000-000000000010",
+  businessName: "Lakeview Yoga",
   kind: "deposit", cancellationPolicy: { refundable: true }, lines: [], amountCents: 12000, currency: "usd", expiresAt: "2026-12-01T12:00:00Z", paid: false, status: "unpaid",
 };

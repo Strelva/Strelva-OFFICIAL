@@ -33,6 +33,11 @@ while IFS= read -r migration; do
   fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 apply "$repo_root/tests/agency2-decisions-schema.sql"
+fingerprint composed
+# Later admission wrappers correctly protect their predecessor from rollback.
+# Remove only the empty website successor before testing the original retained
+# scope refusal; the full ordered fixtures above still prove composed behavior.
+apply "$repo_root/supabase/migrations/rollback-20261025133000_done_agency_website_decisions.sql"
 fingerprint final
 # Retain only the first fictional contract transaction for the populated
 # refusal. Resolve its helper explicitly, independent of temporary file paths.
@@ -60,4 +65,10 @@ if ! rg -q 'ux_agency2_decision_rollback_recorded_scopes' "$cluster_root/refusal
 fi
 fingerprint refused
 diff -u "$cluster_root/final.txt" "$cluster_root/refused.txt"
+# Reapply the successor after the retained predecessor refusal. The complete
+# catalog and exact native website execution must still match the merged whole.
+apply "$repo_root/supabase/migrations/20261025133000_done_agency_website_decisions.sql"
+fingerprint recomposed
+diff -u "$cluster_root/composed.txt" "$cluster_root/recomposed.txt"
+apply "$repo_root/tests/done-agency-website-decisions-schema.sql"
 printf 'Agency2 decisions SQL passed: supported claim and exact receipt, unsupported source refusal, current-scope recovery, immutable snapshot, inverse/reapply, populated refusal.\n'

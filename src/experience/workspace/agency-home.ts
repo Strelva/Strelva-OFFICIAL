@@ -53,6 +53,7 @@ export interface AgencyClientsView {
   total: number;
   nextCursor: string | null;
   queueGaps: string[];
+  queueComplete: boolean;
 }
 
 /**
@@ -82,6 +83,7 @@ export function combineAgencyPages(pages: readonly AgencyLoadedPage[]): AgencyCl
     total: last?.total ?? 0,
     nextCursor: last?.nextCursor ?? null,
     queueGaps: [...new Set(pages.flatMap(({ page }) => page.queueGaps ?? []))],
+    queueComplete: Boolean(last) && !last?.nextCursor && clients.size >= (last?.total ?? 0) && pages.every(({ page }) => page.queueComplete !== false && !page.queueGaps?.length),
   };
 }
 
@@ -137,6 +139,7 @@ const QUEUE_KIND_LABEL: Record<AgencyQueueItem["kind"], string> = {
   improvement: "Improvement ready",
   health: "System health",
   owner_email: "Owner email",
+  owner_claim: "Waiting for the business to claim",
   operator: "Platform support",
 };
 

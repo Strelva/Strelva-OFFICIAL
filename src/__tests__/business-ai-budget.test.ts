@@ -70,3 +70,32 @@ describe("business AI budget (ADR 0015)", () => {
     expect(await reserveBusinessAiBudget(WS, "0.01", null, { rpc: async () => ({ data: {}, error: null }) })).toBeNull();
   });
 });
+
+
+describe("truthful budget pauses", () => {
+  it("does not say unused building usage was spent and offers one available next step", async () => {
+    const environment = { ...on, STRELVA_FREE_MONTHLY_AI_CAP_USD: "0" };
+    const reserve = vi.fn();
+    await expect(assertBusinessAiBudget(context, { environment, read: async () => budget("0", null, false), reserve }))
+      .rejects.toThrow("Building is paused because this business has no included building usage. Bring in an agency to continue with help.");
+    expect(reserve).not.toHaveBeenCalled();
+    expect(new ModelBudgetPausedError(0, 0, environment).message).not.toContain("used its available");
+  });
+  it("offers a plan only when checkout can actually open", () => {
+    const ready = { STRELVA_SELF_SERVE_BILLING: "1", STRELVA_WORKSPACE_PRICE_ID: "price_test", STRIPE_SECRET_KEY: "test-only" };
+    expect(new ModelBudgetPausedError(0, 0, ready).message).toContain("Open Plan and billing to choose a plan.");
+    expect(new ModelBudgetPausedError(0, 0, { ...ready, STRELVA_WORKSPACE_PRICE_ID: "" }).message).toContain("Bring in an agency");
+    expect(new ModelBudgetPausedError(1, 2, {}).message).toContain("this work would exceed");
+  });
+  it("preserves an uncapped paid entitlement when the free cap is zero", async () => {
+    const reserve = vi.fn();
+    await expect(assertBusinessAiBudget(context, { environment: { ...on, STRELVA_FREE_MONTHLY_AI_CAP_USD: "0" }, read: async () => budget("5", null, true), reserve })).resolves.toBeNull();
+    expect(reserve).not.toHaveBeenCalled();
+  });
+});
+
+it("does not strip uncapped paid AI because an earlier call has an unpriced cost", async () => {
+  const reserve = vi.fn();
+  await expect(assertBusinessAiBudget(context, { environment: { ...on, STRELVA_FREE_MONTHLY_AI_CAP_USD: "0" }, read: async () => ({ ...budget("5", null, true), unknownCostCalls: 1 }), reserve })).resolves.toBeNull();
+  expect(reserve).not.toHaveBeenCalled();
+});

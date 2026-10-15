@@ -8,6 +8,7 @@ export function isPlatformPublicPath(pathname: string): boolean {
 /** Optional public-site origin. No same-host redirect: it would loop when
  * marketing traffic itself reaches the app's fallback entry. */
 export function marketingEntryTarget(host: string, search = "", configured = process.env.STRELVA_MARKETING_ORIGIN): string | null {
+  if (host.toLowerCase().split(":")[0] === new URL(CONTROL_PLANE_URL).hostname) return null;
   if (!configured?.trim()) return null;
   try {
     const url = new URL(configured.trim());

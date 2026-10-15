@@ -1,3 +1,4 @@
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { actorCopy, actorLabel } from "@/platform/presentation/actor";
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
@@ -317,6 +318,9 @@ async function postPage(request: Request): Promise<NextResponse> {
     // An accepted action is never replayed if its presentation read fails.
     if (result.changed && claims.action === "approve") receiptEvent = await getEventRaw(claims.eventId).catch(() => null);
   } catch (err) {
+    if (err instanceof ModelBudgetPausedError || err instanceof ModelBudgetUnavailableError) {
+      return noticePage({ status: 200, heading: "Building is paused", body: err.message, dashboardUrl, buttonLabel: "Open your workspace" });
+    }
     console.error(`[api/approve] resolveEventAction threw for ${claims.tenantId}/${claims.eventId}:`, err);
     return noticePage({
       status: 200,

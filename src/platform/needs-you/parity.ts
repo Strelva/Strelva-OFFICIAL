@@ -102,7 +102,7 @@ export function replayTenantParity(settings: TenantPolicySettings, events: reado
     // Only routes in force when the change was proposed apply (spec 3.16): a
     // review reply drafted with an auto-post time was drafted in auto mode.
     const policies = classification.kind === "review.reply"
-      ? replyPolicies(seeded.policies, typeof event.metadata?.autoPostAt === "string")
+      ? replyPolicies(seeded.policies, event.metadata?.replyGeneration === "model" && typeof event.metadata?.autoPostAt === "string")
       : seeded.policies;
     const evaluation = evaluateRoute({
       kind: classification.kind,

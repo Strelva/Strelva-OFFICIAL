@@ -54,6 +54,19 @@ it("fails closed when the business publishing release is off or unreadable", asy
   const f = fixture(); await sendApprovedNewsletterIssues({ ...f, released: async () => { throw new Error("unavailable"); } });
   expect(f.store.finish).toHaveBeenCalledWith(batch, { status: "gated", detail: "not sent: gated" }); expect(f.send).not.toHaveBeenCalled();
 });
+it("records an unreadable mail gate without beginning a send and continues with later issues", async () => {
+  const f = fixture();
+  const next = { ...batch, id: "cc000000-0000-4000-8000-000000000005", issueId: "cc000000-0000-4000-8000-000000000006" };
+  f.store.list.mockResolvedValue([batch.issueId, next.issueId]);
+  f.store.claim.mockResolvedValueOnce(batch).mockResolvedValueOnce(null).mockResolvedValueOnce(next).mockResolvedValueOnce(null);
+  const suppression = vi.fn().mockRejectedValueOnce(new Error("private gate lookup failed")).mockResolvedValueOnce(null);
+  expect(await sendApprovedNewsletterIssues({ ...f, suppression })).toMatchObject({ gated: 1, accepted: 1 });
+  expect(f.store.finish).toHaveBeenCalledWith(batch, { status: "gated", detail: "not sent: email gates unavailable" });
+  expect(f.store.begin).toHaveBeenCalledTimes(1);
+  expect(f.store.begin).toHaveBeenCalledWith(next);
+  expect(f.send).toHaveBeenCalledTimes(1);
+  expect(f.send).toHaveBeenCalledWith(expect.objectContaining({ idempotencyKey: `workspace-newsletter:${next.id}` }));
+});
 it("records suppression when every snapshotted subscriber has opted out", async () => {
   const f = fixture(); f.store.begin.mockResolvedValue([]);
   expect(await sendApprovedNewsletterIssues(f)).toMatchObject({ suppressed: 1 }); expect(f.send).not.toHaveBeenCalled();

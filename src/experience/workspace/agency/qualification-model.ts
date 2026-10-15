@@ -23,9 +23,10 @@ export const qualificationRecordSchema = z.object({
   evidenceUrl: z.string(), evidence: z.string(), submittedAt: z.string(), submittedBy: z.string().uuid(),
   decision: z.enum(["verified", "changes_requested", "unavailable"]).nullable(), reason: z.string().nullable(),
   decidedAt: z.string().nullable(), decidedBy: z.string().uuid().nullable(),
+  canReview: z.boolean().optional(),
 });
 export const qualificationStateSchema = z.object({
-  workspaceId: z.string().uuid(), canSubmit: z.boolean(), submissions: z.array(qualificationRecordSchema),
+  workspaceId: z.string().uuid(), canSubmit: z.boolean(), independentReviewerAvailable: z.boolean().optional(), submissions: z.array(qualificationRecordSchema),
   effects: z.array(z.object({ effect: z.enum(AGENCY_EFFECTS), available: z.boolean() })),
 });
 export type QualificationState = z.infer<typeof qualificationStateSchema>;

@@ -30,7 +30,7 @@ export function AgencyDecisionRows({ items, busy, onDecide }: { items: OwnerDeci
       {item.openHref?.startsWith("/") ? <StTextButton href={item.openHref}>Open preview</StTextButton> : null}
       <StHold label={label} aria-label={`${label}: ${item.title}`} disabled={busy || item.review === null} onAccept={() => onDecide(item, "approve")} />
     </div>}>
-      {item.review?.length ? <ul aria-label="Every change you approve" className="space-y-1">{item.review.map((line, index) => <li key={index}>{line}</li>)}</ul> : item.detail ? <p>{item.detail}</p> : null}
+      {item.review?.length ? <ul aria-label="Every change you approve" className="space-y-1">{item.review.map((line, index) => <li key={index} className="whitespace-pre-wrap break-words">{line}</li>)}</ul> : item.detail ? <p>{item.detail}</p> : null}
       <p className="text-sm text-gray-muted">Make it live: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}</p>
       {item.review === null ? <StNotice>The exact changes could not be loaded. Refresh before deciding.</StNotice> : null}
     </StRow>;
@@ -110,7 +110,7 @@ export function AgencyClientDecisions({ workspaceId, agencyWorkspaceId, clientNa
     }
   }
   return <StSection title={`Decisions for ${clientName}`} action={<StTextButton disabled={busy} onClick={() => void load()}>Refresh decisions</StTextButton>}>
-    <p className="text-sm text-gray-muted">Your agency decides within supported Full-control areas. Website, domain and Possibility execution still require the business owner’s review. Payer, exit, access and private business details stay with the owner.</p>
+    <p className="text-sm text-gray-muted">Your agency decides within its Full-control areas. Website publishing and domain changes also require current publishing verification and the owner’s permission for that resource. Possibilities, payer, exit, access and private business details stay with the owner.</p>
     {notice ? <p role="status">{notice}</p> : null}
     {recordedOutcome ? <StNotice>
       <p>{recordedOutcome.title}: {recordedOutcome.state === "open" ? "No decision is recorded. Review the current changes before trying again."

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { createWebsiteRebuildService } from "@/products/websites/rebuild-service";
 import type { resolvePublishedWebsiteCapabilities } from "@/products/websites/published-capabilities";
 import { extractBusinessFacts, currentDescriptionBusinessFacts, runWebsiteRebuild, writeSourceContent, type RebuildOptions } from "@/products/websites/rebuild-pipeline";
@@ -80,6 +81,22 @@ function harness(options: { pipelineOptions?: RebuildOptions; checkLiveFailure?:
 }
 
 describe("website rebuild service lifecycle and durable recovery", () => {
+  it.each([new ModelBudgetPausedError(0, 0), new ModelBudgetUnavailableError()])("persists a cap pause and retries the checkpoint without losing earlier stages", async (refusal) => {
+    let refused = true;
+    const h = harness({ pipelineOptions: { writer: async (_facts, baseline) => { if (refused) throw refusal; return { pages: baseline.pages }; } } });
+    const paused = await h.create();
+    expect(paused.rebuild.status).toBe("paused");
+    expect(paused.rebuild.lastError).toBe(refusal.message);
+    expect(paused.rebuild.stages.at(-1)).toMatchObject({ stage: "write", status: "paused" });
+    expect(paused.rebuild.candidate).toBeNull();
+    expect(paused.rebuild.checkpoint).toMatchObject({ completedStages: ["crawl", "extract"] });
+    refused = false;
+    const resumed = await h.service.retry(actor, paused.workId, { expectedRevision: paused.rebuild.revision });
+    expect(resumed.rebuild.status).toBe("review_ready");
+    expect(resumed.rebuild.lastError).toBeNull();
+    expect(resumed.rebuild.stages.filter(stage => stage.stage === "extract" && stage.status === "completed")).toHaveLength(1);
+  });
+
   it("runs the actual description pipeline through saved review, approval and hosted publication", async () => {
     const h = harness(); const reviewed = await h.create();
     expect(reviewed.rebuild.status).toBe("review_ready"); expect(reviewed.rebuild.stages.filter(stage => stage.status === "completed").map(stage => stage.stage)).toEqual(["crawl","extract","write","compose","verify"]);
@@ -406,12 +423,40 @@ describe("website rebuild service lifecycle and durable recovery", () => {
   });
   it("records read-back failure after accepted publication and never republishes on retry", async () => {
     const h = harness({ checkLiveFailure: true }); const record = await h.launch(await h.create()); expect(record.rebuild.status).toBe("published"); expect(record.rebuild.launch.readBack?.status).toBe("failed");
-    const again = await h.service.launch(actor,record.workId,selection(record)); expect(again.rebuild.launch.receipt).toEqual(record.rebuild.launch.receipt); expect(h.documents.publish).toHaveBeenCalledTimes(1); expect(h.checkLive).toHaveBeenCalledTimes(1);
+    const again = await h.service.launch(actor,record.workId,selection(record)); expect(again.rebuild.launch.receipt).toEqual(record.rebuild.launch.receipt); expect(h.documents.publish).toHaveBeenCalledTimes(1); expect(h.checkLive).toHaveBeenCalledTimes(2);
   });
   it("reconciles an accepted durable publication after its saved-work CAS response is lost", async () => {
     const h = harness(); const reviewed = await h.create(); const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed)); h.state.failWorkKind = "rebuild_published";
     await expect(h.service.launch(actor,approved.workId,selection(approved))).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.publications.size).toBe(1);
-    const recovered = await h.service.read(actor,approved.workId); expect(recovered.rebuild.status).toBe("published"); const again = await h.service.launch(actor,recovered.workId,selection(recovered)); expect(again.rebuild.status).toBe("published"); expect(h.documents.publish).toHaveBeenCalledTimes(1); expect(h.checkLive).not.toHaveBeenCalled();
+    const recovered = await h.service.read(actor,approved.workId); expect(recovered.rebuild.status).toBe("published"); const again = await h.service.launch(actor,recovered.workId,selection(recovered)); expect(again.rebuild.status).toBe("published"); expect(h.documents.publish).toHaveBeenCalledTimes(1); expect(h.checkLive).toHaveBeenCalledOnce(); expect(again.rebuild.launch.readBack?.status).toBe("verified");
+  });
+  it("retries only public read-back after observation persistence fails", async () => {
+    const h = harness(); const reviewed = await h.create(); const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    h.state.failWorkKind = "hosted_read_back";
+    await expect(h.service.launch(actor,approved.workId,selection(approved))).rejects.toBeInstanceOf(WorkspaceConflictError);
+    const committed = await h.service.read(actor,approved.workId);
+    expect(committed.rebuild.launch.readBack?.status).toBe("pending");
+    const recovered = await h.service.verifyPublished(actor,committed.workId);
+    expect(recovered.rebuild.launch.readBack?.status).toBe("verified");
+    expect(h.documents.publish).toHaveBeenCalledOnce(); expect(h.documents.reserveHostedTenant).toHaveBeenCalledOnce(); expect(h.checkLive).toHaveBeenCalledTimes(2);
+  });
+  it("rechecks a renamed site's current address while preserving its issued receipt", async () => {
+    const h = harness(); const published = await h.launch(await h.create()); const oldSlug = published.rebuild.tenantId!;
+    const row = h.publications.get(oldSlug)!; h.publications.delete(oldSlug); h.publications.set("new-address",{ ...row, tenantId: "new-address" });
+    h.documents.currentTenant = async () => ({ tenantId: "new-address", source: "publication", deliveryModel: "platform_template" });
+    const result = await h.service.verifyPublished(actor,published.workId);
+    expect(h.checkLive).toHaveBeenLastCalledWith(expect.objectContaining({ tenantId: "new-address" }),"https://new-address.strelva.com/");
+    expect(result.rebuild.launch.receipt).toEqual(published.rebuild.launch.receipt); expect(h.documents.publish).toHaveBeenCalledOnce();
+  });
+  it("refuses public verification after publication disappears, diverges or access is revoked", async () => {
+    const h = harness(); const published = await h.launch(await h.create()); const slug = published.rebuild.tenantId!; const row = h.publications.get(slug)!;
+    h.publications.delete(slug);
+    await expect(h.service.verifyPublished(actor,published.workId)).rejects.toBeInstanceOf(WorkspaceConflictError);
+    h.publications.set(slug,{ ...row, contentHash: "f".repeat(64) });
+    await expect(h.service.verifyPublished(actor,published.workId)).rejects.toBeInstanceOf(WorkspaceConflictError);
+    h.publications.set(slug,row); h.state.member = false;
+    await expect(h.service.verifyPublished(actor,published.workId)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(h.checkLive).toHaveBeenCalledOnce(); expect(h.documents.publish).toHaveBeenCalledOnce();
   });
   it("leaves no candidate document when the atomic work CAS loses", async () => {
     const h = harness(); h.state.failCandidateCas = true; await expect(h.create()).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.revisions.size).toBe(0); expect(websiteRebuildSchema.parse([...h.works.values()][0]!.payload).candidate).toBeNull();
@@ -559,6 +604,12 @@ describe("website System: publish onto a linked site, routing after a rename, op
     expect(result.cutover.find(item => item.id === "read_back")!.status).toBe("failed");
     expect(result.rebuild.status).toBe("published");
     expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce();
+    h.documents.linkedPublications = async () => [{ tenantId: "linked-client", tenantSlugAtPublication: "linked-client", publishedBy: actor.userId, revision: result.rebuild.candidate!.revision, contentHash: result.rebuild.candidate!.contentHash, priorDeliveryModel: "custom_repo", fallbackUntil: result.fallbackUntil, publishedAt: fixedTime }];
+    h.checkLive.mockResolvedValueOnce({ status: "verified", checkedAt: fixedTime, message: "Delivery recovered." });
+    const recovered = await h.service.publishOntoLinkedTenant(actor,result.workId,{ ...selection(result), tenantId: "linked-client" });
+    expect(recovered.cutover.find(item => item.id === "read_back")!.status).toBe("done");
+    expect(recovered.rebuild.launch.receipt).toEqual(result.rebuild.launch.receipt);
+    expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce(); expect(h.checkLive).toHaveBeenCalledTimes(2);
   });
   it.each([undefined, { baseUrl: "https://app.example.test", tenant: "linked-client", inquiry: { capabilityId: "changed-form", version: 2 } }])("refuses a revoked or changed visitor connection before linked publishing", async projection => {
     const resolveCapabilities = vi.fn(async () => projection);

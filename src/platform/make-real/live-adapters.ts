@@ -51,8 +51,8 @@ function base(channel: MakeRealChannel, ctx: LiveChannelContext | null, reversib
     /** Exploring never reaches a live adapter (rehearsePossibility refuses it). */
     async rehearse() { return { ok: false, detail: "A live adapter never rehearses. Exploring uses isolated adapters." }; },
     async ready(): Promise<{ ok: true } | { ok: false; reason: string }> {
-      if (!ctx) return { ok: false, reason: `${CHANNEL_LABEL[channel]} is not connected to Make real.` };
-      return (await ctx.enabled(channel)) ? { ok: true } : { ok: false, reason: `Make real is not live for ${CHANNEL_LABEL[channel]} in this business yet. Strelva turns it on.` };
+      if (!ctx) return { ok: false, reason: `${CHANNEL_LABEL[channel]} is not connected for publishing yet.` };
+      return (await ctx.enabled(channel)) ? { ok: true } : { ok: false, reason: `Publishing is not enabled for ${CHANNEL_LABEL[channel]} in this business yet.` };
     },
   };
 }
@@ -91,6 +91,8 @@ export interface HostedWebsitePorts {
   /** The owner's approval of this exact preview, recorded on the rebuild (the plan approval is that decision). */
   approve(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<unknown>;
   launch(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<{ rebuild: { launch: LaunchView } }>;
+  /** Read-back recovery only; never repeats publication or approval. */
+  verifyPublished?(actor: WorkspaceActor, workId: string): Promise<{ rebuild: { launch: LaunchView } }>;
   publishLinked?(actor: WorkspaceActor, workId: string, selection: RebuildSelection & { tenantId: string }): Promise<{ rebuild: { launch: LaunchView }; cutover?: unknown }>;
 }
 
@@ -137,8 +139,13 @@ export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveC
     async readBack({ providerRef }) {
       const { workId, receiptId } = split(providerRef);
       const record = await ports.read(ctx.actor, workId);
-      const { receipt, readBack } = record.rebuild.launch;
+      let { receipt, readBack } = record.rebuild.launch;
       if (!receipt || receipt.receiptId !== receiptId) return { ok: false, detail: "The published version is no longer this one." };
+      if (readBack?.status !== "verified" && ports.verifyPublished) {
+        try { ({ receipt, readBack } = (await ports.verifyPublished(ctx.actor, workId)).rebuild.launch); }
+        catch { return { ok: false, detail: "The publication remains recorded; its public delivery could not be checked. Try checking again." }; }
+        if (!receipt || receipt.receiptId !== receiptId) return { ok: false, detail: "The published version is no longer this one." };
+      }
       return { ok: readBack?.status === "verified", detail: readBack?.message ?? "The site has not been checked yet." };
     },
     async compensate() {

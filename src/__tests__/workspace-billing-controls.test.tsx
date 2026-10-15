@@ -29,6 +29,8 @@ it("requires reviewing cancellation before opening the exact hosted flow", async
   expect(button(node, "Continue to cancellation")).toBeUndefined();
   await act(async () => button(node, "Review cancellation").click());
   expect(transport).not.toHaveBeenCalled(); expect(node.textContent).toContain("confirm cancellation");
+  expect(node.textContent).toContain("Leaving the workspace does not stop billing");
+  expect(node.textContent).toContain("Billing continues until cancellation is confirmed in Stripe");
   await act(async () => button(node, "Continue to cancellation").click());
   expect(JSON.parse(transport.mock.calls[0]![1]!.body as string)).toEqual({ workspaceId: "business", action: "cancel" });
   expect(navigate).toHaveBeenCalledOnce();
@@ -66,7 +68,7 @@ it("aborts a prior workspace's portal request and ignores its late capability", 
 });
 it.each([null, { futureWork: "paused", providerParticipation: "kept", maintainedResources: { kind: "stopped" }, completedAt: "2026-10-12T12:00:00Z", summary: {}, retainedObligations: [] }])("keeps workspace billing reachable before and after departure", async state => {
   const { node, root } = host(); const request = vi.fn<typeof fetch>(async () => Response.json({ state, successors: [] }));
-  await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: "business", request })));
+  await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: "business", request, businessBillingReleased: true })));
   const link = [...node.querySelectorAll("a")].find(item => item.textContent === "Manage payments or cancel your plan");
   expect(link?.getAttribute("href")).toBe("/workspace/billing?workspaceId=business"); expect(node.innerHTML).not.toContain("/dashboard");
 });

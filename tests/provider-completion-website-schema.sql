@@ -126,6 +126,12 @@ begin
     array['request_changes'], 'agency', agency_id, 'accepted', operator_id, clock_timestamp(), owner_id
   );
 
+  -- Accepted work is bound to a current seat and explicitly staffed actor.
+  insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
+    values(customer_id,agency_id,'owner',owner_id);
+  insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by)
+    values(agency_id,customer_id,operator_id,owner_id);
+
   select * into assignment from public.offer_agency_operational_assignment(
     owner_id, 'website-draft-owner@example.test', responsibility_id, agency_id,
     'website-draft-operator@example.test', 'agency', expiry, 'website-draft-assignment'

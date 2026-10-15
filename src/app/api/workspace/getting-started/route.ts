@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         const started = await gettingStarted.startFromCheck(actor, input);
         if (!started.alreadyCreated) void recordFunnelEvent("business_created", started.workspaceId, { workspaceId: started.workspaceId });
         void recordFunnelEvent("check_saved", input.resultId, { workspaceId: started.workspaceId });
-        return json({ ...started, location: gettingStartedHref(started.workspaceId) }, started.alreadyCreated ? 200 : 201);
+        return json({ ...started, location: gettingStartedHref(started.workspaceId, null, started.workId) }, started.alreadyCreated ? 200 : 201);
       }
       case "read_website":
         return json({ reading: await gettingStarted.readWebsite(actor, input.workspaceId, input.url) });

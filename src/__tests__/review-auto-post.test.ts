@@ -20,6 +20,13 @@ const mockDraftReviewReply = vi.fn();
 const mockStoreRecentReply = vi.fn();
 const mockIsReviewReplyDeclined = vi.fn();
 
+// These tests exercise legacy cron behavior; listing policy has separate coverage.
+// Keep the lazy workspace port from importing the entire listing product mid-test.
+vi.mock("@/products/google-listing/server", () => ({
+  listingDraftingAllowed: vi.fn(async () => true),
+  noteTenantListingRead: vi.fn(async () => undefined),
+}));
+
 vi.mock("@/lib/tenants", () => ({ getAllTenants: (...a: unknown[]) => mockGetAllTenants(...a) }));
 vi.mock("@/lib/events", () => ({
   getEvents: (...a: unknown[]) => mockGetEvents(...a),
@@ -33,7 +40,7 @@ vi.mock("@/lib/event-actions", () => ({ AUTO_REPLY_ACTOR: "auto-reply-policy", r
 vi.mock("@/lib/reviews/reply-voice", () => ({ getReplyVoice: (...a: unknown[]) => mockGetReplyVoice(...a) }));
 vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
 vi.mock("@/lib/review-replies", () => ({
-  draftReviewReply: (...a: unknown[]) => mockDraftReviewReply(...a),
+  draftReviewReplyWithProvenance: (...a: unknown[]) => mockDraftReviewReply(...a),
   storeRecentReply: (...a: unknown[]) => mockStoreRecentReply(...a),
   isReviewReplyDeclined: (...a: unknown[]) => mockIsReviewReplyDeclined(...a),
 }));
@@ -55,6 +62,7 @@ function draft(over: Partial<UnifiedEvent> & { autoPostAt?: string | null } = {}
     time: new Date(NOW).toISOString(),
     metadata: {
       kind: "review_reply_draft",
+      replyGeneration: "model",
       providerContent: googleReviewContent(new Date(NOW)),
       reviewId: "rev1",
       rating: 5,
@@ -130,6 +138,14 @@ describe("runDueAutoPosts", () => {
     expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 
+  it.each(["template", undefined, "unexpected"])("holds due drafts with %s provenance for the owner", async (replyGeneration) => {
+    const event = draft({ autoPostAt: new Date(NOW - 60_000).toISOString() });
+    event.metadata!.replyGeneration = replyGeneration;
+    mockGetEvents.mockResolvedValue([event]);
+    expect(await runDueAutoPosts(NOW)).toEqual({ posted: 0, failed: 0 });
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
   it("does NOT post a draft still inside its window", async () => {
     mockGetEvents.mockResolvedValue([draft({ autoPostAt: new Date(NOW + 3_600_000).toISOString() })]);
     const res = await runDueAutoPosts(NOW);
@@ -180,7 +196,7 @@ describe("draftReplyBacklog", () => {
     mockGetReplyVoice.mockResolvedValue({ mode: "approve" });
     mockGetEvents.mockResolvedValue([]); // no already-pending drafts
     mockIsReviewReplyDeclined.mockResolvedValue(false);
-    mockDraftReviewReply.mockResolvedValue("thanks Sam");
+    mockDraftReviewReply.mockResolvedValue({ text: "thanks Sam", generation: "model" });
     mockAddEvent.mockResolvedValue(undefined);
     mockStoreRecentReply.mockResolvedValue(undefined);
   });
@@ -207,6 +223,15 @@ describe("draftReplyBacklog", () => {
     const res = await draftReplyBacklog(NOW, 3);
     expect(res.drafted).toBe(3);
     expect(mockAddEvent).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(["approve", "auto"])("queues a template for owner review in %s mode", async (mode) => {
+    mockGetReplyVoice.mockResolvedValue({ mode });
+    mockGetReviews.mockResolvedValue([review()]);
+    mockDraftReviewReply.mockResolvedValue({ text: "A local template", generation: "template" });
+    expect(await draftReplyBacklog(NOW)).toEqual({ drafted: 1 });
+    expect(mockAddEvent.mock.calls[0]?.[0]).toMatchObject({ status: "pending", body: "A local template", metadata: { replyGeneration: "template" } });
+    expect(mockAddEvent.mock.calls[0]?.[0].metadata.autoPostAt).toBeUndefined();
   });
 
   it("stamps autoPostAt only in auto mode", async () => {

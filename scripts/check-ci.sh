@@ -86,8 +86,13 @@ echo "== screen words =="
 pnpm check:words
 echo "== ontology invariants =="
 pnpm check:ontology
-echo "== workspace ownership SQL =="
+echo "== release gate policy regressions =="
+node --test scripts/tests/release-gate-ci.node-test.mjs scripts/tests/supply-chain.node-test.mjs scripts/tests/temp-postgres-env.node-test.mjs
+echo "== migration ordering =="
+pnpm check:migration-order
+echo "== workspace ownership SQL and full ordered upgrade =="
 pnpm check:workspace-sql
+pnpm check:workspace-upgrade
 echo "== vitest with coverage gate =="
 pnpm test:coverage
 echo "== dependency audit =="

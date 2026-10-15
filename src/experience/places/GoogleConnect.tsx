@@ -85,7 +85,11 @@ export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params
       {choices.more ? <p className={styles.copy}>This account manages more listings than fit here. Only the first {choices.listings.length} are shown.</p> : null}
     </StSection> : null}
 
-    {!hasListing ? owner ? choosing ? <form action={actions.start}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StTextButton type="submit">Use a different Google account</StTextButton></form> : <StSection title="Connect Google">
+    {!hasListing && !enabled ? <StSection title="Connect Google · Coming soon">
+      <p className={styles.copy}>Connecting your Google Business Profile in Strelva is not open for this business yet. You can manage your listing directly on Google today.</p>
+      <StTextButton href="https://business.google.com/" target="_blank" rel="noopener noreferrer">Open Google Business Profile</StTextButton>
+      {viewer === "owner" ? <StTextButton href={`/workspace/business-details?${new URLSearchParams({ workspaceId })}`}>Update business details in Strelva</StTextButton> : null}
+    </StSection> : !hasListing ? owner ? choosing ? <form action={actions.start}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StTextButton type="submit">Use a different Google account</StTextButton></form> : <StSection title="Connect Google">
       <p className={styles.copy}>Sign in with the Google account that runs your Business Profile. Strelva reads your listing&apos;s hours, phone, website, description and categories for you to confirm. Nothing changes on Google until you approve it.</p>
       {/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}
       <form action={actions.start} className={styles.actions}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StPill type="submit">Connect Google</StPill>{returnTo ? <StTextButton href={returnTo}>Skip for now</StTextButton> : null}</form>

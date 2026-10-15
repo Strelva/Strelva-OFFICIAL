@@ -34,7 +34,7 @@ async function click(node: HTMLElement, text: string) {
 
 describe("business entry preserves auth and acceptance boundaries", () => {
   it("shows a single email receipt and resends through the same bounded callback", async () => {
-    const node = await render(createElement(SupabaseSignIn, { next: "/workspace?workspaceId=business", prefillEmail: "owner@example.test", heading: createElement(StHead, { title: "Sign in" }) }));
+    const node = await render(createElement(SupabaseSignIn, { emailReady: true, next: "/workspace?workspaceId=business", prefillEmail: "owner@example.test", heading: createElement(StHead, { title: "Sign in" }) }));
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.querySelectorAll("h1")).toHaveLength(1);
     expect(node.querySelector("h1")?.textContent).toBe("Check your email");
@@ -45,11 +45,26 @@ describe("business entry preserves auth and acceptance boundaries", () => {
   });
   it("turns a thrown auth failure into a retryable form instead of a stuck spinner", async () => {
     mocks.otp.mockRejectedValue(new Error("provider unreachable"));
-    const node = await render(createElement(SupabaseSignIn, { prefillEmail: "owner@example.test" }));
+    const node = await render(createElement(SupabaseSignIn, { emailReady: true, prefillEmail: "owner@example.test" }));
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be sent");
     expect(node.querySelector('button[type="submit"]')?.hasAttribute("disabled")).toBe(false);
     expect(node.textContent).not.toContain("Check your email");
+  });
+  it("hides email by default and keeps Google available", async () => {
+    const node = await render(createElement(SupabaseSignIn));
+    expect(node.querySelector("form")).toBeNull();
+    expect(node.textContent).not.toContain("Email me a sign-in link");
+    await click(node, "Continue with Google");
+    expect(mocks.otp).not.toHaveBeenCalled();
+    expect(mocks.oauth).toHaveBeenCalledOnce();
+  });
+  it("never exposes provider errors", async () => {
+    mocks.otp.mockResolvedValue({ error: { code: "email_address_not_authorized", message: "SMTP private provider details" } });
+    const node = await render(createElement(SupabaseSignIn, { emailReady: true, prefillEmail: "owner@example.test" }));
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(node.textContent).toContain("Try again or continue with Google");
+    expect(node.textContent).not.toContain("SMTP");
   });
   it("keeps Google OAuth as an explicit alternate with its return destination", async () => {
     const node = await render(createElement(SupabaseSignIn, { next: "/workspace/account" }));

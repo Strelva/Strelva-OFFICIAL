@@ -7,7 +7,6 @@ import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { AgencyPaymentLinks } from "@/experience/workspace/billing/AgencyPaymentLinks";
 import { paymentLinkAgency } from "@/experience/workspace/billing/payment-links-server";
 import { readAgencyLead } from "@/experience/workspace/leads/leads-server";
-import { strelvaAgencyWorkspaceId } from "@/platform/workspaces/strelva-agency";
 import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 
 export const metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" as const };
@@ -29,7 +28,7 @@ export default async function PaymentLinksPage({ searchParams }: { searchParams:
     catch { return <StrelvaShell title="" workspaceId={workspaceId}><StPage><StHead title="Payment links" /><StNotice tone="critical">This lead is unavailable to your agency. Open your leads and choose a current request.</StNotice></StPage></StrelvaShell>; }
   }
   const brand = await resolveOwnerBrand(agency.id);
-  return <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ paymentLinksCurrent: true, leadsAvailable: agency.id === strelvaAgencyWorkspaceId() }}>
+  return <StrelvaShell title="" workspaceId={agency.id} workspaceName={brand.agencyId === agency.id ? brand.name : "Agency identity unavailable"} ownerBrand={brand} agencyNavigation={{ paymentLinksCurrent: true, leadsAvailable: true }}>
     <StPage><StHead title="Payment links" crumb={{ label: "Agency billing", href: `/workspace/billing?workspaceId=${encodeURIComponent(agency.id)}` }} />
       <AgencyPaymentLinks agencyWorkspaceId={agency.id} initialProspect={initialProspect} />
     </StPage>

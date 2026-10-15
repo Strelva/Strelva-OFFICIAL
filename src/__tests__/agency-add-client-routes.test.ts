@@ -44,7 +44,7 @@ beforeEach(() => {
   mocks.assess.mockResolvedValue({ id: KEY, workspaceId: AGENCY, productId: "ai_visibility", resourceKind: "private_ai_visibility_work",
     payload: { business: "Northside Bakery", score: 70, grade: "C", verdict: "Readiness measured", topFix: "Add schema", signals: [],
       citation: { probed: false, mentioned: false, recommended: false, note: "Not run" }, privateSecret: "must-not-return" } });
-  answer({ agency_add_client: { data: receipt }, issue_agency_client_owner_claim: { data: claim } });
+  answer({ agency_add_client_enrolled: { data: receipt }, issue_agency_client_owner_claim: { data: claim } });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -84,16 +84,16 @@ describe("POST /api/workspace/agency-clients", () => {
     expect(body.website.connect).toBe(`/workspace/site?workspaceId=${CLIENT}&entry=connect`);
     expect(body.aiCheck).toMatchObject({ status: "ready", workId: KEY, href: `/workspace?workspaceId=${AGENCY}&work=${KEY}` });
     expect(JSON.stringify(body.aiCheck)).not.toContain("must-not-return");
-    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client", "issue_agency_client_owner_claim"]);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client_enrolled", "issue_agency_client_owner_claim"]);
     expect(mocks.rpc.mock.calls[0]![1]).toMatchObject({ p_verified_email: "owner@agency.example.test" });
   });
 
   it("passes the database's refusal through with its status", async () => {
-    answer({ agency_add_client: { error: { message: "agency_client_access_denied" } } });
+    answer({ agency_add_client_enrolled: { error: { message: "agency_client_access_denied" } } });
     const denied = await agencyClients(post("/api/workspace/agency-clients", add));
     expect(denied.status).toBe(403);
     expect(await denied.json()).toMatchObject({ error: "Only an owner or admin of this agency can add clients.", code: "agency_client_access_denied" });
-    answer({ agency_add_client: { error: { message: "agency_client_daily_limit" } } });
+    answer({ agency_add_client_enrolled: { error: { message: "agency_client_daily_limit" } } });
     expect((await agencyClients(post("/api/workspace/agency-clients", add))).status).toBe(429);
   });
 

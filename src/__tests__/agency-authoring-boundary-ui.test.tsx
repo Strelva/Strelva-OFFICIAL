@@ -54,7 +54,7 @@ it("keeps client authority separate from an agency qualification", async () => {
     agency: { id: agencyId, name: "North Studio", role: "member" }, effects: [],
   }, fictionalQualification: { workspaceId: agencyId, canSubmit: false, submissions: [], effects: [{ effect: "publish", available: false }] } }));
   expect(node.textContent).toContain("Get verified for client work");
-  expect(node.textContent).toContain("Client access, owner decisions and release gates still apply");
+  expect(node.textContent).toContain("Client permissions, owner decisions and release settings still apply");
   expect(node.textContent).toContain("An agency owner or admin submits evidence");
   expect(node.querySelector("form")).toBeNull();
 });

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { modelAdmissionRpc, modelAdmissionWorkspaceId } from "./support/model-admission";
-import { ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
+import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { crawlWebsite, robotsAllows, normalizeRebuildUrl, sameCrawlDomain, WebsiteCrawlError, type PageFetcher } from "@/products/websites/rebuild-crawl";
 import { runWebsiteRebuild, WebsiteRebuildStageError, validateWrittenContent, writeSourceContent, extractBusinessFacts, createAiRebuildWriter, websiteRebuildInputSchema } from "@/products/websites/rebuild-pipeline";
 import { rebuildInputSchema } from "@/products/websites/rebuild-contracts";
@@ -62,6 +62,27 @@ describe("website rebuild pipeline", () => {
     expect(secondFetch).not.toHaveBeenCalled(); expect(result.checkpoint.completedStages).toEqual(["crawl", "extract", "write", "compose", "verify"]);
     await expect(runWebsiteRebuild({ url: "https://other.example" }, { checkpoint })).rejects.toThrow("another rebuild input");
   });
+  it.each([new ModelBudgetPausedError(0, 0), new ModelBudgetUnavailableError()])("retains a paused writer stage and resumes its saved facts", async (refusal) => {
+    let checkpoint;
+    try {
+      await runWebsiteRebuild({ url: "https://example.com" }, { fetchPage: fixture(), writer: async () => { throw refusal; } });
+      throw new Error("Expected a paused stage");
+    } catch (error) {
+      expect(error).toBeInstanceOf(WebsiteRebuildStageError);
+      const paused = error as WebsiteRebuildStageError;
+      expect(paused.paused).toBe(true);
+      expect(paused.message).toBe(refusal.message);
+      expect(paused.checkpoint.events.at(-1)).toMatchObject({ stage: "write", status: "paused", message: refusal.message });
+      checkpoint = paused.checkpoint;
+    }
+    expect(checkpoint.completedStages).toEqual(["crawl", "extract"]);
+    expect(checkpoint.content).toBeUndefined();
+    const fetchPage = fixture();
+    const result = await runWebsiteRebuild({ url: "https://example.com" }, { checkpoint, fetchPage });
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(result.content.writer).toBe("source");
+  });
+
   it("saves full source HTML before compaction and stops on retention failure", async () => {
     const retained: string[] = []; const result = await runWebsiteRebuild({ url: "https://example.com" }, { fetchPage: fixture(), onSourcePage: page => { retained.push(page.html); } });
     expect(retained[0]).toBe(home); expect(result.checkpoint.crawl?.pages[0]?.html).toBe("");

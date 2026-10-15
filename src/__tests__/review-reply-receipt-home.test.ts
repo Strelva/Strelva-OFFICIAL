@@ -27,7 +27,7 @@ const listingFiles = readdirSync(join(root, "src/products/google-listing")).filt
 function reviewReplyBranch(): string {
   const source = read("src/lib/event-actions.ts");
   const start = source.indexOf('event.metadata?.kind === "review_reply_draft"');
-  const end = source.indexOf("// Remaining simple cases", start);
+  const end = source.indexOf("\n  const actionPrompt =", start);
   expect(start).toBeGreaterThan(0);
   expect(end).toBeGreaterThan(start);
   return source.slice(start, end);

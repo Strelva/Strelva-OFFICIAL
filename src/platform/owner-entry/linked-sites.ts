@@ -4,6 +4,9 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { callReleaseFlagsRpc, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { systemsReleasedFor } from "@/platform/systems-release";
 
 /**
  * The managed sites a business holds, for the workspace homes of the old
@@ -73,15 +76,29 @@ export async function readLinkedSite(actor: WorkspaceActor, workspaceId: string,
 }
 
 /**
- * The workspace homes are new owner-facing behavior, so they open only where
- * owner entry is on for this workspace and viewer (env layering plus the
- * workspace row, owner-entry spec §4). Off: the pages send people to Home and
- * the Home section stays hidden, exactly as before.
+ * Retained tenant businesses require owner entry for this viewer. A business
+ * created through the new direct-owner door can use its places with Systems
+ * released, without moving legacy owners. Its atomic signup receipt records
+ * that origin; later adding a hosted website does not close the owner's door.
+ * This is navigation eligibility, never a grant to read or write records.
  */
 export async function ownerEntryHomesOpen(workspaceId: string, userId: string, check: {
   operator?: () => Promise<boolean>;
   flag?: typeof workspaceReleaseFlagEnabled;
 } = {}): Promise<boolean> {
   const operator = await (check.operator ?? isSuperAdmin)().catch(() => false);
-  return (check.flag ?? workspaceReleaseFlagEnabled)("owner_entry", workspaceId, { operator, tester: false, userId }).catch(() => false);
+  if (await (check.flag ?? workspaceReleaseFlagEnabled)("owner_entry", workspaceId, { operator, tester: false, userId }).catch(() => false)) return true;
+  return directOwnerPlacesOpen(workspaceId, userId).catch(() => false);
+}
+
+async function directOwnerPlacesOpen(workspaceId: string, userId: string): Promise<boolean> {
+  if (!workspaceReleaseEnabled()) return false;
+  const user = await getSessionUser();
+  if (user?.id !== userId || !user.email || !user.email_confirmed_at) return false;
+  if (!await systemsReleasedFor({ userId }, workspaceId)) return false;
+  return callReleaseFlagsRpc("read_direct_owner_places_eligibility", {
+    p_workspace_id: z.string().uuid().parse(workspaceId),
+    p_user_id: z.string().uuid().parse(userId),
+    p_verified_email: z.string().email().parse(user.email.trim().toLowerCase()),
+  }, z.boolean(), "The business's owner places could not be read.");
 }
