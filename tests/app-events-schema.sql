@@ -522,6 +522,16 @@ begin
   ep := public.set_app_event_webhook_endpoint(agency_owner, 'ae-agency@example.test', ws, agency, e1, 'active', null, null);
   perform pg_temp.ae_assert(ep->>'status' = 'active' and jsonb_array_length(public.app_event_claim_lanes(array['webhook:' || e1::text], 10, 60, 10)) = 0,
     '(h) resuming never replays what happened while paused');
+  -- A stale, expired lease must not stop Resume from skipping the paused period.
+  ep := public.set_app_event_webhook_endpoint(agency_owner, 'ae-agency@example.test', ws, agency, e1, 'paused', null, null);
+  update public.app_event_cursors set lease_token = gen_random_uuid(), lease_until = now() - interval '1 minute'
+    where subscriber = 'webhook:' || e1::text and workspace_id = ws;
+  perform pg_temp.ae_emit(ws, 'booking.made', 'wh-4');
+  ep := public.set_app_event_webhook_endpoint(agency_owner, 'ae-agency@example.test', ws, agency, e1, 'active', null, null);
+  perform pg_temp.ae_assert((select c.delivered_through = s.last_sequence and c.lease_until is null and c.lease_token is null
+      from public.app_event_cursors c join public.app_event_streams s on s.workspace_id = c.workspace_id
+      where c.subscriber = 'webhook:' || e1::text and c.workspace_id = ws),
+    '(h) resuming skips the paused period even when an expired lease was left behind');
   ep := public.set_app_event_webhook_endpoint(agency_owner, 'ae-agency@example.test', ws, agency, e1, null, 'enc:v1:rotated', 'rotd');
   perform pg_temp.ae_assert(ep->>'secretHint' = 'rotd' and (select secret_ciphertext = 'enc:v1:rotated' from public.app_event_webhook_endpoints where id = e1), '(h) rotated');
   perform pg_temp.ae_refuse(format($q$select public.set_app_event_webhook_endpoint(%L, 'ae-agency@example.test', %L, %L, %L, null, null, null)$q$, agency_owner, ws, agency, e1),

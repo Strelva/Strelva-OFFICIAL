@@ -772,8 +772,10 @@ begin
     -- Resuming never replays what happened while it was paused.
     update public.app_event_cursors set delivered_through = greatest(delivered_through,
         coalesce((select s.last_sequence from public.app_event_streams s where s.workspace_id = ep.workspace_id), 0)),
-        attempts = 0, last_error = null, next_attempt_at = clock_timestamp(), updated_at = clock_timestamp()
-      where subscriber = 'webhook:' || ep.id::text and workspace_id = ep.workspace_id and lease_until is null;
+        attempts = 0, last_error = null, next_attempt_at = clock_timestamp(), updated_at = clock_timestamp(),
+        lease_token = null, lease_until = null
+      where subscriber = 'webhook:' || ep.id::text and workspace_id = ep.workspace_id
+        and (lease_until is null or lease_until < clock_timestamp());
     act := 'resumed';
   end if;
   insert into public.app_event_webhook_endpoint_changes(endpoint_id, workspace_id, action, actor_id, actor_kind, agency_workspace_id)

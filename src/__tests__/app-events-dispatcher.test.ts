@@ -436,6 +436,19 @@ describe("dispatchAppEvents", () => {
       }
     });
 
+    it("stops replaying once the deadline passes and still purges", async () => {
+      const holder: { clock?: { t: number } } = {};
+      const t = setup({ handler: async () => { holder.clock!.t += 60_000; } });
+      holder.clock = t.clock;
+      for (const id of ["dl5", "dl6", "dl7"]) {
+        t.memory.api.replays.push({ id, subscriber: SUB, workspaceId: WS1, leaseToken: "t" + id, event: replayEvent(), allowed: true });
+      }
+      const result = await t.run();
+      expect(t.memory.api.finished).toEqual([{ id: "dl5", ok: true, error: null }]);
+      expect(result.replays).toEqual({ delivered: 1, failed: 0 });
+      expect(result.purged).toEqual({ events: 0, deadLetters: 0, failures: 0 });
+    });
+
     it("finishes failed for a Webhook that is not allowed", async () => {
       const t = setup({ webhooksOn: true });
       t.memory.api.replays.push({ id: "dl3", subscriber: WEBHOOK, workspaceId: WS1, leaseToken: "t3", event: replayEvent(), allowed: false });

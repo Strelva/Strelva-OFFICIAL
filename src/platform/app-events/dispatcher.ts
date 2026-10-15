@@ -277,6 +277,8 @@ export async function dispatchAppEvents(deps: DispatchDeps = defaultDispatchDeps
   if (deps.now() < deadline) {
     const replays = (await attempt(() => store.claimReplays(20, deps.leaseSeconds))) ?? [];
     for (const replay of replays) {
+      // Replays left unrun keep their lease and are claimed again on the next run.
+      if (deps.now() >= deadline) break;
       const key = parseSubscriberKey(replay.subscriber);
       let ok = false;
       let reason: string | null = null;
