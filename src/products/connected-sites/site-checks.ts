@@ -5,11 +5,16 @@
  * bounded bytes and redirects, never throwing. A page Strelva cannot open is
  * reported as unreachable, never guessed to be a builder.
  */
-import { fetchPinnedPublicResponse } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicResponse, fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { verificationProofs, type ConnectedSite } from "./contracts";
 import { detectSitePlatform, type PlatformDetection } from "./platform-detect";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
+
+/** A connected site's live page, read the one way Strelva reads them: pinned, public addresses only, bounded. */
+export function fetchLiveSitePage(url: string): Promise<string | null> {
+  return fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 });
+}
 
 export interface SiteFingerprint { reachable: boolean; finalUrl: string | null; html: string | null; detection: PlatformDetection }
 

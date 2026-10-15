@@ -8,6 +8,6 @@ export { EDIT_GUIDES, editGuide, editStepsFor, type EditGuide } from "./edit-gui
 export { normalizeForMatch, pageShowsChange, visiblePageText } from "./page-text";
 export {
   CONNECTED_SITE_CHANGE_SCOPE, CONNECTED_SITE_CHANGE_SOURCE, CONNECTED_SITE_CHANGE_STAGES, connectedSiteChangeBrief, connectedSiteChangeRequestCommand,
-  connectedSiteChangeSchema, connectedSiteChangeStage, connectedSiteChangeStepSchema, connectedSiteChangesViewSchema, pendingConnectedSiteRequestSchema, planInputSchema,
-  type ConnectedSiteChange, type ConnectedSiteChangeStage, type ConnectedSiteChangeStep, type ConnectedSiteChangesView, type PendingConnectedSiteRequest, type PlanInput,
+  connectedSiteChangeReleaseRowSchema, connectedSiteChangeReviewSchema, connectedSiteChangeSchema, connectedSiteChangeStage, connectedSiteChangeStepSchema, connectedSiteChangesViewSchema, pendingConnectedSiteRequestSchema, planInputSchema,
+  type ConnectedSiteChange, type ConnectedSiteChangeReleaseRow, type ConnectedSiteChangeReview, type ConnectedSiteChangeStage, type ConnectedSiteChangeStep, type ConnectedSiteChangesView, type PendingConnectedSiteRequest, type PlanInput,
 } from "./change-model";

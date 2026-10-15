@@ -14,7 +14,6 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { scoreLeadSpam } from "@/lib/lead-spam";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   BEACON_EVENT_KINDS, PLATFORMS, SITE_KEY_PATTERN, VERIFICATION_META_NAME, beaconBatchSchema, businessJsonLd, contactFromFields,
@@ -23,14 +22,17 @@ import {
 } from "./contracts";
 import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { recordPlatformSchema } from "./schema-conflicts";
-import { systemOriginId } from "@/platform/systems/invariants";
+import { connectedSiteSystemId } from "./system-id";
 import { connectionEligibilityFor } from "@/platform/connections/server";
 import { recordConnectionHolder } from "@/platform/connections/holders";
 import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
-export { checkConnectedSite, fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
+export { askConnectedSiteChange, checkConnectedSiteChange, connectedSiteChangeView, markConnectedSiteChangeDone, planConnectedSiteChange } from "./changes";
+export { connectedSiteChangesStore, createConnectedSiteChangesStore, setConnectedSiteChangesStoreForTests, type ConnectedSiteChangesStore } from "./changes-store";
+export { checkConnectedSite, fetchLiveSitePage, fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
+import { fetchLiveSitePage } from "./site-checks";
 export { connectedSiteChangeOwnerEmailEnabled, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "./keep-your-site-release";
 
 export { connectedSitesPublicFor, connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "./release";
@@ -104,11 +106,6 @@ export async function connectSite(actor: WorkspaceActor, raw: unknown, store: Co
     throw new WorkspaceConflictError("The website was saved, but whose account it is couldn't be recorded. Connect again.");
   }
   return site;
-}
-
-/** A connected site's live page, read the one way Strelva reads them: pinned, public addresses only, bounded. */
-export function fetchLiveSitePage(url: string): Promise<string | null> {
-  return fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 });
 }
 
 /**
@@ -202,10 +199,7 @@ export async function submitPublicInquiry(publicKey: string, site: ResolvedConne
   return { status: result.status === "recorded" ? "recorded" : "duplicate", id: result.id };
 }
 
-/** The website System a connected site is: connected_site:<id>, the same id the projection derives. */
-export function connectedSiteSystemId(site: Pick<ConnectedSite, "id" | "workspaceId">): string {
-  return systemOriginId(site.workspaceId, { kind: "connected_site", ref: site.id });
-}
+export { connectedSiteSystemId } from "./system-id";
 
 /** A site as the workspace sees it: its install lines and the System it is. */
 export function presentConnectedSite(site: ConnectedSite) {

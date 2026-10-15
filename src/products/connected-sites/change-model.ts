@@ -43,11 +43,27 @@ export type PendingConnectedSiteRequest = z.infer<typeof pendingConnectedSiteReq
 
 export const connectedSiteChangesViewSchema = z.object({
   viewer: z.object({ role: z.string(), isOwner: z.boolean(), actingAgencyId: z.string().uuid().nullable(), agencyName: z.string().nullable() }),
-  site: z.object({ id: z.string().uuid(), siteHost: z.string(), siteUrl: z.string(), platform: z.string() }),
+  site: z.object({ id: z.string().uuid(), siteHost: z.string(), siteUrl: z.string(), platform: z.string(), platformLabel: z.string().optional() }),
   requests: z.array(pendingConnectedSiteRequestSchema),
   changes: z.array(connectedSiteChangeSchema),
 });
 export type ConnectedSiteChangesView = z.infer<typeof connectedSiteChangesViewSchema>;
+
+/** A planned change waiting for the owner in Needs you. */
+export const connectedSiteChangeReviewSchema = z.object({
+  changeId: z.string().uuid(), systemId: z.string().uuid(), siteHost: z.string(), platform: z.string(), title: z.string(),
+  planStepId: z.string().uuid(), pageUrl: z.string(), expectText: z.string(), removeText: z.string().nullable(), editSteps: z.array(z.string()),
+  agencyName: z.string().nullable(), recordedAt: z.string(),
+});
+export type ConnectedSiteChangeReview = z.infer<typeof connectedSiteChangeReviewSchema>;
+
+/** A Release recorded from a connected-site change, as What changed reads it. */
+export const connectedSiteChangeReleaseRowSchema = z.object({
+  id: z.string().uuid(), at: z.string(), systemId: z.string().uuid(), title: z.string(), siteHost: z.string(), platform: z.string(),
+  readBack: z.enum(["confirmed", "not_confirmed"]), releaseNumber: z.number().int().positive(),
+  actor: recordedActorSchema.nullable().optional().catch(null),
+});
+export type ConnectedSiteChangeReleaseRow = z.infer<typeof connectedSiteChangeReleaseRowSchema>;
 
 /** Walk the steps in order. Mirrors SQL connected_site_change_stage exactly. */
 export function connectedSiteChangeStage(steps: Array<{ kind: string; ownerFacing: boolean | null; checkResult: string | null; readBack: string | null }>): ConnectedSiteChangeStage {

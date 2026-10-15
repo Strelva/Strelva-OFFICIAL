@@ -4,7 +4,7 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const page = vi.hoisted(() => ({ html: "" as string | null }));
 const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn(), eligible: vi.fn() }));
-vi.mock("@/lib/pinned-public-text", () => ({
+vi.mock("@/platform/infra/pinned-public-text", () => ({
   fetchPinnedPublicText: async () => page.html,
   fetchPinnedPublicResponse: async () => page.html === null ? null : { url: "https://bakery.example/", status: 200, headers: new Headers({ "content-type": "text/html" }), body: Buffer.from(page.html) },
 }));

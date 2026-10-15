@@ -169,8 +169,7 @@
       "src/lib/types"
     ],
     "src/products/connected-sites/server.ts": [
-      "src/lib/lead-spam",
-      "src/lib/pinned-public-text"
+      "src/lib/lead-spam"
     ],
     "src/products/domain-monitor/server.ts": [
       "src/lib/delivery-email"
