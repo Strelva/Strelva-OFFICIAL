@@ -5,6 +5,7 @@ import { WorkspaceRecaps, type RecapPeriodFilter, type WorkspaceRecapsState } fr
 import type { RecapView } from "@/products/recaps/server";
 import { PublishingPreviewFrame } from "@/experience/workspace/preview/PublishingPreviewFrame";
 import { PUBLISHING_RECAP, PUBLISHING_RECAP_OUTCOME } from "@/experience/workspace/preview/publishing-fixture";
+import { PREVIEW_OWNER_REPORTS } from "@/experience/care-reports/preview-fixture";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Recaps preview", robots: { index: false, follow: false } };
@@ -31,5 +32,5 @@ export default async function RecapsPreviewPage({ searchParams }: { searchParams
     : name === "unlinked" ? { kind: "ready", sites: [] }
     : name === "unavailable" ? { kind: "ready", sites: [{ ...site, recaps: [], unavailable: true }] }
     : { kind: "ready", sites: [site] };
-  return <PublishingPreviewFrame place="Recaps" mode={mode}><WorkspaceRecaps workspaceId={WORKSPACE} state={state} period={period} preview outcomes={{ [PUBLISHING_RECAP.id]: PUBLISHING_RECAP_OUTCOME }} /></PublishingPreviewFrame>;
+  return <PublishingPreviewFrame place="Recaps" mode={mode}><WorkspaceRecaps workspaceId={WORKSPACE} state={state} period={period} preview outcomes={{ [PUBLISHING_RECAP.id]: PUBLISHING_RECAP_OUTCOME }} careReports={name === "reports-empty" ? { kind: "ready", items: [] } : name === "reports-unavailable" ? { kind: "unavailable" } : { kind: "ready", items: PREVIEW_OWNER_REPORTS }} /></PublishingPreviewFrame>;
 }

@@ -102,6 +102,8 @@ export const careReportListSchema = z.object({
   }).strict()),
 }).strict();
 export type CareReportList = z.infer<typeof careReportListSchema>;
+/** What GET /api/workspace/care-reports returns: the list plus which switches are on. */
+export const careReportListResponseSchema = careReportListSchema.extend({ emailOn: z.boolean(), shareLinksOn: z.boolean() });
 
 const releaseRow = z.object({ id: uuid, number: z.number().int().positive(), publishedAt: z.string(), snapshot: z.record(z.string(), z.unknown()) }).strict();
 
@@ -118,6 +120,8 @@ export const careReportAgencyViewSchema = z.object({
   shareLink: z.object({ createdAt: z.string() }).strict().nullable(),
 }).strict();
 export type CareReportAgencyView = z.infer<typeof careReportAgencyViewSchema>;
+/** What GET /api/workspace/care-reports/<id> returns for an agency: the view plus which switches are on. */
+export const careReportAgencyViewResponseSchema = careReportAgencyViewSchema.extend({ emailOn: z.boolean(), shareLinksOn: z.boolean() });
 
 export const careReportOwnerViewSchema = z.object({
   audience: z.literal("owner"),
@@ -146,6 +150,7 @@ export const ownerCareReportListSchema = z.array(z.object({
   latestRelease: z.object({ number: z.number().int().positive(), publishedAt: z.string() }).strict(),
 }).strict());
 export type OwnerCareReportList = z.infer<typeof ownerCareReportListSchema>;
+export type OwnerCareReportItem = OwnerCareReportList[number];
 
 export const agencyTimeEntrySchema = z.object({
   id: uuid,

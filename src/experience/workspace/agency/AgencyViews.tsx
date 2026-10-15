@@ -7,6 +7,7 @@ import { AgencyClientAvailability } from "./AgencyClientAvailability";
 import { AgencyClientDecisions } from "./AgencyClientDecisions";
 import { AgencyClientEvents } from "./AgencyClientEvents";
 import { AgencyClientUsage } from "./AgencyClientUsage";
+import { AgencyClientTime } from "@/experience/care-reports/AgencyClientTime";
 import { AgencyUsageSummary } from "./AgencyUsageSummary";
 import { StBeacon, StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 import { lapseLabel } from "@/platform/owner-reach/model";
@@ -90,7 +91,7 @@ function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRo
 
 function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; request?: typeof fetch }) {
   const [open, setOpen] = useState(false);
-  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
+  return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientTime agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
 }
 
 function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {

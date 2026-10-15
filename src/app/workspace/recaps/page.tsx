@@ -7,8 +7,10 @@ import { readBuiltInAppRelease } from "@/platform/app-releases/server";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { careReportsMayBeOn } from "@/platform/care-reports/release";
+import { listOwnerCareReports } from "@/platform/care-reports/service";
 import { readWorkspaceRecaps } from "@/products/recaps/server";
-import { WorkspaceRecaps, type RecapPeriodFilter, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
+import { WorkspaceRecaps, type OwnerCareReportsState, type RecapPeriodFilter, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Recaps", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -36,10 +38,19 @@ export default async function RecapsPage({ searchParams }: { searchParams: Promi
       state = { kind: "error" };
     }
   }
+  // Reports an agency shared. Absent (and the page unchanged) while Care plan reports is off for this business.
+  let careReports: OwnerCareReportsState | undefined;
+  if (state.kind === "ready" && careReportsMayBeOn()) {
+    const app = await readBuiltInAppRelease("care_reports", workspaceId, await releaseViewerFor({ userId: user.id })).catch(() => null);
+    if (app?.available) {
+      try { careReports = { kind: "ready", items: await listOwnerCareReports({ userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId) }; }
+      catch (error) { careReports = error instanceof WorkspaceAccessError ? undefined : { kind: "unavailable" }; }
+    }
+  }
   const releaseLabel = appReleaseLabelsEnabled() && state.kind === "ready"
     ? await readBuiltInAppRelease("recaps", workspaceId, await releaseViewerFor({ userId: user.id }))
       .then(release => release.available ? builtInAppReleaseLabel(builtInApp("recaps"), release.release) : undefined)
       .catch(() => undefined)
     : undefined;
-  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} releaseLabel={releaseLabel} />;
+  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} releaseLabel={releaseLabel} careReports={careReports} />;
 }

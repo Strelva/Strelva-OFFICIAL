@@ -20,6 +20,11 @@ marketing site in lockstep. Their `package.json` versions must always match.
 - Add a names-only prod flag report.
 - Prepare a report-only nonce CSP behind STRELVA_CSP_NONCE_REPORT_ONLY (off).
 - Add per-package license review to the supply-chain gate (no entries approved yet).
+- Prepare Care plan reports, a built-in App: an agency's monthly report for each
+  client, shared as numbered Releases, with agency time recording. Off by default
+  (`STRELVA_CARE_REPORTS_RELEASE`); share links (`STRELVA_CARE_REPORT_SHARE_LINKS`)
+  and email (`STRELVA_CARE_REPORT_EMAIL`) are separate switches, also off. Held
+  migration and SQL fixture only; nothing is applied or sent.
 
 This is the prepared source cut, not a production deployment or tag receipt.
 October 12–13 go-live claims and October 14 observations are recorded separately

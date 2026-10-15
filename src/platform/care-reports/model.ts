@@ -17,7 +17,9 @@ export function previousCareMonth(now: Date = new Date()): string {
   return monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)));
 }
 
-const shortDate = (iso: string): string => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+/** "Oct 15", in UTC. */
+export const careShortDate = (iso: string): string => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+const shortDate = careShortDate;
 
 export function careReportTitle(facts: Pick<CareReportFacts, "month" | "through">): string {
   const start = monthStart(facts.month);

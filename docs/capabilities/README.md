@@ -43,6 +43,7 @@ model** (`src/platform`, `src/products`, `src/experience`, `/workspace`,
 | [AI visibility](#ai-visibility) | How ready a business is to show up in AI answers | Both | Live (public); private save in production, unproven | — |
 | [Documents](#documents) | Procedures, proposals, notes with reviewed changes and history | Workspace | In production, unproven (opens only for saved document work) | — |
 | [Tracker](#tracker) | A CSV becomes working data with edits and history | Workspace | In production, labelled Experimental | — |
+| [Care plan reports](#care-plan-reports) | An agency's monthly report of its work for each client, shared as numbered Releases under the agency's name | Workspace | Built, off (`STRELVA_CARE_REPORTS_RELEASE`; share links and email are separate switches, also off) | [module](../../src/platform/care-reports/README.md) |
 | [Onboarding](#onboarding) | Collect required documents and see what's missing | Workspace | In production, unproven | — |
 | [Ongoing checks](#ongoing-checks) | Compare two records or a public site and flag disagreement | Workspace | In production, unproven | — |
 | [Delegated work](#delegated-work) | Approve a bounded result; keep progress and evidence together | Workspace | In production; background runs flag off (`STRELVA_BACKGROUND_WORK_RELEASE`) | — |
@@ -112,6 +113,9 @@ All are checked with `=== "1"`.
 | `STRELVA_NEEDS_YOU_RELEASE` | Needs you and What changed from the decision policy ([spec](../product/specs/needs-you.md)): `GET/POST /api/workspace/needs-you`, `POST /api/workspace/needs-you/undo`, workspace-keyed one-tap links at `/api/approve`, the hourly `/api/cron/needs-you` chase, and Home reading the new model (`releases.needsYou`). Off: routes answer 503, workspace links refuse, the cron records a heartbeat only, Home is unchanged. On, every email still goes through `email/send.ts`, so while client email is gated deliveries are recorded as suppressed ("owner not told"). Local preview: add `needsYou=on` to `/preview/strelva` | Off (code not on `main`) |
 | `STRELVA_AGENCY_SIGNUP_RELEASE` | The agency front door (#258): `/sign-up` asks "I run a business / I run an agency" (agency goes to `/workspace/agency/start`; the business path no longer offers "Request your build", so Strelva is not the default provider), the agency setup checklist (profile, team, verification per effect from `read_agency_verification`, first client), `GET /api/agency-onboarding`, and the agency Home link (`releases.agencySetup`). Needs `STRELVA_WORKSPACE_RELEASE`. Off: sign-up is unchanged, the checklist redirects to `/workspace`, the read answers 503. Agency creation (`create_agency`) is the ordinary path and is not gated | Off (code not on `main`) |
 | `STRELVA_AGENCY_ADD_CLIENT_RELEASE` | An agency adds a client (#259, `20261015100000_agency_add_client.sql`): `/workspace/agency/clients/new` from a website or a prospect, `POST /api/workspace/agency-clients` (`add`, `owner_link`), `GET /api/workspace/agency-clients/added`, the owner claim link (`/workspace/claim/[token]`, `/api/workspace-claims/[token]`) and the agency Home and checklist links (`releases.agencyAddClient`). The business gets the agency as provider of record and provider seat (no direct membership), the acting member is staffed, facts from a small site scan are seeded `source = agency`, unconfirmed. The owner link is recorded "not sent: gated" and copied by the agency (decision R08, #235). Limits: 25 adds per agency per UTC day, 100 businesses waiting for an owner, 10 per person per minute. Needs `STRELVA_WORKSPACE_RELEASE`. Off: the page redirects, the routes answer 503/404. Operators keep `/admin/onboard` | Off (code not on `main`) |
+| `STRELVA_CARE_REPORTS_RELEASE` | The Care plan reports App's availability gate (`0` off, `workspace` per-business `care_reports` flag rows, `1` on except rows set off). Needs `STRELVA_WORKSPACE_RELEASE`. Off: `/api/workspace/care-reports*`, `/api/workspace/agency-client-time` and `/workspace/care-reports/*` answer 503/404, Clients and Recaps are unchanged | Off (code not on `main`) |
+| `STRELVA_CARE_REPORT_SHARE_LINKS` | Unguessable, revocable read-only report links at `/care-reports/<token>`. Needs the Care plan reports gate. Off: only the signed-in link is offered, the public page is 404 | Off (code not on `main`) |
+| `STRELVA_CARE_REPORT_EMAIL` | Emailing a shared report to the owner under the agency's name. Also needs `EMAIL_SENDING_ENABLED=true`, a trusted non-staff owner address and the client email override not off. Off: every attempt is recorded as suppressed with its reason and the page says so | Off (code not on `main`) |
 | `STRELVA_PLANNING_ENABLED` | Work-plan generation | Off |
 | `STRELVA_BACKGROUND_WORK_RELEASE` | `/api/cron/workspace-work` | Off |
 | `STRELVA_PRODUCT_LEARNING_RELEASE` | Product learning in production | Off |
@@ -221,6 +225,11 @@ reviews, blog, and newsletter. Writes go through governance and owner approval.
 
 - `src/products/tracker/`, `src/experience/workspace/Tracker*.tsx`, `/api/tracker`; tests `tracker-*`, Playwright `tracker-*`
 - The only workspace product whose operations are marked `supported`. The UI still says "Experimental".
+
+## Care plan reports
+
+- `src/platform/care-reports/`, `src/server/care-reports/`, `src/experience/care-reports/`, `/api/workspace/care-reports*`, `/api/workspace/agency-client-time`, `/workspace/care-reports/[reportId]`, `/care-reports/[token]`; migration `20261028100400_care_reports.sql`; tests `care-reports-*`, `pnpm check:care-reports-sql`
+- Built, off. Every figure is read in Postgres; "Checked on the live site" means a stored read-back. No cost is shown. Email is built and held. See the [module README](../../src/platform/care-reports/README.md).
 
 ## Onboarding
 
