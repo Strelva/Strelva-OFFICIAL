@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { askConnectedSiteChange, checkConnectedSiteChange, markConnectedSiteChangeDone, planConnectedSiteChange } from "@/products/connected-sites/changes";
 import type { ConnectedSiteChange, ConnectedSiteChangesView } from "@/products/connected-sites/client";
 import type { ConnectedSite } from "@/products/connected-sites/contracts";
+import type { ConnectedSiteChangesStore } from "@/products/connected-sites/changes-store";
 import { connectedSiteSystemId } from "@/products/connected-sites/system-id";
 
 const WS = "77000000-0000-4000-8000-000000000002";
@@ -21,10 +22,11 @@ const change = (patch: Partial<ConnectedSiteChange> = {}): ConnectedSiteChange =
 const view = (changes: ConnectedSiteChange[] = [change()]): ConnectedSiteChangesView => ({
   viewer: { role: "admin", isOwner: false, actingAgencyId: AGENCY, agencyName: "Agency" }, site: { id: SITE, siteHost: "bakery.example", siteUrl: "https://bakery.example/", platform: "wix" }, requests: [], changes,
 });
-const store = (overrides: Record<string, unknown> = {}) => ({
+type Fake = ConnectedSiteChangesStore & Record<"list" | "plan" | "markDone" | "recordCheck", ReturnType<typeof vi.fn>>;
+const store = (overrides: Record<string, unknown> = {}): Fake => ({
   list: vi.fn(async () => view()), plan: vi.fn(async () => change()), markDone: vi.fn(async () => change()),
   recordCheck: vi.fn(async () => ({ change: change(), release: null })), ...overrides,
-}) as never;
+}) as unknown as Fake;
 
 describe("askConnectedSiteChange", () => {
   const ask = (deps: Record<string, unknown>, extra: Record<string, unknown> = {}) => askConnectedSiteChange(actor, {
@@ -58,7 +60,7 @@ describe("planConnectedSiteChange", () => {
   it("strips the query and hash and writes the four Wix steps", async () => {
     const changes = store();
     await plan({ sites: sites(), changes, needsYou: () => true });
-    const args = (changes.plan as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[];
+    const args = changes.plan.mock.calls[0] as unknown[];
     const saved = args[2] as { plan: { pageUrl: string; editSteps: string[]; ownerFacing: boolean } };
     expect(saved.plan.pageUrl).toBe("https://bakery.example/hours");
     expect(saved.plan.editSteps).toHaveLength(4);
@@ -92,7 +94,7 @@ describe("checkConnectedSiteChange", () => {
     const changes = store({ recordCheck: vi.fn(async () => { order.push("record"); return { change: change({ stage: "done" }), release: { number: 2 } }; }) });
     const reconcile = vi.fn(async () => { order.push("reconcile"); return 0; });
     const out = await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("We are Open Saturday 9-2"), reconcile: reconcile as never });
-    const call = (changes.recordCheck as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[];
+    const call = changes.recordCheck.mock.calls[0] as unknown[];
     expect(call[3]).toMatchObject({ result: "visible", matched: expect.stringContaining("Open Saturday 9-2") });
     expect((call[3] as { pageHash: string }).pageHash).toMatch(/^[0-9a-f]{64}$/);
     expect(order).toEqual(["reconcile", "record"]);
@@ -102,12 +104,12 @@ describe("checkConnectedSiteChange", () => {
   it("keeps not seen when the text is missing or the old text remains", async () => {
     const changes = store();
     await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("Open Saturday 9-2 and Closed Saturdays"), reconcile: vi.fn(async () => 0) as never });
-    expect((changes.recordCheck as ReturnType<typeof vi.fn>).mock.calls[0]![3]).toMatchObject({ result: "not_visible", matched: null });
+    expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "not_visible", matched: null });
   });
   it("survives a reconcile failure and a fetch that throws", async () => {
     const changes = store();
     await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => { throw new Error("boom"); }, reconcile: vi.fn(async () => { throw new Error("db"); }) as never });
-    expect((changes.recordCheck as ReturnType<typeof vi.fn>).mock.calls[0]![3]).toMatchObject({ result: "unreachable" });
+    expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "unreachable" });
   });
   it("refuses a change that is not on this site", async () => {
     await expect(checkConnectedSiteChange(actor, WS, "77000000-0000-4000-8000-0000000000ff", SYSTEM, { changes: store(), fetchPage: async () => "" })).rejects.toThrow("no longer here");
