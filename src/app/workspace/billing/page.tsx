@@ -16,7 +16,7 @@ import { commandAgencyInvoice } from "@/platform/agency-billing";
 import { readCheckoutAvailability, type CheckoutAvailability } from "@/platform/connect/checkout-availability";
 import { AgencyCheckoutStatus } from "@/experience/workspace/billing/AgencyCheckoutStatus";
 import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
-import { businessAiCapUsd, readBusinessAiBudget, type BusinessAiBudget } from "@/platform/infra/business-ai-budget";
+import { businessAiCapUsd, readBusinessAiBudget, type AiControlsState, type BusinessAiBudget } from "@/platform/infra/business-ai-budget";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   // The service-role budget read needs an authorized customer member first.
   const customerMember = workspace?.kind === "customer" && workspace.access === "member";
   const canManage = customerMember && workspace.role === "owner";
-  let budget: BusinessAiBudget | null = null;
+  let budget: (BusinessAiBudget & { controls?: AiControlsState }) | null = null;
   let capUsd: number | null = null;
   if (customerMember) {
     try {
@@ -73,7 +73,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   }
   return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
     <BusinessBillingView workspaceId={workspaceId} canManage={canManage} billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
-    {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} /> : null}
+    {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={budget?.controls ?? null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={budget?.controls ?? null} /> : null}
     {needsPlan && !showStartPlan ? <WorkspacePlanUnavailable workspaceId={workspaceId} /> : null}
     <nav aria-label="Payment and agency settings" className="flex flex-wrap gap-4">
       {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><StTextButton href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</StTextButton><StTextButton href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</StTextButton></> : null}
