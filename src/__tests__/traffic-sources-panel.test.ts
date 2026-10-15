@@ -65,9 +65,10 @@ describe("TrafficSourcesPanel — connect state", () => {
 });
 
 describe("TrafficSourcesPanel — configured but no data", () => {
-  it("shows a quiet coming-soon when configured but unavailable", () => {
+  it("says the read failed when configured but unavailable", () => {
     const html = render({ ga: UNAVAILABLE_GA, connectHref: "/dashboard/integrations" });
-    expect(html).toContain("coming soon");
+    expect(html).toContain("couldn&#x27;t be read this time");
+    expect(html).not.toMatch(/coming soon/i);
     expect(html).not.toContain("Connect Google and we&#x27;ll show where your visitors come from");
   });
 
