@@ -157,6 +157,7 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
     async resolve(ctx, item, decision, by) {
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
       if (decision === "not_yet") return { outcome: "done", reason: "Not yet: it stays a Possibility." };
+      if (by.kind === "policy") return { outcome: "failed", reason: "policy_not_supported" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       const source = splitSource(item.sourceId);

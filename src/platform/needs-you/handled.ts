@@ -116,6 +116,8 @@ function decider(kind: string | null): string {
   if (kind === "admin_session") return "an admin decided";
   if (kind === "member_session") return "a member decided";
   if (kind === "owner_link" || kind === "owner_session") return "you decided";
+  if (kind === "agency_session") return "your agency decided";
+  if (kind === "policy") return "your notice setting allowed it";
   return "a decision was recorded";
 }
 

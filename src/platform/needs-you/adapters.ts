@@ -17,7 +17,7 @@ import { recordedActor } from "@/platform/presentation/actor";
 import type { UnifiedEvent } from "@/lib/types";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ServiceRequest } from "@/platform/service-requests/types";
-import { KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKind, type ChangeKind, type Decision, type OwnerDecision, type ProposedItem, type SourceLifecycle } from "./contracts";
+import { AUTO_REPLY_POLICY_ACTOR, KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKind, type ChangeKind, type Decision, type OwnerDecision, type PolicyItem, type ProposedItem, type SourceLifecycle } from "./contracts";
 import { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from "./tenant-classify";
 import type { ServiceSession } from "./service-actor";
 
@@ -41,8 +41,9 @@ export type ResolveBy =
    * Strelva (system)'s identity under an item-bound link session bound to
    * this item, and the owner stays the approver of record.
    */
-  | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null; service?: ServiceSession }
+  | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null; service?: ServiceSession; legacyToken?: string }
   | { kind: "session"; actor: WorkspaceActor }
+  | { kind: "policy"; policy: "auto_reply_policy" }
   | { kind: "expiry" };
 
 export interface ResolveOutcome {
@@ -118,7 +119,7 @@ export interface TenantEventPorts {
   linkedTenants(workspaceId: string): Promise<string[]>;
   pendingEvents(tenantId: string): Promise<UnifiedEvent[]>;
   readEvent(eventId: string): Promise<UnifiedEvent | null>;
-  resolveEventAction(tenantId: string, eventId: string, action: "approved" | "dismissed", actorId: string): Promise<{ changed: boolean; reason?: string }>;
+  resolveEventAction(tenantId: string, eventId: string, action: "approved" | "dismissed", actorId: string, authorization?: { reviewApprovalToken: string }): Promise<{ changed: boolean; reason?: string }>;
 }
 
 function splitTenantSource(sourceId: string): { tenantId: string; eventId: string } | null {
@@ -167,6 +168,32 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   };
 }
 
+/**
+ * An auto-posted review reply as a closed policy record: only a model-written
+ * draft that carries an auto-post time, one row per attempt so a retry after a
+ * failed post is not blocked by the earlier row.
+ */
+export function tenantEventPolicyItem(event: UnifiedEvent): PolicyItem | null {
+  const m = event.metadata ?? {};
+  if (m.kind !== "review_reply_draft" || typeof m.autoPostAt !== "string" || m.replyGeneration !== "model") return null;
+  const attempts = typeof m.autoPostAttempts === "number" ? m.autoPostAttempts : 0;
+  const [approveEffect, notYetEffect] = effects("review.reply");
+  return {
+    actor: recordedActor(m.actor),
+    kind: "review.reply",
+    route: "handle_after_notice",
+    title: event.title.slice(0, 200).trim() || "A review reply",
+    detail: event.body ? event.body.slice(0, 600) : null,
+    approveEffect,
+    notYetEffect,
+    sourceLifecycle: "tenant_event",
+    sourceId: `${event.tenantId}:${event.id}`,
+    revisionHash: createHash("sha256").update(`${tenantEventRevision(event)}:attempt:${attempts}`).digest("hex"),
+    urgent: false,
+    adminMayDecide: false,
+  };
+}
+
 export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
   const scopes = async (workspaceId: string) => [...await ports.linkedTenants(workspaceId), ...(releaseFlagMayBeOn("publishing") ? [workspacePublishingScope(workspaceId)] : [])];
   return {
@@ -210,10 +237,12 @@ export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
       // A lapse does nothing at the source: the event stays pending and the
       // operator queue keeps it as the owner's call until someone closes it.
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
-      const actorId = by.kind === "owner_link" ? `owner-link:${by.recipient}` : by.actor.userId;
+      const actorId = by.kind === "policy" ? AUTO_REPLY_POLICY_ACTOR : by.kind === "owner_link" ? `owner-link:${by.recipient}` : by.actor.userId;
+      // A legacy emailed link keeps its review-approval ledgering (event-actions.ts).
+      const authorization = by.kind === "owner_link" && by.legacyToken ? { reviewApprovalToken: by.legacyToken } : undefined;
       let result: { changed: boolean; reason?: string };
       try {
-        result = await ports.resolveEventAction(source.tenantId, source.eventId, decision === "approve" ? "approved" : "dismissed", actorId);
+        result = await ports.resolveEventAction(source.tenantId, source.eventId, decision === "approve" ? "approved" : "dismissed", actorId, ...(authorization ? [authorization] as const : []));
       } catch {
         return { outcome: "failed", reason: "resolver_threw" };
       }
@@ -289,7 +318,8 @@ export function serviceRequestAdapter(ports: ServiceRequestPorts): SourceAdapter
     async resolve(ctx, item, decision, by) {
       // Not yet and a lapse change nothing: the Request keeps its own stage.
       if (decision === "not_yet" || by.kind === "expiry") return { outcome: "done", reason: by.kind === "expiry" ? "Expired, nothing changed" : "Not yet" };
-      const actor = by.kind === "session" ? by.actor : by.actor;
+      if (by.kind === "policy") return { outcome: "failed", reason: "policy_not_supported" };
+      const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       try {
         const request = await find(actor, ctx.workspaceId, item.sourceId);

@@ -11,7 +11,7 @@ import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/sen
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { nextChaseStep, type Decision, type OwnerDecision } from "./contracts";
+import { nextChaseStep, type Decision, type OwnerDecision, type PolicyItem } from "./contracts";
 import type { AdapterContext, ResolveBy, SourceAdapter } from "./adapters";
 import { ServiceSessionRefusedError, type ServiceSession } from "./service-actor";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "./repository";
@@ -186,7 +186,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     revision: string;
     decision: Decision;
     /** `agency`: a staffed member of the agency with full control of this item's scope (ADR 0015); SQL decides. */
-    by: { kind: "owner_link"; recipient: string } | { kind: "session"; actor: WorkspaceActor } | { kind: "agency"; actor: WorkspaceActor };
+    by: { kind: "owner_link"; recipient: string; legacyToken?: string } | { kind: "session"; actor: WorkspaceActor } | { kind: "agency"; actor: WorkspaceActor };
   }): Promise<DecideResult> {
     const item = await deps.store.read(input.workspaceId, input.itemId);
     if (!item) return { status: "not_found", item: null };
@@ -260,7 +260,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       }
     }
     const by: ResolveBy = input.by.kind === "owner_link"
-      ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor, ...(linkService ? { service: linkService } : {}) }
+      ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor, ...(linkService ? { service: linkService } : {}), ...(input.by.legacyToken ? { legacyToken: input.by.legacyToken } : {}) }
       : { kind: "session", actor: input.by.actor };
     const outcome = await adapter.resolve(ctx, claimed.item, input.decision, by).catch(() => ({ outcome: "failed" as const, reason: "resolver_threw" }));
     const finished = await deps.store.finish(input.workspaceId, item.id, outcome.outcome, outcome.reason ?? null, "receiptRef" in outcome ? outcome.receiptRef ?? null : null);
@@ -269,6 +269,50 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const receipt = input.decision === "approve" && (outcome.outcome === "done" || outcome.outcome === "done_unverified")
       ? handledFromStore({ ...finished, store: "owner_decisions", at: finished.decidedAt }) : null;
     return { status: outcome.outcome, item: finished, ...(receipt ? { receipt } : {}) };
+  }
+
+  /**
+   * The open item for one source, opened now when the source waits on someone
+   * and no item exists yet. A legacy emailed link uses this to decide through
+   * Needs you. Null when nothing matches; never opens for another business.
+   */
+  async function openForSource(workspaceId: string, lifecycle: string, sourceId: string): Promise<OwnerDecision | null> {
+    const existing = await deps.store.readOpenForSource?.(workspaceId, lifecycle, sourceId).catch(() => null);
+    if (existing) return existing;
+    const adapter = adapterFor(lifecycle);
+    if (!adapter) return null;
+    const ctx = await cronContext(workspaceId, new Map());
+    const proposal = await adapter.propose(ctx).catch(() => null);
+    const item = proposal?.items.find(candidate => candidate.sourceId === sourceId);
+    if (!item) return null;
+    const opened = ctx.service && deps.store.openAsService
+      ? await deps.store.openAsService(workspaceId, ctx.service.sessionId, item)
+      : await deps.store.open(workspaceId, item);
+    return opened.state === "open" ? opened : null;
+  }
+
+  /**
+   * The notice setting allowed this change, so it goes ahead without asking.
+   * Records one closed policy decision, runs the source's own resolver as the
+   * policy, and records its outcome. A person's open decision for the same
+   * source wins: the policy then does nothing (`owner_decides`).
+   */
+  async function recordPolicyDecision(input: { workspaceId: string; item: PolicyItem; policy: "auto_reply_policy" }): Promise<{ status: "done" | "done_unverified" | "failed" | "already_handled" | "owner_decides" | "unsupported"; item: OwnerDecision | null }> {
+    if (!deps.store.claimPolicy) return { status: "unsupported", item: null };
+    const adapter = adapterFor(input.item.sourceLifecycle);
+    if (!adapter) return { status: "unsupported", item: null };
+    let claimed;
+    try {
+      claimed = await deps.store.claimPolicy(input.workspaceId, input.item, input.policy);
+    } catch (error) {
+      if (error instanceof NeedsYouRefusedError && error.code === "owner_decision_open") return { status: "owner_decides", item: null };
+      throw error;
+    }
+    if (claimed.status !== "claimed") return { status: "already_handled", item: claimed.item };
+    const outcome = await adapter.resolve({ workspaceId: input.workspaceId }, claimed.item, "approve", { kind: "policy", policy: input.policy })
+      .catch(() => ({ outcome: "failed" as const, reason: "resolver_threw" }));
+    const finished = await deps.store.finish(input.workspaceId, claimed.item.id, outcome.outcome, outcome.reason ?? null, "receiptRef" in outcome ? outcome.receiptRef ?? null : null);
+    return { status: outcome.outcome, item: finished };
   }
 
   function links(row: OwnerDecision, recipient: string): EmailDecision {
@@ -544,7 +588,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, review, decide, chase, notifyBookingRequest, deliverUrgentSource };
+  return { sync, list, review, decide, openForSource, recordPolicyDecision, chase, notifyBookingRequest, deliverUrgentSource };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

@@ -27743,6 +27743,14 @@ export type Database = {
           workspace_role: string
         }[]
       }
+      read_open_owner_decision_for_source: {
+        Args: {
+          p_lifecycle: string
+          p_source_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       read_operational_assignment: {
         Args: {
           p_access?: string
@@ -29624,6 +29632,14 @@ export type Database = {
           p_event: string
           p_id: string
           p_intent: string
+        }
+        Returns: Json
+      }
+      record_policy_owner_decision: {
+        Args: {
+          p_item: Json
+          p_policy: string
+          p_workspace_id: string
         }
         Returns: Json
       }

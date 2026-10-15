@@ -118,6 +118,7 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
       // Existing service sessions also refuse: the ordinary member mutation
       // cannot atomically recheck the owner-link agency assignment/effect.
       if (by.kind === "owner_link") return { outcome: "failed", reason: "sign_in_required" };
+      if (by.kind === "policy") return { outcome: "failed", reason: "policy_not_supported" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       const row = (await pending(actor, ctx.workspaceId).catch(() => null))?.find((entry) => entry.versionId === item.sourceId);

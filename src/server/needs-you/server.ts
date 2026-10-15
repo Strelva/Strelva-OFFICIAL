@@ -88,7 +88,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),
         pendingEvents: (tenantId) => getEvents(tenantId, { status: "pending", limit: 100 }),
         readEvent: getEventRaw,
-        resolveEventAction: (tenantId, eventId, action, actorId) => resolveEventAction(tenantId, eventId, action, actorId),
+        resolveEventAction: (tenantId, eventId, action, actorId, authorization) => resolveEventAction(tenantId, eventId, action, actorId, authorization),
       }),
       serviceRequestAdapter({
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
