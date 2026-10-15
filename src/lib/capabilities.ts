@@ -18,7 +18,7 @@ export function sanitizePromptValue(value: unknown): string {
     .slice(0, 400);
 }
 
-export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "social" | "google_business";
+export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews" | "google_business";
 export type AgentSurface = "chat" | "background";
 
 export const AGENT_TOOL_CATALOG = {
@@ -39,8 +39,6 @@ export const AGENT_TOOL_CATALOG = {
   create_gbp_post: ["chat", "background"],
   update_business_hours: ["chat", "background"],
   upload_gbp_photo: ["chat", "background"],
-  draft_social_post: ["chat"],
-  list_social_posts: ["chat"],
   get_reviews: ["chat"],
   reply_to_review: ["chat"],
   toggle_section_visibility: ["chat"],
@@ -58,7 +56,7 @@ export const AGENT_TOOL_CATALOG = {
 
 export type AgentToolId = keyof typeof AGENT_TOOL_CATALOG;
 
-const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "social", "google_business"];
+const ALL_CAPABILITIES: CapabilityId[] = ["website", "analytics", "email", "blog", "reviews", "google_business"];
 
 export interface Capability {
   id: CapabilityId;
@@ -94,11 +92,6 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
     name: "Review Management",
     description: "Monitor reviews and queue governed replies",
     tools: ["get_reviews", "reply_to_review"],
-  },
-  social: {
-    name: "Social Media",
-    description: "Draft social media posts from site content",
-    tools: ["draft_social_post", "list_social_posts"],
   },
   google_business: {
     name: "Google Business",

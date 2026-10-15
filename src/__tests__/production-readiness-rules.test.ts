@@ -225,7 +225,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/queue/[id]/route.ts",
       "src/app/api/reviews/route.ts",
       "src/app/api/rewards/members/[email]/adjust/route.ts",
-      "src/app/api/social/route.ts",
       "src/app/api/suggestions/route.ts",
       "src/app/api/upload/route.ts",
     ];
@@ -252,7 +251,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/queue/[id]/route.ts",
       "src/app/api/reviews/route.ts",
       "src/app/api/rewards/members/[email]/adjust/route.ts",
-      "src/app/api/social/route.ts",
       "src/app/api/suggestions/route.ts",
       "src/app/api/upload/route.ts",
     ];
@@ -343,7 +341,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const suggestions = readFileSync(path.join(process.cwd(), "src/app/api/suggestions/route.ts"), "utf8");
     const newsletterSend = readFileSync(path.join(process.cwd(), "src/app/api/newsletter/send/route.ts"), "utf8");
     const reviews = readFileSync(path.join(process.cwd(), "src/app/api/reviews/route.ts"), "utf8");
-    const social = readFileSync(path.join(process.cwd(), "src/app/api/social/route.ts"), "utf8");
     const yelp = readFileSync(path.join(process.cwd(), "src/app/api/connections/yelp/route.ts"), "utf8");
     const chat = readFileSync(path.join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
 
@@ -351,7 +348,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }
-    for (const source of [suggestions, newsletterSend, reviews, social, yelp]) {
+    for (const source of [suggestions, newsletterSend, reviews, yelp]) {
       expect(source).toContain("readJsonObject(req)");
       expect(source).toContain("Invalid request body");
     }

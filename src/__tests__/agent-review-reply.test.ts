@@ -11,7 +11,7 @@ beforeEach(() => {
 });
 
 /**
- * Trust coverage for the chat agent's review + social tools:
+ * Trust coverage for the chat agent's review tools:
  *
  * 1. `reply_to_review` must NEVER claim a Google reply is live. For a
  *    Google-source review with a connected Google account it queues a
@@ -21,8 +21,8 @@ beforeEach(() => {
  *    (Yelp/manual, or Google without a connection) it saves the reply in the
  *    dashboard store and says so honestly.
  *
- * 2. `schedule_social_post` must NOT be registered — no publisher exists, so
- *    "scheduling" a post was a silent no-op that never published.
+ * 2. No social tools are registered — no Connection can post, so drafting
+ *    or scheduling social posts promised something the product cannot do.
  *
  * Mirrors the agent-custom-change harness: drive the real POST handler with a
  * stand-in streamText that invokes the chosen tool's `execute`.
@@ -284,15 +284,14 @@ describe("agent reply_to_review tool", () => {
   });
 });
 
-describe("agent social tools", () => {
-  it("does not register schedule_social_post — no publisher exists, so scheduling would be a silent no-op", async () => {
+describe("agent social tools are retired", () => {
+  it("registers no social tools and keeps reply_to_review", async () => {
     await runAgent(null);
 
     const toolNames = Object.keys(mockCapturedTools);
+    expect(toolNames).not.toContain("draft_social_post");
+    expect(toolNames).not.toContain("list_social_posts");
     expect(toolNames).not.toContain("schedule_social_post");
-    // Drafts are real — the draft/list tools stay registered.
-    expect(toolNames).toContain("draft_social_post");
-    expect(toolNames).toContain("list_social_posts");
     expect(toolNames).toContain("reply_to_review");
   });
 });

@@ -220,7 +220,7 @@ describe("deriveIntelligenceStatus", () => {
     // Built-ins are always live regardless of connection status.
     { name: "built-in + can-act -> can_act_here", id: "reviews", status: "not_configured", expected: "can_act_here" },
     { name: "built-in + uses-signal -> ai_using_it", id: "website-activity", status: "not_configured", expected: "ai_using_it" },
-    { name: "built-in + can-act (no signal flag) -> can_act_here", id: "social", status: "connected", expected: "can_act_here" },
+    { name: "built-in + can-act (no signal flag) -> can_act_here", id: "website", status: "connected", expected: "can_act_here" },
     // Non-built-in, not connected -> no signal.
     { name: "connectable not connected -> no_signal", id: "yelp", status: "not_configured", expected: "no_signal" },
     { name: "connectable unknown -> no_signal", id: "google-business", status: "unknown", expected: "no_signal" },

@@ -36,8 +36,6 @@ const mockSaveChatMessages = vi.fn();
 const mockUpdateSuggestion = vi.fn();
 const mockAddReview = vi.fn();
 const mockReplyToReview = vi.fn();
-const mockGetSocialPosts = vi.fn();
-const mockSetSocialPosts = vi.fn();
 const mockSaveConnection = vi.fn();
 const mockHeadersGet = vi.fn((key: string): string | null => {
   if (key === "x-tenant") return "test-tenant";
@@ -142,8 +140,6 @@ vi.mock("@/lib/storage", () => ({
   restoreVersion: vi.fn(() => Promise.resolve(null)),
   setPageConfig: vi.fn(() => Promise.resolve()),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
-  getSocialPosts: (...args: unknown[]) => mockGetSocialPosts(...args),
-  setSocialPosts: (...args: unknown[]) => mockSetSocialPosts(...args),
   getInboxItems: vi.fn(() => Promise.resolve([])),
   markInboxRead: vi.fn(() => Promise.resolve(true)),
   markAllInboxRead: vi.fn(() => Promise.resolve()),
@@ -477,8 +473,6 @@ describe("Tenant content write route handlers", () => {
 describe("Dashboard action route handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetSocialPosts.mockResolvedValue([]);
-    mockSetSocialPosts.mockResolvedValue(undefined);
     mockCreateThread.mockResolvedValue({
       id: "thread_123",
       title: "New chat",
@@ -694,40 +688,6 @@ describe("Dashboard action route handlers", () => {
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
     expect(mockReplyToReview).not.toHaveBeenCalled();
-  });
-
-  it("POST /api/social rejects malformed JSON with a client error", async () => {
-    const { POST } = await import("@/app/api/social/route");
-
-    const request = new Request("http://localhost/api/social", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await POST(request);
-    expect(response.status).toBe(400);
-
-    const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
-    expect(mockSetSocialPosts).not.toHaveBeenCalled();
-  });
-
-  it("PATCH /api/social rejects malformed JSON with a client error", async () => {
-    const { PATCH } = await import("@/app/api/social/route");
-
-    const request = new Request("http://localhost/api/social", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await PATCH(request);
-    expect(response.status).toBe(400);
-
-    const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
-    expect(mockSetSocialPosts).not.toHaveBeenCalled();
   });
 
   it("POST /api/connections/yelp rejects malformed JSON with a client error", async () => {
