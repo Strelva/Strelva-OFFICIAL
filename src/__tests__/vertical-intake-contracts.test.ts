@@ -54,7 +54,7 @@ describe("definition guard", () => {
     expect(() => assertIntakeDefinition(HOME_SERVICES_FIXTURE)).not.toThrow();
     const rendered = publicIntakeForm(HOME_SERVICES_FIXTURE, 1, config(), {}, { sensitiveAvailable: false, now: NOW });
     expect(rendered.fields.map(f => f.id)).toEqual(["name", "phone", "address_area", "job_type", "preferred_days"]);
-    expect(validateIntakeAnswers(rendered, { name: "A", phone: "716 555 0100", job_type: "gas" })).toMatchObject({ ok: true, triage: "urgent", summary: "A leak".replace("A leak", "Smell of gas") });
+    expect(validateIntakeAnswers(rendered, { name: "A", phone: "716 555 0100", job_type: "gas" })).toMatchObject({ ok: true, triage: "urgent", summary: "Smell of gas" });
   });
 });
 
