@@ -7,6 +7,7 @@ import {
   builtInAppForMakeRealChannel,
   builtInAppForSystemKind,
   builtInAppReleaseLabel,
+  flagReleaseMeaning,
   releaseLabel,
   releasesGatedByFlag,
   rollbackPlan,
@@ -32,9 +33,11 @@ describe("built-in App catalog", () => {
   });
 
   it("makes Release 1 the ungated 1.0.0 baseline for every App", () => {
+    const ADDED_AFTER_1_0 = new Set(["care_reports"]);
     for (const item of BUILT_IN_APPS) {
       expect(item.releases[0]!.gates, item.id).toEqual([]);
-      expect(item.releases[0]!.shippedIn, item.id).toBe("1.0.0");
+      expect(item.releases[0]!.shippedIn, item.id).toBe(ADDED_AFTER_1_0.has(item.id) ? null : "1.0.0");
+      if (ADDED_AFTER_1_0.has(item.id)) expect(item.availability.some(g => g.kind === "workspace_flag"), item.id).toBe(true);
     }
   });
 
@@ -51,6 +54,7 @@ describe("built-in App catalog", () => {
     for (const channel of ["hosted_website", "tenant_content", "google_listing"] as const) expect(builtInAppForMakeRealChannel(channel)).toBeNull();
     expect(builtInAppForSystemKind("booking")?.id).toBe("bookings");
     expect(builtInAppForSystemKind("website")).toBeNull();
+    expect(builtInAppForSystemKind("report")?.id).toBe("recaps");
   });
 
   it("plans rollback from a Release's own gates", () => {
@@ -66,6 +70,7 @@ describe("built-in App catalog", () => {
 
   it("treats availability as not a Release", () => {
     expect(releasesGatedByFlag("inquiries")).toEqual([]);
+    expect(flagReleaseMeaning("care_reports")).toBeNull();
   });
 
   it("only uses known release flags in gates", () => {

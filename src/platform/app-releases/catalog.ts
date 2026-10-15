@@ -13,7 +13,8 @@ import {
 /**
  * The Apps the platform ships in code to every business. Release 1 of each is
  * the 1.0.0 production baseline with no gates, so nothing here changes live
- * behavior. To add a Release, append one entry (README.md, "Adding a Release").
+ * behavior. Apps added after 1.0.0 take their presence gates in `availability`;
+ * their Release 1 has shippedIn null until deployed. To add a Release, append one entry (README.md, "Adding a Release").
  */
 const resend = (optional: boolean, purpose: string): RequiredConnection => ({ provider: "resend", access: "act", optional, purpose });
 
@@ -99,6 +100,29 @@ export const BUILT_IN_APPS: readonly BuiltInApp[] = Object.freeze([
       release1("internal_tools", "Tools the business uses for its own work, with forms and records.", [
         resend(false, "Send System email to approved recipients"),
       ]),
+    ],
+  } satisfies BuiltInApp),
+  Object.freeze({
+    id: "care_reports",
+    name: "Care plan reports",
+    publisher: "platform",
+    systemKinds: [],
+    labelOnSystems: false,
+    makeRealChannels: [],
+    availability: [
+      { kind: "env", name: "STRELVA_WORKSPACE_RELEASE", values: ["1"] },
+      { kind: "workspace_flag", flag: "care_reports" },
+    ],
+    releases: [
+      Object.freeze({
+        key: "care_reports.baseline",
+        number: 1,
+        summary: "A monthly report of the work an agency did for a client, from checked changes, Requests, inquiries, bookings and recorded time.",
+        shippedIn: null,
+        changesLiveBehavior: false,
+        gates: [],
+        requiredConnections: [resend(true, "Email the monthly report to the owner under the agency's name")],
+      }),
     ],
   } satisfies BuiltInApp),
 ]);
