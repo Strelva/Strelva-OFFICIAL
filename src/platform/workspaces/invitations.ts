@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type WorkspaceRole } from "./types";
-import { inviteBusinessOwner, ownerInvitationAcceptUrl } from "./business-ownership";
+import { inviteBusinessOwner, ownerInvitationAcceptUrl, type OperatorOwnerInvitation } from "./business-ownership";
 import type { OperatorAuditContext } from "./operator-approvals";
 import { deliverWorkspaceInvitation, type InvitationDelivery } from "./invitation-delivery";
 
@@ -177,7 +177,7 @@ export async function issueWorkspaceInvitation(input: {
   recipientEmail: string;
   role: WorkspaceRole;
   issuer: WorkspaceInvitationIssuer;
-}): Promise<{ invitation: WorkspaceInvitation; acceptUrl: string; delivery: InvitationDelivery }> {
+}): Promise<{ invitation: WorkspaceInvitation; acceptUrl: string; delivery: InvitationDelivery; /** The operator owner invitation as the admin screens read it. */ ownerInvitation?: OperatorOwnerInvitation }> {
   if (input.issuer.kind === "operator") {
     if (input.role !== "owner") {
       throw new WorkspaceConflictError("Strelva operators can only invite a business owner. The owner adds everyone else from People & access.");
@@ -198,7 +198,7 @@ export async function issueWorkspaceInvitation(input: {
       createdAt: issued.invitation.createdAt,
     };
     const delivery = await deliverWorkspaceInvitation({ invitation, acceptUrl: issued.acceptUrl, workspaceName: issued.invitation.workspaceName, inviterLabel: "Strelva" });
-    return { invitation, acceptUrl: issued.acceptUrl, delivery };
+    return { invitation, acceptUrl: issued.acceptUrl, delivery, ownerInvitation: issued.invitation };
   }
   const created = await createWorkspaceInvitation(input.issuer.actor, { workspaceId: input.workspaceId, recipientEmail: input.recipientEmail, role: input.role });
   const acceptUrl = ownerInvitationAcceptUrl(created.token);

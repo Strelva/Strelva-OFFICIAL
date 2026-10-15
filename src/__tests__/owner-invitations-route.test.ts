@@ -95,7 +95,8 @@ describe("owner invitation mutations", () => {
   it("records a fresh, same-operator approval for the trusted business owner before creating a link", async () => {
     const response = await POST(request(), ctx);
     expect(response.status).toBe(200);
-    expect((await response.json()).delivery).toEqual({ status: "not_sent", reason: "email_not_requested" });
+    // The one invitation path decides delivery: the owner-invitation release is not the email release.
+    expect((await response.json()).delivery).toEqual({ status: "not_sent", reason: "release_off" });
     expect(mocks.approval).toHaveBeenCalledWith(actor, WORKSPACE,
       { kind: "owner_invitation.issue", recipientEmail: "owner@example.test", sendEmail: false }, { source: "web" });
     expect(issued()[0]![1]).toMatchObject({ p_operator_user_id: OPERATOR, p_workspace_id: WORKSPACE,

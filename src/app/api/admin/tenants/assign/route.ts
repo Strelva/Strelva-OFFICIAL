@@ -10,6 +10,8 @@ import {
   type ClientRole,
 } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
+import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
+import { NON_OWNER_ON_BUSINESS, oneInvitationPathEnabled } from "@/platform/owner-entry/operator-invitations";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -63,6 +65,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // A converted business is joined through workspace invitations, never by direct assignment.
+  let legacy = false;
+  if (oneInvitationPathEnabled()) {
+    let workspaceId: string | null;
+    try {
+      workspaceId = await releaseWorkspaceForTenant(tenantId);
+    } catch {
+      return NextResponse.json({ error: "Access checks are unavailable. Try again later." }, { status: 503 });
+    }
+    if (workspaceId) {
+      return NextResponse.json({ error: role === "owner" ? "Invite the owner instead. Direct assignment is off for businesses." : NON_OWNER_ON_BUSINESS }, { status: 409 });
+    }
+    legacy = true;
+  }
+
   try {
     const userId = await findUserIdByEmail(email);
     if (!userId) {
@@ -114,7 +131,7 @@ export async function POST(req: Request) {
       metadata: { email, role, reason },
     });
 
-    return NextResponse.json({ success: true, userId, tenant: tenantId, role });
+    return NextResponse.json({ success: true, userId, tenant: tenantId, role, ...(legacy ? { legacy: true } : {}) });
   } catch {
     return NextResponse.json(
       { error: "Access change could not be confirmed. Refresh the member list before trying again." },

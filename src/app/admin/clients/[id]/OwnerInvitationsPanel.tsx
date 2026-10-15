@@ -5,6 +5,13 @@ import { StEmpty, StInput, StNotice, StPill, StRow, StRows, StSection, StState, 
 import type { OwnerInvitationsLoad } from "@/platform/owner-entry/operator-invitations";
 import type { OwnerInvitationResult } from "@/platform/workspaces/business-ownership";
 
+/** What the operator is told once an invitation exists: emailed, or plainly not, with the link to copy. */
+export function ownerInvitationNotice(deliveryStatus: string, recipientEmail: string): string {
+  return deliveryStatus === "sent" || deliveryStatus === "accepted"
+    ? `Invitation emailed to ${recipientEmail}.`
+    : "Client email is off, so nothing was emailed. Copy this link and send it yourself.";
+}
+
 export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { tenantId: string; load: OwnerInvitationsLoad; request?: typeof fetch }) {
   const [state, setState] = useState(load.kind === "ready" ? load.state : null);
   const [recipient, setRecipient] = useState(state?.recipient?.email ?? "");
@@ -40,14 +47,10 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
         setState((current) => current && ({ ...current, hasOwner: data.status === "accepted" || current.hasOwner,
           pending: current.pending.filter((invitation) => invitation.invitationId !== command.invitationId) }));
       } else {
-        const result: Omit<OwnerInvitationResult, "acceptUrl"> & { acceptUrl?: string } = data;
+        const result: Omit<OwnerInvitationResult, "acceptUrl" | "delivery"> & { acceptUrl?: string; delivery: { status: string } } = data;
         setAcceptUrl(result.acceptUrl ?? null);
         setApprovalId("");
-        setMessage(result.delivery.status === "sent"
-          ? `Invitation emailed to ${result.invitation.recipientEmail}.`
-          : result.delivery.reason === "email_not_requested"
-          ? "Invitation link prepared. No email was sent."
-          : `Invitation created. Email was not sent: ${result.delivery.reason}.`);
+        setMessage(ownerInvitationNotice(result.delivery.status, result.invitation.recipientEmail));
         setState((current) => current && ({ ...current, pending: [...current.pending, {
           invitationId: result.invitation.invitationId, recipientEmail: result.invitation.recipientEmail,
           expiresAt: result.invitation.expiresAt, createdAt: result.invitation.createdAt,

@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { OwnerInvitationsPanel } from "@/app/admin/clients/[id]/OwnerInvitationsPanel";
+import { OwnerInvitationsPanel, ownerInvitationNotice } from "@/app/admin/clients/[id]/OwnerInvitationsPanel";
 import { ownerInvitationPreviewLoad, ownerInvitationPreviewRequest } from "@/app/preview/strelva/owner-invitations/fixture";
 
 describe("operator owner invitations presentation", () => {
@@ -15,6 +15,13 @@ describe("operator owner invitations presentation", () => {
     expect(html).not.toContain("Jacob approved");
     expect(html).not.toContain("Email invitation");
     expect(html).not.toContain("type=\"checkbox\"");
+  });
+
+  it("says plainly that nothing was emailed and to copy the link, whatever the reason", () => {
+    for (const status of ["not_sent", "unknown"]) {
+      expect(ownerInvitationNotice(status, "owner@example.test")).toBe("Client email is off, so nothing was emailed. Copy this link and send it yourself.");
+    }
+    expect(ownerInvitationNotice("accepted", "owner@example.test")).toBe("Invitation emailed to owner@example.test.");
   });
 
   it("gives the second operator a small exact-address approval form for a non-trusted address", () => {

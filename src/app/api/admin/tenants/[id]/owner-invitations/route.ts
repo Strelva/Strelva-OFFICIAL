@@ -2,7 +2,8 @@ import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admis
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { operatorOwnerInvitationContext, ownerInvitationsReleaseEnabled } from "@/platform/owner-entry/operator-invitations";
-import { inviteBusinessOwner, revokeOwnerInvitation } from "@/platform/workspaces/business-ownership";
+import { revokeOwnerInvitation } from "@/platform/workspaces/business-ownership";
+import { issueWorkspaceInvitation } from "@/platform/workspaces/invitations";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
 type Context = { params: Promise<{ id: string }> };
@@ -55,13 +56,14 @@ export async function POST(request: Request, { params }: Context) {
       const status = await revokeOwnerInvitation(actor, input.invitationId);
       return json({ status });
     }
-    const result = await inviteBusinessOwner(actor, state.workspaceId, {
-      recipientEmail: input.recipientEmail,
-      approvalId: input.approvalId,
-      authTime,
+    const issued = await issueWorkspaceInvitation({
+      workspaceId: state.workspaceId,
+      recipientEmail: input.recipientEmail ?? state.recipient?.email ?? "",
+      role: "owner",
+      issuer: { kind: "operator", actor, authTime, ...(input.approvalId ? { approvalId: input.approvalId } : {}) },
     });
     // The bearer link belongs only in the authenticated response when delivery did not happen.
-    return json({ invitation: result.invitation, delivery: result.delivery,
-      ...(result.delivery.status === "not_sent" ? { acceptUrl: result.acceptUrl } : {}) });
+    return json({ invitation: issued.ownerInvitation, delivery: issued.delivery,
+      ...(issued.delivery.status !== "accepted" ? { acceptUrl: issued.acceptUrl } : {}) });
   } catch (error) { return refused(error); }
 }
