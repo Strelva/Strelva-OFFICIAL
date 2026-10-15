@@ -6,7 +6,7 @@ import { generateCommandSchema } from "@/platform/care-reports/contracts";
 import { currentCareMonth, previousCareMonth } from "@/platform/care-reports/model";
 import { careReportEmailEnabled, careReportShareLinksEnabled, careReportsMayBeOn } from "@/platform/care-reports/release";
 import { listCareReports } from "@/platform/care-reports/service";
-import { generateAgencyCareReports } from "@/server/care-reports/server";
+import { careReportsAvailableFor, generateAgencyCareReports } from "@/server/care-reports/server";
 export const dynamic = "force-dynamic";
 
 const off = () => workspaceJson({ error: "Care plan reports are not enabled." }, 503);
@@ -19,7 +19,10 @@ export async function GET(request: Request) {
     const p = new URL(request.url).searchParams;
     const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).refine(value => value <= currentCareMonth()).parse(p.get("month") ?? previousCareMonth());
     const agencyWorkspaceId = z.string().uuid().parse(p.get("agencyWorkspaceId"));
-    return workspaceJson({ ...(await listCareReports(actor, agencyWorkspaceId, month)), emailOn: careReportEmailEnabled(), shareLinksOn: careReportShareLinksEnabled() });
+    const list = await listCareReports(actor, agencyWorkspaceId, month);
+    const available = await careReportsAvailableFor(list.clients.map(client => client.workspaceId), { operator: false, tester: false, userId: actor.userId });
+    if (available.size === 0) return off();
+    return workspaceJson({ ...list, emailOn: careReportEmailEnabled(), shareLinksOn: careReportShareLinksEnabled() });
   } catch (error) { return workspaceHttpFailure(error); }
 }
 

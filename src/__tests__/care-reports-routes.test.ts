@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   actor: vi.fn(), released: vi.fn(() => true), limited: vi.fn(async () => false),
   list: vi.fn(), issue: vi.fn(), note: vi.fn(), publish: vi.fn(), revoke: vi.fn(), record: vi.fn(), voidTime: vi.fn(), listTime: vi.fn(),
-  generate: vi.fn(), read: vi.fn(), send: vi.fn(),
+  generate: vi.fn(), read: vi.fn(), send: vi.fn(), one: vi.fn(async () => true), many: vi.fn(async () => new Set<string>(["28100000-0000-4000-8000-000000000010"])),
 }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: m.released }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: m.limited }));
@@ -12,7 +12,7 @@ vi.mock("@/platform/care-reports/service", () => ({
   listCareReports: m.list, issueCareReportShareLink: m.issue, saveCareReportNote: m.note, publishCareReport: m.publish, revokeCareReportShareLink: m.revoke,
   recordAgencyClientTime: m.record, voidAgencyClientTime: m.voidTime, listAgencyClientTime: m.listTime,
 }));
-vi.mock("@/server/care-reports/server", () => ({ generateAgencyCareReports: m.generate, readCareReportForViewer: m.read, sendCareReport: m.send }));
+vi.mock("@/server/care-reports/server", () => ({ generateAgencyCareReports: m.generate, readCareReportForViewer: m.read, sendCareReport: m.send, careReportsAvailableForBusiness: m.one, careReportsAvailableFor: m.many }));
 
 import { GET, POST } from "@/app/api/workspace/care-reports/route";
 import { GET as reportGet, POST as reportPost } from "@/app/api/workspace/care-reports/[reportId]/route";
@@ -42,7 +42,9 @@ beforeEach(() => {
   m.actor.mockResolvedValue(actor);
   m.list.mockResolvedValue({ agencyWorkspaceId: AGENCY, month: "2026-09", canGenerate: true, clients: [] });
   m.generate.mockResolvedValue({ generated: 0, reports: [], skipped: [] });
-  m.read.mockResolvedValue({ audience: "agency" });
+  m.read.mockResolvedValue({ audience: "agency", report: { businessWorkspaceId: WS } });
+  m.one.mockResolvedValue(true);
+  m.many.mockResolvedValue(new Set([WS]));
   m.issue.mockResolvedValue({ createdAt: "2026-10-15T00:00:00Z" });
   m.send.mockResolvedValue({ status: "suppressed", reason: "email_off" });
 });
@@ -59,7 +61,32 @@ describe("Care plan report routes", () => {
       expect((await timePost(post("/x", {}))).status).toBe(503);
       expect((await timeDelete(post("/x", {}, "DELETE"))).status).toBe(503);
     }
-    for (const fn of Object.values(m)) if (fn !== m.released && fn !== m.limited && fn !== m.actor) expect(fn).not.toHaveBeenCalled();
+    for (const fn of Object.values(m)) if (fn !== m.released && fn !== m.limited && fn !== m.actor && fn !== m.one && fn !== m.many) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 for agency time when the App is off for that business", async () => {
+    m.one.mockResolvedValue(false);
+    const query = `${base}/api/workspace/agency-client-time?agencyWorkspaceId=${AGENCY}&workspaceId=${WS}&month=2026-10`;
+    expect((await timeGet(new Request(query))).status).toBe(503);
+    const entry = { agencyWorkspaceId: AGENCY, workspaceId: WS, id: REPORT, minutes: 30, category: "change", occurredOn: "2026-10-05" };
+    expect((await timePost(post("/x", entry))).status).toBe(503);
+    expect(m.one).toHaveBeenCalledWith(WS, { operator: false, tester: false, userId: actor.userId });
+    expect(m.listTime).not.toHaveBeenCalled();
+    expect(m.record).not.toHaveBeenCalled();
+  });
+
+  it("answers 503 for the list when the App is on for none of the clients", async () => {
+    m.list.mockResolvedValue({ agencyWorkspaceId: AGENCY, month: "2026-09", canGenerate: true, clients: [{ workspaceId: WS }] });
+    m.many.mockResolvedValue(new Set());
+    expect((await GET(new Request(`${base}/api/workspace/care-reports?agencyWorkspaceId=${AGENCY}`))).status).toBe(503);
+    expect(m.many).toHaveBeenCalledWith([WS], { operator: false, tester: false, userId: actor.userId });
+  });
+
+  it("answers 503 for report actions when the App is off for that business", async () => {
+    m.one.mockResolvedValue(false);
+    expect((await reportPost(post("/x", { action: "publish", expectedRevision: 1 }), ctx())).status).toBe(503);
+    expect(m.one).toHaveBeenCalledWith(WS, { operator: false, tester: false, userId: actor.userId });
+    expect(m.publish).not.toHaveBeenCalled();
   });
 
   it("needs a signed-in actor", async () => {

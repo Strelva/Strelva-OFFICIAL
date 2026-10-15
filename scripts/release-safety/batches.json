@@ -2515,7 +2515,7 @@
       "items": [
         {
           "file": "20261028100400_care_reports.sql",
-          "sha256": "0b7a28b9d04c66c5df9eb0767fbd62ada2566c0f05af70d169ac4bf62e254344",
+          "sha256": "4bd20d92cb9ed0a0bc7017e37f894552a066490ad6ae9536955da0919fd1eb38",
           "rollback": "rollback-20261028100400_care_reports.sql",
           "rollbackSha256": "22db7070eddcb5d0e9fe8c56bb960f3b0f87232e48ddb87f2690dada6909f5bb",
           "rollbackStatus": "Refuses with care_reports_rollback_populated once any report, published Release or time entry exists; otherwise drops the functions and tables and restores the flag-name list without care_reports."

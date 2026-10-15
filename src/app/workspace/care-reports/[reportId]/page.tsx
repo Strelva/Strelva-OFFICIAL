@@ -12,7 +12,7 @@ import { requestOrigin } from "@/platform/care-reports/share";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
-import { readCareReportForViewer } from "@/server/care-reports/server";
+import { careReportsAvailableForBusiness, readCareReportForViewer } from "@/server/care-reports/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Care plan report", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -29,6 +29,7 @@ export default async function CareReportPage({ params, searchParams }: { params:
   if (!actor) redirect(`/sign-in?next=${encodeURIComponent(workspaceReturnTarget(`/workspace/care-reports/${reportId}?${new URLSearchParams({ workspaceId })}`) || "/workspace")}`);
   let view;
   try { view = await readCareReportForViewer(actor, reportId); } catch { notFound(); }
+  if (!await careReportsAvailableForBusiness(view.report.businessWorkspaceId, { operator: false, tester: false, userId: actor.userId })) notFound();
   const brand = await resolveOwnerBrand(view.report.agencyWorkspaceId);
 
   if (view.audience === "agency") {

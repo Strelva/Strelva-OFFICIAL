@@ -80,6 +80,8 @@ begin
  perform pg_temp.cr_raises(format('select public.publish_care_report(%L,%L,%L,%s)', rep, uo, eo, rev - 1), 'care_report_revision_conflict');
  r := public.publish_care_report(rep, uo, eo, rev);
  perform pg_temp.cr_assert((r->>'number')::int = 1, 'Release 1');
+ perform pg_temp.cr_raises(format('select public.publish_care_report(%L,%L,%L,%s)', rep, uo, eo, rev), 'care_report_revision_conflict');
+ rev := (public.read_care_report(rep, uo, eo)#>>'{report,revision}')::int;
  r := public.publish_care_report(rep, uo, eo, rev);
  perform pg_temp.cr_assert((r->>'number')::int = 2, 'Release 2');
  rid := (r->>'releaseId')::uuid;

@@ -42,6 +42,11 @@ export async function careReportsAvailableFor(workspaceIds: string[], viewer?: R
   return new Set(reads.filter((id): id is string => id !== null));
 }
 
+/** Whether the App is on for one business, under the same per-business gate as bulk generation. */
+export async function careReportsAvailableForBusiness(workspaceId: string, viewer?: ReleaseViewer): Promise<boolean> {
+  return (await careReportsAvailableFor([workspaceId], viewer)).has(workspaceId);
+}
+
 /** Site checks come only from the stored domain snapshot. Nothing fetches a site. */
 export async function siteChecksFor(
   clients: { workspaceId: string; tenantIds: string[] }[],

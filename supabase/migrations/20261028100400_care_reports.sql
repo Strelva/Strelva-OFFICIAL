@@ -493,6 +493,7 @@ begin
   insert into public.care_report_releases(report_id, number, snapshot, published_by)
     values (p_report_id, n, rep.draft || jsonb_build_object('agencyNote', rep.agency_note, 'release', n, 'publishedAt', clock_timestamp()), p_user)
     returning id into rid;
+  update public.care_reports set revision = revision + 1, updated_by = p_user, updated_at = clock_timestamp() where id = p_report_id;
   return jsonb_build_object('releaseId', rid, 'number', n);
 end;
 $$;

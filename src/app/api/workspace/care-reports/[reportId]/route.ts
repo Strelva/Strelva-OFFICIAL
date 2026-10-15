@@ -6,7 +6,7 @@ import { careDeliveryLine } from "@/platform/care-reports/model";
 import { careReportEmailEnabled, careReportShareLinksEnabled, careReportsMayBeOn } from "@/platform/care-reports/release";
 import { issueCareReportShareLink, publishCareReport, revokeCareReportShareLink, saveCareReportNote } from "@/platform/care-reports/service";
 import { careReportShareUrl, mintCareReportToken, requestOrigin } from "@/platform/care-reports/share";
-import { readCareReportForViewer, sendCareReport } from "@/server/care-reports/server";
+import { careReportsAvailableForBusiness, readCareReportForViewer, sendCareReport } from "@/server/care-reports/server";
 export const dynamic = "force-dynamic";
 
 type Context = { params: Promise<{ reportId: string }> };
@@ -33,6 +33,8 @@ export async function POST(request: Request, context: Context) {
     if (!reportId.success) return missing();
     const id = reportId.data;
     const action = reportActionSchema.parse(await readWorkspaceBody(request, 8_000));
+    const view = await readCareReportForViewer(actor, id);
+    if (!await careReportsAvailableForBusiness(view.report.businessWorkspaceId, { operator: false, tester: false, userId: actor.userId })) return off();
     const origin = requestOrigin(request.headers);
     switch (action.action) {
       case "note": return workspaceJson(await saveCareReportNote(actor, id, action.note, action.expectedRevision));

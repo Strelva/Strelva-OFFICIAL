@@ -1,13 +1,13 @@
 import { isValidElement, type ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ read: vi.fn() }));
+const mocks = vi.hoisted(() => ({ read: vi.fn(), available: vi.fn(async () => true) }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "example.test" }) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/care-reports/release", () => ({ careReportsMayBeOn: () => true, careReportEmailEnabled: () => false, careReportShareLinksEnabled: () => false }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: async () => ({ userId: "staff", verifiedEmail: "staff@example.test" }) }));
 vi.mock("@/platform/agency-brand/server", async () => ({ resolveOwnerBrand: async () => (await import("@/experience/care-reports/preview-fixture")).PREVIEW_BRAND }));
-vi.mock("@/server/care-reports/server", () => ({ readCareReportForViewer: mocks.read }));
+vi.mock("@/server/care-reports/server", () => ({ readCareReportForViewer: mocks.read, careReportsAvailableForBusiness: mocks.available }));
 import CareReportPage from "@/app/workspace/care-reports/[reportId]/page";
 import { CareReportDocument } from "@/experience/care-reports/CareReportDocument";
 import { CareReportEditor } from "@/experience/care-reports/CareReportEditor";
@@ -24,7 +24,12 @@ const render = (release?: string) => CareReportPage({
   searchParams: Promise.resolve({ workspaceId: PREVIEW_AGENCY_ID, ...(release ? { release } : {}) }),
 });
 
-beforeEach(() => { vi.clearAllMocks(); mocks.read.mockResolvedValue(previewAgencyView()); });
+beforeEach(() => { vi.clearAllMocks(); mocks.read.mockResolvedValue(previewAgencyView()); mocks.available.mockResolvedValue(true); });
+
+it("is not found when the App is off for that business", async () => {
+  mocks.available.mockResolvedValue(false);
+  await expect(render()).rejects.toThrow();
+});
 
 it("shows the agency the editor when no Release is asked for", async () => {
   const page = await render();
