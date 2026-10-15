@@ -17,6 +17,12 @@ begin
   if to_regclass('public.agent_channel_consents') is not null then
     select array_agg(key order by key) into expected from unnest(expected||array['agent_channel']) key;
   end if;
+  if to_regclass('public.website_code_releases') is not null then
+    select array_agg(key order by key) into expected from unnest(expected||array['sites_by_code']) key;
+  end if;
+  if to_regclass('public.app_events') is not null then
+    select array_agg(key order by key) into expected from unnest(expected||array['app_events']) key;
+  end if;
   if actual is distinct from expected then
     raise exception 'release flag allowlist drifted: expected %, got %', expected, actual;
   end if;
