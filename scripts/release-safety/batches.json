@@ -2398,7 +2398,7 @@
     },
     {
       "id": "ai-controls-2026-10-15",
-      "status": "Held and unapplied. Per-client usage controls (business_ai_controls, change log), v2 budget admission and the agency and operator control functions; v1 budget functions untouched. SQL fixture authored (scripts/check-ai-controls-sql.sh); not run during integration. No production, provider or flag change authorized.",
+      "status": "Held and unapplied. Per-client usage controls (business_ai_controls, change log), v2 budget admission and the agency and operator control functions; v1 budget functions untouched. SQL fixture scripts/check-ai-controls-sql.sh passed on a disposable local cluster during wave-2 integration (2026-10-15). No production, provider or flag change authorized.",
       "items": [
         {
           "file": "20261026170000_ai_controls.sql",
@@ -2424,7 +2424,7 @@
     },
     {
       "id": "owner-reach-2026-10-15",
-      "status": "Held and unapplied. Owner reach reads, staff-address refusal on agency owner claims (issue_agency_client_owner_claim redefined from 20261015100000) and the operator's read-only owner reach report. SQL fixture: scripts/check-owner-reach-sql.sh. No production, owner email or flag change authorized.",
+      "status": "Held and unapplied. Owner reach reads, staff-address refusal on agency owner claims (issue_agency_client_owner_claim redefined from 20261015100000) and the operator's read-only owner reach report. SQL fixture scripts/check-owner-reach-sql.sh passed on a disposable local cluster on the integrated branch (2026-10-15), as did scripts/check-agency-add-client-sql.sh and scripts/check-agency-door-sql.sh. No production, owner email or flag change authorized.",
       "items": [
         {
           "file": "20261027100000_owner_reach.sql",
@@ -2437,7 +2437,7 @@
     },
     {
       "id": "dedupe-flows-2026-10-15",
-      "status": "Held and unapplied. Policy owner-decision records, find-open-by-source read and the provider client queue v3 reader behind STRELVA_ONE_APPROVAL_PATH, STRELVA_AUTO_POST_DECISION_RECORD and STRELVA_ONE_QUEUE. SQL fixtures: tests/dedupe-flows-owner-decisions-schema.sql and tests/dedupe-flows-queue-schema.sql. No production or flag change authorized.",
+      "status": "Held and unapplied. Policy owner-decision records, find-open-by-source read and the provider client queue v3 reader behind STRELVA_ONE_APPROVAL_PATH, STRELVA_AUTO_POST_DECISION_RECORD and STRELVA_ONE_QUEUE. SQL fixtures (scripts/check-dedupe-flows-sql.sh, scripts/check-provider-client-queue-sql.sh) passed on a disposable local cluster on the integrated branch (2026-10-15). No production or flag change authorized.",
       "items": [
         {
           "file": "20261027110000_dedupe_flows_owner_decisions.sql",
@@ -2457,7 +2457,7 @@
     },
     {
       "id": "sites-by-code-2026-10-15",
-      "status": "Held and unapplied. sites_by_code release flag, content-source backfill (writes tenant data for gldf, rohlax and rhm-innovations; apply before the code that reads customRepo.contentSource), coding-agent website change tools and code Releases. SQL fixture: scripts/check-sites-by-code-sql.sh. No production, OAuth client registration, owner email or flag change authorized.",
+      "status": "Held and unapplied. sites_by_code release flag, content-source backfill (writes tenant data for gldf, rohlax and rhm-innovations; apply before the code that reads customRepo.contentSource), coding-agent website change tools and code Releases. SQL fixture scripts/check-sites-by-code-sql.sh passed on a disposable local cluster on the integrated branch (2026-10-15). No production, OAuth client registration, owner email or flag change authorized.",
       "items": [
         {
           "file": "20261027120000_sites_by_code_flag.sql",
