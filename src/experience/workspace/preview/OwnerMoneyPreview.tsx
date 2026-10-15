@@ -21,7 +21,7 @@ export function OwnerMoneyPreview({ surface, state = "ready", mode = "light" }: 
   else if (surface === "billing") content = <>
     <StNotice tone="need" action={<StPill onClick={() => setNotice("Fictional card update only. No card or Stripe account was changed.")}>Update the card</StPill>}><strong>Your payment needs attention</strong><p>Open payment management to check the card and payment status. Your site, inquiries and bookings keep running.</p></StNotice>
     <StSplit aside={<StSection title="Receipts"><StRows><StRow title="Paid · amount in Stripe" end={<StMono>Sep 1</StMono>} /><StRow title="Paid · amount in Stripe" end={<StMono>Aug 1</StMono>} /><StRow title={<StState kind="need">Declined · amount in Stripe</StState>} end={<StMono>Oct 1</StMono>} /></StRows></StSection>}>
-      <StRows label="Plan details"><StRow value="Plan" title="Price shown before you pay" /><StRow value="Covers" title="Every System, Connection and receipt for The Mooney Firm" /><StRow value="Paid by" title="Sheri · payment details in Stripe" /><StRow value="Next charge" title={<StMono tone="text">Not recorded</StMono>} /></StRows>
+      <StRows label="Plan details"><StRow value="Plan" title="No plan price published yet" /><StRow value="Covers" title="Every System, Connection and receipt for The Mooney Firm" /><StRow value="Paid by" title="Sheri · payment details in Stripe" /><StRow value="Next charge" title={<StMono tone="text">Not recorded</StMono>} /></StRows>
     </StSplit>
     <p className="text-sm text-gray-muted">Your agency can pay instead. Ask North Studio to take over billing and you’ll get a Needs you item to agree.</p>
   </>;

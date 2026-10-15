@@ -1,6 +1,7 @@
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { PayLinkConflictError, PayLinkValidationError } from "@/lib/pay-links";
+import { AgencyPayLinkClosedError } from "@/platform/agency-pay-links";
 import { commandAgencyPaymentLink, readAgencyPaymentLinks } from "@/experience/workspace/billing/payment-links-server";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
     return workspaceJson({ payLink: await commandAgencyPaymentLink(actor, await readWorkspaceBody(request, 16384)) });
   } catch (error) {
     if (error instanceof PayLinkValidationError) return workspaceJson({ error: error.message }, 400);
+    if (error instanceof AgencyPayLinkClosedError) return workspaceJson({ error: error.message }, error.status);
     if (error instanceof PayLinkConflictError) return workspaceJson({ error: "This address or request key is already in use. Refresh links before trying a new request." }, 409);
     return workspaceHttpFailure(error);
   }

@@ -14,7 +14,7 @@ it("unknown spend does not invent remaining budget or a reset date", () => {
 });
 it("flag-off plan copy does not promise an enforced cap", () => {
   const html = renderToStaticMarkup(<StartWorkspacePlan workspaceId="a0000000-0000-4000-8000-000000000001" />);
-  expect(html).toContain("shown before you pay"); expect(html).toContain("Your current usage limit has not been confirmed");
+  expect(html).toContain("No plan price is published yet"); expect(html).toContain("Your current usage limit has not been confirmed");
   expect(html).not.toContain("Building pauses at the limit");
 });
 
@@ -26,7 +26,7 @@ it("unpriced historical calls make remaining usage unavailable instead of sugges
 
 it("unconfigured plans show honest pricing and an available agency path without checkout", () => {
   const html = renderToStaticMarkup(<WorkspacePlanUnavailable workspaceId="business one" />);
-  expect(html).toContain("Price shown before you pay");
+  expect(html).toContain("No plan price is published yet");
   expect(html).toContain("Self-serve plans are not available yet");
   expect(html).toContain("/workspace?view=help&amp;workspaceId=business%20one");
   expect(html).not.toContain("Start your plan");

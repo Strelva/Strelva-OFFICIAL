@@ -2395,6 +2395,19 @@
           "rollbackStatus": "Drops the function and both triggers only; never undoes accepted publications. Disposable SQL execution UNRUN."
         }
       ]
+    },
+    {
+      "id": "money-agency-pay-links-2026-10-15",
+      "status": "Held and unapplied. Agency pay links, Invoice and Payment receipt records. SQL fixture run locally only (scripts/check-money-pay-links-sql.sh); no production, provider or flag change authorized.",
+      "items": [
+        {
+          "file": "20261026180000_money_agency_pay_links.sql",
+          "sha256": "f4776b87aa3f2e3af0a3230441c5fb09e696bfb7584be2e3d252cb60c89cab23",
+          "rollback": "rollback-20261026180000_money_agency_pay_links.sql",
+          "rollbackSha256": "7c90c8aa525ab05ceb5495b2612bd721ded314f7dff3c82f0c0a5b02b698def3",
+          "rollbackStatus": "Refuses once any link or money document exists; exact empty inverse/reapply proven locally."
+        }
+      ]
     }
   ]
 }

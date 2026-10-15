@@ -100,6 +100,6 @@ describe("honest two-door entry", () => {
     mocks.user.mockResolvedValue({ id: "owner", email: "owner@example.invalid" });
     const html = renderToStaticMarkup(await MarketingLayout({ children: <PricingPage /> }));
     expect(html).toContain("Your workspace"); expect(html).not.toContain("Sign in");
-    expect(html).toContain("Price shown before you pay"); expect(html).not.toMatch(/\[price\]|\$\d+/);
+    expect(html).toContain("Prices are not published yet"); expect(html).not.toMatch(/\[price\]|\$\d+/);
   });
 });

@@ -32,6 +32,7 @@
     "db:types": "tsx scripts/generate-database-types.ts",
     "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
+    "check:money-pay-links-sql": "bash scripts/check-money-pay-links-sql.sh",
     "check:inquiry-forwarding-sql": "bash scripts/check-inquiry-forwarding-sql.sh",
     "check:google-found-facts-sql": "bash scripts/check-google-found-facts-sql.sh",
     "check:workspace-upgrade": "bash scripts/check-workspace-upgrade.sh",

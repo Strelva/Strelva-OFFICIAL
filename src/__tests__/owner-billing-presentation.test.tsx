@@ -23,7 +23,7 @@ describe("owner billing presentation", () => {
   });
   it("does not turn an unrecorded agreement into a zero-price plan", () => {
     const html = render({ ...billing, state: "none", monthlyCents: 0 });
-    expect(html).toContain("Price shown before you pay");
+    expect(html).toContain("No plan price published yet");
     expect(html).toContain("No monthly price or plan is recorded.");
     expect(html).not.toContain("$0.00");
   });

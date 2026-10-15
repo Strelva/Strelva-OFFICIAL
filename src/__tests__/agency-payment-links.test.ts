@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { PAY_LINK_COMMAND_SCRIPT, PAY_LINK_INDEX_KEY, PAY_LINK_PREFIX, type PayLinkConfig } from "@/platform/infra/pay-links";
 
-const mocks = vi.hoisted(() => ({ actor: vi.fn(), list: vi.fn(), rpc: vi.fn(), redis: vi.fn(), payments: vi.fn(), availability: vi.fn(), brand: vi.fn() }));
+const mocks = vi.hoisted(() => ({ actor: vi.fn(), list: vi.fn(), rpc: vi.fn(), redis: vi.fn(), payments: vi.fn(), availability: vi.fn(), brand: vi.fn(), expire: vi.fn() }));
 vi.mock("@/platform/workspaces/agency-onboarding", () => ({ listMemberAgencies: mocks.list }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/agency-brand/server", () => ({ resolveOwnerBrand: mocks.brand }));
@@ -9,6 +9,7 @@ vi.mock("@/platform/infra/redis", () => ({ getRedis: mocks.redis }));
 vi.mock("@/platform/infra/revenue", () => ({ listBuildPayments: mocks.payments }));
 vi.mock("@/platform/connect/checkout-availability", () => ({ readCheckoutAvailability: mocks.availability }));
 vi.mock("@/platform/workspaces/http", async () => ({ ...await vi.importActual<typeof import("@/platform/workspaces/http")>("@/platform/workspaces/http"), workspaceHttpActor: mocks.actor }));
+vi.mock("@/platform/agency-pay-links/checkout", () => ({ expireOpenAgencyPayLinkCheckouts: mocks.expire }));
 import { GET, POST } from "@/app/api/agency/payment-links/route";
 
 const agency = "11111111-1111-4111-8111-111111111111";
@@ -126,5 +127,101 @@ describe("neutral agency payment links", () => {
     expect((await post(create({ tenantId: "foreign" }))).status).toBe(400);
     expect((await post(create({ createdBy: other }))).status).toBe(400);
     expect(memory.redis.eval).not.toHaveBeenCalled();
+  });
+});
+
+// Postgres-held links: the same rules for every agency, no Strelva branch.
+const linkRow = (over: Record<string, unknown> = {}) => ({
+  id: "66666666-6666-4666-8666-666666666666", slug: "acme-coffee-555555", rail: "connected_account", agencyWorkspaceId: agency, businessWorkspaceId: null, clientName: "Acme Coffee",
+  description: "Agreed website build", door: null, amountCents: 50000, minCents: null, maxCents: null, currency: "usd", agencyDisplayName: "Strelva Agency", createdBy: userId,
+  createdAt: "2026-10-15T12:00:00Z", revokedAt: null, revokedBy: null, checkoutGeneration: 0, legacyTenantId: null, leadSlug: null, returnUrl: null, status: "open",
+  paidAt: null, paidAmountCents: null, invoiceNumber: 1, receiptNumber: null, ...over,
+});
+const commandCalls = () => mocks.rpc.mock.calls.filter(call => call[0] === "agency_pay_link_command");
+
+describe("agency payment links on their own Stripe account", () => {
+  beforeEach(() => {
+    vi.stubEnv("STRELVA_AGENCY_PAY_LINKS", "1"); vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+    mocks.availability.mockResolvedValue({ status: "ready" });
+    mocks.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+      if (name === "agency_pay_link_command") { const command = args.p_command as { action: string; slug: string }; return { data: linkRow({ slug: command.slug, ...(command.action === "revoke" ? { revokedAt: "2026-10-16T00:00:00Z", revokedBy: userId } : {}) }), error: null }; }
+      if (name === "read_agency_pay_links") return { data: [linkRow()], error: null };
+      if (name === "read_public_agency_pay_link") return { data: linkRow({ slug: args.p_slug }), error: null };
+      return { data: null, error: null };
+    });
+    mocks.expire.mockResolvedValue({ closed: 1, unconfirmed: 0 });
+  });
+
+  it("asks for Stripe setup first and sends nothing", async () => {
+    mocks.availability.mockResolvedValue({ status: "setup_required" });
+    const response = await post(create());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("Stripe setup") });
+    expect(commandCalls()).toHaveLength(0);
+  });
+
+  it("creates with a slug fixed by the request key, and replays send the identical command", async () => {
+    const first = await post(create());
+    expect(first.status).toBe(200);
+    const second = await post(create());
+    expect(second.status).toBe(200);
+    const [a, b] = commandCalls();
+    expect(a![1].p_command).toMatchObject({ action: "create", slug: "acme-coffee-555555", agencyWorkspaceId: agency, agencyDisplayName: "Strelva Agency", amountCents: 50000 });
+    expect((a![1].p_command as { fingerprint: string }).fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(b![1]).toEqual(a![1]);
+    expect((await first.json()).payLink).toMatchObject({ slug: "acme-coffee-555555", invoiceNumber: 1 });
+  });
+
+  it("lets any agency create exactly like the first", async () => {
+    mocks.list.mockResolvedValue([{ ...member, id: other, name: "Other Studio" }]);
+    mocks.brand.mockResolvedValue({ agencyId: other, name: "Other Studio" });
+    const response = await post(create({ agencyWorkspaceId: other }));
+    expect(response.status).toBe(200);
+    expect(commandCalls()[0]![1].p_command).toMatchObject({ agencyWorkspaceId: other, agencyDisplayName: "Other Studio" });
+  });
+
+  it("refuses a slug already taken in Redis before the command", async () => {
+    memory.seed({ ...oldLink, slug: "taken" });
+    expect((await post(create({ slug: "taken" }))).status).toBe(409);
+    expect(commandCalls()).toHaveLength(0);
+  });
+
+  it("refuses an amount shape the link cannot carry", async () => {
+    expect((await post(create({ amountCents: 50 }))).status).toBe(400);
+    expect((await post(create({ amountCents: undefined }))).status).toBe(400);
+    expect((await post(create({ minCents: 5000, maxCents: 12000, amountCents: undefined }))).status).toBe(400);
+    expect((await post(create({ minCents: 5000, maxCents: 10000 }))).status).toBe(400);
+    expect(commandCalls()).toHaveLength(0);
+  });
+
+  it("revokes a connected link, then closes its open Checkout sessions", async () => {
+    const response = await post({ action: "revoke", agencyWorkspaceId: agency, slug: "acme-coffee-555555", idempotencyKey: key });
+    expect(response.status).toBe(200);
+    expect((await response.json()).payLink).toMatchObject({ revokedBy: userId, checkoutsClosed: 1, checkoutsUnconfirmed: 0 });
+    expect(commandCalls()[0]![1].p_command).toMatchObject({ action: "revoke", slug: "acme-coffee-555555" });
+    expect(mocks.expire).toHaveBeenCalledWith("66666666-6666-4666-8666-666666666666");
+  });
+
+  it("lists connected links and says whether creation is ready", async () => {
+    const listed = await (await read()).json();
+    expect(listed.connectedLinks).toHaveLength(1);
+    expect(listed.creation).toEqual({ enabled: true, reason: "ready" });
+  });
+
+  it("shows a non-Strelva agency only its own backfilled legacy links when reading from Postgres", async () => {
+    vi.stubEnv("STRELVA_PAY_LINK_STORE", "postgres");
+    mocks.list.mockResolvedValue([{ ...member, id: other, name: "Other Studio" }]);
+    mocks.brand.mockResolvedValue({ agencyId: other, name: "Other Studio" });
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "read_agency_pay_links" ? [linkRow({ rail: "platform_legacy", slug: "own-old", agencyWorkspaceId: other, door: "build", description: null }), linkRow({ slug: "own-new", agencyWorkspaceId: other })] : null, error: null }));
+    const listed = await (await read(other)).json();
+    expect(listed.legacyMerchant).toBe(true);
+    expect(listed.payLinks.map((link: PayLinkConfig) => link.slug)).toEqual(["own-old"]);
+    expect(listed.connectedLinks.map((link: { slug: string }) => link.slug)).toEqual(["own-new"]);
+    expect(mocks.redis).not.toHaveBeenCalled();
+  });
+
+  it("reports creation as off when the switch is off, whatever Stripe says", async () => {
+    vi.stubEnv("STRELVA_AGENCY_PAY_LINKS", "");
+    expect((await (await read()).json()).creation).toEqual({ enabled: false, reason: "off" });
   });
 });

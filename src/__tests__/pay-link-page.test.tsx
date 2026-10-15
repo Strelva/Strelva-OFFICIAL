@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 const get = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/pay-links", async () => ({ ...await vi.importActual<typeof import("@/lib/pay-links")>("@/lib/pay-links"), getPayLink: get }));
+vi.mock("@/platform/infra/pay-links", async () => ({ ...await vi.importActual<typeof import("@/platform/infra/pay-links")>("@/platform/infra/pay-links"), getRedisPayLink: get, getPayLink: get }));
 vi.mock("@/app/pay/[slug]/PayLinkForm", () => ({ PayLinkForm: () => <form aria-label="Pay this link" /> }));
 import PayLinkPage, { dynamic, generateMetadata } from "@/app/pay/[slug]/page";
 const props = { params: Promise.resolve({ slug: "old-link" }) };
