@@ -34,6 +34,8 @@ import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource 
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
 import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-payment";
 import { inquiryFactAdapter } from "@/platform/needs-you/sources/inquiry-fact";
+import { websiteChangeAdapter } from "@/platform/needs-you/sources/website-change";
+import { createSiteChangeStore, siteChangeOwnerEmailEnabled, sitesByCodeReleased } from "@/products/websites/server";
 
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -74,6 +76,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       return sendEmailWithReceipt(input);
     },
     emailAllowed: async row => {
+      // Off unless both the global email switch and this notice's own switch are on.
+      if (row.sourceLifecycle === "website_change") return siteChangeOwnerEmailEnabled();
       if (row.sourceLifecycle !== "website_domain") return true;
       const domains = await import("@/platform/needs-you/sources/website-domain-store");
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
@@ -95,6 +99,12 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
       businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn, effects.businessFactsConfirmed),
+      // A reported website preview waits for the owner's Make it live (sites_by_code).
+      websiteChangeAdapter({
+        enabled: id => sitesByCodeReleased(id),
+        pending: (actor, id) => createSiteChangeStore().pendingReviews(actor, id),
+        approve: (actor, id, requestId) => createSiteChangeStore().record(actor, id, requestId, { kind: "approved", note: "Approved in Needs you." }),
+      }),
       ...systemsSourceAdapters(store, effects.google),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
