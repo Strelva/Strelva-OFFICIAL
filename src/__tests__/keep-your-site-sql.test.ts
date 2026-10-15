@@ -59,7 +59,7 @@ describe("20261027160100 keep your site: changes", () => {
     expect(sql).toContain("alter table public.connected_site_change_steps enable row level security;");
     expect(sql).toContain("alter table public.connected_site_detections enable row level security;");
     expect(sql).toContain("revoke all on public.connected_site_changes, public.connected_site_change_steps, public.connected_site_detections from public, anon, authenticated, service_role;");
-    expect(sql).toContain("revoke all on function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid) from public, anon, authenticated, service_role;");
+    expect(sql).toContain("revoke all on function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid, text) from public, anon, authenticated, service_role;");
   });
   it("makes steps append-only with before-update triggers", () => {
     expect(sql).toContain("create trigger connected_site_change_steps_immutable before update on public.connected_site_change_steps");
@@ -88,6 +88,15 @@ describe("20261027160100 keep your site: changes", () => {
     expect(body).toContain("'connected-change:'");
     expect(body).toContain("'kind', 'connected_site'");
     expect(sql).not.toMatch(/website_change_receipts|record_website_change_receipt|reconcile_website_system_releases/);
+  });
+  it("only releases a seen change whose baseline said the text was not there", () => {
+    const check = fn(sql, "record_connected_site_change_check");
+    expect(check).toContain("if v_baseline is distinct from 'not_visible' then p_result := 'unchanged'; end if;");
+    expect(sql).toContain("baseline text check (baseline is null or baseline in ('visible','not_visible','unreachable'))");
+    expect(sql).toContain("check (kind = 'planned' or baseline is null)");
+    expect(fn(sql, "plan_connected_site_change")).toContain("p_plan->>'baseline'");
+    expect(fn(sql, "connected_site_change_release")).toContain("It was not on the page before the edit.");
+    expect(fn(sql, "release_connected_site_change_unconfirmed")).toContain("coalesce(v_done, p_user_id), p_note)");
   });
   it("declares only the lock-free readers stable", () => {
     for (const name of ["connected_site_change_stage", "connected_site_change_request_stage"]) {

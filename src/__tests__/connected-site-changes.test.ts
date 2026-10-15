@@ -17,7 +17,7 @@ const site = (patch: Partial<ConnectedSite> = {}): ConnectedSite => ({
 });
 const SYSTEM = connectedSiteSystemId({ id: SITE, workspaceId: WS });
 const sites = (rows: ConnectedSite[] = [site()]) => ({ list: vi.fn(async () => rows) }) as never;
-const planned = { id: "77000000-0000-4000-8000-0000000000a1", kind: "planned" as const, pageUrl: "https://bakery.example/hours", editSteps: ["a"], expectText: "Open Saturday 9-2", removeText: "Closed Saturdays", ownerFacing: false, checkResult: null, matched: null, readBack: null, releaseNumber: null, note: null, recordedAt: "2026-10-20T00:00:00Z", actor: null };
+const planned = { id: "77000000-0000-4000-8000-0000000000a1", kind: "planned" as const, pageUrl: "https://bakery.example/hours", editSteps: ["a"], expectText: "Open Saturday 9-2", removeText: "Closed Saturdays", ownerFacing: false, baseline: "not_visible" as const, checkResult: null, matched: null, readBack: null, releaseNumber: null, note: null, recordedAt: "2026-10-20T00:00:00Z", actor: null };
 const change = (patch: Partial<ConnectedSiteChange> = {}): ConnectedSiteChange => ({ id: CHANGE, requestId: null, origin: "agency", title: "Hours", createdAt: "2026-10-20T00:00:00Z", stage: "checking", steps: [planned], ...patch });
 const view = (changes: ConnectedSiteChange[] = [change()]): ConnectedSiteChangesView => ({
   viewer: { role: "admin", isOwner: false, actingAgencyId: AGENCY, agencyName: "Agency" }, site: { id: SITE, siteHost: "bakery.example", siteUrl: "https://bakery.example/", platform: "wix" }, requests: [], changes,
@@ -59,13 +59,27 @@ describe("planConnectedSiteChange", () => {
   const plan = (deps: Record<string, unknown>, patch: Record<string, unknown> = {}) => planConnectedSiteChange(actor, WS, { systemId: SYSTEM, siteId: SITE, requestId: "77000000-0000-4000-8000-0000000000b1", input: { ...input, ...patch } as never }, deps as never);
   it("strips the query and hash and writes the four Wix steps", async () => {
     const changes = store();
-    await plan({ sites: sites(), changes, needsYou: () => true });
+    await plan({ sites: sites(), changes, needsYou: () => true, fetchPage: async () => "<p>Closed Saturdays</p>" });
     const args = changes.plan.mock.calls[0] as unknown[];
     const saved = args[2] as { plan: { pageUrl: string; editSteps: string[]; ownerFacing: boolean } };
     expect(saved.plan.pageUrl).toBe("https://bakery.example/hours");
     expect(saved.plan.editSteps).toHaveLength(4);
     expect(saved.plan.editSteps[0]).toContain("Wix dashboard");
     expect(saved.plan.editSteps[0]).toContain("/hours");
+  });
+  it("reads the page as the change is handed over and stores what it showed", async () => {
+    for (const [html, expected] of [["<p>Closed Saturdays</p>", "not_visible"], ["<p>Open Saturday 9-2</p>", "visible"], [null, "unreachable"]] as const) {
+      const changes = store();
+      const fetchPage = vi.fn(async () => html);
+      await plan({ sites: sites(), changes, needsYou: () => true, fetchPage });
+      expect(fetchPage).toHaveBeenCalledWith("https://bakery.example/hours");
+      expect((changes.plan.mock.calls[0] as unknown[])[2]).toMatchObject({ plan: { baseline: expected } });
+    }
+  });
+  it("saves the plan with an unreachable baseline when the read throws", async () => {
+    const changes = store();
+    await plan({ sites: sites(), changes, needsYou: () => true, fetchPage: async () => { throw new Error("boom"); } });
+    expect((changes.plan.mock.calls[0] as unknown[])[2]).toMatchObject({ plan: { baseline: "unreachable" } });
   });
   it("will not save an owner-facing plan while Needs you is off", async () => {
     const changes = store();
@@ -74,11 +88,11 @@ describe("planConnectedSiteChange", () => {
   });
   it("allows a plan the owner need not see while Needs you is off", async () => {
     const changes = store();
-    await plan({ sites: sites(), changes, needsYou: () => false });
+    await plan({ sites: sites(), changes, needsYou: () => false, fetchPage: async () => null });
     expect(changes.plan).toHaveBeenCalledTimes(1);
   });
   it("refuses a page that is not an address", async () => {
-    await expect(plan({ sites: sites(), changes: store(), needsYou: () => true }, { pageUrl: "hours" })).rejects.toThrow();
+    await expect(plan({ sites: sites(), changes: store(), needsYou: () => true, fetchPage: async () => null }, { pageUrl: "hours" })).rejects.toThrow();
   });
 });
 
@@ -105,6 +119,24 @@ describe("checkConnectedSiteChange", () => {
     const changes = store();
     await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("Open Saturday 9-2 and Closed Saturdays"), reconcile: vi.fn(async () => 0) as never });
     expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "not_visible", matched: null });
+  });
+  it("does not count text that was already on the page before the edit", async () => {
+    const changes = store({ list: vi.fn(async () => view([change({ steps: [{ ...planned, baseline: "visible" as const }] })])) });
+    await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("We are Open Saturday 9-2"), reconcile: vi.fn(async () => 0) as never });
+    expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "unchanged" });
+  });
+  it("counts an edit that removed the old text even though the new text was there before", async () => {
+    // With removeText set, the baseline read is not_visible while the old text stands, so the after-read is a real change.
+    const changes = store();
+    await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("Open Saturday 9-2"), reconcile: vi.fn(async () => 0) as never });
+    expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "visible" });
+  });
+  it("falls back to a look when an older change has no baseline or its baseline was unreachable", async () => {
+    for (const baseline of [undefined, null, "unreachable" as const]) {
+      const changes = store({ list: vi.fn(async () => view([change({ steps: [{ ...planned, baseline }] })])) });
+      await checkConnectedSiteChange(actor, WS, CHANGE, SYSTEM, { changes, fetchPage: async () => page("We are Open Saturday 9-2"), reconcile: vi.fn(async () => 0) as never });
+      expect(changes.recordCheck.mock.calls[0]![3]).toMatchObject({ result: "unchanged" });
+    }
   });
   it("survives a reconcile failure and a fetch that throws", async () => {
     const changes = store();

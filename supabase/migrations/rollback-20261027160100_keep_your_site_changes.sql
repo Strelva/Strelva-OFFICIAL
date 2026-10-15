@@ -19,7 +19,7 @@ drop function public.mark_connected_site_change_done(uuid, uuid, text, uuid, tex
 drop function public.decide_connected_site_change(uuid, uuid, text, uuid, text);
 drop function public.plan_connected_site_change(uuid, uuid, text, uuid, uuid, uuid, text, jsonb);
 drop function public.list_connected_site_changes(uuid, uuid, text, uuid);
-drop function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid);
+drop function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid, text);
 drop function public.connected_site_change_is_agency(public.connected_site_changes, uuid);
 drop function public.connected_site_change_is_direct_manager(uuid, uuid);
 drop function public.connected_site_change_verified_user(uuid, text);

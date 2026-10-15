@@ -2435,9 +2435,9 @@
         },
         {
           "file": "20261027160100_keep_your_site_changes.sql",
-          "sha256": "34ba7922e45374a3cad8be7f83a8da3094ef0f55db155e78f12381e335c67893",
+          "sha256": "5a3822ccd5dd747d98110ed71f5b534a5c46c2345bb419a574f220ace37133c4",
           "rollback": "rollback-20261027160100_keep_your_site_changes.sql",
-          "rollbackSha256": "f7cf8b82cffd0cd00d0afccec99954c484576510759930a88000612be994b915",
+          "rollbackSha256": "cc73c1e740aad36a86232c625fe978a74fde75daa2ad23d118dd3c42ca9a197f",
           "rollbackStatus": "Refuses once any Release was recorded from a connected-site change; otherwise drops every new function and table and restores connected_site_json from the saved definition. Applied, scenario-tested (tests/keep-your-site-schema.sql), rolled back and re-applied on a throwaway local PostgreSQL 18 only; production UNRUN."
         },
         {

@@ -231,8 +231,10 @@ export function ConnectedSiteChanges({ workspaceId, systemId, focusRequestId }: 
           </div>;
         case "not_seen":
           return <div className={styles.stack}>
-            <p className={styles.body}>Strelva didn&rsquo;t see &ldquo;{planned?.expectText}&rdquo; on {planned?.pageUrl ?? view.site.siteHost} yet.</p>
-            <p className={styles.body}>{checked?.checkResult === "unreachable" ? "Strelva couldn’t open the page just now." : "Builders can take a minute to publish. If the text is drawn in the browser, Strelva can’t read it."}</p>
+            <p className={styles.body}>{checked?.checkResult === "unchanged"
+              ? <>Strelva sees &ldquo;{planned?.expectText}&rdquo; on {planned?.pageUrl ?? view.site.siteHost}, but can&rsquo;t tell it came from this edit.</>
+              : <>Strelva didn&rsquo;t see &ldquo;{planned?.expectText}&rdquo; on {planned?.pageUrl ?? view.site.siteHost} yet.</>}</p>
+            <p className={styles.body}>{checked?.checkResult === "unreachable" ? "Strelva couldn’t open the page just now." : checked?.checkResult === "unchanged" ? "The text was already there when the change was handed over, or Strelva has no earlier read to compare with. Take a look at the page yourself." : "Builders can take a minute to publish. If the text is drawn in the browser, Strelva can’t read it."}</p>
             {agency ? confirming === change.id ? <div className={styles.stack}>
               <StNotice>This records Release {view.site.nextReleaseNumber ?? "next"} saying Strelva didn&rsquo;t see the change live.</StNotice>
               <div className={styles.actions}>

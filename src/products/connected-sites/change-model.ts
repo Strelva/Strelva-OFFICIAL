@@ -22,7 +22,9 @@ export const connectedSiteChangeStepSchema = z.object({
   kind: z.enum(["planned", "approved", "declined", "marked_done", "checked", "released", "withdrawn"]),
   pageUrl: z.string().nullable(), editSteps: z.array(z.string()).nullable(), expectText: z.string().nullable(), removeText: z.string().nullable(),
   ownerFacing: z.boolean().nullable(),
-  checkResult: z.enum(["visible", "not_visible", "unreachable"]).nullable(), matched: z.string().nullable(),
+  /** What the page showed when the change was handed to the agency. Missing on older rows. */
+  baseline: z.enum(["visible", "not_visible", "unreachable"]).nullable().optional().catch(null),
+  checkResult: z.enum(["visible", "not_visible", "unreachable", "unchanged"]).nullable(), matched: z.string().nullable(),
   readBack: z.enum(["confirmed", "not_confirmed"]).nullable(), releaseNumber: z.number().int().positive().nullable(),
   note: z.string().nullable(), recordedAt: z.string(),
   actor: recordedActorSchema.nullable().optional().catch(null),

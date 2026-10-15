@@ -105,9 +105,10 @@ create table public.connected_site_change_steps (
   expect_text text check (expect_text is null or char_length(btrim(expect_text)) between 1 and 300),
   remove_text text check (remove_text is null or char_length(btrim(remove_text)) between 1 and 300),
   owner_facing boolean,
-  check_result text check (check_result is null or check_result in ('visible','not_visible','unreachable')),
+  check_result text check (check_result is null or check_result in ('visible','not_visible','unreachable','unchanged')),
   page_hash text check (page_hash is null or page_hash ~ '^[0-9a-f]{64}$'),
   matched text check (matched is null or char_length(matched) <= 300),
+  baseline text check (baseline is null or baseline in ('visible','not_visible','unreachable')),
   read_back text check (read_back is null or read_back in ('confirmed','not_confirmed')),
   system_revision_id uuid references public.system_revisions(id) on delete set null,
   release_number integer check (release_number is null or release_number > 0),
@@ -119,6 +120,7 @@ create table public.connected_site_change_steps (
   check (kind = 'planned' or (page_url is null and edit_steps is null and expect_text is null and remove_text is null and owner_facing is null)),
   check ((kind = 'checked') = (check_result is not null)),
   check ((kind = 'released') = (read_back is not null and release_number is not null)),
+  check (kind = 'planned' or baseline is null),
   check (kind in ('checked','released') or page_hash is null)
 );
 create index connected_site_change_steps_change_idx on public.connected_site_change_steps(change_id, recorded_at, seq);
@@ -226,7 +228,7 @@ begin
     'stage', public.connected_site_change_stage(c.id),
     'steps', coalesce((select jsonb_agg(jsonb_build_object(
         'id', s.id, 'kind', s.kind, 'pageUrl', s.page_url, 'editSteps', s.edit_steps, 'expectText', s.expect_text,
-        'removeText', s.remove_text, 'ownerFacing', s.owner_facing, 'checkResult', s.check_result, 'matched', s.matched,
+        'removeText', s.remove_text, 'ownerFacing', s.owner_facing, 'baseline', s.baseline, 'checkResult', s.check_result, 'matched', s.matched,
         'readBack', s.read_back, 'releaseNumber', s.release_number, 'note', s.note, 'recordedAt', s.recorded_at,
         'actor', public.connected_site_change_actor(c.business_workspace_id, s.recorded_by)) order by s.recorded_at, s.seq)
       from public.connected_site_change_steps s where s.change_id = c.id), '[]'::jsonb));
@@ -243,9 +245,9 @@ end $$;
 
 -- The Release: a numbered revision of the connected site's website System,
 -- through the same append path reconcile uses. Idempotent per change and step.
-create function public.connected_site_change_release(p_change public.connected_site_changes, p_key_step uuid, p_read_back text, p_page_hash text, p_actor uuid) returns jsonb
+create function public.connected_site_change_release(p_change public.connected_site_changes, p_key_step uuid, p_read_back text, p_page_hash text, p_actor uuid, p_note text default null) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
-declare v_site record; v_label text; v_key text; v_impl jsonb; v_summary text; v_rev record;
+declare v_site record; v_label text; v_key text; v_impl jsonb; v_summary text; v_rev record; v_baseline text;
 begin
   perform 1 from public.systems where id = p_change.system_id and business_workspace_id = p_change.business_workspace_id and kind = 'website';
   if not found then raise exception 'system_not_found'; end if;
@@ -254,16 +256,21 @@ begin
   v_key := 'connected-change:' || p_change.id::text || ':' || p_key_step::text;
   v_impl := jsonb_build_object('kind', 'connected_site', 'ref', p_change.connected_site_id::text || '@change:' || p_change.id::text)
     || case when p_page_hash is not null then jsonb_build_object('contentHash', p_page_hash) else '{}'::jsonb end;
+  -- The proof: what the page showed when the change was handed to the agency.
+  select baseline into v_baseline from public.connected_site_change_steps
+    where change_id = p_change.id and kind = 'planned' order by recorded_at desc, seq desc limit 1;
   v_summary := left(case when p_read_back = 'confirmed'
     then format('Changed on %s: %s. Strelva saw it on the live page.', v_label, p_change.title)
+      || case when v_baseline = 'not_visible' then ' It was not on the page before the edit.' else '' end
     else format('Changed on %s: %s. Not confirmed on the live page.', v_label, p_change.title) end, 500);
   perform public.append_website_system_release(p_change.business_workspace_id, p_change.system_id, v_key, v_impl, v_summary, p_actor, clock_timestamp());
   select id, number into v_rev from public.system_revisions
     where business_workspace_id = p_change.business_workspace_id
       and command_id = public.system_origin_id(p_change.business_workspace_id, 'website-release', p_change.system_id::text || ':' || v_key);
   if v_rev.id is null then raise exception 'system_not_found'; end if;
-  insert into public.connected_site_change_steps(change_id, business_workspace_id, kind, read_back, release_number, system_revision_id, page_hash, recorded_by)
-    values (p_change.id, p_change.business_workspace_id, 'released', p_read_back, v_rev.number, v_rev.id, p_page_hash, p_actor);
+  insert into public.connected_site_change_steps(change_id, business_workspace_id, kind, read_back, release_number, system_revision_id, page_hash, note, recorded_by)
+    values (p_change.id, p_change.business_workspace_id, 'released', p_read_back, v_rev.number, v_rev.id, p_page_hash,
+      left(nullif(btrim(coalesce(p_note, '')), ''), 1000), p_actor);
   return jsonb_build_object('number', v_rev.number);
 end $$;
 
@@ -291,7 +298,7 @@ revoke all on function public.connected_site_change_request_stage(uuid) from pub
 revoke all on function public.connected_site_change_actor(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.connected_site_change_json(public.connected_site_changes) from public, anon, authenticated, service_role;
 revoke all on function public.connected_site_change_lock(uuid, uuid) from public, anon, authenticated, service_role;
-revoke all on function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.connected_site_change_release(public.connected_site_changes, uuid, text, text, uuid, text) from public, anon, authenticated, service_role;
 revoke all on function public.connected_site_change_is_agency(public.connected_site_changes, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.connected_site_change_is_direct_manager(uuid, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.connected_site_change_verified_user(uuid, text) from public, anon, authenticated, service_role;
@@ -349,11 +356,12 @@ begin
   if v_site.id is null then raise exception 'connected_site_not_found'; end if;
   if v_site.verified_at is null then raise exception 'connected_site_not_verified'; end if;
   if p_plan is null or jsonb_typeof(p_plan) <> 'object'
-    or (p_plan - array['pageUrl','editSteps','expectText','removeText','ownerFacing','note']::text[]) <> '{}'::jsonb
+    or (p_plan - array['pageUrl','editSteps','expectText','removeText','ownerFacing','note','baseline']::text[]) <> '{}'::jsonb
     or jsonb_typeof(p_plan->'pageUrl') is distinct from 'string' or jsonb_typeof(p_plan->'editSteps') is distinct from 'array'
     or jsonb_typeof(p_plan->'expectText') is distinct from 'string' or jsonb_typeof(p_plan->'ownerFacing') is distinct from 'boolean'
     or (p_plan ? 'removeText' and jsonb_typeof(p_plan->'removeText') is distinct from 'string')
-    or (p_plan ? 'note' and jsonb_typeof(p_plan->'note') is distinct from 'string') then
+    or (p_plan ? 'note' and jsonb_typeof(p_plan->'note') is distinct from 'string')
+    or (p_plan ? 'baseline' and (jsonb_typeof(p_plan->'baseline') is distinct from 'string' or p_plan->>'baseline' not in ('visible','not_visible','unreachable'))) then
     raise exception 'connected_site_change_invalid';
   end if;
   v_page := p_plan->>'pageUrl';
@@ -391,9 +399,9 @@ begin
     if public.connected_site_change_stage(v_change.id) not in ('unplanned','planned_waiting','declined','not_seen') then raise exception 'connected_site_change_out_of_order'; end if;
   end if;
   begin
-    insert into public.connected_site_change_steps(change_id, business_workspace_id, kind, page_url, edit_steps, expect_text, remove_text, owner_facing, note, recorded_by)
+    insert into public.connected_site_change_steps(change_id, business_workspace_id, kind, page_url, edit_steps, expect_text, remove_text, owner_facing, baseline, note, recorded_by)
       values (v_change.id, p_workspace_id, 'planned', v_page, p_plan->'editSteps', p_plan->>'expectText', p_plan->>'removeText',
-        (p_plan->>'ownerFacing')::boolean, p_plan->>'note', p_user_id);
+        (p_plan->>'ownerFacing')::boolean, p_plan->>'baseline', p_plan->>'note', p_user_id);
   exception when check_violation then raise exception 'connected_site_change_invalid';
   end;
   return public.connected_site_change_json(v_change);
@@ -438,10 +446,10 @@ end $$;
 create function public.record_connected_site_change_check(p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_change_id uuid,
   p_result text, p_page_hash text, p_matched text) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
-declare v_change public.connected_site_changes; v_step uuid; v_done uuid; v_release jsonb;
+declare v_change public.connected_site_changes; v_step uuid; v_done uuid; v_release jsonb; v_baseline text;
 begin
   perform public.connected_site_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
-  if p_result is null or p_result not in ('visible','not_visible','unreachable')
+  if p_result is null or p_result not in ('visible','not_visible','unreachable','unchanged')
     or (p_page_hash is not null and p_page_hash !~ '^[0-9a-f]{64}$') or (p_matched is not null and char_length(p_matched) > 300) then
     raise exception 'connected_site_change_invalid';
   end if;
@@ -450,6 +458,13 @@ begin
     raise exception 'connected_site_change_agency_required';
   end if;
   if public.connected_site_change_stage(v_change.id) not in ('checking','not_seen') then raise exception 'connected_site_change_out_of_order'; end if;
+  -- Seen is only proof of a change when the page did not already show it when the change was handed over.
+  -- A missing baseline (older rows) or one that already showed it falls back to a look, never an automatic Release.
+  if p_result = 'visible' then
+    select baseline into v_baseline from public.connected_site_change_steps
+      where change_id = v_change.id and kind = 'planned' order by recorded_at desc, seq desc limit 1;
+    if v_baseline is distinct from 'not_visible' then p_result := 'unchanged'; end if;
+  end if;
   insert into public.connected_site_change_steps(change_id, business_workspace_id, kind, check_result, page_hash, matched, recorded_by)
     values (v_change.id, p_workspace_id, 'checked', p_result, p_page_hash, p_matched, p_user_id) returning id into v_step;
   if p_result = 'visible' then
@@ -469,7 +484,7 @@ begin
   if public.connected_site_change_stage(v_change.id) <> 'not_seen' then raise exception 'connected_site_change_out_of_order'; end if;
   select id, page_hash into v_checked from public.connected_site_change_steps where change_id = v_change.id and kind = 'checked' order by recorded_at desc, seq desc limit 1;
   select recorded_by into v_done from public.connected_site_change_steps where change_id = v_change.id and kind = 'marked_done' order by recorded_at desc, seq desc limit 1;
-  v_release := public.connected_site_change_release(v_change, v_checked.id, 'not_confirmed', v_checked.page_hash, coalesce(v_done, p_user_id));
+  v_release := public.connected_site_change_release(v_change, v_checked.id, 'not_confirmed', v_checked.page_hash, coalesce(v_done, p_user_id), p_note);
   return jsonb_build_object('change', public.connected_site_change_json(v_change), 'release', v_release);
 end $$;
 

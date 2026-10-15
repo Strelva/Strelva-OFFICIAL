@@ -213,6 +213,14 @@ receives (pinned, public addresses only, 2 MB, 5 redirects). Text a builder
 draws in the browser (some Wix, Duda and GoDaddy templates) reads as "not
 seen". The screen says so.
 
+**Seen is not the same as changed.** When the agency saves the plan, Strelva
+reads the page and stores what it showed (the baseline). A later sighting
+becomes a Release only when the baseline did not already show the change.
+Text that was already there, a baseline that could not be read, and older
+changes with no baseline all land on "Not seen yet" with a note to take a look,
+and the agency can still record the Release as not confirmed. The Release
+summary says the text was not on the page before the edit.
+
 **Proof so far.** Static SQL tests, TypeScript tests, and
 `tests/keep-your-site-schema.sql` run against a throwaway local PostgreSQL 18
 with the whole migration chain applied, including rollback and re-apply. That

@@ -72,7 +72,7 @@ begin
  perform pg_temp.denied(format('select public.plan_connected_site_change(%L,%L,%L,%L,null,%L,null,%L::jsonb)',c.ws,c.staff,'staff@kys.example.test',c.site,'27400000-0000-4000-8000-0000000000a1',
    '{"pageUrl":"https://bakery.example/hours","editSteps":["a"],"expectText":"Open Saturday 9-2","ownerFacing":true,"extra":1}'),'connected_site_change_invalid');
  chg:=public.plan_connected_site_change(c.ws,c.staff,'staff@kys.example.test',c.site,null,'27400000-0000-4000-8000-0000000000a1',null,
-   '{"pageUrl":"https://bakery.example/hours","editSteps":["Open Pages.","Make this change: x","Choose Publish.","Come back."],"expectText":"Open Saturday 9-2","removeText":"Closed Saturdays","ownerFacing":true}');
+   '{"pageUrl":"https://bakery.example/hours","editSteps":["Open Pages.","Make this change: x","Choose Publish.","Come back."],"expectText":"Open Saturday 9-2","removeText":"Closed Saturdays","ownerFacing":true,"baseline":"not_visible"}');
  cid:=(chg->>'id')::uuid;
  perform pg_temp.ok(chg->>'stage'='planned_waiting' and chg->>'origin'='request' and chg->>'title'='Update the Saturday hours to 9-2','planned stage');
  perform pg_temp.ok(chg->'steps'->0->'actor'->>'displayName'='Agency','step actor is the agency');
@@ -112,7 +112,7 @@ begin
  rel:=public.record_connected_site_change_check(c.ws,c.staff,'staff@kys.example.test',cid,'visible',repeat('f',64),'Open Saturday 9-2');
  perform pg_temp.ok(rel->'change'->>'stage'='done' and (rel->'release'->>'number')::int=before_n+1,'visible -> Release and done');
  perform pg_temp.ok(rel->'change'->'steps'->-1->>'kind'='released' and rel->'change'->'steps'->-1->>'readBack'='confirmed','released step');
- select count(*) into revs from public.system_revisions where system_id=c.sys and implementation->>'kind'='connected_site' and summary like 'Changed on Wix: Update the Saturday hours to 9-2. Strelva saw it%';
+ select count(*) into revs from public.system_revisions where system_id=c.sys and implementation->>'kind'='connected_site' and summary like 'Changed on Wix: Update the Saturday hours to 9-2. Strelva saw it on the live page. It was not on the page before the edit.';
  perform pg_temp.ok(revs=1,'one numbered revision with the summary');
  perform pg_temp.ok((select actor_snapshot->>'displayName' from public.system_revisions where system_id=c.sys order by number desc limit 1)='Agency','revision actor is the agency');
  perform pg_temp.ok((select current_revision_number from public.systems where id=c.sys)=before_n+1,'System points at the Release');
@@ -152,8 +152,9 @@ begin
  perform pg_temp.ok(rel->'change'->>'stage'='not_seen','unreachable -> not seen');
  -- An owner may not record "no confirmation"; the agency may.
  perform pg_temp.denied(format('select public.release_connected_site_change_unconfirmed(%L,%L,%L,%L,null)',c.ws,c.owner,'owner@kys.example.test',cid),'connected_site_change_agency_required');
- rel:=public.release_connected_site_change_unconfirmed(c.ws,c.staff,'staff@kys.example.test',cid,null);
+ rel:=public.release_connected_site_change_unconfirmed(c.ws,c.staff,'staff@kys.example.test',cid,'Agency confirmed by phone');
  perform pg_temp.ok(rel->'change'->>'stage'='done_unconfirmed' and rel->'change'->'steps'->-1->>'readBack'='not_confirmed','Release recorded as not confirmed');
+ perform pg_temp.ok(rel->'change'->'steps'->-1->>'note'='Agency confirmed by phone','the note is kept on the released step');
  perform pg_temp.ok(exists(select 1 from public.system_revisions where system_id=c.sys and summary like 'Changed on Wix: Fix the typo on the about page. Not confirmed on the live page.'),'revision says not confirmed');
  perform pg_temp.denied(format('select public.withdraw_connected_site_change(%L,%L,%L,%L,null)',c.ws,c.staff,'staff@kys.example.test',cid),'connected_site_change_out_of_order');
  perform pg_temp.ok(public.connected_site_change_request_stage('27400000-0000-4000-8000-0000000000a2')='done','unconfirmed counts as done in the Queue');
@@ -179,6 +180,29 @@ begin
  perform pg_temp.ok(chg->>'stage'='withdrawn','owner can withdraw');
  perform pg_temp.denied(format('select public.withdraw_connected_site_change(%L,%L,%L,%L,null)',c.ws,c.stranger,'stranger@kys.example.test',cid2),'workspace_access_denied');
 
+ -- Baseline: text already on the page, or a plan with no baseline, is never an automatic Release.
+ perform pg_temp.denied(format('select public.plan_connected_site_change(%L,%L,%L,%L,null,null,%L,%L::jsonb)',c.ws,c.staff,'staff@kys.example.test',c.site,'Baseline',
+   '{"pageUrl":"https://bakery.example/menu","editSteps":["a"],"expectText":"x","ownerFacing":false,"baseline":"bogus"}'),'connected_site_change_invalid');
+ chg:=public.plan_connected_site_change(c.ws,c.staff,'staff@kys.example.test',c.site,null,null,'Old row with no baseline',
+   '{"pageUrl":"https://bakery.example/menu","editSteps":["a"],"expectText":"Fall menu","ownerFacing":false}');
+ cid3:=(chg->>'id')::uuid;
+ chg:=public.mark_connected_site_change_done(c.ws,c.staff,'staff@kys.example.test',cid3,null);
+ select count(*) into n from public.system_revisions where system_id=c.sys;
+ rel:=public.record_connected_site_change_check(c.ws,c.staff,'staff@kys.example.test',cid3,'visible',repeat('a',64),'Fall menu');
+ perform pg_temp.ok(rel->'change'->>'stage'='not_seen' and rel->'change'->'steps'->-1->>'checkResult'='unchanged' and (rel->'release' is null or rel->'release'='null'::jsonb),'no baseline: seen is only a look');
+ perform pg_temp.ok((select count(*) from public.system_revisions where system_id=c.sys)=n,'no Release without a baseline');
+ chg:=public.plan_connected_site_change(c.ws,c.staff,'staff@kys.example.test',c.site,cid3,null,null,
+   '{"pageUrl":"https://bakery.example/menu","editSteps":["a"],"expectText":"Fall menu","ownerFacing":false,"baseline":"visible"}');
+ chg:=public.mark_connected_site_change_done(c.ws,c.staff,'staff@kys.example.test',cid3,null);
+ rel:=public.record_connected_site_change_check(c.ws,c.staff,'staff@kys.example.test',cid3,'visible',repeat('a',64),'Fall menu');
+ perform pg_temp.ok(rel->'change'->>'stage'='not_seen' and (rel->'release' is null or rel->'release'='null'::jsonb),'already on the page before: a look');
+ chg:=public.plan_connected_site_change(c.ws,c.staff,'staff@kys.example.test',c.site,cid3,null,null,
+   '{"pageUrl":"https://bakery.example/menu","editSteps":["a"],"expectText":"Fall menu","ownerFacing":false,"baseline":"not_visible"}');
+ chg:=public.mark_connected_site_change_done(c.ws,c.staff,'staff@kys.example.test',cid3,null);
+ rel:=public.record_connected_site_change_check(c.ws,c.staff,'staff@kys.example.test',cid3,'visible',repeat('a',64),'Fall menu');
+ perform pg_temp.ok(rel->'change'->>'stage'='done' and (rel->'release'->>'number')::int=n+1,'not there before, seen after: Release');
+ perform pg_temp.ok(exists(select 1 from public.system_revisions where system_id=c.sys and summary like '%Strelva saw it on the live page. It was not on the page before the edit.'),'the Release carries the proof');
+
  -- An unverified site takes no plans.
  perform pg_temp.denied(format('select public.plan_connected_site_change(%L,%L,%L,%L,null,null,%L,%L::jsonb)','27400000-0000-4000-8000-000000000011',c.staff,'staff@kys.example.test','27400000-0000-4000-8000-0000000000c2','x',
    '{"pageUrl":"https://cafe.example/x","editSteps":["a"],"expectText":"x","ownerFacing":true}'),'connected_site_not_verified');
@@ -191,7 +215,7 @@ begin
  perform pg_temp.ok(has_function_privilege('service_role','public.plan_connected_site_change(uuid,uuid,text,uuid,uuid,uuid,text,jsonb)','execute'),'service_role runs plan');
  perform pg_temp.ok(not has_function_privilege('authenticated','public.plan_connected_site_change(uuid,uuid,text,uuid,uuid,uuid,text,jsonb)','execute'),'authenticated cannot plan');
  perform pg_temp.ok(not has_function_privilege('anon','public.read_agency_client_sites(uuid,uuid,text,text,uuid,integer)','execute'),'anon cannot read client sites');
- perform pg_temp.ok(not has_function_privilege('service_role','public.connected_site_change_release(public.connected_site_changes,uuid,text,text,uuid)','execute'),'release helper is internal');
+ perform pg_temp.ok(not has_function_privilege('service_role','public.connected_site_change_release(public.connected_site_changes,uuid,text,text,uuid,text)','execute'),'release helper is internal');
  perform pg_temp.ok(not has_function_privilege('service_role','public.connected_site_change_stage(uuid)','execute'),'stage helper is internal');
  perform pg_temp.ok(not has_table_privilege('service_role','public.connected_site_change_steps','select'),'steps table is closed');
  perform pg_temp.ok(has_function_privilege('service_role','public.record_connected_site_check(uuid,uuid,text,uuid,text,text,text[])','execute'),'service_role records checks');

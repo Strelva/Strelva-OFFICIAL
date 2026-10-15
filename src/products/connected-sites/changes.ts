@@ -18,7 +18,7 @@ import { connectedSiteChangeRequestCommand, planInputSchema, type ConnectedSiteC
 import type { ConnectedSite } from "./contracts";
 import { editStepsFor } from "./edit-guides";
 import { pageShowsChange } from "./page-text";
-import { connectedSiteChangesStore, type ConnectedSiteChangeOutcome, type ConnectedSiteChangesStore } from "./changes-store";
+import { connectedSiteChangesStore, type ConnectedSiteChangeOutcome, type ConnectedSiteChangesStore, type ConnectedSiteCheckResult } from "./changes-store";
 import { fetchLiveSitePage } from "./site-checks";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { connectedSiteSystemId } from "./system-id";
@@ -74,10 +74,16 @@ export async function planConnectedSiteChange(
   if (site.id !== input.siteId) throw new WorkspaceConflictError("This website isn't connected to this business.");
   const url = new URL(plan.pageUrl);
   const pageUrl = `${url.origin}${url.pathname}`;
+  // The "before" read, taken as the change is handed to the agency, so a later sighting can be told from text that was always there.
+  let baseline: "visible" | "not_visible" | "unreachable" = "unreachable";
+  try {
+    const before = await (deps.fetchPage ?? fetchLiveSitePage)(pageUrl);
+    if (before !== null) baseline = pageShowsChange(before, { expectText: plan.expectText, removeText: plan.removeText }).result;
+  } catch { baseline = "unreachable"; }
   const editSteps = editStepsFor(effectivePlatform(site), { pagePath: url.pathname, whatToChange: plan.whatToChange });
   return (deps.changes ?? connectedSiteChangesStore()).plan(actor, workspaceId, {
     siteId: site.id, changeId: input.changeId ?? null, requestId: input.requestId ?? null, title: input.title ?? null,
-    plan: { pageUrl, editSteps, expectText: plan.expectText, ...(plan.removeText ? { removeText: plan.removeText } : {}), ownerFacing: plan.ownerFacing, ...(plan.note ? { note: plan.note } : {}) },
+    plan: { pageUrl, editSteps, baseline, expectText: plan.expectText, ...(plan.removeText ? { removeText: plan.removeText } : {}), ownerFacing: plan.ownerFacing, ...(plan.note ? { note: plan.note } : {}) },
   });
 }
 
@@ -91,12 +97,14 @@ export async function checkConnectedSiteChange(actor: WorkspaceActor, workspaceI
   if (!planned?.pageUrl || !planned.expectText) throw new WorkspaceConflictError("That step doesn't follow from where this change is. Reload it.");
   let html: string | null = null;
   try { html = await (deps.fetchPage ?? fetchLiveSitePage)(planned.pageUrl); } catch { html = null; }
-  let result: "visible" | "not_visible" | "unreachable" = "unreachable";
+  let result: ConnectedSiteCheckResult = "unreachable";
   let pageHash: string | null = null;
   let matched: string | null = null;
   if (html !== null) {
     const shown = pageShowsChange(html, { expectText: planned.expectText, removeText: planned.removeText });
     result = shown.result;
+    // Only a change that was not on the page before counts. No baseline (older rows) or one that already showed it needs a look.
+    if (result === "visible" && planned.baseline !== "not_visible") result = "unchanged";
     matched = shown.matched;
     pageHash = createHash("sha256").update(shown.text).digest("hex");
   }

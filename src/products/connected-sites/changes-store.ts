@@ -16,7 +16,8 @@ import { ConnectedSiteInputError } from "./store";
 
 export interface ConnectedSiteChangesRpc { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> }
 
-export type ConnectedSiteCheckResult = "visible" | "not_visible" | "unreachable";
+/** "unchanged": the text was on the page before the edit, or there is no baseline to compare. A look, never a Release. */
+export type ConnectedSiteCheckResult = "visible" | "not_visible" | "unreachable" | "unchanged";
 export interface ConnectedSiteChangeOutcome { change: ConnectedSiteChange; release: { number: number } | null }
 
 const uuid = z.string().uuid();
@@ -55,7 +56,7 @@ export interface ConnectedSiteChangesStore {
 }
 
 /** The plan an agency saves, as SQL reads it (keys exactly as validated there). */
-export type ConnectedSitePlanPayload = Pick<PlanInput, "pageUrl" | "expectText" | "removeText" | "ownerFacing" | "note"> & { editSteps: string[] };
+export type ConnectedSitePlanPayload = Pick<PlanInput, "pageUrl" | "expectText" | "removeText" | "ownerFacing" | "note"> & { editSteps: string[]; baseline?: "visible" | "not_visible" | "unreachable" };
 
 export function createConnectedSiteChangesStore(db?: ConnectedSiteChangesRpc): ConnectedSiteChangesStore {
   async function rpc(name: string, args: Record<string, unknown>): Promise<unknown> {
