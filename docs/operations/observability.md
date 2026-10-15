@@ -54,3 +54,23 @@ the default, responses and forwarded requests are identical to before.
 To gather evidence, set it in Preview first. Enforcement needs about a week of
 Sentry CSP reports with zero `script-src` violations on app routes, and it is a
 separate release decision.
+
+## Open for Jacob
+
+- **Licenses.** The hosted "Audit dependencies" step is blocked by license review
+  on `@sentry/cli` 2.58.5 and its platform packages (FSL-1.1-MIT, build-time only)
+  and on `gsap` 3.14.2 (GSAP Standard License, ships in client website components,
+  and limits use in tools that compete with Webflow's visual builder). Approve or
+  reject each; `reviewedPackages` in `scripts/supply-chain-policy.json` stays
+  empty until then. The alternative for gsap is replacing it with CSS or existing
+  motion code.
+- **Secret scan.** The Security job is red on exactly two `dev-tenants.json`
+  findings from `eb67cd15b`. Add their fingerprints to `.gitleaksignore` now, or
+  keep it red until the database copy of both secrets is re-encrypted and read back.
+- **Registry audit.** `pnpm check:supply-chain` was not run here (it calls the npm
+  registry audit). Braces is excepted until 2026-10-23.
+- **Cron.** Domain verification now runs every five minutes (unflagged).
+  `payment-holds` runs every 10 minutes but records no heartbeat, so the watchdog
+  does not cover it.
+- **Yelp copy.** The "Daily sync" wording belongs to the integrations lane; the
+  cron stays daily.
