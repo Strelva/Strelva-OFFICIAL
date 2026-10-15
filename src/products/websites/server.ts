@@ -562,6 +562,7 @@ export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string
 export { siteEditingFor, contentSourceFor, readsStrelvaContent, type SiteEditing, type SiteContentSource } from "./site-editing";
 export { resolveWorkspaceSite, type WorkspaceSiteDeps, type WorkspaceSiteState } from "./workspace-site";
 export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
+export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type ReadBack, type SiteDeclaration, type SiteReleaseCheck } from "./site-declaration";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";
 
 /** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */

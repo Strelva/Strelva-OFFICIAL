@@ -15,6 +15,8 @@ vi.mock("@/lib/tenants", () => ({
   updateTenant: mockUpdateTenant,
 }));
 vi.mock("@/lib/storage", () => ({ logAuditEvent: mockLogAuditEvent }));
+const mockRefresh = vi.hoisted(() => vi.fn());
+vi.mock("@/products/websites/site-declaration", () => ({ refreshSiteDeclaration: mockRefresh }));
 // safe-fetch is used as-is (real https/private-host guard).
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -35,6 +37,8 @@ const TENANT = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
+  mockRefresh.mockResolvedValue({ reachable: true, contentSource: "strelva", liveCommit: null });
   mockIsSuperAdmin.mockResolvedValue(true);
   mockGetTenantConfig.mockResolvedValue({ ...TENANT });
   mockGetActorContext.mockResolvedValue({ email: "op@strelva.com", isSuperAdmin: true });
@@ -96,5 +100,21 @@ describe("POST /api/admin/tenants/[id]/capability-manifest", () => {
     const res = await POST(post({ capabilityManifestUrl: 42 }), params("rohlax"));
     expect(res.status).toBe(400);
     expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
+  it("returns no declaration while sites_by_code is off", async () => {
+    const { POST } = await import("@/app/api/admin/tenants/[id]/capability-manifest/route");
+    const res = await POST(post({ capabilityManifestUrl: "https://rohlax.com/api/capabilities" }), params("rohlax"));
+    expect(await res.json()).not.toHaveProperty("declaration");
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("reads what the site declares when sites_by_code is on", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_SITES_BY_CODE_RELEASE", "workspace");
+    const { POST } = await import("@/app/api/admin/tenants/[id]/capability-manifest/route");
+    const res = await POST(post({ capabilityManifestUrl: "https://rohlax.com/api/capabilities" }), params("rohlax"));
+    expect((await res.json()).declaration).toMatchObject({ contentSource: "strelva" });
+    expect(mockRefresh).toHaveBeenCalledWith("rohlax");
   });
 });

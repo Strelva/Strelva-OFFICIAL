@@ -3,6 +3,8 @@ import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { logAuditEvent } from "@/lib/storage";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
+import { refreshSiteDeclaration } from "@/products/websites/site-declaration";
 
 /**
  * Per-tenant capability-manifest URL (B4). A custom repo can publish a manifest
@@ -16,7 +18,8 @@ import { logAuditEvent } from "@/lib/storage";
  * POST — body { capabilityManifestUrl: string | null }. An https URL that passes
  *        the same SSRF guard as the fetch path, or null/"" to clear. The value
  *        is merged into the existing `customRepo` blob (other fields untouched).
- *        Audit-logged. Super-admin only.
+ *        Audit-logged. Super-admin only. With `sites_by_code` on, the response
+ *        also carries the site's `declaration` (content source, live commit).
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isSuperAdmin())) {
@@ -74,5 +77,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     metadata: { capabilityManifestUrl: nextUrl ?? null },
   }).catch(() => {});
 
+  // With sites_by_code on, read what the site declares right away so a new URL takes effect without waiting for the next release.
+  if (releaseFlagMayBeOn("sites_by_code") && nextUrl) {
+    const declaration = await refreshSiteDeclaration(id).catch(() => null);
+    return NextResponse.json({ customRepo: updated.customRepo ?? null, declaration });
+  }
   return NextResponse.json({ customRepo: updated.customRepo ?? null });
 }
