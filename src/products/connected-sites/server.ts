@@ -30,6 +30,7 @@ import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
+export { fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
 export { connectedSiteChangeOwnerEmailEnabled, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "./keep-your-site-release";
 
 export { connectedSitesPublicFor, connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "./release";
