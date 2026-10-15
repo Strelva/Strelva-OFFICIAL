@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
-vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
+vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy, getLeadById: vi.fn() }));
 vi.mock("@/lib/storage", () => ({ trackClick: mocks.trackClick }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
 

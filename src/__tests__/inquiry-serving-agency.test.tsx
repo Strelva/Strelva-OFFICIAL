@@ -17,9 +17,8 @@ describe("standalone inquiry serving agency identity", () => {
     const html = render(agency);
     expect(html).toContain("Current Studio / Buffalo Realty");
     expect(html).toContain("Runs on Strelva");
-    expect(html.match(/aria-label="Strelva platform"/g)).toHaveLength(1);
-    expect(html.indexOf("Current Studio / Buffalo Realty")).toBeLessThan(html.indexOf('aria-label="Strelva platform"'));
-    expect(html.indexOf('aria-label="Strelva platform"')).toBeLessThan(html.indexOf("Your account"));
+    expect(html).not.toContain('aria-label="Strelva platform"');
+    expect(html.indexOf("Current Studio / Buffalo Realty")).toBeLessThan(html.indexOf("Your account"));
     expect(html).not.toContain(">Sign in<");
     expect(html).toContain('href="/preview/strelva/workspace/account"');
   });
@@ -34,7 +33,7 @@ describe("standalone inquiry serving agency identity", () => {
     const html = render(null, "business");
     expect(html).toContain('aria-label="Buffalo Realty home"');
     expect(html).not.toContain("Runs on Strelva");
-    expect(html.match(/aria-label="Strelva platform"/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Strelva platform"');
   });
 });
 

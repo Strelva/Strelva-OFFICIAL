@@ -16,6 +16,17 @@ const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockSendWelcomeEmail = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 
+// The operator must be verified and the invited customer must be confirmed
+// independently from the best-effort legacy email lookup.
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: () => {
+  const query = { select: () => query, eq: () => query, maybeSingle: async () => {
+    const id = await mockFindUserIdByEmail();
+    return { data: id ? { id } : null, error: null };
+  } };
+  return query;
+} }) }));
+vi.mock("@/platform/infra/platform-staff-read", () => ({ readPlatformStaffStrict: async () => false }));
+
 vi.mock("@/platform/infra/auth", () => ({
   CLIENT_ROLES: ["viewer", "editor", "admin", "owner"],
   assignUserToTenant: mockAssignUserToTenant,
@@ -57,7 +68,7 @@ describe("welcome email on new-owner access grant", () => {
     mockGetCurrentUserEmail.mockResolvedValue("admin@example.com");
     mockSendEmail.mockResolvedValue({ data: { id: "email_123" }, error: null, headers: null });
     mockSendWelcomeEmail.mockResolvedValue(true);
-    mockGetActorContext.mockResolvedValue({ email: "admin@example.com" });
+    mockGetActorContext.mockResolvedValue({ userId: "operator_fixture", email: "admin@example.com", isSuperAdmin: true, isImpersonating: false });
     mockLogAuditEvent.mockResolvedValue(undefined);
   });
 
@@ -70,7 +81,7 @@ describe("welcome email on new-owner access grant", () => {
     const res = await POST(new Request("http://localhost/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "owner@example.com", tenant: "gldf", role: "owner" }),
+      body: JSON.stringify({ email: "owner@example.com", tenant: "gldf", role: "owner", reason: "Owner requested access" }),
     }));
 
     expect(res.status).toBe(200);
@@ -92,12 +103,14 @@ describe("welcome email on new-owner access grant", () => {
 
   it("does NOT fire the welcome email for a non-owner invite", async () => {
     const { POST } = await import("@/app/api/admin/invites/route");
-    await POST(new Request("http://localhost/api/admin/invites", {
+    const res = await POST(new Request("http://localhost/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "editor@example.com", tenant: "gldf", role: "editor" }),
+      body: JSON.stringify({ email: "editor@example.com", tenant: "gldf", role: "editor", reason: "Owner requested editor access" }),
     }));
 
+    expect(res.status).toBe(200);
+    expect(mockCreateInvite).toHaveBeenCalledOnce();
     expect(mockSendWelcomeEmail).not.toHaveBeenCalled();
   });
 
@@ -109,7 +122,7 @@ describe("welcome email on new-owner access grant", () => {
     const res = await POST(new Request("http://localhost/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "owner@example.com", tenant: "gldf", role: "owner" }),
+      body: JSON.stringify({ email: "owner@example.com", tenant: "gldf", role: "owner", reason: "Owner requested access" }),
     }));
 
     expect(res.status).toBe(200);

@@ -5,7 +5,7 @@ const mockRedis = makeRedisMock();
 const mocks = vi.hoisted(() => ({ tenant: vi.fn(), capture: vi.fn(), legacy: vi.fn() }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
-vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
+vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy, getLeadById: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
 
 import { getSpam, recordSpam } from "@/lib/spam-pit";

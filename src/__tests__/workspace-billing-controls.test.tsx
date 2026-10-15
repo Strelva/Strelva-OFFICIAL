@@ -68,7 +68,7 @@ it("aborts a prior workspace's portal request and ignores its late capability", 
 });
 it.each([null, { futureWork: "paused", providerParticipation: "kept", maintainedResources: { kind: "stopped" }, completedAt: "2026-10-12T12:00:00Z", summary: {}, retainedObligations: [] }])("keeps workspace billing reachable before and after departure", async state => {
   const { node, root } = host(); const request = vi.fn<typeof fetch>(async () => Response.json({ state, successors: [] }));
-  await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: "business", request })));
+  await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: "business", request, businessBillingReleased: true })));
   const link = [...node.querySelectorAll("a")].find(item => item.textContent === "Manage payments or cancel your plan");
   expect(link?.getAttribute("href")).toBe("/workspace/billing?workspaceId=business"); expect(node.innerHTML).not.toContain("/dashboard");
 });
