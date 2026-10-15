@@ -66,7 +66,7 @@ export async function PUT(
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 422 });
   }
-  return NextResponse.json({ success: true, entry: result.entry });
+  return NextResponse.json({ success: true, entry: result.entry, ...(result.liveSite ? { liveSite: result.liveSite } : {}) });
 }
 
 export async function DELETE(
@@ -86,6 +86,6 @@ export async function DELETE(
   if (!slug) {
     return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   }
-  await removeEntry(tenant, type as CollectionType, slug, actor.isImpersonating ? "admin" : "user");
-  return NextResponse.json({ success: true });
+  const { liveSite } = await removeEntry(tenant, type as CollectionType, slug, actor.isImpersonating ? "admin" : "user");
+  return NextResponse.json({ success: true, ...(liveSite ? { liveSite } : {}) });
 }

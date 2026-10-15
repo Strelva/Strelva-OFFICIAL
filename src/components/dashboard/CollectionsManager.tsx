@@ -147,6 +147,7 @@ export function CollectionsManager({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveNotice, setLiveNotice] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   // Transient confirmation after a successful save, distinguishing the action.
   const [savedAction, setSavedAction] = useState<"published" | "draft" | null>(null);
@@ -217,7 +218,7 @@ export function CollectionsManager({
     }
     setFieldErrors({});
     setSaving(true);
-    setError(null);
+    setError(null); setLiveNotice(null);
     try {
       const res = await fetch(apiPath(`/api/collections/${type}`), {
         method: "PUT",
@@ -233,6 +234,7 @@ export function CollectionsManager({
       setSavedAction(status === "published" ? "published" : "draft");
       window.setTimeout(() => setSavedAction(null), 2500);
       await load(type);
+      if (json.liveSite?.status === "failed") setLiveNotice("Saved. Your live site did not refresh yet; it will pick this up within a few minutes.");
     } finally {
       setSaving(false);
     }
@@ -240,22 +242,24 @@ export function CollectionsManager({
 
   async function remove(slug: string) {
     if (!confirm(`Delete "${slug}"? This cannot be undone.`)) return;
-    setError(null);
+    setError(null); setLiveNotice(null);
     const res = await fetch(apiPath(`/api/collections/${type}?slug=${encodeURIComponent(slug)}`), { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
       setError(json.error ?? "Delete failed.");
       return;
     }
     await load(type);
+    if (json.liveSite?.status === "failed") setLiveNotice("Deleted. Your live site did not refresh yet; it will pick this up within a few minutes.");
   }
 
   return <StPage>
-      <StHead title={type === "blog" ? "Articles" : TYPE_LABEL[type]} meta="Content on your website. Open an entry to edit it or prepare a draft." actions={!readOnly ? <StPill variant={editing ? "soft" : "primary"} onClick={() => { setFieldErrors({}); setError(null); setEditing({ data: emptyData(type) }); }}><Plus size={16} aria-hidden="true" />New {TYPE_LABEL[type].replace(/s$/, "")}</StPill> : undefined} />
+      <StHead title={type === "blog" ? "Articles" : TYPE_LABEL[type]} meta="Content on your website. Open an entry to edit it or prepare a draft." actions={!readOnly ? <StPill variant={editing ? "soft" : "primary"} onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ data: emptyData(type) }); }}><Plus size={16} aria-hidden="true" />New {TYPE_LABEL[type].replace(/s$/, "")}</StPill> : undefined} />
       {savedAction ? <span role="status"><StState kind="live">{savedAction === "published" ? "Published" : "Saved"}</StState></span> : null}
       {readOnly ? <StNotice>You can read these entries. Only an owner or admin can save, publish or delete them.</StNotice> : null}
-      {types.length > 1 ? <StSegmented value={type} label="Content type" options={types.map(value => ({ value, label: TYPE_LABEL[value] }))} onChange={value => { setType(value); setEditing(null); setFieldErrors({}); setError(null); }} /> : null}
+      {types.length > 1 ? <StSegmented value={type} label="Content type" options={types.map(value => ({ value, label: TYPE_LABEL[value] }))} onChange={value => { setType(value); setEditing(null); setFieldErrors({}); setError(null); setLiveNotice(null); }} /> : null}
       {error ? <StNotice tone="critical">{error}</StNotice> : null}
+      {liveNotice ? <StNotice>{liveNotice}</StNotice> : null}
       {editing ? <StSurface label="Website content entry"><div className={styles.brandFields}>
           {FIELDS[type].map((f) => (
             <label key={f.name} className="mb-3 block text-sm">
@@ -287,9 +291,9 @@ export function CollectionsManager({
           ))}
           <div className={styles.actions}>
             {!readOnly ? <><StHold disabled={saving} label={saving ? "Saving…" : "Hold to make it live"} onAccept={() => void save("published")} /><StPill variant="soft" disabled={saving} onClick={() => void save("draft")}>Save draft</StPill></> : null}
-            <StTextButton onClick={() => { setEditing(null); setFieldErrors({}); setError(null); }}>Cancel</StTextButton>
+            <StTextButton onClick={() => { setEditing(null); setFieldErrors({}); setError(null); setLiveNotice(null); }}>Cancel</StTextButton>
           </div>
-        </div></StSurface> : loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading entries"><StSkeleton /><StSkeleton width="70%" /></section> : entries.length === 0 ? <StEmpty>No {TYPE_LABEL[type].toLowerCase()} entries yet.</StEmpty> : <StRows label={TYPE_LABEL[type]}>{entries.map(entry => <StRow key={entry.slug} title={<StTextButton onClick={() => { setFieldErrors({}); setError(null); setEditing({ slug: entry.slug, data: entry.data }); }}>{String(entry.data.title ?? entry.data.name ?? entry.slug)}</StTextButton>} detail={<StState kind={entry.status === "published" ? "live" : "draft"}>{entry.status === "published" ? "Published" : "Draft"}</StState>} end={<>{entry.updatedAt ? <StMono as="time" dateTime={entry.updatedAt}>{new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono> : null}{!readOnly ? <StTextButton tone="danger" onClick={() => void remove(entry.slug)} aria-label="Delete"><Trash2 size={16} aria-hidden="true" /></StTextButton> : null}</>} />)}</StRows>}
+        </div></StSurface> : loading ? <section className={styles.stack} aria-busy="true" aria-label="Loading entries"><StSkeleton /><StSkeleton width="70%" /></section> : entries.length === 0 ? <StEmpty>No {TYPE_LABEL[type].toLowerCase()} entries yet.</StEmpty> : <StRows label={TYPE_LABEL[type]}>{entries.map(entry => <StRow key={entry.slug} title={<StTextButton onClick={() => { setFieldErrors({}); setError(null); setLiveNotice(null); setEditing({ slug: entry.slug, data: entry.data }); }}>{String(entry.data.title ?? entry.data.name ?? entry.slug)}</StTextButton>} detail={<StState kind={entry.status === "published" ? "live" : "draft"}>{entry.status === "published" ? "Published" : "Draft"}</StState>} end={<>{entry.updatedAt ? <StMono as="time" dateTime={entry.updatedAt}>{new Date(entry.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono> : null}{!readOnly ? <StTextButton tone="danger" onClick={() => void remove(entry.slug)} aria-label="Delete"><Trash2 size={16} aria-hidden="true" /></StTextButton> : null}</>} />)}</StRows>}
 
       <AssetPickerModal
         open={pickingField !== null}
