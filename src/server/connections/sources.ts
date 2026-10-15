@@ -9,7 +9,13 @@ const loadScheduling = () => scheduling ??= import("@/products/scheduling/server
  * product imports, credentials reads and provider calls. Each wrapper has stable
  * identity, so repeated initialization cannot duplicate an account row. */
 const productSources: readonly ConnectionSource[] = [
-  { provider: "google_business_profile", list: async input => (await import("@/products/google-listing/server")).googleBusinessProfileConnectionSource().list(input) },
+  { provider: "google_business_profile", list: async input => {
+    const bindings = await (await import("@/products/google-listing/server")).googleBusinessProfileConnectionSource().list(input);
+    // Redis-only legacy accounts show only where no binding exists, and only behind their own flag.
+    if (bindings.length) return bindings;
+    const legacy = await import("@/app/api/oauth/google/legacy-connection-source");
+    return legacy.legacyGoogleConnectionsEnabled() ? legacy.listLegacyGoogleRows(input.workspaceId) : bindings;
+  } },
   { provider: "google_calendar", list: async input => (await loadScheduling()).googleCalendarConnectionSource().list(input) },
   { provider: "outlook_calendar", list: async input => (await loadScheduling()).outlookCalendarConnectionSource().list(input) },
   { provider: "calendly", list: async input => (await import("@/app/api/oauth/calendly/connection-source")).calendlyConnectionSource.list(input) },
