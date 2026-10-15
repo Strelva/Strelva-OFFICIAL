@@ -107,7 +107,7 @@ export function formatReport(report: ProdFlagReport): string {
   return lines.join("\n");
 }
 
-const VALUE_FREE_ROW = /^ {2}[A-Z][A-Z0-9_]*: (unset|on|off|workspace|operators|set \(value hidden\)|set)( {2}\(.*\))?$/;
+const VALUE_FREE_ROW = /^ {2}[A-Z][A-Z0-9_]*: (unset|on|off|workspace|operators|set \(value hidden\)|set)$/;
 const FIXED_LINES = new Set([
   "Strelva prod flag report (names and normalized states only; values never printed)",
   "Client email (must be off)",

@@ -45,7 +45,9 @@ describe("prod flag report", () => {
   it("still throws on a crafted row that leaks a value", () => {
     const pulled = parseRolloutEnv("VERCEL_ENV=production\nSTRELVA_PLAN=strelva");
     expect(() => assertNoValues("  STRELVA_PLAN: strelva", pulled)).toThrow();
-    expect(() => assertNoValues("  STRELVA_PLAN: set  (strelva)\nnote production", pulled)).toThrow();
+    expect(() => assertNoValues("  STRELVA_PLAN: set  (strelva)", pulled)).toThrow();
+    expect(() => assertNoValues("  STRELVA_PLAN: on  (fixture_hidden_value)", { STRELVA_PLAN: "fixture_hidden_value" })).toThrow();
+    expect(() => assertNoValues("note production", pulled)).toThrow();
   });
 
   it("derives the inventory from source, including flags the readiness snapshot misses", () => {
