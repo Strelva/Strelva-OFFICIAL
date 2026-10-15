@@ -14,6 +14,12 @@ marketing site in lockstep. Their `package.json` versions must always match.
 - Report scrubbed workspace failures in server and browser monitoring; browser
   reporting stays off until its public DSN is configured.
 - Report the checked-in 1.0.0 version from health when no deployment override is set.
+- Browser error reporting reaches Sentry once its public DSN is set (CSP now admits the ingest host).
+- History and inbox reads that fail now say so instead of showing an empty list.
+- Domain verification checks every five minutes; the production checklist prints the real cron list.
+- Add a names-only prod flag report.
+- Prepare a report-only nonce CSP behind STRELVA_CSP_NONCE_REPORT_ONLY (off).
+- Add per-package license review to the supply-chain gate (no entries approved yet).
 
 This is the prepared source cut, not a production deployment or tag receipt.
 October 12–13 go-live claims and October 14 observations are recorded separately

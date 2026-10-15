@@ -134,7 +134,7 @@
     },
     {
       "path": "/api/cron/website-domain-verification",
-      "schedule": "* * * * *"
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/connected-sites-purge",

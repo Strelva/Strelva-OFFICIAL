@@ -126,6 +126,12 @@ vercel env add NEXT_PUBLIC_SENTRY_DSN production   # client-side
 
 Same DSN for both unless Sentry gives you separate values.
 
+`NEXT_PUBLIC_SENTRY_DSN` is inlined at build, so redeploy after setting it. Its
+ingest host is added to the CSP `connect-src` automatically; unset, the CSP is
+unchanged and browser reporting stays off. Verify with the existing
+`/api/admin/test-error` route plus a `throw` in the browser console on a public
+page. Private workspace routes arrive scrubbed (masked route, no message).
+
 ## 6. Stripe
 
 Three-tier live billing (Presence $99 / Growth $199 / Scale $499). All Stripe

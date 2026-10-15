@@ -82,12 +82,14 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
   const { dashboardHref } = useDashboard();
   const [entries, setEntries] = useState<ActivityEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [selected, setSelected] = useState<ActivityEntry | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadError(false);
     // Try new versioning API first, fall back to legacy activity snapshots
     fetch(dashboardHref(`/api/content/${section}/versions`), { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : null))
@@ -114,7 +116,11 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
         return fetch(dashboardHref(`/api/activity?section=${encodeURIComponent(section)}`), {
           credentials: "same-origin",
         })
-          .then((res) => (res.ok ? res.json() : []))
+          .then((res) => {
+            // A failed read is not an empty History.
+            if (!res.ok) throw new Error("activity_unavailable");
+            return res.json();
+          })
           .then((data: ActivityEntry[]) => {
             const withSnap = Array.isArray(data)
               ? data.filter((e) => e.snapshot !== undefined && e.snapshot !== null).slice(0, 20)
@@ -122,7 +128,10 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
             setEntries(withSnap);
           });
       })
-      .catch(() => setEntries([]))
+      .catch(() => {
+        setEntries(null);
+        setLoadError(true);
+      })
       .finally(() => setLoading(false));
   }, [dashboardHref, section]);
 
@@ -181,6 +190,22 @@ export function ContentHistory({ section, onRestored }: ContentHistoryProps) {
         <SkeletonLine width="w-full" height="h-10" />
         <SkeletonLine width="w-full" height="h-10" />
       </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <EmptyState
+        icon={<AlertCircle className="w-[18px] h-[18px] text-gray-muted" strokeWidth={1.5} />}
+        title="History couldn't load"
+        description="Strelva couldn't read this section's History. Nothing changed."
+        action={
+          <Button variant="secondary" size="sm" onClick={load}>
+            Try again
+          </Button>
+        }
+        className="h-full"
+      />
     );
   }
 

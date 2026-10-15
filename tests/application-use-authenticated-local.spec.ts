@@ -213,7 +213,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await makerReviewPage.getByRole("tab", { name: "Review", exact: true }).click();
     await expect(makerReviewPage.getByText("Review changes", { exact: true })).toBeVisible();
     if (!await review.evaluate(element => (element as HTMLDetailsElement).open)) await review.locator("summary").click();
-    const mobileNavigation = makerReviewPage.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
+    const mobileNavigation = makerReviewPage.getByRole("dialog", { name: /navigation$/ });
     await expect(mobileNavigation).not.toBeVisible();
     const reviewMainBox = await makerReviewPage.locator("main[data-frame-main]").boundingBox();
     expect(reviewMainBox?.x ?? -1).toBeLessThan(2);

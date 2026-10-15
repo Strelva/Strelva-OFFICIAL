@@ -19,6 +19,16 @@ export function validatePolicy(config, pkg, workflows, now = new Date().toISOStr
   if (pkg.pnpm?.auditConfig?.ignoreGhsas?.length || pkg.pnpm?.auditConfig?.ignoreCves?.length) issues.push("unbounded_package_audit_ignore_forbidden");
   const exceptions = config.advisoryExceptions;
   if (!Array.isArray(exceptions)) issues.push("advisory_exceptions_invalid");
+  const reviewed = config.reviewedPackages;
+  if (reviewed !== undefined && !Array.isArray(reviewed)) issues.push("reviewed_packages_invalid");
+  const reviewedNames = new Set();
+  for (const item of Array.isArray(reviewed) ? reviewed : []) {
+    if (!record(item) || !item.name || !Array.isArray(item.versions) || !item.versions.length || !item.versions.every(v => typeof v === "string" && v) ||
+        !item.license || !["build-tool", "distributed"].includes(item.use) || !item.owner || !item.reason ||
+        !date(item.reviewedAt) || item.reviewedAt > now || !String(item.source ?? "").startsWith("https://")) issues.push("reviewed_package_invalid");
+    if (reviewedNames.has(item?.name)) issues.push("reviewed_package_duplicate");
+    reviewedNames.add(item?.name);
+  }
   const seen = new Set();
   for (const item of exceptions ?? []) {
     if (!ghsa.test(item.id ?? "") || !item.package || !item.owner || !item.reason || !item.priorDecision ||
@@ -71,11 +81,17 @@ export function classifyLicenses(inventory, config) {
   if (!record(inventory) || Object.keys(inventory).length === 0) return { issues: ["license_inventory_unavailable"], packages };
   for (const [license, values] of Object.entries(inventory)) {
     if (!Array.isArray(values) || !values.length) { issues.push("license_inventory_invalid"); continue; }
-    const classification = Object.entries(config.licenseClasses).find(([, licenses]) => licenses.includes(license))?.[0] ?? "reviewRequired";
+    const listed = Object.entries(config.licenseClasses).find(([, licenses]) => licenses.includes(license))?.[0] ?? "reviewRequired";
     for (const value of values) {
       if (!value.name || !Array.isArray(value.versions) || !value.versions.length || value.license !== license) {
         issues.push("license_inventory_invalid"); continue;
       }
+      // A review covers one package, its exact license string and exact versions.
+      // No prefix or wildcard match: every platform package is listed by name.
+      const review = listed === "reviewRequired"
+        ? config.reviewedPackages?.find(r => r.name === value.name && r.license === license && value.versions.every(v => r.versions.includes(v)))
+        : undefined;
+      const classification = review ? "reviewed" : listed;
       packages.push({ name: value.name, versions: value.versions, license, classification });
       // Classification of an existing license is not permission to distribute.
       // Commercial/restricted/unknown terms remain blocked until an exact review.

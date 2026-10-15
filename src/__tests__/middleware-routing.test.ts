@@ -330,6 +330,19 @@ describe("proxy frame policy", () => {
     expect(csp).not.toContain("frame-ancestors 'none'");
   });
 
+  it("admits the Sentry ingest origin in production connect-src only when the DSN is set", () => {
+    const base = "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com";
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://abc@o1.ingest.us.sentry.io/42");
+      expect(buildContentSecurityPolicy({ isPreview: false, host: "strelva.com", protocol: "https:" })).toContain(`${base} https://o1.ingest.us.sentry.io;`);
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+      expect(buildContentSecurityPolicy({ isPreview: false, host: "strelva.com", protocol: "https:" })).toContain(`${base};`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("allows the local Supabase loopback in the development connection policy", () => {
     const csp = buildContentSecurityPolicy({
       isPreview: false,
@@ -338,5 +351,41 @@ describe("proxy frame policy", () => {
     });
 
     expect(csp).toContain("connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com ws://localhost:* http://localhost:* http://127.0.0.1:*");
+  });
+});
+
+describe("report-only nonce policy", () => {
+  async function publicResponse() {
+    const { NextRequest } = await import("next/server");
+    const proxy = (await import("../proxy")).default;
+    return proxy(new NextRequest("https://strelva.com/no-access", { headers: { host: "strelva.com" } }));
+  }
+
+  it("adds nothing when the flag is unset", async () => {
+    const res = await publicResponse();
+    expect(res.headers.get("Content-Security-Policy-Report-Only")).toBeNull();
+    expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBeNull();
+    expect(res.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline'");
+  });
+
+  it("reports and forwards the same nonce policy when the flag is 1", async () => {
+    vi.stubEnv("STRELVA_CSP_NONCE_REPORT_ONLY", "1");
+    try {
+      const res = await publicResponse();
+      const reported = res.headers.get("Content-Security-Policy-Report-Only");
+      expect(reported).toContain("'nonce-");
+      expect(reported).toContain("object-src 'none'");
+      expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBe(reported);
+      const enforced = res.headers.get("Content-Security-Policy")!;
+      expect(enforced).toContain("script-src 'self' 'unsafe-inline'");
+      const directive = (policy: string, name: string) => policy.split("; ").find((d) => d.startsWith(`${name} `));
+      for (const name of ["default-src", "connect-src", "img-src", "font-src", "frame-src", "worker-src"]) {
+        expect(directive(reported!, name)).toBe(directive(enforced, name));
+      }
+      expect(directive(reported!, "connect-src")).toBeDefined();
+      expect(directive(reported!, "img-src")).toBeDefined();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

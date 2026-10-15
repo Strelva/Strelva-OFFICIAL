@@ -24,6 +24,31 @@ security workflow should continue to fail on those two until Jacob authorizes
 rotation of both client revalidation secrets and the signed readback is retained.
 History is public; deleting the old file did not revoke its credentials.
 
+October 15 update. A local `node scripts/check-supply-chain.mjs` on the base
+returned `blocked` with `license_review_required` for `@sentry/cli`,
+`@sentry/cli-darwin` (`-linux-x64` on the CI runner) and `gsap`. The braces
+advisory sat under `audit.all.excepted` (valid until October 23) and the production
+audit had 0 findings, so braces was not the cause of the red "Audit dependencies"
+step. `scripts/supply-chain-policy.json` now has a `reviewedPackages` list: each
+entry names one package, its exact license string and exact versions, a use
+(`build-tool` or `distributed`), an owner, a review date and a license source.
+The list is empty. `@sentry/cli` 2.58.5 (FSL-1.1-MIT, build-time only, nine
+platform packages) and `gsap` 3.14.2 (GSAP Standard License, ships in client
+website components) need Jacob's approval before any entry is added. The
+registry audit did run locally on October 15 (`pnpm check:supply-chain`,
+read-only registry traffic): status `blocked`, issues exactly
+`license_review_required:@sentry/cli`, `license_review_required:@sentry/cli-darwin`
+and `license_review_required:gsap`. `audit.all` has 1 finding, braces, excepted;
+`audit.production` has 0. The block is the unreviewed licenses above, not an advisory.
+
+October 15, secret scan. Locally, Gitleaks reports exactly two findings:
+`eb67cd15b278cf5e4da33d358f1e68919c047ad1:dev-tenants.json:generic-api-key:23`
+and `...:47`, both dated 2026-04-30. The Security job stays red by design on these
+two, and `.gitleaksignore` is unchanged. Closing it needs Jacob's approval plus
+proof that the app database's stored copy of both revalidation secrets was
+re-encrypted and read back. The live sites' secrets already differ from the leaked
+values and signed probes with the leaked values return 401.
+
 ## Replay and migration order
 
 Push and nightly select the same PostgreSQL 18 server/client tools through

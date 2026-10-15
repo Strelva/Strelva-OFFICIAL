@@ -1510,22 +1510,15 @@ function printCronJobs() {
   console.log("  Vercel Cron Jobs");
   console.log("═══════════════════════════════════════════════════════════════\n");
 
-  const crons = [
-    { path: "/api/cron/maintenance", schedule: "0 3 * * *", desc: "Maintenance cleanup (daily 3am UTC)" },
-    { path: "/api/cron/weekly-report", schedule: "0 14 * * 1", desc: "Weekly reports (Mon 2pm UTC)" },
-    { path: "/api/cron/staleness", schedule: "0 6 * * *", desc: "Content staleness check (daily 6am UTC)" },
-    { path: "/api/cron/search-console", schedule: "0 7 * * *", desc: "Search console sync (daily 7am UTC)" },
-    { path: "/api/cron/daily-summary", schedule: "0 8 * * *", desc: "Daily summary (daily 8am UTC)" },
-    { path: "/api/cron/poll-yelp", schedule: "0 6 * * *", desc: "Yelp reviews (daily 6am UTC)" },
-    { path: "/api/cron/poll-google-reviews", schedule: "0 6 * * *", desc: "Google reviews (daily 6am UTC)" },
-    { path: "/api/cron/poll-instagram", schedule: "0 6 * * *", desc: "Instagram feed (daily 6am UTC)" },
-  ];
+  // Read the real schedule so this list cannot drift from what Vercel runs.
+  const { crons = [] } = JSON.parse(readFileSync("vercel.json", "utf8")) as {
+    crons?: Array<{ path?: string; schedule?: string }>;
+  };
 
   console.log("Defined in vercel.json:");
   for (const cron of crons) {
     console.log(`  ${cron.path}`);
-    console.log(`    Schedule: ${cron.schedule}`);
-    console.log(`    Purpose: ${cron.desc}\n`);
+    console.log(`    Schedule: ${cron.schedule}\n`);
   }
 
   console.log("All cron routes require Authorization: Bearer <CRON_SECRET> header.");

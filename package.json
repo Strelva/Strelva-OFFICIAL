@@ -52,6 +52,8 @@
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:site-domains": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-site-domains.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
+    "check:pr-journeys": "pnpm build && CI=true STRELVA_UI_PREVIEW=1 STRELVA_WORKSPACE_RELEASE=0 REB_DEV_UNGATED_ACCESS=0 playwright test tests/illustrated-home.spec.ts tests/self-service-library.spec.ts tests/shared-frame.spec.ts tests/application-use-ui.spec.ts tests/workspace-ui-preview.spec.ts --retries=0 --reporter=line",
+    "report:prod-flags": "tsx scripts/prod-flag-report.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "reborn:progress": "node scripts/reborn-progress.mjs",
     "version:check": "node scripts/check-version-sync.mjs",

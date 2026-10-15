@@ -848,3 +848,45 @@ the port by instruction: hosted preflight wiring, immutable Action pins and
 scanner workflow changes are **not ported**. The strict supply-chain validator
 will refuse the retained mutable workflow references until those changes are
 separately authorized. Dependency and lockfile bytes are unchanged.
+
+## Local hosted-equivalent run, 2026-10-15
+
+`scripts/check-ci.sh` mirrors `ci.yml` only. The hosted reds recorded October 14 on
+PR #642 also include `self-service-review.yml` ("Customer UI journeys") and
+`launch-verification.yml` ("authenticated-journeys"). `pnpm check:pr-journeys`
+now runs the five self-service specs with that workflow's exact environment.
+
+Customer UI journeys, local, no push (port 3187 because 3100 was taken; the dev
+server, not a rebuilt app). Before: 31 of 52 failed, matching the hosted count.
+After renaming stale navigation names (the sidebar and mobile dialog are named
+after the business, `<name> navigation`; the home link is "Workspace home"; the
+list place is "Files and results"): **29 passed, 23 failed**. Still failing, each
+with the first assertion that fails:
+
+- `application-use-ui.spec.ts` (5): "Problem" field not found; "This application
+  link is unavailable" heading missing; "Record 2" article missing.
+- `illustrated-home.spec.ts` (2): the linked-website access status text is not
+  shown; the "Files and results" then "Get or build" Systems path times out.
+- `self-service-library.spec.ts` (6): "Make it yours." heading, "App name" field and
+  "Create private tool" button are not found.
+- `workspace-ui-preview.spec.ts` (10): "Back to Apps", "Business information",
+  "Business offerings", "Client work" headings, "Verified payer email" field and
+  the "Get or build" path are not found.
+
+These need a product decision per screen: either the 1.0 screens lost the
+behavior (fix the page) or retired it (update the spec). None was deleted or
+skipped, and no workflow file changed. They are listed here rather than guessed.
+
+Retired screens awaiting Jacob: none confirmed yet.
+
+Not run: the authenticated journeys (`prepare-launch-auth-stack.sh` and the four
+specs) because the Docker daemon did not answer `docker info` within two minutes
+and the installed Supabase CLI is 2.120.0, not the pinned 2.117.0. Unproven. The
+rename in `application-use-authenticated-local.spec.ts` is unrun.
+
+`pnpm check:ci` was not run end to end: `scripts/check-ci.sh` runs
+`pnpm test:coverage`, the full vitest suite, which is not allowed while lanes run
+in parallel. The supply-chain step's result is recorded separately
+(`pnpm check:supply-chain` ran locally against the registry; status blocked on the
+three `license_review_required` issues). Hosted jobs remain unproven until Jacob
+authorizes a push.

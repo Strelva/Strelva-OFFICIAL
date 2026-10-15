@@ -5,6 +5,8 @@ import {
 } from "@/platform/infra/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/platform/infra/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
+import { buildNonceReportOnlyPolicy, createCspNonce, cspNonceReportOnlyEnabled } from "@/lib/csp-nonce";
+import { sentryIngestOrigin, sentrySecurityReportUri } from "@/lib/sentry-csp";
 import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewRequest } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -29,24 +31,29 @@ const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   [tenantSiteHost("gldf", APP_ROOT_DOMAIN)]: "https://greatlakesdriedfruit.com",
 };
 
-const cspBaseDirectives = [
-  "default-src 'self'",
-  // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
-  // that's a Turbopack/HMR dev artifact; Sentry and Vercel Analytics contain no eval/new Function). The
-  // looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now (Next bootstrap +
-  // JSON-LD inline); removing it needs a nonce rollout.
-  "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com`,
-  "font-src 'self' data:",
-  // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
-  // kept in the looser variant below).
-  "frame-src 'self' https:",
-  "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
-  "worker-src 'self' blob:",
-  "base-uri 'self'",
-  "form-action 'self'",
-];
+function cspBaseDirectives(): string[] {
+  // Browser Sentry events go to the DSN's ingest host; it is appended last so
+  // the "connect-src 'self'" prefix that the sites-host rewrite relies on holds.
+  const sentryOrigin = sentryIngestOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN);
+  return [
+    "default-src 'self'",
+    // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
+    // that's a Turbopack/HMR dev artifact; Sentry and Vercel Analytics contain no eval/new Function). The
+    // looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now (Next bootstrap +
+    // JSON-LD inline); removing it needs a nonce rollout.
+    "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com`,
+    "font-src 'self' data:",
+    // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
+    // kept in the looser variant below).
+    "frame-src 'self' https:",
+    `connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com${sentryOrigin ? ` ${sentryOrigin}` : ""}`,
+    "worker-src 'self' blob:",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ];
+}
 
 // Route matching (replaces Clerk's createRouteMatcher). SECURITY: normalize the
 // path first — decodeURI + collapse duplicate slashes — so an encoded path or a
@@ -395,8 +402,8 @@ export function buildContentSecurityPolicy(params: {
   // live-preview variant above didn't cover.
   const directives =
     process.env.NODE_ENV === "production"
-      ? cspBaseDirectives
-      : cspBaseDirectives.map((d) =>
+      ? cspBaseDirectives()
+      : cspBaseDirectives().map((d) =>
           d.startsWith("script-src")
             ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*"
             : d.startsWith("connect-src")
@@ -405,6 +412,33 @@ export function buildContentSecurityPolicy(params: {
         );
 
   return [...directives, `frame-ancestors ${frameAncestors}`].join("; ");
+}
+
+// Report-only nonce policy (STRELVA_CSP_NONCE_REPORT_ONLY=1, off by default).
+// Next stamps a nonce on its own scripts when the REQUEST carries a CSP header,
+// so every pass-through below goes through forwardInit. Flag off: no nonce, and
+// forwardInit returns exactly what each call site passed before.
+const REQUEST_NONCE = new WeakMap<NextRequest, string>();
+
+function nonceReportOnlyPolicy(nonce: string, req: NextRequest): string {
+  return buildNonceReportOnlyPolicy({
+    nonce,
+    enforced: buildContentSecurityPolicy({
+      isPreview: isPreviewRequest(req),
+      host: req.headers.get("host") || "",
+      protocol: req.nextUrl.protocol,
+    }),
+    reportUri: sentrySecurityReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN, process.env.VERCEL_ENV),
+    dev: process.env.NODE_ENV !== "production",
+  });
+}
+
+function forwardInit(req: NextRequest, headers?: Headers): { request: { headers: Headers } } | undefined {
+  const nonce = REQUEST_NONCE.get(req);
+  if (!nonce) return headers ? { request: { headers } } : undefined;
+  const forwarded = headers ?? new Headers(req.headers);
+  forwarded.set("content-security-policy-report-only", nonceReportOnlyPolicy(nonce, req));
+  return { request: { headers: forwarded } };
 }
 
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
@@ -421,6 +455,10 @@ function applySecurityHeaders(response: NextResponse, req: NextRequest): NextRes
       protocol: req.nextUrl.protocol,
     })
   );
+  const nonce = REQUEST_NONCE.get(req);
+  if (nonce && !websiteCandidate && !livePreviewRequest) {
+    response.headers.set("Content-Security-Policy-Report-Only", nonceReportOnlyPolicy(nonce, req));
+  }
   if (websiteCandidate) {
     response.headers.set("X-Frame-Options", "SAMEORIGIN");
   } else if (isPreviewRequest(req) || livePreviewRequest) {
@@ -560,6 +598,7 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 }
 
 export default async function proxy(req: NextRequest) {
+  if (cspNonceReportOnlyEnabled()) REQUEST_NONCE.set(req, createCspNonce());
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
   // An assigned delivery origin serves only published catalog pages and the
@@ -571,7 +610,7 @@ export default async function proxy(req: NextRequest) {
     const publicHeaders = new Headers(req.headers);
     for (const key of ["cookie", "authorization", "x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) publicHeaders.delete(key);
     if (selected) publicHeaders.set("x-tenant", selected.tenant);
-    const response = applySecurityHeaders(NextResponse.next({ request: { headers: publicHeaders } }), req);
+    const response = applySecurityHeaders(NextResponse.next(forwardInit(req, publicHeaders)), req);
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace("connect-src 'self'", `connect-src 'self' ${CONTROL_PLANE_URL}`));
     return response;
@@ -597,7 +636,7 @@ export default async function proxy(req: NextRequest) {
     const ancestors = await homeFinderFrameAncestors(finderEntry[1]!);
     const forwarded = new Headers(req.headers);
     for (const header of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) forwarded.delete(header);
-    const response = applySecurityHeaders(NextResponse.next({ request: { headers: forwarded } }), req);
+    const response = applySecurityHeaders(NextResponse.next(forwardInit(req, forwarded)), req);
     response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, ancestors));
     if (ancestors !== "frame-ancestors 'none'") response.headers.delete("X-Frame-Options");
     response.headers.set("Cache-Control", "private, no-store");
@@ -610,7 +649,7 @@ export default async function proxy(req: NextRequest) {
   if (agencyEmbed) {
     const agency = await resolveAgencyAttribution(agencyEmbed[1]).catch(() => null);
     if (!agency) return applySecurityHeaders(new NextResponse("Agency check unavailable", { status: 404 }), req);
-    const response = applySecurityHeaders(NextResponse.next(), req);
+    const response = applySecurityHeaders(NextResponse.next(forwardInit(req)), req);
     const origin = new URL(agency.contactUrl).origin;
     response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, `frame-ancestors 'self' ${origin}`));
     response.headers.delete("X-Frame-Options");
@@ -659,7 +698,7 @@ export default async function proxy(req: NextRequest) {
   // The proxy fetches /api/internal/domain-map for custom domain resolution,
   // so these routes must skip tenant resolution entirely.
   if (pathname.startsWith("/api/internal/")) {
-    return applySecurityHeaders(NextResponse.next(), req);
+    return applySecurityHeaders(NextResponse.next(forwardInit(req)), req);
   }
 
   if (isCronRoute(req)) {
@@ -668,7 +707,7 @@ export default async function proxy(req: NextRequest) {
       console.error("[proxy] CRON_SECRET env var not set - blocking cron route");
     }
     if (cron.allowed) {
-      return applySecurityHeaders(NextResponse.next(), req);
+      return applySecurityHeaders(NextResponse.next(forwardInit(req)), req);
     }
     return applySecurityHeaders(new NextResponse(cron.message, { status: cron.status }), req);
   }
@@ -684,12 +723,12 @@ export default async function proxy(req: NextRequest) {
     url.pathname = "/home";
     const headers = new Headers(req.headers);
     for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
-    return applySecurityHeaders(pathname === "/" ? NextResponse.rewrite(url, { request: { headers } }) : NextResponse.next({ request: { headers } }), req);
+    return applySecurityHeaders(pathname === "/" ? NextResponse.rewrite(url, forwardInit(req, headers)) : NextResponse.next(forwardInit(req, headers)), req);
   }
   if (platformEntry && isPlatformPublicPath(pathname)) {
     const headers = new Headers(req.headers);
     for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
-    return applySecurityHeaders(NextResponse.next({ request: { headers } }), req);
+    return applySecurityHeaders(NextResponse.next(forwardInit(req, headers)), req);
   }
 
   // Bare admin host (admin.strelva.com / admin.localhost) -> the operator console
@@ -710,7 +749,7 @@ export default async function proxy(req: NextRequest) {
     }
     const url = req.nextUrl.clone();
     url.pathname = bareAdminConsoleRewritePath(pathname);
-    return applySecurityHeaders(NextResponse.rewrite(url), req);
+    return applySecurityHeaders(NextResponse.rewrite(url, forwardInit(req)), req);
   }
 
   let tenantId: string | null = null;
@@ -779,7 +818,7 @@ export default async function proxy(req: NextRequest) {
     }
     const headers = new Headers(req.headers);
     for (const key of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) headers.delete(key);
-    return applySecurityHeaders(NextResponse.next({ request: { headers } }), req);
+    return applySecurityHeaders(NextResponse.next(forwardInit(req, headers)), req);
   }
 
   if (tenantId) {
@@ -871,9 +910,7 @@ export default async function proxy(req: NextRequest) {
     if (tenantFromClientPath) {
       const url = req.nextUrl.clone();
       url.pathname = clientPathTarget;
-      return applySecurityHeaders(NextResponse.rewrite(url, {
-        request: { headers },
-      }), req);
+      return applySecurityHeaders(NextResponse.rewrite(url, forwardInit(req, headers)), req);
     }
 
     // Rebuilt old paths redirect only on the trusted public tenant host. This
@@ -889,9 +926,7 @@ export default async function proxy(req: NextRequest) {
       }
     }
 
-    const response = NextResponse.next({
-      request: { headers },
-    });
+    const response = NextResponse.next(forwardInit(req, headers));
 
     return applySecurityHeaders(response, req);
   }
@@ -911,7 +946,7 @@ export default async function proxy(req: NextRequest) {
   fallbackHeaders.delete("x-client-fallback-root");
   fallbackHeaders.delete(DASHBOARD_PATH_HEADER);
   return applySecurityHeaders(
-    NextResponse.next({ request: { headers: fallbackHeaders } }),
+    NextResponse.next(forwardInit(req, fallbackHeaders)),
     req
   );
 }
