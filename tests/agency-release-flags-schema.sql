@@ -26,6 +26,18 @@ insert into public.systems(id,business_workspace_id,name,kind,command_id,command
  ('25600000-0000-4000-8000-000000000040','25600000-0000-4000-8000-000000000010','Client website','website','25600000-0000-4000-8000-000000000041',repeat('a',64),'25600000-0000-4000-8000-000000000002','25600000-0000-4000-8000-000000000002');
 create function pg_temp.ag_set(state text,rev bigint,ceiling bigint) returns jsonb language sql as $$select public.set_agency_workspace_release_flag('25600000-0000-4000-8000-000000000020','25600000-0000-4000-8000-000000000010','25600000-0000-4000-8000-000000000003','flags-agency@example.test','systems',state,rev,ceiling,'Explicit fixture change')$$;
 create function pg_temp.op_ceiling(state text,rev bigint) returns jsonb language sql as $$select public.set_agency_release_flag_ceiling('25600000-0000-4000-8000-000000000001','flags-operator@example.test','25600000-0000-4000-8000-000000000010','systems','25600000-0000-4000-8000-000000000020','25600000-0000-4000-8000-000000000040','publish',state,rev,'Explicit fixture permission')$$;
+-- Historical boundary runs predate submissions; complete-schema proofs use
+-- the current submission and independent decision command, never its retired bypass.
+create function pg_temp.flag_qualification(available boolean) returns void language plpgsql as $$begin
+ if to_regprocedure('public.submit_agency_qualification(uuid,text,uuid,uuid,text,text,text)') is not null then
+  if available then
+   perform public.submit_agency_qualification('25600000-0000-4000-8000-000000000003','flags-agency@example.test','25600000-0000-4000-8000-000000000020','25600000-0000-4000-8000-000000000050','publish','https://example.test/flag-proof','Fictional release and recovery evidence');
+  end if;
+  perform public.decide_agency_qualification('flags-operator@example.test','25600000-0000-4000-8000-000000000050',case when available then 'verified' else 'unavailable' end,'Fictional evidence independently reviewed');
+ else
+  perform public.record_agency_verification('flags-operator@example.test','25600000-0000-4000-8000-000000000020','publish',case when available then 'verified' else 'unverified' end,'{"fixture":true}',case when available then null else 'Verification withdrawn' end);
+ end if;
+end$$;
 -- Native permission assertions begin.
 select pg_temp.flag_assert(not has_table_privilege('service_role','public.agency_release_flag_ceilings','select'),'no service table bypass');
 select pg_temp.flag_assert(not has_function_privilege('authenticated','public.set_agency_workspace_release_flag(uuid,uuid,uuid,text,text,text,bigint,bigint,text)','execute'),'no public command');
@@ -38,7 +50,7 @@ select public.set_agency_release_flag_ceiling('25600000-0000-4000-8000-000000000
 reset role;
 select pg_temp.flag_refuse($$select pg_temp.ag_set('on',0,1)$$,'agency_release_flag_above_ceiling');
 select pg_temp.flag_refuse($$select pg_temp.ag_set('operators',0,1)$$,'agency_release_flag_unverified');
-select public.record_agency_verification('flags-operator@example.test','25600000-0000-4000-8000-000000000020','publish','verified','{"fixture":true}',null);
+select pg_temp.flag_qualification(true);
 select pg_temp.flag_refuse($$select public.set_agency_workspace_release_flag('25600000-0000-4000-8000-000000000030','25600000-0000-4000-8000-000000000010','25600000-0000-4000-8000-000000000004','flags-other@example.test','systems','operators',0,1,'Wrong agency fixture')$$,'agency_release_flag_not_permitted');
 set local role service_role;
 select public.set_agency_workspace_release_flag('25600000-0000-4000-8000-000000000020','25600000-0000-4000-8000-000000000010','25600000-0000-4000-8000-000000000003','flags-agency@example.test','systems','operators',0,1,'Explicit service-role change');
@@ -66,9 +78,9 @@ select pg_temp.flag_assert(not has_function_privilege('service_role','public.set
 select pg_temp.flag_assert((select max_state='off' and revision=4 from public.agency_release_flag_ceilings where workspace_id='25600000-0000-4000-8000-000000000010'),'existing operator off revokes agency permission');
 select pg_temp.flag_refuse($$select pg_temp.ag_set('on',4,4)$$,'agency_release_flag_above_ceiling');
 select pg_temp.op_ceiling('on',4);
-select public.record_agency_verification('flags-operator@example.test','25600000-0000-4000-8000-000000000020','publish','unverified','{}','Verification withdrawn');
+select pg_temp.flag_qualification(false);
 select pg_temp.flag_refuse($$select pg_temp.ag_set('on',4,5)$$,'agency_release_flag_unverified');
-select public.record_agency_verification('flags-operator@example.test','25600000-0000-4000-8000-000000000020','publish','verified','{"fixture":true}',null);
+select pg_temp.flag_qualification(true);
 update public.users set verified_at=null where id='25600000-0000-4000-8000-000000000003';
 select pg_temp.flag_refuse($$select pg_temp.ag_set('on',4,5)$$,'workspace_access_denied');
 update public.users set verified_at=now() where id='25600000-0000-4000-8000-000000000003';

@@ -71,14 +71,22 @@ for owner_revocation in \
   rg -q 'lock timeout' "$cluster_root/owner-revocation.log" || { cat "$cluster_root/owner-revocation.log" >&2; exit 1; }
 done
 wait "$owner_lock_pid" || { cat "$cluster_root/owner-lock-holder.log" >&2; exit 1; }
+# The current READ ONLY readers are a successor to proposal identity. Keep
+# them installed for every native/race proof above, then undo that empty
+# function-only successor before exercising the predecessor's own guard.
+apply "$repo_root/supabase/migrations/rollback-20261025170000_done_integrate_readonly_authorization.sql"
+fingerprint pending_predecessor
 if psql "${psql_args[@]}" --file="$rollback" >"$cluster_root/refusal.txt" 2>&1; then
   printf 'Pending-proposal rollback unexpectedly succeeded.\n' >&2; exit 1
 fi
 rg -q 'ux_agency_identity_rollback_pending_proposals' "$cluster_root/refusal.txt" || { cat "$cluster_root/refusal.txt" >&2; exit 1; }
+fingerprint pending_refused
+diff -u "$cluster_root/pending_predecessor.txt" "$cluster_root/pending_refused.txt" >&2
 psql "${psql_args[@]}" --command="do \$\$ begin if public.business_scope_full_control('7f000000-0000-4000-8000-0000000000b1','website') is distinct from '7f000000-0000-4000-8000-0000000000a1'::uuid or (select count(*) from public.agency_scope_grants where customer_workspace_id='7f000000-0000-4000-8000-0000000000b1' and status='proposed') <> 1 then raise exception 'rollback refusal changed access'; end if; end \$\$;" >/dev/null
 psql "${psql_args[@]}" --command="select public.respond_to_agency_proposal('7f000000-0000-4000-8000-000000000002','lead@north.example.test','7f000000-0000-4000-8000-0000000000a1','7f000000-0000-4000-8000-0000000000b1',false,public.agency_proposal_identity('7f000000-0000-4000-8000-0000000000b1','7f000000-0000-4000-8000-0000000000a1'));" >/dev/null
 apply "$rollback"
 apply "$forward"
+apply "$repo_root/supabase/migrations/20261025170000_done_integrate_readonly_authorization.sql"
 fingerprint populated_reapplied
 diff -u "$cluster_root/final.txt" "$cluster_root/populated_reapplied.txt" >&2
 printf 'AG4 proposal SQL passed (exact proposals, owner demotion/unverification, immutable terms, controlled current-owner revocation locks, empty and populated inverse/reapply, pending rollback refusal).\n'

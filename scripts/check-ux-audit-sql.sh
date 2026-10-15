@@ -27,7 +27,7 @@ while IFS= read -r migration; do
   # Keep the original twelve contracts at their historical boundary. Pass 2
   # changes admission and captures these bodies, so install it after the
   # original retained inverse/refusal proofs instead of applying it early.
-  if [[ "$migration_name" == 2026102413* || "$migration_name" == 20261025110000_done_trust_legacy_ai.sql ]]; then continue; fi
+  if [[ "$migration_name" == 2026102413* || "$migration_name" == 20261025110000_done_trust_legacy_ai.sql || "$migration_name" == 20261025133000_done_agency_website_decisions.sql || "$migration_name" == 20261025170000_done_integrate_readonly_authorization.sql ]]; then continue; fi
   if [[ "$migration_name" == 2026102412* || "$migration_name" == 20261025120000_done_owner_signup_releases.sql ]]; then
     fingerprint before
     apply "$migration"
@@ -94,6 +94,10 @@ while IFS= read -r migration; do
   pass2_count=$((pass2_count + 1))
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '2026102413*.sql' | sort)
 [[ "$pass2_count" == 5 ]] || { printf 'Expected five pass-2 UX forwards; found %s\n' "$pass2_count" >&2; exit 1; }
+# The done-agency website wrapper consumes agency2's exact claim contract.
+# Install it after both original authority boundaries and populated refusals.
+apply "$repo_root/supabase/migrations/20261025133000_done_agency_website_decisions.sql"
+apply "$repo_root/tests/done-agency-website-decisions-schema.sql"
 # Done-trust follows its exact reservation predecessor and all historical UX
 # inverse rehearsals. Function-only inverse must restore the catalog exactly.
 fingerprint before
@@ -106,6 +110,9 @@ apply "$repo_root/supabase/migrations/20261025110000_done_trust_legacy_ai.sql"
 fingerprint reapplied
 diff -u "$cluster_root/forward.catalog" "$cluster_root/reapplied.catalog" >&2
 apply "$repo_root/tests/done-trust-legacy-ai-schema.sql"
+# Current readers depend on the pass-2 agency identity wrappers, while their
+# historical inverses above must retain the definitions they originally owned.
+apply "$repo_root/supabase/migrations/20261025170000_done_integrate_readonly_authorization.sql"
 # These owned runners retain their distinct isolation, concurrent reservation,
 # selected-agency and populated-safe-inverse evidence on separate clusters.
 for lane_runner in check-ux-trust-email-sql.sh check-ux-trust-ui-budget-sql.sh check-ux-owner-agency-access-sql.sh check-agency-qualification-sql.sh check-ux-owner2-sql.sh check-ux-agency-proposal-identity-sql.sh check-ux-agency-native-pages-sql.sh check-agency2-decisions-sql.sh; do

@@ -2,13 +2,13 @@
 # Bounded function proof against disposable schema fixtures, never a remote DB.
 set -euo pipefail
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$repo/scripts/temp-postgres.sh"
+create_temp_postgres strelva-trust-email-sql strelva-trust-email-socket
 proof_port="$((61000 + ($$ % 3000)))"
-proof_dir=$(mktemp -d /tmp/strelva-trust-email-sql.XXXXXX)
-cleanup() { pg_ctl -D "$proof_dir/data" -m immediate stop >/dev/null 2>&1 || true; rm -rf "$proof_dir"; }
-trap cleanup EXIT
+proof_dir="$cluster_root"
 initdb -D "$proof_dir/data" -A trust --no-locale >/dev/null
-pg_ctl -D "$proof_dir/data" -l "$proof_dir/server.log" -o "-F -k '$proof_dir' -p $proof_port -c listen_addresses=''" -w start >/dev/null
-psql=(psql -X -v ON_ERROR_STOP=1 -h "$proof_dir" -p "$proof_port" -d postgres)
+pg_ctl -D "$proof_dir/data" -l "$proof_dir/server.log" -o "-F -k '$cluster_socket' -p $proof_port -c listen_addresses=''" -w start >/dev/null
+psql=(psql -X -v ON_ERROR_STOP=1 -h "$cluster_socket" -p "$proof_port" -d postgres)
 "${psql[@]}" >/dev/null <<'SQL'
 create role anon; create role authenticated; create role service_role;
 create table workspaces(id uuid primary key, kind text, name text);

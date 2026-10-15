@@ -80,6 +80,12 @@ begin
     (customer_id, owner_id, 'owner', owner_id),
     (agency_id, operator_id, 'member', operator_id)
   on conflict (workspace_id, user_id) do update set role=excluded.role;
+  -- The current neutral agency contract requires an active seat and an
+  -- explicitly staffed operator; accepted work alone grants neither.
+  insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
+    values(customer_id,agency_id,'owner',owner_id);
+  insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by)
+    values(agency_id,customer_id,operator_id,owner_id);
   insert into public.tenants(id, stable_id, site_name, active, subscription_status) values
     ('other-website-draft-a', binding_id, 'Website draft customer', true, 'active')
   on conflict (id) do update set stable_id=excluded.stable_id, site_name=excluded.site_name, active=true, subscription_status='active';

@@ -257,6 +257,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261024400000": "workspace_google_read_grants",
   "20261024500000": "inquiry_forwarding_addresses",
   "20261024600000": "agency_source_connections",
+  "20261025132000": "done_agency_claim_email_predecessor",
   "20261025133000": "done_agency_website_executions",
 };
 

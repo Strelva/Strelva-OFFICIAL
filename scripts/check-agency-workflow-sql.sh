@@ -92,7 +92,6 @@ psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owne
 psql "${psql_args[@]}" --file="$repo_root/tests/application-actor-snapshots.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-change-actor-privacy-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-workflow-schema.sql" >/dev/null
-psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-import-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/website-owner-agency-publish-schema.sql" >/dev/null
 if [[ "$owner_runtime_installed" == true ]]; then
   # Match the installed successor's entire captured function scope, including
@@ -171,6 +170,10 @@ printf 'Agency workflow SQL passed on %s ordered migrations: add client, seat-on
 
 # #251: bounded platform support reads; pure snapshot APIs remain unchanged.
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
+
+# Import clients needs its October 24 schema; keep the complete proof in its
+# dedicated ordered runner after the historical catalog/inverse checks.
+bash "$repo_root/scripts/check-agency-client-import-sql.sh"
 
 # Qualify the UX successor only after historical owner-claim inverses finish.
 bash "$repo_root/scripts/check-ux-audit-sql.sh"

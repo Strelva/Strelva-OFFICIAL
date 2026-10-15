@@ -73,7 +73,57 @@ select pg_temp.signup_assert(not exists(select 1 from public.workspaces where na
 select pg_temp.signup_assert(not has_function_privilege('anon','public.enter_customer_business_with_releases(uuid,text,text,uuid,text,uuid,text,text[])','EXECUTE')
  and not has_function_privilege('authenticated','public.enter_customer_business_with_releases(uuid,text,text,uuid,text,uuid,text,text[])','EXECUTE')
  and has_function_privilege('service_role','public.enter_customer_business_with_releases(uuid,text,text,uuid,text,uuid,text,text[])','EXECUTE'),'server-only enrollment, no browser-selected flags');
+
+-- The real service role reads only actor-bound eligibility, never the private
+-- creation receipts. A subsequently hosted direct business keeps its places;
+-- selecting a retained client did not manufacture direct signup provenance.
+insert into public.tenants(id,site_name) values ('done-signup-hosted','New hosted business');
+insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
+ values ((select stable_id from public.tenants where id='done-signup-hosted'),'done-signup-hosted',
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000001',
+ 'ad120000-0000-4000-8000-000000000016',repeat('1',64),'{}'::jsonb);
+grant select on signup_result to service_role;
+set local role service_role;
+select pg_temp.signup_assert(public.read_direct_owner_places_eligibility(
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000001',' SIGNUP-OWNER@example.test '),
+ 'service-role direct-owner read works after a hosted tenant link');
+select pg_temp.signup_assert(not public.read_direct_owner_places_eligibility(
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000002','signup-other@example.test')
+ and not public.read_direct_owner_places_eligibility((select (value->>'workspaceId')::uuid from signup_result),
+ 'ad120000-0000-4000-8000-000000000001','stale-owner@example.test'),
+ 'outsider and stale verified email have no direct-owner eligibility');
+select pg_temp.signup_assert(not public.read_direct_owner_places_eligibility(
+ 'ad120000-0000-4000-8100-000000000001','ad120000-0000-4000-8000-000000000002','signup-other@example.test'),
+ 'retained owner with a null enrollment receipt stays gated');
+select pg_temp.signup_assert(not has_table_privilege('service_role','public.workspace_creation_receipts','SELECT')
+ and not has_function_privilege('anon','public.read_direct_owner_places_eligibility(uuid,uuid,text)','EXECUTE')
+ and not has_function_privilege('authenticated','public.read_direct_owner_places_eligibility(uuid,uuid,text)','EXECUTE'),
+ 'private receipts stay private and the eligibility reader is server-only');
+do $$ begin
+ begin perform 1 from public.workspace_creation_receipts; raise exception 'expected private receipt refusal';
+ exception when insufficient_privilege then null; end;
+end; $$;
+reset role;
+update public.users set verified_at=null where id='ad120000-0000-4000-8000-000000000001';
+set local role service_role;
+select pg_temp.signup_assert(not public.read_direct_owner_places_eligibility(
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000001','signup-owner@example.test'),
+ 'current verification loss closes the owner places');
+reset role;
+update public.users set verified_at=now() where id='ad120000-0000-4000-8000-000000000001';
+update public.workspace_memberships set role='admin'
+ where workspace_id=(select (value->>'workspaceId')::uuid from signup_result) and user_id='ad120000-0000-4000-8000-000000000001';
+set local role service_role;
+select pg_temp.signup_assert(not public.read_direct_owner_places_eligibility(
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000001','signup-owner@example.test'),
+ 'admin membership cannot use the direct-owner bypass');
+reset role;
 delete from public.workspace_memberships where workspace_id=(select (value->>'workspaceId')::uuid from signup_result) and user_id='ad120000-0000-4000-8000-000000000001';
+set local role service_role;
+select pg_temp.signup_assert(not public.read_direct_owner_places_eligibility(
+ (select (value->>'workspaceId')::uuid from signup_result),'ad120000-0000-4000-8000-000000000001','signup-owner@example.test'),
+ 'revoked membership cannot use a retained signup receipt');
+reset role;
 do $$ begin
  begin perform public.enter_customer_business_with_releases('ad120000-0000-4000-8000-000000000001','signup-owner@example.test','Direct signup',null,
  'Build a website for our business.','ad120000-0000-4000-8000-000000000010',repeat('a',64),array['systems']); raise exception 'expected revoked replay refusal';

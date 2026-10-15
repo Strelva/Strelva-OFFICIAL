@@ -48,4 +48,22 @@ revoke all on function public.enter_customer_business_with_releases(uuid,text,te
   from public,anon,authenticated;
 grant execute on function public.enter_customer_business_with_releases(uuid,text,text,uuid,text,uuid,text,text[])
   to service_role;
+
+-- Receipts remain private even from direct service-role table reads. This
+-- actor-bound read is eligibility only; each destination enforces its own
+-- record/effect authority and the app also retains the current Systems gate.
+create function public.read_direct_owner_places_eligibility(
+  p_workspace_id uuid, p_user_id uuid, p_verified_email text
+) returns boolean language sql stable security definer set search_path = public,pg_temp as $$
+  select exists (
+    select 1 from public.workspace_creation_receipts r
+    join public.workspaces w on w.id=r.workspace_id and w.kind='customer' and w.created_by=p_user_id
+    join public.workspace_memberships m on m.workspace_id=w.id and m.user_id=p_user_id and m.role='owner'
+    join public.users u on u.id=p_user_id and u.verified_at is not null
+      and lower(u.email)=lower(btrim(p_verified_email))
+    where r.workspace_id=p_workspace_id and r.user_id=p_user_id and r.initial_release_flags is not null
+  );
+$$;
+revoke all on function public.read_direct_owner_places_eligibility(uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.read_direct_owner_places_eligibility(uuid,uuid,text) to service_role;
 commit;

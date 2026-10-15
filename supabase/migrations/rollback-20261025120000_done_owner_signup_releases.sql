@@ -9,5 +9,6 @@ do $$ begin
   end if;
 end; $$;
 drop function public.enter_customer_business_with_releases(uuid,text,text,uuid,text,uuid,text,text[]);
+drop function public.read_direct_owner_places_eligibility(uuid,uuid,text);
 alter table public.workspace_creation_receipts drop column initial_release_flags;
 commit;
