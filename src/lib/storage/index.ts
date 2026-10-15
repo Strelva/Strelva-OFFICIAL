@@ -9,6 +9,10 @@ export { DEFAULT_TENANT } from "./core";
 // Content
 export { getContent, getStoredContent, setContent, SECTION_TO_TYPE } from "./content-store";
 
+// Publish (sections, versions, page layout and drafts together)
+export { publishSiteDrafts, SitePublishError } from "./publish-store";
+export type { PublishDraftSection, PublishSiteDraftsInput } from "./publish-store";
+
 // Versions
 export { appendVersion, getVersions, restoreVersion, restoreVersionToDraft } from "./version-store";
 export type { ContentVersion } from "./version-store";
@@ -30,9 +34,6 @@ export type { AuditLogEntry } from "./audit-store";
 
 // Chat
 export { saveChatMessages, loadChatMessages } from "./chat-store";
-
-// Uploads
-export { uploadFile, uploadTenantFile } from "./upload-store";
 
 // Analytics
 export {
@@ -71,6 +72,9 @@ export {
   getLatestSiteSnapshot,
   getSiteSnapshots,
   restoreSiteSnapshot,
+  SiteSnapshotBackupFailedError,
+  SiteSnapshotNotFoundError,
+  SiteSnapshotRestoreFailedError,
   SITE_SNAPSHOT_SECTIONS,
 } from "./site-snapshot-store";
 export type {

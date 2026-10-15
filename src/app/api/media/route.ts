@@ -4,10 +4,7 @@ import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/plat
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { listTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
-import { verifyRasterImage } from "@/lib/image-signature";
-
-const MAX_SIZE = 5 * 1024 * 1024;
+import { listTenantMedia, deleteTenantMedia, uploadTenantImageFile, mediaUploadErrorResponse } from "@/platform/infra/media/store";
 
 // --- GET: List image assets for this tenant (Vercel Blob) ---
 
@@ -53,32 +50,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
+  try {
+    const asset = await uploadTenantImageFile(tenant, file);
+    return NextResponse.json(asset, { status: 201 });
+  } catch (err) {
+    const { status, error } = mediaUploadErrorResponse(err);
+    return NextResponse.json({ error }, { status });
   }
-
-  // Allowlist raster image types only. `startsWith("image/")` would accept
-  // image/svg+xml — an SVG can carry inline script, so it's a stored-XSS vector
-  // when served from a tenant's domain. Block SVG (and anything non-raster).
-  const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
-  if (!ALLOWED.has(file.type)) {
-    return NextResponse.json(
-      { error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF." },
-      { status: 400 }
-    );
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-
-  // `file.type` is client-supplied — sniff the real bytes so a declared
-  // image/png can't smuggle an SVG/HTML/script payload (stored XSS).
-  const verified = verifyRasterImage(buffer, ALLOWED);
-  if (!verified.ok) {
-    return NextResponse.json({ error: verified.reason }, { status: 400 });
-  }
-
-  const asset = await uploadTenantMedia(tenant, buffer, file.name, file.type);
-  return NextResponse.json(asset, { status: 201 });
 }
 
 // --- DELETE: Remove an image asset owned by this tenant ---

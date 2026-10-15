@@ -16,6 +16,7 @@ const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockGetAllTenants = vi.hoisted(() => vi.fn());
 const mockPruneOldEvents = vi.hoisted(() => vi.fn());
 
+const mockRevalidateClientSite = vi.hoisted(() => vi.fn());
 const devStores = vi.hoisted(() => new Map<string, Record<string, unknown>>());
 
 vi.mock("@/lib/storage/core", () => ({
@@ -53,6 +54,12 @@ vi.mock("@/lib/storage", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/revalidate-client", () => ({
+  revalidateClientSite: (...args: unknown[]) => mockRevalidateClientSite(...args),
+}));
+
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
 vi.mock("@/lib/tenants", () => ({
   getAllTenants: (...args: unknown[]) => mockGetAllTenants(...args),
 }));
@@ -89,6 +96,7 @@ beforeEach(() => {
   });
   mockLogActivity.mockResolvedValue(undefined);
   mockLogAuditEvent.mockResolvedValue(undefined);
+  mockRevalidateClientSite.mockResolvedValue({ success: true, skipped: true });
   mockGetAllTenants.mockResolvedValue([{ id: "demo", active: true }]);
   mockPruneOldEvents.mockResolvedValue(2);
 });
@@ -180,6 +188,78 @@ describe("site snapshots", () => {
     expect(mockLogActivity).toHaveBeenCalledWith(expect.objectContaining({
       text: "Restored full site from Manual backup",
     }), "demo");
+  });
+
+  async function restoreViaRoute(snapshotId?: string) {
+    const { POST } = await import("@/app/api/site-snapshots/route");
+    const post = (body: Record<string, unknown>) => POST(new Request("http://localhost/api/site-snapshots", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }));
+    const id = snapshotId ?? (await (await post({ action: "create" })).json()).snapshot.id;
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSetContent.mockClear();
+    return post({ action: "restore", snapshotId: id });
+  }
+
+  it("restoring an unknown backup is a 404", async () => {
+    const response = await restoreViaRoute("snap_missing");
+    expect(response.status).toBe(404);
+  });
+
+  it("a failed section write rolls back and says so", async () => {
+    const { POST } = await import("@/app/api/site-snapshots/route");
+    const created = await (await POST(new Request("http://localhost/x", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create" }),
+    }))).json();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSetContent.mockClear();
+    mockSetContent.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("disk"));
+    const response = await POST(new Request("http://localhost/x", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restore", snapshotId: created.snapshot.id }),
+    }));
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({ restored: false, rolledBack: true, sectionsNeedingAttention: [] });
+    // The first section was written, then put back with its prior content.
+    expect(mockSetContent).toHaveBeenCalledTimes(3);
+    expect(mockSetContent.mock.calls[2]![1]).toMatchObject({ value: `${mockSetContent.mock.calls[0]![0]}-content` });
+  });
+
+  it("names the sections that could not be put back", async () => {
+    const { POST } = await import("@/app/api/site-snapshots/route");
+    const created = await (await POST(new Request("http://localhost/x", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create" }),
+    }))).json();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mockSetContent.mockClear();
+    mockSetContent
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("disk"))
+      .mockRejectedValueOnce(new Error("still down"));
+    const response = await POST(new Request("http://localhost/x", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "restore", snapshotId: created.snapshot.id }),
+    }));
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.rolledBack).toBe(false);
+    expect(body.sectionsNeedingAttention).toHaveLength(1);
+    expect(body.error).toContain(body.sectionsNeedingAttention[0]);
+  });
+
+  it("a bookkeeping failure after a successful restore is still a 200", async () => {
+    mockLogActivity.mockImplementation(async (entry: { text: string }) => {
+      if (entry.text.startsWith("Restored")) throw new Error("activity down");
+    });
+    const response = await restoreViaRoute();
+    expect(response.status).toBe(200);
+  });
+
+  it("a successful restore refreshes the live site and reports it", async () => {
+    const response = await restoreViaRoute();
+    expect(response.status).toBe(200);
+    expect(mockRevalidateClientSite).toHaveBeenCalledWith("demo", "all");
+    await expect(response.json()).resolves.toMatchObject({ liveSite: { status: "not_configured" } });
   });
 
   it("maintenance creates one daily backup per active tenant while pruning events", async () => {

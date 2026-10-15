@@ -8,7 +8,16 @@ vi.mock("@vercel/blob", () => ({ list: mockList, put: mockPut, del: mockDel }));
 // Blob-only (post-transition) behavior: no Sanity legacy read/delete.
 vi.mock("@/lib/storage/core", () => ({ hasSanity: false }));
 
+const mockFs = vi.hoisted(() => ({ mkdir: vi.fn(async (..._a: unknown[]) => undefined), writeFile: vi.fn(async (..._a: unknown[]) => undefined) }));
+vi.mock("node:fs/promises", () => ({ default: mockFs, ...mockFs }));
+
 import { listTenantMedia, collectTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
+import {
+  MediaStoreUnavailableError,
+  MediaUploadRejectedError,
+  mediaUploadErrorResponse,
+  uploadTenantImageFile,
+} from "@/platform/infra/media/store";
 
 const BLOB = "https://abc123.public.blob.vercel-storage.com";
 
@@ -27,6 +36,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   delete process.env.BLOB_READ_WRITE_TOKEN;
+  vi.unstubAllEnvs();
 });
 
 describe("listTenantMedia", () => {
@@ -175,5 +185,69 @@ describe("tenant-id isolation guard", () => {
     await expect(uploadTenantMedia("a/b", Buffer.from("x"), "x.jpg", "image/jpeg")).rejects.toThrow(/Invalid tenant/);
     expect(mockDel).not.toHaveBeenCalled();
     expect(mockPut).not.toHaveBeenCalled();
+  });
+});
+
+function imageFile(bytes: Buffer, name: string, type: string): File {
+  return new File([new Uint8Array(bytes)], name, { type });
+}
+
+describe("uploadTenantImageFile", () => {
+  it("rejects an oversize file", async () => {
+    const big = imageFile(Buffer.alloc(5 * 1024 * 1024 + 1), "big.png", "image/png");
+    await expect(uploadTenantImageFile("gldf", big)).rejects.toBeInstanceOf(MediaUploadRejectedError);
+  });
+
+  it("rejects an SVG declared as image/png", async () => {
+    const svg = imageFile(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'), "x.png", "image/png");
+    await expect(uploadTenantImageFile("gldf", svg)).rejects.toBeInstanceOf(MediaUploadRejectedError);
+    expect(mockPut).not.toHaveBeenCalled();
+  });
+
+  it("rejects a declared type outside the raster allowlist", async () => {
+    await expect(uploadTenantImageFile("gldf", imageFile(pngHeader(1, 1), "x.svg", "image/svg+xml")))
+      .rejects.toThrow(/Invalid file type/);
+  });
+
+  it("stores a valid PNG under the media/{tenant}/ prefix", async () => {
+    mockPut.mockResolvedValue({ url: `${BLOB}/media/gldf/u/10x10/p.png` });
+    const asset = await uploadTenantImageFile("gldf", imageFile(pngHeader(10, 10), "p.png", "image/png"));
+    expect(mockPut.mock.calls[0]![0]).toMatch(/^media\/gldf\//);
+    expect(asset.url).toContain("/media/gldf/");
+  });
+
+  it("fails closed without a Blob token outside local development", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    await expect(uploadTenantImageFile("gldf", imageFile(pngHeader(10, 10), "p.png", "image/png")))
+      .rejects.toBeInstanceOf(MediaStoreUnavailableError);
+    expect(mockFs.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("writes to local disk only in next dev without a token", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const asset = await uploadTenantImageFile("gldf", imageFile(pngHeader(10, 10), "p.png", "image/png"));
+    expect(String(mockFs.writeFile.mock.calls[0]![0])).toContain("public/uploads/media/gldf/");
+    expect(asset.url).toMatch(/^\/uploads\/media\/gldf\//);
+  });
+
+  it("still fails closed in a Vercel preview even when NODE_ENV is development", async () => {
+    delete process.env.BLOB_READ_WRITE_TOKEN;
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    await expect(uploadTenantImageFile("gldf", imageFile(pngHeader(10, 10), "p.png", "image/png")))
+      .rejects.toBeInstanceOf(MediaStoreUnavailableError);
+    expect(mockFs.writeFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("mediaUploadErrorResponse", () => {
+  it("maps rejected to 400, unavailable to 503 and anything else to 500", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(mediaUploadErrorResponse(new MediaUploadRejectedError("File too large (max 5MB)"))).toEqual({ status: 400, error: "File too large (max 5MB)" });
+    expect(mediaUploadErrorResponse(new MediaStoreUnavailableError("x")).status).toBe(503);
+    expect(mediaUploadErrorResponse(new Error("boom"))).toEqual({ status: 500, error: "Upload failed." });
   });
 });

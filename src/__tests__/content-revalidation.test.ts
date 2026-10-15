@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
+import { clientRevalidationTargetForCollection, clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 
 describe("content revalidation targeting", () => {
   it("revalidates only the homepage for ordinary section edits", () => {
@@ -24,5 +24,20 @@ describe("content revalidation targeting", () => {
 
   it("revalidates the full site when page structure changes", () => {
     expect(clientRevalidationTargetForSections(["hero"], { pageConfigChanged: true })).toBe("all");
+  });
+});
+
+describe("collection revalidation targeting", () => {
+  it("refreshes the blog index and entry page with collection tags", () => {
+    expect(clientRevalidationTargetForCollection("blog", "hello")).toEqual({
+      paths: ["/", "/blog", "/blog/hello"],
+      tags: ["collections", "collection:blog", "collection:blog:hello"],
+    });
+  });
+  it("relies on tags for types without a conventional route", () => {
+    expect(clientRevalidationTargetForCollection("product", "mug")).toEqual({
+      paths: ["/"],
+      tags: ["collections", "collection:product", "collection:product:mug"],
+    });
   });
 });

@@ -2382,6 +2382,19 @@
           "rollbackStatus": "Guarded inverse refuses a recorded Outlook holder, an App declaring outlook_calendar, and later function or ACL changes; verified on a disposable local cluster only."
         }
       ]
+    },
+    {
+      "id": "sites-atomic-publish-2026-10-15",
+      "status": "Held and unapplied. Atomic site editor publish RPC (service_role only) and content/page_config updated_at triggers. Disposable SQL UNRUN; no production application authorized.",
+      "items": [
+        {
+          "file": "20261026160000_sites_atomic_publish.sql",
+          "sha256": "2a66755e700c916d29d38f5d0199c20bf850d6553d294918574ab6e20ac0063f",
+          "rollback": "rollback-20261026160000_sites_atomic_publish.sql",
+          "rollbackSha256": "4ce718e52887600f2701dbeba9fd4de449fced08d377126238bba5415fd8ab7f",
+          "rollbackStatus": "Drops the function and both triggers only; never undoes accepted publications. Disposable SQL execution UNRUN."
+        }
+      ]
     }
   ]
 }

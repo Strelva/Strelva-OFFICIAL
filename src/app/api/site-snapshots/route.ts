@@ -1,12 +1,19 @@
 import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   createSiteSnapshot,
   getSiteSnapshots,
   logActivity,
   logAuditEvent,
+  recordSectionUpdate,
   restoreSiteSnapshot,
+  SiteSnapshotBackupFailedError,
+  SiteSnapshotNotFoundError,
+  SiteSnapshotRestoreFailedError,
 } from "@/lib/storage";
+import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
+import { refreshLiveSite } from "@/lib/live-site-refresh";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import {
   getActorContext,
@@ -88,9 +95,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "snapshotId required" }, { status: 400 });
     }
 
+    let result: Awaited<ReturnType<typeof restoreSiteSnapshot>>;
     try {
-      const result = await restoreSiteSnapshot(tenant, snapshotId, { actor });
+      result = await restoreSiteSnapshot(tenant, snapshotId, { actor });
+    } catch (error) {
+      if (error instanceof SiteSnapshotNotFoundError) {
+        return NextResponse.json({ error: error.message }, { status: 404 });
+      }
+      if (error instanceof SiteSnapshotBackupFailedError) {
+        return NextResponse.json({ error: error.message, restored: false }, { status: 503 });
+      }
+      if (error instanceof SiteSnapshotRestoreFailedError) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            restored: false,
+            rolledBack: error.rolledBack,
+            sectionsNeedingAttention: error.sectionsNeedingAttention,
+          },
+          { status: 500 },
+        );
+      }
+      console.error("[site-snapshots] restore failed", error);
+      return NextResponse.json({ error: "Snapshot restore failed." }, { status: 500 });
+    }
 
+    // The restore is done. Bookkeeping can never turn it into an error.
+    try {
       await logActivity({
         text: actor.isImpersonating
           ? `Strelva admin restored full site from ${result.restored.label}`
@@ -107,8 +138,12 @@ export async function POST(request: Request) {
         ],
         suppressEvent: true,
       }, tenant);
+    } catch (err) {
+      console.error("[site-snapshots] activity not logged", err);
+    }
 
-      if (actor.isImpersonating) {
+    if (actor.isImpersonating) {
+      try {
         await logAuditEvent({
           tenant,
           actor,
@@ -120,15 +155,22 @@ export async function POST(request: Request) {
             preRestoreSnapshotId: result.preRestore.id,
           },
         });
+      } catch (err) {
+        console.error("[site-snapshots] audit not logged", err);
       }
-
-      return NextResponse.json(result);
-    } catch (error) {
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : "Snapshot restore failed." },
-        { status: 404 },
-      );
     }
+
+    for (const section of result.restoredSections) {
+      try {
+        await recordSectionUpdate(section, tenant);
+      } catch (err) {
+        console.error("[site-snapshots] section timestamp not recorded", section, err);
+      }
+    }
+
+    revalidatePath("/");
+    const liveSite = await refreshLiveSite(tenant, clientRevalidationTargetForSections(result.restoredSections));
+    return NextResponse.json({ ...result, liveSite });
   }
 
   return NextResponse.json({ error: "Unsupported action." }, { status: 400 });

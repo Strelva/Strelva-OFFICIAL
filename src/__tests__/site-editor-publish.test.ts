@@ -14,8 +14,7 @@ const mockListDrafts = vi.fn();
 const mockGetDraftContent = vi.fn();
 const mockRestoreVersionToDraft = vi.fn();
 const mockGetContent = vi.fn();
-const mockSetContent = vi.fn();
-const mockAppendVersion = vi.fn();
+const mockPublishSiteDrafts = vi.fn();
 const mockRecordSectionUpdate = vi.fn();
 const mockLogActivity = vi.fn();
 const mockLogAuditEvent = vi.fn();
@@ -80,8 +79,10 @@ vi.mock("@/lib/storage", () => ({
   getDraftContent: (...args: unknown[]) => mockGetDraftContent(...args),
   restoreVersionToDraft: (...args: unknown[]) => mockRestoreVersionToDraft(...args),
   getContent: (...args: unknown[]) => mockGetContent(...args),
-  setContent: (...args: unknown[]) => mockSetContent(...args),
-  appendVersion: (...args: unknown[]) => mockAppendVersion(...args),
+  publishSiteDrafts: (...args: unknown[]) => mockPublishSiteDrafts(...args),
+  SitePublishError: class SitePublishError extends Error {
+    constructor(message: string, readonly rolledBack: boolean, readonly sectionsNeedingAttention: string[] = []) { super(message); }
+  },
   recordSectionUpdate: (...args: unknown[]) => mockRecordSectionUpdate(...args),
   logActivity: (...args: unknown[]) => mockLogActivity(...args),
   logAuditEvent: (...args: unknown[]) => mockLogAuditEvent(...args),
@@ -136,8 +137,7 @@ describe("site editor publish routes", () => {
     mockGetDraftContent.mockResolvedValue(null);
     mockRestoreVersionToDraft.mockResolvedValue(null);
     mockGetContent.mockResolvedValue({ headline: "Live headline" });
-    mockSetContent.mockResolvedValue(undefined);
-    mockAppendVersion.mockResolvedValue(undefined);
+    mockPublishSiteDrafts.mockResolvedValue({ versionIds: { hero: "v_1" } });
     mockRecordSectionUpdate.mockResolvedValue(undefined);
     mockLogActivity.mockResolvedValue(undefined);
     mockLogAuditEvent.mockResolvedValue(undefined);
@@ -193,10 +193,12 @@ describe("site editor publish routes", () => {
       publishedPageConfig: true,
       liveSite: { status: "revalidated" },
     });
-    expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant");
-    expect(mockClearDraft).toHaveBeenCalledWith("hero", "test-tenant");
-    expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
-    expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
+    expect(mockPublishSiteDrafts).toHaveBeenCalledExactlyOnceWith({
+      tenant: "test-tenant",
+      sections: [{ section: "hero", data: HERO_DRAFT, changes: expect.any(Array) }],
+      pageConfig: PAGE_CONFIG,
+      author: "user",
+    });
     expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", "all");
   });
 
@@ -207,7 +209,7 @@ describe("site editor publish routes", () => {
     const response = await POST();
     expect(await response.json()).toEqual({ success: true, publishedSections: ["hero"], publishedPageConfig: false, liveSite: { status: "revalidated" } });
     expect(mockTenantReleaseFlagEnabled).not.toHaveBeenCalled();expect(mockGetTenantConfig).toHaveBeenCalledOnce();expect(mockPublicReadBack).not.toHaveBeenCalled(); // Existing template-manifest routing reads the tenant.
-    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
+    expect(mockPublishSiteDrafts).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
     expect(mockAddEvent).not.toHaveBeenCalled();
   });
 
@@ -234,7 +236,7 @@ describe("site editor publish routes", () => {
     const response = await POST();
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, liveSite: { status: "revalidated" }, readBack: { ok: false, status: "unverified" } });
-    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockAppendVersion).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();expect(mockPublicReadBack).toHaveBeenCalledOnce();
+    expect(mockPublishSiteDrafts).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();expect(mockPublicReadBack).toHaveBeenCalledOnce();
     expect(mockAddEvent).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ tenantId: "test-tenant", type: "change_verify_failed", status: "pending",
       metadata: expect.objectContaining({ publicationAccepted: true, reviewAudience: "operator", sections: ["hero"], status: "unverified" }) }));
   });
@@ -250,7 +252,7 @@ describe("site editor publish routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, readBack: { ok: false, status: "mismatch" } });
     expect(mockAddEvent).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ body: "Published headline is missing.", type: "change_verify_failed" }));
-    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockAppendVersion).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
+    expect(mockPublishSiteDrafts).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
   });
 
   it("POST /api/publish starts no observation or operator event without confirmed rollout authority", async () => {
@@ -260,7 +262,30 @@ describe("site editor publish routes", () => {
     const { POST } = await import("@/app/api/publish/route");
     expect(await (await POST()).json()).toMatchObject({ success: true });
     expect(mockPublicReadBack).not.toHaveBeenCalled();expect(mockAddEvent).not.toHaveBeenCalled();
-    expect(mockSetContent).toHaveBeenCalledOnce();
+    expect(mockPublishSiteDrafts).toHaveBeenCalledOnce();
+  });
+
+  it("POST /api/publish returns 503 and does nothing else when the publish is rolled back", async () => {
+    const { SitePublishError } = await import("@/lib/storage");
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockPublishSiteDrafts.mockRejectedValue(new SitePublishError("Nothing was published. Try again.", true));
+    const { POST } = await import("@/app/api/publish/route");
+    const response = await POST();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ published: false, rolledBack: true, error: "Nothing was published. Try again." });
+    expect(mockRevalidateClientSite).not.toHaveBeenCalled();
+    expect(mockLogActivity).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/publish stays a success when audit or activity logging fails after the commit", async () => {
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockLogAuditEvent.mockRejectedValue(Error("audit unavailable"));
+    mockLogActivity.mockRejectedValue(Error("activity unavailable"));
+    const { POST } = await import("@/app/api/publish/route");
+    const response = await POST();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, liveSite: { status: "not_configured" } });
   });
 
   it("POST /api/publish creates no failed-publication event when no changes were published", async () => {
@@ -268,7 +293,7 @@ describe("site editor publish routes", () => {
     mockPublicReadBack.mockResolvedValue({ ok: false, status: "unverified", detail: "No observable content values." });
     const { POST } = await import("@/app/api/publish/route");
     expect(await (await POST()).json()).toMatchObject({ success: true, publishedSections: [], publishedPageConfig: false });
-    expect(mockSetContent).not.toHaveBeenCalled();expect(mockAddEvent).not.toHaveBeenCalled();
+    expect(mockPublishSiteDrafts).not.toHaveBeenCalled();expect(mockAddEvent).not.toHaveBeenCalled();
   });
 
   it("POST /api/content/:section/versions restores history into a draft", async () => {
@@ -295,7 +320,7 @@ describe("site editor publish routes", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ success: true, draft: true, version });
     expect(mockRestoreVersionToDraft).toHaveBeenCalledWith("hero", "v_older", "test-tenant");
-    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockPublishSiteDrafts).not.toHaveBeenCalled();
   });
 
   it("POST /api/content/:section/versions returns 404 without writing when the version is missing", async () => {
@@ -312,7 +337,7 @@ describe("site editor publish routes", () => {
 
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Version not found" });
-    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockPublishSiteDrafts).not.toHaveBeenCalled();
     expect(mockRevalidateClientSite).not.toHaveBeenCalled();
     expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
@@ -332,7 +357,7 @@ describe("site editor publish routes", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "Failed to restore" });
-    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockPublishSiteDrafts).not.toHaveBeenCalled();
     expect(mockRevalidateClientSite).not.toHaveBeenCalled();
     expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
@@ -357,7 +382,7 @@ describe("site editor publish routes", () => {
 
     expect(response.status).toBe(403);
     expect(mockRestoreVersionToDraft).not.toHaveBeenCalled();
-    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockPublishSiteDrafts).not.toHaveBeenCalled();
     expect(mockRevalidateClientSite).not.toHaveBeenCalled();
     expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });

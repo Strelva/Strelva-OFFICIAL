@@ -17,6 +17,7 @@ const supa = vi.hoisted(() => ({
   result: { data: null as unknown, error: null as unknown },
   lastTable: "",
   lastInsert: undefined as unknown,
+  insertResult: null as null | { data: unknown; error: unknown },
 }));
 
 // Chainable + thenable builder: `await builder()` resolves the list result,
@@ -24,19 +25,19 @@ const supa = vi.hoisted(() => ({
 // the written row, and every other method returns a fresh builder so
 // `.from(t).select("*").eq(...).limit(1).maybeSingle()` and
 // `.from(t).insert(row)` both work.
-function builder(): unknown {
-  const p = Promise.resolve(supa.result);
+function builder(result: { data: unknown; error: unknown } = supa.result): unknown {
+  const p = Promise.resolve(result);
   return new Proxy(
     {},
     {
       get(_t, prop) {
         if (prop === "then") return p.then.bind(p);
         if (prop === "maybeSingle" || prop === "single")
-          return () => Promise.resolve(supa.result);
+          return () => Promise.resolve(result);
         if (prop === "insert" || prop === "upsert")
           return (v: unknown) => {
             supa.lastInsert = v;
-            return builder();
+            return builder(supa.insertResult ?? supa.result);
           };
         return () => builder();
       },
@@ -70,6 +71,9 @@ const { getContent, setContent } = contentMocks;
 import {
   createSiteSnapshot,
   getSiteSnapshots,
+  restoreSiteSnapshot,
+  SiteSnapshotBackupFailedError,
+  SiteSnapshotNotFoundError,
 } from "@/lib/storage/site-snapshot-store";
 
 beforeEach(() => {
@@ -79,6 +83,7 @@ beforeEach(() => {
   supa.result = { data: null, error: null };
   supa.lastTable = "";
   supa.lastInsert = undefined;
+  supa.insertResult = null;
   getContent.mockClear();
   setContent.mockClear();
 });
@@ -202,5 +207,30 @@ describe("site-snapshot-store postgres path", () => {
     expect(insert.actor_user_id).toBeNull();
     expect(insert.actor_email).toBe("legacy@example.com");
     expect(insert.actor_is_super_admin).toBe(true);
+  });
+
+  const storedRow = {
+    id: "snap_1", tenant_id: "gldf", label: "Known good", reason: "manual", author: "user",
+    created_at: "2026-10-01T00:00:00.000Z", sections: ["hero"], data: { hero: { headline: "Old" } }, status: "available",
+  };
+
+  it("restoreSiteSnapshot stops before any write when the safety backup cannot be saved", async () => {
+    supa.result = { data: storedRow, error: null };
+    supa.insertResult = { data: null, error: new Error("insert failed") };
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(restoreSiteSnapshot("gldf", "snap_1")).rejects.toBeInstanceOf(SiteSnapshotBackupFailedError);
+    expect(setContent).not.toHaveBeenCalled();
+  });
+
+  it("restoreSiteSnapshot does not read a database error as not found", async () => {
+    supa.result = { data: null, error: new Error("connection reset") };
+    const err = await restoreSiteSnapshot("gldf", "snap_1").catch((e) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(SiteSnapshotNotFoundError);
+  });
+
+  it("restoreSiteSnapshot reports a missing row as not found", async () => {
+    supa.result = { data: null, error: null };
+    await expect(restoreSiteSnapshot("gldf", "snap_1")).rejects.toBeInstanceOf(SiteSnapshotNotFoundError);
   });
 });
