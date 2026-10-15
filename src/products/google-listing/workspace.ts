@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible, assertGoogleBindingEligible, guardGoogleClient } from "./connection-policy";
 import { nativeGoogleGrantGeneration, assertCurrentNativeGoogleGrant } from "./native/contracts";
 import { nativeGoogleGrantPinSchema } from "@/platform/make-real/google-provider-reference";
 import { assertGoogleDispatchGrant } from "./dispatch-grant";
@@ -40,6 +41,7 @@ const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draf
 /** Existing approval events own the exact frozen copy, never a separate approval store. */
 export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>, version?: { pin: GoogleVersionPin; hours?: z.infer<typeof factValueSchemas.hours> | null }): Promise<UnifiedEvent> {
   const input = googleDraftInputSchema.parse(raw);
+  await assertGoogleConnectionEligible(actor, input.workspaceId);
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor))) throw new Error("Publishing is not enabled for this business.");
   if (!(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can prepare Google changes.");
   const snapshot = await readPublishingSnapshot(actor, input.workspaceId);
@@ -103,10 +105,11 @@ export function isGoogleListingEvent(event: UnifiedEvent): boolean { return even
  * just before the call.
  */
 export function asActingAgency(ctx: ListingContext, actor: WorkspaceActor): ListingContext {
-  return { ...ctx, authorizeProvider: async () => { await assertActingAgency(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
+  return { ...ctx, connectionActor: actor, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(actor, ctx.workspaceId)), authorizeProvider: async () => { await assertActingAgency(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
 }
 
-export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string, nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema>): Promise<ListingContext> {
+export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string, nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema>, actor: WorkspaceActor | null = null): Promise<ListingContext> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const deps = await defaultTenantReplyDeps();
   const nativeWorkspace = publishingWorkspaceId(tenantId);
   const target = nativeWorkspace ? { workspaceId: nativeWorkspace } : await deps.bindingTarget(tenantId);
@@ -115,6 +118,8 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   if (!grant || grant.status !== "connected") throw new Error("Google disconnected. Reconnect Google to continue.");
   const { readGoogleBindingForTenant } = await import("@/platform/account-bindings/store");
   const binding = await readGoogleBindingForTenant(tenantId);
+  if (!binding) throw new Error("Reconnect to record whose account this is.");
+  await assertGoogleBindingEligible(actor, workspaceId, binding.id);
   const saved = binding?.workspaceId === workspaceId ? binding.locations.find(location => location.locationId === locationId) : undefined;
   const checkNative = async () => {
     if (!nativeGrant) return;
@@ -131,11 +136,13 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   const control = await readListingControl(workspaceId, locationId);
   // Database/event awaits can outlive the captured consent. Check before refresh.
   await checkNative();
-  const token = await deps.accessToken(grant);
+  await assertGoogleConnectionEligible(actor, workspaceId);
+  const token = await deps.accessToken(grant, actor);
   if (!token) throw new Error("Reconnect Google to continue.");
   await checkNative();
   if (nativeGrant && token !== grant.accessToken) throw new Error("The captured native Google access token changed.");
   const authorize = async () => {
+    await assertGoogleBindingEligible(actor, workspaceId, binding.id);
     const current = await deps.grant(tenantId);
     const liveBinding = nativeGrant ? await assertCurrentNativeGoogleGrant(workspaceId, locationId, nativeGrant) : await readGoogleBindingForTenant(tenantId);
     assertGoogleDispatchGrant(grant, current, liveBinding, workspaceId, locationId);
@@ -148,7 +155,7 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
     getLocation: async (...args: Parameters<typeof rawClient.getLocation>) => { await authorize(); return rawClient.getLocation(...args); },
     getPost: async (...args: Parameters<typeof rawClient.getPost>) => { await authorize(); return rawClient.getPost(...args); },
   } : rawClient;
-  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(client, workspaceId, locationId, undefined, authorize), receipts: deps.receipts() };
+  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, connectionActor: actor, client: guardGoogleClient(paceGoogleWrites(client, workspaceId, locationId, undefined, authorize), () => assertGoogleBindingEligible(actor, workspaceId, binding.id)), receipts: deps.receipts() };
 }
 
 export type GoogleExecutionResult = { accepted: boolean; verified?: boolean; receiptId?: string; reason?: string };
@@ -163,6 +170,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
   if (input.event.tenantId !== input.tenantId || input.actorId === "auto-reply-policy") return { accepted: false, reason: "permission_denied" };
   const authorization = await deps.authorize({ ...input, event: { ...input.event, metadata: { ...input.event.metadata, businessId: metadata.workspaceId } } });
   if (!authorization.allowed) return { accepted: false, reason: authorization.reason };
+  await assertGoogleConnectionEligible(authorization.actor, metadata.workspaceId);
   if (metadata.draft.action !== "post" && !metadata.version && !metadata.maintenance) {
     const { getSupabase } = await import("@/platform/infra/db/client");
     const db = getSupabase();
@@ -177,13 +185,14 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     await deps.maintenance({preparationId:metadata.maintenance.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:metadata.maintenance.bindingId,locationId:metadata.locationId,draft:metadata.draft});
   }
   if (metadata.nativeGrant) await assertCurrentNativeGoogleGrant(metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
-  const ctx = await deps.context(input.tenantId, metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
+  const ctx = await deps.context(input.tenantId, metadata.workspaceId, metadata.locationId, metadata.nativeGrant, authorization.actor);
   if (metadata.version && (!(await systemsReleaseEnabledForWorkspace(metadata.workspaceId, authorization.viewer)) || !(await googleVersionDraftCurrent({ workspaceId: metadata.workspaceId, locationId: metadata.locationId, bindingId: ctx.bindingId, pin: metadata.version, draft: metadata.draft })))) return { accepted: false, reason: "This Google Version changed. Prepare a fresh draft." };
   if (metadata.maintenance) {
     const recheck = () => deps.maintenance({preparationId:metadata.maintenance!.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
     await recheck();
   }
   ctx.authorizeService = async () => {
+    await assertGoogleConnectionEligible(authorization.actor, metadata.workspaceId);
     if (metadata.nativeGrant) await assertCurrentNativeGoogleGrant(metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
     const current = await deps.authorize(input);
     if (!current.allowed || (input.actorId.startsWith("make-real-service:") && current.bindingId !== ctx.bindingId)) throw new Error("Google service authority ended before dispatch.");
@@ -217,10 +226,11 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
 export async function undoWorkspaceGoogleChange(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; receiptId: string; nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema> }): Promise<ListingWriteOutcome> {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can undo this Google change.");
   if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This Google change needs the business owner's instruction.");
-  return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId, input.nativeGrant), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId }, retryFailed: true });
+  return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId, input.nativeGrant, actor), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId }, retryFailed: true });
 }
 
 export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: string) {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const snapshot = await readPublishingSnapshot(actor, workspaceId);
   const { readLinkedSites } = await import("@/platform/owner-entry/linked-sites");
   const { sites } = await readLinkedSites(actor, workspaceId);
@@ -238,7 +248,7 @@ export { setListingPaused };
 export async function changeWorkspaceGoogleReply(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; reviewId: string; text?: string; withdraw: boolean; commandId: string }): Promise<ListingWriteOutcome> {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can change a Google reply.");
   if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This reply needs the business owner's instruction.");
-  const ctx = await tenantListingContext(input.tenantId, input.workspaceId, input.locationId);
+  const ctx = await tenantListingContext(input.tenantId, input.workspaceId, input.locationId, undefined, actor);
   const authority = { kind: "owner_approval" as const, actor: actor.userId };
   const idempotencyKey = `reply-command:${input.workspaceId}:${z.string().uuid().parse(input.commandId)}`;
   const outcome = await (input.withdraw ? withdrawReviewReply(ctx, { reviewId: input.reviewId, authority, idempotencyKey, retryFailed: true }) : postReviewReply(ctx, { reviewId: input.reviewId, text: input.text ?? "", authority, idempotencyKey, retryFailed: true }));

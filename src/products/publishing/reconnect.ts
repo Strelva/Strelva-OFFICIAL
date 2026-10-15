@@ -71,7 +71,7 @@ export function reconnectStore(db: ReconnectDb | null = getSupabase() as unknown
 export type ReconnectStore = ReturnType<typeof reconnectStore>;
 
 export async function reconnectReleaseEnabled(workspaceId: string): Promise<boolean> {
-  return googleBindingsEnabled() && bindingEncryptionReady() && await workspaceReleaseFlagEnabled("publishing", workspaceId);
+  return googleBindingsEnabled() && bindingEncryptionReady() && await workspaceReleaseFlagEnabled("publishing", workspaceId) && (await (await import("@/platform/account-bindings/store")).googleConnectionEligibility(null, workspaceId)).eligible;
 }
 export function reconnectAppOrigin(): string {
   const url = new URL(process.env.NEXT_PUBLIC_APP_URL || "");
@@ -126,6 +126,7 @@ export const RECONNECT_DIFFERENT_ACCOUNT = "That's a different Google account fr
  * first profile from the owner's account. */
 export async function finishGoogleReconnect(target: ReconnectTarget, code: string, fetcher: typeof fetch = fetch): Promise<void> {
   const startedAt = Date.now();
+  await (await import("@/platform/account-bindings/store")).assertGoogleBindingEligible(null, target.workspaceId, target.bindingId);
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("Google reconnect is not configured.");

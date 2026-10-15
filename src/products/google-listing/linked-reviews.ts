@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible } from "./connection-policy";
 import { getReviews } from "@/lib/reviews";
 import { getConnection } from "@/lib/connections";
 import { getEvents } from "@/lib/events";
@@ -85,6 +86,7 @@ export function reviewView(review: ReviewItem, drafts: ReadonlyMap<string, { rep
 
 /** Throws WorkspaceAccessError for anyone who isn't a direct member of this business. */
 export async function readWorkspaceReviews(actor: WorkspaceActor, workspaceId: string, dependencies: ReviewDependencies = defaults): Promise<WorkspaceReviews> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   const { sites, denied } = await dependencies.sites(actor, workspaceId);
   return {
     denied,

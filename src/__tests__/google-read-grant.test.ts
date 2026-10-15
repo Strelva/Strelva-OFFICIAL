@@ -1,3 +1,7 @@
+// Explicit approved platform access for these existing provider-flow fixtures.
+vi.mock("@/platform/connections/access", () => ({readProviderAccess: () => ({provider:"google_business_profile",through:{kind:"platform"},approval:"approved"})}));
+vi.mock("@/platform/connections/server", () => ({connectionEligibilityFor: async () => ({eligible:true,through:{kind:"platform"}})}));
+vi.mock("@/platform/connections/holders", () => ({recordConnectionHolder: async () => {}, readConnectionHolders: async (workspaceId: string) => ({get: () => ({accountHolder:{kind:"business",workspaceId},accessThrough:{kind:"platform"}})})}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const f = vi.hoisted(() => ({ grant: vi.fn(), revokeRow: vi.fn(), revokeGoogle: vi.fn(), record: vi.fn(), publishing: vi.fn() }));

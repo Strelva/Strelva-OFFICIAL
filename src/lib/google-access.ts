@@ -182,8 +182,9 @@ export async function getGoogleLocation(tenantId: string, grant?: GoogleGrant | 
  * kept. A dead refresh token marks the binding needs_reauth; the Redis record
  * is left for its caller to mark, as before.
  */
-export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.now()): Promise<string | null> {
+export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.now(), actor: {userId:string;verifiedEmail:string} | null = null): Promise<string | null> {
   if (grant.status !== "connected") return null;
+  await (await bindingStore()).assertGoogleGrantEligible(grant, actor);
   const mutationStartedAt = grant.mutationStartedAt ?? new Date(now).toISOString();
   if (grant.accessToken && (!grant.expiresAt || now + EXPIRY_BUFFER_MS < new Date(grant.expiresAt).getTime())) {
     return grant.accessToken;

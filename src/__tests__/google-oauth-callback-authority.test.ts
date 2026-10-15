@@ -1,3 +1,4 @@
+vi.mock("@/products/google-listing/server",()=>({assertTenantGoogleConnectionEligible:async()=>{}}));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GoogleTenantOperation } from "@/lib/google-access";
 

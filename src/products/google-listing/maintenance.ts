@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible } from "./connection-policy";
 /** #297: explicit agency preparation, never an approval or a Google write.
  * The general standing runner remains read-only. No background project use is
  * enabled here; qualification of Google's agency/project rules remains open. */
@@ -30,12 +31,12 @@ async function call(rpc: MaintenanceRpc, name: string, args: Record<string, unkn
 }
 function enabled() { if (process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE !== "1") throw new Error("Bundle maintenance is not enabled."); }
 export interface MaintenanceDeps {
- rpc: MaintenanceRpc; context(tenantId: string,workspaceId: string,locationId: string): Promise<ListingContext>;
+ rpc: MaintenanceRpc; context(tenantId: string,workspaceId: string,locationId: string, actor?: WorkspaceActor): Promise<ListingContext>;
  record: typeof readBusinessRecord; events(): Promise<TenantPublishingPorts>; mode(tenantId:string): Promise<string>;
  draft: NonNullable<TenantPublishingPorts["reviewPreparation"]>["draft"]; declined: NonNullable<TenantPublishingPorts["reviewPreparation"]>["declined"];
 }
 async function reviewPreparation() { const ports=await tenantPublishingPorts();if(!ports.reviewPreparation)throw new Error("Review preparation is unavailable.");return ports.reviewPreparation; }
-export function defaultMaintenanceDeps(): MaintenanceDeps { return { rpc:maintenanceRpc(),context:async (...args) => (await import("./workspace")).tenantListingContext(...args),record:readBusinessRecord,events:tenantPublishingPorts,
+export function defaultMaintenanceDeps(): MaintenanceDeps { return { rpc:maintenanceRpc(),context:async (tenantId,workspaceId,locationId,actor) => (await import("./workspace")).tenantListingContext(tenantId,workspaceId,locationId,undefined,actor),record:readBusinessRecord,events:tenantPublishingPorts,
  mode:async id => (await reviewPreparation()).mode(id), draft:async(...args)=>(await reviewPreparation()).draft(...args),declined:async(...args)=>(await reviewPreparation()).declined(...args) }; }
 /** Uses the existing event queue. A lost link is reconciliation, never a second draft. */
 export async function queueBundleMaintenanceDraft(actor: WorkspaceActor, attachmentId: string, cycleKey: string, recordRevision: number,
@@ -49,6 +50,7 @@ export async function queueBundleMaintenanceDraft(actor: WorkspaceActor, attachm
   if (!event) throw new Error("This preparation needs reconciliation. It was not queued again."); return event;
  }
  const target=reserved.target;
+ await assertGoogleConnectionEligible(actor,target.businessId);
  const event=await ports.addEvent({tenantId:target.tenantId,source:"google",type:"content_update",title:draft.action==="hours"?"Review your Google hours":"Review your Google reply",
  body:JSON.stringify(draft,null,2),status:"pending",metadata:{kind:"workspace_google_listing_draft",workspaceId:target.businessId,locationId:target.locationId,draft,
  reviewAudience:"owner",recordRevision,maintenance:{preparationId:reserved.id,bindingId:target.bindingId}}},{requirePersistence:true});
@@ -60,13 +62,14 @@ export async function prepareBundleMaintenance(actor:WorkspaceActor,raw:unknown,
  enabled(); const input=z.object({attachmentId:z.string().uuid(),cycleKey:z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/)}).strict().parse(raw);
  const deps=override??defaultMaintenanceDeps();
  const target=maintenanceTargetSchema.parse(await call(deps.rpc,"check_bundle_maintenance_attachment",{p_attachment_id:input.attachmentId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail}));
+ await assertGoogleConnectionEligible(actor,target.businessId);
  const record=await deps.record(actor,target.businessId);
  const events:UnifiedEvent[]=[]; const unavailable:string[]=[];
  let context:ListingContext|undefined;
  const currentContext=async()=>{
   if(context)return context;
   await call(deps.rpc,"check_bundle_maintenance_attachment",{p_attachment_id:input.attachmentId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail});
-  context=await deps.context(target.tenantId,target.businessId,target.locationId);
+  context=await deps.context(target.tenantId,target.businessId,target.locationId,actor);
   if(context.bindingId!==target.bindingId||context.workspaceId!==target.businessId||context.location.locationId!==target.locationId||context.lifecycle!=="live")throw new Error("This maintenance target changed or paused.");
   return context;
  };

@@ -1,3 +1,4 @@
+vi.mock("@/platform/account-bindings/google-policy", async original => ({...await original<object>(),assertGoogleGrantEligible:async()=>{}}));
 /**
  * GBP write-side management tests.
  *

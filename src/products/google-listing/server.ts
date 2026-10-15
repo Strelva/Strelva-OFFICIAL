@@ -46,3 +46,8 @@ export type { ReviewView, SiteReviews, WorkspaceReviews } from "./linked-reviews
 export { receiptHeadline } from "./service";
 
 export * from "./connect/index";
+
+export { googleBusinessProfileConnectionSource } from "./connection-source";
+export { assertTenantGoogleConnectionEligible } from "./connection-policy";
+export { assertGoogleGrantEligible } from "./connection-policy";
+export { assertGoogleBindingEligible, googleConnectionEligibility } from "./connection-policy";

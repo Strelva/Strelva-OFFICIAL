@@ -1,3 +1,5 @@
+import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { assertGoogleConnectionEligible, guardGoogleClient } from "./connection-policy";
 import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { actorCopy, actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 import { createHash } from "node:crypto";
@@ -40,6 +42,7 @@ import { hoursMatch, hoursToGoogle, infoMatches, infoToGoogle, type RecordInfo }
  */
 
 export interface ListingContext {
+  connectionActor?: WorkspaceActor | null;
   workspaceId: string;
   bindingId: string | null;
   location: GoogleLocationRef;
@@ -263,6 +266,8 @@ async function readReview(ctx: ListingContext, reviewId: string): Promise<Google
 export async function postReviewReply(ctx: ListingContext, input: {
   reviewId: string; text: string; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const text = input.text.trim();
@@ -297,6 +302,8 @@ export async function postReviewReply(ctx: ListingContext, input: {
 export async function withdrawReviewReply(ctx: ListingContext, input: {
   reviewId: string; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
@@ -360,6 +367,8 @@ async function patchFromRecord(ctx: ListingContext, input: {
 export async function syncHoursFromRecord(ctx: ListingContext, input: {
   hours: FactValues["hours"] | null; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const body = (input.hours ? hoursToGoogle(input.hours) : {}) as Record<string, unknown>;
   const mask = ["regularHours", "specialHours"];
   return patchFromRecord(ctx, {
@@ -372,6 +381,8 @@ export async function syncHoursFromRecord(ctx: ListingContext, input: {
 export async function syncInfoFromRecord(ctx: ListingContext, input: {
   record: RecordInfo; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const { body, updateMask } = infoToGoogle(input.record);
   if (body.websiteUri) {
     try {
@@ -408,6 +419,8 @@ async function defaultCheckUrl(url: string): Promise<void> {
 export async function createListingPost(ctx: ListingContext, input: {
   post: ListingPostInput; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
@@ -442,6 +455,8 @@ export async function createListingPost(ctx: ListingContext, input: {
 export async function undoListingChange(ctx: ListingContext, input: {
   receiptId: string; authority: Extract<ListingAuthority, { kind: "owner_undo" | "operator_undo" }>; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
+  await assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId);
+  ctx = { ...ctx, client: guardGoogleClient(ctx.client, () => assertGoogleConnectionEligible(ctx.connectionActor ?? null, ctx.workspaceId)) };
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const original = await ctx.receipts.get(input.receiptId, ctx.workspaceId);

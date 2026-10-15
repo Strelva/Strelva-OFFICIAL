@@ -1,3 +1,4 @@
+import { assertGoogleConnectionEligible, googleConnectionEligibility } from "../connection-policy";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
@@ -22,11 +23,12 @@ export async function isBusinessOwner(actor: WorkspaceActor, workspaceId: string
 
 /** Whether this business can use the owner connect flow at all (no owner check). */
 export async function ownerConnectAvailable(actor: WorkspaceActor, workspaceId: string): Promise<boolean> {
-  return googleOwnerConnectEnabled() && googleBindingsEnabled() && bindingEncryptionReady() && await publishingEnabledForWorkspace(workspaceId, actor);
+  return googleOwnerConnectEnabled() && googleBindingsEnabled() && bindingEncryptionReady() && await publishingEnabledForWorkspace(workspaceId, actor) && (await googleConnectionEligibility(actor, workspaceId)).eligible;
 }
 
 /** Owner, release and configuration, before any Google sign-in starts or finishes. */
 export async function admitOwnerConnect(actor: WorkspaceActor, workspaceId: string): Promise<void> {
+  await assertGoogleConnectionEligible(actor, workspaceId);
   if (!(await ownerConnectAvailable(actor, workspaceId))) throw new WorkspaceConflictError("Connecting Google isn't open for this business yet.");
   if (!(await isBusinessOwner(actor, workspaceId))) throw new WorkspaceAccessError("Only the business owner connects Google, with their own Google account.");
 }

@@ -1,3 +1,4 @@
+import { assertTenantGoogleConnectionEligible } from "@/products/google-listing/server";
 /**
  * Google OAuth Callback Route
  *
@@ -140,6 +141,7 @@ export async function GET(req: Request) {
       return NextResponse.redirect(`${connectionsUrl}?error=${encodeURIComponent("Access denied")}`);
     }
     const actor = identity.data;
+    await assertTenantGoogleConnectionEligible(actor, tenantId);
     // The guarded snapshot pins the current tenant/link/binding before external
     // reads. Commit rechecks settings authority and those pins under SQL locks.
     const operation = await beginGoogleTenantOperation(tenantId, actor);
