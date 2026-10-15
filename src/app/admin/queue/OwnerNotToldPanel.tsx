@@ -20,6 +20,7 @@ export function notToldReason(row: NotToldRow): string {
   if (last.status === "bounced") return `Email bounced${last.reason ? ` (${last.reason})` : ""}`;
   if (last.status === "suppressed") {
     if (last.reason === "no_trusted_owner_recipient" || last.reason === "no_owner_recipient") return "Not sent: no trusted owner address";
+    if (last.reason === "owner_recipient_is_staff") return "Not sent: the trusted owner address is a staff address. Invite the real owner";
     return `Email held back${last.reason ? ` (${last.reason.replace(/_/g, " ")})` : ""}: client email is off or not set up`;
   }
   if (last.status === "failed") return `Email failed to send${last.reason ? ` (${last.reason})` : ""}`;

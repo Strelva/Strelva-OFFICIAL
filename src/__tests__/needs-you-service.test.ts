@@ -101,13 +101,14 @@ let sendEmail: ReturnType<typeof vi.fn<(input: SendEmailInput) => Promise<SendEm
 let requests: ServiceRequest[];
 let change: ReturnType<typeof vi.fn>;
 
-function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: (tenantId: string | null) => Promise<boolean>) {
+function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: (tenantId: string | null) => Promise<boolean>, recipientIsStaff?: (workspaceId: string, email: string) => Promise<boolean>) {
   return createNeedsYouService({
     store: mem.store,
     appOrigin: "https://app.example.test",
     now: () => clock.now,
     sendEmail,
     urgentInquiryAllowed,
+    recipientIsStaff,
     adapters: adapters ?? [
       tenantEventAdapter({
         linkedTenants: async (ws) => (await mem.store.linkedTenants(ws)).map(l => l.tenantId),
@@ -362,6 +363,26 @@ describe("the chase", () => {
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
     expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_trusted_owner_recipient" });
+  });
+
+  it("never mails an owner link to a staff address, and does not store that address", async () => {
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    const staff = vi.fn(async () => true);
+    const record = vi.spyOn(mem.store, "recordDelivery");
+    const summary = await service(undefined, undefined, staff).chase();
+    expect(staff).toHaveBeenCalledWith(WS, "owner@example.test");
+    expect(summary.ownerNotTold).toBe(1);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "owner_recipient_is_staff" });
+    expect(record).toHaveBeenCalledWith(WS, expect.any(String), "urgent", "suppressed", null, null, "owner_recipient_is_staff");
+  });
+
+  it("holds the send when the staff check itself fails", async () => {
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    const summary = await service(undefined, undefined, async () => { throw new Error("down"); }).chase();
+    expect(summary.ownerNotTold).toBe(1);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "owner_recipient_is_staff" });
   });
 });
 

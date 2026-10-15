@@ -14,6 +14,7 @@ import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { readToolNoticeHandled } from "@/platform/catalog-reports/tool-notices";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+import { getSupabase } from "@/platform/infra/db/client";
 import { publishingDecisionDeliveryAllowed } from "@/platform/needs-you/publishing-delivery";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
@@ -80,6 +81,13 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },
     canDeliver: publishingDecisionDeliveryAllowed,
+    recipientIsStaff: async (workspaceId, email) => {
+      const client = getSupabase();
+      if (!client) throw new Error("storage not configured");
+      const { data, error } = await client.rpc("owner_contact_staff_reason", { p_customer_workspace_id: workspaceId, p_email: email });
+      if (error) throw error;
+      return typeof data === "string";
+    },
     urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
       && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
