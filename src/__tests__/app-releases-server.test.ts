@@ -61,6 +61,13 @@ describe("built-in App release server", () => {
     expect(await readBuiltInAppRelease("ask", WS, undefined, { ...base, STRELVA_ASK_RELEASE: "1" })).toMatchObject({ available: true, release: 1 });
   });
 
+  it("makes Dental intake unavailable unless vertical_intake is on", async () => {
+    fakeFlags({ vertical_intake: "on" });
+    const base = { STRELVA_WORKSPACE_RELEASE: "1" };
+    expect(await readBuiltInAppRelease("dental_intake", WS, undefined, base)).toEqual({ appId: "dental_intake", available: false });
+    expect(await readBuiltInAppRelease("dental_intake", WS, undefined, { ...base, STRELVA_VERTICAL_INTAKE_RELEASE: "workspace" })).toMatchObject({ available: true, release: 1 });
+  });
+
   it("returns the Inquiries email requirement even when the inquiries flag is off", async () => {
     fakeFlags({ inquiries: "off" });
     const connections = await effectiveRequiredConnections("inquiries", WS, undefined, { STRELVA_WORKSPACE_RELEASE: "1", STRELVA_INQUIRIES_RELEASE: "workspace" });
@@ -88,7 +95,7 @@ describe("built-in App release server", () => {
   it("reads every App in catalog order", async () => {
     fakeFlags();
     const states = await readBuiltInAppReleases(WS, undefined, {});
-    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync", "care_reports"]);
+    expect(states.map(state => state.appId)).toEqual(["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync", "care_reports", "dental_intake"]);
   });
 
   it("answers the early gate from env alone", () => {

@@ -54,8 +54,12 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * `care_reports` (20261028100400): the Care plan reports App, an agency's monthly
  * report of its work for a client. It is that App's availability gate, not a
  * Release. Off by default.
+ *
+ * `vertical_intake` (20261028100500): the Dental intake App, a new-patient form
+ * on a connected site. It is that App's availability gate, not a Release. Off by
+ * default.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel", "sites_by_code", "app_events", "listings_sync", "care_reports"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel", "sites_by_code", "app_events", "listings_sync", "care_reports", "vertical_intake"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -70,6 +74,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   app_events: "STRELVA_APP_EVENTS_RELEASE",
   listings_sync: "STRELVA_LISTINGS_SYNC_RELEASE",
   care_reports: "STRELVA_CARE_REPORTS_RELEASE",
+  vertical_intake: "STRELVA_VERTICAL_INTAKE_RELEASE",
   finite_jobs: "STRELVA_FINITE_JOBS_RELEASE",
   approval_store: "STRELVA_APPROVAL_STORE_RELEASE",
   owner_entry: "STRELVA_OWNER_ENTRY",
@@ -98,6 +103,7 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   app_events: "Events Apps receive",
   listings_sync: "Listings in sync",
   care_reports: "Care plan reports",
+  vertical_intake: "Dental intake (new-patient form)",
   finite_jobs: "Unified finite jobs",
   approval_store: "Unified approval store",
   owner_entry: "Owner entry",

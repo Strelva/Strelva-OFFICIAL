@@ -134,6 +134,11 @@ export const factValueSchemas = {
     overrides: z.array(hoursOverrideSchema).max(366).optional(),
   }).strict(),
   owner_recipient: z.object({ email: emailSchema, name: trimmed(1, 160).optional() }).strict(),
+  /** Dental intake lists these as the plans its new-patient form offers. Not a policy: no business_policies row. */
+  insurance_accepted: z.object({
+    carriers: z.array(trimmed(1, 120)).min(1).max(60).refine(v => new Set(v.map(s => s.toLowerCase())).size === v.length, "No duplicate plans"),
+    summary: trimmed(1, 500).optional(),
+  }).strict(),
 } as const;
 
 export type FactKey = keyof typeof factValueSchemas;

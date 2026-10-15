@@ -162,6 +162,31 @@ export const BUILT_IN_APPS: readonly BuiltInApp[] = Object.freeze([
       }),
     ],
   } satisfies BuiltInApp),
+  Object.freeze({
+    id: "dental_intake",
+    name: "Dental intake",
+    publisher: "platform",
+    // Inquiries owns "inquiry" and "inquiry_form"; two Apps may not claim the same one.
+    systemKinds: [],
+    labelOnSystems: false,
+    makeRealChannels: [],
+    availability: [{ kind: "workspace_flag", flag: "vertical_intake" }],
+    releases: [
+      Object.freeze({
+        key: "dental_intake.baseline",
+        number: 1,
+        summary: "New patients ask for a visit from the office's website; tooth pain or swelling is told to call now.",
+        shippedIn: null,
+        changesLiveBehavior: true,
+        gates: [],
+        requiredConnections: [
+          { provider: "connected_site", access: "act", optional: false, purpose: "Show the new-patient form on the office's website and receive what patients send" },
+          { provider: "google_calendar", access: "read", optional: true, purpose: "Read busy times so proposed visits avoid them" },
+          resend(true, "Email patients their visit confirmation"),
+        ],
+      } satisfies BuiltInAppRelease),
+    ],
+  } satisfies BuiltInApp),
 ]);
 
 export function builtInApp(id: string): BuiltInApp {

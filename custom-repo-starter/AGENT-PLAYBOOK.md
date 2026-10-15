@@ -84,6 +84,10 @@ curl -s "$U/api/capabilities" | grep -o '"commitSha":"[0-9a-f]*"'          # wan
 
 Once the site is live, changes to it arrive as Strelva Requests that you pick up with your own coding agent. Paste the block in [`CLAUDE.strelva.md`](./CLAUDE.strelva.md) into this repo's `CLAUDE.md` (or `AGENTS.md`). It says how to connect, the loop to follow, and the rules. For the loop to end in a recorded Release, the capabilities route (A3) must also declare `contentSource` and `release.commitSha`, because Strelva reads the live commit from it and never takes anyone's word for it.
 
+### Strelva Apps on a code site
+
+If the owner asked for an App form (for example Dental intake): connect the site in Strelva first and verify it with the meta tag, then render `<StrelvaIntake baseUrl="https://app.strelva.com" siteKey="sk_pub_…" appId="dental_intake" />` on the visit page. Do not add, remove or reword fields or collect medical details: the form comes from Strelva, and the owner makes it live in Strelva. The component renders `data-strelva-app` and `data-strelva-site` on the server; keep them.
+
 ---
 
 ## Task checklist (work top to bottom)

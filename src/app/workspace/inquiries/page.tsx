@@ -10,6 +10,8 @@ import { WorkspaceSurfaceShell } from "@/experience/workspace/WorkspaceSurfaceSh
 import { listWorkspaces } from "@/platform/workspaces";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { StPage } from "@/components/ui/strelva/Kit";
+import { IntakeAppPanel } from "@/experience/vertical-intake/IntakeAppPanel";
+import { readIntakeApp, verticalIntakeReleaseMayBeOn, verticalIntakeReleasedFor } from "@/products/vertical-intake/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Inquiries", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -26,7 +28,14 @@ export default async function InquiriesPage({ searchParams }: { searchParams: Pr
   ]);
   const forwarding = state.kind !== "permission" && inquiryForwardingReleaseEnabled()
     && await inquiryForwardingReleasedFor(workspaceId, await releaseViewerFor(actor)).catch(() => false);
+  // Dental intake: nothing is read and nothing renders unless the flag may be on and is on for this person and business.
+  const intake = state.kind !== "permission" && verticalIntakeReleaseMayBeOn() && await verticalIntakeReleasedFor(actor, workspaceId).catch(() => false)
+    ? await readIntakeApp(actor, workspaceId, "dental_intake").catch(() => null)
+    : null;
   return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={workspaces.find(workspace => workspace.id === workspaceId)?.name} systemsReleased={systemsReleased}>
-    <StPage><WorkspaceInquiries workspaceId={workspaceId} state={state} forwarding={forwarding} embedded /></StPage>
+    <StPage>
+      {intake ? <IntakeAppPanel workspaceId={workspaceId} initial={intake} /> : null}
+      <WorkspaceInquiries workspaceId={workspaceId} state={state} forwarding={forwarding} embedded />
+    </StPage>
   </WorkspaceSurfaceShell>;
 }

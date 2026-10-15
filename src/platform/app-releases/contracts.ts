@@ -4,7 +4,7 @@ import { RELEASE_FLAGS, type ReleaseFlag } from "@/platform/release-flags/resolv
 import type { MakeRealChannel } from "@/platform/possibilities/contracts";
 import type { AppEventSubscription } from "@/platform/app-events/contracts";
 
-export const BUILT_IN_APP_IDS = ["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync", "care_reports"] as const;
+export const BUILT_IN_APP_IDS = ["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools", "listings_sync", "care_reports", "dental_intake"] as const;
 export type BuiltInAppId = (typeof BUILT_IN_APP_IDS)[number];
 export const builtInAppIdSchema = z.enum(BUILT_IN_APP_IDS);
 

@@ -8,12 +8,15 @@ import { DETAIL_LABELS, EDITABLE_DETAILS, detailText, type EditableDetail } from
 import { recordSource } from "./business-details-presentation";
 
 /** Native server-action submission; this component only explains the edited fields. */
-export function BusinessDetailsForm({ record, workspaceId, readOnly, approvalCopy, action }: {
+export function BusinessDetailsForm({ record, workspaceId, readOnly, approvalCopy, action, showInsurance = false }: {
   record: BusinessRecord; workspaceId: string; readOnly: boolean; approvalCopy?: string | null; action?: (formData: FormData) => Promise<void>;
+  /** Dental intake may be on: show the insurance plans row. Off by default, so the live page is unchanged. */
+  showInsurance?: boolean;
 }) {
   const initial = Object.fromEntries(EDITABLE_DETAILS.map(key => [key, detailText(record, key)])) as Record<EditableDetail, string>;
   const [values, setValues] = useState(initial);
-  const changed = EDITABLE_DETAILS.filter(key => values[key] !== initial[key]);
+  const shown = EDITABLE_DETAILS.filter(key => key !== "insurance_accepted" || showInsurance);
+  const changed = shown.filter(key => values[key] !== initial[key]);
   return <form action={action}>
     <input type="hidden" name="workspaceId" value={workspaceId} />
     <input type="hidden" name="revision" value={record.revision} />
@@ -25,8 +28,8 @@ export function BusinessDetailsForm({ record, workspaceId, readOnly, approvalCop
       {approvalCopy ? <p className="text-sm text-gray-muted">{approvalCopy}</p> : null}
       {readOnly ? <p className="text-sm text-gray-muted">Only the owner can change these details.</p> : <><StPill type="submit" disabled={!changed.length}>Save details</StPill><StTextButton onClick={() => setValues(initial)} disabled={!changed.length}>Cancel changes</StTextButton></>}
     </>}>
-      <StRows label="Business facts">{EDITABLE_DETAILS.map(key => <StRow key={key} title={<StField label={DETAIL_LABELS[key]} hint={`${recordSource(record.facts[key]?.source)} · ${record.facts[key]?.verified ? "Confirmed" : "Not confirmed"}`}>
-        {key === "description" ? <textarea name={key} value={values[key]} readOnly={readOnly} rows={4} maxLength={2000} onChange={event => setValues({ ...values, [key]: event.target.value })} /> : <input name={key} value={values[key]} readOnly={readOnly} type={key === "phone" ? "tel" : key === "email" || key === "owner_recipient" ? "email" : "text"} maxLength={254} autoComplete="off" onChange={event => setValues({ ...values, [key]: event.target.value })} />}
+      <StRows label="Business facts">{shown.map(key => <StRow key={key} title={<StField label={DETAIL_LABELS[key]} hint={key === "insurance_accepted" ? "One plan per line, the way patients say it (for example, Delta Dental PPO). Your new-patient form lists these." : `${recordSource(record.facts[key]?.source)} · ${record.facts[key]?.verified ? "Confirmed" : "Not confirmed"}`}>
+        {key === "insurance_accepted" ? <textarea name={key} value={values[key]} readOnly={readOnly} rows={5} maxLength={8000} onChange={event => setValues({ ...values, [key]: event.target.value })} /> : key === "description" ? <textarea name={key} value={values[key]} readOnly={readOnly} rows={4} maxLength={2000} onChange={event => setValues({ ...values, [key]: event.target.value })} /> : <input name={key} value={values[key]} readOnly={readOnly} type={key === "phone" ? "tel" : key === "email" || key === "owner_recipient" ? "email" : "text"} maxLength={254} autoComplete="off" onChange={event => setValues({ ...values, [key]: event.target.value })} />}
       </StField>} />)}</StRows>
     </StSplit>
   </form>;

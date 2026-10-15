@@ -33,12 +33,19 @@ describe("built-in App catalog", () => {
   });
 
   it("makes Release 1 the ungated baseline for every App, 1.0.0 for the 1.0 Apps", () => {
-    const ADDED_AFTER_1_0 = new Set(["listings_sync", "care_reports"]);
+    const ADDED_AFTER_1_0 = new Set(["listings_sync", "care_reports", "dental_intake"]);
+    expect(BUILT_IN_APPS.map(item => item.id).slice(-1)).toEqual(["dental_intake"]);
     for (const item of BUILT_IN_APPS) {
       expect(item.releases[0]!.gates, item.id).toEqual([]);
       expect(item.releases[0]!.shippedIn, item.id).toBe(ADDED_AFTER_1_0.has(item.id) ? null : "1.0.0");
       if (ADDED_AFTER_1_0.has(item.id)) expect(item.availability.some(gate => gate.kind === "workspace_flag"), item.id).toBe(true);
     }
+    expect(builtInApp("dental_intake").availability).toContainEqual({ kind: "workspace_flag", flag: "vertical_intake" });
+  });
+
+  it("declares Dental intake as Release 1, held by its availability flag", () => {
+    expect(builtInAppReleaseLabel(builtInApp("dental_intake"), 1)).toBe("Dental intake Release 1");
+    expect(releasesGatedByFlag("vertical_intake")).toEqual([]);
   });
 
   it("declares Listings in sync behind its own flag, with the fact.confirmed subscription on both Releases", () => {

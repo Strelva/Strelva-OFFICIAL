@@ -1,5 +1,6 @@
 /*! Strelva connect.js — connects any website to a Strelva business.
  * <script src="https://app.strelva.com/connect.js" data-strelva-site="sk_pub_..." defer></script>
+ * <div data-strelva-app="dental_intake"></div> mounts a Strelva App form (its live Release decides the fields).
  * Optional: data-strelva-consent="required" (wait for strelva.consent(true)),
  *           data-strelva-capture="off" (never read the site's own forms).
  * No cookies. No keystrokes. Query strings are never sent. */
@@ -319,6 +320,174 @@
     for (var i = 0; i < hosts.length; i++) mount(hosts[i]);
   }
 
+  // ---- Strelva Apps (e.g. Dental intake) -----------------------------------
+  // <div data-strelva-app="dental_intake"></div> mounts the form its live Release defines.
+  // Answers go only to the office through /apps/<id>/intake. Never through track() or the beacon.
+  var APP_PHONE_CORRECTION = "Enter a valid phone number.";
+  var APP_UNAVAILABLE = "This form isn't available right now. Please call or email the office.";
+  var APP_KINDS = /^(text|email|phone|choice|multi_choice|textarea)$/;
+  function telHref(phone) { return "tel:" + String(phone).replace(/[^0-9+]/g, ""); }
+  function appCall(phone, label) {
+    var a = d.createElement("a");
+    a.href = telHref(phone); a.textContent = label + phone;
+    a.setAttribute("style", "display:inline-flex;min-height:44px;align-items:center;font-weight:600");
+    return a;
+  }
+  function appText(tag, text, style) {
+    var el = d.createElement(tag);
+    el.textContent = text;
+    if (style) el.setAttribute("style", style);
+    return el;
+  }
+  function validApp(form) {
+    if (!form || form.schemaVersion !== 1 || !Array.isArray(form.fields) || form.fields.length > 20 || !Array.isArray(form.triage)) return false;
+    for (var i = 0; i < form.fields.length; i++) {
+      var f = form.fields[i];
+      if (!f || typeof f.id !== "string" || typeof f.label !== "string" || !APP_KINDS.test(f.kind)) return false;
+    }
+    return true;
+  }
+  function renderApp(host, form, appId) {
+    var p = "strelva-a" + (++formCount) + "-", el = d.createElement("form"), rows = {}, order = [];
+    el.setAttribute("data-strelva-mounted", ""); el.noValidate = true;
+    el.setAttribute("style", "display:grid;gap:.8em;font:inherit;color:inherit");
+    el.appendChild(appText("h3", form.title || "")); el.appendChild(appText("p", form.intro || ""));
+    el.appendChild(appText("p", form.notice || "", "margin:0;font-size:.85em;opacity:.8"));
+    var status = appText("p", "", "margin:0"); status.id = p + "status";
+    status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
+    function inputsOf(f) { return rows[f.id].querySelectorAll("input,select,textarea"); }
+    function answerOf(f) {
+      var els = inputsOf(f), out = [], i;
+      if (f.kind === "multi_choice") { for (i = 0; i < els.length; i++) if (els[i].checked) out.push(els[i].value); return out.join(","); }
+      if (f.kind === "choice" && f.options && f.options.length <= 3) { for (i = 0; i < els.length; i++) if (els[i].checked) return els[i].value; return ""; }
+      return els.length ? String(els[0].value || "").trim() : "";
+    }
+    function isHidden(f) { return !!(f.shownWhen && rows[f.shownWhen.field] && f.shownWhen.notIn.indexOf(answerOf(byId(f.shownWhen.field))) >= 0); }
+    function byId(id) { for (var i = 0; i < form.fields.length; i++) if (form.fields[i].id === id) return form.fields[i]; return null; }
+    form.fields.forEach(function (f) {
+      var id = p + f.id, wrap = d.createElement("div"), hint = null, text = f.label + (f.required ? " (required)" : "");
+      if (f.hint) { hint = appText("p", f.hint, "margin:.2em 0 0;font-size:.85em;opacity:.8"); hint.id = id + "-hint"; }
+      if (f.kind === "multi_choice" || (f.kind === "choice" && f.options && f.options.length <= 3)) {
+        var set = d.createElement("fieldset"); set.setAttribute("style", "border:0;margin:0;padding:0");
+        set.appendChild(appText("legend", text, "padding:0"));
+        (f.options || []).forEach(function (o, n) {
+          var lab = d.createElement("label"), box = d.createElement("input");
+          box.type = f.kind === "multi_choice" ? "checkbox" : "radio"; box.name = id; box.value = o.value; box.id = id + "-" + n;
+          if (hint) box.setAttribute("aria-describedby", hint.id);
+          lab.setAttribute("style", "display:flex;gap:.5em;align-items:center;min-height:44px");
+          lab.appendChild(box); lab.appendChild(d.createTextNode(o.label)); set.appendChild(lab);
+        });
+        wrap.appendChild(set);
+      } else {
+        var l = d.createElement("label"), c;
+        l.htmlFor = id; l.textContent = text; wrap.appendChild(l);
+        if (f.kind === "choice") {
+          c = d.createElement("select"); c.appendChild(new Option("Choose…", ""));
+          (f.options || []).forEach(function (o) { c.appendChild(new Option(o.label, o.value)); });
+        } else if (f.kind === "textarea") { c = d.createElement("textarea"); c.rows = 4; }
+        else { c = d.createElement("input"); c.type = f.kind === "email" ? "email" : f.kind === "phone" ? "tel" : "text"; }
+        c.id = id; c.name = f.id; if (f.maxLength) c.maxLength = f.maxLength;
+        if (f.autocomplete) c.setAttribute("autocomplete", f.autocomplete); else if (f.sensitive) c.setAttribute("autocomplete", "off");
+        if (f.required) c.setAttribute("aria-required", "true");
+        if (hint) c.setAttribute("aria-describedby", hint.id);
+        c.setAttribute("style", INPUT_STYLE); wrap.appendChild(c);
+      }
+      if (hint) wrap.appendChild(hint);
+      rows[f.id] = wrap; order.push(f); el.appendChild(wrap);
+    });
+    var trap = d.createElement("div"), hp = d.createElement("input");
+    trap.setAttribute("aria-hidden", "true"); trap.setAttribute("style", "position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden");
+    hp.name = "_hp"; hp.tabIndex = -1; hp.setAttribute("autocomplete", "off"); trap.appendChild(hp); el.appendChild(trap);
+    var panel = d.createElement("div"), revealed = false;
+    panel.setAttribute("role", "region"); panel.setAttribute("aria-label", "Urgent care"); panel.hidden = true;
+    panel.setAttribute("style", "padding:.8em;border:1px solid currentColor;border-radius:6px");
+    el.appendChild(panel);
+    var button = d.createElement("button");
+    button.type = "submit"; button.textContent = form.submitLabel || "Send";
+    button.setAttribute("style", "justify-self:start;padding:.7em 1.3em;font:inherit;cursor:pointer;border-radius:6px");
+    el.appendChild(button); el.appendChild(status);
+    function urgentRule() {
+      for (var i = 0; i < form.triage.length; i++) {
+        var f = byId(form.triage[i].field), v = f ? answerOf(f).split(",") : [];
+        for (var j = 0; j < v.length; j++) if (form.triage[i].anyOf.indexOf(v[j]) >= 0) return form.triage[i];
+      }
+      return null;
+    }
+    function refresh() {
+      order.forEach(function (f) { rows[f.id].hidden = isHidden(f); });
+      var rule = urgentRule(), office = form.office || {};
+      while (panel.firstChild) panel.removeChild(panel.firstChild);
+      panel.hidden = !rule;
+      if (!rule) return;
+      var h = appText("h4", rule.title); h.tabIndex = -1; panel.appendChild(h); panel.appendChild(appText("p", rule.body));
+      if (office.phone) { var line = d.createElement("p"); line.appendChild(appCall(office.phone, "Call the office: ")); panel.appendChild(line); }
+      if (office.openNow === false) panel.appendChild(appText("p", "The office is closed now. Calling plays their after-hours instructions."));
+      panel.appendChild(appText("p", rule.emergencyNote)); panel.appendChild(appText("p", rule.afterSubmit));
+      if (!revealed) { revealed = true; h.focus(); }
+    }
+    el.addEventListener("change", refresh); refresh();
+    function correction(f, text) {
+      status.textContent = text;
+      var first = inputsOf(f)[0];
+      if (first) { first.setAttribute("aria-invalid", "true"); first.setAttribute("aria-describedby", status.id); first.focus(); }
+    }
+    el.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (button.disabled) return;
+      var bad = el.querySelectorAll("[aria-invalid]"), i;
+      for (i = 0; i < bad.length; i++) { bad[i].removeAttribute("aria-invalid"); bad[i].removeAttribute("aria-describedby"); }
+      if (!granted) { status.textContent = "Allow Strelva to send this form before continuing, or call or email us."; return; }
+      var answers = {};
+      for (i = 0; i < order.length; i++) {
+        var f = order[i], v = isHidden(f) ? "" : answerOf(f);
+        if (isHidden(f)) continue;
+        if (!v && f.required) { correction(f, "Please answer: " + f.label + "."); return; }
+        if (v && f.kind === "email" && !validEmail(v)) { correction(f, EMAIL_CORRECTION); return; }
+        if (v && f.kind === "phone" && !validPhone(v)) { correction(f, APP_PHONE_CORRECTION); return; }
+        if (v) answers[f.id] = v;
+      }
+      button.disabled = true; status.textContent = "Sending…";
+      w.fetch(base + "/apps/" + appId + "/intake", { method: "POST", credentials: "omit", headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ id: "i" + rand(22), sid: session(), path: location.pathname, _hp: hp.value, answers: answers }) })
+        .then(function (r) {
+          if (r.status === 400) return r.json().catch(function () { return null; }).then(function (body) {
+            throw new Error(body && typeof body.error === "string" && body.error.length <= 200 ? body.error : "Check your answers and try again.");
+          });
+          if (!r.ok) throw new Error("");
+          return r.json().catch(function () { return null; });
+        })
+        .then(function (result) {
+          var urgent = !!(result && result.triage === "urgent"), thanks = form.thanks || {};
+          while (el.firstChild) el.removeChild(el.firstChild);
+          var note = appText("p", (urgent ? thanks.urgent : thanks.routine) || "Thanks."); note.setAttribute("role", "status"); el.appendChild(note);
+          if (urgent && form.office && form.office.phone) { var line = d.createElement("p"); line.appendChild(appCall(form.office.phone, "Call the office: ")); el.appendChild(line); }
+        })
+        .catch(function (error) {
+          button.disabled = false;
+          status.textContent = error && error.message ? error.message : "That didn't send. Please call the office.";
+          if (!(error && error.message) && form.office && form.office.phone) { var line = d.createElement("p"); line.appendChild(appCall(form.office.phone, "Call the office: ")); status.appendChild(line); }
+        });
+    });
+    host.appendChild(el);
+  }
+  function mountApp(host) {
+    var appId = host.getAttribute("data-strelva-app");
+    // A code site's own StrelvaIntake component renders itself; it carries the site key.
+    if (host.hasAttribute("data-strelva-mounted") || host.hasAttribute("data-strelva-site") || !/^[a-z][a-z_]{2,39}$/.test(appId || "") || !w.fetch) return;
+    host.setAttribute("data-strelva-mounted", "");
+    w.fetch(base + "/apps/" + appId, { credentials: "omit" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (form) {
+        if (validApp(form)) renderApp(host, form, appId);
+        else host.appendChild(appText("p", APP_UNAVAILABLE));
+      })
+      .catch(function () { host.appendChild(appText("p", APP_UNAVAILABLE)); });
+  }
+  function mountApps() {
+    var hosts = d.querySelectorAll("[data-strelva-app]");
+    for (var i = 0; i < hosts.length; i++) mountApp(hosts[i]);
+  }
+
   // ---- Start ---------------------------------------------------------------
   function patch(method) {
     var original = history[method];
@@ -340,7 +509,7 @@
     w.addEventListener("pagehide", function () { flush(true); });
     d.addEventListener("visibilitychange", function () { if (d.visibilityState === "hidden") flush(true); });
     loadContext();
-    if (d.readyState === "loading") d.addEventListener("DOMContentLoaded", mountAll); else mountAll();
+    if (d.readyState === "loading") d.addEventListener("DOMContentLoaded", function () { mountAll(); mountApps(); }); else { mountAll(); mountApps(); }
   }
 
   var api = {
