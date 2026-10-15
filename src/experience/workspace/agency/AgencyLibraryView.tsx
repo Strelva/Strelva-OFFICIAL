@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorksWithFilter, worksWith } from "@/experience/systems/RequiredConnections";
+import type { ConnectionProvider } from "@/platform/connections/contracts";
 import { SystemCreator } from "@/experience/systems/SystemCreator";
 import { systemHref } from "@/experience/systems/model";
 import { SourcePackageControls } from "./SourcePackageControls";
 import { StEmpty, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
-import { loadAgencyLibrary, reviewAllImprovements, type AgencyBulkReviewResult, type AgencyLibrary, type AgencyLibrarySource, type AgencyLibraryVersion } from "../agency-clients";
+import { AgencyWorkspaceReadError, loadAgencyLibrary, reviewAllImprovements, type AgencyBulkReviewResult, type AgencyLibrary, type AgencyLibrarySource, type AgencyLibraryVersion } from "../agency-clients";
 import {
   conflictPathLabel,
   conflictValue,
@@ -20,7 +22,7 @@ import {
 
 type LibraryState =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; permission?: boolean }
   | { status: "ready"; library: AgencyLibrary };
 
 type ReviewState =
@@ -43,6 +45,7 @@ export function AgencyLibraryView({
   agencyWorkspaceId: string;
   onWorkspace: (workspaceId: string) => void;
 }) {
+  const [provider, setProvider] = useState<ConnectionProvider | "">("");
   const [state, setState] = useState<LibraryState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,9 +66,10 @@ export function AgencyLibraryView({
     try {
       const library = await loadAgencyLibrary(request, agencyWorkspaceId, controller.signal);
       if (!controller.signal.aborted && current === generation.current && scope.current === agencyWorkspaceId) setState({ status: "ready", library });
-    } catch {
+    } catch (cause) {
       if (!controller.signal.aborted && current === generation.current && scope.current === agencyWorkspaceId) {
-        setState(previous => previous.status === "ready" ? previous : { status: "error" });
+        const permission = cause instanceof AgencyWorkspaceReadError && cause.status === 403;
+        setState(previous => !permission && previous.status === "ready" ? previous : { status: "error", permission });
         setRefreshError("The Library could not be refreshed. Counts may be out of date. Read current state before preparing another offer.");
       }
     } finally {
@@ -79,6 +83,7 @@ export function AgencyLibraryView({
     setState({ status: "loading" });
     setReviews({});
     setSelectedSourceId(null);
+    setProvider("");
     void refresh();
     const active = controllers.current;
     const sequence = generation;
@@ -110,16 +115,21 @@ export function AgencyLibraryView({
   }, [request, agencyWorkspaceId, refresh, refreshing, refreshError, state]);
 
   if (state.status === "loading") return <div className="space-y-4" role="status" aria-label="Loading the library"><StSkeleton width="48%" label="Loading the library" /><StSkeleton width="72%" /></div>;
+  if (state.status === "error" && state.permission) return <StNotice>You do not have permission to open this Library. Ask an agency owner to check your access.</StNotice>;
   if (state.status === "error") return <StNotice tone="critical"><p>The library could not be loaded. Nothing was changed.</p><StTextButton onClick={() => setAttempt(value => value + 1)}>Retry</StTextButton></StNotice>;
   if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <div className="space-y-4"><StTextButton disabled={refreshing} onClick={() => void refresh()}>Refresh Library</StTextButton><StEmpty>No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</StEmpty>{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div>;
-  const selectedSource = state.library.sources.find(source => source.systemId === selectedSourceId) ?? state.library.sources[0];
+  const visibleSources = state.library.sources.filter(source => worksWith(latestRevision(source)?.requiredConnections ?? [], provider));
+  const selectedSource = visibleSources.find(source => source.systemId === selectedSourceId) ?? visibleSources[0];
   return <div className="space-y-9"><div><StTextButton disabled={refreshing || Object.values(reviews).some(review => review.status === "running")} onClick={() => void refresh()}>Refresh Library</StTextButton>{refreshing ? <p role="status" className="text-sm text-gray-muted">Refreshing the Library…</p> : null}{refreshError ? <StNotice tone="critical">{refreshError}</StNotice> : null}</div><p className="text-sm text-gray-muted">Library holds your sources. Qualified releases shared with clients appear in their Apps. Each client gets its own Version, records, Connections and approval.</p>
     {state.library.reviewEnabled !== true ? <StNotice>Owner reviews are paused. Your saved sources and client Versions remain available. Strelva will turn reviews on for you.</StNotice> : null}
+    <WorksWithFilter value={provider} onChange={setProvider} />
+    {provider && state.library.sources.some(source => latestRevision(source)?.requiredConnections === undefined) ? <StNotice>Some source Connections could not be checked. Those sources are excluded from this filter.</StNotice> : null}
+    {!visibleSources.length ? <StEmpty>No sources work with this connection yet. Choose another connection.</StEmpty> : null}
     {selectedSource ? <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,0.65fr)_minmax(0,1fr)]">
-      <StRows label="Sources">{state.library.sources.map(source => <StRow key={source.systemId} title={source.name} detail={latestRevision(source)?.summary || "No release published yet"} selected={source.systemId === selectedSource.systemId} onClick={() => setSelectedSourceId(source.systemId)} end={<StMono>{latestRevision(source) ? `Release ${latestRevision(source)!.number}` : "Draft"} · {source.versions.length} {source.versions.length === 1 ? "use" : "uses"}</StMono>} />)}</StRows>
+      <StRows label="Sources">{visibleSources.map(source => <StRow key={source.systemId} title={source.name} detail={latestRevision(source)?.summary || "No release published yet"} selected={source.systemId === selectedSource.systemId} onClick={() => setSelectedSourceId(source.systemId)} end={<StMono>{latestRevision(source) ? `Release ${latestRevision(source)!.number}` : "Draft"} · {source.versions.length} {source.versions.length === 1 ? "use" : "uses"}</StMono>} />)}</StRows>
       <LibrarySource key={selectedSource.systemId} request={request} source={selectedSource} review={reviews[selectedSource.systemId]} reviewEnabled={state.library.reviewEnabled === true} held={refreshing || Boolean(refreshError) || state.library.reviewEnabled !== true} onChanged={() => void refresh()} onReview={ids => void review(selectedSource, ids)} />
     </div> : null}
-    <InquiryLibraryVersions library={state.library} />
+    {!provider ? <InquiryLibraryVersions library={state.library} /> : null}
   </div>;
 }
 

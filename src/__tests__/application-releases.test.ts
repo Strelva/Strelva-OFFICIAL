@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { createApplicationService } from "@/products/applications/server";
+import { assertRequiredConnections } from "@/platform/system-versions/required-connections";
+vi.mock("@/platform/system-versions/required-connections", () => ({ assertRequiredConnections: vi.fn(async () => {}) }));
 
 const owner: WorkspaceActor = { userId: "owner", verifiedEmail: "owner@example.com" };
 const member: WorkspaceActor = { userId: "member", verifiedEmail: "member@example.com" };
@@ -84,6 +86,18 @@ async function createReleasedApplication() {
 }
 
 describe("native application release and record clocks", () => {
+  it("checks required email at the server publish boundary and keeps the draft on failure", async () => {
+    const store = applicationStore();
+    const service = createApplicationService(store);
+    const created = await service.create(owner, "workspace-a", specV1);
+    await service.rehearse(owner, created.id, { expectedDesignRevision: 0 });
+    const update = vi.spyOn(store, "update");
+    vi.mocked(assertRequiredConnections).mockRejectedValueOnce(new Error("Reconnect email in Connections."));
+    await expect(service.publish(owner, created.id, { expectedCandidateRevision: 0, expectedReleaseVersion: null })).rejects.toThrow("Reconnect email");
+    expect(update).not.toHaveBeenCalled();
+    expect((await service.read(owner, created.id)).payload.release).toBeNull();
+    expect(assertRequiredConnections).toHaveBeenCalledWith({ actor: owner, workspaceId: "workspace-a", requiredConnections: [expect.objectContaining({ provider: "resend", optional: false, access: "act" })] });
+  });
   it("keeps v1 live while v2 is edited, rehearsed, and published", async () => {
     const { service, id } = await createReleasedApplication();
     const beforeEdit = await service.readRuntime(member, id);

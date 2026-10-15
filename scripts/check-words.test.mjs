@@ -111,3 +111,9 @@ test("reservation is forbidden in visitor copy, including generated site runtime
   assert.deepEqual(check('const message = "A held reservation is an internal scheduling record.";'), []);
   assert.deepEqual(screenWordProblems('throw new Error("A provider reservation needs recovery.");', "src/products/scheduling/calendar/service.ts"), []);
 });
+
+// ADR 0016: providers are Connections on workspace screens.
+test("uses Connections rather than integrations as the screen noun", () => {
+  assert.equal(screenWordProblems('<h1>Integrations</h1>', 'src/experience/connections/Test.tsx').length, 1);
+  assert.equal(screenWordProblems('<h1>Connections</h1>', 'src/experience/connections/Test.tsx').length, 0);
+});

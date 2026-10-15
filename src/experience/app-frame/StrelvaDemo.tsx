@@ -14,7 +14,7 @@ export function StrelvaDemo({ startHref }: { startHref: string }) {
   const [review, setReview] = useState(false);
   const [changed, setChanged] = useState(false);
   const example = () => { setReview(true); setSection("requests"); };
-  const titles: Record<StrelvaSection, string> = { home: "Harbor Dental", "needs-you": "Review a change", requests: "Requests", ongoing: "Running", apps: "Systems", work: "Systems", products: "Systems", system: "Appointments", ask: "Ask Strelva", settings: "Business details", access: "People & access", help: "Bring in an agency", account: "Your account" };
+  const titles: Record<StrelvaSection, string> = { home: "Harbor Dental", "needs-you": "Review a change", requests: "Requests", ongoing: "Running", apps: "Systems", work: "Systems", products: "Systems", system: "Appointments", ask: "Ask Strelva", connections: "Connections", settings: "Business details", access: "People & access", help: "Bring in an agency", account: "Your account" };
   return <div data-workspace-theme="linen" data-workspace-mode="light">
     <StrelvaShell workspaceName="Harbor Dental" title="Strelva 1.0 demo" systemsReleased active={section} signedIn={false} signInHref="/sign-in" signOut={null}
       accountName="Demo owner" ownerBrand={{ agencyId: "fictional-north-studio", name: "North Studio", logoUrl: null, accentColor: "#447a4f", replyTo: null, credit: "runs_on_strelva" }}

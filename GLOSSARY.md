@@ -35,11 +35,33 @@ changes to its content, data, logic and screens. Draft, Live and Paused express
 intent; Health is separate.
 _Avoid_: product, project, installation, module, app (for a business's own System)
 
-**Connection** _(label open)_:
+**Connection**:
 What a System reads, acts on, appears in, shares with, depends on or is triggered
 by: business facts, another System, a person, an outside account or a domain.
 An account connection is one kind. A Connection never grants authority by itself.
 _Avoid_: integration (as the general on-screen noun), permission
+
+
+**Connections**:
+The workspace section for outside accounts a business or agency works with.
+Each row names whose account it is, whose provider access carries it, its state,
+and the Systems using it. Outside tools never appear as Apps.
+
+**Whose account** _(Account holder underneath)_:
+The business, agency or platform whose login was connected. Show **Your business**,
+**<Agency name> (your agency)** in a business, **<Agency name>** in an agency,
+or **Strelva** for the platform. Legacy accounts show **Unknown** and
+“Reconnect to record whose account this is”. Never infer the holder from membership.
+
+**Access through**:
+Whose approved provider app or project carries the calls. Agency access reads
+“Through <Agency name>’s Google access”. Platform access does not need a second
+line. An account Connection grants no authority; agency access still needs the
+business’s area grant while that agency acts.
+
+**Works with**:
+An Apps filter over the Connections declared by each reusable App. It finds Apps
+that work with a provider; it never turns an outside tool into an App.
 
 **Possibility**:
 A working alternative to one or several Systems that a person can open, use

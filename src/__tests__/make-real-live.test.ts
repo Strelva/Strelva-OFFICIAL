@@ -13,6 +13,8 @@ import { customerActivationView } from "@/platform/make-real/view";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
 import type { NeedsYouStore } from "@/platform/needs-you/repository";
 import { createNeedsYouService } from "@/platform/needs-you/service";
+import { assertRequiredConnections } from "@/platform/system-versions/required-connections";
+vi.mock("@/platform/system-versions/required-connections", () => ({ assertRequiredConnections: vi.fn(async () => {}) }));
 
 /*
  * Make real with live channel adapters, plan approvals keyed by workspace,
@@ -23,6 +25,12 @@ import { createNeedsYouService } from "@/platform/needs-you/service";
 // Fakes for each write path -------------------------------------------------------
 
 describe("live channel adapters", () => {
+  it("holds a native live step before attempt when required email cannot be checked", async () => {
+    const adapter = createInternalAppAdapter({ read: vi.fn(), publish: vi.fn(), rollback: vi.fn() }, ctx());
+    vi.mocked(assertRequiredConnections).mockRejectedValueOnce(new Error("Reconnect email in Connections."));
+    await expect(adapter.ready!({ businessId: BIZ, effect: hostedEffect() })).resolves.toEqual({ ok: false, reason: "Reconnect email in Connections." });
+    expect(assertRequiredConnections).toHaveBeenCalledWith({ actor: OWNER, workspaceId: BIZ, requiredConnections: [expect.objectContaining({ provider: "resend", optional: false })] });
+  });
   it("select only their own channel; isolated fakes serve effects without one", () => {
     const iso = createIsolatedAdapter("publish");
     const hosted = createHostedWebsiteAdapter(hostedPorts().ports, ctx());

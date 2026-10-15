@@ -17,6 +17,7 @@
  * refused, never half-rendered) and the browser loaders. It holds no data.
  */
 import { z } from "zod";
+import { requiredConnectionSchema } from "@/platform/connections/contracts";
 
 export const AGENCY_CLIENT_PAGE_SIZE = 100;
 
@@ -136,6 +137,8 @@ export const agencyLibrarySourceSchema = z.object({
     label: z.string().max(40).nullable(),
     summary: z.string().max(500),
     publishedAt: iso,
+    /** Derived from the exact immutable revision; absent means it could not be checked. */
+    requiredConnections: z.array(requiredConnectionSchema).max(100).optional(),
   }).strict()).max(500),
   versions: z.array(agencyLibraryVersionSchema).max(1000),
 }).strict();
@@ -179,10 +182,14 @@ function failure(value: unknown, fallback: string): string {
   return typeof error === "string" && error.trim() ? error : fallback;
 }
 
+export class AgencyWorkspaceReadError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 async function getJson(request: typeof fetch, url: string, signal: AbortSignal | undefined, fallback: string): Promise<unknown> {
   const response = await request(url, { credentials: "same-origin", headers: { Accept: "application/json" }, signal });
   const value: unknown = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(failure(value, fallback));
+  if (!response.ok) throw new AgencyWorkspaceReadError(failure(value, fallback), response.status);
   return value;
 }
 

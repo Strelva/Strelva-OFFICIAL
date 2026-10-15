@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { DeclaredEffect, MakeRealChannel, Reversibility } from "@/platform/possibilities/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { EffectAdapter, EffectPerformResult } from "./ports";
+import { assertRequiredConnections } from "@/platform/system-versions/required-connections";
 
 /**
  * LIVE effect adapters (systems-experience spec section 5). Each one wraps the
@@ -50,9 +51,15 @@ function base(channel: MakeRealChannel, ctx: LiveChannelContext | null, reversib
     reversibility: (_effect: DeclaredEffect) => reversibility,
     /** Exploring never reaches a live adapter (rehearsePossibility refuses it). */
     async rehearse() { return { ok: false, detail: "A live adapter never rehearses. Exploring uses isolated adapters." }; },
-    async ready(): Promise<{ ok: true } | { ok: false; reason: string }> {
+    async ready(input: { businessId: string }): Promise<{ ok: true } | { ok: false; reason: string }> {
       if (!ctx) return { ok: false, reason: `${CHANNEL_LABEL[channel]} is not connected for publishing yet.` };
-      return (await ctx.enabled(channel)) ? { ok: true } : { ok: false, reason: `Publishing is not enabled for ${CHANNEL_LABEL[channel]} in this business yet.` };
+      if (!(await ctx.enabled(channel))) return { ok: false, reason: `Publishing is not enabled for ${CHANNEL_LABEL[channel]} in this business yet.` };
+      if (channel === "inquiry_form" || channel === "internal_app") {
+        try { await assertRequiredConnections({ actor: ctx.actor, workspaceId: input.businessId,
+          requiredConnections: [{ provider: "resend", access: "act", optional: false, purpose: "Send System email to approved recipients" }] }); }
+        catch (error) { return { ok: false, reason: message(error, "Open Connections and check email sending before making it live.") }; }
+      }
+      return { ok: true };
     },
   };
 }

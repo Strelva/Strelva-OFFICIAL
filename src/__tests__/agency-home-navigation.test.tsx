@@ -52,3 +52,26 @@ it("opens agency Home, preserves separate Clients navigation, and returns Home f
   // Both views reuse the mounted agency's client read.
   expect(request.mock.calls.filter(([input]) => String(input).includes("/api/workspace/agency-clients"))).toHaveLength(1);
 });
+
+it("opens the agency Connections section in the workspace and preserves its scope", async () => {
+  const base = createPreviewRequest("agency");
+  const request = vi.fn<typeof fetch>(async (input, init) => {
+    const path = new URL(String(input), "https://test.invalid").pathname;
+    if (path === "/api/workspace/connections") return Response.json({ connections: [], sourceErrors: [] });
+    if (path === "/api/workspace/agency-clients") return Response.json({ agencyWorkspaceId: agency, clients: [], team: [], total: 0, nextCursor: null, providersRead: true, queueComplete: true, queueGaps: [], queue: [] });
+    const response = await base(input, init);
+    if (path !== "/api/workspace") return response;
+    const data = await response.json();
+    return Response.json({ ...data, releases: { ...data.releases, systems: true } });
+  });
+  const node = document.createElement("div"); document.body.appendChild(node);
+  const root = createRoot(node); roots.push(root);
+  await act(async () => root.render(<WorkspaceApp request={request} />)); await settle();
+  const connections = node.querySelector<HTMLAnchorElement>('aside a[href*="view=connections"]')!;
+  expect(connections).not.toBeNull();
+  await act(async () => connections.click()); await settle();
+  expect(node.querySelector("h1")?.textContent).toBe("Connections");
+  expect(node.textContent).toContain("No outside accounts are connected yet");
+  expect(new URLSearchParams(window.location.search).get("view")).toBe("connections");
+  expect(request.mock.calls.find(([input]) => String(input).includes("/api/workspace/connections"))?.[0]).toContain(`workspaceId=${agency}`);
+});

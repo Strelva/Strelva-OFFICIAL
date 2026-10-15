@@ -2356,6 +2356,19 @@
           "rollbackStatus": "Prepared guarded inverse refuses function, ACL and later caller changes. Disposable SQL execution UNRUN; no production application authorized."
         }
       ]
+    },
+    {
+      "id": "conn-apps-2026-10-14",
+      "status": "Held and unapplied. ADR0016 native package account declarations, legacy read-time derivation and exact qualification. SQL fixture and guarded inverse/reapply runner authored, UNRUN; coordinator must run scripts/check-conn-apps-sql.sh. No provider, production or release-default change authorized.",
+      "items": [
+        {
+          "file": "20261026130000_conn_apps_declarations.sql",
+          "sha256": "13e5e0b6b43fa12cf0ba0e4e105c697890c84e24c7dcf492ded6f4617ef9cddd",
+          "rollback": "rollback-20261026130000_conn_apps_declarations.sql",
+          "rollbackSha256": "48a7f37a02e5d4f5e9b030f0dea715970a5abd2baa77a0ed262128ccba7f80f0",
+          "rollbackStatus": "Guarded inverse refuses later definitions/ACLs/callers and any retained explicit connection declaration; exact inverse/reapply and populated refusal remain UNRUN."
+        }
+      ]
     }
   ]
 }

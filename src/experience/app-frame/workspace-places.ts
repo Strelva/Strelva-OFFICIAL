@@ -26,10 +26,10 @@
  */
 import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 
-export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
+export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "connections" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["needs-you", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system", "ask"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["needs-you", "requests", "apps", "work", "ongoing", "products", "access", "connections", "settings", "help", "system", "ask"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
@@ -42,6 +42,7 @@ const TITLES: Record<StrelvaSection, string> = {
   products: PLACE_LABELS.systems,
   settings: PLACE_LABELS.businessDetails,
   access: PLACE_LABELS.access,
+  connections: "Connections",
   help: PLACE_LABELS.help,
   account: PLACE_LABELS.account,
   system: PLACE_LABELS.system,

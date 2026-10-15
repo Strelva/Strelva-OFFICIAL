@@ -174,3 +174,27 @@ describe("agency Library ready Version selection", () => {
   });
 
 });
+
+it("filters Library by the latest release's declared connections and keeps unknown sources explicit", async () => {
+  const current = library();
+  current.sources[0]!.revisions.forEach(revision => { revision.requiredConnections = [{ provider: "resend", access: "act", optional: false, purpose: "Notify the team." }]; });
+  const request: typeof fetch = async () => Response.json(current);
+  const node = await render(request);
+  const select = node.querySelector<HTMLSelectElement>('[aria-label="Works with"]')!;
+  await act(async () => { select.value = "resend"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(node.querySelector('[aria-label="Sources"]')!.textContent).toContain("Intake");
+  expect(node.querySelector('[aria-label="Sources"]')!.textContent).not.toContain("Twin Trees website");
+  expect(node.textContent).toContain("Some source Connections could not be checked");
+  await act(async () => { select.value = "highlevel"; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(node.textContent).toContain("No sources work with this connection yet");
+  expect(node.querySelector('[aria-label="Sources"]')).toBeNull();
+  await act(async () => { select.value = ""; select.dispatchEvent(new Event("change", { bubbles: true })); });
+  expect(node.querySelector('[aria-label="Sources"]')!.textContent).toContain("Twin Trees website");
+});
+
+it("shows a permission state without source contents when Library read is forbidden", async () => {
+  const request: typeof fetch = async () => Response.json({ error: "Forbidden" }, { status: 403 });
+  const node = await render(request);
+  expect(node.textContent).toContain("You do not have permission to open this Library");
+  expect(node.querySelector('[aria-label="Sources"]')).toBeNull();
+});

@@ -2457,3 +2457,35 @@ share one full-width divider, and visitor typography remains business-owned.
 Local DOM, route and unit checks are recorded in the chrome lane handoff. The
 completion brief forbids servers, builds and Playwright; desktop/phone, zoom,
 keyboard viewport and live rendering remain coordinator verification work.
+
+## October 14 Connections and App requirements (local, apps lane)
+
+[WorkspaceConnections](../../src/experience/connections/WorkspaceConnections.tsx)
+uses `StPage`, `StHead`, `StSection`, `StRows`, `StRow`, `StState`, `StNotice`,
+`StSkeleton` and `StTextButton`. Each account separates **Whose account** from
+**Access**; platform access omits its second line. Legacy holders read Unknown
+with a reconnect instruction. Per-source failures retain readable accounts and
+name unknown providers. Permission, loading, empty and transport failure states
+are distinct; changing workspaces immediately hides the old workspace's rows.
+Provider setup links open existing authorization-checked screens; this list
+never starts OAuth, sends mail or calls a provider. Business and agency menus
+opt into Connections only from workspace surfaces; older dashboard shells stay
+unchanged. The destination is `/workspace?view=connections&workspaceId=<id>`.
+
+[RequiredConnections](../../src/experience/systems/RequiredConnections.tsx)
+adds **Needs** before installation. Its **Works with** native select filters
+App declarations in `PackageCatalog` and agency Library. Providers stay filter
+choices rather than catalog Apps. Missing, unknown, failed or ineligible account
+reads never imply connection readiness. Installation still prepares Drafts;
+server boundaries independently re-read required accounts before a live action.
+StrelvaSidebar and StrelvaShell expose `connectionsAvailable` (default false)
+for this workspace section, independent of the Systems release. The existing
+workspace release remains its outer gate.
+
+Fictional specimens: `/preview/strelva/connections`, `?kind=agency`,
+`?state=empty|loading|error|permission|partial|unavailable`, and `?mode=dark`;
+`/preview/strelva/system-bundles` and `?surface=library` expose the catalog and
+Library filters with normal and failure states. DOM and source checks are local.
+Desktop/mobile rendering, keyboard/focus visual acceptance and actual connected
+provider reads remain the coordinator's post-integration checks under the lane
+brief's explicit browser/build prohibition.

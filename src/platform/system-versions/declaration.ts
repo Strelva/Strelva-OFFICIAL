@@ -1,5 +1,6 @@
 import { inquiryPackageDefinitionSchema, websiteSectionPackageDefinitionSchema } from "./bundle-contracts";
 import { z } from "zod";
+import { requiredConnectionSchema, type RequiredConnection } from "../connections/contracts";
 import { listOfferingDefinitions } from "../offerings/definitions";
 import { assertShareableDefinition, jsonEqual, changedPaths, type JsonObject } from "./compare";
 import { VersionValidationError, type SourceRevision } from "./types";
@@ -9,6 +10,7 @@ export const packageDeclarationSchema = z.object({
   recordsRead: names, recordsWritten: names, businessRecordFields: names,
   outsideEffects: z.array(z.enum(["email", "publish", "google", "payment"])).max(4),
   bindingKinds: names, dataLeavingBusiness: names,
+  requiredConnections: z.array(requiredConnectionSchema).max(100),
 }).strict();
 export type PackageDeclaration = z.infer<typeof packageDeclarationSchema>;
 export const revisionQualificationSchema = z.object({
@@ -29,22 +31,26 @@ export function effectivePackageBehavior(definition: JsonObject, bindingKinds: r
       return effectivePackageBehavior(item.definition, bindingKinds);
     });
     if (new Set(definition.systems.map(item => (item as JsonObject).key)).size !== definition.systems.length) throw new VersionValidationError("Bundle System keys must be unique.");
-    return packageDeclarationSchema.parse(Object.fromEntries(Object.keys(parts[0]!).map(key => [key, [...new Set(parts.flatMap(part => part[key as keyof PackageDeclaration]))].sort()])));
+    const keys = ["recordsRead", "recordsWritten", "businessRecordFields", "outsideEffects", "bindingKinds", "dataLeavingBusiness"] as const;
+    return packageDeclarationSchema.parse({
+      ...Object.fromEntries(keys.map(key => [key, [...new Set(parts.flatMap(part => part[key]))].sort()])),
+      requiredConnections: uniqueRequiredConnections(parts.flatMap(part => part.requiredConnections)),
+    });
   }
   if (definition.kind === "offering") {
     const fixed = listOfferingDefinitions().find(item => item.id === definition.offeringId && item.version === definition.offeringVersion);
     if (!fixed || !jsonEqual(definition, { kind: "offering", offeringId: fixed.id, offeringVersion: fixed.version, name: fixed.name, description: fixed.description, requiredResources: JSON.parse(JSON.stringify(fixed.requiredResources)), scopes: JSON.parse(JSON.stringify(fixed.scopes)), surfaces: JSON.parse(JSON.stringify(fixed.surfaces)), configurationFields: JSON.parse(JSON.stringify(fixed.configurationFields)) })) throw new VersionValidationError("This offering has no exact native definition adapter.");
     const staff = fixed.id === "private_staff_requests", inquiry = fixed.id === "customer_inquiry_intake";
     if (staff) return nativeApplicationBehavior([{ type: "contact" }, { type: "assigned_person" }], [fixed.requiredResources[0]!.kind]);
-    return packageDeclarationSchema.parse({ recordsRead: staff ? ["application.records"] : inquiry ? ["inquiries"] : ["website.content","website.requests"], recordsWritten: staff ? ["application.records"] : inquiry ? ["inquiries","inquiry.actions"] : ["website.requests"], businessRecordFields: staff ? ["contacts.id","contacts.name","people.id","people.name"] : [], outsideEffects: inquiry ? ["email"] : staff ? [] : ["publish"], bindingKinds: [fixed.requiredResources[0]!.kind], dataLeavingBusiness: inquiry ? ["approved email recipients"] : staff ? [] : ["approved public website content"] });
+    return declareBehavior({ recordsRead: staff ? ["application.records"] : inquiry ? ["inquiries"] : ["website.content","website.requests"], recordsWritten: staff ? ["application.records"] : inquiry ? ["inquiries","inquiry.actions"] : ["website.requests"], businessRecordFields: staff ? ["contacts.id","contacts.name","people.id","people.name"] : [], outsideEffects: inquiry ? ["email"] : staff ? [] : ["publish"], bindingKinds: [fixed.requiredResources[0]!.kind], dataLeavingBusiness: inquiry ? ["approved email recipients"] : staff ? [] : ["approved public website content"] });
   }
   if (definition.kind === "inquiry_pattern") {
     inquiryPackageDefinitionSchema.parse(definition);
-    return packageDeclarationSchema.parse({recordsRead:["inquiries"],recordsWritten:["inquiries"],businessRecordFields:[],outsideEffects:["email"],bindingKinds:[...new Set([...bindingKinds,"email"])].sort(),dataLeavingBusiness:["Inquiry routing messages to this business's chosen team"]});
+    return declareBehavior({recordsRead:["inquiries"],recordsWritten:["inquiries"],businessRecordFields:[],outsideEffects:["email"],bindingKinds:[...new Set([...bindingKinds,"email"])].sort(),dataLeavingBusiness:["Inquiry routing messages to this business's chosen team"]});
   }
   if (definition.kind === "website_section") {
     websiteSectionPackageDefinitionSchema.parse(definition);
-    return packageDeclarationSchema.parse({recordsRead:["website.document"],recordsWritten:["website.document"],businessRecordFields:[],outsideEffects:["publish"],bindingKinds:[...new Set([...bindingKinds,"website"])].sort(),dataLeavingBusiness:["Owner-approved website content published publicly"]});
+    return declareBehavior({recordsRead:["website.document"],recordsWritten:["website.document"],businessRecordFields:[],outsideEffects:["publish"],bindingKinds:[...new Set([...bindingKinds,"website"])].sort(),dataLeavingBusiness:["Owner-approved website content published publicly"]});
   }
   if (definition.kind !== "internal_app" || Object.keys(definition).some(key => !["kind", "title", "fields", "components"].includes(key)) || !Array.isArray(definition.fields) || !Array.isArray(definition.components)) throw new VersionValidationError("This runtime has no verified package declaration adapter.");
   return nativeApplicationBehavior(definition.fields as JsonObject[], bindingKinds);
@@ -54,7 +60,7 @@ export function effectivePackageBehavior(definition: JsonObject, bindingKinds: r
  * flags cannot silently expand the declaration approved for the source revision. */
 function nativeApplicationBehavior(fields: readonly JsonObject[], bindingKinds: readonly string[]): PackageDeclaration {
   const contact = fields.some(field => field.type === "contact"), person = fields.some(field => field.type === "assigned_person");
-  return packageDeclarationSchema.parse({
+  return declareBehavior({
     recordsRead: ["application.records", "internal_tool.notices", ...(contact ? ["business.contacts", "business.record"] : []), ...(person ? ["business.people"] : [])].sort(),
     recordsWritten: ["application.records", "internal_tool.notices", ...(contact ? ["business.contacts", "business.record", "business.record.history"] : [])].sort(),
     businessRecordFields: ["owner_recipient.email", "owner_recipient.name", "tenant.owner_email", ...(contact ? ["contacts.id", "contacts.name", "contacts.email", "contacts.phone"] : []), ...(person ? ["people.id", "people.name", "people.email", "people.active"] : [])].sort(),
@@ -63,11 +69,55 @@ function nativeApplicationBehavior(fields: readonly JsonObject[], bindingKinds: 
   });
 }
 
+/** Derived from the closed adapter's actual effects, never a creator's provider claim.
+ * Booking definitions are not currently executable package adapters; unknown kinds
+ * keep failing closed in effectivePackageBehavior rather than acquiring a runtime. */
+export function requiredConnectionsForBehavior(behavior: Pick<PackageDeclaration, "outsideEffects">): RequiredConnection[] {
+  const requirements: RequiredConnection[] = [];
+  if (behavior.outsideEffects.includes("email")) requirements.push({ provider: "resend", access: "act", optional: false, purpose: "Send System email to approved recipients" });
+  if (behavior.outsideEffects.includes("google")) requirements.push({ provider: "google_business_profile", access: "act", optional: false, purpose: "Apply approved Google Business Profile changes" });
+  return requirements;
+}
+
+function declareBehavior(behavior: Omit<PackageDeclaration, "requiredConnections">): PackageDeclaration {
+  return packageDeclarationSchema.parse({ ...behavior, requiredConnections: requiredConnectionsForBehavior(behavior) });
+}
+
+function uniqueRequiredConnections(requirements: RequiredConnection[]): RequiredConnection[] {
+  const unique = new Map(requirements.map(item => [JSON.stringify(item), item]));
+  return [...unique.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, item]) => item);
+}
+
+/** Immutable historical revisions are normalized in memory only. Explicit new
+ * declarations (including []) remain explicit and qualification checks them. */
+export function readPackageDeclaration(definition: JsonObject, declaration: unknown, bindingKinds: readonly string[] = []): PackageDeclaration {
+  const legacy = packageDeclarationSchema.omit({ requiredConnections: true }).safeParse(declaration);
+  if (legacy.success) return packageDeclarationSchema.parse({ ...legacy.data, requiredConnections: effectivePackageBehavior(definition, bindingKinds).requiredConnections });
+  return packageDeclarationSchema.parse(declaration);
+}
+
+/** Shared read-boundary adapter for catalog and source revision payloads. */
+export const packageRevisionConnectionsReadSchema = z.unknown().transform((value, context) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const revision = value as Record<string, unknown>;
+  if (!revision.declaration || !revision.definition || typeof revision.definition !== "object" || Array.isArray(revision.definition)) return value;
+  try {
+    const requires = revision.requires as { bindingKinds?: string[] } | undefined;
+    return { ...revision, declaration: readPackageDeclaration(revision.definition as JsonObject, revision.declaration, requires?.bindingKinds) };
+  } catch {
+    context.addIssue({ code: "custom", message: "The package connection declaration could not be verified." });
+    return z.NEVER;
+  }
+});
+
 export function assertPackageDeclaration(definition: JsonObject, declaration: PackageDeclaration, bindings: readonly string[] = []): void {
   const declared = packageDeclarationSchema.parse(declaration);
   const actual = effectivePackageBehavior(definition, bindings);
-  for (const key of Object.keys(actual) as Array<keyof PackageDeclaration>) {
+  for (const key of ["recordsRead", "recordsWritten", "businessRecordFields", "outsideEffects", "bindingKinds", "dataLeavingBusiness"] as const) {
     if (actual[key].some(value => !(declared[key] as readonly string[]).includes(value))) throw new VersionValidationError(`This System exceeds its package declaration: ${key}.`);
+  }
+  if (!jsonEqual(uniqueRequiredConnections(actual.requiredConnections), uniqueRequiredConnections(declared.requiredConnections))) {
+    throw new VersionValidationError("This System exceeds its package declaration: requiredConnections.");
   }
 }
 
@@ -79,7 +129,7 @@ export function automatedRevisionQualification(revision: SourceRevision, previou
       if (check === "shareable_definition") assertShareableDefinition(revision.definition);
       if (check === "declaration_match") {
         if (!revision.declaration) throw new Error("The immutable revision has no declaration.");
-        assertPackageDeclaration(revision.definition, revision.declaration, revision.requires.bindingKinds);
+        assertPackageDeclaration(revision.definition, readPackageDeclaration(revision.definition, revision.declaration, revision.requires.bindingKinds), revision.requires.bindingKinds);
       }
       if (check === "rehearsal" && (!rehearsal || rehearsal.revisionId !== revision.source.revisionId || !rehearsal.checks.length || rehearsal.checks.some(item => !item.passed))) throw new Error("A passing isolated native-runtime rehearsal receipt for this exact revision is required.");
       const paths = previous ? changedPaths(previous.definition, revision.definition) : [];
