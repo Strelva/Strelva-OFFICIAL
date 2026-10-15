@@ -9,7 +9,6 @@ import {
   CalendarDays,
   ChevronRight,
   Files,
-  ImagePlus,
   Link2,
   Mail,
   MessageSquareText,
@@ -133,12 +132,6 @@ const SOURCE_ACTIONS: SourcePromptAction[] = [
     message: "@Newsletter Draft an update based on the latest site changes.",
     description: "Draft customer emails.",
     icon: Mail,
-  },
-  {
-    label: "Social",
-    message: "@Social Draft a post from the latest site update.",
-    description: "Draft social posts.",
-    icon: ImagePlus,
   },
 ];
 

@@ -2,10 +2,10 @@ import { z } from "zod";
 import { tool } from "ai";
 import type { ChatToolDeps, ChatToolEntries } from "./chat-tool-deps";
 
-// Tenant chat tools for newsletters, Google Business drafts, social posts and
+// Tenant chat tools for newsletters, Google Business drafts and
 // reviews. Part of buildTenantChatTools (./chat-tools.ts).
 
-/** Newsletter, Google Business drafts, subscribers, social posts, reviews. */
+/** Newsletter, Google Business drafts, subscribers, reviews. */
 export function marketingChatTools(deps: ChatToolDeps): ChatToolEntries {
   const { tenant, recordActionResult, gbpTools } = deps;
   return {
@@ -94,78 +94,6 @@ export function marketingChatTools(deps: ChatToolDeps): ChatToolEntries {
               subscribedAt: s.subscribedAt,
             })),
           };
-        },
-      }),
-    },
-    draft_social_post: {
-      capability: "draft_social_post",
-      def: tool({
-        description: "Draft a social media post. Creates it as a draft that the owner can review and publish.",
-        inputSchema: z.object({
-          platform: z.enum(["instagram", "facebook", "x"]).describe("Target social platform"),
-          content: z.string().describe("The post content/caption"),
-          imageUrl: z.string().optional().describe("Optional image URL to attach"),
-        }),
-        execute: async ({ platform, content, imageUrl }) => {
-          try {
-            const { getSocialPosts, setSocialPosts } = await import("@/lib/storage");
-            const post = {
-              id: `sp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-              platform,
-              content,
-              imageUrl: imageUrl || undefined,
-              status: "draft" as const,
-              createdAt: new Date().toISOString(),
-            };
-            const posts = await getSocialPosts(tenant);
-            posts.unshift(post);
-            await setSocialPosts(tenant, posts);
-            recordActionResult({
-              status: "drafted",
-              message: `Social post draft saved for ${platform}.`,
-              sourceProof: "Source: Social drafts stored in dashboard",
-            });
-            return {
-              success: true,
-              post,
-              agentResultStatus: "drafted" as const,
-              sourceProof: "Source: Social drafts stored in dashboard",
-            };
-          } catch (err) {
-            const error = err instanceof Error ? err.message : "Failed to create post";
-            recordActionResult({ status: "failed", error });
-            return { success: false, error, agentResultStatus: "failed" as const };
-          }
-        },
-      }),
-    },
-    list_social_posts: {
-      capability: "list_social_posts",
-      def: tool({
-        description: "List recent social media posts with their status (draft, scheduled, published)",
-        inputSchema: z.object({
-          status: z.enum(["draft", "scheduled", "published"]).optional().describe("Filter by status"),
-        }),
-        execute: async ({ status }) => {
-          try {
-            const { getSocialPosts } = await import("@/lib/storage");
-            let posts = await getSocialPosts(tenant);
-            if (status) posts = posts.filter((p) => p.status === status);
-            return {
-              count: posts.length,
-              posts: posts.slice(0, 20).map((p) => ({
-                id: p.id,
-                platform: p.platform,
-                content: p.content.slice(0, 100) + (p.content.length > 100 ? "..." : ""),
-                status: p.status,
-                scheduledFor: p.scheduledFor,
-                publishedAt: p.publishedAt,
-                createdAt: p.createdAt,
-              })),
-            };
-          } catch (err) {
-            return { error: err instanceof Error ? err.message : "Failed to list posts" };
-          }
         },
       }),
     },

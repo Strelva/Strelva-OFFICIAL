@@ -83,14 +83,13 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
     );
   }
 
-  // Configured, but data isn't ready this cycle. Quiet, never an API error.
+  // Configured, but data isn't ready this cycle. Honest, not alarming, no raw API error.
   if (!ok) {
     return (
       <Shell>
         <div className="rounded-xl border border-glass-border bg-glass p-5">
           <p className="text-[13px] leading-relaxed text-gray-muted">
-            Your visitor sources are coming soon. We&apos;re gathering where people find you.
-            Check back shortly.
+            Visitor sources couldn&apos;t be read this time. Strelva tries again on the next refresh.
           </p>
         </div>
       </Shell>

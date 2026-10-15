@@ -1,5 +1,6 @@
 /**
- * Social post storage - drafts, scheduled, and published posts.
+ * Social post storage: retained drafts from the retired social tools. No writer
+ * remains; kept for data retention and deprovision.
  *
  * When DATA_SOURCE=postgres, reads/writes the Postgres `social_posts` table;
  * otherwise the dev-file store is the source of truth.

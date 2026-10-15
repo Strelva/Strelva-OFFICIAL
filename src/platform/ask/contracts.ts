@@ -46,6 +46,7 @@ export type AskToolId = keyof typeof ASK_TOOL_CATALOG;
 export const ASK_TOOL_IDS = Object.keys(ASK_TOOL_CATALOG) as AskToolId[];
 
 /** Tenant chat tools Ask Strelva retires instead of carrying (spec, Tool inventory). */
+// Retired platform-wide 2026-10-15: no Connection can post (instagram acts: null).
 export const ASK_RETIRED_TENANT_TOOLS = ["draft_social_post", "list_social_posts"] as const;
 /** Tenant tools whose work moves to a workspace-native tool. */
 export const ASK_REPLACED_TENANT_TOOLS = {

@@ -185,6 +185,17 @@ describe("POST /api/approve (the real resolve)", () => {
     expect(html).not.toContain("We couldn&#39;t finish that");
   });
 
+  it("says Not sent when an approved newsletter was held back, instead of a generic failure", async () => {
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "paused" });
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Not sent");
+    expect(html).toContain("stays in Needs you");
+    expect(html).not.toContain("We couldn&#39;t finish that");
+  });
+
   it("treats a not_found event as already handled (200)", async () => {
     mockResolveEventAction.mockResolvedValue({ changed: false, reason: "not_found" });
     const { signApproveToken } = await import("@/lib/approve-link");

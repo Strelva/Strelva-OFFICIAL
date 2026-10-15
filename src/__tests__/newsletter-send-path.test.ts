@@ -1,6 +1,8 @@
 const emailContext = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/infra/email/business-context", () => ({ resolveEmailBusinessContext: emailContext }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "inherit" }));
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The newsletter goes through the one email path (email/send.ts), from
@@ -29,6 +31,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("RESEND_API_KEY", "test-key");
   vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+  vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
   vi.stubEnv("APPROVE_LINK_SECRET", "test-only-secret");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.strelva.example");
   mockGetContent.mockResolvedValue({ siteName: "Outdated cached business" });
@@ -63,6 +66,27 @@ describe("sendNewsletter", () => {
     const result = await sendNewsletter("gldf", { subject: "s", body: "b" });
     expect(result).toMatchObject({ success: false, reason: "paused", subscriberCount: 0, receipt: { suppressed: 3, accepted: 0 } });
     expect(batchSend).not.toHaveBeenCalled();
+  });
+
+  it("is held, with nothing sent, while client email is off", async () => {
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "");
+    mockGetSubscribers.mockResolvedValue(subscribers(2));
+    const result = await sendNewsletter("gldf", { subject: "s", body: "b" });
+    expect(result).toMatchObject({ success: false, reason: "paused", subscriberCount: 0 });
+    expect(batchSend).not.toHaveBeenCalled();
+  });
+
+  it("never claims success without a provider key", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    mockGetSubscribers.mockResolvedValue(subscribers(2));
+    const result = await sendNewsletter("gldf", { subject: "s", body: "b" });
+    expect(result).toMatchObject({ success: false, reason: "not_configured", subscriberCount: 0 });
+    expect((result as { devMode?: boolean }).devMode).toBeUndefined();
+    expect(batchSend).not.toHaveBeenCalled();
+  });
+
+  it("has no manual send route", () => {
+    expect(existsSync(path.join(process.cwd(), "src/app/api/newsletter/send/route.ts"))).toBe(false);
   });
 
   it("keeps sending other batches after one fails, and a retry reuses each batch's key", async () => {

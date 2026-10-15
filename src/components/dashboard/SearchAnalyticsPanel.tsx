@@ -91,14 +91,13 @@ export function SearchAnalyticsPanel({ search, ga, connectHref }: SearchAnalytic
   }
 
   // Configured, but the data isn't ready this cycle (auth hiccup / fresh property).
-  // Quiet and reassuring — never surface an API error to the owner.
+  // Honest, not alarming, no raw API error.
   if (!anyOk) {
     return (
       <Shell>
         <div className="rounded-xl border border-glass-border bg-glass p-5">
           <p className="text-[13px] leading-relaxed text-gray-muted">
-            Your search data is coming soon. We&apos;re gathering how people find you on Google.
-            Check back shortly.
+            Search data from Google couldn&apos;t be read this time. Strelva tries again on the next refresh.
           </p>
         </div>
       </Shell>

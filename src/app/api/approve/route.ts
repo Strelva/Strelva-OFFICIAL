@@ -47,6 +47,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
+import { newsletterNotSentRefusal } from "@/lib/operator-decisions";
 import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
 import { isManagedReviewApproval, readReviewApprovalAuthority, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
 import { oneApprovalPathEnabled } from "@/platform/needs-you/release";
@@ -142,11 +143,11 @@ function confirmPage(params: {
 }
 
 /** Google has not approved Strelva's Business Profile access yet: nothing failed, the reply is saved. */
-function googleAccessPendingPage(businessName: string, dashboardUrl?: string): NextResponse {
+function googleAccessPendingPage(businessName: string | null, dashboardUrl?: string): NextResponse {
   return noticePage({
     status: 200,
     heading: "Waiting on Google",
-    body: `Your reply for ${businessName} is saved and still waiting in your workspace. Google hasn't approved Strelva's Business Profile access yet, so nothing was posted. Once Google approves, approve it again from your workspace.`,
+    body: `Your reply${businessName ? ` for ${businessName}` : ""} is saved and still waiting in your workspace. Google hasn't approved Strelva's Business Profile access yet, so nothing was posted. Once Google approves, approve it again from your workspace.`,
     dashboardUrl,
     buttonLabel: "Open your workspace",
   });
@@ -253,6 +254,12 @@ function decisionPage(result: DecideResult, origin: string, workspaceId: string,
       return noticePage({ status: 403, heading: "This link isn't for this account", body: "Nothing was done.", dashboardUrl: open, buttonLabel: "Open" });
     case "not_found":
       return noticePage({ status: 400, ...INVALID.bad });
+    case "failed": {
+      if (result.item?.outcomeReason === "google_access_pending") return googleAccessPendingPage(null, openItem);
+      const notSent = newsletterNotSentRefusal(result.item?.outcomeReason ?? undefined);
+      if (notSent) return noticePage({ status: 200, heading: "Not sent", body: notSent.error, dashboardUrl: openItem, buttonLabel: "Open your workspace" });
+      return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
+    }
     default:
       return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
   }
@@ -463,6 +470,18 @@ async function postPage(request: Request): Promise<NextResponse> {
   }
 
   if (result.reason === "google_access_pending") return googleAccessPendingPage(businessName, dashboardUrl);
+
+  // A newsletter that was approved but not sent stays pending: say so plainly.
+  const notSent = newsletterNotSentRefusal(result.reason);
+  if (notSent) {
+    return noticePage({
+      status: 200,
+      heading: "Not sent",
+      body: `${notSent.error} (${businessName})`,
+      dashboardUrl,
+      buttonLabel: "Open your workspace",
+    });
+  }
 
   // Any other reason (e.g. the external publish failed) — keep it honest: the
   // item is still pending, point them to the dashboard.

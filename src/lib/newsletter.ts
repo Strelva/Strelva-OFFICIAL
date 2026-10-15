@@ -4,7 +4,7 @@ import { getSubscribers } from "./storage";
 import { resolveEmailBusinessContext } from "@/platform/infra/email/business-context";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
-import { CLIENT_MAIL_DOMAIN, sendBatchWithReceipt } from "@/platform/infra/email/send";
+import { CLIENT_MAIL_DOMAIN, batchEmailSuppression, sendBatchWithReceipt } from "@/platform/infra/email/send";
 import { escapeEmailHtml } from "@/platform/infra/email/escape";
 import { buildUnsubscribeUrl } from "./newsletter-unsubscribe";
 
@@ -25,8 +25,7 @@ export interface SendNewsletterResult {
   success: boolean;
   /** Recipients the provider accepted. Accepted, not delivered. */
   subscriberCount: number;
-  devMode?: boolean;
-  reason?: "no_subscribers" | "paused" | "send_failed" | "business_identity_unavailable";
+  reason?: "no_subscribers" | "paused" | "not_configured" | "send_failed" | "business_identity_unavailable";
   /** Receipt detail (publishing spec, section 3 item 12). */
   receipt?: {
     activeSubscribers: number;
@@ -46,9 +45,9 @@ function controlOrigin(): string {
 }
 
 /**
- * Send a newsletter to a tenant's active subscribers. Shared by the manual
- * send route (POST /api/newsletter/send) and the approve-the-draft path
- * (event-actions). Caller is responsible for auth, rate limit and approval.
+ * Send a newsletter to a tenant's active subscribers. Called only by the
+ * approve-the-draft path (event-actions); no HTTP route sends a newsletter
+ * without an approval event. Caller is responsible for approval.
  *
  * Goes through the one email path (email/send.ts, audience `customer`) from
  * mail.strelva.com: never a per-client domain, never the root domain. Every
@@ -77,10 +76,16 @@ export async function sendNewsletter(
   const safeSubject = sanitizeEmailSubjectText(subject);
   const origin = controlOrigin();
 
-  if (!process.env.RESEND_API_KEY) {
-    // Dev mode: nothing is sent and nothing is claimed as sent to a person.
-    console.log(`[newsletter] dev mode (no RESEND_API_KEY): ${active.length} subscribers, from ${fromAddress}`);
-    return { success: true, subscriberCount: active.length, devMode: true };
+  // Both email switches and the provider key, checked before anything is
+  // claimed: success is only ever "the provider accepted batches".
+  const heldReceipt = { activeSubscribers: active.length, accepted: 0, suppressed: active.length, acceptedBatches: 0, failedBatches: 0, failedRecipients: 0, from: fromAddress };
+  const suppression = await batchEmailSuppression({ audience: "customer", tenantId: tenant, requireClientGate: true });
+  if (suppression === "not sent: unconfigured") {
+    return { success: false, subscriberCount: 0, reason: "not_configured", receipt: heldReceipt };
+  }
+  if (suppression) {
+    console.warn(`[newsletter] email is off — ${tenant} newsletter not sent`);
+    return { success: false, subscriberCount: 0, reason: "paused", receipt: heldReceipt };
   }
 
   let accepted = 0;
@@ -101,6 +106,7 @@ export async function sendNewsletter(
       const result = await sendBatchWithReceipt({
         audience: "customer",
         tenantId: tenant,
+        requireClientGate: true,
         fromName,
         fromAddress,
         idempotencyKey,

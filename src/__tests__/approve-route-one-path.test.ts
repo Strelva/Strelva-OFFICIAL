@@ -145,6 +145,23 @@ describe("/api/approve through Needs you", () => {
     expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 
+  it("says Waiting on Google when the item's decision failed on pending Google access", async () => {
+    needsYou.decide.mockResolvedValue({ status: "failed", item: item({ outcomeReason: "google_access_pending" }) });
+    const { review } = await tokens();
+    const html = await (await post(review)).text();
+    expect(html).toContain("Waiting on Google");
+    expect(html).toContain("Your reply is saved and still waiting in your workspace.");
+    expect(html).not.toContain("Could not finish this");
+  });
+
+  it("says Not sent when the item's decision failed because a newsletter was held back", async () => {
+    needsYou.decide.mockResolvedValue({ status: "failed", item: item({ outcomeReason: "paused" }) });
+    const { review } = await tokens();
+    const html = await (await post(review)).text();
+    expect(html).toContain("Not sent");
+    expect(html).not.toContain("Could not finish this");
+  });
+
   it("shows the honest pause when the model budget is paused", async () => {
     const { ModelBudgetPausedError } = await import("@/platform/infra/business-ai-budget");
     needsYou.decide.mockRejectedValue(new ModelBudgetPausedError(0, 0, {}));

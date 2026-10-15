@@ -67,8 +67,6 @@ export function chatToolLabel(toolName: string, section?: string): string {
               toolName === "create_gbp_post" ? "Drafting a Google post..." :
               toolName === "update_business_hours" ? "Drafting your hours update..." :
               toolName === "upload_gbp_photo" ? "Drafting a photo for your listing..." :
-              toolName === "draft_social_post" ? "Drafting social post..." :
-              toolName === "list_social_posts" ? "Checking social posts..." :
               toolName === "get_reviews" ? "Checking your reviews..." :
               toolName === "reply_to_review" ? "Drafting review reply..." :
               toolName === "toggle_section_visibility" ? "Updating section visibility..." :
