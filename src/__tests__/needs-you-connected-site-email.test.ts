@@ -11,6 +11,8 @@ afterEach(() => vi.unstubAllEnvs());
 describe("Needs you email for a planned connected-site change", () => {
   it("is not sent unless EMAIL_SENDING_ENABLED is true and the change switch is 1", async () => {
     needsYouService();
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "false");
+    vi.stubEnv("STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL", "");
     const allowed = () => captured.config!.emailAllowed(row);
     expect(await allowed()).toBe(false);
     vi.stubEnv("STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL", "1");
