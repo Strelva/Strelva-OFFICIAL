@@ -41,6 +41,19 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 beforeEach(() => { vi.spyOn(console, "error").mockImplementation(() => {}); });
 
 describe("runListingsCheck", () => {
+  it("clips a booking fix from the default hours when the booking settings are null", async () => {
+    const { d, raw, saveFixes } = deps({ targets: targets({ booking: [{ surfaceKey: "booking:main", scope: "t1", label: "Booking" }] as never }) });
+    const hours = { timezone: "America/New_York", weekly: [{ day: 2, opens: "13:00", closes: "17:00" }] };
+    raw.store.confirmedFacts.mockResolvedValueOnce({ ...confirmed, facts: { ...confirmed.facts, hours } } as never);
+    const context = { tenantStableId: null, workspaceId: WS, systemId: "s1", paused: false, services: [], hours, phone: null, settings: null };
+    raw.readers.booking.mockResolvedValueOnce({ context, outside: [{ day: 1, opens: "08:00", closes: "20:00" }] } as never);
+    await runListingsCheck(CHECK, d);
+    const fixes = saveFixes.mock.calls[0]![2] as Array<{ kind: string; proposed: { weekly: unknown[] } }>;
+    const booking = fixes.find(fix => fix.kind === "booking_hours");
+    expect(booking?.proposed.weekly).toEqual([{ day: 2, opens: "13:00", closes: "17:00" }]);
+    expect(fixes.every(fix => fix.kind !== "booking_hours" || fix.proposed.weekly.length > 0)).toBe(true);
+  });
+
   it("finishes with no differences and carries the Release the store records", async () => {
     const { d, finish } = deps({ targets: targets({ websites: [site], google: [{ surfaceKey: "google:loc1", tenantId: "t1", locationId: "loc1", label: "Harbor" }] }) });
     finish.mockResolvedValueOnce({ checkId: CHECK.id, release: { number: 2, recordedAt: "2026-10-15T00:00:00Z" } });
@@ -148,6 +161,7 @@ describe("queue, run and sweep", () => {
     raw.store.due.mockResolvedValueOnce([WS, other] as never);
     (raw.available as unknown as { mockImplementation(fn: (id: string) => Promise<boolean>): void }).mockImplementation(async id => id === WS);
     const result = await sweepListingsSync({}, d);
+    expect(raw.store.due).toHaveBeenCalledWith(50, "workspace");
     expect(raw.store.queue).toHaveBeenCalledTimes(1);
     expect(result.queued).toBe(1);
     vi.unstubAllEnvs();

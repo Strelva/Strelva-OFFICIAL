@@ -114,18 +114,24 @@ select pg_temp.ls_assert((select count(*) from public.listing_sync_releases) = 0
 
 -- ---- Releases: number from 1, no duplicates, new payload makes the next number ----
 set local role service_role;
+create temp table ls_cu as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'after_fix'));
+select public.listing_sync_finish_check((select id from ls_cu), (select claim_token from ls_cu), 'done',
+  '[{"surfaceKey":"website:site","state":"unreadable","facts":[]}]', 0, 0, null);
+reset role;
+select pg_temp.ls_assert((select status from public.listing_sync_fixes where surface_key = 'website:site') = 'applied', 'a page fix stays applied when the page could not be read');
+set local role service_role;
 create temp table ls_c2 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'after_fix'));
 select pg_temp.ls_assert((public.listing_sync_finish_check((select id from ls_c2), (select claim_token from ls_c2), 'done',
-  '[{"surfaceKey":"website:site","facts":[{"fact":"phone","state":"matches"}]}]', 0, 1, null))->'release'->>'number' = '1', 'Release 1');
+  '[{"surfaceKey":"website:site","state":"read","facts":[{"fact":"phone","state":"matches"}]}]', 0, 1, null))->'release'->>'number' = '1', 'Release 1');
 reset role;
 select pg_temp.ls_assert((select status from public.listing_sync_fixes where surface_key = 'website:site') = 'verified', 'the page fix verifies once the page matches');
 set local role service_role;
 create temp table ls_c3 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
 select pg_temp.ls_assert((public.listing_sync_finish_check((select id from ls_c3), (select claim_token from ls_c3), 'done',
-  '[{"surfaceKey":"website:site","facts":[{"fact":"phone","state":"matches"}]}]', 0, 1, null))->'release' = 'null'::jsonb, 'the same readings record no new Release');
+  '[{"surfaceKey":"website:site","state":"read","facts":[{"fact":"phone","state":"matches"}]}]', 0, 1, null))->'release' = 'null'::jsonb, 'the same readings record no new Release');
 create temp table ls_c4 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
 select pg_temp.ls_assert((public.listing_sync_finish_check((select id from ls_c4), (select claim_token from ls_c4), 'done',
-  '[{"surfaceKey":"website:site","facts":[{"fact":"phone","state":"matches"},{"fact":"hours","state":"matches"}]}]', 0, 2, null))->'release'->>'number' = '2', 'different readings make Release 2');
+  '[{"surfaceKey":"website:site","state":"read","facts":[{"fact":"phone","state":"matches"},{"fact":"hours","state":"matches"}]}]', 0, 2, null))->'release'->>'number' = '2', 'different readings make Release 2');
 reset role;
 select pg_temp.ls_refuse($$update public.listing_sync_releases set number = 9$$, 'listing_sync_release_immutable');
 select pg_temp.ls_refuse($$delete from public.listing_sync_releases$$, 'listing_sync_release_immutable');
@@ -154,11 +160,22 @@ select pg_temp.ls_assert(public.read_listing_sync('29100000-0000-4000-8000-00000
 select pg_temp.ls_assert((public.read_listing_sync('29100000-0000-4000-8000-000000000010', '29100000-0000-4000-8000-000000000001', 'ls-owner@example.test')->>'releaseCount')::int = 2, 'two Releases counted');
 
 -- ---- due ----
-select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10)) = 0, 'a freshly checked business is not due');
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'on')) = 0, 'a freshly checked business is not due');
 reset role;
 update public.listing_sync_checks set finished_at = clock_timestamp() - interval '25 hours' where status = 'done';
 set local role service_role;
-select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10)) = 1, 'a business last checked over 24 hours ago is due');
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'on')) = 1, 'a business last checked over 24 hours ago is due');
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'workspace')) = 0, 'workspace mode skips a business without its switch on');
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'off')) = 0, 'an unknown mode reaches no business');
+reset role;
+insert into public.workspace_release_flags(workspace_id, flag, state, changed_by) values ('29100000-0000-4000-8000-000000000010', 'listings_sync', 'on', '29100000-0000-4000-8000-000000000001')
+  on conflict (workspace_id, flag) do update set state = 'on';
+set local role service_role;
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'workspace')) = 1, 'workspace mode reaches a business with its switch on');
+reset role;
+update public.workspace_release_flags set state = 'off' where workspace_id = '29100000-0000-4000-8000-000000000010' and flag = 'listings_sync';
+set local role service_role;
+select pg_temp.ls_assert((select count(*) from public.listing_sync_due_workspaces(10, 'on')) = 0, 'on mode skips a business switched off');
 reset role;
 
 -- ---- authenticated cannot call ----

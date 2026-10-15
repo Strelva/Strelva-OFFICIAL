@@ -43,7 +43,10 @@ export function planFixes(readings: SurfaceReading[], ctx: PlanContext): Planned
     if (reading.kind === "booking") {
       const booking = ctx.booking[key];
       if (booking && facts.some(fact => fact.fact === "hours")) {
-        out.push({ surfaceKey: key, factKey: "hours", kind: "booking_hours", proposed: { scope: booking.scope, weekly: clipBooking(booking.weekly, ctx.recordHours ?? []) } });
+        const weekly = clipBooking(booking.weekly, ctx.recordHours ?? []);
+        // Never propose clearing every bookable time when none were known to begin with.
+        if (!weekly.length && !booking.weekly.length) continue;
+        out.push({ surfaceKey: key, factKey: "hours", kind: "booking_hours", proposed: { scope: booking.scope, weekly } });
       }
       continue;
     }

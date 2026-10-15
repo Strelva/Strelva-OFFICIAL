@@ -177,7 +177,9 @@ begin
         and exists (
           select 1 from jsonb_array_elements(p_readings) r
           where r->>'surfaceKey' = fx.surface_key
-            and ((fx.fact_key = 'page' and not exists (select 1 from jsonb_array_elements(r->'facts') f where f->>'state' = 'differs'))
+            and ((fx.fact_key = 'page' and r->>'state' = 'read'
+                    and not exists (select 1 from jsonb_array_elements(r->'facts') f where f->>'state' = 'differs')
+                    and exists (select 1 from jsonb_array_elements(r->'facts') f where f->>'state' = 'matches'))
               or (fx.fact_key <> 'page' and exists (select 1 from jsonb_array_elements(r->'facts') f
                     where f->>'fact' = fx.fact_key and f->>'state' in ('matches','follows')))));
   end if;
@@ -222,12 +224,17 @@ begin
 end;
 $$;
 
-create function public.listing_sync_due_workspaces(p_limit int) returns setof uuid
+create function public.listing_sync_due_workspaces(p_limit int, p_mode text) returns setof uuid
 language plpgsql security definer set search_path = public, pg_temp as $$
 begin
   return query
     select br.workspace_id from public.business_records br
       where not public.workspace_exit_completed(br.workspace_id)
+        -- Only businesses the switch can reach, so switched-off ones never fill the limit.
+        and case p_mode
+          when 'workspace' then exists (select 1 from public.workspace_release_flags f where f.workspace_id = br.workspace_id and f.flag = 'listings_sync' and f.state = 'on')
+          when 'on' then not exists (select 1 from public.workspace_release_flags f where f.workspace_id = br.workspace_id and f.flag = 'listings_sync' and f.state = 'off')
+          else false end
         and not exists (select 1 from public.listing_sync_checks c where c.workspace_id = br.workspace_id and c.status in ('queued','running'))
         and (
           not exists (select 1 from public.listing_sync_checks d where d.workspace_id = br.workspace_id and d.status = 'done')
@@ -293,13 +300,13 @@ revoke all on function public.listing_sync_release_immutable(),
   public.listing_sync_confirmed_facts(uuid), public.listing_sync_targets(uuid),
   public.listing_sync_save_fixes(uuid, uuid, jsonb), public.listing_sync_finish_check(uuid, uuid, text, jsonb, int, int, text),
   public.listing_sync_set_fix(uuid, uuid, text[], text, text, text, uuid), public.listing_sync_decline_plan(uuid, bigint, uuid),
-  public.listing_sync_due_workspaces(int), public.listing_sync_open_plan(uuid), public.read_listing_sync(uuid, uuid, text)
+  public.listing_sync_due_workspaces(int, text), public.listing_sync_open_plan(uuid), public.read_listing_sync(uuid, uuid, text)
   from public, anon, authenticated, service_role;
 grant execute on function public.listing_sync_queue_check(uuid, text, uuid), public.listing_sync_claim_checks(int, uuid),
   public.listing_sync_confirmed_facts(uuid), public.listing_sync_targets(uuid),
   public.listing_sync_save_fixes(uuid, uuid, jsonb), public.listing_sync_finish_check(uuid, uuid, text, jsonb, int, int, text),
   public.listing_sync_set_fix(uuid, uuid, text[], text, text, text, uuid), public.listing_sync_decline_plan(uuid, bigint, uuid),
-  public.listing_sync_due_workspaces(int), public.listing_sync_open_plan(uuid), public.read_listing_sync(uuid, uuid, text)
+  public.listing_sync_due_workspaces(int, text), public.listing_sync_open_plan(uuid), public.read_listing_sync(uuid, uuid, text)
   to service_role;
 
 commit;

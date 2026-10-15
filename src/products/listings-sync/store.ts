@@ -112,8 +112,8 @@ export const listingsSyncStore = {
   async declinePlan(workspaceId: string, recordRevision: number, decidedBy: string | null): Promise<number> {
     return call("listing_sync_decline_plan", { p_workspace_id: workspaceId, p_record_revision: recordRevision, p_decided_by: decidedBy }, z.number().int());
   },
-  async due(limit: number): Promise<string[]> {
-    return call("listing_sync_due_workspaces", { p_limit: limit }, z.array(uuid));
+  async due(limit: number, mode: "workspace" | "on"): Promise<string[]> {
+    return call("listing_sync_due_workspaces", { p_limit: limit, p_mode: mode }, z.array(uuid));
   },
   async openPlan(workspaceId: string): Promise<OpenListingsPlan> {
     return call("listing_sync_open_plan", { p_workspace_id: workspaceId }, openPlanSchema);

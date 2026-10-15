@@ -12,7 +12,7 @@ end $$;
 
 drop function if exists public.read_listing_sync(uuid, uuid, text);
 drop function if exists public.listing_sync_open_plan(uuid);
-drop function if exists public.listing_sync_due_workspaces(int);
+drop function if exists public.listing_sync_due_workspaces(int, text);
 drop function if exists public.listing_sync_decline_plan(uuid, bigint, uuid);
 drop function if exists public.listing_sync_set_fix(uuid, uuid, text[], text, text, text, uuid);
 drop function if exists public.listing_sync_finish_check(uuid, uuid, text, jsonb, int, int, text);

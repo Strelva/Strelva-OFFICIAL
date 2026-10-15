@@ -20,6 +20,10 @@ describe("planFixes", () => {
     const fixes = planFixes([reading("booking:main", "booking", [differs("hours")])], ctx);
     expect(fixes).toEqual([{ surfaceKey: "booking:main", factKey: "hours", kind: "booking_hours", proposed: { scope: "t1", weekly: [{ day: 1, opens: "09:00", closes: "17:00" }] } }]);
   });
+  it("never proposes clearing every bookable time when none were known", () => {
+    const empty = { ...ctx, booking: { "booking:main": { scope: "t1", weekly: [] } } };
+    expect(planFixes([reading("booking:main", "booking", [differs("hours")])], empty)).toEqual([]);
+  });
   it("makes Google differences owner to-dos until the fix Release is reached", () => {
     const readings = [reading("google:loc1", "google", [differs("hours"), differs("phone")])];
     expect(planFixes(readings, ctx).map(fix => fix.kind)).toEqual(["owner_todo", "owner_todo"]);

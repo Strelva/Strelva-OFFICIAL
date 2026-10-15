@@ -1,10 +1,12 @@
+import { settingsOrDefault } from "@/platform/bookings/availability";
 import { factValueSchemas } from "@/platform/business-record/contracts";
 import { comparePlatformSchema, publicFactsFromRecord } from "@/products/connected-sites/server";
 import { compareBooking, compareGoogle, compareWebsite, compareYelp, expectedFacts, type Expected, type GoogleLocationLike, type YelpBusinessLike } from "./compare";
 import { LISTING_FACTS, type FactComparison, type SurfaceReading } from "./contracts";
 import { planFixes, type PlanContext } from "./plan";
 import { readBookingSurface, readGoogleLocation, readWebsitePage, readYelpBusiness } from "./readers";
-import { listingsGoogleFixReached, listingsSyncAvailable, listingsSyncMayBeOn } from "./release";
+import { releaseFlagEnvMode } from "@/platform/release-flags/resolve";
+import { LISTINGS_APP, listingsGoogleFixReached, listingsSyncAvailable, listingsSyncMayBeOn } from "./release";
 import { listingsSyncStore, type CheckTrigger } from "./store";
 import { readListingTargets, type ListingTargets } from "./targets";
 
@@ -108,7 +110,7 @@ export async function runListingsCheck(check: ClaimedListingsCheck, deps: CheckD
       tasks.push(withTimeout((async (): Promise<SurfaceReading> => {
         const read = await deps.readers.booking(place.scope);
         if (!read) return { ...frame, state: "unreadable", reason: "Couldn't read the booking page. Strelva will check again.", ...base };
-        planCtx.booking[place.surfaceKey] = { scope: place.scope, weekly: read.context.settings?.bookableHours ?? [] };
+        planCtx.booking[place.surfaceKey] = { scope: place.scope, weekly: settingsOrDefault(read.context).bookableHours ?? [] };
         return { ...frame, state: "read", facts: sortFacts(compareBooking(expected, read.context, read.outside)) };
       })(), ms).catch((): SurfaceReading => ({ ...frame, state: "unreadable", reason: "Couldn't read the booking page. Strelva will check again.", ...base })));
     }
@@ -165,7 +167,9 @@ export async function runQueuedListingsChecks(options: { limit?: number; budgetM
 
 export async function sweepListingsSync(options: { limit?: number } = {}, deps: CheckDeps = liveCheckDeps): Promise<{ queued: number; ran: number; failed: number }> {
   if (!listingsSyncMayBeOn()) return { queued: 0, ran: 0, failed: 0 };
-  const due = await deps.store.due(options.limit ?? 50);
+  const mode = releaseFlagEnvMode(LISTINGS_APP);
+  if (mode === "off") return { queued: 0, ran: 0, failed: 0 };
+  const due = await deps.store.due(options.limit ?? 50, mode);
   let queued = 0;
   for (const workspaceId of due) {
     if (await queueListingsCheck(workspaceId, "sweep", undefined, deps)) queued += 1;

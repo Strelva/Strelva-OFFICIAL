@@ -43,8 +43,8 @@ describe("listings sync store", () => {
     expect(rpc).toHaveBeenCalledWith("listing_sync_decline_plan", { p_workspace_id: WS, p_record_revision: 4, p_decided_by: "u1" });
 
     rpc = fakeDb([WS]);
-    expect(await listingsSyncStore.due(10)).toEqual([WS]);
-    expect(rpc).toHaveBeenCalledWith("listing_sync_due_workspaces", { p_limit: 10 });
+    expect(await listingsSyncStore.due(10, "workspace")).toEqual([WS]);
+    expect(rpc).toHaveBeenCalledWith("listing_sync_due_workspaces", { p_limit: 10, p_mode: "workspace" });
 
     rpc = fakeDb(null);
     expect(await listingsSyncStore.openPlan(WS)).toBeNull();
