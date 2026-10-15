@@ -3,7 +3,7 @@ import { planHash, planLines } from "./plan";
 import { listingsSyncStore } from "./store";
 
 /** What the owner is asked to make live, one decision per business. */
-export interface ListingsPlan { workspaceId: string; recordRevision: number; hash: string; lines: string[]; requests: number; strelvaChanges: number }
+export interface ListingsPlan { workspaceId: string; recordRevision: number; hash: string; lines: string[]; requests: number; strelvaChanges: number; places?: number }
 export type OpenListingsPlanWithFixes = ListingsPlan & { fixes: ListingFix[]; readings: SurfaceReading[] };
 
 /** Service-side read (no member identity): the fixes the last finished check left open. Null when there is nothing to decide. */
@@ -20,6 +20,7 @@ export async function readListingsPlanForService(workspaceId: string, deps: { st
     lines: planLines(fixes, open.readings),
     requests,
     strelvaChanges: fixes.length - requests,
+    places: new Set(fixes.map(fix => fix.surfaceKey)).size,
     fixes,
     readings: open.readings,
   };
