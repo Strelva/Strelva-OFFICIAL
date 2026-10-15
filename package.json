@@ -50,6 +50,7 @@
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:site-domains": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-site-domains.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
+    "report:prod-flags": "tsx scripts/prod-flag-report.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "reborn:progress": "node scripts/reborn-progress.mjs",
     "version:check": "node scripts/check-version-sync.mjs",
