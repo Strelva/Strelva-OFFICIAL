@@ -3,7 +3,8 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { PLATFORMS } from "@/products/connected-sites/contracts";
-import { ConnectedSiteInputError, connectSite, connectedSitesReleaseEnabled, connectedSitesReleasedFor, presentConnectedSite, readConnectedSites, verifySite } from "@/products/connected-sites/server";
+import { detectSitePlatform } from "@/products/connected-sites/client";
+import { ConnectedSiteInputError, checkConnectedSite, connectSite, connectedSitesReleaseEnabled, connectedSitesReleasedFor, keepYourSiteReleasedFor, presentConnectedSite, readConnectedSites, verifySite } from "@/products/connected-sites/server";
 import { connectedSitesStore } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ const action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("connect"), workspaceId: z.string().uuid(), siteUrl: z.string().trim().min(4).max(500), label: z.string().trim().min(1).max(120).optional(), platform: z.enum(PLATFORMS).optional() }).strict(),
   z.object({ action: z.literal("update"), workspaceId: z.string().uuid(), siteId: z.string().uuid(), label: z.string().trim().min(1).max(120).optional(), platform: z.enum(PLATFORMS).optional(), captureForms: z.boolean().optional(), injectSchema: z.boolean().optional() }).strict(),
   z.object({ action: z.literal("verify"), workspaceId: z.string().uuid(), siteId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("check"), workspaceId: z.string().uuid(), siteId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("disconnect"), workspaceId: z.string().uuid(), siteId: z.string().uuid() }).strict(),
 ]);
 
@@ -54,8 +56,23 @@ export async function POST(request: Request) {
       const site = await connectSite(actor, { businessId: body.workspaceId, siteUrl: body.siteUrl, label: body.label, platform: body.platform }, store);
       return workspaceJson({ site: presentConnectedSite(site) }, 201);
     }
+    if (body.action === "check") {
+      // Keep your site: re-read the live page. Off means this action does not exist.
+      if (!(await keepYourSiteReleasedFor(actor, body.workspaceId))) return workspaceJson({ error: "Not available." }, 404);
+      if (await isRateLimitedWindowedAsync(`connected-site-check:${body.siteId}`, 10, 600_000)) return workspaceJson({ error: "Please wait before checking again." }, 429);
+      return workspaceJson({ site: presentConnectedSite(await checkConnectedSite(actor, body.workspaceId, body.siteId, { store })) });
+    }
     if (body.action === "verify") {
-      const site = await verifySite(actor, body.workspaceId, body.siteId, { store });
+      const keep = await keepYourSiteReleasedFor(actor, body.workspaceId);
+      const site = await verifySite(actor, body.workspaceId, body.siteId, {
+        store,
+        ...(keep ? {
+          observe: (verified, html) => {
+            const detected = detectSitePlatform({ html });
+            return store.recordCheck(actor, body.workspaceId, verified.id, { result: "present", platform: detected.platform === "unknown" ? null : detected.platform, evidence: detected.evidence });
+          },
+        } : {}),
+      });
       return workspaceJson({ site: presentConnectedSite(site) });
     }
     if (body.action === "disconnect") return workspaceJson({ site: presentConnectedSite(await store.revoke(actor, body.workspaceId, body.siteId)) });

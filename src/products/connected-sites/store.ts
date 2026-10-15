@@ -11,7 +11,7 @@ import { ownerDecisionSchema, type OwnerDecision, type ProposedItem } from "@/pl
 import { getSupabase } from "@/platform/infra/db/client";
 import type { CredentialHolder } from "@/platform/connections/contracts";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite } from "./contracts";
+import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite, type SitePlatform } from "./contracts";
 
 export interface ConnectedSitesRpc { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> }
 
@@ -33,6 +33,7 @@ export interface ConnectedSitesStore {
   update(actor: WorkspaceActor, workspaceId: string, siteId: string, patch: { label?: string; platform?: string; captureForms?: boolean; injectSchema?: boolean }): Promise<ConnectedSite>;
   revoke(actor: WorkspaceActor, workspaceId: string, siteId: string): Promise<ConnectedSite>;
   confirmVerification(actor: WorkspaceActor, workspaceId: string, siteId: string, observed: string[]): Promise<ConnectedSite>;
+  recordCheck(actor: WorkspaceActor, workspaceId: string, siteId: string, check: { result: "present" | "missing" | "unreachable"; platform: SitePlatform | null; evidence: string[] }): Promise<ConnectedSite>;
   inquiries(actor: WorkspaceActor, workspaceId: string, limit: number): Promise<ConnectedInquiry[]>;
   activity(actor: WorkspaceActor, workspaceId: string, days: number): Promise<Record<string, Record<string, number>>>;
   resolve(publicKey: string): Promise<ResolvedConnectedSite | null>;
@@ -77,6 +78,7 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
     async update(actor, workspaceId, siteId, patch) { return site(await rpc("update_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_patch: patch })); },
     async revoke(actor, workspaceId, siteId) { return site(await rpc("revoke_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId) })); },
     async confirmVerification(actor, workspaceId, siteId, observed) { return site(await rpc("confirm_connected_site_verification", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_observed: observed.slice(0, 20) })); },
+    async recordCheck(actor, workspaceId, siteId, check) { return site(await rpc("record_connected_site_check", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_result: check.result, p_platform: check.platform, p_evidence: check.evidence.slice(0, 5).map(item => item.slice(0, 120)) })); },
     async inquiries(actor, workspaceId, limit) { return z.array(inquirySchema).parse(await rpc(connectedInquiryRecordsEnabled() ? "read_connected_site_inquiries_v2" : "read_connected_site_inquiries", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_limit: limit })); },
     async activity(actor, workspaceId, days) { return z.record(z.string(), z.record(z.string(), z.number())).parse(await rpc("read_connected_site_activity", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_days: days }) ?? {}); },
     async resolve(publicKey) { const data = await rpc("resolve_connected_site", { p_public_key: publicKey }); return data ? resolvedConnectedSiteSchema.parse(data) : null; },

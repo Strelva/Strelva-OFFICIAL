@@ -30,7 +30,7 @@ import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
-export { fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
+export { checkConnectedSite, fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";
 export { connectedSiteChangeOwnerEmailEnabled, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "./keep-your-site-release";
 
 export { connectedSitesPublicFor, connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "./release";
@@ -116,7 +116,7 @@ export function fetchLiveSitePage(url: string): Promise<string | null> {
  * public addresses only) and pass the tokens found there to SQL, which
  * accepts only this site's own verification token or key.
  */
-export async function verifySite(actor: WorkspaceActor, businessId: string, siteId: string, deps: { store?: ConnectedSitesStore; fetchPage?: (url: string) => Promise<string | null> } = {}): Promise<ConnectedSite> {
+export async function verifySite(actor: WorkspaceActor, businessId: string, siteId: string, deps: { store?: ConnectedSitesStore; fetchPage?: (url: string) => Promise<string | null>; observe?: (site: ConnectedSite, html: string) => Promise<unknown> } = {}): Promise<ConnectedSite> {
   const store = deps.store ?? connectedSitesStore();
   const site = (await store.list(actor, businessId)).find(item => item.id === siteId && item.status === "active");
   if (!site) throw new WorkspaceConflictError("This connected site is no longer active here. Reload and try again.");
@@ -124,7 +124,12 @@ export async function verifySite(actor: WorkspaceActor, businessId: string, site
   let html: string | null = null;
   try { html = await (deps.fetchPage ?? fetchLiveSitePage)(site.siteUrl); } catch { html = null; }
   if (html === null) throw new WorkspaceConflictError(`We couldn't open ${site.siteHost} just now. Check the site is published, then try again.`);
-  return store.confirmVerification(actor, businessId, siteId, verificationProofs(html));
+  const confirmed = await store.confirmVerification(actor, businessId, siteId, verificationProofs(html));
+  if (deps.observe) {
+    // Best effort: what the page is built with never undoes a proven host.
+    try { await deps.observe(confirmed, html); } catch { console.warn("[connected-sites] post-verify check failed"); }
+  }
+  return confirmed;
 }
 
 export async function resolvePublicSite(publicKey: string, store: ConnectedSitesStore = connectedSitesStore()): Promise<ResolvedConnectedSite | null> {

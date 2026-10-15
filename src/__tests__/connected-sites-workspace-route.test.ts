@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
+const page = vi.hoisted(() => ({ html: "" as string | null }));
 const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn(), eligible: vi.fn() }));
+vi.mock("@/lib/pinned-public-text", () => ({
+  fetchPinnedPublicText: async () => page.html,
+  fetchPinnedPublicResponse: async () => page.html === null ? null : { url: "https://bakery.example/", status: 200, headers: new Headers({ "content-type": "text/html" }), body: Buffer.from(page.html) },
+}));
 vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: deps.eligible }));
 vi.mock("@/platform/connections/holders", () => ({ recordConnectionHolder: vi.fn(async () => undefined) }));
 vi.mock("@/products/connected-sites/installer", () => ({ resolveConnectedSiteInstaller: vi.fn(async (_actor, workspaceId) => ({ kind: "business", workspaceId })) }));
@@ -32,7 +37,8 @@ describe("/api/workspace/connected-sites", () => {
     deps.systemsOn = true;
     deps.flag.mockReset().mockResolvedValue(true);
     deps.eligible.mockReset().mockResolvedValue({ eligible: true, through: { kind: "platform" } });
-    store = { create: vi.fn(async () => stored), list: vi.fn(async () => [stored]), activity: vi.fn(async () => ({})), inquiries: vi.fn(async () => []), revoke: vi.fn(async () => ({ ...stored, status: "revoked", revokedAt: "2026-10-08T02:00:00Z" })), update: vi.fn(async () => stored), confirmVerification: vi.fn() } as unknown as ConnectedSitesStore;
+    store = { create: vi.fn(async () => stored), list: vi.fn(async () => [stored]), activity: vi.fn(async () => ({})), inquiries: vi.fn(async () => []), revoke: vi.fn(async () => ({ ...stored, status: "revoked", revokedAt: "2026-10-08T02:00:00Z" })), update: vi.fn(async () => stored), confirmVerification: vi.fn(async () => ({ ...stored, verifiedAt: "2026-10-08T01:00:00Z", verificationToken: null })), recordCheck: vi.fn(async () => ({ ...stored, verifiedAt: "2026-10-08T01:00:00Z", lastCheckResult: "present" })) } as unknown as ConnectedSitesStore;
+    page.html = `<html><head><meta name="generator" content="Wix.com Website Builder"><script src="https://app.strelva.test/connect.js" data-strelva-site="${stored.publicKey}" defer></script></head></html>`;
     setConnectedSitesStoreForTests(store);
   });
   afterEach(() => { vi.unstubAllEnvs(); setConnectedSitesStoreForTests(null); });
@@ -81,5 +87,37 @@ describe("/api/workspace/connected-sites", () => {
     expect((await list.json()).sites[0].siteHost).toBe("bakery.example");
     const gone = await post({ action: "disconnect", workspaceId: BUSINESS, siteId: SITE_ID });
     expect((await gone.json()).site.status).toBe("revoked");
+  });
+
+  describe("keep your site", () => {
+    it("check does not exist while the flag is off, and records nothing", async () => {
+      const response = await post({ action: "check", workspaceId: BUSINESS, siteId: SITE_ID });
+      expect(response.status).toBe(404);
+      expect(store.recordCheck).not.toHaveBeenCalled();
+    });
+    it("check re-reads the live page and stores what it found", async () => {
+      vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+      vi.stubEnv("STRELVA_KEEP_YOUR_SITE_RELEASE", "workspace");
+      const response = await post({ action: "check", workspaceId: BUSINESS, siteId: SITE_ID });
+      expect(response.status).toBe(200);
+      expect((await response.json()).site.lastCheckResult).toBe("present");
+      expect(store.recordCheck).toHaveBeenCalledWith(expect.anything(), BUSINESS, SITE_ID, { result: "present", platform: "wix", evidence: ["generator: Wix.com Website Builder"] });
+    });
+    it("check is rate limited per site", async () => {
+      vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+      vi.stubEnv("STRELVA_KEEP_YOUR_SITE_RELEASE", "workspace");
+      deps.limited.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      expect((await post({ action: "check", workspaceId: BUSINESS, siteId: SITE_ID })).status).toBe(429);
+      expect(deps.limited).toHaveBeenLastCalledWith(`connected-site-check:${SITE_ID}`, 10, 600_000);
+    });
+    it("verify records the detected builder once when on, and not when off", async () => {
+      expect((await post({ action: "verify", workspaceId: BUSINESS, siteId: SITE_ID })).status).toBe(200);
+      expect(store.recordCheck).not.toHaveBeenCalled();
+      vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+      vi.stubEnv("STRELVA_KEEP_YOUR_SITE_RELEASE", "workspace");
+      expect((await post({ action: "verify", workspaceId: BUSINESS, siteId: SITE_ID })).status).toBe(200);
+      expect(store.recordCheck).toHaveBeenCalledTimes(1);
+      expect(store.recordCheck).toHaveBeenCalledWith(expect.anything(), BUSINESS, SITE_ID, expect.objectContaining({ result: "present", platform: "wix" }));
+    });
   });
 });

@@ -6,7 +6,10 @@
  * reported as unreachable, never guessed to be a builder.
  */
 import { fetchPinnedPublicResponse } from "@/lib/pinned-public-text";
+import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { verificationProofs, type ConnectedSite } from "./contracts";
 import { detectSitePlatform, type PlatformDetection } from "./platform-detect";
+import { connectedSitesStore, type ConnectedSitesStore } from "./store";
 
 export interface SiteFingerprint { reachable: boolean; finalUrl: string | null; html: string | null; detection: PlatformDetection }
 
@@ -27,4 +30,24 @@ export async function fetchSiteFingerprint(url: string, fetchResponse: typeof fe
   } catch {
     return unreachable;
   }
+}
+
+/**
+ * Re-read the live page: are the Strelva lines still on it, and what is it
+ * built with. The result is stored as evidence on the site.
+ */
+export async function checkConnectedSite(
+  actor: WorkspaceActor, businessId: string, siteId: string,
+  deps: { store?: ConnectedSitesStore; fingerprint?: typeof fetchSiteFingerprint } = {},
+): Promise<ConnectedSite> {
+  const store = deps.store ?? connectedSitesStore();
+  const site = (await store.list(actor, businessId)).find(item => item.id === siteId && item.status === "active");
+  if (!site) throw new WorkspaceConflictError("This connected site is no longer active here. Reload and try again.");
+  const { reachable, html, detection } = await (deps.fingerprint ?? fetchSiteFingerprint)(site.siteUrl);
+  const result = !reachable || html === null ? "unreachable" : verificationProofs(html).includes(site.publicKey) ? "present" : "missing";
+  return store.recordCheck(actor, businessId, siteId, {
+    result,
+    platform: detection.platform === "unknown" ? null : detection.platform,
+    evidence: detection.evidence,
+  });
 }

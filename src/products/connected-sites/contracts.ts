@@ -50,6 +50,12 @@ export interface ConnectedSite {
   revokedAt: string | null;
   firstEventAt: string | null;
   lastEventAt: string | null;
+  /** Keep your site: the last live re-check of the page, and what it said it is built with. */
+  lastCheckedAt?: string | null;
+  lastCheckResult?: "present" | "missing" | "unreachable" | null;
+  detectedPlatform?: SitePlatform | null;
+  detectedEvidence?: string[];
+  detectedAt?: string | null;
 }
 
 /** What the public routes need about a site, by key. No workspace id leaves the server. */
@@ -71,6 +77,11 @@ export const connectedSiteSchema = z.object({
   verificationToken: z.string().nullable().optional().transform(value => value ?? null),
   verifiedAt: z.string().nullable(), createdAt: z.string(), updatedAt: z.string(), revokedAt: z.string().nullable(),
   firstEventAt: z.string().nullable(), lastEventAt: z.string().nullable(),
+  lastCheckedAt: z.string().nullable().optional().transform(value => value ?? null),
+  lastCheckResult: z.enum(["present", "missing", "unreachable"]).nullable().optional().transform(value => value ?? null),
+  detectedPlatform: z.enum(PLATFORMS).nullable().optional().transform(value => value ?? null),
+  detectedEvidence: z.array(z.string()).optional().transform(value => value ?? []),
+  detectedAt: z.string().nullable().optional().transform(value => value ?? null),
 });
 
 export const resolvedConnectedSiteSchema = z.object({
