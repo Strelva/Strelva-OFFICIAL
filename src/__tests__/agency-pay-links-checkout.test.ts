@@ -31,7 +31,7 @@ function fixture(over: { link?: unknown; prepared?: Array<{ sessionId?: string }
     }
   });
   const create = vi.fn(async () => ({ id: "cs_New", url: "https://checkout.stripe.com/pay/new" }));
-  const retrieve = vi.fn(async () => ({ id: "cs_Old", url: null }));
+  const retrieve = vi.fn(async () => ({ id: "cs_Old", url: null, status: "expired" }));
   const expire = vi.fn(async () => ({}));
   const stripe = { checkout: { sessions: { create, retrieve, expire } } } as unknown as Stripe;
   return { db: { rpc }, stripe, rpc, create, retrieve, expire };
@@ -80,6 +80,14 @@ describe("agency pay-link checkout", () => {
     expect(names(f)).toContain("advance_agency_pay_link_checkout");
     const keys = f.rpc.mock.calls.filter(call => call[0] === "reserve_business_payment").map(call => (call[1] as { p_key: string }).p_key);
     expect(keys[1]).toContain(":g1:");
+  });
+
+  it("never opens a second charge when the reused session already completed", async () => {
+    const f = fixture({ prepared: [{ sessionId: "cs_Old" }, {}] });
+    f.retrieve.mockResolvedValueOnce({ id: "cs_Old", url: null, status: "complete" });
+    await expect(startAgencyPayLinkCheckout(input, { db: f.db, stripe: f.stripe })).rejects.toMatchObject({ status: 409 });
+    expect(names(f)).not.toContain("advance_agency_pay_link_checkout");
+    expect(f.create).not.toHaveBeenCalled();
   });
 
   it("refuses a range amount outside the link before reserving anything", async () => {

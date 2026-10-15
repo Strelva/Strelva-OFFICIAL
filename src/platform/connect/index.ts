@@ -101,7 +101,7 @@ export async function createDirectCheckout(input:DirectCheckoutInput,deps:Connec
  if(!prepared?.sessionId){await deps.beforeProviderMutation?.(payment.id);await assertBusinessCheckoutAdmission(payment.id,merchant,{...deps,db});}
  const session=prepared?.sessionId?await stripe.checkout.sessions.retrieve(prepared.sessionId,{stripeAccount:merchant.stripe_account_id!}):await stripe.checkout.sessions.create({mode:"payment",line_items:[{price_data:{currency:input.currency,unit_amount:input.amountCents,product_data:{name:input.productName?input.productName.slice(0,250):input.purpose==="quote"?"Accepted quote":input.purpose==="deposit"?"Booking deposit":"Business payment"}},quantity:1}],success_url:input.successUrl,cancel_url:input.cancelUrl,metadata:{businessPaymentId:payment.id},payment_intent_data:{application_fee_amount:0,metadata:{businessPaymentId:payment.id}}},{stripeAccount:merchant.stripe_account_id!,idempotencyKey:`payment:${payment.id}`});
  await moneyRpc("record_business_payment_event",{p_account_id:merchant.stripe_account_id,p_event_id:`checkout:${session.id}`,p_object_id:session.id,p_payment_id:payment.id,p_kind:"checkout_created",p_amount:0},db);
- return {paymentId:payment.id,sessionId:session.id,url:session.url};
+ return {paymentId:payment.id,sessionId:session.id,url:session.url,status:session.status};
 }
 export async function createDirectSubscription(input:{workspaceId:string;idempotencyKey:string;customerId:string;priceId:string;purpose:string;businessWorkspaceId?:string;agencyInvoiceId?:string},deps:ConnectDependencies={}) {
  const merchant=await getConnectedMerchant(input.workspaceId,deps.db===undefined?connectDb():deps.db);

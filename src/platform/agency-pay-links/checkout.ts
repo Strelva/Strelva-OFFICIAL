@@ -29,7 +29,11 @@ export async function startAgencyPayLinkCheckout(input: { slug: string; submitte
   });
   let begun = await open();
   let result = await create(begun);
-  if (!result.url) {
+  if (!result.url && result.status === "complete") {
+    // Stripe took the payment but the paid webhook has not landed: never open a second charge.
+    throw new AgencyPayLinkClosedError("Stripe accepted a payment on this link. It shows as paid here once Stripe confirms it. Nothing more was charged.", 409);
+  }
+  if (!result.url && result.status === "expired") {
     // A reused Stripe session had expired: move to the next generation and open a fresh one.
     await payLinkRpc("advance_agency_pay_link_checkout", { p_link_id: begun.linkId, p_expected_generation: begun.generation }, db, input.slug);
     begun = await open();
