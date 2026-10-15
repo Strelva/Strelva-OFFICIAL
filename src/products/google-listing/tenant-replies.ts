@@ -180,7 +180,8 @@ export async function postTenantReviewReply(input: {
     }
     if (outcome.status === "failed") {
       if (outcome.accessPending) await deps.noteAccess?.(input.workspaceId, locationId, true);
-      deps.notify(`Review reply FAILED for *${input.tenantId}* (reviewId=${input.reviewId}): ${outcome.receipt.error ?? "Google refused it"}`);
+      if (outcome.accessPending) deps.notify(`Review reply waiting on Google access for *${input.tenantId}* (reviewId=${input.reviewId}); it goes out once Google approves.`);
+      else deps.notify(`Review reply FAILED for *${input.tenantId}* (reviewId=${input.reviewId}): ${outcome.receipt.error ?? "Google refused it"}`);
       return { status: "failed", reason: outcome.accessPending ? "google_access_pending" : "google_refused", receipt: outcome.receipt };
     }
     if (outcome.status !== "posted") {

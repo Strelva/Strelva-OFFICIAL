@@ -313,7 +313,7 @@ export interface TenantReviewRepliesPort {
   postTenantReviewReply(input: {
     tenantId: string; workspaceId: string; eventId: string; attemptId: string; reviewId: string; text: string;
     authority: TenantReplyAuthority;
-  }, deps: TenantReplyDepsHandle): Promise<{ status: string }>;
+  }, deps: TenantReplyDepsHandle): Promise<{ status: string; reason?: string }>;
 }
 
 // ── Website documents for the agent's v2 site tools (src/products/websites) ────

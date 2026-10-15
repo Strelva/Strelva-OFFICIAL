@@ -52,12 +52,12 @@ non-local database needs `--i-have-jacobs-yes`.
 
 ## Outlook Calendar
 
-- **Keys.** `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`. Needs the shared state secret and app URL.
+- **Keys.** `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`. Needs the shared state secret and app URL. Apply the migration below first; the keys alone are not enough.
 - **Where.** Microsoft Entra admin center, App registrations, a new registration. Supported account types: any organization plus personal Microsoft accounts (the `/common` endpoint).
 - **Redirect URL.** Web, `/api/workspace/calendar-connections/oauth/outlook/callback`.
 - **Permissions.** Delegated: `offline_access`, `Calendars.ReadWrite`, `openid`, `profile`.
 - **Renewal.** Client secrets expire (24 months at most). Write the renewal date down when you create it. **UNVERIFIED (2026-10-15):** Microsoft's current maximum and whether publisher verification is required for multi-tenant apps.
-- **Needs the migration.** `20261026150000_conn_outlook_calendar.sql` is held and unapplied; Outlook shows in Connections with whose account it is only after it is applied.
+- **Needs the migration (hard prerequisite).** `20261026150000_conn_outlook_calendar.sql` is held and unapplied. Apply it before adding the `MICROSOFT_*` keys: without it, every Outlook connect fails (the holder cannot be recorded) and Apps that declare `outlook_calendar` are refused.
 - **Before and after.** "Not set up yet", then connectable; the scheduling panel disables Connect until then.
 
 ## HighLevel
