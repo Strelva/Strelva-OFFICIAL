@@ -9,11 +9,20 @@ import { disconnectTenantProvider } from "@/lib/provider-disconnect";
 
 const YELP_API_BASE = "https://api.yelp.com/v3";
 
-async function validateYelpCredentials(apiKey: string, businessId: string): Promise<boolean> {
-  const res = await fetch(`${YELP_API_BASE}/businesses/${businessId}/reviews`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  return res.ok;
+/** Says which part Yelp refused. Never echoes the key. */
+async function validateYelpCredentials(apiKey: string, businessId: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${YELP_API_BASE}/businesses/${encodeURIComponent(businessId)}/reviews`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+  } catch {
+    return { ok: false, message: "Yelp didn't answer. Try again in a minute." };
+  }
+  if (res.ok) return { ok: true };
+  if (res.status === 401 || res.status === 403) return { ok: false, message: "Yelp refused this API key." };
+  if (res.status === 404) return { ok: false, message: "Yelp couldn't find that business ID." };
+  return { ok: false, message: "Yelp didn't answer. Try again in a minute." };
 }
 
 export async function POST(req: Request) {
@@ -38,9 +47,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "apiKey and businessId are required" }, { status: 400 });
   }
 
-  const valid = await validateYelpCredentials(apiKey, businessId);
-  if (!valid) {
-    return NextResponse.json({ error: "Invalid Yelp credentials" }, { status: 400 });
+  const checked = await validateYelpCredentials(apiKey, businessId);
+  if (!checked.ok) {
+    return NextResponse.json({ error: checked.message }, { status: 400 });
   }
 
   await saveConnection({

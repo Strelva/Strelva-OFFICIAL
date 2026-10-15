@@ -56,6 +56,14 @@ describe("integration registry", () => {
     ).toBe("not_configured");
   });
 
+  it("tells the truth about Yelp: once a day, and the owner posts replies on Yelp", () => {
+    const yelp = getIntegrationDefinition("yelp")!;
+    expect(yelp.syncFrequency).toBe("Once a day");
+    expect(yelp.description).toContain("once a day");
+    expect(yelp.description).toContain("you post it on Yelp yourself");
+    expect(JSON.stringify(yelp)).not.toMatch(/12 hours|respond to your Yelp|publish/i);
+  });
+
   it("normalizes connection errors without false connected states", () => {
     const yelp = getIntegrationDefinition("yelp");
     expect(yelp).toBeDefined();

@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   redisDel: vi.fn(),
   connection: vi.fn(),
   synced: vi.fn(),
+  mutateConnection: vi.fn(async () => undefined),
   addEvent: vi.fn(),
   addReview: vi.fn(),
   reviewAlert: vi.fn(),
@@ -71,7 +72,7 @@ vi.mock("@/platform/infra/monitoring", () => ({ alert: mocks.alert, alertOnce: m
 vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({ get: mocks.redisGet, set: mocks.redisSet, del: mocks.redisDel }),
 }));
-vi.mock("@/lib/connections", () => ({ getConnection: mocks.connection, updateLastSynced: mocks.synced }));
+vi.mock("@/lib/connections", () => ({ getConnection: mocks.connection, updateLastSynced: mocks.synced, saveConnectionMutation: mocks.mutateConnection }));
 vi.mock("@/lib/google-access", () => ({
   getGoogleGrant: vi.fn(async () => ({ status: "connected" })),
   getGoogleLocation: vi.fn(async () => ({ accountId: "accounts/test-account", locationId: "test-location" })),

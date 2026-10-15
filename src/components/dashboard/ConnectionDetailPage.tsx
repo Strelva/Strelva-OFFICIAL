@@ -49,6 +49,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<IntegrationStatus>("not_configured");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [platformReady, setPlatformReady] = useState(true);
   const [disconnecting, setDisconnecting] = useState(false);
   const isConnected = status === "connected";
 
@@ -97,6 +98,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         })
       );
       setLastSyncedAt(conn?.lastSyncedAt ?? null);
+      setPlatformReady(conn?.platformReady !== false);
     });
   }, [dashboardHref, detail]);
 
@@ -239,7 +241,12 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <SourceHealthBadge status={intelligenceStatus} lastSync={lastSyncedAt} compact />
-          {!isConnected && detail.connectionProvider === "google" && (
+          {!isConnected && !platformReady && (
+            <p className="text-[13px] text-gray-muted">
+              Strelva hasn’t set up {detail.displayName} yet. Connecting will work once it has.
+            </p>
+          )}
+          {!isConnected && platformReady && detail.connectionProvider === "google" && (
             <a
               href={dashboardHref("/api/oauth/google")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
@@ -247,7 +254,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
               Connect with Google
             </a>
           )}
-          {!isConnected && detail.connectionProvider === "calendly" && (
+          {!isConnected && platformReady && detail.connectionProvider === "calendly" && (
             <a
               href={dashboardHref("/api/oauth/calendly")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"
@@ -255,7 +262,7 @@ export function ConnectionDetailPage({ connectionId }: { connectionId: string })
               Connect with Calendly
             </a>
           )}
-          {!isConnected && detail.connectionProvider === "instagram" && (
+          {!isConnected && platformReady && detail.connectionProvider === "instagram" && (
             <a
               href={dashboardHref("/api/oauth/instagram")}
               className="rounded-xl bg-accent px-6 py-2.5 text-[13px] font-medium text-on-accent hover:bg-accent/80 transition-colors inline-flex items-center"

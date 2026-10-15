@@ -57,6 +57,8 @@ export interface RawConnectionStatus {
   connected?: boolean;
   lastSyncedAt?: string | null;
   status?: string | null;
+  /** False when Strelva has not added the provider's keys yet; absent means unknown. */
+  platformReady?: boolean;
 }
 
 export type RawTenantConnectionSettings = Record<string, boolean | undefined>;
@@ -340,18 +342,18 @@ export const INTEGRATION_REGISTRY: IntegrationDefinition[] = [
     id: "yelp",
     displayName: "Yelp",
     providerId: "yelp",
-    shortDescription: "Monitor & respond to Yelp reviews",
+    shortDescription: "Read your Yelp reviews; draft replies you post on Yelp",
     description:
-      "Monitor and respond to your Yelp reviews through your AI. Get notified when new reviews come in, draft professional responses, and keep your Yelp listing accurate.",
+      "Strelva reads your recent Yelp reviews once a day with the Yelp API key you add. It can draft a reply for you, but Yelp has no way for apps to post replies, so you post it on Yelp yourself.",
     icon: "YP",
     iconBg: "bg-[rgba(255,255,255,0.03)]",
     iconColor: "text-gray-fg",
-    syncFrequency: "Every 12 hours",
+    syncFrequency: "Once a day",
     usedIn: "Review management, reputation",
     intelligenceCategory: "understands_customers",
     additionalIntelligenceCategories: ["can_take_action"],
     addsIntelligence: "Customer language and reputation signals from Yelp reviews.",
-    actionPaths: ["Draft Yelp review reply", "Suggest site proof copy"],
+    actionPaths: ["Draft a Yelp reply for you to post", "Suggest site proof copy"],
     appearsIn: ["Chat", "Reports", "Suggestions"],
     sourcePrompt: "@Yelp What customer language should my site reuse?",
     connectionProvider: "yelp",

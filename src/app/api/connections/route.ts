@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess } from "@/platform/infra/auth";
 import { getConnections } from "@/lib/connections";
+import { providerKeyStatus, type KeyedIntegration } from "@/platform/connections/provider-keys";
 import type { Connection, IntegrationProvider } from "@/lib/types";
 
 export interface ConnectionStatus {
@@ -14,7 +15,13 @@ export interface ConnectionStatus {
   connected: boolean;
   lastSyncedAt: string | null;
   status: Connection["status"] | "disconnected";
+  /** False when Strelva has not added this provider's keys yet. Yelp is always true: the owner brings the key. */
+  platformReady: boolean;
 }
+
+const PLATFORM_KEYS: Partial<Record<IntegrationProvider, KeyedIntegration>> = {
+  google: "google_sign_in_legacy", calendly: "calendly", instagram: "instagram",
+};
 
 export async function GET() {
   try {
@@ -34,6 +41,7 @@ export async function GET() {
         connected: conn?.status === "connected",
         lastSyncedAt: conn?.lastSyncedAt ?? null,
         status: conn?.status ?? "disconnected",
+        platformReady: PLATFORM_KEYS[provider] ? providerKeyStatus(PLATFORM_KEYS[provider]).ready : true,
       };
     });
 
