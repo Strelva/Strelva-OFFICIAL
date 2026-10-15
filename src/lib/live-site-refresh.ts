@@ -15,7 +15,7 @@ export async function refreshLiveSite(
   options?: { tags?: string[] },
 ): Promise<LiveSiteRefresh> {
   try {
-    const result = await revalidateClientSite(tenant, target, options);
+    const result = await (options ? revalidateClientSite(tenant, target, options) : revalidateClientSite(tenant, target));
     if (result.skipped) return { status: "not_configured" };
     if (result.success) return { status: "revalidated" };
     return { status: "failed", error: result.error || "Unknown revalidation failure" };

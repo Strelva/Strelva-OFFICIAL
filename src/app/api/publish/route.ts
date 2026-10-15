@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentMap, ContentSection } from "@/lib/types";
 import {
-  appendVersion,
   clearDraft,
   clearDraftPageConfig,
   getContent,
@@ -12,17 +11,18 @@ import {
   listDrafts,
   logActivity,
   logAuditEvent,
+  publishSiteDrafts,
   recordSectionUpdate,
-  setContent,
-  setPageConfig,
+  SitePublishError,
 } from "@/lib/storage";
+import type { PublishDraftSection } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sectionSchemas } from "@/lib/schemas";
 import { diffFields } from "@/lib/utils";
-import { revalidateClientSite } from "@/lib/revalidate-client";
+import { refreshLiveSite } from "@/lib/live-site-refresh";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
 import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
@@ -104,75 +104,98 @@ export async function POST() {
       validatedPageConfig = parsed.pageConfig;
     }
 
-    const publishedSections: ContentSection[] = [];
+    const sections: PublishDraftSection[] = [];
+    const priorBySection = new Map<ContentSection, Record<string, unknown>>();
+    const changesBySection = new Map<ContentSection, ReturnType<typeof diffFields>>();
     for (const draft of parsedDrafts) {
       const current = await getContent(draft.section, tenant) as unknown as Record<string, unknown>;
-      const next = draft.data as ContentMap[typeof draft.section];
-      const changes = diffFields(current, next as unknown as Record<string, unknown>);
-
-      await setContent(draft.section, next, tenant);
-      await appendVersion(draft.section, next, actor.isImpersonating ? "admin" : "user", tenant, changes);
-      await recordSectionUpdate(draft.section, tenant);
-      await logActivity({
-        text: actor.isImpersonating
-          ? `Strelva admin published ${draft.section}`
-          : `Published ${draft.section} from site editor`,
-        time: new Date().toISOString(),
-        type: "admin",
-        section: draft.section,
-        actor: actor.isImpersonating ? "admin" : "user",
-        changes,
-        snapshot: current,
-      }, tenant);
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "content.published",
-        targetType: "content_section",
-        targetId: draft.section,
-        metadata: { section: draft.section, changeCount: changes.length },
-      });
-      await clearDraft(draft.section, tenant);
-      publishedSections.push(draft.section);
+      const changes = diffFields(current, draft.data as unknown as Record<string, unknown>);
+      priorBySection.set(draft.section, current);
+      changesBySection.set(draft.section, changes);
+      sections.push({ section: draft.section, data: draft.data, changes });
     }
 
-    let publishedPageConfig = false;
+    // Sections, versions, page layout and cleared drafts go live together or
+    // not at all.
+    try {
+      if (sections.length > 0 || validatedPageConfig) {
+        await publishSiteDrafts({
+          tenant,
+          sections,
+          pageConfig: validatedPageConfig,
+          author: actor.isImpersonating ? "admin" : "user",
+        });
+      }
+    } catch (err) {
+      if (err instanceof SitePublishError) {
+        console.error("[publish POST] not published", err);
+        return NextResponse.json(
+          { error: err.message, published: false, rolledBack: err.rolledBack, sectionsNeedingAttention: err.sectionsNeedingAttention },
+          { status: err.rolledBack ? 503 : 500 }
+        );
+      }
+      throw err;
+    }
+
+    const publishedSections: ContentSection[] = sections.map((s) => s.section);
+    const publishedPageConfig = Boolean(validatedPageConfig);
+
+    // The publish is committed. Bookkeeping below can never change the response.
+    for (const draft of parsedDrafts) {
+      const changes = changesBySection.get(draft.section) ?? [];
+      try {
+        await recordSectionUpdate(draft.section, tenant);
+      } catch (err) {
+        console.error("[publish POST] section timestamp not recorded", draft.section, err);
+      }
+      try {
+        await logActivity({
+          text: actor.isImpersonating
+            ? `Strelva admin published ${draft.section}`
+            : `Published ${draft.section} from site editor`,
+          time: new Date().toISOString(),
+          type: "admin",
+          section: draft.section,
+          actor: actor.isImpersonating ? "admin" : "user",
+          changes,
+          snapshot: priorBySection.get(draft.section),
+        }, tenant);
+      } catch (err) {
+        console.error("[publish POST] activity not logged", draft.section, err);
+      }
+      try {
+        await logAuditEvent({
+          tenant,
+          actor,
+          action: "content.published",
+          targetType: "content_section",
+          targetId: draft.section,
+          metadata: { section: draft.section, changeCount: changes.length },
+        });
+      } catch (err) {
+        console.error("[publish POST] audit not logged", draft.section, err);
+      }
+    }
     if (validatedPageConfig) {
-      await setPageConfig(validatedPageConfig, tenant);
-      await clearDraftPageConfig(tenant);
-      publishedPageConfig = true;
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "page_config.published",
-        targetType: "page_config",
-        targetId: tenant,
-        metadata: { pages: Object.keys(validatedPageConfig) },
-      });
+      try {
+        await logAuditEvent({
+          tenant,
+          actor,
+          action: "page_config.published",
+          targetType: "page_config",
+          targetId: tenant,
+          metadata: { pages: Object.keys(validatedPageConfig) },
+        });
+      } catch (err) {
+        console.error("[publish POST] audit not logged for page layout", err);
+      }
     }
 
     revalidatePath("/");
-    let liveSite:
-      | { status: "revalidated" }
-      | { status: "not_configured" }
-      | { status: "failed"; error: string };
-    try {
-      const liveSiteResult = await revalidateClientSite(
-        tenant,
-        clientRevalidationTargetForSections(publishedSections, {
-          pageConfigChanged: publishedPageConfig,
-        })
-      );
-      liveSite = liveSiteResult.skipped
-        ? { status: "not_configured" }
-        : liveSiteResult.success
-          ? { status: "revalidated" }
-          : { status: "failed", error: liveSiteResult.error || "Unknown revalidation failure" };
-    } catch (err) {
-      const error = err instanceof Error ? err.message : "Unknown revalidation failure";
-      console.error("[publish POST] Failed to revalidate client site:", err);
-      liveSite = { status: "failed", error };
-    }
+    const liveSite = await refreshLiveSite(
+      tenant,
+      clientRevalidationTargetForSections(publishedSections, { pageConfigChanged: publishedPageConfig })
+    );
 
     // Revalidation acceptance is distinct from observing the public homepage.
     // Keep the existing response and calls exactly when the new channel is off.
