@@ -60,7 +60,7 @@ begin
   end if;
  end loop;
  -- Canonical set equality keeps Works with truthful: no unused provider claims.
- if not (actual->'requiredConnections' @> declared->'requiredConnections') then
+ if not ((actual->'requiredConnections') @> (declared->'requiredConnections')) then
   raise exception 'system_package_declaration_exceeded';
  end if;
 end $$;

@@ -44,7 +44,8 @@ do $$ declare attempt uuid:='ec110000-0000-4000-8000-000000000030'; result jsonb
  -- Removing current assignment stops completion even after consent exchange.
  update public.agency_client_staff set status='ended',ended_at=now() where customer_workspace_id='ec110000-0000-4000-8000-000000000020';
  begin perform pg_temp.agency_call('finish_oauth',jsonb_build_object('id',attempt));raise exception 'revoked staff admitted';exception when others then if sqlerrm<>'conn_google_agency_denied' then raise;end if;end;
- update public.agency_client_staff set status='active',ended_at=null where customer_workspace_id='ec110000-0000-4000-8000-000000000020';
+ insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by) values
+  ('ec110000-0000-4000-8000-000000000010','ec110000-0000-4000-8000-000000000020','ec110000-0000-4000-8000-000000000001','ec110000-0000-4000-8000-000000000001');
  result:=pg_temp.agency_call('finish_oauth',jsonb_build_object('id',attempt,'subject','north-fixture-subject','scopes',jsonb_build_array('openid','https://www.googleapis.com/auth/business.manage'),'accessTokenCiphertext','enc:v1:AAAA:BBBB:CCCC','refreshTokenCiphertext','enc:v1:DDDD:EEEE:FFFF','tokenExpiresAt',(clock_timestamp()+interval '1 hour')::text));
  if result->>'status'<>'connected' or not exists(select 1 from public.workspace_google_locations where binding_id=(result->>'bindingId')::uuid and account_id='accounts/north' and location_id='harbor') then raise exception 'exact agency binding missing'; end if;
  if exists(select 1 from public.workspace_memberships where workspace_id='ec110000-0000-4000-8000-000000000020' and user_id='ec110000-0000-4000-8000-000000000001') then raise exception 'agency became owner'; end if;

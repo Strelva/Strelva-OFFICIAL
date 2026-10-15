@@ -66,7 +66,9 @@ rollback to valid_authority;
 insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by) values ('bc120000-0000-4000-8000-000000000013','bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000002','bc120000-0000-4000-8000-000000000001');
 select pg_temp.expect_error($q$select public.read_connected_site_installer('bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000002','ct-staff@example.test')$q$,'workspace_access_denied');
 rollback to valid_authority;
-update public.agency_scope_grants set level='full_control' where agency_workspace_id='bc120000-0000-4000-8000-000000000012';
+update public.agency_scope_grants set status='ended',ended_by='bc120000-0000-4000-8000-000000000001',ended_at=now() where agency_workspace_id='bc120000-0000-4000-8000-000000000012' and scope='website';
+insert into public.agency_scope_grants(customer_workspace_id,agency_workspace_id,scope,level,status,consent,proposed_by,responded_by,responded_at) values
+ ('bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000012','website','full_control','active','Fictional local consent','bc120000-0000-4000-8000-000000000001','bc120000-0000-4000-8000-000000000002',now());
 select pg_temp.assert_true(public.read_connected_site_installer('bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000002','ct-staff@example.test')->>'kind'='agency','Full control also carries the website area');
 rollback to valid_authority;
 

@@ -2363,7 +2363,7 @@
       "items": [
         {
           "file": "20261026130000_conn_apps_declarations.sql",
-          "sha256": "13e5e0b6b43fa12cf0ba0e4e105c697890c84e24c7dcf492ded6f4617ef9cddd",
+          "sha256": "dfcefd463a4d6ee5287ceb01a9d9c8418edcf2753d1d6a3ea4276694af825fe3",
           "rollback": "rollback-20261026130000_conn_apps_declarations.sql",
           "rollbackSha256": "48a7f37a02e5d4f5e9b030f0dea715970a5abd2baa77a0ed262128ccba7f80f0",
           "rollbackStatus": "Guarded inverse refuses later definitions/ACLs/callers and any retained explicit connection declaration; exact inverse/reapply and populated refusal remain UNRUN."

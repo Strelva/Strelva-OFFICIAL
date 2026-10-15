@@ -53,7 +53,7 @@ describe("workspace Connections", () => {
     await render(request);
     expect(node.textContent).toContain("No outside accounts are connected yet");
     expect(node.querySelector('a[href*="/workspace/google"]')?.textContent).toContain("Open setup");
-    const refresh = [...node.querySelectorAll("button")].find(button => button.textContent === "Refresh Connections")!;
+    const refresh = [...node.querySelectorAll("button")].find(button => button.textContent === "Refresh")!;
     await act(async () => refresh.click());
     expect(request).toHaveBeenCalledTimes(2);
   });
