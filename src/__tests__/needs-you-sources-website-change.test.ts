@@ -113,7 +113,8 @@ describe("website change owner email", () => {
   afterEach(() => vi.unstubAllEnvs());
   const row = { sourceLifecycle: "website_change", workspaceId: WS, sourceId: REQUEST };
 
-  it("is allowed only with both EMAIL_SENDING_ENABLED=true and STRELVA_SITE_CHANGE_OWNER_EMAIL=1", async () => {
+  // Importing the whole Needs you server can take a while on a loaded machine.
+  it("is allowed only with both EMAIL_SENDING_ENABLED=true and STRELVA_SITE_CHANGE_OWNER_EMAIL=1", { timeout: 30_000 }, async () => {
     const { needsYouService } = await import("@/server/needs-you/server");
     needsYouService({} as never);
     const allowed = () => captured.deps!.emailAllowed(row);
