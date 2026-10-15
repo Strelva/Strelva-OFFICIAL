@@ -44,3 +44,16 @@ export function clientRevalidationTargetForSections(
   // If no sections were provided, fall back to homepage only.
   return paths.size > 0 ? Array.from(paths) : ["/"];
 }
+
+// Collection entries render on a conventional route only for blog; the starter
+// BlogSection links to /blog/<slug>. Video and product entries rely on tags.
+const COLLECTION_PAGE_PATHS: Partial<Record<string, string>> = { blog: "/blog" };
+
+/** Paths and cache tags (as fetched by the starter scaffold) for one collection entry. */
+export function clientRevalidationTargetForCollection(type: string, slug: string): { paths: string[]; tags: string[] } {
+  const base = COLLECTION_PAGE_PATHS[type];
+  return {
+    paths: base ? ["/", base, `${base}/${slug}`] : ["/"],
+    tags: ["collections", `collection:${type}`, `collection:${type}:${slug}`],
+  };
+}

@@ -67,6 +67,19 @@ describe("revalidateClientSite", () => {
     expect(JSON.parse(init.body as string)).toEqual({ tenant: "gldf", all: true });
   });
 
+  it("adds deduped tags to the signed body for paths and for all", async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response("{}", { status: 200 })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { revalidateClientSite } = await import("@/lib/revalidate-client");
+    await revalidateClientSite("gldf", ["/", "/blog"], { tags: ["collections", "collections", "", "collection:blog"] });
+    await revalidateClientSite("gldf", "all", { tags: ["collections"] });
+
+    const bodies = (fetchMock.mock.calls as unknown as [string, RequestInit][]).map(([, init]) => JSON.parse(init.body as string));
+    expect(bodies[0]).toEqual({ tenant: "gldf", paths: ["/", "/blog"], tags: ["collections", "collection:blog"] });
+    expect(bodies[1]).toEqual({ tenant: "gldf", all: true, tags: ["collections"] });
+  });
+
   it("fails without sending when a revalidate URL has no tenant secret", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
