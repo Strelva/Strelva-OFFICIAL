@@ -2,7 +2,7 @@ import type { ReleaseEnvironment } from "@/platform/release-flags/resolve";
 import { builtInAppReleaseMayReach, readBuiltInAppRelease } from "@/platform/app-releases/server";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
-import { customerEmailEnabled } from "@/platform/infra/email/enabled";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 
 /** Cheap early gate: could Dental intake be on for any business? Env only. */
 export function verticalIntakeReleaseMayBeOn(env: ReleaseEnvironment = process.env): boolean {
@@ -30,4 +30,13 @@ export function intakeSensitiveFieldsAvailable(env: ReleaseEnvironment = process
 /** Patients are emailed only when customer email is on. The copy says so when it is off. */
 export function intakeEmailOn(): boolean {
   return customerEmailEnabled();
+}
+
+/**
+ * The owner's own Needs you email for Dental intake (a Make it live ask, a visit to confirm). Off unless the
+ * global email switch and this one are both on. This is about the owner, not patients: patient email is
+ * customer email, which stays off by itself.
+ */
+export function intakeOwnerEmailEnabled(env: ReleaseEnvironment = process.env): boolean {
+  return emailSendingEnabled() && env.STRELVA_INTAKE_OWNER_EMAIL?.trim() === "1";
 }

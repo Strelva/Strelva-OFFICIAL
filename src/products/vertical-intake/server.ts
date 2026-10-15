@@ -26,6 +26,7 @@ import { intakeEmailOn, intakeSensitiveFieldsAvailable, verticalIntakePublicFor 
 
 export * from "./release";
 export { IntakeUnavailableError, verticalIntakeStore } from "./store";
+export type { IntakeLiveRequests, IntakeVisit, IntakeVisitRead, VerticalIntakeStore } from "./store";
 export { intakeReadiness, intakeCanGoLive } from "./readiness";
 export { checkIntakeOnPage } from "./live-check";
 export type { IntakeInstall, IntakeRelease, IntakeSubmission, IntakeReadinessRow, IntakeLiveCheck };

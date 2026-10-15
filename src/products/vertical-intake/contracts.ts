@@ -252,6 +252,11 @@ export function validateIntakeAnswers(form: PublicIntakeForm, raw: unknown): Int
     const answered = (answers[rule.field] ?? "").split(",").filter(Boolean);
     return answered.some(item => rule.anyOf.includes(item));
   });
+  return { ok: true, contact, answers, sensitive, triage: urgent ? "urgent" : "routine", summary: summarizeIntakeAnswers(form, answers) };
+}
+
+/** The one-line summary of what was answered, the way the form's definition says it reads. */
+export function summarizeIntakeAnswers(form: PublicIntakeForm, answers: Record<string, string>): string {
   const parts: string[] = [];
   for (const spec of form.summaryFields) {
     const field = form.fields.find(item => item.id === spec.id);
@@ -260,14 +265,7 @@ export function validateIntakeAnswers(form: PublicIntakeForm, raw: unknown): Int
     const text = value.split(",").map(item => spec.labels?.[item] ?? field.options?.find(option => option.value === item)?.label ?? item).join(", ");
     parts.push(`${spec.prefix ?? ""}${text}`);
   }
-  return {
-    ok: true,
-    contact,
-    answers,
-    sensitive,
-    triage: urgent ? "urgent" : "routine",
-    summary: parts.join(" · ").slice(0, 1000),
-  };
+  return parts.join(" · ").slice(0, 1000);
 }
 
 export function intakeReviewLines(form: PublicIntakeForm, config: IntakeInstallConfig, bookingServiceName: string | null, emailOn: boolean): string[] {

@@ -172,6 +172,8 @@ export const SOURCE_LIFECYCLES = [
   "connected_site_schema",
   "business_payment",
   "website_change",
+  "app_intake_live",
+  "app_intake_visit",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

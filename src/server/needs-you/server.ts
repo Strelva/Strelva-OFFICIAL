@@ -37,6 +37,8 @@ import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-pa
 import { inquiryFactAdapter } from "@/platform/needs-you/sources/inquiry-fact";
 import { websiteChangeAdapter } from "@/platform/needs-you/sources/website-change";
 import { createSiteChangeStore, siteChangeOwnerEmailEnabled, sitesByCodeReleased } from "@/products/websites/server";
+import { intakeOwnerEmailEnabled } from "@/products/vertical-intake/server";
+import { appIntakeLiveAdapter, appIntakeVisitAdapter } from "@/server/needs-you/sources/app-intake";
 
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -78,6 +80,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
     },
     emailAllowed: async row => {
       // Off unless both the global email switch and this notice's own switch are on.
+      if (row.sourceLifecycle === "app_intake_live" || row.sourceLifecycle === "app_intake_visit") return intakeOwnerEmailEnabled();
       if (row.sourceLifecycle === "website_change") return siteChangeOwnerEmailEnabled();
       if (row.sourceLifecycle !== "website_domain") return true;
       const domains = await import("@/platform/needs-you/sources/website-domain-store");
@@ -136,6 +139,9 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
           }
         },
       }),
+      // Dental intake: making the form live, and each proposed new-patient visit (vertical_intake, default off).
+      appIntakeLiveAdapter(),
+      appIntakeVisitAdapter(),
     ].map(adapter => withCanonicalApprovalStore(adapter, { store, enabled: businessId => workspaceReleaseFlagEnabled("approval_store", businessId) })),
   });
 }
