@@ -2508,6 +2508,33 @@
           "rollbackStatus": "Drops the 13 triggers and their functions; touches no data."
         }
       ]
+    },
+    {
+      "id": "vertical-intake-2026-10-15",
+      "status": "Held and unapplied. vertical_intake release flag (default off), insurance_accepted business-record fact, and the Dental intake tables (installs, immutable Releases, submissions, ciphertext-only sensitive values with a 30-day purge) with 15 service-role RPCs. Depends on 20261005090000, 20261008151000, 20261010124000 and 20261011120000. SQL fixture scripts/check-vertical-intake-sql.sh passed on a disposable local cluster on the lane branch (2026-10-15). Not HIPAA-covered posture: member IDs stay off behind STRELVA_INTAKE_SENSITIVE_FIELDS. No production, provider, email or flag change authorized.",
+      "items": [
+        {
+          "file": "20261028100500_vertical_intake_flag.sql",
+          "sha256": "716352f9b41650c9baed2f5e7e06bedbeed3ceaf79e802fae0ea6c487a4d961a",
+          "rollback": "rollback-20261028100500_vertical_intake_flag.sql",
+          "rollbackSha256": "cbe01a5d37e9bac6977c709d785f4e1079289d573ce59233e83340885789538a",
+          "rollbackStatus": "Deletes the vertical_intake flag rows, ceilings and change history, then restores the prior workspace_release_flag_names."
+        },
+        {
+          "file": "20261028100600_business_record_insurance_fact.sql",
+          "sha256": "15d05fd15176a227a5fe445041fe9e239fd004deb7a60c6e4121c7959e9bf844",
+          "rollback": "rollback-20261028100600_business_record_insurance_fact.sql",
+          "rollbackSha256": "023587e9a2559fb8381333f69a62ecdb092b1bbc571058af3384a9e31d1a42f5",
+          "rollbackStatus": "Refuses while insurance_accepted facts exist; otherwise drops the wrapper, renames the prior validator back, re-points the CHECK constraints and restores the 16-key list."
+        },
+        {
+          "file": "20261028100700_vertical_intake.sql",
+          "sha256": "113a802892d0485ead10d77ec13e5b343e50a3c9b9c1d743f34b79cf7c7b57bb",
+          "rollback": "rollback-20261028100700_vertical_intake.sql",
+          "rollbackSha256": "6b3036e2555c0560aaf8cfb516ea1fc4086cb0d1c9fefffaf48a9689d111977f",
+          "rollbackStatus": "Refuses with app_intake_rollback_has_releases once any numbered Release exists; otherwise drops the 15 RPCs, helpers and the five app_intake tables."
+        }
+      ]
     }
   ]
 }
