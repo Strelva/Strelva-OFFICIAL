@@ -18,6 +18,13 @@ describe("provider client delivery queue",()=>{
   const open=await render(request);expect(node.textContent).toContain("Read-back queue");expect(node.textContent).toContain("Owner not told");expect(node.textContent).toContain("Delivery bounced");expect([...node.querySelectorAll("a")].map(link=>link.getAttribute("href"))).toEqual([`/workspace?workspaceId=${CLIENT}&view=home&deliveryCheck=${encodeURIComponent(item.key)}`,`/workspace?workspaceId=${CLIENT}&view=needs-you&decision=25700000-0000-4000-8000-000000000032`]);expect(open).not.toHaveBeenCalled();
   await click("Show more delivery checks");expect(request.mock.calls[1]![0]).toContain("cursor=");expect(node.querySelectorAll("li")).toHaveLength(2);
  });
+ it("lists review and request rows as Client work with their own links and words",async()=>{
+  const review={...item,key:"review:25700000-0000-4000-8000-0000000000e1",kind:"review",status:"waiting",title:"Hours copy"};
+  const req={...item,key:"request:25700000-0000-4000-8000-0000000000e2",kind:"request",status:"pending_acceptance",title:"A new page"};
+  await render(vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page([review,req]))));
+  expect(node.textContent).toContain("Client work");expect(node.textContent).toContain("Waiting for your review");expect(node.textContent).toContain("Waiting for you to accept");
+  expect([...node.querySelectorAll("a")].map(link=>link.getAttribute("href"))).toEqual([`/workspace?workspaceId=${CLIENT}&view=needs-you&decision=25700000-0000-4000-8000-0000000000e1`,`/workspace/delivery/25700000-0000-4000-8000-0000000000e2?workspaceId=${CLIENT}`]);
+ });
  it("preserves loaded rows when a later page fails, and can retry",async()=>{
   const request=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(page([item],{at:item.openedAt,key:item.key}))).mockResolvedValueOnce(Response.json({}, {status:503})).mockResolvedValueOnce(Response.json(page([])));
   await render(request);await click("Show more delivery checks");expect(node.textContent).toContain("queue is incomplete");expect(node.querySelectorAll("li")).toHaveLength(1);await click("Show more delivery checks");expect(node.textContent).not.toContain("queue is incomplete");
@@ -27,7 +34,7 @@ describe("provider client delivery queue",()=>{
   await render(request);await click("Show more delivery checks");expect(node.textContent).toContain("access may have changed");expect(node.querySelectorAll("li")).toHaveLength(0);
  });
  it("exposes initial error/retry and honest empty states",async()=>{
-  const request=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({}, {status:503})).mockResolvedValueOnce(Response.json(page()));await render(request);expect(node.querySelector('[role="alert"]')).toBeTruthy();await click("Retry delivery checks");expect(node.textContent).toContain("No failed or unchecked");expect(node.textContent).toContain("No undelivered owner decisions");
+  const request=vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json({}, {status:503})).mockResolvedValueOnce(Response.json(page()));await render(request);expect(node.querySelector('[role="alert"]')).toBeTruthy();await click("Retry delivery checks");expect(node.textContent).toContain("No failed or unchecked");expect(node.textContent).toContain("No undelivered owner decisions");expect(node.textContent).toContain("No client work waiting in the loaded queue.");
  });
  it("shows loading and discards a late response after changing agency",async()=>{
   let resolve!: (value:Response)=>void;const request=vi.fn<typeof fetch>().mockImplementationOnce(()=>new Promise(r=>resolve=r)).mockResolvedValueOnce(Response.json({agencyWorkspaceId:"25700000-0000-4000-8000-000000000030",items:[],nextCursor:null}));await render(request);expect(node.querySelector('[role="status"]')?.textContent).toContain("Checking");await render(request,vi.fn(),"25700000-0000-4000-8000-000000000030");await act(async()=>resolve(Response.json(page([item]))));expect(node.textContent).not.toContain("Queue client");

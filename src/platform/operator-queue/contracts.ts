@@ -163,6 +163,16 @@ export interface QueueSourceGap { kind: QueueKind; source: string; reason: strin
 
 export interface QueueSourceCount { kind: QueueKind; read: number; shown: number; closed: number; snoozed: number }
 
+/**
+ * Client-service work: it belongs to whoever serves the client. For a business
+ * an agency holds, STRELVA_ONE_QUEUE moves it to that agency's Queue. Platform
+ * health, abuse and domain alerts stay here, and so does domain_unverified,
+ * because no agency surface shows it.
+ */
+export const CLIENT_WORK_KINDS: ReadonlySet<QueueKind> = new Set<QueueKind>([
+  "draft_review", "owner_pending", "change_request", "site_draft", "maintenance_digest", "service_request", "lead_unkept",
+]);
+
 export interface OperatorQueue {
   generatedAt: string;
   items: QueueItem[];
@@ -175,6 +185,8 @@ export interface OperatorQueue {
   operators: { userId: string; email: string }[];
   /** Released operator enrichment, containing counts and no lead contents. */
   businessLeads?: QueueBusinessLeadCount[];
+  /** Client work that moved to the Queue of the agency that holds the business (STRELVA_ONE_QUEUE). */
+  delegated?: { agencyWorkspaceId: string; count: number }[];
 }
 
 export interface QueueBusinessLeadCount { businessKey: string; businessName: string; lastSevenDays: number | null; failure: string | null }

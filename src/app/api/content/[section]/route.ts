@@ -1,28 +1,20 @@
 import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import type { ContentMap, ContentSection } from "@/lib/types";
 import {
   getContent,
-  setContent,
-  recordSectionUpdate,
-  logActivity,
   logAuditEvent,
   getDraftContent,
   setDraftContent,
   clearDraft,
-  appendVersion,
 } from "@/lib/storage";
-import { diffFields } from "@/lib/utils";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { revalidateClientSite } from "@/lib/revalidate-client";
 import { readJsonObject } from "@/lib/request-body";
 import { sectionSchemas } from "@/lib/schemas";
-import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
-import { scheduleVerification } from "@/lib/verify-live";
+import { publishWebsite } from "@/products/websites/publish";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateManifestForTenant(tenant);
@@ -119,53 +111,31 @@ export async function PUT(
     }
 
     const current = await getContent(s, tenant) as unknown as Record<string, unknown>;
-    const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
 
-    await setContent(s, parsed.data as ContentMap[typeof s], tenant);
-    // Content is now live. Version history + the section timestamp are
-    // bookkeeping — if one throws here, DON'T 500 (that would tell the owner the
+    // Content goes live here, then version history, the section timestamp,
+    // activity and audit follow. Version history + the timestamp are
+    // bookkeeping: if one throws, DON'T 500 (that would tell the owner the
     // save failed when it actually succeeded, and they'd retry / lose trust).
-    try {
-      await appendVersion(s, parsed.data, actor.isImpersonating ? "admin" : "user", tenant, changes);
-      await recordSectionUpdate(s, tenant);
-    } catch (err) {
-      console.error("[content PUT] post-write bookkeeping failed (content IS saved):", s, err);
-    }
-    await logActivity({
-      text: actor.isImpersonating ? `Strelva admin updated ${s}` : `Updated ${s} via admin`,
-      time: new Date().toISOString(),
-      type: "admin",
-      section: s,
-      actor: actor.isImpersonating ? "admin" : "user",
-      changes,
-      snapshot: current,
-    }, tenant);
-    await logAuditEvent({
-      tenant,
-      actor,
-      action: "content.published",
-      targetType: "content_section",
-      targetId: s,
-      metadata: { section: s, changeCount: changes.length },
-    });
-
-    await clearDraft(s, tenant).catch((err) =>
-      // A leftover draft after publish would resurface as a phantom unsaved
-      // change; log it (matches the revalidate-failure logging just below).
-      console.error("[content PUT] failed to clear draft after publish:", s, err),
-    );
-
-    revalidatePath("/");
-
-    // Trigger revalidation on standalone client site. Settings-like sections
-    // affect layout, metadata, links, and design tokens across many routes.
-    revalidateClientSite(tenant, clientRevalidationTargetForSections([s])).catch((err) => {
-      console.error("[content PUT] Failed to revalidate client site:", err);
-    });
-
-    // Fire-and-forget verification: confirms the change is live on the public
-    // read path and emits a change_verified / change_verify_failed event.
-    scheduleVerification(tenant, s, parsed.data as unknown as Record<string, unknown>);
+    // A leftover draft after publish would resurface as a phantom unsaved
+    // change, so a failed clear is logged. Settings-like sections affect
+    // layout, metadata, links and design tokens across many routes, so the
+    // client site revalidates the matching targets; verification confirms the
+    // change is live on the public read path.
+    await publishWebsite({ via: "tenant_sections", input: {
+      tenantId: tenant,
+      writes: [{ section: s, data: parsed.data as ContentMap[typeof s], prior: current }],
+      author: actor.isImpersonating ? "admin" : "user",
+      versions: "best_effort",
+      activity: { mode: "strict", text: () => (actor.isImpersonating ? `Strelva admin updated ${s}` : `Updated ${s} via admin`) },
+      audit: { actor },
+      clearDrafts: "best_effort",
+      verify: true,
+      onRevalidateError: (err) => console.error("[content PUT] Failed to revalidate client site:", err),
+      messages: {
+        versions: (section) => ["[content PUT] post-write bookkeeping failed (content IS saved):", section],
+        clearDraft: ([section]) => ["[content PUT] failed to clear draft after publish:", section],
+      },
+    } });
 
     return NextResponse.json({ success: true });
   } catch (err) {

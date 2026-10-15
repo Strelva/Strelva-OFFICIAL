@@ -3,6 +3,9 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type WorkspaceRole } from "./types";
+import { inviteBusinessOwner, ownerInvitationAcceptUrl, type OperatorOwnerInvitation } from "./business-ownership";
+import type { OperatorAuditContext } from "./operator-approvals";
+import { deliverWorkspaceInvitation, type InvitationDelivery } from "./invitation-delivery";
 
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const INVITATION_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
@@ -155,6 +158,60 @@ export async function createWorkspaceInvitation(inputActor: WorkspaceActor, inpu
   const row = result.data?.[0] as Record<string, unknown> | undefined;
   if (!row) throw new WorkspaceStoreError("The invitation could not be created");
   return { invitation: mapInvitation(row), token };
+}
+
+export type WorkspaceInvitationIssuer =
+  | { kind: "member"; actor: WorkspaceActor }
+  | { kind: "operator"; actor: WorkspaceActor; approvalId?: string; authTime: number | null; auditContext?: OperatorAuditContext };
+
+/**
+ * The one entry for inviting someone to a workspace. A member (an owner or
+ * manager from People & access, an agency manager) invites by role; a Strelva
+ * operator may only invite a business owner, through the approval-gated owner
+ * invitation. Either way the invitation is created once, then delivery is
+ * attempted. With client email off nothing is sent and the result says why, so
+ * the caller can show the link to copy.
+ */
+export async function issueWorkspaceInvitation(input: {
+  workspaceId: string;
+  recipientEmail: string;
+  role: WorkspaceRole;
+  issuer: WorkspaceInvitationIssuer;
+}): Promise<{ invitation: WorkspaceInvitation; acceptUrl: string; delivery: InvitationDelivery; /** The operator owner invitation as the admin screens read it. */ ownerInvitation?: OperatorOwnerInvitation }> {
+  if (input.issuer.kind === "operator") {
+    if (input.role !== "owner") {
+      throw new WorkspaceConflictError("Strelva operators can only invite a business owner. The owner adds everyone else from People & access.");
+    }
+    const issued = await inviteBusinessOwner(input.issuer.actor, input.workspaceId, {
+      recipientEmail: input.recipientEmail,
+      ...(input.issuer.approvalId ? { approvalId: input.issuer.approvalId } : {}),
+      authTime: input.issuer.authTime,
+      ...(input.issuer.auditContext ? { auditContext: input.issuer.auditContext } : {}),
+    });
+    const invitation: WorkspaceInvitation = {
+      id: issued.invitation.invitationId,
+      workspaceId: issued.invitation.workspaceId,
+      recipientEmail: issued.invitation.recipientEmail,
+      role: "owner",
+      status: "pending",
+      expiresAt: issued.invitation.expiresAt,
+      createdAt: issued.invitation.createdAt,
+    };
+    const delivery = await deliverWorkspaceInvitation({ invitation, acceptUrl: issued.acceptUrl, workspaceName: issued.invitation.workspaceName, inviterLabel: "Strelva" });
+    return { invitation, acceptUrl: issued.acceptUrl, delivery, ownerInvitation: issued.invitation };
+  }
+  const created = await createWorkspaceInvitation(input.issuer.actor, { workspaceId: input.workspaceId, recipientEmail: input.recipientEmail, role: input.role });
+  const acceptUrl = ownerInvitationAcceptUrl(created.token);
+  const delivery = await deliverWorkspaceInvitation({
+    invitation: created.invitation,
+    acceptUrl,
+    workspaceName: async () => {
+      const row = await db().from("workspaces").select("name").eq("id", input.workspaceId).maybeSingle();
+      return string((row.data as Record<string, unknown> | null)?.name) || "your workspace";
+    },
+    inviterLabel: input.issuer.actor.verifiedEmail,
+  });
+  return { invitation: created.invitation, acceptUrl, delivery };
 }
 
 export async function listWorkspaceInvitations(inputActor: WorkspaceActor, workspaceId: string): Promise<WorkspaceInvitation[]> {

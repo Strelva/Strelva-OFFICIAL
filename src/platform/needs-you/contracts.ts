@@ -180,7 +180,7 @@ export const ownerDecisionSchema = z.object({
   workspaceId: z.string().uuid(),
   systemId: z.string().uuid().nullable(),
   kind: changeKindSchema,
-  route: z.enum(["strelva_reviews", "owner_decides"]),
+  route: z.enum(["strelva_reviews", "owner_decides", "handle_after_notice"]),
   title: z.string(),
   detail: z.string().nullable(),
   approveEffect: z.string(),
@@ -247,6 +247,15 @@ export interface ProposedItem {
   openHref?: string | null;
   openedAt?: string;
 }
+
+/**
+ * The actor a policy decision records. Must equal AUTO_REPLY_ACTOR in
+ * src/lib/event-actions.ts (the platform layer cannot import that file).
+ */
+export const AUTO_REPLY_POLICY_ACTOR = "auto-reply-policy";
+
+/** A change the notice setting already allowed: recorded closed, never asked. */
+export type PolicyItem = Omit<ProposedItem, "route"> & { route: "handle_after_notice" };
 
 // Chase clock -------------------------------------------------------------------
 

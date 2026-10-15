@@ -15,6 +15,8 @@ for migration in "$repo_root"/supabase/migrations/20*.sql; do
 done
 # #257: service-only read-only agency projection, exact rollback/reapply.
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-client-queue-schema.sql"
+# One agency Queue (read_provider_client_queue_v3): reviews drafts and pending Requests.
+psql "${psql_args[@]}" --file="$repo_root/tests/dedupe-flows-queue-schema.sql"
 psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.read_provider_client_queue(uuid,text,uuid,timestamptz,text,integer)'::regprocedure))" >"$cluster_root/provider-client-queue-forward.txt"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021094000_provider_client_queue.sql"
 psql "${psql_args[@]}" -Atc "select to_regprocedure('public.read_provider_client_queue(uuid,text,uuid,timestamptz,text,integer)') is null" | grep -qx t

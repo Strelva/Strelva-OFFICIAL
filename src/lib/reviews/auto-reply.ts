@@ -14,6 +14,9 @@ import { workspacePorts } from "../workspace-ports";
  *                governed path (resolveEventAction → "approved") a manual
  *                approval uses. Edited or dismissed before then ⇒ no longer
  *                pending ⇒ never fires. No new external-write path is created.
+ *                For a business with a workspace, STRELVA_AUTO_POST_DECISION_RECORD
+ *                records the post as a Needs you policy decision first, and a
+ *                decision the owner holds open blocks it.
  */
 
 import type { TenantConfig, UnifiedEvent } from "../types";
@@ -132,6 +135,45 @@ export async function draftReplyBacklog(
   return { drafted };
 }
 
+/** STRELVA_AUTO_POST_DECISION_RECORD (off by default): needs the policy decision migration. */
+function autoPostDecisionRecordEnabled(): boolean {
+  return process.env.STRELVA_AUTO_POST_DECISION_RECORD === "1";
+}
+
+/**
+ * Post one due reply. For a business with a workspace the post goes through a
+ * policy decision (route handle_after_notice, decided by the notice setting),
+ * so What changed shows it once; otherwise the direct resolver runs as before.
+ * `hold` means nothing was posted and nothing failed: this attempt is already
+ * recorded, or the owner holds the reply open.
+ */
+async function autoPostThroughDecision(tenantId: string, event: UnifiedEvent): Promise<{ changed: boolean; hold?: boolean }> {
+  const direct = () => resolveEventAction(tenantId, event.id, "approved", AUTO_REPLY_ACTOR);
+  if (!autoPostDecisionRecordEnabled()) return direct();
+  try {
+    const { releaseWorkspaceForTenant } = await import("@/platform/release-flags/store");
+    const workspaceId = await releaseWorkspaceForTenant(tenantId);
+    if (!workspaceId) return direct();
+    const { tenantEventPolicyItem } = await import("@/platform/needs-you/adapters");
+    const item = tenantEventPolicyItem(event);
+    if (!item) return direct();
+    const { needsYouService, needsYouReleaseEnabled } = await import("@/server/needs-you/server");
+    if (!needsYouReleaseEnabled()) return direct();
+    const recorded = await needsYouService().recordPolicyDecision({ workspaceId, item, policy: "auto_reply_policy" });
+    switch (recorded.status) {
+      case "done":
+      case "done_unverified": return { changed: true };
+      case "already_handled":
+      case "owner_decides": return { changed: false, hold: true };
+      case "unsupported": return direct();
+      default: return { changed: false };
+    }
+  } catch {
+    // The record could not be written (for example the migration is not applied): nothing posted yet, so take the direct path.
+    return direct();
+  }
+}
+
 /** Publish any auto-mode drafts whose safety window has elapsed. Best-effort,
  *  per-tenant isolated — one failure never blocks the rest. */
 export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; failed: number }> {
@@ -161,7 +203,8 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
       if (Number.isNaN(due) || due > nowMs) continue; // still inside the window
       let ok = false;
       try {
-        const result = await resolveEventAction(t.id, e.id, "approved", AUTO_REPLY_ACTOR);
+        const result = await autoPostThroughDecision(t.id, e);
+        if (result.hold) continue;
         ok = result.changed;
       } catch {
         ok = false;

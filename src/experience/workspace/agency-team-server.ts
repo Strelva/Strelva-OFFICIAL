@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
-import { createWorkspaceInvitation, revokeWorkspaceInvitation } from "@/platform/workspaces/invitations";
+import { issueWorkspaceInvitation, revokeWorkspaceInvitation } from "@/platform/workspaces/invitations";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { parseAgencyTeam, type AgencyTeamAction } from "./agency-team";
 
@@ -55,7 +55,8 @@ export async function manageAgencyTeam(actor: WorkspaceActor, input: AgencyTeamA
   const team = await readAgencyTeam(actor, input.workspaceId, db);
   if (!team.canManage) throw new WorkspaceAccessError();
   if (input.action === "invite") {
-    return createWorkspaceInvitation(actor, { workspaceId: input.workspaceId, recipientEmail: input.recipientEmail, role: input.role });
+    const issued = await issueWorkspaceInvitation({ workspaceId: input.workspaceId, recipientEmail: input.recipientEmail, role: input.role, issuer: { kind: "member", actor } });
+    return { invitation: issued.invitation, token: issued.acceptUrl.slice(issued.acceptUrl.lastIndexOf("/") + 1), delivery: issued.delivery };
   }
   if (!team.invitations.some(invitation => invitation.id === input.invitationId && invitation.role !== "owner")) throw new WorkspaceAccessError();
   return { status: await revokeWorkspaceInvitation(actor, input.invitationId) };

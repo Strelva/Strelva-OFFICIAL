@@ -3,8 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
-import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
-import { serviceRequestAdapter, tenantEventAdapter, tenantEventItem, type SourceAdapter } from "@/platform/needs-you/adapters";
+import { AUTO_REPLY_POLICY_ACTOR, type OwnerDecision, type ProposedItem } from "@/platform/needs-you/contracts";
+import { AUTO_REPLY_ACTOR } from "@/lib/event-actions";
+import { serviceRequestAdapter, tenantEventAdapter, tenantEventItem, tenantEventPolicyItem, type SourceAdapter } from "@/platform/needs-you/adapters";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "@/platform/needs-you/repository";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
@@ -52,6 +53,22 @@ function memoryStore(clock: { now: number }) {
       const next = { ...i, state: input.decision === "approve" ? "approved" as const : "declined" as const, decidedAt: new Date(clock.now).toISOString(), decidedByKind: input.by };
       items.set(i.id, next);
       return { status: "claimed", item: next };
+    },
+    async readOpenForSource(ws, lifecycle, sourceId) { return [...items.values()].find(i => i.workspaceId === ws && i.sourceLifecycle === lifecycle && i.sourceId === sourceId && i.state === "open") ?? null; },
+    async claimPolicy(ws, p) {
+      const same = [...items.values()].find(i => i.workspaceId === ws && i.sourceLifecycle === p.sourceLifecycle && i.sourceId === p.sourceId && i.revisionHash === p.revisionHash);
+      if (same) return { status: "already_handled", item: same };
+      if ([...items.values()].some(i => i.workspaceId === ws && i.sourceId === p.sourceId && i.state === "open")) throw new NeedsYouRefusedError("owner_decision_open", "x");
+      const at = new Date(clock.now).toISOString();
+      const row: OwnerDecision = {
+        id: randomUUID(), workspaceId: ws, systemId: null, kind: p.kind, route: p.route, title: p.title, detail: p.detail ?? null,
+        approveEffect: p.approveEffect, notYetEffect: p.notYetEffect, sourceLifecycle: p.sourceLifecycle, sourceId: p.sourceId,
+        revisionHash: p.revisionHash, urgent: false, signInRequired: false, adminMayDecide: false, openHref: null, state: "approved", outcome: null,
+        outcomeReason: null, receiptRef: null, decidedByKind: "policy", decidedAt: at, deliveryState: "not_sent", operatorNote: null, openedAt: at,
+        expiresAt: new Date(clock.now + DAY).toISOString(), reminded1At: null, reminded2At: null, deliveries: [],
+      };
+      items.set(row.id, row);
+      return { status: "claimed", item: row };
     },
     async expire(_ws, id) { const i = items.get(id)!; const next = { ...i, state: "expired" as const, decidedAt: "now", decidedByKind: "expiry" }; items.set(id, next); return next; },
     async finish(_ws, id, outcome, reason, receiptRef) { const i = items.get(id)!; const next = { ...i, outcome, outcomeReason: reason, receiptRef }; items.set(id, next); return next; },
@@ -578,5 +595,61 @@ describe("booking urgent-mail overflow", () => {
     const result = await svc.chase();
     expect(result.urgent).toBe(0); expect(result.digests).toBe(1);
     expect(sendEmail.mock.calls[0]?.[0].tags?.kind).toBe("digest");
+  });
+});
+
+describe("one approval path: policy decisions and legacy links", () => {
+  function policyEvent(over: Partial<UnifiedEvent> = {}) {
+    return ev({ id: "evt-9", metadata: { kind: "review_reply_draft", replyGeneration: "model", rating: 5, reviewId: "r9", autoPostAt: "2026-10-06T21:00:00Z" }, ...over });
+  }
+
+  it("records a policy decision, resolves as the auto-reply policy and finishes done", async () => {
+    const event = policyEvent();
+    events.set("evt-9", event);
+    const policyItem = tenantEventPolicyItem(event)!;
+    const result = await service().recordPolicyDecision({ workspaceId: WS, item: policyItem, policy: "auto_reply_policy" });
+    expect(result.status).toBe("done");
+    expect(resolveEventAction).toHaveBeenCalledWith("fixture-firm", "evt-9", "approved", "auto-reply-policy");
+    expect(result.item).toMatchObject({ route: "handle_after_notice", state: "approved", decidedByKind: "policy", outcome: "done", receiptRef: "tenant_event:evt-9" });
+  });
+
+  it("each attempt is its own record; the same attempt is already handled", async () => {
+    const event = policyEvent();
+    events.set("evt-9", event);
+    const svc = service();
+    const first = tenantEventPolicyItem(event)!;
+    await svc.recordPolicyDecision({ workspaceId: WS, item: first, policy: "auto_reply_policy" });
+    const again = await svc.recordPolicyDecision({ workspaceId: WS, item: first, policy: "auto_reply_policy" });
+    expect(again.status).toBe("already_handled");
+    expect(resolveEventAction).toHaveBeenCalledTimes(1);
+    const retry = tenantEventPolicyItem(policyEvent({ metadata: { ...event.metadata, autoPostAttempts: 1 } }))!;
+    expect(retry.revisionHash).not.toBe(first.revisionHash);
+  });
+
+  it("leaves a person's open decision for the same source alone", async () => {
+    const event = policyEvent();
+    events.set("evt-9", event);
+    await mem.store.open(WS, { ...tenantEventPolicyItem(event)!, route: "owner_decides", revisionHash: "a".repeat(64) });
+    const result = await service().recordPolicyDecision({ workspaceId: WS, item: tenantEventPolicyItem(event)!, policy: "auto_reply_policy" });
+    expect(result.status).toBe("owner_decides");
+    expect(resolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("builds a policy item only for a model-written draft that carries an auto-post time", () => {
+    expect(tenantEventPolicyItem(ev({}))).toBeNull();
+    expect(tenantEventPolicyItem(policyEvent({ metadata: { kind: "review_reply_draft", replyGeneration: "template", autoPostAt: "2026-10-06T21:00:00Z" } }))).toBeNull();
+    expect(tenantEventPolicyItem(policyEvent())).toMatchObject({ kind: "review.reply", route: "handle_after_notice", sourceId: "fixture-firm:evt-9" });
+  });
+
+  it("a legacy-token link decision forwards the token as the review approval authorization", async () => {
+    const svc = service();
+    const [item] = (await svc.list(OWNER, WS)).items;
+    const result = await svc.decide({ workspaceId: WS, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test", legacyToken: "legacy-token" } });
+    expect(result.status).toBe("done");
+    expect(resolveEventAction).toHaveBeenCalledWith("fixture-firm", "evt-1", "approved", "owner-link:owner@example.test", { reviewApprovalToken: "legacy-token" });
+  });
+
+  it("auto-reply actor ids stay in step", () => {
+    expect(AUTO_REPLY_POLICY_ACTOR).toBe(AUTO_REPLY_ACTOR);
   });
 });

@@ -73,7 +73,8 @@ function askNeedsYou(actor: WorkspaceActor): { port: NeedsYouPort; path: string 
         }
       },
       sync: (workspaceId) => service.sync({ workspaceId, actor }),
-      openItems: (workspaceId) => needsYouStore.list(actor, workspaceId, false),
+      // A notice-route row is a receipt, never an open ask.
+      openItems: async (workspaceId) => (await needsYouStore.list(actor, workspaceId, false)).flatMap(item => item.route === "handle_after_notice" ? [] : [{ ...item, route: item.route }]),
       readEvent: getEventRaw,
       decideAt: (workspaceId) => `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`,
     }),

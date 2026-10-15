@@ -57,6 +57,26 @@ export function needsYouMemoryStore(options: {
       items.set(i.id, next);
       return { status: "claimed", item: next };
     },
+    async readOpenForSource(ws, lifecycle, sourceId) {
+      const i = [...items.values()].filter((row) => row.workspaceId === ws && row.sourceLifecycle === lifecycle && row.sourceId === sourceId && row.state === "open")[0];
+      return i ? structuredClone(i) : null;
+    },
+    async claimPolicy(ws, p) {
+      const same = [...items.values()].find((i) => i.workspaceId === ws && i.sourceLifecycle === p.sourceLifecycle && i.sourceId === p.sourceId && i.revisionHash === p.revisionHash);
+      if (same) return { status: "already_handled", item: same };
+      if ([...items.values()].some((i) => i.workspaceId === ws && i.sourceLifecycle === p.sourceLifecycle && i.sourceId === p.sourceId && i.state === "open")) {
+        throw new NeedsYouRefusedError("owner_decision_open", "A person still has this one open.");
+      }
+      const row: OwnerDecision = {
+        id: randomUUID(), workspaceId: ws, systemId: null, kind: p.kind, route: p.route, title: p.title, detail: p.detail ?? null,
+        approveEffect: p.approveEffect, notYetEffect: p.notYetEffect, sourceLifecycle: p.sourceLifecycle, sourceId: p.sourceId,
+        revisionHash: p.revisionHash, urgent: false, signInRequired: false, adminMayDecide: false,
+        openHref: p.openHref ?? null, state: "approved", outcome: null, outcomeReason: null, receiptRef: null, decidedByKind: "policy", decidedAt: iso(),
+        deliveryState: "not_sent", operatorNote: null, openedAt: iso(), expiresAt: new Date(options.clock.now + DAY).toISOString(), reminded1At: null, reminded2At: null, deliveries: [],
+      };
+      items.set(row.id, row);
+      return { status: "claimed", item: row };
+    },
     async expire(_ws, id) { const i = items.get(id)!; const next = { ...i, state: "expired" as const, decidedAt: iso(), decidedByKind: "expiry" }; items.set(id, next); return next; },
     async finish(_ws, id, outcome, reason, receiptRef) { const i = items.get(id)!; const next = { ...i, outcome, outcomeReason: reason, receiptRef }; items.set(id, next); return next; },
     async recordDelivery(_ws, id) { return items.get(id)!; },

@@ -25,6 +25,7 @@ import { addAgencyOperatorOverview } from "./agency/operator-overview";
 import { projectAgencyLibraryOffers } from "./agency/library-offers";
 import { addAgencyProviderAlerts } from "./agency/provider-alerts";
 import { addAgencyOwnerReach } from "./agency/owner-reach";
+import { addAgencyTenantServiceQueue } from "./agency/tenant-service-queue";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
@@ -92,7 +93,8 @@ export async function readAgencyClientsPage(
     library = { agencyWorkspaceId, sources: [] };
   }
   const claimed = await addAgencyClaimQueue(actor, await addAgencyOperatorOverview(actor, projectAgencyLibraryOffers(page, library)), db);
-  const overview = await addAgencyOwnerReach(actor, claimed, db);
+  const serviced = await addAgencyTenantServiceQueue(actor, claimed);
+  const overview = await addAgencyOwnerReach(actor, serviced, db);
   return operatorQueueReleaseEnabled() ? addAgencyProviderAlerts(actor, overview, db) : overview;
 }
 

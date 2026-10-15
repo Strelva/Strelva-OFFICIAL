@@ -74,7 +74,7 @@ export const agencyClientRowSchema = z.object({
 
 export const agencyQueueItemSchema = z.object({
   id: z.string().min(1).max(200),
-  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator", "owner_claim", "owner_unreachable"]),
+  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator", "owner_claim", "client_site", "owner_unreachable"]),
   workspaceId: uuid,
   clientName: z.string().min(1).max(120),
   title: z.string().min(1).max(300),

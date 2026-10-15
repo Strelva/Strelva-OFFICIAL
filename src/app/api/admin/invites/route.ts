@@ -18,6 +18,10 @@ import { inviteEmailOptions, sanitizeEmailSubjectText } from "@/lib/invite-email
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { sendEmail } from "@/platform/infra/email/send";
 import { sendWelcomeEmail } from "@/lib/delivery-email";
+import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
+import { NON_OWNER_ON_BUSINESS, operatorOwnerInvitationContext, oneInvitationPathEnabled, ownerInvitationsReleaseEnabled } from "@/platform/owner-entry/operator-invitations";
+import { issueWorkspaceInvitation } from "@/platform/workspaces/invitations";
+import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -129,6 +133,48 @@ export async function POST(req: Request) {
 
   const reason = typeof rawReason === "string" ? rawReason.trim() : "";
   if (!reason || reason.length > 1000) return NextResponse.json({ error: "Give a reason for this access change (up to 1000 characters)." }, { status: 400 });
+  // A converted business is invited through workspace invitations only. An
+  // operator invites its owner; nobody is assigned a tenant role directly.
+  let legacy = false;
+  if (oneInvitationPathEnabled()) {
+    let workspaceId: string | null;
+    try {
+      workspaceId = await releaseWorkspaceForTenant(tenantId);
+    } catch {
+      return NextResponse.json({ error: "Access checks are unavailable. Try again later." }, { status: 503 });
+    }
+    if (workspaceId) {
+      if (role !== "owner") return NextResponse.json({ error: NON_OWNER_ON_BUSINESS }, { status: 409 });
+      if (!ownerInvitationsReleaseEnabled()) return NextResponse.json({ error: "Owner invitations are not released." }, { status: 409 });
+      try {
+        await logAuditEvent({ tenant: tenantId, action: "invite.requested", targetType: "user", targetId: email, actor, metadata: { role, reason, path: "workspace_invitation" } });
+      } catch {
+        return NextResponse.json({ error: "Invitation could not be recorded. No invitation was created." }, { status: 503 });
+      }
+      try {
+        const context = await operatorOwnerInvitationContext(tenantId);
+        const issued = await issueWorkspaceInvitation({
+          workspaceId: context.state.workspaceId,
+          recipientEmail: email,
+          role: "owner",
+          issuer: { kind: "operator", actor: context.actor, authTime: context.authTime, auditContext: { source: "web" } },
+        });
+        return NextResponse.json({
+          success: true,
+          workspaceInvitation: true,
+          invitation: issued.invitation,
+          delivery: issued.delivery,
+          ...(issued.delivery.status !== "accepted" ? { acceptUrl: issued.acceptUrl } : {}),
+        });
+      } catch (error) {
+        if (error instanceof WorkspaceConflictError) return NextResponse.json({ error: error.message }, { status: 409 });
+        if (error instanceof WorkspaceAccessError) return NextResponse.json({ error: "An active Strelva operator with business admin membership is required." }, { status: 403 });
+        console.error("[invite] Workspace owner invitation failed:", error);
+        return NextResponse.json({ error: "Owner invitation storage is unavailable. Refresh the invitation state before trying again." }, { status: 503 });
+      }
+    }
+    legacy = true;
+  }
   if (existingUserId) {
     const userId = existingUserId;
     try {
@@ -150,6 +196,7 @@ export async function POST(req: Request) {
     });
     return NextResponse.json({
       success: true,
+      ...(legacy ? { legacy: true } : {}),
       existingUser: true,
       message: `${email} already has an account — assigned to ${tenantConfig.siteName}`,
     });
@@ -181,6 +228,7 @@ export async function POST(req: Request) {
     console.warn(`[invites] email paused (EMAIL_SENDING_ENABLED != true) — invite recorded but not emailed to ${email}`);
     return NextResponse.json({
       success: true,
+      ...(legacy ? { legacy: true } : {}),
       emailed: false,
       reason: "email_sending_paused",
     });
@@ -243,6 +291,7 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({
         success: true,
+      ...(legacy ? { legacy: true } : {}),
         emailSent: false,
         signUpUrl,
         message: `Invite created but email failed. Share this link: ${signUpUrl}`,
@@ -251,6 +300,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
+      ...(legacy ? { legacy: true } : {}),
       emailSent: true,
       signUpUrl,
       message: `Invite sent to ${email}`,
@@ -273,6 +323,7 @@ export async function POST(req: Request) {
   });
   return NextResponse.json({
     success: true,
+      ...(legacy ? { legacy: true } : {}),
     emailSent: false,
     signUpUrl,
     message: `Invite created. Share this link with ${email}: ${signUpUrl}`,

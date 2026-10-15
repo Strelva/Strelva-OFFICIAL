@@ -19,6 +19,22 @@ describe("provider client queue route", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(mocks.rpc).toHaveBeenCalledWith("read_provider_client_queue_v2", { p_user_id: USER, p_verified_email: "staff@queue.example.test", p_agency_workspace_id: AGENCY, p_after_at: null, p_after_key: null, p_limit: 50 });
   });
+  it("reads v2 by default and v3 with STRELVA_ONE_QUEUE, and accepts review and request keys", async () => {
+    await call(); expect(mocks.rpc.mock.calls[0]![0]).toBe("read_provider_client_queue_v2");
+    mocks.rpc.mockClear(); vi.stubEnv("STRELVA_ONE_QUEUE", "1");
+    const items = [
+      { key: "review:25700000-0000-4000-8000-0000000000e1", workspaceId: AGENCY, workspaceName: "Client", systemId: null, kind: "review", title: "Hours copy", status: "waiting", openedAt: "2026-10-08T12:00:00Z" },
+      { key: "request:25700000-0000-4000-8000-0000000000e2", workspaceId: AGENCY, workspaceName: "Client", systemId: null, kind: "request", title: "A page", status: "pending_acceptance", openedAt: "2026-10-08T12:00:00Z" },
+    ];
+    mocks.rpc.mockResolvedValue({ data: { agencyWorkspaceId: AGENCY, items, nextCursor: null }, error: null });
+    const response = await call(); expect(response.status).toBe(200);
+    expect(mocks.rpc.mock.calls[0]![0]).toBe("read_provider_client_queue_v3");
+    expect((await response.json()).items.map((item: { kind: string }) => item.kind)).toEqual(["review", "request"]);
+    const cursor = { at: "2026-10-08T12:00:00Z", key: "request:25700000-0000-4000-8000-0000000000e2" };
+    expect((await call(`workspaceId=${AGENCY}&cursor=${encodeURIComponent(JSON.stringify(cursor))}`)).status).toBe(200);
+    const bad = { at: "2026-10-08T12:00:00Z", key: "other:25700000-0000-4000-8000-0000000000e2" };
+    expect((await call(`workspaceId=${AGENCY}&cursor=${encodeURIComponent(JSON.stringify(bad))}`)).status).toBe(400);
+  });
   it("fails closed for flag off, unsigned and unconfirmed users", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", ""); expect((await call()).status).toBe(503);
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); mocks.session.mockResolvedValue(null); expect((await call()).status).toBe(401);

@@ -1,5 +1,7 @@
 /** Tenant decision authority. Owners and authorized agency staff decide content; platform support only triages requests or marks a quote as required. */
 import { getTenantAgencySeat } from "@/platform/infra/db/repositories";
+import { oneApprovalPathEnabled } from "@/platform/needs-you/release";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { getEventRaw } from "./events";
 import { resolveEventAction, type EventWorkflowAction } from "./event-actions";
 import { logAuditEvent, type AuditLogEntry } from "./storage";
@@ -34,6 +36,23 @@ export function isOwnerDecision(event: UnifiedEvent): boolean {
 
 export type DecisionResult = { changed: boolean; reason?: string };
 
+/** A signed-in decision that records through Needs you for a converted business (src/server/needs-you/tenant-event-decision.ts). */
+async function throughNeedsYou(
+  input: { tenantId: string; eventId: string; action: EventWorkflowAction },
+  by: { kind: "session" | "agency"; userId: string; email: string | null },
+  fallback: () => Promise<DecisionResult>,
+): Promise<DecisionResult> {
+  if ((input.action !== "approved" && input.action !== "dismissed") || !by.email) return fallback();
+  const { decideTenantEventOnce } = await import("@/server/needs-you/tenant-event-decision");
+  return decideTenantEventOnce({
+    tenantId: input.tenantId,
+    eventId: input.eventId,
+    action: input.action,
+    by: { kind: by.kind, actor: { userId: by.userId, verifiedEmail: by.email.trim().toLowerCase() } },
+    fallback,
+  });
+}
+
 type DelegateDecisionInput = {
   tenantId: string;
   eventId: string;
@@ -49,6 +68,8 @@ interface Delegate {
   actorId: string;
   /** Re-read before the effect: null when still active, else the refusal. */
   revoked(tenantId: string): Promise<string | null>;
+  /** The effect itself. Defaults to the direct resolver; agency staff record through Needs you first. */
+  resolve?(input: { tenantId: string; eventId: string; action: EventWorkflowAction }): Promise<DecisionResult>;
   audit(input: { tenantId: string; eventId: string; action: string; phase: "attempt" | "result"; detail: Record<string, unknown> }): Promise<void>;
 }
 
@@ -64,6 +85,7 @@ function agencyStaffDelegate(staff: AgencyStaff): Delegate {
   const actor: AuditLogEntry["actor"] = { userId: staff.userId, email: staff.email, type: "user", isSuperAdmin: false };
   return {
     actorId: staff.actorId,
+    resolve: (input) => throughNeedsYou(input, { kind: "agency", userId: staff.userId, email: staff.email }, () => resolveEventAction(input.tenantId, input.eventId, input.action, staff.actorId)),
     // Still a member of the same agency, still holding the business's seat.
     revoked: async (tenantId) => ((await getTenantAgencySeat(staff.userId, tenantId)) === staff.agencyWorkspaceId ? null : "agency_access_changed"),
     audit: async ({ tenantId, eventId, action, phase, detail }) => {
@@ -124,7 +146,7 @@ async function decideAsDelegate(delegate: Delegate, input: DelegateDecisionInput
   }
   let result: DecisionResult;
   try {
-    result = await resolveEventAction(tenantId, eventId, action, delegate.actorId);
+    result = delegate.resolve ? await delegate.resolve({ tenantId, eventId, action }) : await resolveEventAction(tenantId, eventId, action, delegate.actorId);
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "error";
     await delegate.audit({ ...audit, phase: "result", detail: { ...detail, changed: false, reason } })
@@ -143,7 +165,11 @@ export async function decideTenantEvent(
 ): Promise<DecisionResult> {
   if (decider.kind === "operator") return decideTenantEventAsOperator(decider.operator, input);
   if (decider.kind === "agency_staff") return decideTenantEventAsAgencyStaff(decider.staff, input);
-  return resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId);
+  // The owner's own decision records through Needs you when the business has one.
+  if (!oneApprovalPathEnabled()) return resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId);
+  const user = await getSessionUser().catch(() => null);
+  return throughNeedsYou(input, { kind: "session", userId: decider.actorId, email: user?.id === decider.actorId ? user.email ?? null : null },
+    () => resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId));
 }
 
 /** HTTP status and message for a refused delegate decision, or null. */

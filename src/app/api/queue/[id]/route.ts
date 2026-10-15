@@ -73,6 +73,7 @@ export async function PATCH(
       if (!operator) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       result = await decideTenantEventAsOperator(operator, decision);
     } else {
+      // Approve and dismiss for a converted business record through Needs you (via operator-decisions).
       result = await decideTenantEvent(decider, decision);
     }
   } catch (error) {

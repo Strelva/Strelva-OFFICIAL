@@ -212,7 +212,14 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
-      setAssignNote(data.emailSent === false ? `✓ Invite created. Email failed, share: ${data.signUpUrl}` : `✓ ${data.message || "Invite sent"}`);
+      if (data.workspaceInvitation) {
+        // A business workspace is joined by workspace invitation; client email is off, so the link is the delivery.
+        setAssignNote(`Invitation created for ${form.ownerEmail.trim()}. ${data.delivery?.status === "accepted" ? "Emailed." : "Client email is off, so nothing was emailed. Copy this link and send it yourself:"} ${data.acceptUrl ?? ""}`.trim());
+      } else if (data.emailed === false) {
+        setAssignNote("Invite recorded. Client email is off, so nothing was emailed.");
+      } else {
+        setAssignNote(data.emailSent === false ? `✓ Invite created. Email failed, share: ${data.signUpUrl}` : `✓ ${data.message || "Invite sent"}`);
+      }
     } catch (err) {
       setAssignNote(err instanceof Error ? err.message : "Invite failed");
     } finally {

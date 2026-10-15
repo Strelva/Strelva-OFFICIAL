@@ -17,6 +17,7 @@ import {
   type Decision,
   type LadderRoute,
   type OwnerDecision,
+  type PolicyItem,
   type PolicyLayer,
   type PolicySetting,
   type ProposedItem,
@@ -56,6 +57,7 @@ const REFUSALS: Record<string, string> = {
   owner_decision_not_open: "This is no longer open.",
   owner_decision_not_claimed: "This decision has no recorded outcome to finish.",
   owner_decision_invalid: "That item is not valid.",
+  owner_decision_open: "A person still has this one open.",
 };
 const ACCESS = ["decision_policy_access_denied", "owner_decision_access_denied", "owner_decision_not_found"];
 
@@ -87,6 +89,8 @@ export type InquiryNoticeClaim = z.infer<typeof inquiryNoticeClaimSchema>;
 
 const claimSchema = z.object({ status: z.enum(["claimed", "already_handled", "changed", "expired"]), item: ownerDecisionSchema });
 export type ClaimResult = z.infer<typeof claimSchema>;
+const policyClaimSchema = z.object({ status: z.enum(["claimed", "already_handled"]), item: ownerDecisionSchema });
+export type PolicyClaimResult = z.infer<typeof policyClaimSchema>;
 
 const policyRowSchema = z.object({
   systemId: z.string().uuid().nullable(),
@@ -105,6 +109,14 @@ export interface NeedsYouStore {
   list(actor: WorkspaceActor, workspaceId: string, includeClosed: boolean): Promise<OwnerDecision[]>;
   claim(input: { workspaceId: string; itemId: string; revision: string; decision: Decision; by: "owner_link" | "session" | "operator" | "agency"; actor?: WorkspaceActor; recipient?: string }): Promise<ClaimResult>;
   expire(workspaceId: string, itemId: string): Promise<OwnerDecision>;
+  /** The open item for one source, or null: lets a legacy link decide through the item. */
+  readOpenForSource?(workspaceId: string, lifecycle: string, sourceId: string): Promise<OwnerDecision | null>;
+  /**
+   * Record that a policy (the auto-reply notice setting) handled a source: one
+   * closed handle_after_notice row. Refuses (`owner_decision_open`) while a
+   * person's decision for that source is open.
+   */
+  claimPolicy?(workspaceId: string, item: PolicyItem, policy: "auto_reply_policy"): Promise<PolicyClaimResult>;
   finish(workspaceId: string, itemId: string, outcome: "done" | "done_unverified" | "failed", reason: string | null, receiptRef: string | null): Promise<OwnerDecision>;
   recordDelivery(workspaceId: string, itemId: string, kind: "urgent" | "digest" | "reminder_1" | "reminder_2", status: "sent" | "suppressed" | "bounced" | "failed", recipient: string | null, providerMessageId: string | null, reason: string | null): Promise<OwnerDecision>;
   dueForDelivery(limit: number): Promise<DeliveryRow[]>;
@@ -145,6 +157,8 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
     p_workspace_id: input.workspaceId, p_decision_id: input.itemId, p_revision_hash: input.revision, p_decision: input.decision, p_by_kind: input.by,
     p_user_id: input.actor?.userId ?? null, p_verified_email: input.actor?.verifiedEmail ?? null, p_recipient: input.recipient ?? null,
   }, claimSchema, "The decision could not be recorded."),
+  readOpenForSource: (workspaceId, lifecycle, sourceId) => call("read_open_owner_decision_for_source", { p_workspace_id: workspaceId, p_lifecycle: lifecycle, p_source_id: sourceId }, ownerDecisionSchema.nullable(), "The open item could not be read."),
+  claimPolicy: (workspaceId, item, policy) => call("record_policy_owner_decision", { p_workspace_id: workspaceId, p_item: item, p_policy: policy }, policyClaimSchema, "The policy decision could not be recorded."),
   expire: (workspaceId, itemId) => call("expire_owner_decision", { p_workspace_id: workspaceId, p_decision_id: itemId }, ownerDecisionSchema, "The item could not lapse."),
   finish: (workspaceId, itemId, outcome, reason, receiptRef) => call("finish_owner_decision", { p_workspace_id: workspaceId, p_decision_id: itemId, p_outcome: outcome, p_reason: reason, p_receipt_ref: receiptRef }, ownerDecisionSchema, "The outcome could not be recorded."),
   recordDelivery: (workspaceId, itemId, kind, status, recipient, providerMessageId, reason) => call("record_owner_decision_delivery", {

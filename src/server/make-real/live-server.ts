@@ -59,7 +59,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, 
       approve: async (a, workId, selection) => (await import("@/products/websites")).approveWebsiteRebuild(a, workId, selection),
       launch: async (a, workId, selection) => (await import("@/products/websites")).launchWebsiteRebuild(a, workId, selection),
       verifyPublished: async (a, workId) => (await import("@/products/websites")).verifyPublishedWebsiteRebuild(a, workId),
-      publishLinked: async (a, workId, selection) => (await import("@/products/websites")).publishWebsiteRebuildOntoLinkedSite(a, workId, selection),
+      publishLinked: async (a, workId, selection) => (await (await import("@/products/websites/publish")).publishWebsite({ via: "site_document", actor: a, workId, input: selection })).detail,
     }, ctx),
     createTenantContentAdapter({
       tenantConfig: async (tenantId) => (await getTenantConfig(tenantId)) ?? null,

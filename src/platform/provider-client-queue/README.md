@@ -21,6 +21,15 @@ when provider-seat cleanup has not finished. UI refresh discards
 previous pages; permission failure clears displayed rows. Failed later pages
 keep the loaded rows and state that the queue is incomplete.
 
+With `STRELVA_ONE_QUEUE=1` the route reads `read_provider_client_queue_v3`
+(`20261027111000_provider_client_queue_v3.sql`) instead of v2. It adds two kinds
+under the same admission: `review` (a client's open "Strelva reviews" draft, shown
+read-only; customer messages and owner-only kinds stay out) and `request` (a
+Request addressed to this agency that it has not accepted). The UI lists them as
+"Client work". Off, the route reads v2 and the response is unchanged. The
+agency's own staff do not decide "Strelva reviews" drafts here; that is an open
+decision for Jacob.
+
 The strict projection contains only row key, business identity/name, System id,
 kind, title, status and timestamp. It excludes receipt requests, snapshots,
 provider references, actors, errors, notes, delivery recipients and owner-link

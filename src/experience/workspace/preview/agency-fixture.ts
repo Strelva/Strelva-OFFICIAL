@@ -200,6 +200,8 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
         { key: `listing:${hex("d7000000", 1)}`, workspaceId: TWIN_TREES, workspaceName: "Twin Trees", systemId: null, kind: "readback", title: "Google listing change", status: "failed", openedAt: at(4, now) },
         { key: `website:${hex("d7000000", 2)}`, workspaceId: MOONEY, workspaceName: "The Mooney Firm", systemId: systemId(2, 1), kind: "readback", title: "Website deployment", status: "not_confirmed", openedAt: at(3, now) },
         { key: `decision:${hex("d7000000", 3)}`, workspaceId: ELMWOOD, workspaceName: "Elmwood Physical Therapy", systemId: null, kind: "owner_not_told", title: "Review the revised website hours before publishing", status: "bounced", openedAt: at(2, now) },
+        { key: `review:${hex("d7000000", 4)}`, workspaceId: MOONEY, workspaceName: "The Mooney Firm", systemId: null, kind: "review", title: "Update the weekend hours on the contact page", status: "waiting", openedAt: at(1, now) },
+        { key: `request:${hex("d7000000", 5)}`, workspaceId: HARBOR, workspaceName: "Harbor Dental", systemId: null, kind: "request", title: "Add a new patient information page", status: "pending_acceptance", openedAt: at(1, now) },
       ];
       return json({ agencyWorkspaceId, items: rows, nextCursor: !cursor && rows.length ? { at: rows[rows.length - 1]!.openedAt, key: rows[rows.length - 1]!.key } : null });
     }

@@ -7,6 +7,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { googleTargetAllowed, prepareGoogleListingDraft, undoWorkspaceGoogleChange, setListingPaused, changeWorkspaceGoogleReply } from "@/products/google-listing/server";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getEventRaw } from "@/lib/events";
+import { decideTenantEventOnce } from "@/server/needs-you/tenant-event-decision";
 import { z } from "zod";
 
 export async function googleListingAction(form: FormData): Promise<void> {
@@ -28,7 +29,9 @@ export async function googleListingAction(form: FormData): Promise<void> {
       const eventId = z.string().min(1).max(200).parse(form.get("eventId"));
       const event = await getEventRaw(eventId);
       if (event?.tenantId !== tenantId || event.metadata?.kind !== "workspace_google_listing_draft" || event.metadata.workspaceId !== workspaceId || event.metadata.locationId !== locationId) throw new Error("That draft is not available here.");
-      const resolved = await resolveEventAction(tenantId, eventId, action === "approve" ? "approved" : "dismissed", actor.userId);
+      const decision = action === "approve" ? "approved" : "dismissed";
+      // The signed-in decision records through Needs you for a converted business (STRELVA_ONE_APPROVAL_PATH).
+      const resolved = await decideTenantEventOnce({ tenantId, eventId, workspaceId, action: decision, by: { kind: "session", actor }, fallback: () => resolveEventAction(tenantId, eventId, decision, actor.userId) });
       result = resolved.changed ? (action === "approve" ? resolved.reason === "already_on_google" ? "Google already matches. Nothing was sent." : resolved.reason ? "Google accepted the change; confirmation is still pending. See its receipt below." : "Google accepted the change. See its receipt below." : "Declined. Nothing was sent.") : resolved.reason ?? "The draft remains waiting. Nothing was sent again.";
     } else if (action === "reply" || action === "withdraw") {
       const outcome = await changeWorkspaceGoogleReply(actor, { workspaceId, tenantId, locationId, commandId: z.string().uuid().parse(form.get("commandId")), reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,300}$/).parse(form.get("reviewId")), text: String(form.get("replyText") ?? ""), withdraw: action === "withdraw" });

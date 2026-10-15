@@ -34,6 +34,7 @@ import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";
 import { buildApproveUrl } from "@/lib/approve-link";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { maybeAlertNewReview } from "@/lib/review-alert";
+// The review3 links this alert mints decide through Needs you for a converted business (STRELVA_ONE_APPROVAL_PATH, /api/approve).
 import type { TenantConfig } from "@/lib/types";
 import { requireCronRequest } from "@/lib/cron-auth";
 

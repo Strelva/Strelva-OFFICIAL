@@ -9,6 +9,20 @@ export function ownerInvitationsReleaseEnabled(): boolean {
   return process.env.STRELVA_OWNER_INVITATIONS_RELEASE === "1" && ownerEntryPossible();
 }
 
+/**
+ * STRELVA_ONE_INVITATION_PATH (off by default): the super-admin invite and
+ * assign routes stop granting tenant membership on a converted business.
+ * An operator then only invites the owner, through the one workspace
+ * invitation path; everyone else is invited by the owner from People & access.
+ * Unconverted tenants keep the legacy path.
+ */
+export function oneInvitationPathEnabled(): boolean {
+  return process.env.STRELVA_ONE_INVITATION_PATH === "1";
+}
+
+export const NON_OWNER_ON_BUSINESS =
+  "This client has a business workspace. Its owner adds people from People & access. Strelva operators only invite the owner.";
+
 export type OwnerInvitationsLoad =
   | { kind: "ready"; state: OwnerInvitationState }
   | { kind: "unconverted" | "denied" | "unavailable" };

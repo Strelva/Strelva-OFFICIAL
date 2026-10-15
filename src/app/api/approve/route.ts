@@ -14,6 +14,11 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  * approve → "approved" (which performs the external write, e.g. posting a review
  * reply), not-yet → "dismissed".
  *
+ * A tenant or review link for a business with a workspace resolves through
+ * that business's Needs you item (STRELVA_ONE_APPROVAL_PATH), so the decision
+ * is recorded once; `resolveEventAction` is reached directly only for an
+ * unconverted tenant, an item on another route, or with the flag off.
+ *
  * Security:
  *  - The signed token and current database authority authorize converted reviews.
  *    The route is public (no session) so it works from an email client.
@@ -43,7 +48,10 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
 import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
-import { isManagedReviewApproval, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
+import { isManagedReviewApproval, readReviewApprovalAuthority, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
+import { oneApprovalPathEnabled } from "@/platform/needs-you/release";
+import type { DecideResult } from "@/platform/needs-you/service";
+import type { OwnerDecision } from "@/platform/needs-you/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -216,11 +224,17 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     console.error(`[api/approve] Needs you decision failed for ${claims.workspaceId}/${claims.itemId}:`, err);
     return noticePage({ status: 200, heading: "Strelva is checking the outcome", body: "The change may have gone through, but we couldn't record its final result. Strelva needs to check it before anyone tries again.", dashboardUrl: open, buttonLabel: "Open" });
   }
-  const openItem = workspaceOpenUrl(origin, claims.workspaceId, result.item?.openHref);
+  return decisionPage(result, origin, claims.workspaceId, claims.action === "approve");
+}
+
+/** The page for a Needs you decision result, shared by workspace links and legacy tenant links. */
+function decisionPage(result: DecideResult, origin: string, workspaceId: string, isApprove: boolean): NextResponse {
+  const open = workspaceOpenUrl(origin, workspaceId);
+  const openItem = workspaceOpenUrl(origin, workspaceId, result.item?.openHref);
   switch (result.status) {
     case "done":
     case "done_unverified":
-      return claims.action === "approve"
+      return isApprove
         ? noticePage({ status: 200, heading: "Approved", body: result.receipt
             ? `${result.receipt.sentence}\n${actorLabel(result.receipt.actor)}\n${result.receipt.changed ?? result.item?.title ?? "Decision recorded"}\n${result.receipt.evidence?.readBack === "verified" ? "Confirmed live." : result.status === "done_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
             : `Decision recorded: ${result.item?.title ?? "your approval"}. Actor not recorded. ${result.status === "done_unverified" ? "Confirmation is still pending." : "Completion recorded; the change receipt is unavailable here."}`,
@@ -241,6 +255,52 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
       return noticePage({ status: 400, ...INVALID.bad });
     default:
       return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
+  }
+}
+
+/**
+ * The Needs you item a tenant or review link stands for, when this business
+ * decides through Needs you (STRELVA_ONE_APPROVAL_PATH). Null keeps the legacy
+ * resolver: flag off, a tenant with no business yet, no trusted recipient, or
+ * an item on another route (the operator's, for example).
+ */
+async function linkedNeedsYouItem(claims: ApproveLinkClaims, recipient: string | null): Promise<{ workspaceId: string; item: OwnerDecision; recipient: string } | null> {
+  if (!oneApprovalPathEnabled()) return null;
+  try {
+    const { releaseWorkspaceForTenant } = await import("@/platform/release-flags/store");
+    const workspaceId = await releaseWorkspaceForTenant(claims.tenantId);
+    if (!workspaceId) return null;
+    const owner = recipient ?? (await readReviewApprovalAuthority(claims.tenantId))?.recipient ?? null;
+    if (!owner) return null;
+    const { needsYouService } = await import("@/experience/workspace/needs-you-server");
+    const item = await needsYouService().openForSource(workspaceId, "tenant_event", `${claims.tenantId}:${claims.eventId}`);
+    return item && item.state === "open" && item.route === "owner_decides" ? { workspaceId, item, recipient: owner } : null;
+  } catch (err) {
+    console.error(`[api/approve] Needs you lookup failed for ${claims.tenantId}/${claims.eventId}; using the direct resolver:`, err);
+    return null;
+  }
+}
+
+/** POST for a linked item: the decision is recorded by Needs you, with this link's token kept as the review authorization. */
+async function decideLinked(token: string, claims: ApproveLinkClaims, linked: { workspaceId: string; item: OwnerDecision; recipient: string }): Promise<NextResponse> {
+  const { needsYouAppOrigin, needsYouService, needsYouStore } = await import("@/experience/workspace/needs-you-server");
+  const open = workspaceOpenUrl(needsYouAppOrigin(), linked.workspaceId);
+  try {
+    const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
+    const result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({
+      workspaceId: linked.workspaceId,
+      itemId: linked.item.id,
+      revision: linked.item.revisionHash,
+      decision: claims.action === "approve" ? "approve" : "not_yet",
+      by: { kind: "owner_link", recipient: linked.recipient, legacyToken: token },
+    });
+    return decisionPage(result, needsYouAppOrigin(), linked.workspaceId, claims.action === "approve");
+  } catch (err) {
+    if (err instanceof ModelBudgetPausedError || err instanceof ModelBudgetUnavailableError) {
+      return noticePage({ status: 200, heading: "Building is paused", body: err.message, dashboardUrl: open, buttonLabel: "Open your workspace" });
+    }
+    console.error(`[api/approve] Needs you decision failed for ${linked.workspaceId}/${linked.item.id}:`, err);
+    return noticePage({ status: 200, heading: "Strelva is checking the outcome", body: "The change may have gone through, but we couldn't record its final result. Strelva needs to check it before anyone tries again.", dashboardUrl: open, buttonLabel: "Open" });
   }
 }
 
@@ -270,6 +330,22 @@ async function getPage(request: Request): Promise<NextResponse> {
     if (!event || !isManagedReviewApproval(event, claims.tenantId)) return noticePage({ status: 403, ...MOVED, dashboardUrl });
   }
   const isApprove = claims.action === "approve";
+
+  const linked = await linkedNeedsYouItem(claims, verified.kind === "review" ? verified.claims.recipient : null);
+  if (linked) {
+    const { needsYouService } = await import("@/experience/workspace/needs-you-server");
+    const { item } = linked;
+    const lines = await needsYouService().review(item).catch(() => null);
+    if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl, buttonLabel: "Open your workspace" });
+    return confirmPage({
+      token,
+      heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
+      body: `${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
+      confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
+      dashboardUrl,
+      ...(lines ? { lines } : {}),
+    });
+  }
 
   return confirmPage({
     token,
@@ -321,6 +397,8 @@ async function postPage(request: Request): Promise<NextResponse> {
     if (event && ["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
       return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
     }
+    const linked = await linkedNeedsYouItem(claims, verified.kind === "review" ? verified.claims.recipient : null);
+    if (linked) return decideLinked(token, claims, linked);
     // Every review carries authorization, even if the route observed an
     // unconverted tenant: conversion may commit before the provider call.
     result = reviewOnly || (event && isManagedReviewApproval(event, claims.tenantId))
