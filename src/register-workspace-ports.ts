@@ -7,7 +7,7 @@
 import { registerWorkspacePorts, type WorkspacePorts } from "@/lib/workspace-ports";
 import { workspacePortLoaders } from "@/server/workspace-ports";
 import { registerTenantPublishingPorts } from "@/platform/infra/tenant-publishing";
-import { registerListingsTenantPorts } from "@/products/listings-sync/ports";
+import { registerListingsTenantPorts } from "@/products/listings-sync";
 
 import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
 import { registerAutoPostWithdrawal } from "@/platform/ai-controls/runtime-ports";
