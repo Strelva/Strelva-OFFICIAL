@@ -135,8 +135,8 @@ export function builtInAppReleaseLabel(app: Pick<BuiltInApp, "name">, number: nu
 }
 
 /** Releases a workspace flag turns on. Availability gates are not Releases, so they are excluded. */
-export function releasesGatedByFlag(flag: ReleaseFlag): Array<{ app: BuiltInApp; release: BuiltInAppRelease; returnsTo: number }> {
-  return BUILT_IN_APPS.flatMap(app =>
+export function releasesGatedByFlag(flag: ReleaseFlag, apps: readonly BuiltInApp[] = BUILT_IN_APPS): Array<{ app: BuiltInApp; release: BuiltInAppRelease; returnsTo: number }> {
+  return apps.flatMap(app =>
     app.releases
       .filter(release => release.gates.some(gate => gate.kind === "workspace_flag" && gate.flag === flag))
       .map(release => ({ app, release, returnsTo: release.number - 1 })),
@@ -144,8 +144,8 @@ export function releasesGatedByFlag(flag: ReleaseFlag): Array<{ app: BuiltInApp;
 }
 
 /** What the agency or operator sees beside a switch: what On does and what Off returns to. */
-export function flagReleaseMeaning(flag: string): string | null {
-  const gated = releasesGatedByFlag(flag as ReleaseFlag);
+export function flagReleaseMeaning(flag: string, apps: readonly BuiltInApp[] = BUILT_IN_APPS): string | null {
+  const gated = releasesGatedByFlag(flag as ReleaseFlag, apps);
   if (!gated.length) return null;
   return gated
     .map(({ app, release, returnsTo }) => `On turns on ${builtInAppReleaseLabel(app, release.number)}. Off returns ${app.name} to ${releaseLabel(returnsTo)}.`)

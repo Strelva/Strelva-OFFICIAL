@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
+import { flagReleaseMeaning } from "@/platform/app-releases/catalog";
 import { agencyFlagViewSchema, type AgencyFlagView } from "@/platform/release-flags/agency-contracts";
 export function AgencyClientAvailability({ agencyWorkspaceId, workspaceId, request = fetch }: { agencyWorkspaceId: string; workspaceId: string; request?: typeof fetch }) {
   const [open, setOpen] = useState(false), [data, setData] = useState<AgencyFlagView | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [saved, setSaved] = useState(false);
@@ -30,6 +31,7 @@ function FlagControl({ flag, agencyWorkspaceId, workspaceId, request, changed }:
   const [state, setState] = useState(flag.state), [reason, setReason] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState<string | null>(null);
   const blocked = !flag.workspaceReleased || flag.environment === "off" || flag.ceiling === "off" || !flag.verified;
   const explanation = !flag.workspaceReleased || flag.environment === "off" ? "Paused by the platform release switch." : flag.ceiling === "off" ? "The platform has paused this permission." : !flag.verified ? `Agency verification for ${flag.verificationEffect} is required.` : `Platform limit: ${flag.ceiling === "on" ? "On" : "Operators and named testers"}.`;
+  const meaning = flagReleaseMeaning(flag.flag);
   async function save() {
     setBusy(true); setMessage(null);
     try {
@@ -40,7 +42,7 @@ function FlagControl({ flag, agencyWorkspaceId, workspaceId, request, changed }:
     } catch (error) { setMessage(error instanceof Error ? error.message : "Availability could not be changed."); }
     finally { setBusy(false); }
   }
-  return <div className="grid gap-3 border-t border-gray-border pt-4"><div><h3 className="text-sm font-medium">{flag.label}</h3><p className="mt-1 text-xs text-gray-muted">{flag.systemName} · {explanation}</p></div>
+  return <div className="grid gap-3 border-t border-gray-border pt-4"><div><h3 className="text-sm font-medium">{flag.label}</h3><p className="mt-1 text-xs text-gray-muted">{flag.systemName} · {explanation}</p>{meaning ? <p className="mt-1 text-xs text-gray-muted">{meaning}</p> : null}</div>
     <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-end">
       <SelectInput label={`${flag.label} availability`} value={state} onChange={event => setState(event.target.value as typeof state)} disabled={blocked || busy} options={[{ value: "off", label: "Off" }, { value: "operators", label: "Operators and named testers" }, ...(flag.ceiling === "on" || flag.state === "on" ? [{ value: "on", label: flag.ceiling === "on" ? "On" : "On · platform controlled" }] : [])]} />
       <TextInput label="Reason for change" value={reason} onChange={event => setReason(event.target.value)} maxLength={500} disabled={blocked || busy} />

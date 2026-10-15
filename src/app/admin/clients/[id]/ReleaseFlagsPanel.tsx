@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StEmpty, StInput, StLabel, StMono, StNotice, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StState, StTextButton, StToggle } from "@/components/ui/strelva/Kit";
+import { flagReleaseMeaning } from "@/platform/app-releases/catalog";
 import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 
 /**
@@ -140,6 +141,7 @@ export function ReleaseFlagsPanel({ tenantId, initialState, request = fetch, glo
     return <StRow key={flag.flag} title={labelFor(flag)} align="start" lead={compact ? <StToggle label={labelFor(flag)} checked={flag.effective === "on"} disabled={busy || needsReadback || !reasonOk} reason={needsReadback ? "Refresh current flags first." : !reasonOk ? "Write a reason to enable changes." : busy ? "Change in progress." : undefined} onChange={checked => void send({ kind: "flag", flag: flag.flag, state: checked ? "on" : "off", reason, expectedRevision: flag.revision })} /> : undefined} detail={<>
       <StState kind={flag.effective === "on" ? "live" : flag.effective === "operators" ? "need" : "draft"}>{flag.effective === "on" ? "On for this client" : flag.effective === "operators" ? "Operators and testers" : "Off for this client"}</StState>
       <span className="block">{flag.envMode === "off" ? "The global release switch is off." : flag.envMode === "workspace" ? "Released separately for each client." : "The global release switch is on."}</span>
+      {flagReleaseMeaning(flag.flag) ? <span className="block">{flagReleaseMeaning(flag.flag)}</span> : null}
     </>} end={compact ? undefined : <StSegmented value={current} options={STATES} label={`${labelFor(flag)} for this client`} disabledValues={busy || needsReadback || !reasonOk ? STATES.map(option => option.value) : [current]} disabledReason={needsReadback ? "Refresh current flags first." : !reasonOk ? "Write a reason to enable changes." : "Change in progress."} onChange={next => void send({ kind: "flag", flag: flag.flag, state: next, reason, expectedRevision: flag.revision })} />} />;
   };
 
