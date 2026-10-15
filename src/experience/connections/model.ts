@@ -51,7 +51,7 @@ export function connectionSetupHref(connection: Pick<WorkspaceConnection, "provi
   const params = new URLSearchParams({ workspaceId });
   switch (connection.provider) {
     case "google_business_profile": return `/workspace/google?${params}`;
-    case "google_calendar": case "calendly": return `/workspace?${params}&view=scheduling`;
+    case "google_calendar": case "outlook_calendar": case "calendly": return `/workspace?${params}&view=scheduling`;
     case "connected_site": return `/workspace/site?${params}`;
     case "stripe": return `/workspace/payments?${params}`;
     case "highlevel": return `/workspace?${params}&agencyView=clients`;
@@ -63,5 +63,5 @@ export function connectionSetupHref(connection: Pick<WorkspaceConnection, "provi
 
 export function accountSetupChoices(kind: "customer" | "agency"): ConnectionProvider[] {
   return kind === "agency" ? ["highlevel", "google_business_profile", "stripe"]
-    : ["google_business_profile", "google_calendar", "calendly", "connected_site", "stripe", "instagram"];
+    : ["google_business_profile", "google_calendar", "outlook_calendar", "calendly", "connected_site", "stripe", "instagram"];
 }

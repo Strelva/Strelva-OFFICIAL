@@ -2369,6 +2369,19 @@
           "rollbackStatus": "Guarded inverse refuses later definitions/ACLs/callers and any retained explicit connection declaration; exact inverse/reapply and populated refusal remain UNRUN."
         }
       ]
+    },
+    {
+      "id": "connections-outlook-calendar-2026-10-15",
+      "status": "Held and unapplied. SQL runner authored; coordinator runs scripts/check-conn-outlook-sql.sh. Passed once on a disposable local cluster in the integrations lane (ordered migrations, exact inverse/reapply, function-drift and populated refusals). No production authority.",
+      "items": [
+        {
+          "file": "20261026150000_conn_outlook_calendar.sql",
+          "sha256": "71abcfded152ea827b230aa1d5e991298ea2b00c8a925c0b735075794d091814",
+          "rollback": "rollback-20261026150000_conn_outlook_calendar.sql",
+          "rollbackSha256": "4f5fdcd21f80e0d4307f92211fd2525ff6e522c3138481fdbb343c51437390d2",
+          "rollbackStatus": "Guarded inverse refuses a recorded Outlook holder, an App declaring outlook_calendar, and later function or ACL changes; verified on a disposable local cluster only."
+        }
+      ]
     }
   ]
 }

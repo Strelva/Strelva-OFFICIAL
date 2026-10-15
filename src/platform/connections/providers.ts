@@ -30,6 +30,11 @@ const definitions: readonly ProviderDefinition[] = [
     reads: "Busy times", acts: "Booking events", policyNote: null, approver: "Google",
   },
   {
+    provider: "outlook_calendar", label: "Outlook Calendar", area: "bookings",
+    accountHolders: ["business"], accessThrough: ["platform"],
+    reads: "Busy times", acts: "Booking events", policyNote: null, approver: "Microsoft",
+  },
+  {
     provider: "calendly", label: "Calendly", area: "bookings",
     accountHolders: ["business"], accessThrough: ["platform"],
     reads: "Event types and scheduled events", acts: null, policyNote: null, approver: "Calendly",

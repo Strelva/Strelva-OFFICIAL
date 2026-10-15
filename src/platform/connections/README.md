@@ -46,7 +46,7 @@ call `registerConnectionSource(source)` for each chosen object once, before
 returns a cleanup function for tests. `listConnectionSources()` takes a snapshot.
 The core registry intentionally imports no products. Next's Node instrumentation
 calls `registerProductConnectionSources` in `src/server/connections/sources.ts`
-before requests run. Its stable lazy wrappers cover all eight providers for
+before requests run. Its stable lazy wrappers cover all nine providers for
 both workspace GETs and server live gates. Imports and registration perform no
 storage reads or provider calls; each source loads inside the authorized read,
 so an import/storage failure remains isolated to that source.

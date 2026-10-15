@@ -16,6 +16,7 @@ import { z } from "zod";
 export const CONNECTION_PROVIDERS = [
   "google_business_profile",
   "google_calendar",
+  "outlook_calendar",
   "calendly",
   "highlevel",
   "connected_site",

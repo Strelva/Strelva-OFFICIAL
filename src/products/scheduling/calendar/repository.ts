@@ -305,10 +305,9 @@ export async function saveWorkspaceCalendarConnection(
   await assertWorkspaceCalendarManager(actor, workspaceId);
   await assertWorkspaceCalendarWriteAllowed(workspaceId);
   const value = calendarConnectionInputSchema.parse(input);
-  if (value.provider === "google") {
-    const eligibility = await connectionEligibilityFor(actor, {provider:"google_calendar",businessWorkspaceId:workspaceId});
-    if (!eligibility.eligible) throw new WorkspaceConflictError(eligibility.message);
-  }
+  const connectionProvider = value.provider === "google" ? "google_calendar" : "outlook_calendar";
+  const eligibility = await connectionEligibilityFor(actor, {provider:connectionProvider,businessWorkspaceId:workspaceId});
+  if (!eligibility.eligible) throw new WorkspaceConflictError(eligibility.message);
   const timeZone = validTimeZone(value.timeZone);
   if (!credentials.accessToken.trim()) throw new WorkspaceStoreError("Calendar authorization is incomplete.");
   const { data, error } = await db().rpc("save_workspace_calendar_connection", {
@@ -329,7 +328,7 @@ export async function saveWorkspaceCalendarConnection(
   const row = firstRow(data);
   if (!row) failure(null, "Calendar connection could not be saved.");
   const saved = mapConnection(row);
-  if (saved.provider === "google" && recordHolder) await recordConnectionHolder({ref:`google_calendar:${saved.id}`,provider:"google_calendar",workspaceId,accountHolder:{kind:"business",workspaceId},accessThrough:readProviderAccess("google_calendar").through,actor,commandId:randomUUID()});
+  if (recordHolder) await recordConnectionHolder({ref:`${connectionProvider}:${saved.id}`,provider:connectionProvider,workspaceId,accountHolder:{kind:"business",workspaceId},accessThrough:readProviderAccess(connectionProvider).through,actor,commandId:randomUUID()});
   return saved;
 }
 

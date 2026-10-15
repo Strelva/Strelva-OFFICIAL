@@ -20,7 +20,7 @@ describe("workspace Connections", () => {
   it("lists rows from every provider while naming their recorded account holder", async () => {
     await render(async () => Response.json({ connections: CONNECTION_PROVIDERS.map(provider => ({ ...row, provider, ref: `${provider}:fixture`, accountHolder: { kind: "business", workspaceId: business }, accessThrough: { kind: "platform" } })), sourceErrors: [] }));
     for (const provider of CONNECTION_PROVIDERS) expect(node.textContent).toContain(providerDefinition(provider).label);
-    expect(node.textContent?.match(/Whose account: Your business/g)).toHaveLength(8);
+    expect(node.textContent?.match(/Whose account: Your business/g)).toHaveLength(9);
   });
   it("shows Coming soon for unavailable providers before there are any account rows", async () => {
     await render(async () => Response.json({ connections: [], sourceErrors: [], providerEligibility: {
