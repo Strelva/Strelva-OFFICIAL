@@ -5,6 +5,7 @@ import {
 } from "@/platform/infra/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/platform/infra/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
+import { sentryIngestOrigin } from "@/lib/sentry-csp";
 import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewRequest } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -29,24 +30,29 @@ const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
   [tenantSiteHost("gldf", APP_ROOT_DOMAIN)]: "https://greatlakesdriedfruit.com",
 };
 
-const cspBaseDirectives = [
-  "default-src 'self'",
-  // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
-  // that's a Turbopack/HMR dev artifact; Sentry and Vercel Analytics contain no eval/new Function). The
-  // looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now (Next bootstrap +
-  // JSON-LD inline); removing it needs a nonce rollout.
-  "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
-  "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com`,
-  "font-src 'self' data:",
-  // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
-  // kept in the looser variant below).
-  "frame-src 'self' https:",
-  "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com",
-  "worker-src 'self' blob:",
-  "base-uri 'self'",
-  "form-action 'self'",
-];
+function cspBaseDirectives(): string[] {
+  // Browser Sentry events go to the DSN's ingest host; it is appended last so
+  // the "connect-src 'self'" prefix that the sites-host rewrite relies on holds.
+  const sentryOrigin = sentryIngestOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN);
+  return [
+    "default-src 'self'",
+    // No 'unsafe-eval' in prod: nothing in the production runtime needs it (Next `next start` doesn't eval —
+    // that's a Turbopack/HMR dev artifact; Sentry and Vercel Analytics contain no eval/new Function). The
+    // looser dev/live-preview variant below keeps it. 'unsafe-inline' stays for now (Next bootstrap +
+    // JSON-LD inline); removing it needs a nonce rollout.
+    "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
+    "style-src 'self' 'unsafe-inline'",
+    `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com`,
+    "font-src 'self' data:",
+    // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
+    // kept in the looser variant below).
+    "frame-src 'self' https:",
+    `connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com${sentryOrigin ? ` ${sentryOrigin}` : ""}`,
+    "worker-src 'self' blob:",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ];
+}
 
 // Route matching (replaces Clerk's createRouteMatcher). SECURITY: normalize the
 // path first — decodeURI + collapse duplicate slashes — so an encoded path or a
@@ -395,8 +401,8 @@ export function buildContentSecurityPolicy(params: {
   // live-preview variant above didn't cover.
   const directives =
     process.env.NODE_ENV === "production"
-      ? cspBaseDirectives
-      : cspBaseDirectives.map((d) =>
+      ? cspBaseDirectives()
+      : cspBaseDirectives().map((d) =>
           d.startsWith("script-src")
             ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*"
             : d.startsWith("connect-src")

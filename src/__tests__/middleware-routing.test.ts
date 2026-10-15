@@ -330,6 +330,19 @@ describe("proxy frame policy", () => {
     expect(csp).not.toContain("frame-ancestors 'none'");
   });
 
+  it("admits the Sentry ingest origin in production connect-src only when the DSN is set", () => {
+    const base = "connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com";
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "https://abc@o1.ingest.us.sentry.io/42");
+      expect(buildContentSecurityPolicy({ isPreview: false, host: "strelva.com", protocol: "https:" })).toContain(`${base} https://o1.ingest.us.sentry.io;`);
+      vi.stubEnv("NEXT_PUBLIC_SENTRY_DSN", "");
+      expect(buildContentSecurityPolicy({ isPreview: false, host: "strelva.com", protocol: "https:" })).toContain(`${base};`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("allows the local Supabase loopback in the development connection policy", () => {
     const csp = buildContentSecurityPolicy({
       isPreview: false,
