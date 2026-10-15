@@ -138,7 +138,7 @@ function googleAccessPendingPage(businessName: string, dashboardUrl?: string): N
   return noticePage({
     status: 200,
     heading: "Waiting on Google",
-    body: `Your reply for ${businessName} is saved. It goes out once Google approves Strelva's Business Profile access. Nothing else to do.`,
+    body: `Your reply for ${businessName} is saved and still waiting in your workspace. Google hasn't approved Strelva's Business Profile access yet, so nothing was posted. Once Google approves, approve it again from your workspace.`,
     dashboardUrl,
     buttonLabel: "Open your workspace",
   });

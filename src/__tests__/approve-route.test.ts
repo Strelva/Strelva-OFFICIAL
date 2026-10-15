@@ -181,7 +181,7 @@ describe("POST /api/approve (the real resolve)", () => {
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).toContain("Waiting on Google");
-    expect(html).toContain("Your reply for GLDF is saved.");
+    expect(html).toContain("Your reply for GLDF is saved and still waiting in your workspace.");
     expect(html).not.toContain("We couldn&#39;t finish that");
   });
 

@@ -37,7 +37,7 @@ export function connectionNextStep(connection: WorkspaceConnection): string | nu
     case "not_set_up": return `Strelva hasn’t set up ${label} yet. It will work once Strelva adds it; nothing to do on your side.`;
     case "approval_pending": {
       const approver = providerDefinition(connection.provider).approver;
-      return `${label} is waiting on ${approver}’s approval. Ready changes stay ready and go out once ${approver} approves.`;
+      return `${label} is waiting on ${approver}’s approval. Nothing is sent until then; changes stay in Needs you to approve again once ${approver} approves.`;
     }
     case "not_configured": return `${label} is coming soon.`;
   }
