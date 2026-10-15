@@ -264,5 +264,5 @@ export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, 
 
 export { publishedPolicyRows } from "./published-policies";
 
-export { connectedSitesStore } from "./store";
+export { connectedInquiryRecordsEnabled, connectedSitesStore } from "./store";
 export { createConnectedSiteConnectionSource, connectedSiteConnectionSource } from "./connection-source";
