@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { appEventsMayBeOn, appEventsReleased, appEventWebhooksEnabled } from "@/platform/app-events/release";
+import { appEventsMayBeOn, appEventsReleased, appEventsReleasedOrThrow, appEventWebhooksEnabled } from "@/platform/app-events/release";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 import { RELEASE_FLAG_ENV, RELEASE_FLAG_LABELS } from "@/platform/release-flags/resolve";
 
@@ -73,5 +73,16 @@ describe("app_events release", () => {
     fakeDb(null, { message: "down" });
     await expect(appEventsReleased(WS, undefined, env)).resolves.toBe(false);
     spy.mockRestore();
+  });
+
+  it("the strict reader throws on a failed read where the lenient one reads off", async () => {
+    const env = { STRELVA_WORKSPACE_RELEASE: "1", STRELVA_APP_EVENTS_RELEASE: "workspace" };
+    fakeDb(null, { message: "down" });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(appEventsReleased(WS, undefined, env)).resolves.toBe(false);
+    await expect(appEventsReleasedOrThrow(WS, env)).rejects.toThrow();
+    fakeDb(rows("on"));
+    await expect(appEventsReleasedOrThrow(WS, env)).resolves.toBe(true);
+    await expect(appEventsReleasedOrThrow(WS, {})).resolves.toBe(false);
   });
 });

@@ -235,6 +235,28 @@ describe("dispatchAppEvents", () => {
     expect(t.memory.api.cursor(SUB, WS1)).toMatchObject({ delivered: 2, lease: null });
   });
 
+  it("releases the lane, without advancing, when reading the subscriptions throws", async () => {
+    const t = setup({ activeFor: async () => { throw new Error("flag read failed"); } });
+    t.memory.api.seed(SUB, WS1);
+    t.memory.api.add(WS1, "booking.made"); t.memory.api.add(WS1, "booking.made");
+    const result = await t.run();
+    expect(result.skipped).toBe(0);
+    expect(t.handler).not.toHaveBeenCalled();
+    expect(t.memory.api.calls.skip).toEqual([]);
+    expect(t.memory.api.cursor(SUB, WS1)).toMatchObject({ delivered: 0, lease: null });
+  });
+
+  it("stops a lane between events once the deadline has passed", async () => {
+    const holder: { clock?: { t: number } } = {};
+    const t = setup({ handler: async () => { holder.clock!.t += 60_000; } });
+    holder.clock = t.clock;
+    t.memory.api.seed(SUB, WS1);
+    t.memory.api.add(WS1, "booking.made"); t.memory.api.add(WS1, "booking.made");
+    const result = await t.run();
+    expect(result.delivered).toBe(1);
+        expect(t.memory.api.cursor(SUB, WS1)).toMatchObject({ delivered: 1, lease: null });
+  });
+
   it("releases a lane whose handler is not registered, without advancing", async () => {
     const t = setup({ handler: null });
     t.memory.api.seed(SUB, WS1);
@@ -350,6 +372,25 @@ describe("dispatchAppEvents", () => {
       expect(t.sendWebhook).not.toHaveBeenCalled();
     });
 
+    it("releases a Webhook lane, without advancing, when the business read throws", async () => {
+      const t = withEndpoint({ workspaceOn: async () => { throw new Error("flag read failed"); } });
+      t.memory.api.add(WS1, "booking.made");
+      const result = await t.run();
+      expect(result.webhooks.skipped).toBe(0);
+      expect(t.sendWebhook).not.toHaveBeenCalled();
+      expect(t.memory.api.cursor(WEBHOOK, WS1)).toMatchObject({ delivered: 0, lease: null });
+    });
+
+    it("stops a Webhook lane between events once the deadline has passed", async () => {
+      const t = withEndpoint();
+      t.sendWebhook.mockImplementation(async () => { t.clock.t += 60_000; return "delivered"; });
+      t.memory.api.add(WS1, "booking.made"); t.memory.api.add(WS1, "booking.made");
+      const result = await t.run();
+      expect(t.sendWebhook).toHaveBeenCalledTimes(1);
+      expect(result.webhooks.delivered).toBe(1);
+      expect(t.memory.api.cursor(WEBHOOK, WS1)).toMatchObject({ delivered: 1, lease: null });
+    });
+
     it("skips a claimed Webhook lane when the switch or the business is off", async () => {
       const t = withEndpoint({ workspaceOn: async () => false });
       t.memory.api.add(WS1, "booking.made");
@@ -381,6 +422,18 @@ describe("dispatchAppEvents", () => {
       const result = await t.run();
       expect(result.replays).toEqual({ delivered: 0, failed: 1 });
       expect(t.memory.api.finished[0]).toEqual({ id: "dl2", ok: false, error: "nope for <email>" });
+    });
+
+    it("finishes failed for a Webhook replay when the business's app_events row is off or unreadable", async () => {
+      for (const workspaceOn of [async () => false, async () => { throw new Error("flag read failed"); }]) {
+        const t = setup({ webhooksOn: true, workspaceOn });
+        t.memory.api.endpoints.push({ id: ENDPOINT, workspaceId: WS1, url: "https://maker.example.test/e", eventTypes: ["booking.made"], secretCiphertext: "enc:v1:x", createdByKind: "business", agencyWorkspaceId: null });
+        t.memory.api.replays.push({ id: "dl4", subscriber: WEBHOOK, workspaceId: WS1, leaseToken: "t4", event: replayEvent(), allowed: true });
+        const result = await t.run();
+        expect(result.replays).toEqual({ delivered: 0, failed: 1 });
+        expect(t.memory.api.finished[0]).toEqual({ id: "dl4", ok: false, error: "The webhook is not receiving events." });
+        expect(t.sendWebhook).not.toHaveBeenCalled();
+      }
     });
 
     it("finishes failed for a Webhook that is not allowed", async () => {

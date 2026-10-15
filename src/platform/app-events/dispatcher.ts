@@ -8,7 +8,8 @@ import {
   type AppEvent,
 } from "./contracts";
 import { appEventHandlerFor, PermanentAppEventError } from "./handlers";
-import { appEventsReleased, appEventWebhooksEnabled } from "./release";
+import { resolveBuiltInAppRelease } from "@/platform/app-releases/resolve";
+import { appEventsReleasedOrThrow, appEventWebhooksEnabled, strictGateReader } from "./release";
 import * as defaultStore from "./store";
 import type { ClaimedLane, LaneRef, WebhookEndpointTarget } from "./store";
 import { activeSubscribersFor, declaredSubscribers } from "./subscriptions";
@@ -50,8 +51,12 @@ export function defaultDispatchDeps(): DispatchDeps {
     store: defaultStore,
     apps: BUILT_IN_APPS,
     handlerFor: appEventHandlerFor,
-    activeFor: (workspaceId) => activeSubscribersFor(workspaceId),
-    workspaceOn: (workspaceId) => appEventsReleased(workspaceId),
+    // Strict reads: a failed flag or gate read throws, so the dispatcher releases the lane instead of skipping it past its events.
+    activeFor: (workspaceId) => activeSubscribersFor(workspaceId, {
+      flagOn: (id) => appEventsReleasedOrThrow(id),
+      resolve: (app, id) => resolveBuiltInAppRelease(app, strictGateReader(id)),
+    }),
+    workspaceOn: (workspaceId) => appEventsReleasedOrThrow(workspaceId),
     webhooksOn: appEventWebhooksEnabled(),
     sendWebhook: (endpoint, event, attempt) => sendAppEventWebhook(endpoint, event, attempt),
     now: Date.now,
@@ -183,6 +188,7 @@ export async function dispatchAppEvents(deps: DispatchDeps = defaultDispatchDeps
         continue;
       }
       for (const claimed of lane.events) {
+        if (deps.now() >= deadline) break;
         if (!subscription.events.includes(claimed.type)) {
           if (!(await ack(lane, claimed.sequence))) { stopped = true; break; }
           continue;
@@ -218,12 +224,16 @@ export async function dispatchAppEvents(deps: DispatchDeps = defaultDispatchDeps
     if (key?.kind === "webhook") {
       const endpoint = endpoints.get(key.endpointId);
       // The App lanes above are already gated by activeFor, which includes the flag; this is the Webhook lanes' own check.
-      if (!deps.webhooksOn || !endpoint || !(await attempt(() => deps.workspaceOn(lane.workspaceId)))) {
+      const on = deps.webhooksOn && endpoint ? await attempt(() => deps.workspaceOn(lane.workspaceId)) : false;
+      // A failed read is not "off": release the lane so its events are still there next run.
+      if (on === undefined) { await attempt(() => store.releaseLane(lane)); continue; }
+      if (!deps.webhooksOn || !endpoint || on !== true) {
         await attempt(() => store.skipLane(lane));
         result.webhooks.skipped++;
         continue;
       }
       for (const claimed of lane.events) {
+        if (deps.now() >= deadline) break;
         if (!claimed.allowed || !endpoint.eventTypes.includes(claimed.type)) {
           if (!(await ack(lane, claimed.sequence))) { stopped = true; break; }
           continue;
@@ -288,6 +298,8 @@ export async function dispatchAppEvents(deps: DispatchDeps = defaultDispatchDeps
         } else if (key?.kind === "webhook") {
           const endpoint = endpoints.get(key.endpointId);
           if (!deps.webhooksOn || !endpoint || !replay.allowed) throw new Error("The webhook is not receiving events.");
+          // The business's app_events row may have been turned off since the event was set aside; a failed read counts as off.
+          if (!(await deps.workspaceOn(replay.workspaceId).catch(() => false))) throw new Error("The webhook is not receiving events.");
           const outcome = await deps.sendWebhook(endpoint, event, 1);
           if (outcome !== "delivered") throw new Error("The address did not accept the event.");
           ok = true;
