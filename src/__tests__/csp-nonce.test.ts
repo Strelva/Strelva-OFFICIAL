@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildNonceReportOnlyPolicy, createCspNonce, cspNonceReportOnlyEnabled } from "@/lib/csp-nonce";
 
-const enforced = "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://x.supabase.co; img-src 'self' data: blob:; object-src 'none'; frame-ancestors 'none'";
+const enforced = "default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://x.supabase.co; img-src 'self' data: blob:; frame-ancestors 'none'";
 
 describe("csp nonce report-only helpers", () => {
   it("is on only when the flag is exactly 1", () => {

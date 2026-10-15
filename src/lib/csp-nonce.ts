@@ -19,6 +19,8 @@ export function createCspNonce(): string {
 export function buildNonceReportOnlyPolicy(params: { nonce: string; enforced: string; reportUri: string | null; dev: boolean }): string {
   const scriptSrc = `script-src 'self' 'nonce-${params.nonce}' 'strict-dynamic' https://va.vercel-scripts.com${params.dev ? " 'unsafe-eval'" : ""}`;
   const directives = params.enforced.split("; ").filter((d) => !d.startsWith("report-uri "));
-  const swapped = directives.some((d) => d.startsWith("script-src ")) ? directives.map((d) => (d.startsWith("script-src ") ? scriptSrc : d)) : [...directives, scriptSrc];
+  const swapDirective = (list: string[], name: string, value: string) =>
+    list.some((d) => d.startsWith(`${name} `)) ? list.map((d) => (d.startsWith(`${name} `) ? value : d)) : [...list, value];
+  const swapped = swapDirective(swapDirective(directives, "script-src", scriptSrc), "object-src", "object-src 'none'");
   return [...swapped, ...(params.reportUri ? [`report-uri ${params.reportUri}`] : [])].join("; ");
 }

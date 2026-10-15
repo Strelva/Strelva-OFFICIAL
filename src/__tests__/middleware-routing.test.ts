@@ -374,6 +374,7 @@ describe("report-only nonce policy", () => {
       const res = await publicResponse();
       const reported = res.headers.get("Content-Security-Policy-Report-Only");
       expect(reported).toContain("'nonce-");
+      expect(reported).toContain("object-src 'none'");
       expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBe(reported);
       const enforced = res.headers.get("Content-Security-Policy")!;
       expect(enforced).toContain("script-src 'self' 'unsafe-inline'");
