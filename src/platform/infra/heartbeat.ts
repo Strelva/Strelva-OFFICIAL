@@ -58,6 +58,7 @@ const _CRON_SCHEDULE = {
   "newsletter-sender": 30 * 60, // every 5 min, independently release-gated
   "needs-you": 3 * 3600, // hourly, independently release-gated
   "workspace-work": 30 * 60, // every 5 min, independently release-gated
+  "app-events": 30 * 60, // every 5 min, release-gated event delivery
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
   "workspace-export-recovery": 30 * 60, // every ten minutes, default-off durable export recovery
   "lead-mirror-reconcile": 3 * 3600, // hourly — retries client leads not yet in Postgres
