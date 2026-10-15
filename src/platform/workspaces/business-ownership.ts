@@ -179,6 +179,10 @@ export async function inviteBusinessOwner(actor: WorkspaceActor, workspaceId: st
   if (state.hasOwner) throw new WorkspaceConflictError(CONFLICTS.operator_owner_invitation_owner_exists);
   const recipient = email.safeParse(options.recipientEmail ?? state.recipient?.email ?? "");
   if (!recipient.success) throw new WorkspaceConflictError("No owner address is on record. Pass the owner's email address.");
+  // Staff could otherwise approve owner decisions as the owner (#524). The same rule the agency claim path enforces.
+  const staff = await db().rpc("owner_contact_staff_reason", { p_customer_workspace_id: state.workspaceId, p_email: recipient.data });
+  if (staff.error) throw new WorkspaceStoreError("The owner address could not be checked. Nothing changed.");
+  if (typeof staff.data === "string") throw new WorkspaceConflictError("This address belongs to platform or agency staff. Invite the business owner's own address.");
   const trusted = trustedRecipient(state) === recipient.data;
   let approvalId = options.approvalId;
   if (trusted) {

@@ -40,6 +40,7 @@ beforeEach(() => {
     if (name === "read_operator_owner_invitation_state") return { data: state(), error: null };
     if (name === "create_operator_owner_invitation_approved") return { data: created(args), error: null };
     if (name === "revoke_operator_owner_invitation_audited") return { data: "revoked", error: null };
+    if (name === "owner_contact_staff_reason") return { data: null, error: null };
     return { data: null, error: { message: `unexpected ${name}` } };
   });
   approvalRpc = vi.fn<Rpc>(async (_name, args) => ({ data: {
@@ -94,7 +95,8 @@ describe("inviteBusinessOwner", () => {
     rpc.mockImplementation(async () => ({ data: null, error: { message: "operator_owner_invitation_operator_required" } }));
     await expect(inviteBusinessOwner(ACTOR, WS, { authTime: null, approvalId: APPROVAL, recipientEmail: "other@example.test" })).rejects.toBeInstanceOf(WorkspaceAccessError);
     rpc.mockImplementation(async (name: string) => name === "read_operator_owner_invitation_state"
-      ? { data: state(), error: null } : { data: null, error: { message: "operator_owner_invitation_pending" } });
+      ? { data: state(), error: null } : name === "owner_contact_staff_reason"
+        ? { data: null, error: null } : { data: null, error: { message: "operator_owner_invitation_pending" } });
     await expect(inviteBusinessOwner(ACTOR, WS, { authTime: new Date().getTime() / 1000 })).rejects.toThrow("already waiting");
     rpc.mockImplementation(async (name: string) => name === "revoke_operator_owner_invitation_audited"
       ? { data: "revoked", error: null } : { data: null, error: { message: `unexpected ${name}` } });
