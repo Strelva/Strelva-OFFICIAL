@@ -54,7 +54,7 @@ import { GET as getAvailability } from "@/app/api/booking/availability/route";
 import { PUT as putBooking } from "@/app/api/booking/[id]/route";
 import { getBookings } from "@/platform/bookings/legacy-store";
 import type { Booking } from "@/lib/types";
-import { resetBookingFlagCache } from "@/platform/bookings/flags";
+import { bookingReadMode, bookingReadSource, resetBookingFlagCache } from "@/platform/bookings/flags";
 import { setBookingStoreDb, readTenantBookings, upsertBookingSettings, type BookingStoreDb } from "@/platform/bookings/store";
 import { publicBookingStoreHook, subtractStoreBookings } from "@/server/bookings/public-api";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingReservationRef } from "@/products/scheduling/public-booking";
@@ -64,7 +64,7 @@ import { backfillTenantBookings, checkTenantBookingParity, repairPendingBookings
 import { recordCalendlyBooking } from "@/platform/bookings/calendly";
 import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBookingRequests } from "@/platform/bookings/store";
-import { updateBooking } from "@/platform/bookings/legacy-store";
+import { getBookingConfig, getDateOverrides, updateBooking } from "@/platform/bookings/legacy-store";
 import { setCalendarBusyPorts, type CalendarBusyPorts } from "@/platform/bookings/calendar-busy";
 
 const FRIDAY = "2026-11-06";
@@ -807,5 +807,56 @@ describe("a connected calendar's busy times on the tenant routes", () => {
     await availability();
     expect(ports.busy).toHaveBeenCalledTimes(1);
     expect(set).toHaveBeenCalledWith(expect.stringMatching(/^reb:booking:busy:.+:2026-11-06$/), expect.any(Array), 60);
+  });
+});
+
+describe("STRELVA_BOOKING_READ_POSTGRES_DEFAULT moves every booking surface together", () => {
+  const streakDb = (days: number) => ({ rpc: async () => ({ data: { days }, error: null }) }) as unknown as BookingStoreDb;
+
+  it("makes postgres the default read mode; an explicit legacy still pins legacy", () => {
+    expect(bookingReadMode({})).toBe("legacy");
+    expect(bookingReadMode({ STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1" })).toBe("postgres");
+    expect(bookingReadMode({ STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1", STRELVA_BOOKING_STORE_READ: "" })).toBe("postgres");
+    expect(bookingReadMode({ STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1", STRELVA_BOOKING_STORE_READ: "legacy" })).toBe("legacy");
+    expect(bookingReadMode({ STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1", STRELVA_BOOKING_STORE_READ: "compare" })).toBe("compare");
+    expect(bookingReadMode({ STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "0" })).toBe("legacy");
+  });
+
+  it("still needs the write switch, and the 7-day streak before it serves postgres", async () => {
+    const env = { STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1" };
+    expect(await bookingReadSource({ env, db: streakDb(30) })).toBe("legacy");
+    const armed = { ...env, STRELVA_BOOKING_STORE_WRITE: "1" };
+    resetBookingFlagCache();
+    expect(await bookingReadSource({ env: armed, db: streakDb(6) })).toBe("compare");
+    resetBookingFlagCache();
+    expect(await bookingReadSource({ env: armed, db: streakDb(7) })).toBe("postgres");
+    resetBookingFlagCache();
+    expect(await bookingReadSource({ env: { ...armed, STRELVA_BOOKING_STORE_READ: "legacy" }, db: streakDb(7) })).toBe("legacy");
+    resetBookingFlagCache();
+    expect(await bookingReadSource({ env: armed, db: null })).toBe("legacy");
+  });
+
+  it("a failing streak read serves compare, never postgres", async () => {
+    const env = { STRELVA_BOOKING_READ_POSTGRES_DEFAULT: "1", STRELVA_BOOKING_STORE_WRITE: "1" };
+    const failing = { rpc: async () => ({ data: null, error: { message: "down" } }) } as unknown as BookingStoreDb;
+    expect(await bookingReadSource({ env, db: failing })).toBe("compare");
+  });
+
+  it("booking config and date overrides fall back to the legacy copy when the store cannot answer", async () => {
+    const { fake } = fakeWorld();
+    env("postgres");
+    const DEFAULT = (await import("@/lib/booking")).DEFAULT_BOOKING_CONFIG;
+    const config = { ...DEFAULT, bufferTime: 17 };
+    const overrides = [{ date: "2026-12-25", available: false, reason: "Closed" }];
+    // The legacy copy every write also reaches.
+    await redis.set("reb:booking:config:t1", config);
+    await redis.set("reb:booking:overrides:t1", overrides);
+    await bookingReadSource();
+    fake.state.down = true;
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await getBookingConfig("t1")).toEqual(config);
+    expect(await getDateOverrides("t1")).toEqual(overrides);
+    expect(error.mock.calls.map(call => String(call[0]))).toEqual(expect.arrayContaining([expect.stringContaining("config read failed"), expect.stringContaining("overrides read failed")]));
+    error.mockRestore();
   });
 });

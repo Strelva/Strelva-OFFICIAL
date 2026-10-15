@@ -79,3 +79,24 @@ The fictional UI fixture at `/preview/strelva/agency-release-flags` requires
 both development mode and `STRELVA_UI_PREVIEW=1`. It is interface proof and
 grants no authentication or provider access. Local tests and renders do not
 prove production operation, live verification or customer adoption.
+
+## One path switches (dedupe flows)
+
+Each job has one path. Every switch below defaults off, and none turns on
+client or customer email: delivery stays behind `EMAIL_SENDING_ENABLED` and
+`CUSTOMER_EMAIL_ENABLED`, which are off by decision. Production flips are
+Jacob's yes.
+
+| Switch | What turns on | Needs |
+| --- | --- | --- |
+| `STRELVA_ONE_APPROVAL_PATH` | An emailed Approve or Not yet link, and a signed-in owner or agency decision on a converted business's tenant event, decide through that business's Needs you item and land as one decision record | Needs you released (`STRELVA_NEEDS_YOU_RELEASE`) |
+| `STRELVA_AUTO_POST_DECISION_RECORD` | The review auto-post records a policy decision (route handle after notice) before it posts, so What changed shows it once. A reply the owner holds open is not posted | Migration `20261027110000`; Needs you released |
+| `STRELVA_ONE_INVITATION_PATH` | `/api/admin/invites` and `/api/admin/tenants/assign` use workspace invitations for converted businesses: operators invite the owner only; everyone else is invited by the owner from People & access | `STRELVA_OWNER_INVITATIONS_RELEASE` for owner invitations |
+| `STRELVA_INVITATION_EMAIL_RELEASE` | The workspace invitation email path | `EMAIL_SENDING_ENABLED` and `CUSTOMER_EMAIL_ENABLED`, both off by decision. Until then the screen says nothing was emailed and shows the link to copy |
+| `STRELVA_ONE_QUEUE` | An agency's Queue also lists its clients' Strelva reviews drafts, Requests waiting for its acceptance and its clients' site work. `/admin/queue` stops listing client work for a business an agency holds and says how many moved | Migration `20261027111000` |
+| `STRELVA_BOOKING_READ_POSTGRES_DEFAULT` | With `STRELVA_BOOKING_STORE_READ` unset, every booking surface reads Postgres. An explicit `STRELVA_BOOKING_STORE_READ=legacy` pins legacy | `STRELVA_BOOKING_STORE_WRITE=1` and the 7-day all-tenant parity streak; until then it serves compare |
+
+Local proof: `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-dedupe-flows-sql.sh`
+applies the complete ordered migrations to a disposable cluster, runs the
+contracts for both migrations, rolls them back to the exact prior catalog and
+reapplies them.

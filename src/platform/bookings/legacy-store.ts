@@ -168,7 +168,7 @@ export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<BookingConfig> {
   if ((await bookingReadSource()) === "postgres") {
-    return storeGetBookingConfig(tenant);
+    return storeOrLegacy("config read", tenant, () => storeGetBookingConfig(tenant), () => legacyGetBookingConfig(tenant));
   }
   return legacyGetBookingConfig(tenant);
 }
@@ -221,7 +221,9 @@ export async function setBookingConfig(config: BookingConfig, tenant: string = D
 }
 
 export async function getDateOverrides(tenant: string = DEFAULT_TENANT): Promise<DateOverride[]> {
-  if ((await bookingReadSource()) === "postgres") return storeGetDateOverrides(tenant);
+  if ((await bookingReadSource()) === "postgres") {
+    return storeOrLegacy("overrides read", tenant, () => storeGetDateOverrides(tenant), () => legacyGetDateOverrides(tenant));
+  }
   return legacyGetDateOverrides(tenant);
 }
 

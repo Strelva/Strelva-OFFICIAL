@@ -7,13 +7,24 @@
  *                                   the one store. A failed store write never
  *                                   fails the visitor; it is queued and retried.
  *                                   DUAL_WRITE_PG=0 turns it off too.
- *   STRELVA_BOOKING_STORE_READ      legacy (default) | compare | postgres.
+ *   STRELVA_BOOKING_STORE_READ      legacy | compare | postgres. Unset, it follows
+ *                                   STRELVA_BOOKING_READ_POSTGRES_DEFAULT below, else legacy.
+ *                                   An explicit legacy always pins legacy: the rollback lever.
  *     compare   serve the legacy stores, compute the store's answer beside it
  *               and log any difference (bookings and offered slots).
  *     postgres  serve the one store, but only after 7 consecutive days of
  *               parity (client_record_parity_streak('bookings')) and only with
  *               the write switch on. Until then it acts as compare. Rollback is
  *               setting it back: both stores keep receiving every write.
+ *   STRELVA_BOOKING_READ_POSTGRES_DEFAULT=1
+ *                                   with STRELVA_BOOKING_STORE_READ unset, the default read
+ *                                   becomes postgres. It still needs the write switch and the
+ *                                   7-day parity streak; until then it serves compare. One
+ *                                   switch moves every booking surface (the widget and /api/booking,
+ *                                   the v1 public booking service, the native v1 agent routes
+ *                                   and MCP, owner screens and Needs you), because they all read
+ *                                   bookingReadSource(). Redis stays the read fallback, now for
+ *                                   booking config and date overrides too.
  *   STRELVA_BOOKING_OWNER_NOTICE=1  the "New booking" owner email, through the
  *                                   owner-recipient rule.
  */
@@ -34,7 +45,8 @@ export function bookingStoreWriteEnabled(env: Env = process.env): boolean {
 
 export function bookingReadMode(env: Env = process.env): BookingReadMode {
   const value = env.STRELVA_BOOKING_STORE_READ?.trim();
-  return value === "compare" || value === "postgres" ? value : "legacy";
+  if (value === "compare" || value === "postgres" || value === "legacy") return value;
+  return env.STRELVA_BOOKING_READ_POSTGRES_DEFAULT?.trim() === "1" ? "postgres" : "legacy";
 }
 
 export function bookingOwnerNoticeEnabled(env: Env = process.env): boolean {
