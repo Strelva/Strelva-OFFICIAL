@@ -3,6 +3,7 @@
 import { CSSProperties, FormEvent, useState } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { formatWholeDollarsUsd } from "@/lib/currency";
+import { formatMoney } from "@/lib/orders";
 import { payLinkReassurance } from "@/lib/pay-link-copy";
 
 const STEP_DOLLARS = 50;
@@ -30,7 +31,10 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
   const [error, setError] = useState("");
 
   const pct = max > min ? ((amount - min) / (max - min)) * 100 : 100;
-  const amountLabel = formatWholeDollarsUsd(Math.round(amount * 100));
+  const amountCentsNow = Math.round(amount * 100);
+  // Connected fixed links may carry cents; whole-dollar output stays as it was.
+  const hasCents = amountCentsNow % 100 !== 0;
+  const amountLabel = hasCents ? formatMoney(amountCentsNow, "usd") : formatWholeDollarsUsd(amountCentsNow);
 
   const reassurance = door ? payLinkReassurance({ door, amountCents, minCents, maxCents }) : null;
 
@@ -144,7 +148,7 @@ export function PayLinkForm({ slug, door, amountCents, minCents, maxCents }: Pay
         <div className="mt-1.5 flex items-start justify-center text-[#1d1d1f]">
           <span className="mt-[10px] text-[26px] font-semibold">$</span>
           <span className="text-[58px] font-semibold leading-none tracking-[-0.035em] tabular-nums">
-            {amount.toLocaleString("en-US")}
+            {amount.toLocaleString("en-US", hasCents ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : undefined)}
           </span>
         </div>
       </div>

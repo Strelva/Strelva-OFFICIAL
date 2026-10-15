@@ -261,6 +261,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261025133000": "done_agency_website_executions",
   "20261026100000": "connection_holders",
   "20261026110000": "conn_google_agency_oauth_attempts",
+  "20261026180000": "agency_pay_links",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

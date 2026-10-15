@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { StHead, StNotice, StPage } from "@/components/ui/strelva/Kit";
@@ -28,6 +29,10 @@ export async function MoneyDocumentPage({ kind, params, searchParams }: { kind: 
   if (kind === "payment_receipt" && link.status !== "paid") return shell(<><StHead title="Payment receipt" crumb={back} /><StNotice>No payment is recorded for this link yet. Stripe confirms payments; this page updates when it does.</StNotice></>);
   const doc = kind === "invoice" ? await readMoneyDocument("invoice", link.id) : await issueAgencyPayLinkReceipt(link.id);
   if (!doc) notFound();
-  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, "");
+  // NEXT_PUBLIC_APP_URL, else the request origin, so a printed Invoice always carries an absolute pay URL.
+  const requestHeaders = await headers();
+  const requestHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "";
+  const requestProto = requestHeaders.get("x-forwarded-proto") || (requestHost.includes("localhost") ? "http" : "https");
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || (requestHost ? `${requestProto}://${requestHost}` : "")).replace(/\/$/, "");
   return shell(<MoneyDocument doc={doc} back={back} payUrl={kind === "invoice" && link.status === "open" ? `${origin}/pay/${link.slug}` : undefined} />);
 }
