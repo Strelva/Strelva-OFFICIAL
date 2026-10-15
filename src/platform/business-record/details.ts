@@ -7,7 +7,7 @@ import { factValueSchemas, type BusinessRecord, type BusinessRecordWriteSource }
  * server action writes through patchBusinessRecord, and the SQL decides.
  */
 
-export const EDITABLE_DETAILS = ["display_name", "phone", "email", "description", "owner_recipient"] as const;
+export const EDITABLE_DETAILS = ["display_name", "phone", "email", "description", "owner_recipient", "insurance_accepted"] as const;
 export type EditableDetail = (typeof EDITABLE_DETAILS)[number];
 
 export const DETAIL_LABELS: Record<EditableDetail, string> = {
@@ -16,11 +16,29 @@ export const DETAIL_LABELS: Record<EditableDetail, string> = {
   email: "Public email",
   description: "Description",
   owner_recipient: "Send Strelva's emails to",
+  insurance_accepted: "Insurance plans you accept",
 };
+
+/** One plan per line: trimmed, blanks dropped, repeats (any case) dropped. */
+function insurancePlans(raw: string): string[] {
+  const seen = new Set<string>();
+  const plans: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const plan = line.trim();
+    if (!plan || seen.has(plan.toLowerCase())) continue;
+    seen.add(plan.toLowerCase());
+    plans.push(plan);
+  }
+  return plans;
+}
 
 /** The form value of one fact, as text. */
 export function detailText(record: BusinessRecord, key: EditableDetail): string {
   const value = record.facts[key]?.value;
+  if (key === "insurance_accepted") {
+    const carriers = value && typeof value === "object" && "carriers" in value && Array.isArray(value.carriers) ? value.carriers : [];
+    return carriers.filter((item): item is string => typeof item === "string").join("\n");
+  }
   if (key === "owner_recipient") return value && typeof value === "object" && "email" in value && typeof value.email === "string" ? value.email : "";
   return typeof value === "string" ? value : "";
 }
@@ -40,7 +58,8 @@ export function businessDetailsPatch(record: BusinessRecord, form: Partial<Recor
   for (const key of EDITABLE_DETAILS) {
     const raw = form[key];
     if (raw === undefined) continue;
-    const next = key === "email" || key === "owner_recipient" ? raw.trim().toLowerCase() : raw.trim();
+    const next = key === "insurance_accepted" ? insurancePlans(raw).join("\n")
+      : key === "email" || key === "owner_recipient" ? raw.trim().toLowerCase() : raw.trim();
     if (next === detailText(record, key)) continue;
     if (!next) {
       if (key === "owner_recipient") return { kind: "invalid", field: key, message: "Strelva needs an address to send your reports and alerts to." };
@@ -48,11 +67,14 @@ export function businessDetailsPatch(record: BusinessRecord, form: Partial<Recor
       continue;
     }
     const prior = record.facts.owner_recipient?.value;
-    const value = key === "owner_recipient"
+    const priorInsurance = record.facts.insurance_accepted?.value;
+    const value = key === "insurance_accepted"
+      ? { carriers: next.split("\n"), ...(priorInsurance && typeof priorInsurance === "object" && "summary" in priorInsurance && typeof priorInsurance.summary === "string" ? { summary: priorInsurance.summary } : {}) }
+      : key === "owner_recipient"
       ? { email: next, ...(prior && typeof prior === "object" && "name" in prior && typeof prior.name === "string" ? { name: prior.name } : {}) }
       : next;
     const parsed = factValueSchemas[key].safeParse(value);
-    if (!parsed.success) return { kind: "invalid", field: key, message: key === "phone" ? "Use a phone number with 7 to 15 digits." : key.includes("email") || key === "owner_recipient" ? "Use a full email address." : "That value isn't allowed." };
+    if (!parsed.success) return { kind: "invalid", field: key, message: key === "insurance_accepted" ? "List up to 60 plans, one per line, each under 120 characters." : key === "phone" ? "Use a phone number with 7 to 15 digits." : key.includes("email") || key === "owner_recipient" ? "Use a full email address." : "That value isn't allowed." };
     facts[key] = { value: parsed.data };
   }
   return Object.keys(facts).length ? { kind: "patch", facts } : { kind: "unchanged" };

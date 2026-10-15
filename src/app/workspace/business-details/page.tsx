@@ -11,6 +11,7 @@ import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
 import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
 import { WorkspaceBusinessDetails } from "@/experience/places/WorkspaceBusinessDetails";
+import { verticalIntakeReleaseMayBeOn } from "@/products/vertical-intake/server";
 import { saveBusinessDetailsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -37,5 +38,5 @@ export default async function BusinessDetailsPage({ searchParams }: { searchPara
   const result = typeof params.result === "string" && OUTCOMES.has(params.result as DetailsSaveOutcome) ? params.result as DetailsSaveOutcome : null;
   const field = typeof params.field === "string" && (EDITABLE_DETAILS as readonly string[]).includes(params.field) ? params.field as EditableDetail : null;
   const googleResult = typeof params.googleResult === "string" && ["needs_approval", "confirmed", "unconfirmed", "failed", "unavailable"].includes(params.googleResult) ? params.googleResult as import("@/products/publishing/server").RecordGoogleSummary : null;
-  return <StrelvaShell workspaceId={workspaceId} active="settings" title="Business details" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><WorkspaceBusinessDetails workspaceId={workspaceId} state={state} result={result} googleResult={googleResult} field={field} action={saveBusinessDetailsAction} /></StrelvaShell>;
+  return <StrelvaShell workspaceId={workspaceId} active="settings" title="Business details" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><WorkspaceBusinessDetails workspaceId={workspaceId} state={state} result={result} googleResult={googleResult} field={field} action={saveBusinessDetailsAction} showInsurance={verticalIntakeReleaseMayBeOn()} /></StrelvaShell>;
 }

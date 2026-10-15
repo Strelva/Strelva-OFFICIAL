@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   businessRecordPatchSchema,
   contactInputSchema,
+  factKeySchema,
   factValueSchemas,
   parseFactValue,
   patchVerificationAllowed,
@@ -35,6 +36,18 @@ describe("business record contracts", () => {
     expect(factValueSchemas.address.safeParse({ city: "Buffalo" }).success).toBe(false);
     expect(factValueSchemas.address.safeParse({ formatted: "1 Main St, Buffalo, NY" }).success).toBe(true);
     expect(factValueSchemas.links.safeParse([{ kind: "website", url: "javascript:alert(1)" }]).success).toBe(false);
+  });
+
+  it("accepts a plan list for insurance_accepted and rejects the rest", () => {
+    const schema = factValueSchemas.insurance_accepted;
+    expect(schema.safeParse({ carriers: ["Delta Dental PPO", "Cigna"], summary: "Most plans." }).success).toBe(true);
+    expect(schema.safeParse({ carriers: Array.from({ length: 60 }, (_, i) => `Plan ${i}`) }).success).toBe(true);
+    expect(schema.safeParse({ carriers: Array.from({ length: 61 }, (_, i) => `Plan ${i}`) }).success).toBe(false);
+    expect(schema.safeParse({ carriers: ["Delta", "delta"] }).success).toBe(false);
+    expect(schema.safeParse({ carriers: [] }).success).toBe(false);
+    expect(schema.safeParse({ carriers: ["x".repeat(121)] }).success).toBe(false);
+    expect(schema.safeParse({ carriers: ["Delta"], extra: 1 }).success).toBe(false);
+    expect(factKeySchema.safeParse("insurance_accepted").success).toBe(true);
   });
 
   it("rejects unknown facts, untrimmed names and empty patches", () => {
