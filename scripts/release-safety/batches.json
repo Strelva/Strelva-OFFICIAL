@@ -2522,7 +2522,7 @@
         },
         {
           "file": "20261028100300_listings_sync_store.sql",
-          "sha256": "bf84ef61b6aec4e53aa14cfc38f98fcb16eb7d4b7460c9734b2c816a9d6d192a",
+          "sha256": "f0010e047e22d55582f13c7a33e596f8fad7c1c1c5e7cd9a1420c3970f2a68b6",
           "rollback": "rollback-20261028100300_listings_sync_store.sql",
           "rollbackSha256": "38235dc4fc35e71a2d0f575d247b2dc92c9988c96dc73334df0a7c2087d08108",
           "rollbackStatus": "Refuses with listing_sync_rollback_has_data while numbered Releases exist unless listing_sync.allow_drop = '1', which also drops them; otherwise drops the functions and the three tables."

@@ -216,7 +216,7 @@ language plpgsql security definer set search_path = public, pg_temp as $$
 declare n int;
 begin
   update public.listing_sync_fixes set status = 'declined', decided_by = p_decided_by, updated_at = clock_timestamp()
-    where workspace_id = p_workspace_id and record_revision = p_record_revision and status = 'proposed' and kind <> 'owner_todo';
+    where workspace_id = p_workspace_id and record_revision = p_record_revision and status in ('proposed','failed') and kind <> 'owner_todo';
   get diagnostics n = row_count;
   return n;
 end;
@@ -240,7 +240,8 @@ end;
 $$;
 
 -- The owner's pending plan: the Strelva-made and Request fixes of the last
--- finished check. Owner to-dos are not decisions, so they are left out.
+-- finished check that are not yet applied (a failed one is offered again).
+-- Owner to-dos are not decisions, so they are left out.
 create function public.listing_sync_open_plan(p_workspace_id uuid) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare last public.listing_sync_checks;
@@ -254,7 +255,7 @@ begin
         'recordRevision', f.record_revision) order by f.surface_key, f.fact_key)
       from public.listing_sync_fixes f
       where f.workspace_id = p_workspace_id and f.record_revision = last.record_revision
-        and f.status = 'proposed' and f.kind <> 'owner_todo'), '[]'::jsonb));
+        and f.status in ('proposed','failed') and f.kind <> 'owner_todo'), '[]'::jsonb));
 end;
 $$;
 
