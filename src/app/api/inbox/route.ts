@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getInboxItems, markInboxRead, markAllInboxRead } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
+import { trackError } from "@/platform/infra/monitoring";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(request: Request) {
@@ -21,8 +23,11 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ items, unreadCount });
   } catch (err) {
-    console.error("[inbox GET]", err);
-    return NextResponse.json({ items: [], unreadCount: 0 }, { status: 500 });
+    if (err instanceof WorkspaceAccessError) {
+      return NextResponse.json({ error: "You don't have access to this inbox.", code: "inbox_forbidden" }, { status: 403 });
+    }
+    trackError(err, { route: "api/inbox", op: "GET" });
+    return NextResponse.json({ error: "The inbox couldn't be read right now. Nothing changed.", code: "inbox_unavailable" }, { status: 503 });
   }
 }
 
