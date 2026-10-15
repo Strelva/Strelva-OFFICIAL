@@ -568,6 +568,7 @@ export { siteChangeOwnerEmailEnabled } from "./site-change-email";
 export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type DeclaredTenant, type ReadBack, type SiteDeclaration, type SiteDeclarationPorts, type SiteReleaseCheck } from "./site-declaration";
 export { observeWebsiteSystemRelease } from "./system-releases";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";
+export { codeAgentReleased } from "./code-agent-release";
 
 /** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */
 export { crawlWebsite, normalizeRebuildUrl, WebsiteCrawlError } from "./rebuild-crawl";

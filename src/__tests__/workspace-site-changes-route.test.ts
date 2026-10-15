@@ -38,6 +38,8 @@ describe("/api/workspace/site-changes", () => {
     for (const mock of Object.values(mocks)) mock.mockReset();
     mocks.workspaceRelease.mockReturnValue(true);
     mocks.byCode.mockResolvedValue(false);
+    vi.stubEnv("STRELVA_MCP_OAUTH", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     mocks.released.mockResolvedValue(true);
     mocks.actor.mockResolvedValue(actor);
     mocks.snapshot.mockResolvedValue({ managedWebsites: [{ link: "tenant_link", tenantStableId: MCLEARS, tenantId: "mclears", siteName: "McClear's", tenantActive: true, linkedAt: "2026-10-01T00:00:00Z" }] });
@@ -131,6 +133,15 @@ describe("/api/workspace/site-changes", () => {
       expect(recordedKinds()).toHaveLength(0);
       mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "website_change_out_of_order" } });
       await post(deployed({ readBack: "confirmed" }));
+      expect(recordedKinds()[0]![1]).toMatchObject({ p_details: { readBack: "confirmed" } });
+      expect(mocks.verify).not.toHaveBeenCalled();
+    });
+
+    it("with sites_by_code on but OAuth off, takes the client's read-back and never verifies", async () => {
+      vi.stubEnv("STRELVA_MCP_OAUTH", "0");
+      mocks.byCode.mockResolvedValue(true);
+      mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "website_change_out_of_order" } });
+      await post(deployed({ readBack: "confirmed" }, ""));
       expect(recordedKinds()[0]![1]).toMatchObject({ p_details: { readBack: "confirmed" } });
       expect(mocks.verify).not.toHaveBeenCalled();
     });
