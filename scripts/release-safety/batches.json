@@ -2397,6 +2397,19 @@
       ]
     },
     {
+      "id": "ai-controls-2026-10-15",
+      "status": "Held and unapplied. Per-client usage controls (business_ai_controls, change log), v2 budget admission and the agency and operator control functions; v1 budget functions untouched. SQL fixture authored (scripts/check-ai-controls-sql.sh); not run during integration. No production, provider or flag change authorized.",
+      "items": [
+        {
+          "file": "20261026170000_ai_controls.sql",
+          "sha256": "13023c90c893ee4c6e2f15d48d0e1107f3a782c4f788ae973bb6247778749914",
+          "rollback": "rollback-20261026170000_ai_controls.sql",
+          "rollbackSha256": "9989cb9c7dd57ce03d307da8828638ef89521f5372a605cf3d93757607efc168",
+          "rollbackStatus": "Refuses while any control is active or any list-price reservation exists; otherwise drops the v2 functions, the ceiling_source column and both tables."
+        }
+      ]
+    },
+    {
       "id": "money-agency-pay-links-2026-10-15",
       "status": "Held and unapplied. Agency pay links, Invoice and Payment receipt records. SQL fixture run locally only (scripts/check-money-pay-links-sql.sh); no production, provider or flag change authorized.",
       "items": [
