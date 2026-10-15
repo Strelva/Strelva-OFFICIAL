@@ -4,7 +4,7 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { systemOriginSchema, type SystemOrigin } from "@/platform/systems/contracts";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
-import { CONTENT_READING_REPOS } from "./site-editing";
+import { readsStrelvaContent, type SiteEditingTenant } from "./site-editing";
 
 export interface WebsiteReleaseTarget {
   systemId: string;
@@ -20,19 +20,23 @@ export interface WebsiteReleasesDb {
  * Never retry a provider write to repair this projection. */
 export async function reconcileWebsiteSystemReleases(
   actor: WorkspaceActor, businessId: string, target: WebsiteReleaseTarget,
-  dependencies: { db?: WebsiteReleasesDb; released?: typeof systemsReleasedFor } = {},
+  dependencies: { db?: WebsiteReleasesDb; released?: typeof systemsReleasedFor; tenantConfig?: (id: string) => Promise<SiteEditingTenant | undefined> } = {},
 ): Promise<number> {
   if (!(await (dependencies.released ?? systemsReleasedFor)(actor, businessId))) return 0;
   const db = dependencies.db ?? getSupabase() as unknown as WebsiteReleasesDb | null;
   if (!db) throw new WorkspaceStoreError("Website release history is unavailable.");
   const origin = systemOriginSchema.parse(target.origin);
+  const tenantConfig = dependencies.tenantConfig ?? (async (id: string) => (await import("@/lib/tenants")).getTenantConfig(id));
+  const contentReading = target.tenantId
+    ? readsStrelvaContent((await tenantConfig(target.tenantId).catch(() => undefined)) ?? { id: target.tenantId })
+    : false;
   const { data, error } = await db.rpc("reconcile_website_system_releases", {
     p_workspace_id: z.string().uuid().parse(businessId),
     p_user_id: z.string().uuid().parse(actor.userId),
     p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),
     p_system_id: z.string().uuid().parse(target.systemId),
     p_origin_kind: origin.kind, p_origin_ref: origin.ref,
-    p_content_reading: target.tenantId ? CONTENT_READING_REPOS.has(target.tenantId) : false,
+    p_content_reading: contentReading,
   });
   if (error) {
     if (/business_record_access_denied|system_not_found/.test(error.message ?? "")) throw new WorkspaceAccessError();

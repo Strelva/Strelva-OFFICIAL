@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dependencies = vi.hoisted(() => ({ released: vi.fn(async () => false), list: vi.fn(), rpc: vi.fn() }));
+const dependencies = vi.hoisted(() => ({ released: vi.fn(async () => false), list: vi.fn(), rpc: vi.fn(), tenant: vi.fn() }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: dependencies.released }));
 vi.mock("@/platform/systems/from-existing", () => ({ listBusinessSystems: dependencies.list }));
 vi.mock("@/platform/systems/supabase-store", () => ({ createSupabaseSystemStore: () => ({}) }));
+vi.mock("@/lib/tenants", () => ({ getTenantConfig: dependencies.tenant }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: dependencies.rpc }) }));
 import { observeWebsiteSystemRelease, observeWebsiteWorkRelease, reconcileWebsiteSystemReleases } from "@/products/websites/system-releases";
 
@@ -17,6 +18,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dependencies.released.mockResolvedValue(false);
   dependencies.rpc.mockResolvedValue({ data: 2, error: null });
+  dependencies.tenant.mockResolvedValue({ id: "gldf", customRepo: { contentSource: "strelva" } });
   dependencies.list.mockResolvedValue({ systems: [{ system: { id: systemId, kind: "website", origin: target.origin }, references: { savedWorkId: workId, tenantId: "gldf" } }] });
 });
 
@@ -36,6 +38,16 @@ describe("website release reconciliation", () => {
       p_workspace_id: businessId, p_user_id: actor.userId, p_verified_email: "owner@example.test",
       p_system_id: systemId, p_origin_kind: "tenant", p_origin_ref: target.origin.ref, p_content_reading: true,
     });
+  });
+
+  it("reports no content coverage when the site declares none", async () => {
+    dependencies.released.mockResolvedValue(true);
+    const tenantConfig = vi.fn(async () => undefined);
+    await reconcileWebsiteSystemReleases(actor, businessId, target, { tenantConfig });
+    expect(tenantConfig).toHaveBeenCalledWith("gldf");
+    expect(dependencies.rpc).toHaveBeenCalledWith("reconcile_website_system_releases", expect.objectContaining({ p_content_reading: false }));
+    await reconcileWebsiteSystemReleases(actor, businessId, target, { tenantConfig: async () => ({ id: "gldf", customRepo: { contentSource: "strelva" } }) });
+    expect(dependencies.rpc).toHaveBeenLastCalledWith("reconcile_website_system_releases", expect.objectContaining({ p_content_reading: true }));
   });
 
   it("fails closed on access denial and malformed storage results", async () => {

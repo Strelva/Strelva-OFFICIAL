@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { CONTENT_READING_REPOS, siteEditingFor } from "@/products/websites/site-editing";
+import { readsStrelvaContent, siteEditingFor } from "@/products/websites/site-editing";
 import { resolveWorkspaceSite, type WorkspaceSiteDeps } from "@/products/websites/workspace-site";
 import { SITE_CHANGE_STAGE_LABEL, siteChangeRequestCommand, siteChangeStage, recordSiteChangeSchema, type SiteChangeRequest } from "@/products/websites/site-change-model";
 import { sitePlaceForDashboardPath, workspaceDashboardHref, workspaceSiteHref, workspaceSiteTarget } from "@/platform/workspaces/site-places";
@@ -18,16 +18,22 @@ const mclearsSystem = systemOriginId(WS, { kind: "tenant", ref: MCLEARS });
 const actor = { userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "ruth@gldf.example" };
 
 describe("how a managed website changes", () => {
-  it("edits natively exactly the repos whose manifest reads Strelva content, and hosted templates", () => {
+  it("edits natively what a site declares, and hosted templates, never by name", () => {
+    expect(siteEditingFor({ id: "gldf", deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } })).toBe("native");
+    expect(siteEditingFor({ id: "gldf" })).toBe("request");
+    expect(siteEditingFor({ id: "gldf", deliveryModel: "custom_repo" })).toBe("request");
+    expect(siteEditingFor({ id: "x", customRepo: { contentSource: "repo" } })).toBe("request");
+    expect(siteEditingFor({ id: "tenant-zero", deliveryModel: "platform_template" })).toBe("native");
+    expect(readsStrelvaContent({ id: "tenant-zero", deliveryModel: "platform_template" })).toBe(false);
+    expect(readsStrelvaContent({ id: "gldf", customRepo: { contentSource: "strelva" } })).toBe(true);
+  });
+
+  it("backfills exactly the repos whose manifest reads Strelva content", () => {
     const manifest = JSON.parse(readFileSync(path.join(process.cwd(), "release-manifest.json"), "utf8")) as { customRepoWorkspace: { repos: Array<{ tenant: string; v1Endpoints: string[] }> } };
     const readers = manifest.customRepoWorkspace.repos.filter((repo) => repo.v1Endpoints.includes("content")).map((repo) => repo.tenant).sort();
-    expect([...CONTENT_READING_REPOS].sort()).toEqual(readers);
-    expect(siteEditingFor({ id: "gldf", deliveryModel: "custom_repo" })).toBe("native");
-    expect(siteEditingFor({ id: "rohlax" })).toBe("native");
-    expect(siteEditingFor({ id: "rhm-innovations", deliveryModel: "custom_repo" })).toBe("native");
-    expect(siteEditingFor({ id: "mclears", deliveryModel: "custom_repo" })).toBe("request");
-    expect(siteEditingFor({ id: "vermont-unlimited" })).toBe("request");
-    expect(siteEditingFor({ id: "tenant-zero", deliveryModel: "platform_template" })).toBe("native");
+    const sql = readFileSync(path.join(process.cwd(), "supabase/migrations/20261027120100_site_content_source_backfill.sql"), "utf8");
+    const listed = [...(/where id in \(([^)]*)\)/.exec(sql)?.[1] ?? "").matchAll(/'([^']+)'/g)].map((match) => match[1]).sort();
+    expect(listed).toEqual(readers);
   });
 });
 
@@ -87,7 +93,7 @@ function deps(patch: Partial<WorkspaceSiteDeps> = {}, role: "owner" | "admin" | 
     systemsReleased: async () => true,
     listWorkspaces: async () => [{ id: WS, kind: "customer", name: "Great Lakes Dried Fruit", access: "member", role }, { id: OTHER_WS, kind: "personal", name: "Personal", access: "member", role: "owner" }],
     readSystems: async () => snapshot(),
-    tenantConfig: async (id) => ({ id, deliveryModel: "custom_repo" }),
+    tenantConfig: async (id) => ({ id, deliveryModel: "custom_repo", customRepo: id === "gldf" ? { contentSource: "strelva" } : { contentSource: "repo" } }),
     hasTenantAccess: async () => true,
     isOperator: async () => false,
     ...patch,

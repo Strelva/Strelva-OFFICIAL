@@ -1,7 +1,7 @@
 import { systemOriginId } from "@/platform/systems/invariants";
 import type { ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { siteEditingFor, type SiteEditing } from "./site-editing";
+import { siteEditingFor, type SiteEditing, type SiteEditingTenant } from "./site-editing";
 
 /**
  * Resolves `/workspace/site` (a managed website's own pages in the
@@ -34,7 +34,7 @@ export interface WorkspaceSiteDeps {
   systemsReleased(workspaceId: string, viewer: { operator: boolean; tester: boolean; userId: string }): Promise<boolean>;
   listWorkspaces(actor: WorkspaceActor): Promise<Array<{ id: string; kind: string; name: string; access?: string; role?: string | null }>>;
   readSystems(actor: WorkspaceActor, workspaceId: string): Promise<ExistingSystemsSnapshot>;
-  tenantConfig(tenantId: string): Promise<{ id: string; deliveryModel?: "custom_repo" | "platform_template" | null } | undefined>;
+  tenantConfig(tenantId: string): Promise<SiteEditingTenant | undefined>;
   hasTenantAccess(tenantId: string): Promise<boolean>;
   isOperator(): Promise<boolean>;
 }

@@ -559,7 +559,7 @@ export const listWebsiteCapabilityOptions = (actor: WorkspaceActor, workId: stri
 export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.connectCapabilities(actor, workId, input);
 
 // A managed website in the workspace: how it changes, its own pages, and repo-change Requests.
-export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-editing";
+export { siteEditingFor, contentSourceFor, readsStrelvaContent, type SiteEditing, type SiteContentSource } from "./site-editing";
 export { resolveWorkspaceSite, type WorkspaceSiteDeps, type WorkspaceSiteState } from "./workspace-site";
 export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";

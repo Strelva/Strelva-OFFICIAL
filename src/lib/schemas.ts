@@ -404,6 +404,11 @@ export const siteCapabilityManifestSchema = z.object({
   customOnlyFeatures: z.array(z.string().max(10000)),
   customRequestEndpoint: z.string().max(10000).optional(),
   customComponents: z.array(customComponentCapabilitySchema),
+  contentSource: z.enum(["strelva", "repo"]).optional(),
+  release: z.object({
+    commitSha: z.string().regex(/^[0-9a-fA-F]{7,40}$/).nullable(),
+    builtAt: z.string().max(64).nullable().optional(),
+  }).optional(),
 });
 
 /**
