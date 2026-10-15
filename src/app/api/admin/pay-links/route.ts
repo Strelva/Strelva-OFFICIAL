@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { listBuildPayments } from "@/lib/revenue";
 import { listPayLinks, PayLinkStorageError } from "@/lib/pay-links";
+import { agencyPayLinksEnabled, listAgencyPayLinksForSupport } from "@/platform/agency-pay-links";
 
 /** Platform support cannot sell agency work, with either billing flag value. */
 export async function POST(_request: Request) {
@@ -51,7 +52,9 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ payLinks, count: payLinks.length, paidPayments, paymentStatusAvailable }, { headers: { "Cache-Control": "private, no-store" } });
+  // Read-only: links that charge on an agency's own Stripe account, only while their switch is on.
+  const connectedLinks = agencyPayLinksEnabled() ? (await listAgencyPayLinksForSupport().catch(() => [])).filter(row => row.rail === "connected_account") : undefined;
+  return NextResponse.json({ payLinks, count: payLinks.length, paidPayments, paymentStatusAvailable, ...(connectedLinks ? { connectedLinks } : {}) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /** Existing service invoices are inspected here; changes belong to their agency. */

@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { getRedis } from "@/platform/infra/redis";
 import { formatWholeDollarsUsd } from "./currency";
+import { payLinkStore } from "@/platform/agency-pay-links/release";
 
 /**
  * Persistent Redis keys follow the repo's `reb:` convention (AGENTS.md) — wire-
@@ -350,8 +351,20 @@ export async function getRedisPayLink(slug: string): Promise<PayLinkConfig | nul
   return redis.get<PayLinkConfig>(key);
 }
 
-/** Existing callers keep this name. It reads Redis only; the Postgres read is in agency-pay-links/public. */
-export const getPayLink = getRedisPayLink;
+/**
+ * The store-aware read. Redis until STRELVA_PAY_LINK_STORE=postgres, which
+ * Jacob sets after the backfill verifies. Connected (Stripe account) links
+ * are served by resolvePublicPayLink, never here.
+ */
+export async function getPayLink(slug: string): Promise<PayLinkConfig | null> {
+  if (payLinkStore() === "redis") return getRedisPayLink(slug);
+  const normalized = normalizePayLinkSlug(slug);
+  if (!normalized || normalized === "index") return null;
+  // Lazy: agency-pay-links imports this module's helpers.
+  const { readPublicAgencyPayLink, toLegacyPayLinkConfig } = await import("@/platform/agency-pay-links");
+  const row = await readPublicAgencyPayLink(normalized);
+  return row?.rail === "platform_legacy" ? toLegacyPayLinkConfig(row) : null;
+}
 
 /**
  * List every minted pay link for authorized support or scoped agency readers. Reads the slug index set, then the
@@ -359,6 +372,12 @@ export const getPayLink = getRedisPayLink;
  * without mutating the index. Sorted newest-first by createdAt.
  */
 export async function listPayLinks(): Promise<PayLinkConfig[]> {
+  if (payLinkStore() === "redis") return listRedisPayLinks();
+  const { listAgencyPayLinksForSupport, toLegacyPayLinkConfig } = await import("@/platform/agency-pay-links");
+  return (await listAgencyPayLinksForSupport()).filter(row => row.rail === "platform_legacy").map(toLegacyPayLinkConfig);
+}
+
+export async function listRedisPayLinks(): Promise<PayLinkConfig[]> {
   const redis = getRedis();
   if (!redis) return [];
   const slugs = await redis.smembers(PAY_LINK_INDEX_KEY);
