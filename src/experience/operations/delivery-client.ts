@@ -9,6 +9,8 @@ export const deliveryInspectionSchema = z.object({
     canManage: z.boolean(), canOperate: z.boolean(), stopped: z.boolean(),
     websiteBindings: z.array(z.object({ id: z.string().uuid(), name: z.string().nullable(), tenantId: z.string() })),
   }),
+  /** Present only for a website Request with sites_by_code on: what to give the agency's coding agent. */
+  codeAgent: z.object({ mcpUrl: z.string().url(), requestId: z.string().uuid() }).strict().optional(),
 });
 export type DeliveryInspection = z.infer<typeof deliveryInspectionSchema>;
 export type DeliveryChange = z.infer<typeof deliveryCommitmentCommandSchema>["change"];
