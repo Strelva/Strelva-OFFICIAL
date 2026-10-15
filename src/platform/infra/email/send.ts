@@ -113,6 +113,12 @@ async function audiencePolicyEnabled(input: SendEmailInput): Promise<boolean> {
   return armed || !emailSendingPaused();
 }
 
+/** Would client mail for this business pass the audience policy right now?
+ * Sends nothing; errors answer false so callers never claim mail is on. */
+export async function clientEmailPolicyAllows(input: { workspaceId?: string; tenantId?: string }): Promise<boolean> {
+  try { return await audiencePolicyEnabled({ audience: "client", subject: "", to: "", html: "", text: "", ...input }); } catch { return false; }
+}
+
 /** Instant-based confirmation mail uses the business zone, with an explicit
  * UTC fallback if the saved zone cannot be read. Never display a raw ISO date. */
 export function readableBookingInstant(value: string, timeZone: string): string {
@@ -212,6 +218,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
 
   // Authorize the actual sending domain after resolving agency branding.
   if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    console.warn("[email] agency-authored send held: agency_email_gate_closed");
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }
 
