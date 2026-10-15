@@ -3,7 +3,7 @@
 import { CSSProperties, FormEvent, useState } from "react";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { formatWholeDollarsUsd } from "@/lib/currency";
-import { formatMoney } from "@/lib/orders";
+import { formatMoney } from "@/platform/connect/money-format";
 import { payLinkReassurance } from "@/lib/pay-link-copy";
 
 const STEP_DOLLARS = 50;

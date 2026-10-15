@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({ actor: vi.fn(), agency: vi.fn(), records: vi.fn(), document: vi.fn(), receipt: vi.fn(), brand: vi.fn(), release: vi.fn(), notFound: vi.fn(() => { throw new Error("NEXT_NOT_FOUND"); }), redirect: vi.fn(() => { throw new Error("NEXT_REDIRECT"); }) }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "app.example" }) }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound, redirect: mocks.redirect }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
@@ -22,7 +23,7 @@ const props = (id = linkId) => ({ params: Promise.resolve({ linkId: id }), searc
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("STRELVA_AGENCY_PAY_LINKS", "1"); vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+  vi.stubEnv("NEXT_PUBLIC_APP_URL", ""); vi.stubEnv("STRELVA_AGENCY_PAY_LINKS", "1"); vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
   mocks.release.mockReturnValue(true); mocks.actor.mockResolvedValue({ userId: "u", verifiedEmail: "o@example.test" });
   mocks.agency.mockResolvedValue({ id: agency, role: "owner" }); mocks.records.mockResolvedValue([link()]);
   mocks.brand.mockResolvedValue({ agencyId: agency, name: "North Studio" });
@@ -57,7 +58,7 @@ describe("agency document pages", () => {
   it("show the numbered Invoice", async () => {
     mocks.document.mockResolvedValue(doc("invoice", 1));
     const html = renderToStaticMarkup(await InvoicePage(props()));
-    expect(html).toContain("INV-000001");
+    expect(html).toContain("INV-000001"); expect(html).toContain("https://app.example/pay/harbor-site");
   });
   it("tell an unpaid link's receipt page that no payment is recorded, without issuing one", async () => {
     const html = renderToStaticMarkup(await ReceiptPage(props()));

@@ -29,10 +29,17 @@ export async function MoneyDocumentPage({ kind, params, searchParams }: { kind: 
   if (kind === "payment_receipt" && link.status !== "paid") return shell(<><StHead title="Payment receipt" crumb={back} /><StNotice>No payment is recorded for this link yet. Stripe confirms payments; this page updates when it does.</StNotice></>);
   const doc = kind === "invoice" ? await readMoneyDocument("invoice", link.id) : await issueAgencyPayLinkReceipt(link.id);
   if (!doc) notFound();
-  // NEXT_PUBLIC_APP_URL, else the request origin, so a printed Invoice always carries an absolute pay URL.
-  const requestHeaders = await headers();
-  const requestHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "";
-  const requestProto = requestHeaders.get("x-forwarded-proto") || (requestHost.includes("localhost") ? "http" : "https");
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || (requestHost ? `${requestProto}://${requestHost}` : "")).replace(/\/$/, "");
-  return shell(<MoneyDocument doc={doc} back={back} payUrl={kind === "invoice" && link.status === "open" ? `${origin}/pay/${link.slug}` : undefined} />);
+  // Only an open Invoice prints a pay URL. NEXT_PUBLIC_APP_URL, else the request origin, so it is always absolute.
+  let payUrl: string | undefined;
+  if (kind === "invoice" && link.status === "open") {
+    let origin = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "");
+    if (!origin) {
+      const requestHeaders = await headers();
+      const requestHost = requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "";
+      const requestProto = requestHeaders.get("x-forwarded-proto") || (requestHost.includes("localhost") ? "http" : "https");
+      origin = requestHost ? `${requestProto}://${requestHost}` : "";
+    }
+    payUrl = `${origin}/pay/${link.slug}`;
+  }
+  return shell(<MoneyDocument doc={doc} back={back} payUrl={payUrl} />);
 }
