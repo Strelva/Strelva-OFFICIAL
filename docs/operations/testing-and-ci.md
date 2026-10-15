@@ -884,6 +884,9 @@ specs) because the Docker daemon did not answer `docker info` within two minutes
 and the installed Supabase CLI is 2.120.0, not the pinned 2.117.0. Unproven. The
 rename in `application-use-authenticated-local.spec.ts` is unrun.
 
-`pnpm check:ci` was not run end to end: it calls the npm registry audit, which
-needs Jacob's allowance for read-only network calls. Hosted jobs remain unproven
-until Jacob authorizes a push.
+`pnpm check:ci` was not run end to end: `scripts/check-ci.sh` runs
+`pnpm test:coverage`, the full vitest suite, which is not allowed while lanes run
+in parallel. The supply-chain step's result is recorded separately
+(`pnpm check:supply-chain` ran locally against the registry; status blocked on the
+three `license_review_required` issues). Hosted jobs remain unproven until Jacob
+authorizes a push.
