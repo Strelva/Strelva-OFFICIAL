@@ -2491,7 +2491,7 @@
     },
     {
       "id": "app-events-2026-10-15",
-      "status": "Held and unapplied. Per-business event outbox (capture off by default), delivery cursors, dead letters, webhook endpoints, agent read, and AFTER triggers on 13 existing tables. SQL fixture: scripts/check-app-events-sql.sh. No production, provider or flag change authorized.",
+      "status": "Held and unapplied. Per-business event outbox (capture off by default), delivery cursors, dead letters, webhook endpoints, agent read, and AFTER triggers on 13 existing tables. SQL fixture scripts/check-app-events-sql.sh passed on a disposable local cluster on the integrated branch (2026-10-15). No production, provider or flag change authorized.",
       "items": [
         {
           "file": "20261028100000_app_events.sql",
