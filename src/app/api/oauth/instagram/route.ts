@@ -1,3 +1,4 @@
+import { beginOAuthHolder } from "../calendly/connection-holder";
 /**
  * Instagram OAuth Initiation Route
  *
@@ -27,6 +28,12 @@ export async function GET() {
   if (permissionDenied) return permissionDenied;
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
+
+  try {
+    await beginOAuthHolder("instagram", tenant);
+  } catch {
+    return NextResponse.json({ error: "This account cannot be connected for this business." }, { status: 403 });
+  }
 
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;

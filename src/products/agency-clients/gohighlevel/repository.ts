@@ -52,6 +52,8 @@ export interface GhlConnectionStore {
   save(input: { workspaceId: string; companyId: string; connectedBy: string; tokens: GhlTokenWrite }): Promise<GhlConnection>;
   updateTokens(id: string, tokens: GhlTokenWrite): Promise<void>;
   markStatus(id: string, status: GhlConnectionStatus, lastError: string | null): Promise<void>;
+  /** Compensation only for this exact save; never clears a newer concurrent reconnect. */
+  revokeSaved?(id: string, updatedAt: string): Promise<void>;
   /** `false` when this delivery was already recorded (a retry). */
   recordEvent(event: Omit<GhlStoredEvent, "receivedAt">): Promise<boolean>;
   eventsSince(companyId: string, since: string | null): Promise<GhlStoredEvent[]>;
@@ -169,6 +171,13 @@ export function supabaseGhlConnectionStore(client: Db | null = getSupabase() as 
     async markStatus(id, status, lastError) {
       const clear = status === "revoked" ? { access_token_ciphertext: null, refresh_token_ciphertext: null, token_expires_at: null } : {};
       const { error } = await db().from("agency_source_connections").update({ status, last_error: lastError?.slice(0, 500) ?? null, ...clear }).eq("id", id);
+      check(error);
+    },
+    async revokeSaved(id, updatedAt) {
+      const { error } = await db().from("agency_source_connections").update({
+        status: "revoked", last_error: "Reconnect to record whose account this is.",
+        access_token_ciphertext: null, refresh_token_ciphertext: null, token_expires_at: null,
+      }).eq("id", id).eq("updated_at", updatedAt).eq("status", "connected");
       check(error);
     },
     async recordEvent(event) {

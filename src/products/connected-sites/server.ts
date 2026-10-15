@@ -11,7 +11,7 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
  * Off unless STRELVA_CONNECTED_SITES_RELEASE is `1` or `workspace` (and the
  * workspace release), then per business by its `connected_sites` row.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
@@ -27,6 +27,9 @@ import {
 import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { recordPlatformSchema } from "./schema-conflicts";
 import { systemOriginId } from "@/platform/systems/invariants";
+import { connectionEligibilityFor } from "@/platform/connections/server";
+import { recordConnectionHolder } from "@/platform/connections/holders";
+import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
@@ -107,13 +110,33 @@ export function normalizeSiteUrl(raw: string, production = process.env.NODE_ENV 
   return { siteUrl: `${url.protocol}//${url.host.toLowerCase()}${url.pathname === "/" ? "/" : url.pathname}`, siteHost: host };
 }
 
-export async function connectSite(actor: WorkspaceActor, raw: unknown, store: ConnectedSitesStore = connectedSitesStore()): Promise<ConnectedSite> {
+export interface ConnectSiteDependencies {
+  eligible?: typeof connectionEligibilityFor;
+  installer?: typeof resolveConnectedSiteInstaller;
+  recordHolder?: typeof recordConnectionHolder;
+}
+
+export async function connectSite(actor: WorkspaceActor, raw: unknown, store: ConnectedSitesStore = connectedSitesStore(), deps: ConnectSiteDependencies = {}): Promise<ConnectedSite> {
   const input = connectInput.parse(raw);
   const { siteUrl, siteHost } = normalizeSiteUrl(input.siteUrl);
-  return store.create(actor, input.businessId, {
+  const eligibility = await (deps.eligible ?? connectionEligibilityFor)(actor, { provider: "connected_site", businessWorkspaceId: input.businessId });
+  if (!eligibility.eligible) throw new WorkspaceConflictError(eligibility.message);
+  const accountHolder = await (deps.installer ?? resolveConnectedSiteInstaller)(actor, input.businessId);
+  const site = await store.create(actor, input.businessId, {
+    installerHolder: accountHolder,
     publicKey: generateSiteKey(), verificationToken: generateVerificationToken(), label: input.label ?? siteHost.replace(/^www\./, ""),
     siteUrl, siteHost, allowedOrigins: defaultAllowedOrigins(siteUrl), platform: input.platform ?? "unknown",
   });
+  try {
+    await (deps.recordHolder ?? recordConnectionHolder)({
+      ref: `connected_site:${site.id}`, provider: "connected_site", workspaceId: input.businessId,
+      accountHolder, accessThrough: eligibility.through, actor, commandId: randomUUID(),
+    });
+  } catch {
+    await store.revoke(actor, input.businessId, site.id);
+    throw new WorkspaceConflictError("The website was saved, but whose account it is couldn't be recorded. Connect again.");
+  }
+  return site;
 }
 
 /** A connected site's live page, read the one way Strelva reads them: pinned, public addresses only, bounded. */
@@ -242,3 +265,4 @@ export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, 
 export { publishedPolicyRows } from "./published-policies";
 
 export { connectedSitesStore } from "./store";
+export { createConnectedSiteConnectionSource, connectedSiteConnectionSource } from "./connection-source";

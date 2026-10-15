@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), tables: {} as Record<string, unknown> }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), eligibility: vi.fn(), tables: {} as Record<string, unknown> }));
+vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: mocks.eligibility }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/platform/infra/db/client", () => ({
@@ -29,6 +30,7 @@ const USER = "a9100000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.eligibility.mockResolvedValue({ eligible: true, through: { kind: "platform" } });
   mocks.tables = { workspaces: { kind: "agency" }, workspace_memberships: { role: "owner" } };
   mocks.session.mockResolvedValue({ id: USER, email: "owner@agency.example.test", email_confirmed_at: "2026-10-12" });
   mocks.rate.mockResolvedValue(false);
@@ -62,6 +64,16 @@ describe("GoHighLevel import routes", () => {
     it("refuses to start without Marketplace app credentials", async () => {
       const response = await start(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth?workspaceId=${AGENCY}`));
       expect(response.status).toBe(503);
+    });
+
+    it("refuses consent when provider access is unavailable, even with the release and credentials on", async () => {
+      vi.stubEnv("HIGHLEVEL_CLIENT_ID", "fixture-client");
+      vi.stubEnv("HIGHLEVEL_CLIENT_SECRET", "fixture-secret");
+      mocks.eligibility.mockResolvedValue({ eligible: false, reason: "not_configured", message: "HighLevel is coming soon." });
+      const response = await start(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth?workspaceId=${AGENCY}`));
+      expect(response.status).toBe(503);
+      expect(response.headers.get("location")).toBeNull();
+      expect(await response.json()).toMatchObject({ error: "HighLevel is coming soon." });
     });
 
     it("starts the agency consent with state in the URL and in an HttpOnly cookie", async () => {

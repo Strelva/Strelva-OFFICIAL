@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { prepareStripeConnectionHolder } from "./connection-holder";
 export const connectEnabled = () => process.env.STRELVA_CONNECT === "1";
 export type RpcDb = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{data: unknown; error: {message?: string} | null}> };
 export const connectDb = () => getSupabase() as unknown as RpcDb | null;
@@ -48,6 +49,7 @@ export async function onboardConnectedAccount(actor:WorkspaceActor,input:{worksp
  const db=deps.db===undefined?connectDb():deps.db;
  const reserved=await manageConnectedAccount(actor,input.workspaceId,"reserve",db);
  if (!reserved || reserved.state==="disconnected") throw new WorkspaceStoreError("The account is disconnected.");
+ const recordHolder=await prepareStripeConnectionHolder(actor,input.workspaceId);
  const stripe=deps.stripe??stripeClient();
  let accountId=reserved.stripe_account_id;
  if (!accountId) {
@@ -69,6 +71,7 @@ export async function onboardConnectedAccount(actor:WorkspaceActor,input:{worksp
  await stripe.v2.core.accounts.update(accountId,{configuration},{idempotencyKey:`connect-upgrade:${input.workspaceId}:${reserved.generation}:${profile.version}:${input.configurations.slice().sort().join(",")}`});
  account=await refreshConnectedAccount(input.workspaceId,accountId,profile.version,stripe,db);
  }
+ await recordHolder(account.generation);
  const link=await stripe.v2.core.accountLinks.create({account:accountId,use_case:{type:"account_onboarding",account_onboarding:{configurations:input.configurations,refresh_url:`${input.origin}/workspace/billing?connect=refresh`,return_url:`${input.origin}/workspace/billing?connect=return`}}});
  return {url:link.url,accountId};
 }

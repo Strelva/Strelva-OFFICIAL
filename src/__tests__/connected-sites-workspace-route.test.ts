@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
-const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn() }));
+const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn(), eligible: vi.fn() }));
+vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: deps.eligible }));
+vi.mock("@/platform/connections/holders", () => ({ recordConnectionHolder: vi.fn(async () => undefined) }));
+vi.mock("@/products/connected-sites/installer", () => ({ resolveConnectedSiteInstaller: vi.fn(async (_actor, workspaceId) => ({ kind: "business", workspaceId })) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
@@ -28,6 +31,7 @@ describe("/api/workspace/connected-sites", () => {
     deps.limited.mockReset().mockResolvedValue(false);
     deps.systemsOn = true;
     deps.flag.mockReset().mockResolvedValue(true);
+    deps.eligible.mockReset().mockResolvedValue({ eligible: true, through: { kind: "platform" } });
     store = { create: vi.fn(async () => stored), list: vi.fn(async () => [stored]), activity: vi.fn(async () => ({})), inquiries: vi.fn(async () => []), revoke: vi.fn(async () => ({ ...stored, status: "revoked", revokedAt: "2026-10-08T02:00:00Z" })), update: vi.fn(async () => stored), confirmVerification: vi.fn() } as unknown as ConnectedSitesStore;
     setConnectedSitesStoreForTests(store);
   });
@@ -47,6 +51,13 @@ describe("/api/workspace/connected-sites", () => {
     expect(site.snippet.script).toContain('data-strelva-site="sk_pub_abcdefghijklmnopqrstuvwx"');
     expect(site.snippet.meta).toContain(`content="${"c".repeat(32)}"`);
     expect(site.systemId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+  it("refuses unavailable provider access while the existing release gates remain on", async () => {
+    deps.eligible.mockResolvedValue({ eligible: false, reason: "not_configured", message: "Website script is coming soon." });
+    const response = await post({ action: "connect", workspaceId: BUSINESS, siteUrl: "bakery.example" });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "Website script is coming soon." });
+    expect(store.create).not.toHaveBeenCalled();
   });
   it("refuses without a session, when off, for a bad address and when SQL denies", async () => {
     deps.user = null; expect((await post({ action: "connect", workspaceId: BUSINESS, siteUrl: "bakery.example" })).status).toBe(401);

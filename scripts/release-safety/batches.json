@@ -2343,6 +2343,19 @@
           "rollbackStatus": "Empty inverse/reapply prepared. Populated attempts refuse inverse; SQL execution remains UNRUN."
         }
       ]
+    },
+    {
+      "id": "conn-tools-2026-10-14",
+      "status": "Held and unapplied. ADR 0016 connected-site installer authority and safe connection metadata. Disposable SQL and inverse/reapply qualification UNRUN; no production application authorized.",
+      "items": [
+        {
+          "file": "20261026120100_conn_tools_installer.sql",
+          "rollback": "rollback-20261026120100_conn_tools_installer.sql",
+          "sha256": "a88fbd9c9584e2670f4a777eb850b26e625d041f74c322dee6486415d223d90f",
+          "rollbackSha256": "b9d69ef8a32585a4288dcf4bcb5019a9c562e09c08369d4aabe15452fc59825e",
+          "rollbackStatus": "Prepared guarded inverse refuses function, ACL and later caller changes. Disposable SQL execution UNRUN; no production application authorized."
+        }
+      ]
     }
   ]
 }
