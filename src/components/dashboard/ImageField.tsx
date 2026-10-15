@@ -17,6 +17,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
   const dashboard = useDashboardOptional();
   const dashboardHref = dashboard?.dashboardHref ?? ((path: string) => path);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const url = (value as string) || "";
@@ -26,6 +27,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
 
   async function handleFile(file: File) {
     setUploading(true);
+    setUploadError("");
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -37,7 +39,11 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
       if (res.ok) {
         const { url: uploaded } = await res.json();
         onChange(uploaded);
+      } else {
+        setUploadError((await res.json().catch(() => null))?.error || "Upload failed.");
       }
+    } catch {
+      setUploadError("Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -108,6 +114,7 @@ export function ImageField({ value, onChange, label, size = "md" }: ImageFieldPr
         onClose={() => setPickerOpen(false)}
         onSelect={(picked) => onChange(picked)}
       />
+      {uploadError ? <p role="alert" className="mt-1 text-[11px] text-critical">{uploadError}</p> : null}
     </div>
   );
 }

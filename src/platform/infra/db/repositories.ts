@@ -500,6 +500,44 @@ export async function upsertContentDataWithReceipt(
   return receipt && typeof receipt.id === "string" ? receipt.id : null;
 }
 
+export interface PublishSectionRow {
+  section: string;
+  contentKey: string;
+  data: Record<string, unknown>;
+  versionId: string;
+  changes: { field: string; before: string; after: string }[] | null;
+}
+
+/**
+ * Site editor publish in one transaction: sections, their version rows, the
+ * page layout and the cleared drafts. Returns receipt ids by section name
+ * when receipts were requested.
+ */
+export async function publishSiteDraftsAtomic(
+  tenant: string,
+  sections: PublishSectionRow[],
+  pageConfig: Record<string, unknown> | null,
+  author: "user" | "admin" | "ai",
+  withReceipts: boolean,
+): Promise<Record<string, string | null>> {
+  const db = requiredDb(`publishSiteDraftsAtomic ${tenant}`);
+  const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+  const result = await rpc.rpc("publish_site_drafts", {
+    p_tenant_id: tenant,
+    p_sections: sections,
+    p_page_config: pageConfig,
+    p_author: author,
+    p_with_receipts: withReceipts,
+  });
+  if (result.error) throw result.error;
+  // The transaction already committed; a malformed response cannot undo it.
+  const receipts = (result.data as { receipts?: unknown } | null)?.receipts;
+  if (!receipts || typeof receipts !== "object" || Array.isArray(receipts)) return {};
+  return Object.fromEntries(
+    Object.entries(receipts as Record<string, unknown>).map(([section, id]) => [section, typeof id === "string" ? id : null]),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // collection_entries (Collections CMS — typed repeating entries)
 // See src/lib/cms/collection-types.ts + docs/capabilities/publishing/collections-cms.md.

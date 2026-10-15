@@ -360,7 +360,7 @@ export function contentChatTools(deps: ChatToolDeps): ChatToolEntries {
             const buffer = Buffer.from(match[2]!, "base64");
 
             // Size cap: a base64 string from the model is unbounded, so cap the
-            // decoded buffer at 5MB (parity with MAX_FILE_SIZE in upload-store
+            // decoded buffer at 5MB (parity with MEDIA_MAX_BYTES in the media store
             // and MAX_SIZE in /api/media). Reject cleanly instead of throwing.
             const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
             if (buffer.byteLength > MAX_UPLOAD_SIZE) {

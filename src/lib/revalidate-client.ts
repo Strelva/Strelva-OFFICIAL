@@ -77,8 +77,10 @@ async function sleep(ms: number): Promise<void> {
 
 export async function revalidateClientSite(
   tenantId: string,
-  paths: string[] | "all" = "all"
+  paths: string[] | "all" = "all",
+  options: { tags?: string[] } = {},
 ): Promise<{ success: boolean; error?: string; skipped?: boolean }> {
+  const tags = Array.from(new Set((options.tags ?? []).filter(Boolean)));
   addSentryBreadcrumb("webhook", "Revalidation webhook delivery", { tenantId, paths: paths === "all" ? "all" : paths.join(",") });
   const config = await getTenantConfig(tenantId);
 
@@ -138,8 +140,8 @@ export async function revalidateClientSite(
     try {
       const body = createRevalidationBody(
         paths === "all"
-          ? { tenant: tenantId, all: true }
-          : { tenant: tenantId, paths }
+          ? { tenant: tenantId, all: true, ...(tags.length ? { tags } : {}) }
+          : { tenant: tenantId, paths, ...(tags.length ? { tags } : {}) }
       );
       const signed = signRevalidationBody(body, secret);
 

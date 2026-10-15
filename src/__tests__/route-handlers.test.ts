@@ -141,7 +141,6 @@ vi.mock("@/lib/storage", () => ({
   recordSectionUpdate: vi.fn(() => Promise.resolve()),
   restoreVersion: vi.fn(() => Promise.resolve(null)),
   setPageConfig: vi.fn(() => Promise.resolve()),
-  uploadFile: vi.fn(() => Promise.resolve({ url: "https://example.com/image.jpg" })),
   addSubscriber: vi.fn(() => Promise.resolve({ duplicate: false })),
   getSocialPosts: (...args: unknown[]) => mockGetSocialPosts(...args),
   setSocialPosts: (...args: unknown[]) => mockSetSocialPosts(...args),

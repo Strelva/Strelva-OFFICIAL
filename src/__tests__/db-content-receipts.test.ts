@@ -25,3 +25,23 @@ describe("atomic content repository", () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(1);
   });
 });
+
+import { publishSiteDraftsAtomic } from "@/platform/infra/db/repositories";
+describe("atomic site publish repository", () => {
+  const rows = [{ section: "settings", contentKey: "siteSettings", data: { a: 1 }, versionId: "v_1", changes: null }];
+  it("calls one RPC with exact arguments and maps receipts", async () => {
+    mocks.rpc.mockResolvedValue({ data: { receipts: { settings: "r1", hero: 7 } }, error: null });
+    await expect(publishSiteDraftsAtomic("alpha", rows, null, "user", true)).resolves.toEqual({ settings: "r1", hero: null });
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("publish_site_drafts", {
+      p_tenant_id: "alpha", p_sections: rows, p_page_config: null, p_author: "user", p_with_receipts: true,
+    });
+  });
+  it("propagates errors", async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: new Error("rejected") });
+    await expect(publishSiteDraftsAtomic("alpha", rows, null, "user", false)).rejects.toThrow("rejected");
+  });
+  it.each([null, {}, { receipts: [] }])("returns {} for malformed response %j", async response => {
+    mocks.rpc.mockResolvedValue({ data: response, error: null });
+    await expect(publishSiteDraftsAtomic("alpha", rows, null, "user", false)).resolves.toEqual({});
+  });
+});

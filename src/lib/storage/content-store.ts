@@ -194,13 +194,55 @@ export async function getStoredContent<K extends ContentSection>(
     : stored as ContentMap[K];
 }
 
+/** Release flag: content publishes write a receipt in the same transaction. */
+export function operatorContentReceiptsEnabled(): boolean {
+  return process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1";
+}
+
+/**
+ * After an accepted receipt-mode write: cache, read the section back and
+ * settle the receipt. Never throws; the content is already committed.
+ */
+export async function settleContentReceipt<K extends ContentSection>(
+  section: K,
+  tenant: string,
+  data: ContentMap[K],
+  receiptId: string | null,
+): Promise<void> {
+  // Accepted content must never become retryable because cache, projection
+  // read-back or receipt settlement failed. The committed receipt stays
+  // pending if settlement cannot be saved; no publication is re-sent.
+  let result: "matched" | "differs" | "failed" = "failed";
+  let detail = "Public content projection could not be read after acceptance. External storefront rendering is unverified.";
+  try {
+    await setCachedContent(section, tenant, data);
+    // Public reads intentionally fall back on storage failure. Require a
+    // strict source read first so a fallback cannot prove publication.
+    const persisted = await getStoredContentData(tenant, SECTION_TO_TYPE[section]);
+    if (!persisted) throw new Error("Accepted section is absent from storage");
+    const publicContent = await getContent(section, tenant);
+    result = isDeepStrictEqual(transformSanityImages(section, persisted), data) && isDeepStrictEqual(publicContent, data) ? "matched" : "differs";
+    detail = result === "matched"
+      ? "Stored section and public content projection match. External storefront rendering is unverified."
+      : "Stored section or public content projection differs from the requested content. External storefront rendering is unverified.";
+  } catch {
+    // Keep a failed read-back separate from the accepted content write.
+  }
+  try {
+    if (!receiptId) throw new Error("Accepted content receipt response is unavailable");
+    await (await workspacePorts().outsideWriteReceipts()).recordReadback(receiptId, result, detail);
+  } catch {
+    console.error("[content-receipt] accepted content has unsettled read-back", { tenant, section, receiptId });
+  }
+}
+
 export async function setContent<K extends ContentSection>(
   section: K,
   data: ContentMap[K],
   tenant: string = DEFAULT_TENANT
 ): Promise<void> {
   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
-  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" && contentSourceIsPostgres()) {
+  if (operatorContentReceiptsEnabled() && contentSourceIsPostgres()) {
     let receiptId: string | null;
     try {
       receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>);
@@ -208,31 +250,7 @@ export async function setContent<K extends ContentSection>(
       await invalidateCachedContent(section, tenant);
       throw error;
     }
-    // Accepted content must never become retryable because cache, projection
-    // read-back or receipt settlement failed. The committed receipt stays
-    // pending if settlement cannot be saved; no publication is re-sent.
-    let result: "matched" | "differs" | "failed" = "failed";
-    let detail = "Public content projection could not be read after acceptance. External storefront rendering is unverified.";
-    try {
-      await setCachedContent(section, tenant, data);
-      // Public reads intentionally fall back on storage failure. Require a
-      // strict source read first so a fallback cannot prove publication.
-      const persisted = await getStoredContentData(tenant, SECTION_TO_TYPE[section]);
-      if (!persisted) throw new Error("Accepted section is absent from storage");
-      const publicContent = await getContent(section, tenant);
-      result = isDeepStrictEqual(transformSanityImages(section, persisted), data) && isDeepStrictEqual(publicContent, data) ? "matched" : "differs";
-      detail = result === "matched"
-        ? "Stored section and public content projection match. External storefront rendering is unverified."
-        : "Stored section or public content projection differs from the requested content. External storefront rendering is unverified.";
-    } catch {
-      // Keep a failed read-back separate from the accepted content write.
-    }
-    try {
-      if (!receiptId) throw new Error("Accepted content receipt response is unavailable");
-      await (await workspacePorts().outsideWriteReceipts()).recordReadback(receiptId, result, detail);
-    } catch {
-      console.error("[content-receipt] accepted content has unsettled read-back", { tenant, section, receiptId });
-    }
+    await settleContentReceipt(section, tenant, data, receiptId);
     return;
   }
   try {

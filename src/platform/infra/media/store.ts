@@ -23,7 +23,7 @@
 
 import { randomUUID } from "crypto";
 import type { MediaAsset } from "./contracts";
-import { readImageDimensions } from "./image-signature";
+import { readImageDimensions, verifyRasterImage } from "./image-signature";
 
 /** Vercel Blob public-store host — used to gate the id passed to DELETE. */
 const BLOB_HOST = "blob.vercel-storage.com";
@@ -31,6 +31,30 @@ const BLOB_HOST = "blob.vercel-storage.com";
 const mediaPrefix = (tenant: string): string => `media/${tenant}/`;
 
 const blobEnabled = (): boolean => !!process.env.BLOB_READ_WRITE_TOKEN;
+
+export const MEDIA_MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Raster types only. `startsWith("image/")` would accept image/svg+xml, and an
+ * SVG can carry inline script: a stored-XSS vector when served from a
+ * tenant's domain.
+ */
+export const MEDIA_ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+
+/** The upload itself is not acceptable (too big, wrong type); maps to 400. */
+export class MediaUploadRejectedError extends Error {}
+
+/** Storage is not configured; maps to 503. */
+export class MediaStoreUnavailableError extends Error {}
+
+/**
+ * Only local `next dev` may write uploads to disk. Not "test", so tests keep
+ * asserting the Blob-only failure, and not "production", so `next start` and
+ * Vercel fail closed instead of silently writing to a server's local disk.
+ */
+function localMediaFallbackAllowed(): boolean {
+  return process.env.NODE_ENV === "development" && !process.env.VERCEL_ENV;
+}
 
 /**
  * The `media/{tenant}/` prefix IS the tenant-isolation boundary, so a tenant id
@@ -143,7 +167,10 @@ export async function uploadTenantMedia(
 ): Promise<MediaAsset> {
   assertTenant(tenant);
   if (!blobEnabled()) {
-    throw new Error("Media uploads require BLOB_READ_WRITE_TOKEN (Vercel Blob) to be configured.");
+    if (!localMediaFallbackAllowed()) {
+      throw new MediaStoreUnavailableError("Media uploads require BLOB_READ_WRITE_TOKEN (Vercel Blob) to be configured.");
+    }
+    return writeLocalMedia(tenant, buffer, filename);
   }
   const { put } = await import("@vercel/blob");
   const safe = sanitizeFilename(filename);
@@ -165,6 +192,56 @@ export async function uploadTenantMedia(
     size: buffer.length,
     createdAt: new Date().toISOString(),
   };
+}
+
+async function writeLocalMedia(tenant: string, buffer: Buffer, filename: string): Promise<MediaAsset> {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const safe = sanitizeFilename(filename);
+  const id = randomUUID();
+  const dir = path.join(process.cwd(), "public", "uploads", "media", tenant, id);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, safe), buffer);
+  console.warn("[media] BLOB_READ_WRITE_TOKEN missing; wrote upload to local disk (development only)");
+  const url = `/uploads/media/${tenant}/${id}/${safe}`;
+  const dims = readImageDimensions(buffer);
+  return {
+    id: url,
+    url,
+    filename: safe,
+    width: dims?.width ?? 0,
+    height: dims?.height ?? 0,
+    size: buffer.length,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * The one image upload path for the editor and the media library: size, type
+ * and real-bytes checks, then the tenant's Blob library.
+ */
+export async function uploadTenantImageFile(tenant: string, file: File): Promise<MediaAsset> {
+  assertTenant(tenant);
+  if (file.size > MEDIA_MAX_BYTES) throw new MediaUploadRejectedError("File too large (max 5MB)");
+  if (!MEDIA_ALLOWED_TYPES.has(file.type)) {
+    throw new MediaUploadRejectedError("Invalid file type. Allowed: JPEG, PNG, WebP, GIF, AVIF.");
+  }
+  const buffer = Buffer.from(await file.arrayBuffer());
+  // `file.type` is client-supplied; sniff the real bytes so a declared
+  // image/png can't smuggle an SVG/HTML/script payload.
+  const verified = verifyRasterImage(buffer, MEDIA_ALLOWED_TYPES);
+  if (!verified.ok) throw new MediaUploadRejectedError(verified.reason);
+  return uploadTenantMedia(tenant, buffer, file.name, file.type);
+}
+
+/** Status and plain message for a failed upload; shared by /api/upload and /api/media. */
+export function mediaUploadErrorResponse(err: unknown): { status: number; error: string } {
+  if (err instanceof MediaUploadRejectedError) return { status: 400, error: err.message };
+  if (err instanceof MediaStoreUnavailableError) {
+    return { status: 503, error: "Image uploads are not available right now: storage is not configured." };
+  }
+  console.error("[media] upload failed", err);
+  return { status: 500, error: "Upload failed." };
 }
 
 export interface MediaDeleteResult {
