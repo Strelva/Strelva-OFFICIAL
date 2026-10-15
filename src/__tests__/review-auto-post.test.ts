@@ -1,5 +1,5 @@
 import { googleReviewContent } from "@/platform/infra/google-review-content";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 
 // The auto-post cron for "auto" reply mode. Safety invariants:
@@ -43,6 +43,14 @@ vi.mock("@/lib/review-replies", () => ({
   draftReviewReplyWithProvenance: (...a: unknown[]) => mockDraftReviewReply(...a),
   storeRecentReply: (...a: unknown[]) => mockStoreRecentReply(...a),
   isReviewReplyDeclined: (...a: unknown[]) => mockIsReviewReplyDeclined(...a),
+}));
+
+const mockWorkspaceForTenant = vi.fn();
+const mockRecordPolicyDecision = vi.fn();
+vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: (...a: unknown[]) => mockWorkspaceForTenant(...a) }));
+vi.mock("@/server/needs-you/server", () => ({
+  needsYouReleaseEnabled: () => true,
+  needsYouService: () => ({ recordPolicyDecision: (...a: unknown[]) => mockRecordPolicyDecision(...a) }),
 }));
 
 import { runDueAutoPosts, draftReplyBacklog } from "@/lib/reviews/auto-reply";
@@ -257,5 +265,77 @@ describe("draftReplyBacklog", () => {
     await draftReplyBacklog(NOW);
     const evt = mockAddEvent.mock.calls[0]?.[0];
     expect(evt?.metadata?.autoPostAt).toBeUndefined();
+  });
+});
+
+describe("runDueAutoPosts with STRELVA_AUTO_POST_DECISION_RECORD", () => {
+  const due = () => new Date(NOW - 60_000).toISOString();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.STRELVA_AUTO_POST_DECISION_RECORD = "1";
+    mockGetAllTenants.mockResolvedValue([{ id: "acme", active: true }]);
+    mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
+    mockResolveEventAction.mockResolvedValue({ changed: true });
+    mockUpdateEvent.mockResolvedValue({ changed: true });
+    mockWorkspaceForTenant.mockResolvedValue("aaaaaaaa-0000-4000-8000-000000000001");
+    mockRecordPolicyDecision.mockResolvedValue({ status: "done", item: null });
+    mockGetEvents.mockResolvedValue([draft({ autoPostAt: due() })]);
+  });
+  afterEach(() => { delete process.env.STRELVA_AUTO_POST_DECISION_RECORD; });
+
+  it("flag off makes the same direct call as before", async () => {
+    delete process.env.STRELVA_AUTO_POST_DECISION_RECORD;
+    await runDueAutoPosts(NOW);
+    expect(mockRecordPolicyDecision).not.toHaveBeenCalled();
+    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved", "auto-reply-policy");
+  });
+
+  it("a linked tenant records a review.reply handle_after_notice item with the attempt in its revision", async () => {
+    const res = await runDueAutoPosts(NOW);
+    expect(res).toEqual({ posted: 1, failed: 0 });
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    const input = mockRecordPolicyDecision.mock.calls[0]![0] as { workspaceId: string; policy: string; item: { kind: string; route: string; sourceId: string; revisionHash: string } };
+    expect(input).toMatchObject({ workspaceId: "aaaaaaaa-0000-4000-8000-000000000001", policy: "auto_reply_policy", item: { kind: "review.reply", route: "handle_after_notice", sourceId: "acme:e1" } });
+    expect(input.item.revisionHash).toMatch(/^[0-9a-f]{64}$/);
+    // The next attempt is a different row.
+    const retry = draft({ autoPostAt: due() });
+    retry.metadata = { ...retry.metadata, autoPostAttempts: 1 };
+    mockGetEvents.mockResolvedValue([retry]);
+    await runDueAutoPosts(NOW);
+    expect((mockRecordPolicyDecision.mock.calls[1]![0] as typeof input).item.revisionHash).not.toBe(input.item.revisionHash);
+  });
+
+  it("already_handled does not post, fail or count an attempt", async () => {
+    mockRecordPolicyDecision.mockResolvedValue({ status: "already_handled", item: null });
+    expect(await runDueAutoPosts(NOW)).toEqual({ posted: 0, failed: 0 });
+    expect(mockUpdateEvent).not.toHaveBeenCalled();
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("a reply the owner holds open is not posted and not counted", async () => {
+    mockRecordPolicyDecision.mockResolvedValue({ status: "owner_decides", item: null });
+    expect(await runDueAutoPosts(NOW)).toEqual({ posted: 0, failed: 0 });
+    expect(mockUpdateEvent).not.toHaveBeenCalled();
+  });
+
+  it("a failed post counts an attempt as before", async () => {
+    mockRecordPolicyDecision.mockResolvedValue({ status: "failed", item: null });
+    expect(await runDueAutoPosts(NOW)).toEqual({ posted: 0, failed: 1 });
+    expect(mockUpdateEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("an unlinked tenant takes the direct path", async () => {
+    mockWorkspaceForTenant.mockResolvedValue(null);
+    await runDueAutoPosts(NOW);
+    expect(mockRecordPolicyDecision).not.toHaveBeenCalled();
+    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved", "auto-reply-policy");
+  });
+
+  it("unsupported, or a record that cannot be written, takes the direct path", async () => {
+    mockRecordPolicyDecision.mockResolvedValue({ status: "unsupported", item: null });
+    await runDueAutoPosts(NOW);
+    mockRecordPolicyDecision.mockRejectedValue(new Error("function does not exist"));
+    await runDueAutoPosts(NOW);
+    expect(mockResolveEventAction).toHaveBeenCalledTimes(2);
   });
 });
