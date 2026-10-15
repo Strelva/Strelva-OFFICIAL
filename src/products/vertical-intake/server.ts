@@ -14,7 +14,7 @@ import {
 import { normalizeOrigin, safePath, type ConnectedSite, type ResolvedConnectedSite } from "@/products/connected-sites/contracts";
 import {
   intakeInstallConfigSchema, intakeReviewLines, publicIntakeForm, validateIntakeAnswers, verticalIntakeAppIdSchema,
-  type IntakeInstallConfig, type PublicIntakeForm, type VerticalIntakeAppId,
+  type IntakeAppView, type IntakeInstallConfig, type PublicIntakeForm,
 } from "./contracts";
 import { intakeDefinition } from "./definitions";
 import { checkIntakeOnPage, type IntakeLiveCheck } from "./live-check";
@@ -29,7 +29,7 @@ export { IntakeUnavailableError, verticalIntakeStore } from "./store";
 export type { IntakeLiveRequests, IntakeVisit, IntakeVisitRead, VerticalIntakeStore } from "./store";
 export { intakeReadiness, intakeCanGoLive } from "./readiness";
 export { checkIntakeOnPage } from "./live-check";
-export type { IntakeInstall, IntakeRelease, IntakeSubmission, IntakeReadinessRow, IntakeLiveCheck };
+export type { IntakeAppView, IntakeInstall, IntakeRelease, IntakeSubmission, IntakeReadinessRow, IntakeLiveCheck };
 
 type FactMap = Record<string, unknown>;
 
@@ -42,22 +42,6 @@ function recordFacts(record: Awaited<ReturnType<typeof readBusinessRecord>>): Fa
 
 function activeVerifiedSites(sites: ConnectedSite[]): ConnectedSite[] {
   return sites.filter(site => site.status === "active" && site.verifiedAt);
-}
-
-export interface IntakeAppView {
-  app: { appId: VerticalIntakeAppId; name: string; label: string };
-  access: string;
-  install: IntakeInstall | null;
-  releases: IntakeRelease[];
-  readiness: IntakeReadinessRow[];
-  canGoLive: boolean;
-  sites: Array<{ siteId: string; host: string; siteKey: string; lines: { script: string; mount: string }; codeSnippet: string }>;
-  services: Array<{ id: string; name: string }>;
-  submissions: Array<IntakeSubmission & { reasonLabel: string | null }>;
-  sensitiveAvailable: boolean;
-  emailOn: boolean;
-  manualBookingsOn: boolean;
-  previewForm: PublicIntakeForm;
 }
 
 async function bookingServices(workspaceId: string): Promise<Array<{ id: string; name: string }>> {

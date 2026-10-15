@@ -100,6 +100,37 @@ export type IntakeValidation =
   | { ok: true; contact: { name: string; phone: string | null; email: string | null }; answers: Record<string, string>; sensitive: Array<{ fieldId: string; value: string }>; triage: "routine" | "urgent"; summary: string }
   | { ok: false; message: string };
 
+// ---- What the Inquiries panel shows (plain data, safe in the browser) ----
+
+export interface IntakeReadinessRow { id: "phone" | "site" | "insurance" | "hours" | "booking" | "email"; state: "done" | "missing" | "note"; blocking: boolean; label: string; detail: string }
+export interface IntakeLiveCheck { state: "found" | "not_seen" | "unreachable"; checkedAt: string; url: string; release: number | null }
+export interface IntakeInstallView {
+  id: string; workspaceId: string; appId: VerticalIntakeAppId; status: "draft" | "live" | "paused"; draftConfig: IntakeInstallConfig; draftRevision: number;
+  liveRelease: number | null; liveRequestedAt: string | null; lastLiveCheck: IntakeLiveCheck | null; updatedAt: string;
+}
+export interface IntakeReleaseView { number: number; definitionVersion: number; config: IntakeInstallConfig; madeLiveAt: string; madeLiveBy: string }
+export interface IntakeSubmissionView {
+  id: string; leadRowId: string; name: string; email: string | null; phone: string | null; answers: Record<string, string>;
+  triage: "routine" | "urgent" | null; state: "new" | "visit_booked" | "not_booked"; bookingId: string | null; createdAt: string; hasSensitive: boolean;
+  reasonLabel: string | null;
+}
+export interface IntakeAppView {
+  app: { appId: VerticalIntakeAppId; name: string; label: string };
+  /** The viewer's role on this business: owner, admin, member or agency. */
+  access: string;
+  install: IntakeInstallView | null;
+  releases: IntakeReleaseView[];
+  readiness: IntakeReadinessRow[];
+  canGoLive: boolean;
+  sites: Array<{ siteId: string; host: string; siteKey: string; lines: { script: string; mount: string }; codeSnippet: string }>;
+  services: Array<{ id: string; name: string }>;
+  submissions: IntakeSubmissionView[];
+  sensitiveAvailable: boolean;
+  emailOn: boolean;
+  manualBookingsOn: boolean;
+  previewForm: PublicIntakeForm;
+}
+
 const ID = /^[a-z][a-z0-9_]{0,63}$/;
 const OPTION_VALUE = /^[a-z][a-z0-9_]{0,39}$/;
 
@@ -211,7 +242,6 @@ export function publicIntakeForm(
 }
 
 function clean(value: string, multiline: boolean): string {
-  // eslint-disable-next-line no-control-regex
   return value.replace(multiline ? /[\u0000-\u0009\u000b-\u001f\u007f]/g : /[\u0000-\u001f\u007f]/g, "").trim();
 }
 

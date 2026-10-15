@@ -1,12 +1,8 @@
 /** What an office needs before Dental intake can go live, and what only makes it better. Pure. */
 
-export interface IntakeReadinessRow {
-  id: "phone" | "site" | "insurance" | "hours" | "booking" | "email";
-  state: "done" | "missing" | "note";
-  blocking: boolean;
-  label: string;
-  detail: string;
-}
+import type { IntakeReadinessRow } from "./contracts";
+
+export type { IntakeReadinessRow };
 
 function hasFact(facts: Record<string, unknown>, key: string): boolean {
   const value = facts[key];

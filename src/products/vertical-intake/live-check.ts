@@ -1,7 +1,7 @@
 import { fetchLiveSitePage } from "@/products/connected-sites/server";
-import type { VerticalIntakeAppId } from "./contracts";
+import type { IntakeLiveCheck, VerticalIntakeAppId } from "./contracts";
 
-export type IntakeLiveCheck = { state: "found" | "not_seen" | "unreachable"; checkedAt: string; url: string; release: number | null };
+export type { IntakeLiveCheck };
 
 /** Looks at the office's live page for the form's mount marker and the site key. Never changes anything. */
 export async function checkIntakeOnPage(

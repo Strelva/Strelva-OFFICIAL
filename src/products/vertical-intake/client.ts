@@ -1,3 +1,4 @@
 export type {
-  IntakeFieldKind, IntakeOption, IntakeValidation, IntakeInstallConfig, PublicIntakeField, PublicIntakeForm, VerticalIntakeAppId,
+  IntakeAppView, IntakeFieldKind, IntakeInstallConfig, IntakeInstallView, IntakeLiveCheck, IntakeOption, IntakeReadinessRow, IntakeReleaseView,
+  IntakeSubmissionView, IntakeValidation, PublicIntakeField, PublicIntakeForm, VerticalIntakeAppId,
 } from "./contracts";

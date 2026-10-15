@@ -9,11 +9,14 @@ const control = { display: "block", width: "100%", minHeight: "2.75rem", padding
 const telHref = (phone: string) => `tel:${phone.replace(/[^0-9+]/g, "")}`;
 
 /** The Strelva App form for a connected code site. The fields come from the office's live Release, not from this file. */
-export function StrelvaIntake({ baseUrl, siteKey, appId, className }: { baseUrl: string; siteKey: string; appId: string; className?: string }) {
+export function StrelvaIntake(props: { baseUrl: string; siteKey: string; appId: string; className?: string }) {
+  return <IntakeLoader key={`${props.baseUrl}:${props.siteKey}:${props.appId}`} {...props} />;
+}
+
+function IntakeLoader({ baseUrl, siteKey, appId, className }: { baseUrl: string; siteKey: string; appId: string; className?: string }) {
   const [result, setResult] = useState<PublicIntakeForm | Error | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    setResult(null);
     void loadIntakeForm(baseUrl, siteKey, appId, controller.signal).then(
       form => { if (!controller.signal.aborted) setResult(form); },
       (error: unknown) => { if (!controller.signal.aborted) setResult(error instanceof Error ? error : new Error(FALLBACK)); },

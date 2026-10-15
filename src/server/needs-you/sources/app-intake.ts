@@ -15,7 +15,6 @@
  * Both are owner only (adminMayDecide false), and both are off with the business's `vertical_intake` flag.
  * Nothing here emails a patient; confirmations follow the existing booking email gates.
  */
-import { createHash } from "node:crypto";
 import { createManualBooking, manualBookingsEnabled } from "@/platform/bookings/manual";
 import { resolveBookingScope } from "@/platform/bookings/booking-scope";
 import { nativeServices, nativeSlots } from "@/platform/bookings/native";
