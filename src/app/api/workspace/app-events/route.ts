@@ -4,6 +4,7 @@ import { appEventsMayBeOn, appEventsReleased, appEventWebhooksEnabled } from "@/
 import { readAppEventDeliveries, runAppEventCommand, WebhooksOffError } from "@/platform/app-events/service";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
 export const dynamic = "force-dynamic";
 
 const off = () => workspaceJson({ error: "Events aren't turned on." }, 503);
@@ -34,6 +35,10 @@ export async function POST(request: Request) {
     return workspaceJson(await runAppEventCommand(actor, command));
   } catch (error) {
     if (error instanceof WebhooksOffError) return webhooksOff();
+    // A specific refusal (the agency's access doesn't cover those events) keeps its words.
+    if (error instanceof WorkspaceAccessError && error.message !== new WorkspaceAccessError().message && error.constructor === WorkspaceAccessError) {
+      return workspaceJson({ error: error.message }, 403);
+    }
     return workspaceHttpFailure(error);
   }
 }

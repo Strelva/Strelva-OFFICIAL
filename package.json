@@ -22,6 +22,7 @@
     "check:ci": "bash scripts/check-ci.sh",
     "bench:agent": "npx tsx scripts/run-benchmark.ts",
     "app-releases": "tsx --env-file-if-exists=.env.local scripts/app-releases.ts",
+    "app-events": "tsx --env-file-if-exists=.env.local scripts/app-events.ts",
     "provision-tenant": "npx tsx scripts/provision-tenant.ts",
     "deprovision-tenant": "npx tsx --env-file=.env.local scripts/deprovision-tenant.ts",
     "seed-tenant": "npx tsx scripts/seed-tenant.ts",
