@@ -29,6 +29,7 @@ import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
+export { readConnectedSiteChangeHandled } from "./changes-handled";
 export { askConnectedSiteChange, checkConnectedSiteChange, connectedSiteChangeView, markConnectedSiteChangeDone, planConnectedSiteChange } from "./changes";
 export { connectedSiteChangesStore, createConnectedSiteChangesStore, setConnectedSiteChangesStoreForTests, type ConnectedSiteChangesStore } from "./changes-store";
 export { checkConnectedSite, fetchLiveSitePage, fetchSiteFingerprint, type SiteFingerprint } from "./site-checks";

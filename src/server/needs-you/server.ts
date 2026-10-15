@@ -34,6 +34,10 @@ import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource 
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
 import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-payment";
 import { inquiryFactAdapter } from "@/platform/needs-you/sources/inquiry-fact";
+import { connectedSiteChangeAdapter } from "@/platform/needs-you/sources/connected-site-change";
+import { editGuide } from "@/products/connected-sites/client";
+import type { SitePlatform } from "@/products/connected-sites/contracts";
+import { connectedSiteChangeOwnerEmailEnabled, connectedSiteChangesStore, keepYourSiteReleasedFor, readConnectedSiteChangeHandled } from "@/products/connected-sites/server";
 
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -74,6 +78,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       return sendEmailWithReceipt(input);
     },
     emailAllowed: async row => {
+      // Built and default off: owners are not emailed about a planned change on their site unless this switch is on too.
+      if (row.sourceLifecycle === "connected_site_change") return connectedSiteChangeOwnerEmailEnabled();
       if (row.sourceLifecycle !== "website_domain") return true;
       const domains = await import("@/platform/needs-you/sources/website-domain-store");
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
@@ -95,6 +101,12 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
       businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn, effects.businessFactsConfirmed),
+      connectedSiteChangeAdapter({
+        enabled: (actor, workspaceId) => keepYourSiteReleasedFor(actor, workspaceId),
+        pending: (actor, workspaceId) => connectedSiteChangesStore().reviews(actor, workspaceId),
+        decide: (actor, workspaceId, changeId, decision) => connectedSiteChangesStore().decide(actor, workspaceId, changeId, decision).then(changed => ({ stage: changed.stage })),
+        platformLabel: platform => editGuide(platform as SitePlatform).label,
+      }),
       ...systemsSourceAdapters(store, effects.google),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
@@ -131,14 +143,15 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const decided = decidedTenantEventIds(rows);
   // The actor-scoped handled read must succeed before unscoped tenant discovery.
   // Receipt sources recheck their own access; required failures still reject.
-  const [events, reports, notices] = await Promise.all([
+  const [events, reports, notices, siteChanges] = await Promise.all([
     store.linkedTenants(workspaceId).catch(() => []).then(tenants => Promise.all(tenants.map(async link =>
       (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
         .filter(event => !decided.has(`${link.tenantId}:${event.id}`)))).then(rows => rows.flat())),
     readCatalogReportHandled(actor, workspaceId, sinceIso),
     readToolNoticeHandled(actor, workspaceId, sinceIso),
+    readConnectedSiteChangeHandled(actor, workspaceId, sinceIso),
   ]);
-  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports, ...notices], since).slice(0, 50);
+  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports, ...notices, ...siteChanges], since).slice(0, 50);
 }
 
 /** Booking capture opens only this request; the hourly cron remains recovery. */
