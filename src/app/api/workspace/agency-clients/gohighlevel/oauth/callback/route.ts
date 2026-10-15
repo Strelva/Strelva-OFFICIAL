@@ -35,6 +35,6 @@ export async function GET(request: Request) {
     await connectGhlAgency(actor, state.workspaceId, code, ghlRedirectUri(appUrl));
     return finish(appUrl, workspaceId, { connected: true });
   } catch (error) {
-    return finish(appUrl, workspaceId, { error: error instanceof GhlImportError && error.status < 500 ? error.message : "HighLevel couldn't be connected. Nothing changed." });
+    return finish(appUrl, workspaceId, { error: error instanceof GhlImportError ? error.message : "HighLevel couldn't be connected. Nothing changed." });
   }
 }

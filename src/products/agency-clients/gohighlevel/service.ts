@@ -1,4 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
+import type { ProviderEligibility } from "@/platform/connections/contracts";
+import { connectionEligibilityFor } from "@/platform/connections/server";
+import { recordConnectionHolder } from "@/platform/connections/holders";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ClientImportRow } from "../import-contract";
 import { createGoHighLevelImportAdapter, listGhlSubAccounts } from "./adapter";
@@ -29,7 +33,16 @@ export interface GhlServiceDeps {
   now(): number;
   /** The actor's role in this workspace, or null when it isn't an agency workspace they belong to. */
   agencyRole(actor: WorkspaceActor, workspaceId: string): Promise<AgencyRole>;
+  eligibility?: typeof connectionEligibilityFor;
+  recordHolder?: typeof recordConnectionHolder;
   clock?: { now(): number; sleep(ms: number): Promise<void> };
+}
+
+/** Check access before consent or token exchange. No agency has a privileged path. */
+export async function assertGhlConnectionEligible(actor: WorkspaceActor, workspaceId: string, deps: Pick<GhlServiceDeps, "eligibility"> = {}): Promise<Extract<ProviderEligibility, { eligible: true }>> {
+  const result = await (deps.eligibility ?? connectionEligibilityFor)(actor, { provider: "highlevel", businessWorkspaceId: workspaceId });
+  if (!result.eligible) throw new GhlImportError(result.message, 503, `connection_${result.reason}`);
+  return result;
 }
 
 type Db = { from(table: string): { select(c: string): { eq(c: string, v: string): { eq(c: string, v: string): { maybeSingle(): PromiseLike<{ data: unknown; error: unknown }> }; maybeSingle(): PromiseLike<{ data: unknown; error: unknown }> } } } };
@@ -74,10 +87,23 @@ function toImportError(error: unknown): GhlImportError {
 /** Exchange the consent code and store the agency's account connection. */
 export async function connectGhlAgency(actor: WorkspaceActor, workspaceId: string, code: string, redirectUri: string, deps: GhlServiceDeps = defaultGhlServiceDeps()): Promise<GhlConnection> {
   await assertGhlAgencyManager(actor, workspaceId, deps);
+  const eligibility = await assertGhlConnectionEligible(actor, workspaceId, deps);
   try {
     const tokens = await exchangeGhlCode(code, redirectUri, deps.fetcher, deps.now());
     if (!GHL_ID.test(tokens.companyId)) throw new GhlConnectError(GHL_MESSAGES.malformed, "unavailable");
-    return await deps.store.save({ workspaceId, companyId: tokens.companyId, connectedBy: actor.userId, tokens });
+    const connection = await deps.store.save({ workspaceId, companyId: tokens.companyId, connectedBy: actor.userId, tokens });
+    try {
+      await (deps.recordHolder ?? recordConnectionHolder)({
+        ref: `highlevel:${connection.id}`, provider: "highlevel", workspaceId,
+        accountHolder: { kind: "agency", workspaceId }, accessThrough: eligibility.through,
+        actor, commandId: randomUUID(),
+      });
+    } catch {
+      // Do not leave newly saved credentials usable without their provenance.
+      await deps.store.revokeSaved?.(connection.id, connection.updatedAt);
+      throw new GhlImportError("HighLevel was saved, but whose account it is couldn't be recorded. Connect again.", 503, "connection_holder_unavailable");
+    }
+    return connection;
   } catch (error) {
     throw toImportError(error);
   }

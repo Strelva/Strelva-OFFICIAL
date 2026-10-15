@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assertGhlConnectionEligible } from "@/products/agency-clients/server";
 import { z } from "zod";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platform/workspaces/http";
 import {
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
     if (!actor) return workspaceJson({ error: "Sign in to connect HighLevel." }, 401);
     const workspaceId = z.string().uuid().parse(new URL(request.url).searchParams.get("workspaceId"));
     await assertGhlAgencyManagerForRoute(actor, workspaceId);
+    await assertGhlConnectionEligible(actor, workspaceId);
     const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
     if (!appUrl) return workspaceJson({ error: "Importing from HighLevel isn't available yet." }, 503);
     const state = createGhlOAuthState({ workspaceId, userId: actor.userId });

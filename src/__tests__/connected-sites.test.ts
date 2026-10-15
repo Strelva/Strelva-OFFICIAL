@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: vi.fn(async () => ({ eligible: true, through: { kind: "platform" } })) }));
+vi.mock("@/platform/connections/holders", () => ({ recordConnectionHolder: vi.fn(async () => undefined) }));
+vi.mock("@/products/connected-sites/installer", () => ({ resolveConnectedSiteInstaller: vi.fn(async (_actor, workspaceId) => ({ kind: "business", workspaceId })) }));
 import { businessJsonLd, defaultAllowedOrigins, publicFactsFromRecord, verificationProofs } from "@/products/connected-sites/contracts";
 import { connectSite, connectedSiteSystemId, normalizeSiteUrl, readPublicContext, recordBeacon, submitPublicInquiry, verifySite } from "@/products/connected-sites/server";
 import { createConnectedSitesStore, ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";

@@ -1,3 +1,4 @@
+import { beginOAuthHolder, assertCurrentOAuthHolder, completeOAuthHolder } from "../../calendly/connection-holder";
 /**
  * Instagram OAuth Callback Route
  *
@@ -67,7 +68,9 @@ export async function GET(req: Request) {
 
   const redirectUri = `${appUrl}/api/oauth/instagram/callback`;
 
+  let connectionSaved = false;
   try {
+    const holder = await beginOAuthHolder("instagram", tenantId);
     // Exchange code for short-lived token
     const tokenRes = await fetch(INSTAGRAM_TOKEN_URL, {
       method: "POST",
@@ -82,8 +85,7 @@ export async function GET(req: Request) {
     });
 
     if (!tokenRes.ok) {
-      const errText = await tokenRes.text();
-      console.error("[instagram-callback] Token exchange failed:", errText);
+      console.error("[instagram-callback] Token exchange failed:", tokenRes.status);
       return NextResponse.redirect(`${appUrl}/dashboard/sources?error=token_exchange`);
     }
 
@@ -100,14 +102,14 @@ export async function GET(req: Request) {
     );
 
     if (!longLivedRes.ok) {
-      const errText = await longLivedRes.text();
-      console.error("[instagram-callback] Long-lived token exchange failed:", errText);
+      console.error("[instagram-callback] Long-lived token exchange failed:", longLivedRes.status);
       return NextResponse.redirect(`${appUrl}/dashboard/sources?error=long_lived_token`);
     }
 
     const longLived: LongLivedTokenResponse = await longLivedRes.json();
 
     // Save connection with long-lived token
+    await assertCurrentOAuthHolder(holder);
     await saveConnection({
       tenantId,
       provider: "instagram",
@@ -116,9 +118,13 @@ export async function GET(req: Request) {
       expiresAt: new Date(Date.now() + longLived.expires_in * 1000).toISOString(),
     });
 
+    connectionSaved = true;
+    await completeOAuthHolder(holder);
+
     return NextResponse.redirect(`${appUrl}/dashboard/sources?success=instagram`);
-  } catch (err) {
-    console.error("[instagram-callback] Error:", err);
+  } catch {
+    console.error("[instagram-callback] Connection failed.");
+    if (connectionSaved) return NextResponse.redirect(`${appUrl}/dashboard/sources?error=${encodeURIComponent("Instagram connected, but setup is incomplete. Reconnect to finish recording whose account this is.")}`);
     return NextResponse.redirect(`${appUrl}/dashboard/sources?error=unknown`);
   }
 }

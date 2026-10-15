@@ -4,6 +4,7 @@
  * docs/operations/gohighlevel-import-2026-10-12.md.
  */
 export { ghlImportReleaseEnabled, ghlRedirectUri, GHL_SCOPES, GHL_ENV } from "./config";
+export { createGhlConnectionSource, ghlConnectionSource } from "./connection-source";
 export { GhlApiError, GhlClient, GhlPacer, GHL_MESSAGES, type GhlErrorCode, type GhlTokenSource } from "./client";
 export { createGhlOAuthState, consumeGhlOAuthState, ghlAuthorizationUrl, exchangeGhlCode, refreshGhlToken, GHL_STATE_COOKIE, GHL_STATE_COOKIE_MAX_AGE_SECONDS } from "./oauth";
 export { createGoHighLevelImportAdapter, ghlLocationToRow, ghlOwnerCandidates, listGhlSubAccounts, listGhlSubAccountUsers } from "./adapter";
@@ -11,6 +12,7 @@ export { verifyGhlWebhookSignature, parseGhlWebhook, type GhlWebhookEvent } from
 export { supabaseGhlConnectionStore, type GhlConnection, type GhlConnectionStore } from "./repository";
 export {
   GhlImportError,
+  assertGhlConnectionEligible,
   connectGhlAgency,
   disconnectGhlAgency,
   newGhlSubAccounts,

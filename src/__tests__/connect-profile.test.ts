@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
 import { connectProfile, onboardConnectedAccount } from "@/platform/connect";
+const holders = vi.hoisted(() => ({ record: vi.fn(), prepare: vi.fn() }));
+vi.mock("@/platform/connect/connection-holder", () => ({ prepareStripeConnectionHolder: holders.prepare }));
 
 const workspaceId = "a2830000-0000-4000-8000-000000000010";
 const actor = { userId: "a2830000-0000-4000-8000-000000000011", verifiedEmail: "owner@example.test" };
@@ -23,6 +25,8 @@ function onboardingFixture(existing?: { profile_version: string; configurations:
 }
 
 beforeEach(() => {
+  holders.record.mockReset().mockResolvedValue(undefined);
+  holders.prepare.mockReset().mockResolvedValue(holders.record);
   vi.stubEnv("STRELVA_CONNECT", "1");
   vi.stubEnv("STRELVA_CONNECT_PROFILE_VERSION", "fictional-v1");
   vi.stubEnv("STRELVA_CONNECT_FEES_COLLECTOR", "application");
@@ -62,6 +66,8 @@ describe("Connect full Dashboard profile boundary", () => {
       configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
     }, { idempotencyKey: `connect:${workspaceId}:3:fictional-v1` });
     expect(fixture.update).not.toHaveBeenCalled();
+    expect(holders.prepare).toHaveBeenCalledWith(actor, workspaceId);
+    expect(holders.record).toHaveBeenCalledExactlyOnceWith(3);
   });
 
   it.each(["STRELVA_CONNECT_PROFILE_VERSION", "STRELVA_CONNECT_FEES_COLLECTOR", "STRELVA_CONNECT_LOSSES_COLLECTOR"])("has no implicit default when %s is missing", async field => {
@@ -109,5 +115,23 @@ describe("Connect full Dashboard profile boundary", () => {
 
   it("leaves generic profile parsing available to the separate platform-collection rail", () => {
     expect(connectProfile()).toEqual({ version: "fictional-v1", feesCollector: "application", lossesCollector: "application" });
+  });
+
+  it("checks holder eligibility before creating or retrieving a provider account", async () => {
+    vi.stubEnv("STRELVA_CONNECT_LOSSES_COLLECTOR", "stripe");
+    holders.prepare.mockRejectedValue(new Error("Stripe is coming soon."));
+    const fixture = onboardingFixture();
+    await expect(onboardConnectedAccount(actor, input, fixture)).rejects.toThrow(/coming soon/);
+    expect(fixture.create).not.toHaveBeenCalled();
+    expect(fixture.retrieve).not.toHaveBeenCalled();
+    expect(fixture.createLink).not.toHaveBeenCalled();
+  });
+
+  it("does not return an onboarding link without the holder receipt", async () => {
+    vi.stubEnv("STRELVA_CONNECT_LOSSES_COLLECTOR", "stripe");
+    holders.record.mockRejectedValue(new Error("holder storage unavailable"));
+    const fixture = onboardingFixture();
+    await expect(onboardConnectedAccount(actor, input, fixture)).rejects.toThrow(/holder storage unavailable/);
+    expect(fixture.createLink).not.toHaveBeenCalled();
   });
 });

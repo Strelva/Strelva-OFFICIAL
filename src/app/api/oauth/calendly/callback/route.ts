@@ -1,3 +1,4 @@
+import { beginOAuthHolder, assertCurrentOAuthHolder, completeOAuthHolder } from "../connection-holder";
 import { mirrorRecord } from "@/lib/client-records";
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
@@ -81,7 +82,9 @@ export async function GET(req: Request) {
 
   const redirectUri = `${appUrl}/api/oauth/calendly/callback`;
 
+  let connectionSaved = false;
   try {
+    const holder = await beginOAuthHolder("calendly", tenantId);
     const tokenRes = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -95,8 +98,7 @@ export async function GET(req: Request) {
     });
 
     if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      console.error("Calendly token exchange failed:", errBody);
+      console.error("Calendly token exchange failed:", tokenRes.status);
       return NextResponse.redirect(
         `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Calendly account")}`
       );
@@ -113,7 +115,7 @@ export async function GET(req: Request) {
     });
 
     if (!userRes.ok) {
-      console.error("Calendly user fetch failed:", await userRes.text());
+      console.error("Calendly user fetch failed:", userRes.status);
       return NextResponse.redirect(
         `${connectionsUrl}?error=${encodeURIComponent("Failed to fetch Calendly user")}`
       );
@@ -139,10 +141,10 @@ export async function GET(req: Request) {
     });
 
     if (!webhookRes.ok) {
-      const webhookErr = await webhookRes.text();
-      console.error("Calendly webhook registration failed:", webhookErr);
+      console.error("Calendly webhook registration failed:", webhookRes.status);
     }
 
+    await assertCurrentOAuthHolder(holder);
     await saveConnection({
       provider: "calendly",
       tenantId,
@@ -152,6 +154,8 @@ export async function GET(req: Request) {
       status: "connected",
       lastSyncedAt: new Date().toISOString(),
     });
+
+    connectionSaved = true;
 
     const redis = getRedis();
     if (redis) {
@@ -168,9 +172,11 @@ export async function GET(req: Request) {
       });
     }
 
+    await completeOAuthHolder(holder);
     return NextResponse.redirect(`${connectionsUrl}?success=true`);
-  } catch (err) {
-    console.error("Calendly OAuth callback error:", err);
+  } catch {
+    console.error("Calendly OAuth callback failed.");
+    if (connectionSaved) return NextResponse.redirect(`${connectionsUrl}?error=${encodeURIComponent("Calendly connected, but setup is incomplete. Reconnect to finish recording whose account this is.")}`);
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Calendly account")}`
     );

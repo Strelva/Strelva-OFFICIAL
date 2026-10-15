@@ -9,6 +9,7 @@ import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { businessRecordSchema, type BusinessRecord } from "@/platform/business-record/contracts";
 import { ownerDecisionSchema, type OwnerDecision, type ProposedItem } from "@/platform/needs-you/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
+import type { CredentialHolder } from "@/platform/connections/contracts";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite } from "./contracts";
 
@@ -22,7 +23,7 @@ export class ConnectedSiteInputError extends Error {
   constructor(message = "The request is invalid.") { super(message); this.name = "ConnectedSiteInputError"; }
 }
 
-export interface NewConnectedSite { publicKey: string; verificationToken: string; label: string; siteUrl: string; siteHost: string; allowedOrigins: string[]; platform: string }
+export interface NewConnectedSite { installerHolder?: CredentialHolder; publicKey: string; verificationToken: string; label: string; siteUrl: string; siteHost: string; allowedOrigins: string[]; platform: string }
 export interface StoredEvent { kind: string; occurredAt: string; sessionId: string | null; pagePath: string | null; referrerHost: string | null; target: string | null; dedupeKey: string }
 export interface StoredLead { leadId: string; submissionHash: string; name: string; email?: string; message?: string; source: string; fields: Record<string, string>; capturedAt: string }
 
@@ -71,7 +72,7 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
   }
   const site = (data: unknown) => connectedSiteSchema.parse(data) as ConnectedSite;
   return {
-    async create(actor, workspaceId, input) { return site(await rpc("create_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_input: input })); },
+    async create(actor, workspaceId, input) { return site(await rpc("create_connected_site_for_installer", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_input: input })); },
     async list(actor, workspaceId) { return z.array(z.unknown()).parse(await rpc("list_connected_sites", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor) })).map(site); },
     async update(actor, workspaceId, siteId, patch) { return site(await rpc("update_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_patch: patch })); },
     async revoke(actor, workspaceId, siteId) { return site(await rpc("revoke_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId) })); },

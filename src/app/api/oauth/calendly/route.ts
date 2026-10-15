@@ -1,3 +1,4 @@
+import { beginOAuthHolder } from "./connection-holder";
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -17,6 +18,12 @@ export async function GET() {
   if (permissionDenied) return permissionDenied;
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
+
+  try {
+    await beginOAuthHolder("calendly", tenant);
+  } catch {
+    return NextResponse.json({ error: "This account cannot be connected for this business." }, { status: 403 });
+  }
 
   const clientId = process.env.CALENDLY_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
