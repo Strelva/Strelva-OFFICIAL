@@ -1,4 +1,4 @@
-import { stepCountIs } from "ai";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
@@ -128,8 +128,8 @@ export async function POST(request: Request) {
       }),
       async stream(input, consume, emitted) {
         await streamModelText(
-          { purpose: "ask", ...input.context },
-          { system: input.system, messages: input.messages, tools: input.tools, stopWhen: stepCountIs(8) },
+          { purpose: ASSISTANT_POLICIES.workspace_ask.purpose, ...input.context },
+          assistantCallOptions(ASSISTANT_POLICIES.workspace_ask, input),
           (result) => consume(result.fullStream as AsyncIterable<{ type: string } & Record<string, unknown>>),
           { emitted },
         );

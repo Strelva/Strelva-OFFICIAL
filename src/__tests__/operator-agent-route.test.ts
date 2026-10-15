@@ -23,11 +23,11 @@ vi.mock("@/lib/pay-links", () => ({ listPayLinks: vi.fn() }));
 // Drive the model: streamText yields the parts the route reacts to. `tool` and
 // `stepCountIs` are pass-throughs so the tools object still builds. This lets us
 // assert the __CARD__ channel without a live LLM.
-const mockFullStream = vi.hoisted(() => ({ parts: [] as unknown[] }));
+const mockFullStream = vi.hoisted(() => ({ parts: [] as unknown[], options: undefined as unknown }));
 vi.mock("ai", () => ({
   tool: (def: unknown) => def,
   stepCountIs: () => 8,
-  streamText: () => ({
+  streamText: (options: unknown) => (mockFullStream.options = options, {
     fullStream: (async function* () {
       for (const p of mockFullStream.parts) yield p;
     })(),
@@ -93,6 +93,8 @@ describe("POST /api/admin/agent (operator agent)", () => {
     expect(body.match(/__CARD__/g)?.length).toBe(1);
     // The agent's own text still streams alongside the card.
     expect(body).toContain("Acme has the worst site health.");
+    // Every chat request is bounded by the operator policy.
+    expect(mockFullStream.options).toMatchObject({ maxOutputTokens: 4096 });
   });
 
   it("does not emit a __CARD__ when the read tool returned an error", async () => {

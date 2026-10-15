@@ -1,4 +1,5 @@
 import { generateModelText } from "@/platform/infra/model-calls";
+import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/assistant/policy";
 import type { WeeklyBrief, WeeklyBriefStats, WeeklyInquiryOutcomeProof } from "./types";
 import { workspacePorts } from "./workspace-ports";
 import { getRedis } from "@/platform/infra/redis";
@@ -525,6 +526,7 @@ Rules:
 - Talk about their real world: "your website", "the people who found you", "your booking link" — not "users", "conversions", "traffic", or "functionality"
 - Never use these words: leverage, utilize, implement, functionality, solution, seamless, robust, streamline, empower, unlock, elevate, cutting-edge, "in today's", "e-commerce". No em dashes.
 - No greeting, no markdown, no sign-off`,
+      maxOutputTokens: TEXT_PURPOSE_MAX_OUTPUT_TOKENS.weekly_brief,
     });
     return text.trim();
   } catch {

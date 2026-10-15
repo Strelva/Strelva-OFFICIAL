@@ -1,5 +1,5 @@
 import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
-import { stepCountIs } from "ai";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
@@ -264,8 +264,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
         // any content reached the client, so a half-streamed answer is never
         // duplicated. One cost row per provider call.
         await streamModelText(
-          { purpose: "ask", tenantId: tenant, actorKind: askerIsOperator ? "operator" : "member" },
-          { system: systemPrompt, messages, tools, stopWhen: stepCountIs(8) },
+          { purpose: ASSISTANT_POLICIES.tenant_chat.purpose, tenantId: tenant, actorKind: askerIsOperator ? "operator" : "member" },
+          assistantCallOptions(ASSISTANT_POLICIES.tenant_chat, { system: systemPrompt, messages, tools }),
           consume,
           { emitted: () => emittedToClient },
         );

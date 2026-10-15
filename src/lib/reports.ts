@@ -1,5 +1,6 @@
 import { workspacePorts } from "./workspace-ports";
 import { generateModelText } from "@/platform/infra/model-calls";
+import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/assistant/policy";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
@@ -480,6 +481,7 @@ Rules:
 - Sound like a helpful coworker texting an update, not a marketing email
 - No subject line, no greeting, no sign-off — just the body
 - Plain text, no markdown or HTML formatting`,
+      maxOutputTokens: TEXT_PURPOSE_MAX_OUTPUT_TOKENS.report,
     }));
   } catch (err) {
     console.error(

@@ -13,7 +13,8 @@ import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admis
  * mutation on its own.
  */
 
-import { tool, stepCountIs } from "ai";
+import { tool } from "ai";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -414,8 +415,8 @@ export async function POST(req: Request) {
         // fallback runs only when nothing has streamed yet and the failure
         // looks transient (outage / rate limit / 5xx). One cost row per call.
         await streamModelText(
-          { purpose: "operator", actorKind: "operator" },
-          { system: SYSTEM_PROMPT, messages, tools, stopWhen: stepCountIs(8) },
+          { purpose: ASSISTANT_POLICIES.operator.purpose, actorKind: "operator" },
+          assistantCallOptions(ASSISTANT_POLICIES.operator, { system: SYSTEM_PROMPT, messages, tools }),
           (result) => consume(result),
           { emitted: () => emittedToClient },
         );

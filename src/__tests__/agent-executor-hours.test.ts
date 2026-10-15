@@ -26,13 +26,15 @@ const mockSendSlackNotification = vi.fn((..._args: unknown[]) => Promise.resolve
 type ExecutorTools = Record<string, { execute: (args: unknown) => Promise<unknown> }>;
 
 let mockCapturedTools: ExecutorTools = {};
+let mockCapturedOptions: { maxOutputTokens?: number } = {};
 let mockAfterToolError: Error | null = null;
 
 vi.mock("ai", () => ({
   tool: (def: unknown) => def,
   stepCountIs: () => () => true,
-  generateText: async (opts: { tools: ExecutorTools }) => {
+  generateText: async (opts: { tools: ExecutorTools; maxOutputTokens?: number }) => {
     mockCapturedTools = opts.tools;
+    mockCapturedOptions = opts;
     const input = {
       hours: [
         { day: "MONDAY", open: "09:00", close: "17:00" },
@@ -200,6 +202,7 @@ describe("agent-executor update_business_hours", () => {
     expect(output.message).toContain("once approved");
 
     expect(Object.keys(mockCapturedTools)).toContain("update_business_hours");
+    expect(mockCapturedOptions.maxOutputTokens).toBe(4096);
     expect(mockBillingWorkspace).toHaveBeenCalledExactlyOnceWith("gldf");
   });
 

@@ -1,4 +1,5 @@
 import { generateModelText } from "@/platform/infra/model-calls";
+import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/assistant/policy";
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";
@@ -632,6 +633,7 @@ Return strict JSON:
 }
 
 No markdown. No extra text.`,
+      maxOutputTokens: TEXT_PURPOSE_MAX_OUTPUT_TOKENS.suggestion,
     });
     const parsed = JSON.parse(text.trim()) as { title?: string; description?: string; prompt?: string };
     if (!parsed.title || !parsed.description || !parsed.prompt) return null;
