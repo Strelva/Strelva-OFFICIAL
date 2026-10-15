@@ -27,7 +27,8 @@ function failure(error: unknown) {
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isSuperAdmin())) return json({ error: "Forbidden" }, 403);
   if (!appEventsMayBeOn()) return json({ error: "Events aren't turned on." }, 503);
-  await authorizeAdminOperatorRead("admin.tenant-app-events.read");
+  // The reader names are an allowlist in the database (20261020090039); a client's events are read under the same name as its other controls.
+  await authorizeAdminOperatorRead("admin.tenant-controls.read");
   const { id } = await params;
   try {
     const workspaceId = await releaseWorkspaceForTenant(id);

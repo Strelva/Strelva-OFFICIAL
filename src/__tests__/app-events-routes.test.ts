@@ -19,6 +19,7 @@ vi.mock("@/platform/app-events/service", async () => ({
 
 import { GET, POST } from "@/app/api/workspace/app-events/route";
 import { GET as adminGet, POST as adminPost } from "@/app/api/admin/tenants/[id]/app-events/route";
+import type { AppEventsCommand } from "@/platform/app-events/contracts";
 import { WebhooksOffError, type CommandDeps } from "@/platform/app-events/service";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
@@ -194,11 +195,12 @@ describe("runAppEventCommand", () => {
     const d = deps({ webhooksOn: false });
     await expect(actualService.runAppEventCommand(actor, { ...base, action: "set_webhook", endpointId: ENDPOINT, status: "paused" }, d)).resolves.toEqual({ view: endpointView });
     await expect(actualService.runAppEventCommand(actor, { ...base, action: "set_webhook", endpointId: ENDPOINT, status: "disabled" }, d)).resolves.toBeTruthy();
-    for (const command of [
+    const refused: AppEventsCommand[] = [
       { ...base, action: "set_webhook", endpointId: ENDPOINT, status: "active" },
       { ...base, action: "rotate_webhook_secret", endpointId: ENDPOINT },
       { ...base, action: "create_webhook", url: "https://maker.example.test/e", eventTypes: ["booking.made"] },
-    ] as const) {
+    ];
+    for (const command of refused) {
       await expect(actualService.runAppEventCommand(actor, command, d), command.action).rejects.toBeInstanceOf(WebhooksOffError);
     }
   });
