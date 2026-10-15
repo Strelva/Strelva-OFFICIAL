@@ -14,7 +14,7 @@ import { getActorContext, requireTenantAccess, requireTenantPermission } from "@
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { sectionSchemas } from "@/lib/schemas";
-import { publishTenantSections } from "@/products/websites/publish/tenant-sections";
+import { publishWebsite } from "@/products/websites/publish";
 
 async function isValidSection(section: string, tenant: string): Promise<boolean> {
   const template = await getTemplateManifestForTenant(tenant);
@@ -121,7 +121,7 @@ export async function PUT(
     // layout, metadata, links and design tokens across many routes, so the
     // client site revalidates the matching targets; verification confirms the
     // change is live on the public read path.
-    await publishTenantSections({
+    await publishWebsite({ via: "tenant_sections", input: {
       tenantId: tenant,
       writes: [{ section: s, data: parsed.data as ContentMap[typeof s], prior: current }],
       author: actor.isImpersonating ? "admin" : "user",
@@ -135,7 +135,7 @@ export async function PUT(
         versions: (section) => ["[content PUT] post-write bookkeeping failed (content IS saved):", section],
         clearDraft: ([section]) => ["[content PUT] failed to clear draft after publish:", section],
       },
-    });
+    } });
 
     return NextResponse.json({ success: true });
   } catch (err) {

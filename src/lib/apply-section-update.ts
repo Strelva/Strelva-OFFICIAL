@@ -172,13 +172,13 @@ export async function applySectionUpdate(
   let eventId: string | undefined;
 
   if (autoPublish) {
-    const { publishTenantSections, isSectionWriteFailure } = await import("@/products/websites/publish/tenant-sections");
+    const { publishWebsite, isSectionWriteFailure } = await import("@/products/websites/publish");
     try {
       // Version history is bookkeeping: the content is already durably saved, so
       // a version-write hiccup must not turn a successful publish into a failure.
       // The activity log and section timestamp below stay with this function,
       // because the queued branch shares them.
-      await publishTenantSections({
+      await publishWebsite({ via: "tenant_sections", input: {
         tenantId,
         writes: [{ section, data: parsed.data as ContentMap[ContentSection], prior: current, changes }],
         author: "ai",
@@ -189,7 +189,7 @@ export async function applySectionUpdate(
         onRevalidateError: (err) => console.error("[agent] Failed to revalidate client site:", err),
         readBack: { actorId: "ai", publicationRef: input.requestId },
         messages: { versions: () => ["[agent] appendVersion failed after publish:"] },
-      });
+      } });
     } catch (err) {
       if (!isSectionWriteFailure(err)) throw err;
       return {

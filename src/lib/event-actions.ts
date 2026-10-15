@@ -8,7 +8,7 @@ import {
   getDraftContent,
   logActivity,
 } from "./storage";
-import { publishTenantSections } from "@/products/websites/publish/tenant-sections";
+import { publishWebsite } from "@/products/websites/publish";
 import { recordApproval, recordRejection } from "./ai-auto-approve";
 import { GBP_OPERATIONS } from "./agent/gbp-operations";
 import {
@@ -470,7 +470,7 @@ async function executeResolvedEventAction(
       const current = (await getContent(section, tenantId)) as unknown as Record<string, unknown>;
       // The live write is the authoritative effect. Resolve only after it
       // succeeds so a storage failure cannot produce a false "Made live" state.
-      const published = await publishTenantSections({
+      const { detail: published } = await publishWebsite({ via: "tenant_sections", input: {
         tenantId,
         writes: [{ section, data: draft as ContentMap[typeof section], prior: current }],
         author: isDelegateActor(actorId) ? "admin" : "user",
@@ -483,7 +483,7 @@ async function executeResolvedEventAction(
         // agency's approval must never earn the owner's auto-publish.
         onPublished: () => { if (event.source === "ai" && !isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {}); },
         readBack: { actorId, publicationRef: eventId },
-      });
+      } });
       if (published.status === "already_resolved") return { changed: false, reason: "already_resolved" };
       return { changed: true };
     }
