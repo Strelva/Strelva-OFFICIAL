@@ -14,11 +14,11 @@ import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admis
  */
 
 import { tool } from "ai";
-import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { streamAssistantTurn } from "@/platform/assistant/core";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { isSuperAdmin } from "@/platform/infra/auth";
-import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import {
   buildPortfolioSnapshot,
   getPortfolioSummary,
@@ -122,6 +122,28 @@ You can READ the whole business. Pick the right tool:
 For consequential actions — assigning a user, sending an invite, running a fresh site scan, or updating a tenant's config — you do NOT perform them. You call the matching propose_* tool (propose_assign_user, propose_send_invite, propose_run_scan, propose_update_tenant), which returns a confirmation card the operator clicks to commit. Client content authoring and approval belongs to the business owner or its authorized agency through ordinary permissions. Platform support cannot propose approval or rejection of client drafts. Always state plainly what you're proposing and the exact amounts/targets/fields so they can verify before confirming.
 
 Be direct and concise. Lead with the answer. No fluff. When asked "what needs attention" or "what's the health," read the portfolio and surface the blocked tenants, breakage, and pending drafts first. Agency service sales and client publishing require ordinary agency access.`;
+
+const OPERATOR_TOOL_LABELS: Record<string, string> = {
+  read_portfolio: "Reading the portfolio...",
+  read_ops: "Checking operational health...",
+  read_health: "Checking platform health...",
+  read_attention: "Building the attention briefing...",
+  refresh_portfolio: "Refreshing the data...",
+  read_tenant: "Looking up the tenant...",
+  read_scan: "Reading site-health scans...",
+  list_drafts: "Checking pending drafts...",
+  read_audit: "Reading the audit trail...",
+  read_pay_links: "Checking pay links...",
+  read_revenue: "Tallying collected payments...",
+  propose_pay_link: "Preparing a pay link...",
+  propose_assign_user: "Preparing an access grant...",
+  propose_approve_draft: "Preparing a draft approval...",
+  propose_reject_draft: "Preparing a draft rejection...",
+  propose_update_tenant: "Preparing a tenant change...",
+  propose_run_scan: "Preparing a scan...",
+  propose_revoke_pay_link: "Preparing a pay-link revoke...",
+  propose_send_invite: "Preparing an invite...",
+};
 
 export async function POST(req: Request) {
   if (!(await isSuperAdmin())) {
@@ -356,79 +378,41 @@ export async function POST(req: Request) {
     async start(controller) {
       // Tracks whether anything visible was emitted so the fallback only fires
       // when retrying is still safe (no partial output sent to the client).
-      let emittedToClient = false;
+      const state = { emitted: false };
+      const write = (text: string) => controller.enqueue(encoder.encode(text));
 
-      const consume = async (result: ModelTextStream): Promise<void> => {
-        for await (const part of result.fullStream) {
-          if (part.type === "error") {
-            throw part.error;
-          } else if (part.type === "tool-call") {
-            const label =
-              part.toolName === "read_portfolio" ? "Reading the portfolio..." :
-              part.toolName === "read_ops" ? "Checking operational health..." :
-              part.toolName === "read_health" ? "Checking platform health..." :
-              part.toolName === "read_attention" ? "Building the attention briefing..." :
-              part.toolName === "refresh_portfolio" ? "Refreshing the data..." :
-              part.toolName === "read_tenant" ? "Looking up the tenant..." :
-              part.toolName === "read_scan" ? "Reading site-health scans..." :
-              part.toolName === "list_drafts" ? "Checking pending drafts..." :
-              part.toolName === "read_audit" ? "Reading the audit trail..." :
-              part.toolName === "read_pay_links" ? "Checking pay links..." :
-              part.toolName === "read_revenue" ? "Tallying collected payments..." :
-              part.toolName === "propose_pay_link" ? "Preparing a pay link..." :
-              part.toolName === "propose_assign_user" ? "Preparing an access grant..." :
-              part.toolName === "propose_approve_draft" ? "Preparing a draft approval..." :
-              part.toolName === "propose_reject_draft" ? "Preparing a draft rejection..." :
-              part.toolName === "propose_update_tenant" ? "Preparing a tenant change..." :
-              part.toolName === "propose_run_scan" ? "Preparing a scan..." :
-              part.toolName === "propose_revoke_pay_link" ? "Preparing a pay-link revoke..." :
-              part.toolName === "propose_send_invite" ? "Preparing an invite..." :
-              "Working on it...";
-            controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
-          } else if (part.type === "tool-result") {
+      try {
+        // Primary then fallback through the one model-call helper: the
+        // fallback runs only when nothing has streamed yet and the failure
+        // looks transient (outage / rate limit / 5xx). One cost row per call.
+        await streamAssistantTurn({
+          policy: ASSISTANT_POLICIES.operator,
+          context: { actorKind: "operator" },
+          system: SYSTEM_PROMPT,
+          messages,
+          tools,
+          state,
+          handlers: {
+            toolCall: ({ toolName }) => OPERATOR_TOOL_LABELS[toolName] ?? "Working on it...",
             // A few read tools return structured data that reads far better as a
             // compact card than as flattened prose. Mirror the client agent's
             // __CARD__ channel: stream the raw tool output tagged with its tool
             // name; the console renders a typed, read-only card and falls back to
             // the agent's own text for everything else. Display-only — the
             // propose_* → confirm → gated-endpoint mutation flow is untouched.
-            if (CARD_TOOLS.has(part.toolName)) {
-              const output = ("output" in part ? part.output : undefined) as unknown;
-              if (output && typeof output === "object" && !("error" in output)) {
-                controller.enqueue(
-                  encoder.encode(`__CARD__${JSON.stringify({ tool: part.toolName, data: output })}\n`)
-                );
-              }
-            }
-          } else if (part.type === "text-delta") {
-            const text = "text" in part ? part.text : "";
-            if (text) {
-              emittedToClient = true;
-              controller.enqueue(encoder.encode(text));
-            }
-          }
-        }
-      };
-
-      try {
-        // Primary then fallback through the one model-call helper: the
-        // fallback runs only when nothing has streamed yet and the failure
-        // looks transient (outage / rate limit / 5xx). One cost row per call.
-        await streamModelText(
-          { purpose: ASSISTANT_POLICIES.operator.purpose, actorKind: "operator" },
-          assistantCallOptions(ASSISTANT_POLICIES.operator, { system: SYSTEM_PROMPT, messages, tools }),
-          (result) => consume(result),
-          { emitted: () => emittedToClient },
-        );
+            toolResult: ({ toolName, output }) =>
+              CARD_TOOLS.has(toolName) && output && typeof output === "object" && !("error" in output)
+                ? { tool: toolName, data: output }
+                : null,
+            text: write,
+            line: write,
+          },
+        });
       } catch (err) {
         console.error("[operator-agent] turn failed:", err);
-        if (!emittedToClient) {
+        if (!state.emitted) {
           try {
-            controller.enqueue(
-              encoder.encode(
-                "Sorry — I couldn't reach the AI just now. Please try that again in a moment."
-              )
-            );
+            write(ASSISTANT_POLICIES.operator.noAnswer);
           } catch {}
         }
       } finally {
