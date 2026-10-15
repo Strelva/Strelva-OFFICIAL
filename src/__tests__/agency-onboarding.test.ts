@@ -48,6 +48,26 @@ beforeEach(() => {
   } as typeof deps;
 });
 
+describe("deriveAgencyOnboarding first client", () => {
+  const stepFor = (result: ReturnType<typeof deriveAgencyOnboarding>) => result.steps.find((step) => step.id === "first_client");
+
+  it("is the next step for an owner once adding clients is released and the team is done", () => {
+    const result = deriveAgencyOnboarding(facts({ members: 2 }), { addClient: true });
+    expect(stepFor(result)?.available).toBe(true);
+    expect(result.next).toBe("first_client");
+  });
+
+  it("is never available to a plain member", () => {
+    const result = deriveAgencyOnboarding(facts({ agency: { id: AGENCY, name: "Northside", role: "member" }, members: 2, pendingInvitations: null }), { addClient: true });
+    expect(stepFor(result)?.available).toBe(false);
+  });
+
+  it("stays unavailable while adding clients is off", () => {
+    expect(stepFor(deriveAgencyOnboarding(facts({ members: 2 })))?.available).toBe(false);
+    expect(stepFor(deriveAgencyOnboarding(facts({ members: 2 }), { addClient: false }))?.available).toBe(false);
+  });
+});
+
 describe("deriveAgencyOnboarding", () => {
   it("starts a new agency with its profile done, team next, every effect unverified and the first client after", () => {
     const result = deriveAgencyOnboarding(facts());

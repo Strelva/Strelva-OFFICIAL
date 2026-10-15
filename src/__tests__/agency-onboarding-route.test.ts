@@ -45,7 +45,13 @@ describe("GET /api/agency-onboarding", () => {
     const response = await get(`?workspaceId=${AGENCY}`);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ onboarding: { agency: { id: AGENCY }, next: "team" } });
-    expect(mocks.read).toHaveBeenCalledWith({ userId: "5a000000-0000-4000-8000-000000000001", verifiedEmail: "owner@northside.example" }, AGENCY);
+    expect(mocks.read).toHaveBeenCalledWith({ userId: "5a000000-0000-4000-8000-000000000001", verifiedEmail: "owner@northside.example" }, AGENCY, undefined, { addClient: false });
+  });
+
+  it("offers adding a first client once the add-client release is on", async () => {
+    vi.stubEnv("STRELVA_AGENCY_ADD_CLIENT_RELEASE", "1");
+    await get(`?workspaceId=${AGENCY}`);
+    expect(mocks.read).toHaveBeenCalledWith(expect.anything(), AGENCY, undefined, { addClient: true });
   });
 
   it("answers 403 for an agency the actor is not a member of, and 503 when the store fails", async () => {

@@ -1,4 +1,5 @@
 import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
+import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
 import { listMemberAgencies, readAgencyOnboarding } from "@/platform/workspaces/agency-onboarding";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platform/workspaces/http";
 
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   try {
     const workspaceId = new URL(request.url).searchParams.get("workspaceId");
     if (workspaceId === null) return workspaceJson({ agencies: await listMemberAgencies(actor) });
-    return workspaceJson({ onboarding: await readAgencyOnboarding(actor, workspaceId) });
+    return workspaceJson({ onboarding: await readAgencyOnboarding(actor, workspaceId, undefined, { addClient: agencyAddClientReleaseEnabled() }) });
   } catch (error) {
     return workspaceHttpFailure(error);
   }
