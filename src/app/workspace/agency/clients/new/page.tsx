@@ -18,9 +18,9 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  * read and write behind it rechecks the session and the agency role.
  * Operators keep /admin/onboard. Off unless STRELVA_AGENCY_ADD_CLIENT_RELEASE=1.
  */
-export default async function AgencyAddClientPage({ searchParams }: { searchParams: Promise<{ workspaceId?: string | string[]; prospect?: string | string[]; leadToken?: string | string[] }> }) {
+export default async function AgencyAddClientPage({ searchParams }: { searchParams: Promise<{ workspaceId?: string | string[]; prospect?: string | string[]; client?: string | string[]; leadToken?: string | string[] }> }) {
   if (!agencyAddClientReleaseEnabled()) redirect("/workspace");
-  const { workspaceId, prospect, leadToken } = await searchParams;
+  const { workspaceId, prospect, client, leadToken } = await searchParams;
   if (typeof workspaceId !== "string" || !UUID.test(workspaceId)) redirect("/workspace");
   if (leadToken !== undefined) {
     const leadsHref = `/workspace/leads?workspaceId=${encodeURIComponent(workspaceId)}`;
@@ -39,5 +39,6 @@ export default async function AgencyAddClientPage({ searchParams }: { searchPara
       initialConversion={initialConversion} conversionHeld={conversionHeld} convertedBusinessWorkspaceId={conversion?.businessWorkspaceId} />;
   }
   return <AgencyAddClient emailEnabled={agencyClaimEmailReleased()} agencyWorkspaceId={workspaceId} prospecting={agencyProspectingEnabled()}
-    initialProspectId={typeof prospect === "string" && UUID.test(prospect) ? prospect : null} />;
+    initialProspectId={typeof prospect === "string" && UUID.test(prospect) ? prospect : null}
+    initialClientId={typeof client === "string" && UUID.test(client) ? client : null} />;
 }

@@ -9,7 +9,7 @@ import { FirstClientHandoff } from "./FirstClientHandoff";
 import { Tabs } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
 import type { AddAgencyClientInput, AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
-import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
+import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimDeliveryCopy, ownerClaimSchema } from "@/products/agency-clients/contracts";
 
 /**
  * An agency adds a client (#259). The agency names a website or picks one of
@@ -56,8 +56,8 @@ function currentOwnerClaim(claim: OwnerClaim | null, client?: AgencyClientListIt
   return claim && Date.parse(claim.expiresAt) > Date.now() && (!client || client.pendingClaim?.claimId === claim.claimId) ? claim : null;
 }
 
-export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId, emailEnabled = false }: {
-  emailEnabled?: boolean; agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialLead?: InitialLead;
+export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialClientId = null, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId, emailEnabled = false }: {
+  emailEnabled?: boolean; agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialClientId?: string | null; initialLead?: InitialLead;
   initialConversion?: AddAgencyClientInput | null; conversionHeld?: boolean; convertedBusinessWorkspaceId?: string;
 }) {
   const [source, setSource] = useState<"url" | "prospect">(initialProspectId && prospecting ? "prospect" : "url");
@@ -81,6 +81,8 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
   const submittingNow = useRef(false);
   const [requestHeld, setRequestHeld] = useState(Boolean(initialConversion));
   const [listAttempt, setListAttempt] = useState(0);
+  // The Queue links here with a client already chosen, so its fresh owner link form starts open.
+  const [openClientId, setOpenClientId] = useState<string | null>(initialClientId);
   const id = useId().replace(/:/g, "");
   const agencyHref = `/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`;
 
@@ -232,7 +234,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
           <li className="border-b border-gray-border py-4"><strong className="block font-medium text-warm-black">A claim link for the owner</strong>It keeps working while they decide. Their site keeps running if they never sign in.</li>
         </ol>
       </section>}
-    <ClientList clients={clients} error={clientRead.workspaceId === agencyWorkspaceId ? clientRead.error : ""} loading={clientRead.workspaceId !== agencyWorkspaceId || clientRead.loading} onRetry={() => setListAttempt((value) => value + 1)} />
+    <ClientList agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} openClientId={openClientId} onOpen={setOpenClientId} onClaimed={() => void loadClients()} clients={clients} error={clientRead.workspaceId === agencyWorkspaceId ? clientRead.error : ""} loading={clientRead.workspaceId !== agencyWorkspaceId || clientRead.loading} onRetry={() => setListAttempt((value) => value + 1)} />
   </Shell>;
 }
 
@@ -322,7 +324,7 @@ export function AddedClient({ emailEnabled = false, result, agencyWorkspaceId, a
         <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{client.factsSeeded} {client.factsSeeded === 1 ? "detail" : "details"} on the business record, including its name. Only the owner confirms them.</p>
       </div>
 
-      <OwnerLink emailEnabled={emailEnabled} result={result} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
+      <OwnerLink emailEnabled={emailEnabled} subject={{ customerWorkspaceId: result.client.customerWorkspaceId, ownerClaim: result.ownerClaim, ownerClaimError: result.ownerClaimError }} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
     </div>
 
     <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-gray-border pt-6">
@@ -347,23 +349,26 @@ export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
   </section>;
 }
 
-function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient, emailEnabled }: { emailEnabled: boolean; currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void }) {
+interface OwnerLinkSubject { customerWorkspaceId: string; ownerClaim: OwnerClaim | null; ownerClaimError: string | null }
+
+/** The one place an owner link is made, whether the client was just added or added earlier. */
+function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEnabled, headingId = "owner-link-title" }: { emailEnabled: boolean; currentClient?: AgencyClientListItem; subject: OwnerLinkSubject; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void; headingId?: string }) {
   const [email, setEmail] = useState("");
   const [sendEmail, setSendEmail] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(result.ownerClaimError ?? "");
+  const [error, setError] = useState(subject.ownerClaimError ?? "");
   const [copied, setCopied] = useState(false);
-  const [needsCheck, setNeedsCheck] = useState(Boolean(result.ownerClaimError));
+  const [needsCheck, setNeedsCheck] = useState(Boolean(subject.ownerClaimError));
   const [reconciled, setReconciled] = useState<{ source: AgencyClientListItem | undefined; client: AgencyClientListItem } | null>(null);
   const latestClient = reconciled && reconciled.source === currentClient ? reconciled.client : currentClient;
   const ownerClaimed = latestClient?.ownerClaimed ?? false;
-  const issuedClaim = result.ownerClaim;
+  const issuedClaim = subject.ownerClaim;
   const claim = currentOwnerClaim(issuedClaim, latestClient);
   const link = claim ? absolute(claim.claimPath) : "";
 
   async function reconcile() {
     const loaded = await readClients(agencyWorkspaceId);
-    const client = loaded.find(item => item.customerWorkspaceId === result.client.customerWorkspaceId);
+    const client = loaded.find(item => item.customerWorkspaceId === subject.customerWorkspaceId);
     if (!client) throw new Error("This client’s owner claim could not be checked. Refresh before creating a link.");
     setReconciled({ source: currentClient, client });
     if (!client.seatActive && !client.ownerClaimed) throw new Error("Your agency seat ended. No new owner link can be created.");
@@ -396,9 +401,9 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient, emailEna
       issuing = true;
       const body = await readJson<{ ownerClaim: OwnerClaim }>(await fetch("/api/workspace/agency-clients", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "owner_link", agencyWorkspaceId, customerWorkspaceId: result.client.customerWorkspaceId, ownerEmail: email.trim(), ...(emailEnabled && sendEmail ? { sendEmail: true } : {}) }),
+        body: JSON.stringify({ action: "owner_link", agencyWorkspaceId, customerWorkspaceId: subject.customerWorkspaceId, ownerEmail: email.trim(), ...(emailEnabled && sendEmail ? { sendEmail: true } : {}) }),
       }), "The owner link couldn’t be created.");
-      if (!ownerClaimSchema.safeParse(body.ownerClaim).success || body.ownerClaim.customerWorkspaceId !== result.client.customerWorkspaceId || !/^\/workspace\/claim\/[A-Za-z0-9_-]+$/.test(body.ownerClaim.claimPath)) throw new Error("The issued owner link could not be confirmed.");
+      if (!ownerClaimSchema.safeParse(body.ownerClaim).success || body.ownerClaim.customerWorkspaceId !== subject.customerWorkspaceId || !/^\/workspace\/claim\/[A-Za-z0-9_-]+$/.test(body.ownerClaim.claimPath)) throw new Error("The issued owner link could not be confirmed.");
       setReconciled(null);
       onClaim(body.ownerClaim);
     } catch (cause) {
@@ -413,14 +418,14 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient, emailEna
     catch { setError("Copy didn’t work here. Select the link and copy it."); }
   }
 
-  return <aside className="self-start rounded-3xl border border-gray-border bg-surface p-6" aria-labelledby="owner-link-title">
-    <h2 id="owner-link-title" className="text-[15px] font-medium">Owner claim link</h2>
+  return <aside className="self-start rounded-3xl border border-gray-border bg-surface p-6" aria-labelledby={headingId}>
+    <h2 id={headingId} className="text-[15px] font-medium">Owner claim link</h2>
     {ownerClaimed ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">The owner has accepted their claim. No new owner link is needed.</p> : claim ? <>
       <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">For {claim.recipientEmail}. The recipient signs in with that address and accepts to become the owner.</p>
-      <label htmlFor="owner-link-value" className="sr-only">Owner claim link</label>
-      <input id="owner-link-value" readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 font-mono text-[12px]" />
+      <label htmlFor={`${headingId}-value`} className="sr-only">Owner claim link</label>
+      <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 font-mono text-[12px]" />
       <Button className="mt-3 w-full" onClick={() => void copy()} icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button>
-      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">{claim.delivery.status === "accepted" ? "Email accepted for delivery." : claim.delivery.status === "unknown" || claim.delivery.status === "sending" ? "Email delivery unconfirmed." : "Not sent."}</strong> {claim.delivery.status === "accepted" ? "You can also copy the link." : "Copy the link and share it yourself."} Works until {dateLabel(claim.expiresAt)}.</p>
+      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">{ownerClaimDeliveryCopy(claim.delivery).headline}</strong> {ownerClaimDeliveryCopy(claim.delivery).next} Works until {dateLabel(claim.expiresAt)}.</p>
       <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">The link is shown once. Making a new one replaces it.</p>
     </> : <form onSubmit={create} noValidate className="mt-1">
       <p className="text-[13px] leading-relaxed text-gray-muted">{issuedClaim ? "The previously shown owner link is no longer current. Create a fresh link for the owner." : "Make a link for the owner to take their business."} Copy and share it yourself, or explicitly request email when available.</p>
@@ -434,7 +439,24 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim, currentClient, emailEna
   </aside>;
 }
 
-function ClientList({ clients, error, loading, onRetry }: { clients: AgencyClientListItem[] | null; error: string; loading: boolean; onRetry: () => void }) {
+function claimStatus(client: AgencyClientListItem): string {
+  if (!client.seatActive) return "Seat ended";
+  if (client.ownerClaimed) return "Owner signed in";
+  const claim = client.pendingClaim;
+  if (!claim) return "No owner link";
+  if (claim.delivery.status === "not_sent") return `Claim not sent · link for ${claim.recipientEmail}`;
+  if (claim.delivery.status === "accepted") return `Claim email sent · ${claim.recipientEmail}`;
+  return "Claim email unconfirmed";
+}
+
+/** A fresh link for a client added earlier; the old one was shown once and cannot be copied again. */
+function ClientOwnerLink({ client, agencyWorkspaceId, emailEnabled, onClaimed }: { client: AgencyClientListItem; agencyWorkspaceId: string; emailEnabled: boolean; onClaimed: () => void }) {
+  const [claim, setClaim] = useState<OwnerClaim | null>(null);
+  return <OwnerLink emailEnabled={emailEnabled} agencyWorkspaceId={agencyWorkspaceId} currentClient={client} headingId={`owner-link-${client.additionId}`}
+    subject={{ customerWorkspaceId: client.customerWorkspaceId, ownerClaim: claim, ownerClaimError: null }} onClaim={(issued) => { setClaim(issued); onClaimed(); }} />;
+}
+
+function ClientList({ clients, error, loading, onRetry, agencyWorkspaceId, emailEnabled, openClientId, onOpen, onClaimed }: { clients: AgencyClientListItem[] | null; error: string; loading: boolean; onRetry: () => void; agencyWorkspaceId: string; emailEnabled: boolean; openClientId: string | null; onOpen: (id: string | null) => void; onClaimed: () => void }) {
   return <section className="mt-16" aria-labelledby="added-clients-title">
     <div className="flex items-center justify-between gap-3">
       <h2 id="added-clients-title" className="text-[15px] font-medium">Clients your agency added</h2>
@@ -444,10 +466,18 @@ function ClientList({ clients, error, loading, onRetry }: { clients: AgencyClien
     {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error} {clients ? "Last successful read; these clients and their claim status may have changed." : "No successful client read yet."}</p> : null}
     {clients?.length === 0 && !error && !loading ? <p className="mt-3 text-[13px] text-gray-muted">No clients added yet.</p> : null}
     <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">
-      {clients?.map((client) => <li key={client.additionId} className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-3">
-        <span className="min-w-0"><strong className="block truncate text-[14px] font-medium">{client.name}</strong><small className="mt-0.5 block truncate text-[12px] text-gray-muted">{client.sourceUrl ?? "No website"} · added {dateLabel(client.addedAt)}</small></span>
-        <span className={`text-right text-[12px] ${client.ownerClaimed ? "text-positive" : "text-gray-muted"}`}>{!client.seatActive ? "Seat ended" : client.ownerClaimed ? "Owner signed in" : client.pendingClaim ? `Link for ${client.pendingClaim.recipientEmail}` : "No owner link"}</span>
-      </li>)}
+      {clients?.map((client) => {
+        const canLink = client.seatActive && !client.ownerClaimed;
+        const open = canLink && openClientId === client.customerWorkspaceId;
+        return <li key={client.additionId} className="py-3">
+          <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
+            <span className="min-w-0"><strong className="block truncate text-[14px] font-medium">{client.name}</strong><small className="mt-0.5 block truncate text-[12px] text-gray-muted">{client.sourceUrl ?? "No website"} · added {dateLabel(client.addedAt)}</small></span>
+            <span className={`text-right text-[12px] ${client.ownerClaimed ? "text-positive" : "text-gray-muted"}`}>{claimStatus(client)}</span>
+          </div>
+          {canLink ? <StTextButton className="mt-1" aria-expanded={open} onClick={() => onOpen(open ? null : client.customerWorkspaceId)}>{open ? "Close owner link" : "New owner link"}</StTextButton> : null}
+          {open ? <div className="mt-3"><ClientOwnerLink client={client} agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} onClaimed={onClaimed} /></div> : null}
+        </li>;
+      })}
     </ul>
   </section>;
 }
