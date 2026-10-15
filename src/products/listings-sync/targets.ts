@@ -1,11 +1,9 @@
-import { getTenantConfig } from "@/lib/tenants";
-import { getTenantPublicUrl } from "@/lib/tenant-urls";
-import { getConnection } from "@/lib/connections";
 import { readGoogleBindingForTenant } from "@/platform/account-bindings/store";
 import { readBookingContext } from "@/platform/bookings/store";
 import { resolveBookingScope } from "@/platform/bookings/booking-scope";
 import { workspacePublishingScope } from "@/platform/infra/publishing-scope";
 import { siteEditingFor } from "@/products/websites/server";
+import { listingsTenantPorts, type ListingsTenant } from "./ports";
 import { listingsYelpEnabled } from "./release";
 import { listingsSyncStore, type RawListingTargets } from "./store";
 
@@ -25,8 +23,7 @@ export interface ListingTargets {
 
 export interface TargetDeps {
   raw: (workspaceId: string) => Promise<RawListingTargets>;
-  tenant: (tenantId: string) => Promise<{ id: string; deliveryModel?: string; customRepo?: unknown } | undefined | null>;
-  publicUrl: (tenant: never) => string;
+  tenant: (tenantId: string) => Promise<ListingsTenant | null>;
   editing: (tenant: { id: string; deliveryModel?: string; customRepo?: unknown }) => "native" | "request";
   binding: (scope: string) => Promise<{ workspaceId: string; locations: Array<{ locationId: string; title: string | null }> } | null>;
   booking: (scope: string) => Promise<{ workspaceId: string | null; systemId: string | null; calendarKey?: string; tenantStableId: string | null } | null>;
@@ -38,14 +35,13 @@ export interface TargetDeps {
 
 export const liveTargetDeps: TargetDeps = {
   raw: id => listingsSyncStore.targets(id),
-  tenant: id => getTenantConfig(id) as Promise<{ id: string; deliveryModel?: string; customRepo?: unknown } | undefined>,
-  publicUrl: tenant => getTenantPublicUrl(tenant),
+  tenant: async id => (await listingsTenantPorts()).tenant(id),
   editing: tenant => siteEditingFor(tenant as Parameters<typeof siteEditingFor>[0]),
   binding: scope => readGoogleBindingForTenant(scope),
   booking: scope => readBookingContext(scope),
   bookingScope: resolveBookingScope,
   publishingScope: workspacePublishingScope,
-  yelp: tenantId => getConnection(tenantId, "yelp"),
+  yelp: async tenantId => (await listingsTenantPorts()).yelpConnection(tenantId),
   yelpEnabled: () => listingsYelpEnabled(),
 };
 
@@ -62,9 +58,9 @@ export async function readListingTargets(workspaceId: string, deps: TargetDeps =
   for (const item of raw.tenants) {
     const config = await swallow(() => deps.tenant(item.tenantId));
     if (!config) continue;
-    const url = await swallow(async () => deps.publicUrl(config as never));
-    const host = url ? hostOf(url) : null;
-    if (!url || !host || hosts.has(host)) continue;
+    const url = config.publicUrl;
+    const host = hostOf(url);
+    if (!host || hosts.has(host)) continue;
     hosts.add(host);
     websites.push({ surfaceKey: `website:tenant:${item.tenantId}`, kind: "tenant", label: host, url, tenantId: item.tenantId, tenantStableId: item.tenantStableId,
       editing: await swallow(async () => deps.editing({ id: config.id, deliveryModel: item.deliveryModel, customRepo: config.customRepo })) ?? "request" });

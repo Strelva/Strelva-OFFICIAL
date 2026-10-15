@@ -1,11 +1,11 @@
 import { load } from "cheerio";
 import { z } from "zod";
-import { getConnection } from "@/lib/connections";
 import { readProviderAccess } from "@/platform/connections/access";
 import { readBookingContext, type BookingContext } from "@/platform/bookings/store";
 import { hoursOutsideRecord } from "@/platform/bookings/availability";
 import { fetchLiveSitePage, platformSchemaFromHtml, type PlatformSchemaReport } from "@/products/connected-sites/server";
 import { readListingControl, tenantListingContext } from "@/products/google-listing/server";
+import { listingsTenantPorts } from "./ports";
 import { listingsYelpEnabled } from "./release";
 
 /** Read-only, bounded in time and size. Nothing here can change a place. */
@@ -79,7 +79,7 @@ const yelpBusinessSchema = z.object({
 /** Yelp's terms limit caching: the response is used for this check and never stored beyond its readings. */
 export async function readYelpBusiness(
   tenantId: string,
-  deps: { connection: (tenantId: string) => Promise<{ accessToken?: string; apiKey?: string } | null>; fetch: typeof fetch } = { connection: t => getConnection(t, "yelp"), fetch },
+  deps: { connection: (tenantId: string) => Promise<{ accessToken?: string; apiKey?: string } | null>; fetch: typeof fetch } = { connection: async t => (await listingsTenantPorts()).yelpConnection(t), fetch },
 ): Promise<unknown | null> {
   if (!listingsYelpEnabled()) return null;
   const connection = await deps.connection(tenantId);

@@ -7,6 +7,7 @@
 import { registerWorkspacePorts, type WorkspacePorts } from "@/lib/workspace-ports";
 import { workspacePortLoaders } from "@/server/workspace-ports";
 import { registerTenantPublishingPorts } from "@/platform/infra/tenant-publishing";
+import { registerListingsTenantPorts } from "@/products/listings-sync/ports";
 
 import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
 import { registerAutoPostWithdrawal } from "@/platform/ai-controls/runtime-ports";
@@ -39,3 +40,13 @@ registerCalendarBusyProviderRead(async (...args) => (await import("@/products/sc
 registerBookingRequestNotifier(async (booking) => (await import("@/server/needs-you/server")).notifyBookingRequestNow(booking));
 // A usage-controls hold withdraws reply timers already waiting; the tenant review code stays in src/lib.
 registerAutoPostWithdrawal(async (...args) => (await import("@/lib/reviews/auto-reply")).withdrawPendingAutoPosts(...args));
+
+// Listings in sync reads tenant addresses and the Yelp key through two small ports; the tenant model stays in src/lib.
+registerListingsTenantPorts(async () => ({
+  tenant: async tenantId => {
+    const config = await (await import("@/lib/tenants")).getTenantConfig(tenantId);
+    if (!config) return null;
+    return { id: config.id, deliveryModel: config.deliveryModel, customRepo: config.customRepo, publicUrl: (await import("@/lib/tenant-urls")).getTenantPublicUrl(config) };
+  },
+  yelpConnection: async tenantId => (await import("@/lib/connections")).getConnection(tenantId, "yelp"),
+}));
