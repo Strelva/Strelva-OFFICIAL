@@ -10,5 +10,15 @@ export function needsYouReleaseEnabled(environment: { STRELVA_NEEDS_YOU_RELEASE?
   return environment.STRELVA_NEEDS_YOU_RELEASE === "1";
 }
 
+/**
+ * STRELVA_ONE_APPROVAL_PATH (off by default): an emailed legacy or review link
+ * and a signed-in decision on a converted business's tenant event resolve
+ * through that business's Needs you item, so each decision lands as one
+ * owner_decisions record. Needs you itself must be released.
+ */
+export function oneApprovalPathEnabled(): boolean {
+  return process.env.STRELVA_ONE_APPROVAL_PATH === "1" && needsYouReleaseEnabled();
+}
+
 /** Connected-site published-fact observations: record only, off by default. */
 export const schemaConflictReleaseEnabled = () => process.env.STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE === "1";
