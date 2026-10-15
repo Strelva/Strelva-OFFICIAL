@@ -29,7 +29,8 @@ export interface ManualBookingPorts {
   notify: typeof notifyBookingRequestNow;
   updates: typeof deliverBookingUpdates;
 }
-const defaults: ManualBookingPorts = { enabled: manualBookingsEnabled, rpc: nativeRpc, services: nativeServices, slots: nativeSlots, bookings: readTenantBookings, notify: notifyBookingRequestNow, updates: deliverBookingUpdates };
+// Built per call, so importing this module reads none of its ports.
+const defaults = (): ManualBookingPorts => ({ enabled: manualBookingsEnabled, rpc: nativeRpc, services: nativeServices, slots: nativeSlots, bookings: readTenantBookings, notify: notifyBookingRequestNow, updates: deliverBookingUpdates });
 async function authorize(actor: WorkspaceActor, scope: z.infer<typeof manualBookingScope>, ports: ManualBookingPorts) {
   if (!await ports.enabled()) throw new PublicBookingError("unavailable", "Taking bookings here is not enabled. Nothing changed.");
   const bookingScope = resolveBookingScope(scope.workspaceId,scope.tenantId);
@@ -37,7 +38,7 @@ async function authorize(actor: WorkspaceActor, scope: z.infer<typeof manualBook
   if (bookingScope.startsWith("workspace:") && (context.workspaceId !== scope.workspaceId || !context.systemId)) throw new PublicBookingError("not_found","This business’s Bookings System is unavailable.");
   return { ...context, servicePolicies: bookingServicePoliciesEnabled() ? context.servicePolicies : undefined };
 }
-export async function manualBookingOptions(actor: WorkspaceActor, scope: z.infer<typeof manualBookingScope>, serviceId?: string, ports = defaults) {
+export async function manualBookingOptions(actor: WorkspaceActor, scope: z.infer<typeof manualBookingScope>, serviceId?: string, ports = defaults()) {
   const parsed=manualBookingScope.parse(scope);
   const bookingScope=resolveBookingScope(parsed.workspaceId,parsed.tenantId);
   const context=await authorize(actor, parsed, ports);
@@ -46,7 +47,7 @@ export async function manualBookingOptions(actor: WorkspaceActor, scope: z.infer
   const offered = serviceId && !context.paused ? await ports.slots(bookingScope, serviceId, from, to) : null;
   return { ...services, slots: offered?.slots.slice(0, 60) ?? [] };
 }
-export async function createManualBooking(actor: WorkspaceActor, raw: unknown, ports = defaults) {
+export async function createManualBooking(actor: WorkspaceActor, raw: unknown, ports = defaults()) {
   const input = manualBookingInput.parse(raw);
   const bookingScope=resolveBookingScope(input.workspaceId,input.tenantId);
   const context = await authorize(actor, { workspaceId: input.workspaceId, tenantId: bookingScope }, ports);
