@@ -1,4 +1,5 @@
 import { getSupabase } from "@/platform/infra/db/client";
+import { effectiveRequiredConnections } from "@/platform/app-releases/server";
 import { assertRequiredConnections } from "./required-connections";
 
 /** Governed inquiry execution retains an authenticated user's id in its
@@ -11,5 +12,5 @@ export async function assertInstalledInquiryConnections(userId: string, workspac
   const user = data?.user;
   if (error || user?.id !== userId || !user.email_confirmed_at || !user.email) throw new Error("Sign in to check this business's Connections before making it live.");
   await assertRequiredConnections({ actor: { userId, verifiedEmail: user.email }, workspaceId,
-    requiredConnections: [{ provider: "resend", access: "act", optional: false, purpose: "Send inquiry routing messages" }] });
+    requiredConnections: await effectiveRequiredConnections("inquiries", workspaceId) });
 }

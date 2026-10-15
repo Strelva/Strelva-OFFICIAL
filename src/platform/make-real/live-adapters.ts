@@ -2,6 +2,9 @@ import { z } from "zod";
 import type { DeclaredEffect, MakeRealChannel, Reversibility } from "@/platform/possibilities/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { EffectAdapter, EffectPerformResult } from "./ports";
+import { builtInAppForMakeRealChannel } from "@/platform/app-releases/catalog";
+import { effectiveRequiredConnections } from "@/platform/app-releases/server";
+import type { RequiredConnection } from "@/platform/connections/contracts";
 import { assertRequiredConnections } from "@/platform/system-versions/required-connections";
 
 /**
@@ -54,10 +57,15 @@ function base(channel: MakeRealChannel, ctx: LiveChannelContext | null, reversib
     async ready(input: { businessId: string }): Promise<{ ok: true } | { ok: false; reason: string }> {
       if (!ctx) return { ok: false, reason: `${CHANNEL_LABEL[channel]} is not connected for publishing yet.` };
       if (!(await ctx.enabled(channel))) return { ok: false, reason: `Publishing is not enabled for ${CHANNEL_LABEL[channel]} in this business yet.` };
-      if (channel === "inquiry_form" || channel === "internal_app") {
-        try { await assertRequiredConnections({ actor: ctx.actor, workspaceId: input.businessId,
-          requiredConnections: [{ provider: "resend", access: "act", optional: false, purpose: "Send System email to approved recipients" }] }); }
-        catch (error) { return { ok: false, reason: message(error, "Open Connections and check email sending before making it live.") }; }
+      const app = builtInAppForMakeRealChannel(channel);
+      if (app) {
+        let requirements: RequiredConnection[];
+        try { requirements = await effectiveRequiredConnections(app.id, input.businessId); }
+        catch { return { ok: false, reason: "Open Connections and retry checking this business's accounts before making it live." }; }
+        if (requirements.some(item => !item.optional)) {
+          try { await assertRequiredConnections({ actor: ctx.actor, workspaceId: input.businessId, requiredConnections: requirements }); }
+          catch (error) { return { ok: false, reason: message(error, "Open Connections and check email sending before making it live.") }; }
+        }
       }
       return { ok: true };
     },
