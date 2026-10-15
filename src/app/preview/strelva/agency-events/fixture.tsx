@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AgencyClientEvents } from "@/experience/workspace/agency/AgencyClientEvents";
 import { SelectInput } from "@/components/ui/TextInput";
 const agencyWorkspaceId = "28100000-0000-4000-8000-000000000020", workspaceId = "28100000-0000-4000-8000-000000000010";
@@ -24,18 +24,18 @@ function view(scenario: Scenario, extraEndpoints: unknown[], retried: boolean) {
 
 export function AgencyClientEventsFixture() {
  const [scenario, setScenario] = useState<Scenario>("healthy");
- const state = { extra: [] as unknown[], retried: false };
+ const state = useRef({ extra: [] as unknown[], retried: false });
  const request: typeof fetch = async (_input, init) => {
   if (scenario === "off") return Response.json({ error: "Events aren't turned on." }, { status: 503 });
   if (scenario === "error") return Response.json({}, { status: 500 });
   if (init?.method === "POST") {
    const body = JSON.parse(String(init.body));
-   if (body.action === "retry") { state.retried = true; return Response.json({ view: view(scenario, state.extra, true) }); }
+   if (body.action === "retry") { state.current.retried = true; return Response.json({ view: view(scenario, state.current.extra, true) }); }
    if (body.action === "create_webhook" || body.action === "rotate_webhook_secret") return Response.json({ view: {}, secret: "whsec_example_only" });
    return Response.json({ view: {} });
   }
-  return Response.json(view(scenario, state.extra, state.retried));
+  return Response.json(view(scenario, state.current.extra, state.current.retried));
  };
- return <div className="grid gap-8"><SelectInput label="Fixture state" value={scenario} onChange={event => setScenario(event.target.value as Scenario)} options={SCENARIOS.map(value => ({ value, label: value }))} />
+ return <div className="grid gap-8"><SelectInput label="Fixture state" value={scenario} onChange={event => { state.current = { extra: [], retried: false }; setScenario(event.target.value as Scenario); }} options={SCENARIOS.map(value => ({ value, label: value }))} />
   <AgencyClientEvents key={scenario} agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName="Fictional Buffalo client" request={request} /></div>;
 }
