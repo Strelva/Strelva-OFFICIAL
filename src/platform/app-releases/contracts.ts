@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requiredConnectionSchema, type RequiredConnection } from "@/platform/connections/contracts";
 import { RELEASE_FLAGS, type ReleaseFlag } from "@/platform/release-flags/resolve";
 import type { MakeRealChannel } from "@/platform/possibilities/contracts";
+import type { AppEventSubscription } from "@/platform/app-events/contracts";
 
 export const BUILT_IN_APP_IDS = ["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools"] as const;
 export type BuiltInAppId = (typeof BUILT_IN_APP_IDS)[number];
@@ -31,6 +32,8 @@ export interface BuiltInAppRelease {
   gates: readonly AppReleaseGate[];
   /** The full list for this Release, not a delta. [] means no outside accounts. */
   requiredConnections: readonly RequiredConnection[];
+  /** Events this Release handles. Full list, not a delta; absent means none. */
+  eventSubscriptions?: readonly AppEventSubscription[];
 }
 
 export interface BuiltInApp {

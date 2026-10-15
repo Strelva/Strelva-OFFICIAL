@@ -92,3 +92,28 @@ unchanged and honest. Bookings and Recaps list it as optional.
 
 `pnpm app-releases` prints the catalog; `pnpm app-releases --workspace <uuid>`
 prints where one business stands.
+
+## Events
+
+An App can react to what happens at a business: an inquiry arrives, a booking is
+made, a business detail is confirmed. Declare it on the Release that handles it,
+in `catalog.ts`:
+
+```ts
+eventSubscriptions: [{ event: "booking.made", handler: "stop_follow_ups", scope: "bookings" }],
+```
+
+`scope` must be the data area of the event (`APP_EVENT_SCOPE` in
+`src/platform/app-events/contracts.ts`); the catalog refuses a mismatch and a
+duplicate event and handler pair. Then register the handler at the app edge, in
+`src/server/app-events/handlers.ts`, with `registerAppEventHandler(appId, handler, run)`.
+A test fails if a Release declares a subscription that has no handler.
+
+A subscription is active only where that Release is reached and the `app_events`
+release flag is on for the business. Delivery is at least once, in order within
+one business, so a handler must be idempotent on `event.id`. Retries and set-aside
+events are in `src/platform/app-events/README.md`.
+
+Release lists are full lists. A subscription declared on Release 1 must be
+repeated on every later Release or it switches off when that Release is reached.
+The six 1.0 Apps declare none.

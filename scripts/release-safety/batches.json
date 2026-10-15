@@ -2488,6 +2488,26 @@
           "rollbackStatus": "Refuses when reconcile_website_system_releases changed later; with recorded code releases present it refuses unless sites_by_code.allow_drop = '1'."
         }
       ]
+    },
+    {
+      "id": "app-events-2026-10-15",
+      "status": "Held and unapplied. Per-business event outbox (capture off by default), delivery cursors, dead letters, webhook endpoints, agent read, and AFTER triggers on 13 existing tables. SQL fixture: scripts/check-app-events-sql.sh. No production, provider or flag change authorized.",
+      "items": [
+        {
+          "file": "20261028100000_app_events.sql",
+          "sha256": "70916590a46750c3babf8e0918ade58fd63718e6cad0842a36e7671fe3ed6fe1",
+          "rollback": "rollback-20261028100000_app_events.sql",
+          "rollbackSha256": "e9a3879656d2e441ef20ec5ab5982fefcdae7a464aa5c681dfe63c1e17e2a88f",
+          "rollbackStatus": "Run the sources rollback first. Refuses with app_events_rollback_has_data while events, dead letters or webhook endpoints exist unless app_events.allow_drop = '1', which also drops them; otherwise deletes the app_events flag rows and drops the outbox objects."
+        },
+        {
+          "file": "20261028100100_app_event_sources.sql",
+          "sha256": "029bad98991e9e83af7c62428cb9996d025c32ad4fa68d90cdf308deacf4e01f",
+          "rollback": "rollback-20261028100100_app_event_sources.sql",
+          "rollbackSha256": "86a83a5745e696664df495678bb94665ec690628017453c93febfb6531716f09",
+          "rollbackStatus": "Drops the 13 triggers and their functions; touches no data."
+        }
+      ]
     }
   ]
 }

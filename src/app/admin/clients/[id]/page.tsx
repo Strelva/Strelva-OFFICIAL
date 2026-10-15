@@ -30,6 +30,7 @@ import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { TenantEditor } from "./TenantEditor";
 import { OperatorControlsPanel } from "./OperatorControlsPanel";
 import { OperatorUsageControls } from "./OperatorUsageControls";
+import { OperatorEventDeliveries } from "./OperatorEventDeliveries";
 import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";
 import { OwnerInvitationsPanel } from "./OwnerInvitationsPanel";
 import { loadOwnerInvitations } from "@/platform/owner-entry/operator-invitations";
@@ -361,6 +362,7 @@ export default async function ClientDetailPage({
           }}
         />
         <OperatorUsageControls tenantId={tenant.id} />
+        <OperatorEventDeliveries tenantId={tenant.id} />
         <DomainView load={domainView} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />

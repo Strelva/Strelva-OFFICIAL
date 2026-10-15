@@ -667,6 +667,15 @@ A stored login or credential binding to an outside system, with its connection
 state. One kind of Connection; it never grants authority by itself.
 _Avoid_: Connection (as if all Connections were accounts), mandate, Assignment
 
+**Event**:
+Something that happened at a business, recorded in order with ids and states only.
+Apps and coding agents read Events; they carry no customer details.
+_Avoid_: activity, log entry, notification
+
+**Webhook**:
+An outside https address an agency or business registers to receive signed Events.
+_Avoid_: integration, callback
+
 **Inquiry message**:
 An email about one inquiry for one purpose.
 _Avoid_: action, notification, send attempt (as synonyms)

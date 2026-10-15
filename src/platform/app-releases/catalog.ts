@@ -1,6 +1,7 @@
 import type { MakeRealChannel } from "@/platform/possibilities/contracts";
 import { requiredConnectionSchema, type RequiredConnection } from "@/platform/connections/contracts";
 import type { ReleaseFlag } from "@/platform/release-flags/resolve";
+import { APP_EVENT_SCOPE, appEventSubscriptionSchema } from "@/platform/app-events/contracts";
 import {
   appReleaseGateSchema,
   BUILT_IN_APP_IDS,
@@ -202,6 +203,16 @@ export function assertBuiltInAppCatalog(apps: readonly BuiltInApp[] = BUILT_IN_A
       }
       for (const connection of release.requiredConnections) {
         if (!requiredConnectionSchema.safeParse(connection).success) throw new Error(`${where}: invalid required Connection.`);
+      }
+      const subscribed = new Set<string>();
+      for (const subscription of release.eventSubscriptions ?? []) {
+        if (!appEventSubscriptionSchema.safeParse(subscription).success) throw new Error(`${where}: invalid event subscription.`);
+        if (subscription.scope !== APP_EVENT_SCOPE[subscription.event]) {
+          throw new Error(`${where}: ${subscription.event} needs scope ${APP_EVENT_SCOPE[subscription.event]}.`);
+        }
+        const pair = `${subscription.event}/${subscription.handler}`;
+        if (subscribed.has(pair)) throw new Error(`${where}: duplicate event subscription ${pair}.`);
+        subscribed.add(pair);
       }
     });
   }

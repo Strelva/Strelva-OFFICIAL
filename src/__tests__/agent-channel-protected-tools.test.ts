@@ -7,6 +7,7 @@ vi.mock("@/platform/agent-channel/oauth", async original => ({
 vi.mock("@/platform/bookings/store", () => ({ readBookingContext: ports.context }));
 import { createAgentWebsiteAdapter } from "@/products/websites/agent-adapter";
 import type { AgentSiteChangePort } from "@/platform/agent-channel/site-change-tools";
+import type { AgentEventsPort } from "@/platform/agent-channel/event-tools";
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
 import { serveMcp, type McpServer } from "@/platform/agent-channel/protocol";
 import { assistantBusinessContext } from "@/platform/agent-channel/business-context";
@@ -36,6 +37,8 @@ const base: McpServer = {
 function server() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com")); }
 const siteChanges = { call: vi.fn() } satisfies AgentSiteChangePort;
 function serverWithSiteChanges() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com"), siteChanges); }
+const events = { list: vi.fn() } satisfies AgentEventsPort;
+function serverWithEvents() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com"), undefined, events); }
 function request(name: string, args: Record<string, unknown> = {}, authenticated = true) {
   return new Request("https://app.strelva.com/api/mcp/public", {
     method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2025-11-25",
@@ -218,5 +221,54 @@ describe("coding agent site Request tools", () => {
     const result = (await (await serveMcp(request("list_site_requests", { workspaceId }), serverWithSiteChanges())).json()).result;
     expect(result.isError).toBe(true);
     expect(siteChanges.call).not.toHaveBeenCalled();
+  });
+});
+describe("coding agent event tool", () => {
+  it("is absent without the port, and the surface does not change", () => {
+    expect(server().tools.map(t => t.name)).not.toContain("list_recent_events");
+    expect(server().instructions).not.toContain("list_recent_events");
+    expect(withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com"), undefined, undefined).tools).toEqual(server().tools);
+  });
+  it("is listed with the port as a read that names no business", () => {
+    const listed = serverWithEvents();
+    const tool = listed.tools.find(t => t.name === "list_recent_events")!;
+    expect(tool.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
+    expect(tool.inputSchema).not.toHaveProperty("oneOf");
+    expect(Object.keys(tool.inputSchema.properties as object)).toEqual(["after", "types", "limit"]);
+    expect(listed.instructions).toContain("call list_recent_events and continue with after");
+    expect(listed.tools.filter(t => t.name !== "list_recent_events")).toEqual(server().tools);
+  });
+  it("authorizes business:read with no business argument and passes the authority", async () => {
+    events.list.mockResolvedValue({ events: [], nextAfter: 0, lastSequence: 0, captureOn: true });
+    const result = (await (await serveMcp(request("list_recent_events", { after: 4, limit: 10 }), serverWithEvents())).json()).result;
+    expect(result.isError).toBe(false);
+    expect(ports.validate).toHaveBeenCalledWith(expect.any(Request), "business:read", undefined);
+    expect(events.list).toHaveBeenCalledWith({ after: 4, limit: 10 }, { tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/), resource: expect.any(String), workspaceId, agencyId: null });
+  });
+  it("lets an agency principal read", async () => {
+    ports.validate.mockResolvedValue({ userId, verifiedEmail: "staff@agency.example", workspaceId, agencyId: otherId });
+    events.list.mockResolvedValue({ events: [], nextAfter: 0, lastSequence: 0, captureOn: true });
+    const result = (await (await serveMcp(request("list_recent_events"), serverWithEvents())).json()).result;
+    expect(result.isError).toBe(false);
+    expect(events.list).toHaveBeenCalledWith({}, expect.objectContaining({ agencyId: otherId, workspaceId }));
+  });
+  it("challenges without authority and does not answer when the port is missing", async () => {
+    ports.validate.mockResolvedValue(null);
+    const challenged = await serveMcp(request("list_recent_events"), serverWithEvents());
+    expect(challenged.status).toBe(401);
+    expect(challenged.headers.get("www-authenticate")).toContain('scope="business:read"');
+    ports.validate.mockClear();
+    const missing = await serveMcp(request("list_recent_events"), server());
+    expect(JSON.stringify(await missing.json())).toContain("error");
+    expect(ports.validate).not.toHaveBeenCalled();
+  });
+  it("refuses extra arguments before the port is called, and maps errors to words", async () => {
+    events.list.mockClear();
+    expect((await (await serveMcp(request("list_recent_events", { workspaceId }), serverWithEvents())).json()).result.isError).toBe(true);
+    expect(events.list).not.toHaveBeenCalled();
+    events.list.mockRejectedValueOnce(new Error("app_events_off"));
+    expect(JSON.stringify((await (await serveMcp(request("list_recent_events"), serverWithEvents())).json()).result)).toContain("Events aren't turned on for this business.");
+    events.list.mockRejectedValueOnce(new Error("oauth_invalid_token"));
+    expect(JSON.stringify((await (await serveMcp(request("list_recent_events"), serverWithEvents())).json()).result)).toContain("could not be authorized or confirmed");
   });
 });
