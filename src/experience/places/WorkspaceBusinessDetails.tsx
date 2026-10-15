@@ -1,6 +1,7 @@
 import { PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { StPage, StHead, StSection, StRows, StRow, StNotice, StEmpty, StMono, StTextButton } from "@/components/ui/strelva/Kit";
 import { BusinessDetailsForm } from "./BusinessDetailsForm";
+import { ListingsSyncPanel } from "@/experience/listings-sync/ListingsSyncPanel";
 import { recordSource } from "./business-details-presentation";
 import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
 import type { RecordGoogleSummary } from "@/products/publishing/client";
@@ -23,6 +24,8 @@ export interface BusinessDetailsData {
   googleApprovalCopy?: string | null;
   publishing?: boolean;
   operator: boolean;
+  /** Listings in sync is on for this business. */
+  listings?: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
 }
@@ -42,7 +45,7 @@ const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
   owner_recipient: "Use a full email address. Strelva needs one to send your reports and alerts.",
 };
 
-export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action }: {
+export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action, listingsSync = false }: {
   workspaceId: string;
   state: PlaceState<BusinessDetailsData>;
   result?: DetailsSaveOutcome | null;
@@ -50,6 +53,8 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
   field?: EditableDetail | null;
   /** The server action; absent in previews and tests. */
   action?: (formData: FormData) => Promise<void>;
+  /** Show "Where your details appear". Off unless Listings in sync is on for this business. */
+  listingsSync?: boolean;
 }) {
   const data = state.kind === "ready" ? state.data : null;
   const workspaceHref = (view: string) => `/workspace?view=${view}&workspaceId=${encodeURIComponent(workspaceId)}`;
@@ -65,6 +70,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
     {data?.denied.length ? <StNotice>Your account can’t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
     {data ? <>
       <StSection id="business" title="About the business"><BusinessDetailsForm key={data.record.revision} record={data.record} workspaceId={workspaceId} readOnly={readOnly} approvalCopy={data.googleApprovalCopy} action={action} /></StSection>
+      {listingsSync ? <ListingsSyncPanel workspaceId={workspaceId} viewerIsOwner={data.record.access === "owner"} businessName={String((data.record.facts.display_name?.value as string | undefined) ?? "this business")} /> : null}
       <span id="notifications" />
       {remainingFacts.length ? <StSection title="Other recorded facts"><StRows>{remainingFacts.map(([key, fact]) => fact ? <StRow key={key} title={key.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase())} value={<StMono tone="text">{typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value)}</StMono>} detail={`${recordSource(fact.source)} · ${fact.verified ? "Confirmed" : "Not confirmed"}`} end="Usage not recorded" /> : null)}</StRows></StSection> : null}
       {data.publishing ? <StSection id="publishing-facts" title="Hours and website"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></StSection> : null}
