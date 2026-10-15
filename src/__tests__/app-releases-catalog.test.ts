@@ -31,11 +31,19 @@ describe("built-in App catalog", () => {
     expect(() => assertBuiltInAppCatalog()).not.toThrow();
   });
 
-  it("makes Release 1 the ungated 1.0.0 baseline for every App", () => {
+  it("makes Release 1 ungated, and the 1.0.0 baseline for every App shipped in 1.0.0", () => {
+    const ADDED_AFTER_1_0 = ["dental_intake"];
+    expect(BUILT_IN_APPS.map(item => item.id).slice(-1)).toEqual(["dental_intake"]);
     for (const item of BUILT_IN_APPS) {
       expect(item.releases[0]!.gates, item.id).toEqual([]);
-      expect(item.releases[0]!.shippedIn, item.id).toBe("1.0.0");
+      expect(item.releases[0]!.shippedIn, item.id).toBe(ADDED_AFTER_1_0.includes(item.id) ? null : "1.0.0");
     }
+    expect(builtInApp("dental_intake").availability).toContainEqual({ kind: "workspace_flag", flag: "vertical_intake" });
+  });
+
+  it("declares Dental intake as Release 1, held by its availability flag", () => {
+    expect(builtInAppReleaseLabel(builtInApp("dental_intake"), 1)).toBe("Dental intake Release 1");
+    expect(releasesGatedByFlag("vertical_intake")).toEqual([]);
   });
 
   it("labels Releases with GLOSSARY words", () => {
