@@ -78,7 +78,7 @@ function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {
 /** Queue: oldest first within each kind, with the client's own entrance. */
 export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork, complete = true }: { complete?: boolean; items: readonly AgencyQueueItem[]; now: number; onWorkspace: (workspaceId: string) => void; onOpenClientWork: (workspaceId: string, workId: string) => void }) {
   if (!items.length) return <StEmpty>{complete ? "Nothing is waiting across clients." : "Nothing is waiting in the loaded clients. The Queue is incomplete."}</StEmpty>;
-  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email", "owner_claim"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
+  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Client site work", kinds: ["client_site"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email", "owner_claim"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
   return <div className="space-y-8">{groups.map(group => {
     const rows = agencyQueueOrder(items.filter(item => group.kinds.includes(item.kind)));
     if (!rows.length) return null;

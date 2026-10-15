@@ -140,6 +140,7 @@ const QUEUE_KIND_LABEL: Record<AgencyQueueItem["kind"], string> = {
   health: "System health",
   owner_email: "Owner email",
   owner_claim: "Waiting for the business to claim",
+  client_site: "Client site work",
   operator: "Platform support",
 };
 
