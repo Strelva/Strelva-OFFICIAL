@@ -2317,6 +2317,19 @@
           "rollbackStatus": "Guarded inverse restores exact reader definitions and refuses later source, ACL, helper or caller changes. Local empty inverse/reapply and successor refusal verified; no customer rows removed. No production application authorized."
         }
       ]
+    },
+    {
+      "id": "connections-core-2026-10-14",
+      "status": "ADR 0016 core holder metadata and actor/area/binding authority. Held and unapplied; local TypeScript tests only. SQL execution is coordinator-owned. No flag, provider or production activation authorized.",
+      "items": [
+        {
+          "file": "20261026100000_conn_core_holders.sql",
+          "sha256": "44ab6cf4bfb6e9a7bd00787780ca1b88ec8443352ba83c28c22cc2fa6076de94",
+          "rollback": "rollback-20261026100000_conn_core_holders.sql",
+          "rollbackSha256": "3a85f7a7607cb0d05f9c68e51b3df81f851b7f0fa3730041e04e2eaf396863e2",
+          "rollbackStatus": "Held and unapplied. Guarded inverse preserves populated holders and refuses successor definitions/ACL/callers. Ordered disposable SQL, READ ONLY and inverse/reapply authored in scripts/check-conn-core-sql.sh; UNRUN in lane. Coordinator qualification required. No production authority."
+        }
+      ]
     }
   ]
 }

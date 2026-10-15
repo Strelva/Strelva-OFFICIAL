@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { connectionProviderSchema } from "@/platform/connections/contracts";
+import { readProviderAccess } from "@/platform/connections/access";
+import { connectionEligibilityFor } from "@/platform/connections/server";
+import { readConnectionHolders } from "@/platform/connections/holders";
 import { getSupabase } from "@/platform/infra/db/client";
 import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -164,6 +168,13 @@ function toRecord(value: z.infer<typeof sourceSchema>): SourceSystemRecord {
   return record;
 }
 
+async function assertConnectionBindings(actor: VersionActor, lineage: VersionLineage, db: VersionsDb): Promise<void> {
+  const ownership = createSupabaseConnectionOwnership(db);
+  for (const binding of lineage.bindings) {
+    if (await ownership.ownerOf(actor, binding.connectionId) !== lineage.version.businessId) throw new VersionAccessError();
+  }
+}
+
 export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
   const db = () => client ?? versionsDb();
   return {
@@ -220,10 +231,12 @@ export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
         z.string().nullable(), "The connection could not be checked.");
     },
     async insertLineage(actor, lineage) {
+      await assertConnectionBindings(actor, lineage, db());
       return call(db(), "create_system_version", { ...actorArgs(actor), p_lineage: lineage }, lineageSchema,
         "The Version could not be created.") as Promise<VersionLineage>;
     },
     async updateLineage(actor, lineage, expectedRowRevision) {
+      await assertConnectionBindings(actor, lineage, db());
       return call(db(), "save_system_version", {
         ...actorArgs(actor), p_version_id: uuid.parse(lineage.id), p_expected_row_revision: expectedRowRevision, p_lineage: lineage,
       }, lineageSchema, "The Version could not be saved.") as Promise<VersionLineage>;
@@ -231,12 +244,23 @@ export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
   };
 }
 
-/** Connection ownership from the database: `calendar:<id>` and `tenant:<stableId>` refs. */
+/** Business-scoped connections, including ADR 0016 provider refs and legacy calendar/tenant refs. */
 export function createSupabaseConnectionOwnership(client?: VersionsDb): ConnectionOwnership {
   return {
     async ownerOf(actor, connectionId) {
-      return call(client ?? versionsDb(), "read_system_version_connection_owner", { ...actorArgs(actor), p_connection_ref: connectionId },
+      const owner = await call(client ?? versionsDb(), "read_system_version_connection_owner", { ...actorArgs(actor), p_connection_ref: connectionId },
         uuid.nullable(), "The connection could not be checked.");
+      const provider = connectionProviderSchema.safeParse(connectionId.split(":")[0]);
+      if (!owner || !provider.success) return owner; // Existing calendar:/tenant: rules stay intact.
+      if (!actor.verifiedEmail) return null;
+      const workspaceActor = { userId: actor.userId, verifiedEmail: actor.verifiedEmail };
+      const eligibility = await connectionEligibilityFor(workspaceActor, { provider: provider.data, businessWorkspaceId: owner }, client ?? versionsDb());
+      if (!eligibility.eligible) return null;
+      const holders = (await readConnectionHolders(owner, client ?? versionsDb())).get(connectionId);
+      const access = readProviderAccess(provider.data);
+      if (!holders || holders.accountHolder.kind === "unknown" || holders.accessThrough.kind === "unknown") return null;
+      if (canonicalJson(holders.accessThrough) !== canonicalJson(access.through)) return null;
+      return owner;
     },
   };
 }

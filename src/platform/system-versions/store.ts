@@ -32,7 +32,11 @@ export interface VersionStore {
   recordQualification?(actor: VersionActor, qualification: RevisionQualification): Promise<RevisionQualification>;
 }
 
-/** Who owns a live connection. Lane-owned elsewhere; this is the port. */
+/**
+ * The business allowed to bind this ref: its own account, or an agency-held
+ * account scoped to it while the acting agency holds the required area.
+ * A source or sibling business's ref must never resolve as this business.
+ */
 export interface ConnectionOwnership {
   ownerOf(actor: VersionActor, connectionId: string): Promise<string | null>;
 }
