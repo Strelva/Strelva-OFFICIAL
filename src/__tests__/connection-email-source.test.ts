@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubAllProviderKeys } from "./helpers/provider-keys";
 import type { ProviderAccess } from "@/platform/connections/contracts";
 import { createEmailConnectionSource, type EmailConnectionSourceDependencies } from "@/platform/infra/email/connection-source";
 import type { EmailBusinessContext } from "@/platform/infra/email/business-context";
@@ -11,7 +12,17 @@ function fixture(extra: Partial<EmailConnectionSourceDependencies> = {}) {
   return { deps, source: createEmailConnectionSource(deps) };
 }
 
+beforeEach(() => stubAllProviderKeys());
+afterEach(() => vi.unstubAllEnvs());
+
 describe("Email Connections source", () => {
+  it("reports not_set_up when RESEND_API_KEY is missing", async () => {
+    vi.stubEnv("RESEND_API_KEY", "");
+    const { source } = fixture();
+    const [row] = await source.list({ workspaceId, access });
+    expect(row).toMatchObject({ state: "unavailable", unavailableReason: "not_set_up" });
+  });
+
   it("shows platform-held business email policy using existing scoped exclusions", async () => {
     const { source, deps } = fixture();
     expect(await source.list({ workspaceId, access })).toEqual([{

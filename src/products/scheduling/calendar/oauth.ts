@@ -3,6 +3,7 @@ import { getRedis } from "@/platform/infra/redis";
 import { calendarProviderSchema, type CalendarProvider } from "./contracts";
 import { CalendarProviderError } from "./adapters";
 import { revokeProviderAuthorization } from "@/platform/infra/provider-revocation";
+import { readProviderKeys } from "@/platform/connections/provider-keys";
 
 type State = { workspaceId: string; userId: string; provider: CalendarProvider; exp: number; nonce: string };
 type CalendarFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -68,6 +69,8 @@ function redirectUri(provider: CalendarProvider, appUrl: string): string {
 export function calendarOAuthConfiguration(provider: CalendarProvider, appUrl: string): { clientId: string; authorizationUrl: string; redirectUri: string; scopes: string[] } | null {
   const parsed = calendarProviderSchema.safeParse(provider);
   if (!parsed.success) return null;
+  // Every key the exchange later needs, so a missing secret fails here and not after the person has consented.
+  if (!readProviderKeys(parsed.data === "outlook" ? "outlook_calendar" : "google_calendar").ready) return null;
   const callback = redirectUri(parsed.data, appUrl);
   if (parsed.data === "outlook") {
     const clientId = process.env.MICROSOFT_CLIENT_ID;

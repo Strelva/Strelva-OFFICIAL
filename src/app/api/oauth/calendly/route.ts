@@ -1,4 +1,5 @@
 import { beginOAuthHolder } from "./connection-holder";
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
@@ -28,10 +29,11 @@ export async function GET() {
   const clientId = process.env.CALENDLY_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-  if (!clientId || !appUrl) {
+  // Missing keys are Strelva's to add, not a server fault: say so, and log the missing names once.
+  if (!providerKeyStatus("calendly").ready || !clientId || !appUrl) {
     return NextResponse.json(
-      { error: "OAuth not configured" },
-      { status: 500 }
+      { error: "Calendly isn't set up on Strelva yet." },
+      { status: 503 }
     );
   }
 

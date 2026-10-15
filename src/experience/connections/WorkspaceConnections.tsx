@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { StEmpty, StHead, StNotice, StPage, StRow, StRows, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { providerDefinition } from "@/platform/connections/providers";
 import type { WorkspaceConnection } from "@/platform/connections/contracts";
-import { accountSetupChoices, accountHolderLabel, connectionNextStep, connectionSetupHref, connectionsResponseSchema, type ConnectionsResponse } from "./model";
+import { accountSetupChoices, accountHolderLabel, connectionNextStep, connectionSetupHref, connectionsResponseSchema, unavailableStateLabel, type ConnectionsResponse } from "./model";
 
 type Read = { scope: string; state: "loading" } | { scope: string; state: "error" } | { scope: string; state: "permission" } | { scope: string; state: "ready"; data: ConnectionsResponse };
 export interface WorkspaceConnectionsProps {
@@ -47,7 +47,7 @@ export function WorkspaceConnections({ workspaceId, workspaceKind, workspaceName
         {canManage && accountSetupChoices(workspaceKind).some(provider => !current.data.connections.some(row => row.provider === provider) && !current.data.sourceErrors.includes(provider)) ? <StSection title="Add an account"><p className="text-sm text-gray-muted">Open setup to check availability and connect an account.</p><StRows label="Account setup">{accountSetupChoices(workspaceKind).filter(provider => !current.data.connections.some(row => row.provider === provider) && !current.data.sourceErrors.includes(provider)).map(provider => {
           const eligibility = current.data.providerEligibility?.[provider];
           const unavailable = eligibility && !eligibility.eligible ? eligibility : null;
-          return <StRow key={provider} title={providerDefinition(provider).label} detail={unavailable?.message} href={unavailable ? undefined : provider === "stripe" && workspaceKind === "agency" ? `/workspace/payment-links?${new URLSearchParams({ workspaceId })}` : connectionSetupHref({ provider }, workspaceId)} end={unavailable ? <StState kind="draft">Coming soon</StState> : "Open setup"} />;
+          return <StRow key={provider} title={providerDefinition(provider).label} detail={unavailable?.message} href={unavailable ? undefined : provider === "stripe" && workspaceKind === "agency" ? `/workspace/payment-links?${new URLSearchParams({ workspaceId })}` : connectionSetupHref({ provider }, workspaceId)} end={unavailable ? <StState kind="draft">{unavailableStateLabel(unavailable.reason, provider)}</StState> : "Open setup"} />;
         })}</StRows></StSection> : null}
         <p className="text-sm text-gray-muted">A Connection supplies an account. People & access controls who can act for this workspace.</p>
       </div>}
@@ -61,7 +61,7 @@ function ConnectionRow({ connection, workspaceId, workspaceKind, names, systems,
   const action = unavailable ? "Coming soon" : reconnect ? "Reconnect" : connection.state === "disconnected" ? "Connect" : "Manage";
   const states = { connected: "Connected", stale: "Needs reconnection", disconnected: "Disconnected", unavailable: "Unavailable" };
   const agency = connection.accessThrough.kind === "agency" ? names.get(connection.accessThrough.workspaceId) || "Agency name unavailable" : null;
-  return <StRow title={providerDefinition(connection.provider).label} detail={connection.accountLabel || "Account name not recorded"} align="start" end={<StState kind={unavailable || connection.state === "stale" ? "need" : connection.state === "connected" ? "live" : "draft"}>{unavailable ? "Coming soon" : states[connection.state]}</StState>}>
+  return <StRow title={providerDefinition(connection.provider).label} detail={connection.accountLabel || "Account name not recorded"} align="start" end={<StState kind={unavailable || connection.state === "stale" ? "need" : connection.state === "connected" ? "live" : "draft"}>{unavailable ? unavailableStateLabel(connection.unavailableReason, connection.provider) : states[connection.state]}</StState>}>
     <div className="space-y-3 text-sm">
       <p><span className="text-gray-muted">Whose account: </span>{accountHolderLabel(connection.accountHolder, workspaceId, workspaceKind, names)}</p>
       {connection.accessThrough.kind !== "platform" ? <p><span className="text-gray-muted">Access: </span>{agency ? `Through ${agency}’s ${connection.provider === "google_business_profile" ? "Google" : providerDefinition(connection.provider).label} access` : "Unknown"}</p> : null}

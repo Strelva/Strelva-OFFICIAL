@@ -1,7 +1,7 @@
 "use client";
 
 import { StField, StLabel, StNotice, StRow, StRows, StSection, StState, StTextButton } from "@/components/ui/strelva/Kit";
-import { accountHolderLabel, connectionNextStep } from "@/experience/connections/model";
+import { accountHolderLabel, connectionNextStep, unavailableStateLabel } from "@/experience/connections/model";
 import { listProviderDefinitions, providerDefinition } from "@/platform/connections/providers";
 import type { ConnectionProvider, ProviderEligibilityMap, RequiredConnection, WorkspaceConnection } from "@/platform/connections/contracts";
 
@@ -38,7 +38,7 @@ export function RequiredConnections({ requirements, read, workspaceId, retry, ho
       const unavailable = Boolean(denied || connection && (connection.state === "unavailable" || connection.unavailableReason));
       const reconnect = unknown || connection?.state === "stale" || connection?.state === "disconnected";
       const connected = !failed && !unavailable && connection?.state === "connected" && !unknown;
-      const state = failed ? "Could not check" : unavailable ? "Coming soon" : reconnect ? "Reconnect" : connected ? "Connected" : read.status !== "ready" ? "Not checked" : "Connect";
+      const state = failed ? "Could not check" : unavailable ? unavailableStateLabel(denied?.reason ?? connection?.unavailableReason ?? null, requirement.provider) : reconnect ? "Reconnect" : connected ? "Connected" : read.status !== "ready" ? "Not checked" : "Connect";
       return <StRow key={`${requirement.provider}:${requirement.access}:${index}`} title={`${provider.label}${requirement.optional ? " · optional" : ""}`} detail={<>
         <span>{requirement.purpose} · {requirement.access === "act" ? "Acts" : "Reads"}</span><br />
         <span>Whose account: {connection ? accountHolderLabel(connection.accountHolder, workspaceId, "customer", holderNames) : read.status === "ready" && !failed ? "Not connected" : "Not checked"}</span>

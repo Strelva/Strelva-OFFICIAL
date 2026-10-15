@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
+import { emitSetupPending, googleBusinessProfileApprovalPending, isSetupPendingError } from "./gbp-setup-pending";
 // Outside-write receipts (src/platform/operator-queue) through the port
 // src/lib declares (Strelva Reborn section 7).
 import { workspacePorts, type OutsideWriteReceiptsPort } from "./workspace-ports";
@@ -102,6 +103,8 @@ export interface PublishReplyResult {
   published: boolean;
   verified: boolean;
   evidence: string;
+  /** Only Google's pending approval stopped it: waiting, not failed. The draft stays pending. */
+  pendingSetup?: boolean;
 }
 
 /**
@@ -127,6 +130,12 @@ export async function publishReviewReply(
 ): Promise<PublishReplyResult> {
   const actor = options.actor ?? "strelva";
   const checkedAt = new Date().toISOString();
+
+  // Told Google's approval is pending: send nothing, write no receipt, raise no alarm.
+  if (googleBusinessProfileApprovalPending()) {
+    await emitSetupPending(tenantId, "review_reply", "google_access_pending");
+    return { published: false, verified: false, evidence: "google_access_pending", pendingSetup: true };
+  }
 
   // ── Scope check ────────────────────────────────────────────────────────────
   const grant = await getGoogleGrant(tenantId);
@@ -180,8 +189,13 @@ export async function publishReviewReply(
 
   if (!publishResult.ok) {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=publish_api_error status=${publishResult.status} body=${publishResult.body.slice(0, 200)}`;
-    await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     await recordReviewReplyReceipt({ tenantId, reviewId, replyText, actor, outcome: { kind: "rejected", detail: `Google answered ${publishResult.status}.` } });
+    // Google's API access is still pending: a gentle note, not a FAILED alert.
+    if (isSetupPendingError(publishResult.status, publishResult.body)) {
+      await emitSetupPending(tenantId, "review_reply", evidence);
+      return { published: false, verified: false, evidence, pendingSetup: true };
+    }
+    await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     return { published: false, verified: false, evidence };
   }
 
@@ -279,6 +293,12 @@ async function publishReceiptedReply(input: {
   }
   await admission?.settle(response.status).catch(() => {});
   if (!response.ok) {
+    const failureBody = await response.text().catch(() => "");
+    if (isSetupPendingError(response.status, failureBody)) {
+      try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: "Google API access pending. Nothing applied." }); } catch { /* Pending attempt blocks replay. */ }
+      await emitSetupPending(tenantId, "review_reply", `status=${response.status}`);
+      return { published: false, verified: false, evidence: "Google API access is pending. Nothing applied.", pendingSetup: true };
+    }
     const acceptance = input.beforeDispatch && response.status >= 500 ? "unknown" : "rejected";
     try { await port.completeGoogleWrite(attemptId, { ...base, acceptance, acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
     return { published: false, verified: false, evidence: acceptance === "unknown" ? "Google acceptance uncertain. Reconcile before any resend." : `Google rejected the reply (${response.status}).` };

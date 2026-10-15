@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
 import { calendarConnectionInputSchema, calendarProviderSchema, outlookCalendarConsentAction } from "@/products/scheduling/contracts";
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
     const workspaceId = z.string().uuid().parse(query.get("workspaceId"));
     const provider = query.get("provider");
     if (query.get("list") === "1" && provider) return workspaceJson({ calendars: await listWorkspaceProviderCalendars(actor, workspaceId, provider) });
-    return workspaceJson({ connections: await listWorkspaceCalendarConnections(actor, workspaceId) });
+    const connections = await listWorkspaceCalendarConnections(actor, workspaceId);
+    // `ready` only; the panel never learns which keys are missing.
+    return workspaceJson({ connections, setup: { google: providerKeyStatus("google_calendar").ready, outlook: providerKeyStatus("outlook_calendar").ready } });
   } catch (error) {
     return workspaceHttpFailure(error);
   }

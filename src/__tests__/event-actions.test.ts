@@ -586,6 +586,16 @@ describe("resolveEventAction", () => {
     expect(mockResolveEvent).not.toHaveBeenCalled();
   });
 
+  it("leaves a review reply pending, as waiting on Google, while Google access is pending", async () => {
+    mockGetEvent.mockResolvedValue(reviewDraft());
+    mockPublishReviewReply.mockResolvedValue({ published: false, pendingSetup: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "google_access_pending" });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
   it("dismisses a review reply draft without publishing to Google", async () => {
     mockGetEvent.mockResolvedValue(reviewDraft());
     mockResolveEvent.mockResolvedValue({ changed: true });

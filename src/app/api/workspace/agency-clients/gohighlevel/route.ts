@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { disconnectGhlAgency, ghlImportReleaseEnabled, GhlImportError, readGhlConnection, readGhlImportRows } from "@/products/agency-clients/server";
+import { disconnectGhlAgency, ghlImportReleaseEnabled, ghlSetupReady, GhlImportError, readGhlConnection, readGhlImportRows } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 // A large agency is a few hundred paced HighLevel reads.
@@ -27,7 +27,8 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const input = query.parse(Object.fromEntries(url.searchParams));
     const connection = await readGhlConnection(actor, input.workspaceId);
-    if (!input.rows) return workspaceJson({ connection });
+    // `ready` only: the page never learns which keys are missing.
+    if (!input.rows) return workspaceJson({ connection, setup: { ready: ghlSetupReady() } });
     if (await isRateLimitedWindowedAsync(`workspace:agency-ghl-rows:${input.workspaceId}`, 6, 60_000)) return workspaceJson({ error: "Please wait a minute before reading HighLevel again." }, 429);
     return workspaceJson({ connection, source: "gohighlevel", rows: await readGhlImportRows(actor, input.workspaceId) });
   } catch (error) {

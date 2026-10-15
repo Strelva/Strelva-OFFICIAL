@@ -36,6 +36,10 @@ describe("required Connections before a System goes live", () => {
   it("preserves provider's plain next step and rejects connected but ineligible accounts", async () => {
     await expect(assertRequiredConnections(input, port([row], { eligible: false, reason: "area_not_granted", message: "Give your agency the Google area." }))).rejects.toThrow("Give your agency the Google area.");
   });
+  it("says plainly when Strelva has not set the provider up", async () => {
+    await expect(assertRequiredConnections(input, port([row], { eligible: false, reason: "not_set_up", message: "Google Business Profile isn't set up on Strelva yet." })))
+      .rejects.toThrow("Google Business Profile isn't set up on Strelva yet.");
+  });
   it("requires agency access to match the eligible agency, without a preferred-agency path", async () => {
     const agencyRow: WorkspaceConnection = { ...row, accountHolder: { kind: "agency", workspaceId: agencyId }, accessThrough: { kind: "agency", workspaceId: agencyId } };
     await expect(assertRequiredConnections(input, port([agencyRow], { eligible: true, through: { kind: "agency", workspaceId: agencyId } }))).resolves.toBeUndefined();

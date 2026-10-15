@@ -1,3 +1,4 @@
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 /**
@@ -23,11 +24,16 @@ export function ghlImportReleaseEnabled(
   return workspaceReleaseEnabled() && environment.STRELVA_GHL_IMPORT_RELEASE === "1";
 }
 
-/** Placeholder env names. No value exists anywhere yet; Jacob creates the Marketplace app first. */
+/** Env names for the Marketplace app's keys. Where to get them: docs/operations/integration-keys.md. */
 export const GHL_ENV = {
   clientId: "HIGHLEVEL_CLIENT_ID",
   clientSecret: "HIGHLEVEL_CLIENT_SECRET",
 } as const;
+
+/** Has Strelva added every key HighLevel needs? Names are logged once per process; the page never sees them. */
+export function ghlSetupReady(env: Record<string, string | undefined> = process.env): boolean {
+  return providerKeyStatus("highlevel", env).ready;
+}
 
 export function ghlClientCredentials(env: NodeJS.ProcessEnv = process.env): { clientId: string; clientSecret: string } | null {
   const clientId = env[GHL_ENV.clientId]?.trim();

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
-import { getConnection, updateLastSynced } from "@/lib/connections";
+import { getConnection, saveConnectionMutation, updateLastSynced } from "@/lib/connections";
+import type { Connection } from "@/lib/types";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/platform/infra/redis";
@@ -36,11 +37,16 @@ function seenReviewsKey(tenantId: string): string {
   return `yelp:seenReviews:${tenantId}`;
 }
 
+/** Carries Yelp's status so the poll can tell a dead key from a bad day. */
+class YelpApiError extends Error {
+  constructor(readonly status: number) { super(`Yelp API error: ${status}`); }
+}
+
 async function fetchYelpReviews(apiKey: string, businessId: string): Promise<YelpReview[]> {
   const res = await fetch(`${YELP_API_BASE}/businesses/${businessId}/reviews?limit=20&sort_by=date`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  if (!res.ok) throw new Error(`Yelp API error: ${res.status}`);
+  if (!res.ok) throw new YelpApiError(res.status);
   const data: YelpReviewsResponse = await res.json();
   return data.reviews;
 }
@@ -58,15 +64,22 @@ export async function GET(request: Request) {
   const errors: string[] = [];
 
 await mapPool(active, 8, async (tenant) => {
+    let connection: Connection | null = null;
     try {
-      const connection = await getConnection(tenant.id, "yelp");
-      if (!connection || connection.status !== "connected") return;
+      connection = await getConnection(tenant.id, "yelp");
+      // An "error" connection is still polled, so it can recover; a dead key (needs_reauth) waits for the owner.
+      if (!connection || (connection.status !== "connected" && connection.status !== "error")) return;
 
       const apiKey = connection.accessToken;
       const businessId = connection.apiKey;
       if (!apiKey || !businessId) return;
 
       const reviews = await fetchYelpReviews(apiKey, businessId);
+      // Yelp answered again: a connection marked "error" by a bad day is healthy.
+      if (connection.status === "error") {
+        await saveConnectionMutation(connection, { status: "connected" }, new Date().toISOString()).catch((err) =>
+          console.error(`[poll-yelp] Could not restore ${tenant.id}:`, err));
+      }
       if (reviews.length === 0) return;
 
       // Set-based dedup (matches Google) — membership, not order. The old
@@ -142,6 +155,15 @@ await mapPool(active, 8, async (tenant) => {
       totalNew += newReviews.length;
       results.push({ tenant: tenant.id, newReviews: newReviews.length });
     } catch (err) {
+      // A refused key shows "Needs reconnect"; a Yelp outage or rate limit shows "error" and heals itself.
+      if (connection && err instanceof YelpApiError) {
+        const next = err.status === 401 || err.status === 403 ? "needs_reauth" as const
+          : (err.status === 429 || err.status >= 500) && connection.status === "connected" ? "error" as const : null;
+        if (next) {
+          await saveConnectionMutation(connection, { status: next }, new Date().toISOString()).catch((saveErr) =>
+            console.error(`[poll-yelp] Could not mark ${tenant.id} ${next}:`, saveErr));
+        }
+      }
       const msg = `${tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`;
       console.error(`[poll-yelp] Failed for tenant ${tenant.id}:`, err);
       errors.push(msg);

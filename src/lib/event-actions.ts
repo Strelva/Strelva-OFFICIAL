@@ -588,7 +588,7 @@ async function executeResolvedEventAction(
         if (!authority) return { changed: false, reason: "review_reply_needs_owner" };
         const posted = await postTenantReviewReply({ tenantId, workspaceId: route.workspaceId, eventId, attemptId, reviewId, text: replyText, authority }, deps);
         if (posted.status === "write_unconfirmed") return { changed: false, reason: "google_write_unconfirmed" };
-        if (posted.status === "failed" || posted.status === "refused") return { changed: false, reason: "review_reply_failed" };
+        if (posted.status === "failed" || posted.status === "refused") return { changed: false, reason: posted.status === "failed" && posted.reason === "google_access_pending" ? "google_access_pending" : "review_reply_failed" };
         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
       } else {
         const { publishReviewReply } = await import("./gbp-replies");
@@ -598,7 +598,7 @@ async function executeResolvedEventAction(
             return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
               ledger: "legacy", ledgerId, request: { reviewId, reply: replyText, providerTarget } });
           } } : {}) });
-        if (!result.published) return { changed: false, reason: "review_reply_failed" };
+        if (!result.published) return { changed: false, reason: result.pendingSetup ? "google_access_pending" : "review_reply_failed" };
       }
       // Reply accepted by Google — mark acceptance before resolving so a lost
       // lock / crash can't let a retry re-post it.

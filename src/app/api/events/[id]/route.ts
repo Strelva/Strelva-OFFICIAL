@@ -45,6 +45,9 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
+    // Google has not approved Strelva's Business Profile access yet: the draft stays pending.
+    if (result.reason === "google_access_pending") return NextResponse.json({ success: true, changed: false, waiting: "google" });
+
     return NextResponse.json({ success: true, changed: result.changed });
   } catch (error) {
     if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {

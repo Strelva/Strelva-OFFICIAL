@@ -56,7 +56,18 @@ describe("calendar connection HTTP boundary", () => {
     mocks.list.mockResolvedValue([{ provider: "outlook", status: "connected", calendarId: "calendar-1", calendarName: "Operations", timeZone: "America/New_York" }]);
     const response = await GET(new Request(`https://workspace.test/api/workspace/calendar-connections?workspaceId=${workspaceId}`));
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ connections: [{ provider: "outlook", status: "connected", calendarId: "calendar-1", calendarName: "Operations", timeZone: "America/New_York" }] });
+    expect(await response.json()).toMatchObject({ connections: [{ provider: "outlook", status: "connected", calendarId: "calendar-1", calendarName: "Operations", timeZone: "America/New_York" }] });
+  });
+
+  it("reports which calendar providers Strelva has set up, never which keys are missing", async () => {
+    mocks.actor.mockResolvedValue(actor); mocks.list.mockResolvedValue([]);
+    const url = `https://workspace.test/api/workspace/calendar-connections?workspaceId=${workspaceId}`;
+    expect(await (await GET(new Request(url))).json()).toMatchObject({ setup: { google: false, outlook: false } });
+    vi.stubEnv("MICROSOFT_CLIENT_ID", "id"); vi.stubEnv("MICROSOFT_CLIENT_SECRET", "outlook-secret-value");
+    vi.stubEnv("OAUTH_STATE_SECRET", "s"); vi.stubEnv("APP_URL", "https://workspace.test");
+    const body = await (await GET(new Request(url))).json();
+    expect(body.setup).toEqual({ google: false, outlook: true });
+    expect(JSON.stringify(body)).not.toContain("outlook-secret-value");
   });
 
   it("lists calendars only after an explicit provider discovery request", async () => {

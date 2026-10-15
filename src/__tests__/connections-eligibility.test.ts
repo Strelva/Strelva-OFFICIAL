@@ -55,6 +55,21 @@ describe("providerEligibility", () => {
     expect(await providerEligibility({ ...base, access: { ...agencyHeldGoogle, through: { kind: "unknown" } } })).toMatchObject({ reason: "not_configured" });
   });
 
+  it("says not set up when Strelva lacks the provider's keys", async () => {
+    const keys = { ready: false as const, missing: ["HIGHLEVEL_CLIENT_ID"] };
+    const base = { businessWorkspaceId: client, actingAgencyWorkspaceId: null, agencyHoldsArea: vi.fn(), keys };
+    expect(await providerEligibility({ ...base, access: { provider: "highlevel", through: { kind: "platform" }, approval: "not_required" } }))
+      .toEqual({ eligible: false, reason: "not_set_up", message: "HighLevel isn't set up on Strelva yet." });
+    expect(await providerEligibility({ ...base, access: agencyHeldGoogle })).toMatchObject({ reason: "not_set_up" });
+    // Deliberately off still wins over missing keys.
+    expect(await providerEligibility({ ...base, access: { ...agencyHeldGoogle, through: { kind: "unknown" } } })).toMatchObject({ reason: "not_configured" });
+  });
+
+  it("names who must approve while approval is pending", async () => {
+    const result = await providerEligibility({ access: { ...agencyHeldGoogle, approval: "pending" }, businessWorkspaceId: client, actingAgencyWorkspaceId: null, agencyHoldsArea: vi.fn(), keys: { ready: true } });
+    expect(result).toEqual({ eligible: false, reason: "approval_pending", message: "Google Business Profile is waiting on Google's approval." });
+  });
+
   it("refuses agency access for a provider that only runs through the platform", async () => {
     const result = await providerEligibility({ access: { provider: "google_calendar", through: { kind: "agency", workspaceId: strelvaAgency }, approval: "approved" }, businessWorkspaceId: client, actingAgencyWorkspaceId: strelvaAgency, agencyHoldsArea: vi.fn().mockResolvedValue(true) });
     expect(result).toMatchObject({ eligible: false, reason: "not_configured" });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubAllProviderKeys } from "./helpers/provider-keys";
 import type { ConnectionProvider, ConnectionSource, WorkspaceConnection } from "@/platform/connections/contracts";
 
 const f = vi.hoisted(() => ({ rows: new Map<string, WorkspaceConnection[]>(), failed: new Set<string>(), reads: vi.fn() }));
@@ -10,7 +11,7 @@ function source(provider: ConnectionProvider): ConnectionSource {
   } };
 }
 vi.mock("@/products/google-listing/server", () => ({ googleBusinessProfileConnectionSource: () => source("google_business_profile") }));
-vi.mock("@/products/scheduling/server", () => ({ googleCalendarConnectionSource: () => source("google_calendar") }));
+vi.mock("@/products/scheduling/server", () => ({ googleCalendarConnectionSource: () => source("google_calendar"), outlookCalendarConnectionSource: () => source("outlook_calendar") }));
 vi.mock("@/app/api/oauth/calendly/connection-source", () => ({ calendlyConnectionSource: source("calendly") }));
 vi.mock("@/products/agency-clients/server", () => ({ ghlConnectionSource: source("highlevel") }));
 vi.mock("@/products/connected-sites/server", () => ({ connectedSiteConnectionSource: source("connected_site") }));
@@ -37,6 +38,7 @@ function fixtureRow(provider: ConnectionProvider): WorkspaceConnection {
     accountHolder: { kind: "unknown" }, accessThrough: { kind: "unknown" }, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] };
 }
 beforeEach(() => {
+  stubAllProviderKeys();
   vi.clearAllMocks(); f.rows.clear(); f.failed.clear(); acting = agency; area = true; recorded = true;
   registerProductConnectionSources();
   vi.stubEnv("STRELVA_CONNECTION_ACCESS_GOOGLE_BUSINESS_PROFILE", `agency:${agency}`);
@@ -53,7 +55,7 @@ beforeEach(() => {
 afterEach(() => { setConnectionsDb(null); vi.unstubAllEnvs(); });
 
 describe("registered Connections composed with real admission and live gate", () => {
-  it("registers exactly the eight product sources idempotently without reading accounts", () => {
+  it("registers exactly the nine product sources idempotently without reading accounts", () => {
     registerProductConnectionSources();
     expect(listConnectionSources().map(item => item.provider)).toEqual([...CONNECTION_PROVIDERS]);
     expect(f.reads).not.toHaveBeenCalled();
@@ -61,7 +63,7 @@ describe("registered Connections composed with real admission and live gate", ()
   it("composes every source, records whose account, and isolates a failed source", async () => {
     const result = await listWorkspaceConnections(actor, business);
     expect(result.sourceErrors).toEqual([]);
-    expect(result.connections).toHaveLength(8);
+    expect(result.connections).toHaveLength(9);
     expect(new Set(f.reads.mock.calls.map(call => call[0]))).toEqual(new Set(CONNECTION_PROVIDERS));
     const google = result.connections.find(row => row.provider === "google_business_profile")!;
     expect(google).toMatchObject({ state: "connected", accountHolder: { kind: "agency", workspaceId: agency }, accessThrough: { kind: "agency", workspaceId: agency } });
@@ -69,7 +71,7 @@ describe("registered Connections composed with real admission and live gate", ()
     f.failed.add("calendly");
     const partial = await listWorkspaceConnections(actor, business);
     expect(partial.sourceErrors).toEqual(["calendly"]);
-    expect(partial.connections).toHaveLength(7);
+    expect(partial.connections).toHaveLength(8);
     recorded = false;
     expect((await listWorkspaceConnections(actor, business)).connections.every(row => row.accountHolder.kind === "unknown" && row.state === "stale")).toBe(true);
   });

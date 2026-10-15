@@ -74,7 +74,7 @@ import { AUTO_REPLY_ACTOR, agencyStaffActorId, isDelegateActor, isOperatorActor,
 const WORKSPACE = "ab000000-0000-4000-8000-000000000010";
 const ok = <T,>(data: T): GoogleResult<T> => ({ ok: true, data });
 
-function fakeGoogle(options: { readbackFails?: boolean; refuse?: boolean; rating?: GoogleReview["starRating"] } = {}) {
+function fakeGoogle(options: { readbackFails?: boolean; refuse?: boolean; pending?: boolean; rating?: GoogleReview["starRating"] } = {}) {
   const review: GoogleReview = { reviewId: "rev_9", starRating: options.rating ?? "FIVE", comment: "Great" };
   const writes: string[] = [];
   let reads = 0;
@@ -86,6 +86,7 @@ function fakeGoogle(options: { readbackFails?: boolean; refuse?: boolean; rating
       return ok({ ...review });
     }),
     updateReply: vi.fn(async (_loc: unknown, _id: string, comment: string) => {
+      if (options.pending) return { ok: false, kind: "setup_pending", status: 403, detail: "accessnotconfigured" } as const;
       if (options.refuse) return { ok: false, kind: "error", status: 400, detail: "bad request" } as const;
       writes.push(comment);
       review.reviewReply = { comment };
@@ -184,6 +185,16 @@ describe("review reply approve on the listing System", () => {
     expect(mockMark).not.toHaveBeenCalled();
     expect(mockResolveEvent).not.toHaveBeenCalled();
     expect(mockRecordOutsideWrite).not.toHaveBeenCalled();
+  });
+
+  it("reports Google access pending as waiting, with no failure ping to Slack", async () => {
+    const { receipts, google } = setup({}, fakeGoogle({ pending: true }));
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved", "owner-user-1");
+    expect(result).toEqual({ changed: false, reason: "google_access_pending" });
+    expect(receipts.all()).toEqual([expect.objectContaining({ status: "failed" })]);
+    expect(vi.mocked(deps.notify).mock.calls.some(([text]) => String(text).includes("FAILED"))).toBe(false);
+    expect(google.writes).toEqual([]);
+    expect(mockResolveEvent).not.toHaveBeenCalled();
   });
 
   it("sends nothing and records nothing when the grant is gone", async () => {

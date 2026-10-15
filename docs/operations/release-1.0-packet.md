@@ -1414,7 +1414,7 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 | `STRELVA_WEBSITE_REBUILD_RELEASE` | Website rebuild, v2 documents, health and domain alerts | off | `workspace`, `1` | Yes: per business; a converted site follows its business (needs batch 4); public hosted pages never count as operators | batch 2; `VERCEL_API_TOKEN` | unset |
 | `STRELVA_NEEDS_YOU_RELEASE` | Needs you and What changed; hourly cron does work for every business (step 16a) | off (cron heartbeat only, routes 503) | `1` | No | batches 3, 6–7 and 7A's neutral service actor; S11; step 16a | unset |
 | `STRELVA_PUBLISHING_RELEASE` | Listing and newsletter Systems, Connect Google | off | `1` | No; shows inside Systems | batch 3, S8 | unset |
-| `STRELVA_GOOGLE_BINDINGS` | Read the Postgres Google binding first, fall back to Redis (counted daily in `reb:google-binding:fallback:*`); OAuth callback writes both | off (Redis only) | `1` | No | batch 3, `SECRETS_ENC_KEY`, S8 | unset |
+| `STRELVA_GOOGLE_BINDINGS` | Read the Postgres Google binding first, fall back to Redis (counted daily in `reb:google-binding:fallback:*`); OAuth callback writes both | off (Redis only) | `1` | No | batch 3, `SECRETS_ENC_KEY`, S8, and the client-records cutover: `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1`, `DUAL_WRITE_PG` not `0`, `STRELVA_CLIENT_RECORDS_READ` including `provider_connections` and `provider_metadata`. Without them every Google reconnect fails ("Google reconnect persistence is unavailable."). Check: `npx tsx scripts/google-bindings-readiness.ts` | unset |
 | `STRELVA_BUSINESS_BILLING` | `workspaceId` on new checkout metadata; webhook copies payment status to the business | off | `1` | No | batch 4 | unset |
 | `STRELVA_CLIENT_RECORDS_DUAL_WRITE` | Copy Redis client stores to `tenant_client_records`; the daily `client-records-parity` cron records parity | off | `1` (and `DUAL_WRITE_PG` not `0`) | No | batch 3 | unset |
 | `STRELVA_CLIENT_RECORDS_READ` | Read a store from Postgres, only after a 7-day parity streak | empty | comma list of `spam_held`, `inquiry_timeline`, `inquiry_reply`, `booking_config`, `account_grouping` | Per store | batch 3, S3 | remove the store |
@@ -1481,8 +1481,12 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
    `operators`, gldf `operators`, Jacob walks every page, then `on`. For the
    agency library, set the Strelva agency workspace's `systems` row with S10.
 6. `STRELVA_BUSINESS_BILLING=1`, then S7.
-7. After S8: `STRELVA_GOOGLE_BINDINGS=1`; after 30 days with zero fallbacks,
-   `STRELVA_PUBLISHING_RELEASE=1`.
+7. After S8 and the client-records cutover for `provider_connections` and
+   `provider_metadata` (`STRELVA_CLIENT_RECORDS_DUAL_WRITE=1`, `DUAL_WRITE_PG`
+   not `0`, both stores in `STRELVA_CLIENT_RECORDS_READ`): run
+   `npx tsx scripts/google-bindings-readiness.ts` and read it; then
+   `STRELVA_GOOGLE_BINDINGS=1`. After 30 days with zero fallbacks (the same
+   command counts them), `STRELVA_PUBLISHING_RELEASE=1`.
 8. `STRELVA_NEEDS_YOU_RELEASE=1`, only after `needs-you-parity` is clean
    and S11 has seeded each converted tenant's policies. From then the
    hourly chase opens items as "Strelva (system)" for every business,

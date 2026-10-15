@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), eligibility: vi.fn(), tables: {} as Record<string, unknown> }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), eligibility: vi.fn(), tables: {} as Record<string, unknown>, connect: vi.fn() }));
+vi.mock("@/products/agency-clients/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/products/agency-clients/server")>()), connectGhlAgency: mocks.connect }));
 vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: mocks.eligibility }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("APP_URL", ORIGIN);
   vi.stubEnv("INTERNAL_API_SECRET", "ghl-route-test-secret");
+  vi.stubEnv("SECRETS_ENC_KEY", "ghl-route-test-enc-key");
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -61,9 +63,48 @@ describe("GoHighLevel import routes", () => {
   describe("with the flag on", () => {
     beforeEach(() => vi.stubEnv("STRELVA_GHL_IMPORT_RELEASE", "1"));
 
-    it("refuses to start without Marketplace app credentials", async () => {
+    it("sends an agency without Marketplace app credentials back to the import page, never to JSON", async () => {
       const response = await start(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth?workspaceId=${AGENCY}`));
-      expect(response.status).toBe(503);
+      expect(response.status).toBe(307);
+      const target = new URL(response.headers.get("location")!);
+      expect(target.pathname).toBe("/workspace/agency/clients/import");
+      expect(target.searchParams.get("workspaceId")).toBe(AGENCY);
+      expect(target.searchParams.get("highlevelError")).toMatch(/isn't set up on Strelva yet/);
+      expect(response.headers.get("set-cookie")).toBeNull();
+    });
+
+    it("reports setup readiness, and only readiness, on the read route", async () => {
+      const url = `${ORIGIN}/api/workspace/agency-clients/gohighlevel?workspaceId=${AGENCY}`;
+      expect(await (await read(new Request(url))).json()).toMatchObject({ setup: { ready: false } });
+      vi.stubEnv("HIGHLEVEL_CLIENT_ID", "fixture-client");
+      vi.stubEnv("HIGHLEVEL_CLIENT_SECRET", "fixture-secret");
+      const body = await (await read(new Request(url))).json();
+      expect(body.setup).toEqual({ ready: true });
+      expect(JSON.stringify(body)).not.toContain("fixture-secret");
+    });
+
+    it("sends a finished callback to the import page marked connected", async () => {
+      mocks.connect.mockResolvedValue(undefined);
+      const state = createGhlOAuthState({ workspaceId: AGENCY, userId: USER });
+      const response = await callback(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth/callback?code=c&state=${encodeURIComponent(state)}`));
+      const target = new URL(response.headers.get("location")!);
+      expect(mocks.connect).toHaveBeenCalledTimes(1);
+      expect(target.pathname).toBe("/workspace/agency/clients/import");
+      expect(target.searchParams.get("workspaceId")).toBe(AGENCY);
+      expect(target.searchParams.get("highlevel")).toBe("connected");
+      expect(target.searchParams.get("highlevelError")).toBeNull();
+      expect(target.searchParams.get("source")).toBe("highlevel");
+    });
+
+    it("sends a failed token exchange to the import page with an error, not connected", async () => {
+      mocks.connect.mockRejectedValue(new Error("exchange failed"));
+      const state = createGhlOAuthState({ workspaceId: AGENCY, userId: USER });
+      const response = await callback(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth/callback?code=c&state=${encodeURIComponent(state)}`));
+      const target = new URL(response.headers.get("location")!);
+      expect(target.pathname).toBe("/workspace/agency/clients/import");
+      expect(target.searchParams.get("workspaceId")).toBe(AGENCY);
+      expect(target.searchParams.get("highlevelError")).toBeTruthy();
+      expect(target.searchParams.get("highlevel")).toBeNull();
     });
 
     it("refuses consent when provider access is unavailable, even with the release and credentials on", async () => {

@@ -1,10 +1,12 @@
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { stubAllProviderKeys } from "./helpers/provider-keys";
 import { createSupabaseConnectionOwnership, type VersionsDb } from "@/platform/system-versions/supabase-store";
 const business = "b1000000-0000-4000-8000-000000000001";
 const agency = "b1000000-0000-4000-8000-000000000002";
 const actor = { userId: "b1000000-0000-4000-8000-000000000003", verifiedEmail: "owner@example.test", memberships: [{ businessId: business, role: "owner" as const }] };
 const db: VersionsDb = { rpc: async () => ({ data: business, error: null }) };
 const ref = "google_business_profile:location1";
+beforeEach(() => stubAllProviderKeys());
 afterEach(() => { vi.unstubAllEnvs(); });
 it("preserves legacy calendar/tenant ownership without widening their owner", async () => {
   const ownership = createSupabaseConnectionOwnership(db);

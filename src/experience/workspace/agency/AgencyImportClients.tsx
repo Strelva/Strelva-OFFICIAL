@@ -97,11 +97,11 @@ interface HighLevelConnection { status: "connected" | "needs_reauth" | "revoked"
 /** One row of the agency's list. `uid` is its place in this list; two rows may share a source ref. */
 interface Item { uid: number; sheetRow: number; entry: ClientImportPreviewRow }
 
-export function AgencyImportClients({ agencyWorkspaceId, highLevel = false }: { agencyWorkspaceId: string; highLevel?: boolean }) {
+export function AgencyImportClients({ agencyWorkspaceId, highLevel = false, initialSource, initialNotice, initialError }: { agencyWorkspaceId: string; highLevel?: boolean; initialSource?: "highlevel"; initialNotice?: string; initialError?: string }) {
   const id = useId().replace(/:/g, "");
   const agencyHref = `/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`;
   const [step, setStep] = useState<Step>("source");
-  const [mode, setMode] = useState<Mode>("paste");
+  const [mode, setMode] = useState<Mode>(initialSource === "highlevel" && highLevel ? "highlevel" : "paste");
   const [source, setSource] = useState<ClientImportSource>("sheet");
   const [owners, setOwners] = useState<Record<number, OwnerChoice>>({});
   const [connection, setConnection] = useState<HighLevelConnection | null | undefined>(undefined);
@@ -113,7 +113,9 @@ export function AgencyImportClients({ agencyWorkspaceId, highLevel = false }: { 
   const [items, setItems] = useState<Item[]>([]);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError ?? "");
+  const [notice, setNotice] = useState(initialNotice ?? "");
+  const [setupReady, setSetupReady] = useState<boolean | undefined>(undefined);
   const [signedOut, setSignedOut] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [copied, setCopied] = useState("");
@@ -176,8 +178,9 @@ export function AgencyImportClients({ agencyWorkspaceId, highLevel = false }: { 
     const controller = new AbortController();
     fetch(`/api/workspace/agency-clients/gohighlevel?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
-        const body = await response.json().catch(() => ({})) as { connection?: HighLevelConnection | null; error?: string };
+        const body = await response.json().catch(() => ({})) as { connection?: HighLevelConnection | null; setup?: { ready?: boolean }; error?: string };
         if (response.status === 401) { setSignedOut(true); return; }
+        if (typeof body.setup?.ready === "boolean") setSetupReady(body.setup.ready);
         if (!response.ok) { setConnection(null); setError(body.error ?? "Your HighLevel connection couldn’t be read."); return; }
         setConnection(body.connection ?? null);
       })
@@ -264,8 +267,8 @@ export function AgencyImportClients({ agencyWorkspaceId, highLevel = false }: { 
   return <Frame agencyHref={agencyHref}>
     {step === "source" ? <StSection title="Your list" meta={mode === "highlevel" ? "Your HighLevel sub-accounts" : "CSV, TSV, or rows copied from Google Sheets or Excel"}>
       <StCopy muted>One client per row. A website or a business name is enough; an owner’s email gets a claim link you send yourself. Phone and address are kept for the owner to confirm.</StCopy>
-      <StSegmented label="How you’re bringing the list" value={mode} onChange={(value) => { setMode(value); setError(""); }} options={[{ value: "paste", label: "Paste rows" }, { value: "file", label: "Upload a file" }, ...(highLevel ? [{ value: "highlevel" as const, label: "HighLevel" }] : [])]} />
-      {mode === "highlevel" ? <HighLevelSource agencyWorkspaceId={agencyWorkspaceId} connection={connection} busy={busy} onRead={() => void readHighLevel()} />
+      <StSegmented label="How you’re bringing the list" value={mode} onChange={(value) => { setMode(value); setError(""); setNotice(""); }} options={[{ value: "paste", label: "Paste rows" }, { value: "file", label: "Upload a file" }, ...(highLevel ? [{ value: "highlevel" as const, label: "HighLevel" }] : [])]} />
+      {mode === "highlevel" ? <HighLevelSource agencyWorkspaceId={agencyWorkspaceId} connection={connection} setupReady={setupReady} busy={busy} onRead={() => void readHighLevel()} />
         : mode === "paste"
         ? <StField label="Rows" hint="Include the header row if your sheet has one.">
           <textarea id={`${id}-paste`} rows={10} value={text} spellCheck={false} onChange={(event) => { setText(event.target.value); setError(""); }} placeholder={"Business\tWebsite\tOwner email\nNorthside Bakery\tnorthsidebakery.com\towner@northsidebakery.com"} />
@@ -273,6 +276,7 @@ export function AgencyImportClients({ agencyWorkspaceId, highLevel = false }: { 
         : <StField label="CSV or TSV file" hint={fileName ? `Read ${fileName}.` : "Up to 1 MB and 500 rows."}>
           <input type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain" onChange={(event) => void onFile(event)} />
         </StField>}
+      {notice && !error ? <StNotice>{notice}</StNotice> : null}
       {error ? <StNotice tone="critical">{error}</StNotice> : null}
       {mode === "paste" ? <div><StPill onClick={() => readList(text)} disabled={!text.trim()}>Read the list</StPill></div> : null}
     </StSection> : null}
@@ -365,9 +369,12 @@ function OwnerPicker({ candidates, value, label, onChange }: { candidates: Clien
  * leaves Strelva for HighLevel's own consent screen; reading lists the
  * sub-accounts as rows and adds nothing.
  */
-function HighLevelSource({ agencyWorkspaceId, connection, busy, onRead }: { agencyWorkspaceId: string; connection: HighLevelConnection | null | undefined; busy: boolean; onRead: () => void }) {
+function HighLevelSource({ agencyWorkspaceId, connection, setupReady, busy, onRead }: { agencyWorkspaceId: string; connection: HighLevelConnection | null | undefined; setupReady: boolean | undefined; busy: boolean; onRead: () => void }) {
   const connect = `/api/workspace/agency-clients/gohighlevel/oauth?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`;
   if (connection === undefined) return <p role="status" className="text-[13px] text-gray-muted">Checking your HighLevel connection</p>;
+  if (setupReady === false && connection?.status !== "connected") {
+    return <StNotice>HighLevel isn’t set up on Strelva yet. Paste rows or upload a file instead.</StNotice>;
+  }
   if (!connection || connection.status !== "connected") {
     return <StNotice action={<a href={connect} className="inline-flex min-h-11 items-center text-[13px] font-medium underline underline-offset-4">Connect HighLevel</a>}>
       {connection?.status === "needs_reauth" || connection?.status === "revoked" ? "Your HighLevel connection stopped working. Connect it again to read your sub-accounts." : "Connect your HighLevel agency account once. Strelva reads your sub-accounts and never changes anything in HighLevel."}

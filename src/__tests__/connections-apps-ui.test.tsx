@@ -79,3 +79,13 @@ it("uses explicit provider eligibility before the first account is connected", a
   expect(needs.textContent).toContain("Email sending is coming soon.");
   expect(needs.textContent).not.toContain("Connect Email sending to confirm access");
 });
+
+it("says Not set up yet when Strelva has not added the provider's keys", async () => {
+  const delegate = bundlePreviewRequest("ready");
+  const request: typeof fetch = async (input, init) => String(input).startsWith("/api/workspace/connections")
+    ? Response.json({ connections: [], sourceErrors: [], providerEligibility: { resend: { eligible: false, reason: "not_set_up", message: "Email sending isn't set up on Strelva yet." } } }) : delegate(input, init);
+  await mount("ready", request);
+  const needs = host.querySelector('[aria-label="Connections this App needs"]')!;
+  expect(needs.textContent).toContain("Not set up yet");
+  expect(needs.textContent).not.toContain("Coming soon");
+});

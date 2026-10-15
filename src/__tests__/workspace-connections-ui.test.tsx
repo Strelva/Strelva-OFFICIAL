@@ -20,7 +20,7 @@ describe("workspace Connections", () => {
   it("lists rows from every provider while naming their recorded account holder", async () => {
     await render(async () => Response.json({ connections: CONNECTION_PROVIDERS.map(provider => ({ ...row, provider, ref: `${provider}:fixture`, accountHolder: { kind: "business", workspaceId: business }, accessThrough: { kind: "platform" } })), sourceErrors: [] }));
     for (const provider of CONNECTION_PROVIDERS) expect(node.textContent).toContain(providerDefinition(provider).label);
-    expect(node.textContent?.match(/Whose account: Your business/g)).toHaveLength(8);
+    expect(node.textContent?.match(/Whose account: Your business/g)).toHaveLength(9);
   });
   it("shows Coming soon for unavailable providers before there are any account rows", async () => {
     await render(async () => Response.json({ connections: [], sourceErrors: [], providerEligibility: {
@@ -45,8 +45,25 @@ describe("workspace Connections", () => {
     await render(async () => Response.json({ connections: [{ ...row, state: "unavailable", unavailableReason: "area_not_granted" }], sourceErrors: ["stripe"] }));
     expect(node.textContent).toContain("Some accounts could not be read: Stripe");
     expect(node.textContent).toContain("Give your agency this business area in People & access.");
-    expect(node.textContent).toContain("Coming soon");
+    expect(node.textContent).toContain("Needs access");
     expect(node.querySelector('a[href*="/workspace/google"]')).toBeNull();
+  });
+  it("says Not set up yet, Waiting on Google and Coming soon for the three honest reasons", async () => {
+    await render(async () => Response.json({ connections: [{ ...row, state: "unavailable", unavailableReason: "approval_pending" }], sourceErrors: [], providerEligibility: {
+      highlevel: { eligible: false, reason: "not_set_up", message: "HighLevel isn't set up on Strelva yet." },
+      stripe: { eligible: false, reason: "not_configured", message: "Stripe is coming soon." },
+    } }));
+    expect(node.textContent).toContain("Waiting on Google");
+    expect(node.textContent).toContain("Google Business Profile is waiting on Google’s approval.");
+    expect(node.textContent).toContain("Coming soon");
+  });
+  it("shows Not set up yet and the next step for a provider missing its keys", async () => {
+    root.unmount(); root = createRoot(node);
+    await act(async () => root.render(<WorkspaceConnections workspaceId={agency} workspaceKind="agency" workspaceName="North Studio" names={new Map()} canRead canManage request={async () => Response.json({ connections: [], sourceErrors: [], providerEligibility: {
+      highlevel: { eligible: false, reason: "not_set_up", message: "HighLevel isn't set up on Strelva yet." },
+    } })} />));
+    expect(node.textContent).toContain("Not set up yet");
+    expect(node.textContent).toContain("HighLevel isn't set up on Strelva yet.");
   });
   it("shows an honest empty state and refreshes with the current scope", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ connections: [], sourceErrors: [] }));
@@ -83,6 +100,7 @@ describe("workspace Connections", () => {
     expect(accountHolderLabel({ kind: "business", workspaceId: business }, business, "customer", new Map())).toBe("Your business");
     expect(accountHolderLabel(row.accountHolder, agency, "agency", new Map([[agency, "North Studio"]]))).toBe("North Studio");
     expect(connectionNextStep({ ...row, unavailableReason: "coming_soon" })).toContain("coming soon");
+    expect(connectionNextStep({ ...row, provider: "highlevel", unavailableReason: "not_set_up" })).toContain("nothing to do on your side");
   });
   it("exposes the section only when the workspace shell opts in and preserves route scope", async () => {
     await act(async () => root.render(<StrelvaSidebar accountName="You" signOut={null} />));

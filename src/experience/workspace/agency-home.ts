@@ -149,6 +149,7 @@ export function queueKindLabel(kind: AgencyQueueItem["kind"]): string {
 
 const ACCOUNT_NAMES: Record<string, string> = {
   google_calendar: "Google Calendar",
+  outlook_calendar: "Outlook Calendar",
   google_business_profile: "Google Business Profile",
   google_analytics: "Google Analytics",
   google_search_console: "Google Search Console",

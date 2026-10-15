@@ -174,6 +174,17 @@ describe("POST /api/approve (the real resolve)", () => {
     expect(await res.text()).toContain("Already handled");
   });
 
+  it("says Waiting on Google, not an error, while Google's approval is pending", async () => {
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "google_access_pending" });
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("Waiting on Google");
+    expect(html).toContain("Your reply for GLDF is saved and still waiting in your workspace.");
+    expect(html).not.toContain("We couldn&#39;t finish that");
+  });
+
   it("treats a not_found event as already handled (200)", async () => {
     mockResolveEventAction.mockResolvedValue({ changed: false, reason: "not_found" });
     const { signApproveToken } = await import("@/lib/approve-link");

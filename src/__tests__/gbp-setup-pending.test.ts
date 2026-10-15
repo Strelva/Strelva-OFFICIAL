@@ -13,7 +13,7 @@
  * All external APIs (GBP HTTP, Redis, Slack, connections) are mocked.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // These cases exercise provider responses after local admission. The real
 // fail-closed admission and zero-provider-call matrix is in connections-integration.
@@ -47,6 +47,14 @@ const mockAddEvent = vi.fn((_payload: unknown) => Promise.resolve({ id: "evt_tes
 vi.mock("@/lib/events", () => ({
   addEvent: (...args: Parameters<typeof mockAddEvent>) => mockAddEvent(...args),
 }));
+
+const mockRecordReply = vi.fn((_input: unknown) => Promise.resolve());
+const mockBeginWrite = vi.fn((_input: unknown) => Promise.resolve({ claimed: true, attemptId: "attempt_1" }));
+const mockCompleteWrite = vi.fn((_id: string, _input: unknown) => Promise.resolve({ id: "receipt_1" }));
+vi.mock("@/lib/workspace-ports", async importOriginal => {
+  const original = await importOriginal<typeof import("@/lib/workspace-ports")>();
+  return { ...original, workspacePorts: () => ({ ...original.workspacePorts(), outsideWriteReceipts: async () => ({ recordReviewReply: mockRecordReply, beginGoogleWrite: mockBeginWrite, completeGoogleWrite: mockCompleteWrite }) }) };
+});
 
 const mockSendSlack = vi.fn((_msg: unknown) => Promise.resolve(true));
 
@@ -128,7 +136,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
 
     // A gentle informational event, not the scary change_verify_failed FAILED path.
     const calls = mockAddEvent.mock.calls as MockEventCall[];
@@ -154,7 +162,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
     expect(mockSendSlack).not.toHaveBeenCalled();
   });
 
@@ -170,7 +178,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
   });
 
   it("a GENUINE 403 (real permission problem) stays a hard failure, not 'being set up'", async () => {
@@ -190,5 +198,88 @@ describe("GBP pending-approval soft-fail", () => {
     const calls = mockAddEvent.mock.calls as MockEventCall[];
     expect(calls.find(([e]) => e.type === "change_verify_failed")).toBeDefined();
     expect(calls.find(([e]) => e.metadata?.kind === "gbp_setup_pending")).toBeUndefined();
+  });
+});
+
+describe("Google approval pending (STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE=pending)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockGetConnection.mockResolvedValue(connectedWithScope());
+    setupGbpMeta();
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("updateBusinessHours makes zero Google calls and says it is waiting", async () => {
+    vi.stubEnv("STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE", "pending");
+    const { updateBusinessHours } = await import("@/lib/gbp-management");
+    const result = await updateBusinessHours(TENANT, { regularHours });
+    expect(result).toMatchObject({ success: false, pendingSetup: true });
+    expect(result.ownerMessage).toContain("Google hasn't approved");
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockSendSlack).not.toHaveBeenCalled();
+  });
+
+  it("publishReviewReply sends nothing, writes no receipt and raises no alarm", async () => {
+    vi.stubEnv("STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE", "pending");
+    const { publishReviewReply } = await import("@/lib/gbp-replies");
+    const result = await publishReviewReply(TENANT, "rev_1", "Thank you!");
+    expect(result).toMatchObject({ published: false, pendingSetup: true });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockRecordReply).not.toHaveBeenCalled();
+    expect(mockSendSlack).not.toHaveBeenCalled();
+    const calls = mockAddEvent.mock.calls as MockEventCall[];
+    expect(calls.find(([e]) => e.metadata?.kind === "gbp_setup_pending")).toBeDefined();
+  });
+
+  it("by default (unset) nothing is short-circuited", async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve("{}"), json: () => Promise.resolve({ comment: "Thank you!" }) });
+    const { publishReviewReply } = await import("@/lib/gbp-replies");
+    const result = await publishReviewReply(TENANT, "rev_1", "Thank you!");
+    expect(result.pendingSetup).toBeUndefined();
+    expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe("a reply rejected because Google access is pending", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch.mockReset();
+    mockGetConnection.mockResolvedValue(connectedWithScope());
+    setupGbpMeta();
+  });
+
+  it("returns pendingSetup, sends no FAILED alert and leaves a rejected receipt", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, text: () => Promise.resolve(SETUP_PENDING_BODY) });
+    const { publishReviewReply } = await import("@/lib/gbp-replies");
+    const result = await publishReviewReply(TENANT, "rev_1", "Thank you!");
+    expect(result).toMatchObject({ published: false, pendingSetup: true });
+    expect(mockSendSlack).not.toHaveBeenCalled();
+    expect(mockRecordReply).toHaveBeenCalledWith(expect.objectContaining({ outcome: expect.objectContaining({ kind: "rejected" }) }));
+    const calls = mockAddEvent.mock.calls as MockEventCall[];
+    expect(calls.find(([e]) => e.metadata?.kind === "gbp_setup_pending")).toBeDefined();
+    expect(calls.find(([e]) => e.metadata?.kind === "review_reply_verify_failed")).toBeUndefined();
+  });
+
+  it("also soft-fails on the receipted path, completing the attempt as rejected with nothing applied", async () => {
+    vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "1");
+    mockFetch
+      .mockResolvedValueOnce({ ok: true, status: 200, text: () => Promise.resolve("{}"), json: () => Promise.resolve({}) })
+      .mockResolvedValueOnce(new Response(SETUP_PENDING_BODY, { status: 403 }));
+    const { publishReviewReply } = await import("@/lib/gbp-replies");
+    const result = await publishReviewReply(TENANT, "rev_1", "Thank you!");
+    vi.unstubAllEnvs();
+    expect(result).toMatchObject({ published: false, pendingSetup: true });
+    expect(mockCompleteWrite).toHaveBeenCalledWith("attempt_1", expect.objectContaining({ acceptance: "rejected", acceptanceDetail: "Google API access pending. Nothing applied." }));
+    expect(mockSendSlack).not.toHaveBeenCalled();
+  });
+
+  it("keeps a generic 403 a hard failure with the alert", async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, text: () => Promise.resolve("Forbidden: no permission on this location") });
+    const { publishReviewReply } = await import("@/lib/gbp-replies");
+    const result = await publishReviewReply(TENANT, "rev_1", "Thank you!");
+    expect(result.pendingSetup).toBeUndefined();
+    expect(result.published).toBe(false);
+    expect(mockSendSlack).toHaveBeenCalled();
   });
 });
