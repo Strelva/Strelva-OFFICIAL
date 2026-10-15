@@ -6,13 +6,13 @@ import { z } from 'zod';
 import { pinnedRequestOptions, isPublicIPv4Address } from '@/platform/infra/pinned-lookup';
 import { getSupabase } from '@/platform/infra/db/client';
 import type { WorkspaceActor } from '@/platform/workspaces/types';
-export const MCP_SCOPES = ['business:read', 'website:read', 'website:propose', 'inquiries:read', 'quotes:approve'] as const;
+export const MCP_SCOPES = ['business:read', 'website:read', 'website:propose', 'website:code', 'inquiries:read', 'quotes:approve'] as const;
 export const hash = (v: string) => createHash('sha256').update(v).digest('hex');
 export const pkce = (v: string) => createHash('sha256').update(v, 'ascii').digest('base64url');
 export const oauthEnabled = () => process.env.STRELVA_MCP_OAUTH === '1' && process.env.STRELVA_WORKSPACE_RELEASE === '1';
 export function oauthOrigin() { const u = new URL(process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://app.strelva.com'); return u.origin; }
 export const resourceUrl = (origin = oauthOrigin()) => `${origin}/api/mcp/public`;
-export function protectedMetadata() { return { resource: resourceUrl(), authorization_servers: [oauthOrigin()], scopes_supported: ['business:read', 'website:read', 'website:propose'], bearer_methods_supported: ['header'] }; }
+export function protectedMetadata() { return { resource: resourceUrl(), authorization_servers: [oauthOrigin()], scopes_supported: ['business:read', 'website:read', 'website:propose', 'website:code'], bearer_methods_supported: ['header'] }; }
 export function authorizationMetadata() { const origin = oauthOrigin(); return { issuer: origin, authorization_endpoint: `${origin}/connect/authorize`, token_endpoint: `${origin}/api/mcp/oauth/token`, revocation_endpoint: `${origin}/api/mcp/oauth/revoke`, response_types_supported: ['code'], grant_types_supported: ['authorization_code', 'refresh_token'], code_challenge_methods_supported: ['S256'], token_endpoint_auth_methods_supported: ['none'], client_id_metadata_document_supported: true, authorization_response_iss_parameter_supported: true, scopes_supported: MCP_SCOPES }; }
 export const publicIPv4 = isPublicIPv4Address;
 export function validRedirect(value: string) { try {

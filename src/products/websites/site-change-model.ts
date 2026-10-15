@@ -18,6 +18,12 @@ export const siteChangeReceiptSchema = z.object({
   note: z.string().nullable(),
   recordedAt: z.string(),
   actor: recordedActorSchema.nullable().optional().catch(null),
+  /** Provenance of a preview or deploy a coding agent reported (20261027120200). Absent on older rows. */
+  sourceCommitSha: z.string().nullable().optional(),
+  branch: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  ownerFacing: z.boolean().nullable().optional(),
+  reportedBy: z.enum(["person", "coding_agent"]).optional(),
 });
 export type SiteChangeReceipt = z.infer<typeof siteChangeReceiptSchema>;
 
@@ -26,6 +32,7 @@ export const siteChangeRequestSchema = z.object({
   request: z.string(),
   status: z.enum(["draft", "requested", "withdrawn"]),
   accepted: z.enum(["pending", "accepted", "declined"]),
+  page: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   receipts: z.array(siteChangeReceiptSchema),

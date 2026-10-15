@@ -562,6 +562,9 @@ export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string
 export { siteEditingFor, contentSourceFor, readsStrelvaContent, type SiteEditing, type SiteContentSource } from "./site-editing";
 export { resolveWorkspaceSite, type WorkspaceSiteDeps, type WorkspaceSiteState } from "./workspace-site";
 export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
+export { createAgentSiteChangeAdapter, type AgentSiteChangeDeps } from "./agent-site-changes";
+export { siteRequestBrief, siteRequestNextStep, siteRequestNextStepWords, siteRequestBranch, siteRequestReviewHref, type SiteRequestRow, type SiteRequestNextStep } from "./site-change-brief";
+export { siteChangeOwnerEmailEnabled } from "./site-change-email";
 export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type ReadBack, type SiteDeclaration, type SiteReleaseCheck } from "./site-declaration";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";
 

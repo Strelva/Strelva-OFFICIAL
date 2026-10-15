@@ -6,6 +6,7 @@ vi.mock("@/platform/agent-channel/oauth", async original => ({
 }));
 vi.mock("@/platform/bookings/store", () => ({ readBookingContext: ports.context }));
 import { createAgentWebsiteAdapter } from "@/products/websites/agent-adapter";
+import type { AgentSiteChangePort } from "@/platform/agent-channel/site-change-tools";
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
 import { serveMcp, type McpServer } from "@/platform/agent-channel/protocol";
 import { assistantBusinessContext } from "@/platform/agent-channel/business-context";
@@ -33,6 +34,8 @@ const base: McpServer = {
   ready: async () => {}, limited: async () => false, call: async () => ({ unknownTool: true }),
 };
 function server() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com")); }
+const siteChanges = { call: vi.fn() } satisfies AgentSiteChangePort;
+function serverWithSiteChanges() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com"), siteChanges); }
 function request(name: string, args: Record<string, unknown> = {}, authenticated = true) {
   return new Request("https://app.strelva.com/api/mcp/public", {
     method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2025-11-25",
@@ -170,5 +173,50 @@ describe("assistant business context", () => {
     await s.authorize!(request("read_business_context"), { method: "tools/call", tool: "read_business_context", args: {} });
     expect(await s.call("read_business_context", {})).toEqual({ ok: false, message: "Authorization is required." });
     expect(ports.rpc).not.toHaveBeenCalled();
+  });
+});
+describe("coding agent site Request tools", () => {
+  const siteTools = ["list_site_requests", "read_site_request", "report_site_preview", "report_site_deploy"];
+  it("are absent without the port and listed with it, as a reviewed write", () => {
+    expect(server().tools.filter(t => siteTools.includes(t.name))).toEqual([]);
+    const listed = serverWithSiteChanges().tools;
+    expect(listed.filter(t => siteTools.includes(t.name)).map(t => t.name)).toEqual(siteTools);
+    expect(listed.find(t => t.name === "report_site_preview")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(listed.find(t => t.name === "list_site_requests")!.annotations).toMatchObject({ readOnlyHint: true });
+    expect(listed.find(t => t.name === "list_site_requests")!.inputSchema).not.toHaveProperty("oneOf");
+  });
+  it("does not answer them when the port is missing", async () => {
+    const response = await serveMcp(request("list_site_requests"), server());
+    expect(JSON.stringify(await response.json())).toContain("error");
+    expect(ports.validate).not.toHaveBeenCalled();
+  });
+  it("lets an agency principal list Requests with the website:code scope but still not list_websites", async () => {
+    ports.validate.mockResolvedValue({ userId, verifiedEmail: "staff@agency.example", workspaceId, agencyId: otherId });
+    siteChanges.call.mockResolvedValue({ requests: [] });
+    const listed = (await (await serveMcp(request("list_site_requests"), serverWithSiteChanges())).json()).result;
+    expect(listed.isError).toBe(false);
+    expect(ports.validate).toHaveBeenCalledWith(expect.any(Request), "website:code", undefined);
+    expect(siteChanges.call).toHaveBeenCalledWith("list_site_requests", {}, expect.objectContaining({ workspaceId, userId, agencyId: otherId, verifiedEmail: "staff@agency.example", tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/) }));
+    const websites = (await (await serveMcp(request("list_websites"), serverWithSiteChanges())).json()).result;
+    expect(websites.isError).toBe(true);
+  });
+  it("challenges for website:code and maps database refusals to words", async () => {
+    ports.validate.mockResolvedValue(null);
+    const challenged = await serveMcp(request("report_site_deploy", { requestId: workspaceId }), serverWithSiteChanges());
+    expect(challenged.status).toBe(401);
+    expect(challenged.headers.get("www-authenticate")).toContain('scope="website:code"');
+    ports.validate.mockResolvedValue({ userId, verifiedEmail: "staff@agency.example", workspaceId, agencyId: otherId });
+    siteChanges.call.mockRejectedValueOnce(new Error("website_change_not_accepted"));
+    const refused = (await (await serveMcp(request("report_site_preview", { requestId: workspaceId }), serverWithSiteChanges())).json()).result;
+    expect(refused.isError).toBe(true);
+    expect(JSON.stringify(refused)).toContain("must accept this Request");
+    siteChanges.call.mockRejectedValueOnce(new Error("acting_provider_no_mandate"));
+    expect(JSON.stringify((await (await serveMcp(request("report_site_deploy", { requestId: workspaceId }), serverWithSiteChanges())).json()).result)).not.toContain("could not be authorized");
+  });
+  it("refuses extra arguments before the port is called", async () => {
+    siteChanges.call.mockClear();
+    const result = (await (await serveMcp(request("list_site_requests", { workspaceId }), serverWithSiteChanges())).json()).result;
+    expect(result.isError).toBe(true);
+    expect(siteChanges.call).not.toHaveBeenCalled();
   });
 });
