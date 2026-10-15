@@ -1,6 +1,6 @@
 import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
 import { consumeAssistantParts } from "@/platform/assistant/core";
-import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
+import { ModelAgencyCapReachedError, ModelAiPausedError, ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
 import type { AskWorkspaceDraftPort } from "./workspace-drafts";
 import type { AskNativeSystemPort } from "./native-systems";
@@ -337,7 +337,9 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       } catch (error) {
         if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
           onReceipt({ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: error instanceof ModelBudgetPausedError ? "budget_paused" : "budget_unavailable" });
-          if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
+          // An agency or operator pause or limit is lifted by the agency, never by buying a plan.
+          if (error instanceof ModelAiPausedError || error instanceof ModelAgencyCapReachedError) budgetRecovery = (error instanceof ModelAiPausedError ? error.pausedBy : error.setBy)?.kind === "agency" ? "agency" : null;
+          else if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
           try { say(`${replyText ? "\n\n" : ""}${error.message}`); } catch { /* client gone */ }
         } else if (!state.emitted) {
           replyText = NO_ANSWER;
