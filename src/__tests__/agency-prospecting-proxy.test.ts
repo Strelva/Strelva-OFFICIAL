@@ -20,6 +20,13 @@ describe("agency embed frame authority", () => {
     expect(response.headers.has("x-frame-options")).toBe(false);
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
+  it("gives the report-only policy the same frame-ancestors when the nonce flag is on", async () => {
+    vi.stubEnv("STRELVA_CSP_NONCE_REPORT_ONLY", "1");
+    const response = await proxy(request("/embed/agency/northside/audit"));
+    const directive = (name: string) => response.headers.get(name)!.split("; ").find(d => d.startsWith("frame-ancestors "));
+    expect(directive("content-security-policy-report-only")).toBe("frame-ancestors 'self' https://north.example");
+    expect(directive("content-security-policy-report-only")).toBe(directive("content-security-policy"));
+  });
   it("denies disabled or missing profiles", async () => {
     mocks.resolve.mockResolvedValue(undefined);
     const response = await proxy(request("/embed/agency/unknown/audit"));

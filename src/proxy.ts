@@ -441,6 +441,15 @@ function forwardInit(req: NextRequest, headers?: Headers): { request: { headers:
   return { request: { headers: forwarded } };
 }
 
+// Route-specific CSP edits apply to the report-only policy too, so it differs
+// from enforcement in script-src alone (see src/lib/csp-nonce.ts).
+function rewriteCsp(response: NextResponse, rewrite: (policy: string) => string): void {
+  for (const name of ["Content-Security-Policy", "Content-Security-Policy-Report-Only"]) {
+    const policy = response.headers.get(name);
+    if (policy) response.headers.set(name, rewrite(policy));
+  }
+}
+
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
   applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
@@ -612,7 +621,7 @@ export default async function proxy(req: NextRequest) {
     if (selected) publicHeaders.set("x-tenant", selected.tenant);
     const response = applySecurityHeaders(NextResponse.next(forwardInit(req, publicHeaders)), req);
     response.headers.set("Cache-Control", "no-store");
-    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace("connect-src 'self'", `connect-src 'self' ${CONTROL_PLANE_URL}`));
+    rewriteCsp(response, (policy) => policy.replace("connect-src 'self'", `connect-src 'self' ${CONTROL_PLANE_URL}`));
     return response;
   }
   // Enforce the public-origin boundary before embeds, dev bypasses, internal
@@ -637,7 +646,7 @@ export default async function proxy(req: NextRequest) {
     const forwarded = new Headers(req.headers);
     for (const header of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) forwarded.delete(header);
     const response = applySecurityHeaders(NextResponse.next(forwardInit(req, forwarded)), req);
-    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, ancestors));
+    rewriteCsp(response, (policy) => policy.replace(/frame-ancestors [^;]+/, ancestors));
     if (ancestors !== "frame-ancestors 'none'") response.headers.delete("X-Frame-Options");
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("Referrer-Policy", "no-referrer");
@@ -651,7 +660,7 @@ export default async function proxy(req: NextRequest) {
     if (!agency) return applySecurityHeaders(new NextResponse("Agency check unavailable", { status: 404 }), req);
     const response = applySecurityHeaders(NextResponse.next(forwardInit(req)), req);
     const origin = new URL(agency.contactUrl).origin;
-    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, `frame-ancestors 'self' ${origin}`));
+    rewriteCsp(response, (policy) => policy.replace(/frame-ancestors [^;]+/, `frame-ancestors 'self' ${origin}`));
     response.headers.delete("X-Frame-Options");
     response.headers.set("Cache-Control", "no-store");
     return response;
