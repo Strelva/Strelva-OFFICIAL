@@ -38,6 +38,14 @@ website components) need Jacob's approval before any entry is added. The
 registry audit was not run in this lane (no network calls to the registry
 without Jacob's allowance).
 
+October 15, secret scan. Locally, Gitleaks reports exactly two findings:
+`eb67cd15b278cf5e4da33d358f1e68919c047ad1:dev-tenants.json:generic-api-key:23`
+and `...:47`, both dated 2026-04-30. The Security job stays red by design on these
+two, and `.gitleaksignore` is unchanged. Closing it needs Jacob's approval plus
+proof that the app database's stored copy of both revalidation secrets was
+re-encrypted and read back. The live sites' secrets already differ from the leaked
+values and signed probes with the leaked values return 401.
+
 ## Replay and migration order
 
 Push and nightly select the same PostgreSQL 18 server/client tools through
