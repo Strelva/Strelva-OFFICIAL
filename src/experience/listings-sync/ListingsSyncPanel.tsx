@@ -109,7 +109,7 @@ export function ListingsSyncPanel({ workspaceId, request = fetch, viewerIsOwner,
         const note = surfaceNote(reading, workspaceId);
         return <StRow key={reading.surfaceKey} title={reading.label}
           detail={<>{note ? <span>{note}</span> : null}{reading.facts.length ? <FactLines reading={reading} /> : null}</>}
-          end={<StState kind={surfaceBeacon(reading)}>{reading.facts.some(fact => fact.state === "differs") ? "Differs" : reading.state === "waiting_on_google" ? "Waiting on Google" : reading.state === "read" ? "Matches" : "Not read"}</StState>} />;
+          end={<StState kind={surfaceBeacon(reading)}>{reading.facts.some(fact => fact.state === "differs") ? "Differs" : reading.state === "waiting_on_google" ? "Waiting on Google" : reading.state === "read" ? (reading.facts.some(fact => fact.state === "matches" || fact.state === "follows") ? "Matches" : FACT_STATE_LABEL.not_checked) : "Not read"}</StState>} />;
       })}
     </StRows> : <p className="text-sm text-gray-muted">{view.checkedAt ? "Nothing to compare yet. Confirm your phone, address or hours to start." : "Strelva hasn't checked yet."}</p>}
 

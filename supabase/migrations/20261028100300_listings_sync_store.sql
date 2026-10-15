@@ -148,7 +148,10 @@ begin
   for item in select * from jsonb_array_elements(p_fixes) loop
     insert into public.listing_sync_fixes(workspace_id, check_id, record_revision, surface_key, fact_key, kind, proposed)
       values (chk.workspace_id, chk.id, chk.record_revision, item->>'surfaceKey', item->>'factKey', item->>'kind', item->'proposed')
-      on conflict (workspace_id, surface_key, fact_key, record_revision) do nothing;
+      on conflict (workspace_id, surface_key, fact_key, record_revision) do update
+        set status = 'proposed', proposed = excluded.proposed, check_id = excluded.check_id, outcome_ref = null, reason = null,
+          decided_by = null, updated_at = clock_timestamp()
+        where public.listing_sync_fixes.status = 'verified';
   end loop;
   update public.listing_sync_fixes set status = 'superseded', updated_at = clock_timestamp()
     where workspace_id = chk.workspace_id and status = 'proposed' and record_revision < chk.record_revision;
@@ -259,7 +262,7 @@ begin
   return jsonb_build_object('recordRevision', last.record_revision, 'readings', last.readings,
     'fixes', coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'surfaceKey', f.surface_key, 'factKey', f.fact_key,
         'kind', f.kind, 'proposed', f.proposed, 'status', f.status, 'outcomeRef', f.outcome_ref, 'reason', f.reason,
-        'recordRevision', f.record_revision) order by f.surface_key, f.fact_key)
+        'recordRevision', f.record_revision, 'checkId', f.check_id) order by f.surface_key, f.fact_key)
       from public.listing_sync_fixes f
       where f.workspace_id = p_workspace_id and f.record_revision = last.record_revision
         and f.status in ('proposed','failed') and f.kind <> 'owner_todo'), '[]'::jsonb));

@@ -29,6 +29,7 @@ function setup(fixes: ListingFix[], over: Partial<ApplyDeps> = {}, hash = "h1") 
     tenant: vi.fn(async () => ({ id: "t1", deliveryModel: "platform_template" })),
     requests: vi.fn(async () => ({ id: "req1" })),
     queue: vi.fn(async () => "check1"),
+    run: vi.fn(async () => ({ ran: 1, failed: 0 })),
     ...over,
   };
   return { deps: deps as unknown as ApplyDeps, raw: deps, setFix };
@@ -48,6 +49,32 @@ describe("applyListingFixes", () => {
     await expect(applyListingFixes(actor, WS, "other", deps)).rejects.toBeInstanceOf(ListingsPlanChangedError);
     expect(raw.bookingHours).not.toHaveBeenCalled();
     expect(raw.queue).not.toHaveBeenCalled();
+  });
+
+  it("refuses a plan made from an older record revision before any write", async () => {
+    const f = fix({ proposed: { scope: "scope1", weekly: [] } });
+    const { deps, raw, setFix } = setup([f], { record: vi.fn(async () => ({ access: "owner", revision: 5 })) });
+    (raw.openPlan as ReturnType<typeof vi.fn>).mockResolvedValue({ workspaceId: WS, recordRevision: 4, hash: "h1", lines: [], requests: 0, strelvaChanges: 0, fixes: [f], readings: [] });
+    await expect(applyListingFixes(actor, WS, "h1", deps)).rejects.toBeInstanceOf(ListingsPlanChangedError);
+    expect(setFix).not.toHaveBeenCalled();
+    expect(raw.bookingHours).not.toHaveBeenCalled();
+    expect(raw.prepareGoogle).not.toHaveBeenCalled();
+    expect(raw.requests).not.toHaveBeenCalled();
+    expect(raw.queue).toHaveBeenCalledWith(WS, "after_fix", actor.userId);
+  });
+
+  it("runs the queued after-fix check right away", async () => {
+    const { deps, raw } = setup([fix({ proposed: { scope: "s", weekly: [] } })]);
+    await applyListingFixes(actor, WS, "h1", deps);
+    expect(raw.run).toHaveBeenCalledWith({ checkId: "check1", limit: 1, budgetMs: 30_000 });
+  });
+
+  it("does not run a check when none was queued, and survives a failing run", async () => {
+    const none = setup([fix({ proposed: { scope: "s", weekly: [] } })], { queue: vi.fn(async () => { throw new Error("x"); }) as never });
+    await applyListingFixes(actor, WS, "h1", none.deps);
+    expect(none.raw.run).not.toHaveBeenCalled();
+    const bad = setup([fix({ proposed: { scope: "s", weekly: [] } })], { run: vi.fn(async () => { throw new Error("x"); }) as never });
+    await expect(applyListingFixes(actor, WS, "h1", bad.deps)).resolves.toMatchObject({ applied: 1 });
   });
 
   it("clips booking hours and records the revision", async () => {

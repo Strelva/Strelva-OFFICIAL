@@ -57,6 +57,10 @@ describe("planHash and planLines", () => {
     expect(planHash(3, [a, b])).toBe(planHash(3, [b, a, todo]));
     expect(planHash(3, [a, b])).not.toBe(planHash(4, [a, b]));
   });
+  it("changes when a fix is re-opened by a later check, not on a plain re-check", () => {
+    expect(planHash(3, [{ ...a, checkId: "c1" }, b])).not.toBe(planHash(3, [{ ...a, checkId: "c2" }, b]));
+    expect(planHash(3, [{ ...a, checkId: "c1" }, b])).toBe(planHash(3, [b, { ...a, checkId: "c1" }]));
+  });
   it("writes owner-readable lines", () => {
     const readings = [
       reading("booking:main", "booking", [differs("hours", "Monday 18:00–20:00", "Inside your hours")]),

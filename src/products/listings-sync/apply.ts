@@ -10,7 +10,7 @@ import { prepareGoogleListingDraft } from "@/products/google-listing/server";
 import { siteChangeRequestCommand } from "@/products/websites/client";
 import { siteEditingFor } from "@/products/websites/server";
 import type { ListingFix } from "./contracts";
-import { queueListingsCheck } from "./check";
+import { queueListingsCheck, runQueuedListingsChecks } from "./check";
 import { listingsGoogleFixReached } from "./release";
 import { readListingsPlanForService, type OpenListingsPlanWithFixes } from "./open-plan";
 import { listingsSyncStore } from "./store";
@@ -31,6 +31,7 @@ export interface ApplyDeps {
   tenant: (tenantId: string) => Promise<{ id: string; deliveryModel?: string; customRepo?: unknown } | null>;
   requests: (actor: WorkspaceActor, command: unknown) => Promise<{ id: string }>;
   queue: typeof queueListingsCheck;
+  run: typeof runQueuedListingsChecks;
 }
 
 export const liveApplyDeps: ApplyDeps = {
@@ -46,6 +47,7 @@ export const liveApplyDeps: ApplyDeps = {
   tenant: async id => (await (await listingsTenantPorts()).tenant(id)),
   requests: (actor, command) => new ServiceRequestService(PostgresServiceRequestStore).execute(actor, command),
   queue: queueListingsCheck,
+  run: runQueuedListingsChecks,
 };
 
 const RANK: Record<string, number> = { booking_hours: 0, google_hours: 1, google_info: 1, site_request: 2 };
@@ -58,7 +60,7 @@ const str = (value: unknown): string => (typeof value === "string" ? value : "")
  * Request to the business's agency. Never retries a provider write: running it
  * again with the same fix ids is idempotent (the Google draft uses the fix id
  * as its command id; the Request uses the idempotency key listings-sync:<fixId>).
- * An after_fix check then re-reads every place, and a fix becomes verified only
+ * An after_fix check is then queued and run once, right away, and re-reads every place, and a fix becomes verified only
  * when its place reads as matching.
  */
 export async function applyListingFixes(actor: WorkspaceActor, workspaceId: string, expectedHash: string, deps: ApplyDeps = liveApplyDeps): Promise<{ applied: number; failed: Array<{ fixId: string; reason: string }>; checkId: string | null }> {
@@ -66,6 +68,11 @@ export async function applyListingFixes(actor: WorkspaceActor, workspaceId: stri
   if (record.access !== "owner") throw new WorkspaceAccessError("Only the business owner makes these changes live.");
   const plan = await deps.openPlan(workspaceId);
   if (!plan || plan.hash !== expectedHash) throw new ListingsPlanChangedError("These details changed since they were shown. Check again.");
+  if (record.revision !== plan.recordRevision) {
+    // The plan was made from an older record; never write it. Re-read so a fresh plan can appear.
+    await deps.queue(workspaceId, "after_fix", actor.userId).catch(() => null);
+    throw new ListingsPlanChangedError("These details changed since they were shown. Check again.");
+  }
 
   const pending = await deps.reviews().read(workspaceId).catch(() => null);
   const blocked = new Set((pending?.changes ?? []).filter(change => change.entity === "fact").map(change => change.id));
@@ -145,5 +152,7 @@ export async function applyListingFixes(actor: WorkspaceActor, workspaceId: stri
   }
 
   const checkId = await deps.queue(workspaceId, "after_fix", actor.userId).catch(() => null);
+  // Queued checks only run from the sweep or Check now, so run this one now, bounded.
+  if (checkId) await deps.run({ checkId, limit: 1, budgetMs: 30_000 }).catch(() => undefined);
   return { applied, failed, checkId };
 }

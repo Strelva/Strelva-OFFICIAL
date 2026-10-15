@@ -86,9 +86,10 @@ export function planFixes(readings: SurfaceReading[], ctx: PlanContext): Planned
 }
 
 /** Stable under reordering; owner to-dos are not decisions, so they are not part of it. */
-export function planHash(recordRevision: number, fixes: Array<Pick<PlannedFix, "surfaceKey" | "factKey" | "kind" | "proposed">>): string {
+export function planHash(recordRevision: number, fixes: Array<Pick<PlannedFix, "surfaceKey" | "factKey" | "kind" | "proposed"> & { checkId?: string }>): string {
   const decided = fixes.filter(fix => fix.kind !== "owner_todo")
-    .map(({ surfaceKey, factKey, kind, proposed }) => ({ surfaceKey, factKey, kind, proposed }))
+    // checkId changes only when a verified fix is re-opened by a later check, so a plain re-check keeps the hash.
+    .map(({ surfaceKey, factKey, kind, proposed, checkId }) => ({ surfaceKey, factKey, kind, proposed, checkId: checkId ?? null }))
     .sort((a, b) => `${a.surfaceKey}|${a.factKey}`.localeCompare(`${b.surfaceKey}|${b.factKey}`));
   return sha256(canonicalJson([recordRevision, decided]));
 }

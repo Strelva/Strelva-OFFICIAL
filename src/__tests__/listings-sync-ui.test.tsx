@@ -51,6 +51,13 @@ describe("ListingsSyncPanel", () => {
     for (const state of FACT_STATES) expect(node.textContent).toContain(FACT_STATE_LABEL[state]);
   });
 
+  it("does not say Matches for a read place where nothing matches", async () => {
+    const view: ListingsSyncView = { ...matches, surfaces: [{ ...matches.surfaces[0]!, state: "read", facts: [{ fact: "phone", state: "not_shown", shown: null, expected: "y" }, { fact: "hours", state: "not_checked", shown: null, expected: "y" }] }] };
+    await panel({ initial: view });
+    expect(node.textContent).toContain(FACT_STATE_LABEL.not_checked);
+    expect(node.textContent).not.toContain("Matches");
+  });
+
   it("gives the owner a link to Needs you but no approve control", async () => {
     await panel({ initial: twoDiffer });
     expect(node.textContent).toContain("Review and hold to make it live in Needs you.");

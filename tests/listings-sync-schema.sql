@@ -136,6 +136,19 @@ reset role;
 select pg_temp.ls_refuse($$update public.listing_sync_releases set number = 9$$, 'listing_sync_release_immutable');
 select pg_temp.ls_refuse($$delete from public.listing_sync_releases$$, 'listing_sync_release_immutable');
 
+-- ---- a verified fix is offered again when a later check at the same revision saves it ----
+select pg_temp.ls_assert((select status from public.listing_sync_fixes where surface_key = 'booking:main') = 'verified', 'booking fix is verified before the drift');
+set local role service_role;
+create temp table ls_d1 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
+select pg_temp.ls_assert((select count(*) from public.listing_sync_save_fixes((select id from ls_d1), (select claim_token from ls_d1),
+  '[{"surfaceKey":"booking:main","factKey":"hours","kind":"booking_hours","proposed":{"weekly":[]}}]') f where f.status = 'proposed' and f.surface_key = 'booking:main') = 1,
+  'a verified fix becomes proposed again when a later check at the same revision saves it');
+select public.listing_sync_finish_check((select id from ls_d1), (select claim_token from ls_d1), 'done',
+  '[{"surfaceKey":"booking:main","facts":[{"fact":"hours","state":"differs"}]}]', 1, 1, null);
+select pg_temp.ls_assert((select count(*) from jsonb_array_elements(public.listing_sync_open_plan('29100000-0000-4000-8000-000000000010')->'fixes') x
+  where x->>'surfaceKey' = 'booking:main' and x->>'checkId' = (select id::text from ls_d1)) = 1, 'open_plan lists the re-opened fix with its new checkId');
+reset role;
+
 -- ---- supersede and decline ----
 update public.business_records set revision = 4 where workspace_id = '29100000-0000-4000-8000-000000000010';
 set local role service_role;

@@ -47,6 +47,8 @@ export const listingFixSchema = z.object({
   outcomeRef: z.string().nullable(),
   reason: z.string().nullable(),
   recordRevision: z.number().int(),
+  /** The check that proposed (or re-opened) this fix. Only the open plan carries it. */
+  checkId: z.string().uuid().optional(),
 }).strict();
 export type ListingFix = z.infer<typeof listingFixSchema>;
 

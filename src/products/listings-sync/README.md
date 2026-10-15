@@ -25,7 +25,7 @@ read per location, at most about 14 reads, each bounded to 10 seconds.
 2. `plan.ts` proposes fixes. They are stored with the readings (`listing_sync_*`, migrations 20261028100200 and 20261028100300).
 3. One Needs you item per business (`listings_sync`, `system.change_live`, owner decides) shows the plan: "Hold to make it live".
 4. Approving runs `applyListingFixes`: booking hours, the Google draft and approval path (with receipts), website Requests as the owner. Nothing is retried; ids make a repeat idempotent.
-5. An `after_fix` check re-reads every place. An applied fix becomes `verified` only when its place reads as matching.
+5. Approving queues an `after_fix` check and runs it once, right away. It re-reads every place. An applied fix becomes `verified` only when its place reads as matching.
 6. When every compared place matches, a numbered **Release N** of the listings state is recorded, only if the record revision or the readings changed. Releases are append-only.
 
 ## Triggers
@@ -33,9 +33,9 @@ read per location, at most about 14 reads, each bounded to 10 seconds.
 - App events: `fact.confirmed` (not `fact.changed`: checks read only confirmed facts). Events arrive only when capture is on, `app_events` is on for the business and the App is available there.
 - The sweep (`/api/cron/listings-sync`): records whose revision moved or whose last check is a day old. The route is not in `vercel.json`.
 - "Check now" on Business details, at most 6 an hour per business.
-- After a fix.
+- After a fix: approving queues a check and runs it once, right away.
 
-Until app events are on, the sweep and Check now are the triggers.
+Checks queued by app events (and the sweep's extra checks) only run when the sweep runs or someone presses Check now. Until the sweep is in `vercel.json`, they wait for Check now.
 
 ## Seams
 
