@@ -106,6 +106,7 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20261027120300": "website_code_releases",
   // Full-model additions: private/denied probes remain unknown.
   "20261022175100": "legacy_google_operation_watermarks",
   "20261022173000": "creator_version_paid_periods",
@@ -350,6 +351,8 @@ export const FLAG_ENV = [
   "STRELVA_BOOKING_MANUAL",
   "STRELVA_MAKE_REAL_LIVE",
   "STRELVA_CONNECTED_SITES_RELEASE",
+  "STRELVA_SITES_BY_CODE_RELEASE",
+  "STRELVA_SITE_CHANGE_OWNER_EMAIL",
   "STRELVA_BUSINESS_PAGES",
   "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
   "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
