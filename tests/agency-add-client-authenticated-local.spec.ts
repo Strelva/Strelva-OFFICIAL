@@ -61,7 +61,7 @@ test("an agency adds a client by URL with a provider seat, and the owner claims 
   await page.getByLabel("Their website").fill("https://example.com");
   await page.getByRole("button", { name: "Add client" }).click();
   await expect(page.getByRole("heading", { name: "Elmwood Bakery" })).toBeVisible({ timeout: 120_000 });
-  await expect(page.getByText("Not sent.")).toBeVisible();
+  await expect(page.getByText("Claim not sent: email to owners is off.", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Connect the site they have/ })).toBeVisible();
   // Rebuild is offered, but saved work does not yet resolve the seat (#245's TypeScript half): no dead link.
   await expect(page.getByText("The owner can start a rebuild once they claim the business.")).toBeVisible();

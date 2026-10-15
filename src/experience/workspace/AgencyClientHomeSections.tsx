@@ -19,10 +19,13 @@ export function AgencyClientDecisionStatus({ state, businessName, workspaceId, s
   }, [selectedId, state]);
   const title = `Waiting on ${businessName}`;
   const decisions = state.status === "ready" ? state.data.decisions.filter(item => selectedId ? item.id === selectedId : item.state === "open") : [];
-  return <StSection title={title} id="client-decision-status" meta="Read-only · the business decides">
+  // What the business decided in the last 30 days (the read already returns them), newest first.
+  const decided = state.status === "ready" && !selectedId ? state.data.decisions.filter(item => item.state !== "open").sort((a, b) => Date.parse(b.since) - Date.parse(a.since)).slice(0, 10) : [];
+  return <><StSection title={title} id="client-decision-status" meta="Read-only · the business decides">
     {state.status === "loading" ? <StSkeleton label="Checking shared decision status" /> : state.status === "error" ? <StNotice tone="critical">Shared decisions could not be checked. <StTextButton onClick={onRetry}>Check again</StTextButton></StNotice> : state.status === "ready" ? decisions.length ? <StRows label={title}>{decisions.map(item => <StRow key={item.id} title={<span id={`decision-${item.id}`} ref={item.id === selectedId ? selectedItem : undefined} tabIndex={-1}>{item.title}</span>} href={clientDecisionHref(workspaceId, item.id)} detail={<StMono as="time" dateTime={item.since}>{new Date(item.since).toLocaleDateString()}</StMono>} selected={item.id === selectedId} end={<StState kind={item.state === "open" ? "need" : "draft"}>{item.state === "open" ? title : item.state === "approved" ? "Approved by the business" : item.state === "declined" ? "Not yet" : item.state === "expired" ? "Expired" : "No longer waiting"}</StState>} />)}</StRows> : <StEmpty>{selectedId ? "This decision is no longer available in your shared scope." : "No shared decisions are waiting."}</StEmpty> : null}
     <p className="text-xs text-gray-muted">Approval, access, money, exit and sensitive customer details stay with the business. Only shared status appears here.</p>
-  </StSection>;
+  </StSection>
+  {decided.length ? <StSection title="Recently decided" id="client-decisions-decided" meta="Last 30 days"><StRows label="Recently decided, newest first">{decided.map(item => <StRow key={item.id} title={item.title} href={clientDecisionHref(workspaceId, item.id)} detail={<StMono as="time" dateTime={item.since}>{new Date(item.since).toLocaleDateString()}</StMono>} end={<StState kind="draft">{item.state === "approved" ? "Approved by the business" : item.state === "declined" ? "Not yet" : item.state === "expired" ? "Expired" : "No longer waiting"}</StState>} />)}</StRows></StSection> : null}</>;
 }
 export function AgencyClientChanges({ state, workspaceId, onRetry }: { state: AgencyClientHomeState; workspaceId: string; onRetry: () => void }) {
   return <StSection title={STRELVA_HANDLED_LABEL} meta="Shared Systems · last 7 days">

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { addAgencyClaimQueue } from "@/experience/workspace/agency-server";
+import { addAgencyClaimQueue, ownerClaimQueueState } from "@/experience/workspace/agency-server";
 import type { AgencyClientsPage } from "@/experience/workspace/agency-clients";
-import type { AgencyClientListItem } from "@/products/agency-clients/contracts";
+import { ownerClaimDeliveryCopy, type AgencyClientListItem, type OwnerClaimDelivery } from "@/products/agency-clients/contracts";
 
 const agency = "11111111-1111-4111-8111-111111111111";
 const client = "22222222-2222-4222-8222-222222222222";
@@ -17,7 +17,7 @@ describe("agency owner-claim Queue", () => {
     const store = db([addition()]);
     const result = await addAgencyClaimQueue(actor, page(), store, true, now);
     expect(store.rpc).toHaveBeenCalledWith("list_agency_client_additions", { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_agency_workspace_id: agency });
-    expect(result.queue).toEqual([expect.objectContaining({ kind: "owner_claim", workspaceId: client, title: "Waiting on Harbor Dental to claim", label: "Share the owner's claim link", href: `/workspace/agency/clients/new?workspaceId=${agency}` })]);
+    expect(result.queue).toEqual([expect.objectContaining({ kind: "owner_claim", workspaceId: client, title: "Claim not sent to Harbor Dental", claimDelivery: "not_sent", label: "Claim not sent: email to owners is off. Create a fresh link and share it yourself.", href: `/workspace/agency/clients/new?workspaceId=${agency}&client=${client}` })]);
     expect(JSON.stringify(result)).not.toContain("private-owner");
     expect(JSON.stringify(result)).not.toContain("claimPath");
     expect(result.clients[0]!.ownerClaimWaiting).toBe(true);
@@ -36,8 +36,30 @@ describe("agency owner-claim Queue", () => {
   });
   it("keeps a waiting business actionable when its claim is missing or expired", async () => {
     for (const pendingClaim of [null, { ...addition().pendingClaim!, expiresAt: "2026-10-01T12:00:00Z" }]) {
-      expect((await addAgencyClaimQueue(actor, page(), db([addition({ pendingClaim })]), true, now)).queue[0]!.label).toBe("Create a new owner claim link");
+      expect((await addAgencyClaimQueue(actor, page(), db([addition({ pendingClaim })]), true, now)).queue[0]).toMatchObject({ claimDelivery: "no_link", title: "Waiting on Harbor Dental to claim", label: "No current owner link. Create one and share it yourself." });
     }
+  });
+  it.each([
+    ["accepted", "sent", "Waiting on Harbor Dental to claim", "Email accepted for delivery."],
+    ["sending", "unconfirmed", "Waiting on Harbor Dental to claim", "Email delivery unconfirmed. Don't resend; create a fresh link and share it yourself if needed."],
+    ["unknown", "unconfirmed", "Waiting on Harbor Dental to claim", "Email delivery unconfirmed. Don't resend; create a fresh link and share it yourself if needed."],
+  ] as const)("says %s honestly", async (status, claimDelivery, title, label) => {
+    const pendingClaim = { ...addition().pendingClaim!, delivery: { status, reason: "x", decision: "R08", agencyEmailVerified: true } };
+    const item = (await addAgencyClaimQueue(actor, page(), db([addition({ pendingClaim })]), true, now)).queue[0]!;
+    expect(item).toMatchObject({ claimDelivery, title, label });
+    expect(JSON.stringify(item)).not.toContain("private-owner");
+  });
+  it("derives the state from the claim and the clock alone", () => {
+    expect(ownerClaimQueueState("Harbor Dental", null, now).claimDelivery).toBe("no_link");
+    expect(ownerClaimQueueState("Harbor Dental", addition().pendingClaim, now).title).toBe("Claim not sent to Harbor Dental");
+  });
+  it("words every delivery state in one place", () => {
+    const d = (status: OwnerClaimDelivery["status"], reason: string): OwnerClaimDelivery => ({ status, reason, decision: "R08", agencyEmailVerified: false });
+    expect(ownerClaimDeliveryCopy(d("accepted", "")).headline).toBe("Email accepted for delivery.");
+    expect(ownerClaimDeliveryCopy(d("unknown", "")).headline).toBe("Email delivery unconfirmed.");
+    expect(ownerClaimDeliveryCopy(d("not_sent", "email_suppressed")).headline).toBe("Claim not sent: email to owners is off.");
+    expect(ownerClaimDeliveryCopy(d("not_sent", "permission_or_email_gate")).headline).toContain("not permitted for your agency");
+    expect(ownerClaimDeliveryCopy(d("not_sent", "other")).headline).toBe("Claim not sent.");
   });
   it("refuses foreign/malformed claim responses and names denied or failed reads", async () => {
     for (const store of [db([addition({ agencyWorkspaceId: other })]), db({ claims: [] }), db(null, { message: "agency_client_access_denied" })]) {

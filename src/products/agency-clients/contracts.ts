@@ -67,6 +67,16 @@ export const ownerClaimDeliverySchema = z.object({
 }).passthrough();
 export type OwnerClaimDelivery = z.infer<typeof ownerClaimDeliverySchema>;
 
+/** One plain sentence pair for every surface that shows a claim: what happened, then what the agency can do. */
+export function ownerClaimDeliveryCopy(delivery: OwnerClaimDelivery): { headline: string; next: string } {
+  const share = "Copy the link and share it yourself.";
+  if (delivery.status === "accepted") return { headline: "Email accepted for delivery.", next: "You can also copy the link." };
+  if (delivery.status === "sending" || delivery.status === "unknown") return { headline: "Email delivery unconfirmed.", next: share };
+  if (delivery.reason === "gated" || delivery.reason === "email_suppressed") return { headline: "Claim not sent: email to owners is off.", next: share };
+  if (delivery.reason === "permission_or_email_gate") return { headline: "Claim not sent: email to owners is off or not permitted for your agency.", next: share };
+  return { headline: "Claim not sent.", next: share };
+}
+
 export const agencyClientAdditionSchema = z.object({
   additionId: uuid,
   agencyWorkspaceId: uuid,

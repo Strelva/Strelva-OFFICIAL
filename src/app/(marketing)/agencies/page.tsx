@@ -31,7 +31,7 @@ export default async function AgenciesPage() {
     <StSection title="How to get started"><StRows>
       <StRow title="Create your agency" detail="Choose “I build for clients” when creating an account, then set up your agency’s name, brand and team." />
       <StRow title="Qualify the work you’ll do" detail="Submit the evidence needed for publishing, Google, email or payments. Each effect has its own availability; creating an account alone does not enable it." />
-      <StRow title="Bring in your first client" detail="Add a client and prepare a draft. Owner invitations are paused during rollout; agree the work and access before making changes. Review stays with whoever has permission for the decision." />
+      <StRow title="Bring in your first client" detail="Add a client, then copy its owner claim link and share it yourself. Strelva doesn’t email your clients yet. Review stays with whoever has permission for the decision." />
     </StRows></StSection>
     {open ? <StPillLink href="/sign-up?as=agency">Create your agency</StPillLink> : <>
       <StNotice>Agency signup is coming soon. You can request access now; publishing and other outside actions remain subject to qualification.</StNotice>

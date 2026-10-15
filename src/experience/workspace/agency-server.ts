@@ -1,7 +1,7 @@
 import { effectivePackageBehavior } from "@/platform/system-versions/declaration";
 import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
-import { agencyClientListItemSchema } from "@/products/agency-clients/contracts";
+import { agencyClientListItemSchema, ownerClaimDeliveryCopy, type AgencyClientListItem } from "@/products/agency-clients/contracts";
 /**
  * Server reads behind the agency surface. Each one runs under the signed-in
  * actor; Postgres rechecks access on every row.
@@ -44,6 +44,7 @@ import {
   agencyClientsPageSchema,
   type AgencyBulkReviewResult,
   type AgencyClientsPage,
+  type AgencyQueueItem,
   type AgencyLibrary,
   type AgencyLibraryVersion,
 } from "./agency-clients";
@@ -93,6 +94,20 @@ export async function readAgencyClientsPage(
   return operatorQueueReleaseEnabled() ? addAgencyProviderAlerts(actor, overview, db) : overview;
 }
 
+/** What the Queue says about a client's owner claim. The link is shown once and stored only as a hash, so
+ * the only action left is a fresh link; nothing here carries the owner's address, a reason code or a token. */
+export function ownerClaimQueueState(name: string, pendingClaim: AgencyClientListItem["pendingClaim"], now: number): Pick<AgencyQueueItem, "claimDelivery" | "title" | "label"> {
+  const waiting = `Waiting on ${name} to claim`;
+  if (!pendingClaim || Date.parse(pendingClaim.expiresAt) <= now) return { claimDelivery: "no_link", title: waiting, label: "No current owner link. Create one and share it yourself." };
+  const copy = ownerClaimDeliveryCopy(pendingClaim.delivery);
+  switch (pendingClaim.delivery.status) {
+    case "accepted": return { claimDelivery: "sent", title: waiting, label: copy.headline };
+    case "sending":
+    case "unknown": return { claimDelivery: "unconfirmed", title: waiting, label: `${copy.headline} Don't resend; create a fresh link and share it yourself if needed.` };
+    default: return { claimDelivery: "not_sent", title: `Claim not sent to ${name}`, label: `${copy.headline} Create a fresh link and share it yourself.` };
+  }
+}
+
 /** Claim status is in-app work even while owner email and Needs you are off.
  * The existing additions RPC rechecks agency membership; only clients in the
  * current scoped page are projected, with no owner email or claim token. */
@@ -108,11 +123,11 @@ export async function addAgencyClaimQueue(actor: WorkspaceActor, page: AgencyCli
     for (const addition of additions) {
       const client = visible.get(addition.customerWorkspaceId);
       if (!client || !addition.seatActive || addition.ownerClaimed) continue;
-      const activeLink = addition.pendingClaim && Date.parse(addition.pendingClaim.expiresAt) > now;
+      const state = ownerClaimQueueState(client.name, addition.pendingClaim, now);
       queue.push({ id: `owner-claim:${addition.additionId}`, kind: "owner_claim", workspaceId: client.workspaceId,
-        clientName: client.name, title: `Waiting on ${client.name} to claim`, systemId: null, workId: null,
-        since: addition.addedAt, label: activeLink ? "Share the owner's claim link" : "Create a new owner claim link",
-        href: `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(page.agencyWorkspaceId)}` });
+        clientName: client.name, title: state.title, systemId: null, workId: null,
+        since: addition.addedAt, label: state.label, claimDelivery: state.claimDelivery,
+        href: `/workspace/agency/clients/new?workspaceId=${encodeURIComponent(page.agencyWorkspaceId)}&client=${encodeURIComponent(client.workspaceId)}` });
     }
     const gaps = [...(page.queueGaps ?? []), ...(additions.length >= 200 ? ["Owner claims: only the latest 200 added clients were checked."] : [])];
     const waiting = new Set(queue.filter(item => item.kind === "owner_claim").map(item => item.workspaceId));
