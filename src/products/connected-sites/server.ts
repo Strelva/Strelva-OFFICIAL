@@ -33,6 +33,8 @@ import { resolveConnectedSiteInstaller } from "./installer";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
+export { platformSchemaFromHtml, comparePlatformSchema, type PlatformSchemaReport } from "./schema-facts";
+export { publicFactsFromRecord, type PublicFacts } from "./contracts";
 
 /**
  * The cheap early gate: connected sites could be on for at least one
