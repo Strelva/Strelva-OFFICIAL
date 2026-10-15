@@ -40,7 +40,15 @@ export async function refreshConnectedAccount(workspaceId:string,accountId:strin
  const recipient=account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status==="active";
  return moneyRpc<ConnectedAccount>("record_connected_account",{p_workspace_id:workspaceId,p_account_id:account.id,p_configurations:configurations,p_profile_version:profileVersion,p_capabilities:account.configuration??{},p_requirements:account.requirements??{},p_ready:(!configurations.includes("merchant")||merchant)&&(!configurations.includes("recipient")||recipient)},db);
 }
-export async function onboardConnectedAccount(actor:WorkspaceActor,input:{workspaceId:string;configurations:Array<"merchant"|"recipient"|"customer">;origin:string},deps:ConnectDependencies={}) {
+/** Re-reads the account from Stripe so setup state does not wait on a webhook. Managers only. */
+export async function refreshConnectedAccountForActor(actor:WorkspaceActor,workspaceId:string,deps:ConnectDependencies={}) {
+ if (!connectEnabled()) throw new WorkspaceStoreError("Connect is not enabled.");
+ const db=deps.db===undefined?connectDb():deps.db;
+ const row=await manageConnectedAccount(actor,workspaceId,"read",db);
+ if (!row||!row.stripe_account_id||!row.profile_version||row.state==="disconnected") return row;
+ return refreshConnectedAccount(workspaceId,row.stripe_account_id,row.profile_version,deps.stripe??stripeClient(),db);
+}
+export async function onboardConnectedAccount(actor:WorkspaceActor,input:{workspaceId:string;configurations:Array<"merchant"|"recipient"|"customer">;origin:string;returnTo?:"payments"|"payment-links"},deps:ConnectDependencies={}) {
  if (!connectEnabled()) throw new WorkspaceStoreError("Connect is not enabled.");
  const profile=connectProfile();
  // Onboarding requests the full Dashboard, which Stripe does not support when
@@ -72,7 +80,9 @@ export async function onboardConnectedAccount(actor:WorkspaceActor,input:{worksp
  account=await refreshConnectedAccount(input.workspaceId,accountId,profile.version,stripe,db);
  }
  await recordHolder(account.generation);
- const link=await stripe.v2.core.accountLinks.create({account:accountId,use_case:{type:"account_onboarding",account_onboarding:{configurations:input.configurations,refresh_url:`${input.origin}/workspace/billing?connect=refresh`,return_url:`${input.origin}/workspace/billing?connect=return`}}});
+ // Stripe sends people back here, so the link carries the workspace and the page that started setup.
+ const back=`${input.origin}${input.returnTo==="payment-links"?"/workspace/payment-links":"/workspace/payments"}?workspaceId=${encodeURIComponent(input.workspaceId)}`;
+ const link=await stripe.v2.core.accountLinks.create({account:accountId,use_case:{type:"account_onboarding",account_onboarding:{configurations:input.configurations,refresh_url:`${back}&connect=refresh`,return_url:`${back}&connect=return`}}});
  return {url:link.url,accountId};
 }
 export interface DirectCheckoutInput {workspaceId:string;idempotencyKey:string;purpose:"checkout"|"deposit"|"quote"|"agent"|"agency_rebill"|"pay_link";amountCents:number;currency:string;successUrl:string;cancelUrl:string;referenceId?:string;}
