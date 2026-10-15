@@ -263,6 +263,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261026110000": "conn_google_agency_oauth_attempts",
   "20261026170000": "business_ai_controls",
   "20261026180000": "agency_pay_links",
+  "20261027160100": "connected_site_changes",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

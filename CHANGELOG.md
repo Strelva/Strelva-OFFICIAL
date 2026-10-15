@@ -20,6 +20,7 @@ marketing site in lockstep. Their `package.json` versions must always match.
 - Add a names-only prod flag report.
 - Prepare a report-only nonce CSP behind STRELVA_CSP_NONCE_REPORT_ONLY (off).
 - Add per-package license review to the supply-chain gate (no entries approved yet).
+- Prepare Keep your site for connected sites behind `keep_your_site` (off): install health, what a site is built with, agency change Requests with the exact edit, live-page checks and Releases, and Clients → Client websites. Three held migrations; no owner email, no prices.
 
 This is the prepared source cut, not a production deployment or tag receipt.
 October 12–13 go-live claims and October 14 observations are recorded separately

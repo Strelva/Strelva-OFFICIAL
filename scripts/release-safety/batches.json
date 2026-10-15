@@ -2421,6 +2421,33 @@
           "rollbackStatus": "Refuses once any link or money document exists; exact empty inverse/reapply proven locally."
         }
       ]
+    },
+    {
+      "id": "keep-your-site-2026-10-15",
+      "status": "Held and unapplied. Connected-site health, changes and Releases behind keep_your_site. Disposable SQL ran only on a throwaway local PostgreSQL 18, not the owned-cluster runner; no production application authorized. Prerequisites: batch 6 (20261008151000), Connections core 20261026100000 and 20261026120100, agency ceilings 20261021093000, and 20261024123500.",
+      "items": [
+        {
+          "file": "20261027160000_keep_your_site_flag.sql",
+          "sha256": "e77939a1c89abfe4c77534fa9dea14d7060890e631637d22dae9845c56d0b516",
+          "rollback": "rollback-20261027160000_keep_your_site_flag.sql",
+          "rollbackSha256": "eb2bc83d7e1e11a14de7c35d7924ba75776f6a4724a8cd3507d5e6cb3727e23f",
+          "rollbackStatus": "Restores the saved agency_release_flag_system_kind and removes the keep_your_site name; refuses when ceiling history exists. Applied, rolled back and re-applied on a throwaway local PostgreSQL 18 only; production UNRUN."
+        },
+        {
+          "file": "20261027160100_keep_your_site_changes.sql",
+          "sha256": "34ba7922e45374a3cad8be7f83a8da3094ef0f55db155e78f12381e335c67893",
+          "rollback": "rollback-20261027160100_keep_your_site_changes.sql",
+          "rollbackSha256": "f7cf8b82cffd0cd00d0afccec99954c484576510759930a88000612be994b915",
+          "rollbackStatus": "Refuses once any Release was recorded from a connected-site change; otherwise drops every new function and table and restores connected_site_json from the saved definition. Applied, scenario-tested (tests/keep-your-site-schema.sql), rolled back and re-applied on a throwaway local PostgreSQL 18 only; production UNRUN."
+        },
+        {
+          "file": "20261027160200_keep_your_site_agency_home.sql",
+          "sha256": "9f402ba74c1981f4ef523e6fcf10e6da1c173c511febb2123c8aeda988ce8ec2",
+          "rollback": "rollback-20261027160200_keep_your_site_agency_home.sql",
+          "rollbackSha256": "91a8ed0f8a636930d5f6305205e8ade722f1968bdad1088baee969961280a906",
+          "rollbackStatus": "Restores the saved read_agency_client_home only while its fingerprint is unchanged; refuses later definitions or ACL changes. Applied, rolled back and re-applied on a throwaway local PostgreSQL 18 only; production UNRUN."
+        }
+      ]
     }
   ]
 }

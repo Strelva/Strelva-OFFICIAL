@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
-import { PostgresServiceRequestStore, ServiceRequestAccessError, ServiceRequestConflictError } from "@/platform/service-requests";
+import { ServiceRequestAccessError, ServiceRequestConflictError } from "@/platform/service-requests";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";

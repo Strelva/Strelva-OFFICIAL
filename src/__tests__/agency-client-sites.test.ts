@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { AgencyClientSitesPage } from "@/products/connected-sites/client";
 import type { ConnectedSiteChangesStore } from "@/products/connected-sites/changes-store";
 import type { ConnectedSite } from "@/products/connected-sites/contracts";
