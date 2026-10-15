@@ -68,6 +68,15 @@ describe("agency client shared read", () => {
     const html = renderToStaticMarkup(createElement(AgencyClientDeliveryCheck, { state: { status: "ready", data: projection }, selectedKey: `website:${id}`, workspaceId, onRetry: vi.fn() }));
     expect(html).toContain("resolved or no longer available");
   });
+  it("carries a connected-site delivery check: its key parses and its title renders", async () => {
+    const siteKey = `site:${id}`;
+    const withCheck: AgencyClientHome = { ...projection, deliveryChecks: [{ key: siteKey, title: "Website change on bakery.example", systemId: null, status: "not_confirmed", at }] };
+    const rpc = vi.fn(async () => ({ data: withCheck, error: null }));
+    expect(await readAgencyClientHome(actor, workspaceId, { rpc })).toEqual(withCheck);
+    const html = renderToStaticMarkup(createElement(AgencyClientDeliveryCheck, { state: { status: "ready", data: withCheck }, selectedKey: siteKey, workspaceId, onRetry: vi.fn() }));
+    expect(html).toContain("Website change on bakery.example");
+    expect(html).toContain("Read-back not confirmed");
+  });
   it("uses serving-agency identity even when the viewer has no agency membership", async () => {
     const rows = [request()];
     const rpc = vi.fn(async () => ({ data: [{ requestId: id, displayName: "North Studio" }], error: null }));

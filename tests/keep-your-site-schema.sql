@@ -77,6 +77,8 @@ begin
  perform pg_temp.ok(chg->>'stage'='planned_waiting' and chg->>'origin'='request' and chg->>'title'='Update the Saturday hours to 9-2','planned stage');
  perform pg_temp.ok(chg->'steps'->0->'actor'->>'displayName'='Agency','step actor is the agency');
  perform pg_temp.ok(public.connected_site_change_request_stage('27400000-0000-4000-8000-0000000000a1')='needs_you','request stage needs_you');
+ home:=public.read_agency_client_home(c.ws,c.staff,'staff@kys.example.test');
+ perform pg_temp.ok((select d->>'stage' from jsonb_array_elements(home->'deliveries') d where d->>'id'='27400000-0000-4000-8000-0000000000a1')='needs_you','agency Home shows Waiting on the owner');
  perform pg_temp.denied(format('select public.plan_connected_site_change(%L,%L,%L,%L,null,%L,null,%L::jsonb)',c.ws,c.staff,'staff@kys.example.test',c.site,'27400000-0000-4000-8000-0000000000a1',
    '{"pageUrl":"https://bakery.example/hours","editSteps":["a"],"expectText":"x","ownerFacing":true}'),'connected_site_change_out_of_order');
  -- A pending (unaccepted) request cannot be planned.
@@ -122,6 +124,8 @@ begin
  perform pg_temp.denied(format('select public.read_connected_site_change_releases(%L,%L,%L,now())',c.ws,c.stranger,'stranger@kys.example.test'),'workspace_access_denied');
  -- Home: stage follows the change
  home:=public.read_agency_client_home(c.ws,c.staff,'staff@kys.example.test');
+ perform pg_temp.ok((select d->>'stage' from jsonb_array_elements(home->'deliveries') d where d->>'id'='27400000-0000-4000-8000-0000000000a1')='done','agency Home shows done once the Release is recorded');
+ perform pg_temp.ok(jsonb_array_length(home->'deliveryChecks')=0,'a confirmed Release raises no delivery check');
  -- The Request task page
  v:=public.read_connected_site_change_for_request(c.owner,'owner@kys.example.test','27400000-0000-4000-8000-0000000000a1');
  perform pg_temp.ok(v->>'workspaceId'=c.ws::text and v->>'systemId'=c.sys::text,'request target');
@@ -153,6 +157,9 @@ begin
  perform pg_temp.ok(exists(select 1 from public.system_revisions where system_id=c.sys and summary like 'Changed on Wix: Fix the typo on the about page. Not confirmed on the live page.'),'revision says not confirmed');
  perform pg_temp.denied(format('select public.withdraw_connected_site_change(%L,%L,%L,%L,null)',c.ws,c.staff,'staff@kys.example.test',cid),'connected_site_change_out_of_order');
  perform pg_temp.ok(public.connected_site_change_request_stage('27400000-0000-4000-8000-0000000000a2')='done','unconfirmed counts as done in the Queue');
+ v:=public.read_agency_client_home(c.ws,c.staff,'staff@kys.example.test');
+ perform pg_temp.ok((select count(*) from jsonb_array_elements(v->'deliveryChecks') k where k->>'key' like 'site:%' and k->>'title'='Website change on bakery.example' and k->>'status'='not_confirmed')=1,'an unconfirmed Release shows as a delivery check');
+ perform pg_temp.ok((select d->>'stage' from jsonb_array_elements(v->'deliveries') d where d->>'id'='27400000-0000-4000-8000-0000000000a2')='done','unconfirmed Request leaves the Queue as done');
 
  -- An agency-origin change: declined, re-planned, then withdrawn by the owner.
  perform pg_temp.denied(format('select public.plan_connected_site_change(%L,%L,%L,%L,null,null,%L,%L::jsonb)',c.ws,c.staff,'staff@kys.example.test',c.site,'   ',

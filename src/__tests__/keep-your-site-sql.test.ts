@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -131,5 +131,37 @@ describe("20261027160100 keep your site: agency client websites", () => {
   it("never selects a site key or verification token", () => {
     expect(body).not.toContain("public_key");
     expect(body).not.toContain("verification_token");
+  });
+});
+
+describe("20261027160200 keep your site: agency Home", () => {
+  const sql = read("20261027160200_keep_your_site_agency_home.sql");
+  const original = read("20261024123500_ux_chrome_recorded_actors.sql");
+  const squash = (text: string) => text.replace(/\s+/g, " ").trim();
+  const functionOf = (text: string) => {
+    const start = text.indexOf("create or replace function public.read_agency_client_home(");
+    return text.slice(start, text.indexOf("end $$;", start) + 7);
+  };
+  const stageBranch = "when r.context->>'source'='connected_site_change' and r.provider_acceptance='accepted' and public.connected_site_change_request_stage(r.id) is not null then public.connected_site_change_request_stage(r.id)";
+  const releaseUnion = "union all select 'site:'||st.id,'Website change on '||cs.site_host,c.system_id,'not_confirmed',st.recorded_at from public.connected_site_change_steps st join public.connected_site_changes c on c.id=st.change_id join public.connected_sites cs on cs.id=c.connected_site_id where c.business_workspace_id=p_workspace_id and st.kind='released' and st.read_back='not_confirmed' and exists(select 1 from public.systems s where s.id=c.system_id and s.business_workspace_id=p_workspace_id and public.system_in_scope(p_workspace_id,s.origin_kind,s.origin_ref,scope.work_ids))";
+  it("is the newest definition it copies", () => {
+    const definitions = readdirSync(dir).filter(name => /^\d{14}_.*\.sql$/.test(name) && read(name).includes("function public.read_agency_client_home("));
+    expect(definitions.at(-2)).toBe("20261024123500_ux_chrome_recorded_actors.sql");
+    expect(definitions.at(-1)).toBe("20261027160200_keep_your_site_agency_home.sql");
+  });
+  it("equals the original body except for the two inserted fragments", () => {
+    const body = squash(functionOf(sql));
+    expect(body).toContain(stageBranch);
+    expect(body).toContain(releaseUnion);
+    expect(body.replace(stageBranch, "").replace(releaseUnion, "").replace(/\s+/g, " ")).toBe(squash(functionOf(original)));
+  });
+  it("is still stable and security definer", () => {
+    expect(functionOf(sql)).toContain("returns jsonb language plpgsql stable security definer");
+  });
+  it("rolls back only an untouched function", () => {
+    const rollback = read("rollback-20261027160200_keep_your_site_agency_home.sql");
+    expect(rollback).toContain("keep_your_site_home_rollback_drift");
+    expect(rollback).toContain("after_fingerprint");
+    expect(sql).toContain("md5(pg_get_functiondef(p.oid)||':'||p.proowner::text||':'||coalesce(p.proacl::text,''))");
   });
 });
