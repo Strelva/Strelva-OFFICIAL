@@ -284,6 +284,12 @@ nothing that wasn't theirs did.
       expiry.
     - Inquiry replies keep their own 24-hour budget
       (`src/products/inquiries/message-review-policy.ts`).
+    - Owner links never go to a staff address: when the trusted address
+      belongs to platform or agency staff the item is recorded as not sent
+      (`owner_recipient_is_staff`) and Owner not told says so. With
+      `STRELVA_OWNER_REACH_RELEASE`, the agency Queue shows each open owner
+      decision's lapse time and one "Owner not reachable" item for each
+      client whose owner cannot be told. The 14-day clock is unchanged.
 12. **The serving agency can escalate.** A `strelva_reviews` item an
     authorized agency reviewer will not decide becomes an `owner_decides`
     item, with that reviewer's note. This generalizes `escalateEventToOwner`

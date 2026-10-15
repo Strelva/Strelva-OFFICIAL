@@ -79,8 +79,8 @@ function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRo
     {reach.canIssueClaim && agencyWorkspaceId
       ? <StTextButton href={`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, client: client.workspaceId })}`}>Fix owner contact</StTextButton>
       : client.reach === "member"
-        ? <><StTextButton href={`/workspace/business-details?workspaceId=${encodeURIComponent(client.workspaceId)}`}>Add the owner's email</StTextButton><small className="block text-xs text-gray-muted">An address you add waits for the owner to confirm it.</small></>
-        : <small className="block text-xs text-gray-muted">Ask {client.name} for the owner's email.</small>}
+        ? <><StTextButton href={`/workspace/business-details?workspaceId=${encodeURIComponent(client.workspaceId)}`}>{"Add the owner's email"}</StTextButton><small className="block text-xs text-gray-muted">An address you add waits for the owner to confirm it.</small></>
+        : <small className="block text-xs text-gray-muted">Ask {client.name} for {"the owner's email"}.</small>}
   </span>;
 }
 

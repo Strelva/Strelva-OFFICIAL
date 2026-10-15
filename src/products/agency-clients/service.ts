@@ -11,6 +11,10 @@
  * owner's address, an owner claim link. A failed assessment leaves the added
  * client and owner link intact; a repeated add recovers the same assessment.
  *
+ * An owner claim is never issued to a staff address (platform operators and
+ * agency members or their domains): the database refuses it, because staff
+ * could otherwise approve owner decisions as the owner.
+ *
  * Copy-only is the default. Explicit claim delivery is behind its own
  * default-off release plus the shared client-email policy; converted clients
  * remain silent. The transactional invitation reserves an exact current claim
