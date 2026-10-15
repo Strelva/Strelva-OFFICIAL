@@ -36,7 +36,8 @@ import { websiteDocumentStore } from "@/products/websites";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
 import { createSiteChangeStore } from "@/products/websites/index";
 import { reconcileWebsiteSystemReleases } from "@/products/websites/index";
-import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
+import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, keepYourSiteReleasedFor, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
+import { connectedSiteHealth, installGuide } from "@/products/connected-sites/client";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs, type WebsiteDomainItem, type WebsiteSystemDetail } from "./website-detail";
 
 export interface WebsiteDetailSources {
@@ -52,6 +53,8 @@ export interface WebsiteDetailSources {
   rebuild: (actor: WorkspaceActor, workId: string) => Promise<{ rebuild: { status: string; candidate: { revision: number } | null; history: Array<{ at: string }> } } | null>;
   /** Null while STRELVA_CONNECTED_SITES_RELEASE is off. */
   connectedSites: (actor: WorkspaceActor, businessId: string) => Promise<ConnectedSitesOverview> | null;
+  /** Keep your site is on for this business (its own flag, on top of connected sites). */
+  keepYourSite?: (actor: WorkspaceActor, businessId: string) => Promise<boolean>;
   repoChanges?: ReturnType<typeof createSiteChangeStore>["list"];
   reconcileReleases?: typeof reconcileWebsiteSystemReleases;
 }
@@ -68,6 +71,7 @@ const liveSources: WebsiteDetailSources = {
   documents: websiteDocumentStore,
   repoChanges: (actor, businessId, systemId) => createSiteChangeStore().list(actor, businessId, systemId),
   reconcileReleases: reconcileWebsiteSystemReleases,
+  keepYourSite: (actor, businessId) => keepYourSiteReleasedFor(actor, businessId),
   rebuild: async (actor, workId) => {
     if (!websiteRebuildReleaseEnabled()) return null;
     const { readWebsiteRebuild } = await import("@/products/websites/index");
@@ -88,9 +92,10 @@ async function read<T>(label: string, unavailable: string[], fallback: T, run: (
 export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId: string, systemId: string, sources: WebsiteDetailSources = liveSources): Promise<WebsiteSystemDetail | null> {
   const connectedRead = sources.connectedSites(actor, businessId);
   const connected = connectedRead ? await connectedRead.catch(() => null) : null;
+  const keep = connected && sources.keepYourSite ? await sources.keepYourSite(actor, businessId).catch(() => false) : false;
   const listing = await sources.listSystems(actor, businessId, {
     store: createSupabaseSystemStore(),
-    ...(connected ? { connectedSites: async () => connected.sites.map(item => ({ id: item.id, label: item.label, siteUrl: item.siteUrl, siteHost: item.siteHost, status: item.status, verifiedAt: item.verifiedAt, lastEventAt: item.lastEventAt, createdAt: item.createdAt, updatedAt: item.updatedAt })) } : {}),
+    ...(connected ? { connectedSites: async () => connected.sites.map(item => ({ id: item.id, label: item.label, siteUrl: item.siteUrl, siteHost: item.siteHost, status: item.status, verifiedAt: item.verifiedAt, lastEventAt: item.lastEventAt, createdAt: item.createdAt, updatedAt: item.updatedAt, ...(keep ? { lastCheckedAt: item.lastCheckedAt, lastCheckResult: item.lastCheckResult } : {}) })) } : {}),
   });
   const site = listing.systems.find(item => item.system.id === systemId);
   if (!site || site.system.kind !== "website") return null;
@@ -170,7 +175,8 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     draftSections: Object.entries(drafts).filter(([, present]) => present).map(([section]) => section),
     siteReview: reviewing && savedWorkId ? { workId: savedWorkId, revision: reviewing.revision, at: rebuild?.rebuild.history.at(-1)?.at ?? null, href: workspaceHref(savedWorkId) } : null,
     changeRequests: selectWebsiteRequestHistory(events).map(row => ({ ...row, actor: eventActor(row.requestId) })),
-    serviceRequests: services.filter(row => row.status !== "draft" && aboutThisSite(row.context))
+    // Connected-site changes render in their own section on the page, not twice.
+    serviceRequests: services.filter(row => row.status !== "draft" && aboutThisSite(row.context) && !(keep && row.context.source === "connected_site_change"))
       .map(row => ({ id: row.id, outcome: row.outcome, createdAt: row.createdAt, status: row.status, commitment: row.deliveryCommitment?.status ?? null })),
     contentVersions: versions.map(row => ({ ...row, actor: recordedActor((row as unknown as Record<string, unknown>).actor) })),
     snapshots: snapshots.map(row => ({ ...row, actor: recordedActor((row as unknown as Record<string, unknown>).actor) ?? (row.actorUserId ? principalActors.get(row.actorUserId) : null) })),
@@ -185,7 +191,18 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
       lastEventAt: connectedSite.lastEventAt, activity: connectedSite.activity,
       inquiries: (connected?.inquiries ?? []).filter(item => item.siteId === connectedSite.id).slice(0, 10)
         .map(item => ({ id: item.id, name: item.name, email: item.email, message: item.message, capturedAt: item.capturedAt })),
+      ...(keep ? keepYourSiteFields(connectedSite) : {}),
     } } : {}),
     unavailable,
   });
+}
+
+/** What keep your site adds to a connected site's block: its install health and what it is built with. */
+function keepYourSiteFields(site: ConnectedSitesOverview["sites"][number]) {
+  const value = site.platform !== "unknown" ? site.platform : site.detectedPlatform ?? "unknown";
+  return {
+    keepYourSite: true as const,
+    health: connectedSiteHealth(site),
+    platform: { value, label: value === "unknown" ? "Not recognized" : installGuide(value).label, detected: site.platform === "unknown" && !!site.detectedPlatform },
+  };
 }

@@ -28,7 +28,8 @@ import { readToolReleases } from "@/platform/catalog-reports/tool-history";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
-import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/products/connected-sites/server";
+import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "@/products/connected-sites/server";
+import { connectedSiteHealth } from "@/products/connected-sites/client";
 import { connectedSitesStore } from "@/products/connected-sites/server";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
@@ -295,7 +296,13 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
 }
 
 /** A connected site is "reporting" while its script sends visits; silence for a week is worth a look. */
-export function connectedSiteObservation(subjectId: string, site: { siteHost: string; verified: boolean; lastEventAt: string | null }): Observation {
+export function connectedSiteObservation(subjectId: string, site: { siteHost: string; verified: boolean; lastEventAt: string | null; lastCheckedAt?: string | null; lastCheckResult?: "present" | "missing" | "unreachable" | null }, now = Date.now()): Observation {
+  // Keep your site read the live re-check: say what it found, not only that visits stopped.
+  if (site.lastCheckedAt !== undefined || site.lastCheckResult !== undefined) {
+    const health = connectedSiteHealth({ status: "active", siteHost: site.siteHost, verifiedAt: site.verified ? "1970-01-01T00:00:00.000Z" : null, lastEventAt: site.lastEventAt, lastCheckedAt: site.lastCheckedAt ?? null, lastCheckResult: site.lastCheckResult ?? null }, now);
+    const outcome = health.state === "reporting" ? "pass" : health.state === "stopped" ? "fail" : health.state === "unreachable" ? "warn" : "unknown";
+    return { subjectId, signal: "connected_site.reporting", outcome, observedAt: outcome === "unknown" ? null : site.lastCheckedAt ?? site.lastEventAt, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: health.detail };
+  }
   if (!site.verified) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `Waiting for proof that ${site.siteHost} is this business's site.` };
   if (!site.lastEventAt) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} has not reported a visit yet. Check the Strelva script is on the page.` };
   return { subjectId, signal: "connected_site.reporting", outcome: "pass", observedAt: site.lastEventAt, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} is reporting visits.` };
@@ -327,10 +334,16 @@ export function inquiryFormUnchecked(subjectId: string): Observation {
 /** Connected sites join the projection only while their release is on for this business. */
 function connectedSitesReader(actor: WorkspaceActor, businessId: string): (() => Promise<ExistingConnectedSite[]>) | undefined {
   if (!connectedSitesReleaseEnabled()) return undefined;
-  return async () => !(await connectedSitesReleasedFor(actor, businessId).catch(() => false)) ? [] : (await connectedSitesStore().list(actor, businessId)).map((site) => ({
+  return async () => {
+    if (!(await connectedSitesReleasedFor(actor, businessId).catch(() => false))) return [];
+    // Keep your site: carry the last live re-check so Health can say what it found.
+    const keepYourSite = keepYourSiteMayBeOn() && await keepYourSiteReleasedFor(actor, businessId).catch(() => false);
+    return (await connectedSitesStore().list(actor, businessId)).map((site) => ({
     id: site.id, label: site.label, siteUrl: site.siteUrl, siteHost: site.siteHost, status: site.status,
     verifiedAt: site.verifiedAt, lastEventAt: site.lastEventAt, createdAt: site.createdAt, updatedAt: site.updatedAt,
-  }));
+    ...(keepYourSite ? { lastCheckedAt: site.lastCheckedAt, lastCheckResult: site.lastCheckResult } : {}),
+    }));
+  };
 }
 
 export interface LiveSystemsDeps {

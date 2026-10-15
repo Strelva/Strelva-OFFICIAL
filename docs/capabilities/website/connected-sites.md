@@ -141,7 +141,96 @@ bytes and a 16-hex SHA-256 hash).
   inquiry route, which needs a verified host and Origin.
 
 - Installation on a real Wix or Squarespace site. Never run end to end on a
-  builder.
+  builder (also true of the keep-your-site section above).
+
+## Keep your site for agencies (lane 13, local, flag `keep_your_site` off)
+
+Built Oct 15 on `grade/keep-your-site`. Nothing here is in production, nothing
+is applied, and with no env set every path below is off for every business.
+
+**What it adds for a connected site**
+
+- **Install health.** The System says not installed yet, installed, installed
+  and reporting, stopped reporting, or couldn't open the site. It comes from
+  stored evidence (`connected_sites.last_check_result`, `last_checked_at`, the
+  last visit) and an on-demand "Check the live site" that re-reads the page.
+- **What it is built with.** Detected from the live page (generator tag, asset
+  hosts, response headers; `platform-detect.ts`) and stored as
+  `detected_platform`. It never overwrites the platform the owner chose.
+- **Changes on this site.** The owner (or Ask) files a Request to the business's
+  agency (`service_requests`, `context.source = 'connected_site_change'`). The
+  agency accepts it and saves the exact edit for the builder's own editor
+  (`edit-guides.ts`). When the plan is owner-facing the owner says yes in
+  Needs you (`system.change_live`, Make it live / Not yet). The agency makes the
+  edit in the builder and marks it done. Strelva then reads the live page and,
+  when it sees the new text, records a numbered Release. Strelva never edits
+  the site and cannot sign in to any builder.
+- **Client websites.** In the agency's Clients, one table of every staffed
+  client's website: what it is built with, install state, last visit, "Get the
+  two lines" with per-platform steps, and bulk checks. Every agency, Strelva
+  Agency included, takes the same path.
+
+**Stages of a change** (`connected_site_change_stage`, mirrored by
+`connectedSiteChangeStage`): `unplanned`, `planned_waiting`, `ready_to_make`,
+`declined`, `checking`, `not_seen`, `done`, `done_unconfirmed`, `withdrawn`.
+Steps are append-only (`connected_site_change_steps`); nothing rewrites them.
+
+**Releases.** A Release is a `system_revisions` row on the connected site's
+website System with implementation kind `connected_site` and release key
+`connected-change:<change>:<step>`, recorded through
+`append_website_system_release`. It does not touch `website_change_receipts`
+or `reconcile_website_system_releases`. A check that does not see the change
+leaves the change at `not_seen`; the agency may check again, or record a
+Release that says Strelva did not see it live (`done_unconfirmed`), which also
+shows as a delivery check on the agency Home.
+
+**Gates.** `STRELVA_KEEP_YOUR_SITE_RELEASE` (`keep_your_site`: unset/`0` off,
+`workspace` per business rows, `1` on except rows off) on top of
+`connected_sites` for the same business, Systems and `STRELVA_WORKSPACE_RELEASE`.
+Owner-facing plans also need `STRELVA_NEEDS_YOU_RELEASE`; without it the plan is
+refused with "Owner approvals use Needs you, which isn't on for this business
+yet". Agency ceilings bind the flag to website Systems; it is not operator-only.
+`STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL` is off: Needs you emails an owner
+about a planned change only when it is `1` **and** `EMAIL_SENDING_ENABLED` is on,
+and the screen says plainly when the owner was not emailed.
+
+**Held migrations** (`20261027160000`, `20261027160100`, `20261027160200`; the
+requested `2026102730xxxx` is not a valid UTC time, so these sort after the
+last wave-2 timestamp). Registered as held in
+`scripts/release-safety/batches.json`. Hard prerequisites, in order:
+
+1. Batch 6 (connected sites, `20261008151000`) if not already applied.
+2. Connections core `20261026100000` and `20261026120100`: `connectSite` calls
+   `create_connected_site_for_installer` and `read_connected_site_installer`,
+   which live there. Flipping the env alone would fail on connect.
+3. Agency ceilings `20261021093000` and `20261024123500` (the Home read).
+
+`20261027160200` replaces `read_agency_client_home` with a copy of
+`20261024123500` plus two additions; any later replacement must carry both.
+
+**What a live-page check can see.** It reads the server-rendered HTML Strelva
+receives (pinned, public addresses only, 2 MB, 5 redirects). Text a builder
+draws in the browser (some Wix, Duda and GoDaddy templates) reads as "not
+seen". The screen says so.
+
+**Seen is not the same as changed.** When the agency saves the plan, Strelva
+reads the page and stores what it showed (the baseline). A later sighting
+becomes a Release only when the baseline did not already show the change.
+Text that was already there, a baseline that could not be read, and older
+changes with no baseline all land on "Not seen yet" with a note to take a look,
+and the agency can still record the Release as not confirmed. The Release
+summary says the text was not on the page before the edit.
+
+**Proof so far.** Static SQL tests, TypeScript tests, and
+`tests/keep-your-site-schema.sql` run against a throwaway local PostgreSQL 18
+with the whole migration chain applied, including rollback and re-apply. That
+SQL has not run on a production-shaped copy. Not proven:
+
+- a real Wix, Squarespace or WordPress install, or a real change followed
+  through a builder;
+- the edit guides, which are written from vendor help pages (Oct 2026) and not
+  yet followed on a live account;
+- any phone-width pass of the new screens in a browser.
 
 ## Published schema disagreements (#503, local preparation)
 

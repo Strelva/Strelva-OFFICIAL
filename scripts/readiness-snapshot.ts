@@ -264,6 +264,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261026170000": "business_ai_controls",
   "20261026180000": "agency_pay_links",
   "20261027120300": "website_code_releases",
+  "20261027160100": "connected_site_changes",
   "20261028100000": "app_events",
   "20261028100300": "listing_sync_checks",
   "20261028100400": "care_reports",

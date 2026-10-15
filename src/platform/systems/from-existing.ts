@@ -95,6 +95,13 @@ export const existingManagedWebsiteSchema = z.object({
   linkedAt: iso,
 });
 
+/** The re-check fields ride along only when keep your site read them. */
+function checkFields(site: { lastCheckedAt?: string | null; lastCheckResult?: "present" | "missing" | "unreachable" | null }) {
+  return site.lastCheckedAt === undefined && site.lastCheckResult === undefined
+    ? {}
+    : { lastCheckedAt: site.lastCheckedAt ?? null, lastCheckResult: site.lastCheckResult ?? null };
+}
+
 /** A website the business runs elsewhere and connected by script (connected_sites). */
 export const existingConnectedSiteSchema = z.object({
   id: z.string().uuid(),
@@ -104,6 +111,9 @@ export const existingConnectedSiteSchema = z.object({
   status: z.enum(["active", "revoked"]),
   verifiedAt: z.string().nullable(),
   lastEventAt: z.string().nullable(),
+  /** Keep your site only: the last live re-check of the page. Absent otherwise. */
+  lastCheckedAt: z.string().nullable().optional(),
+  lastCheckResult: z.enum(["present", "missing", "unreachable"]).nullable().optional(),
   createdAt: iso,
   updatedAt: iso,
 });
@@ -164,7 +174,7 @@ export interface SystemListing {
   /** Native ids this System stands for (work id, tenant id, connected site). */
   references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null; connectedSiteId?: string | null; inquiryBusinessId?: string };
   /** A connected site's address and reporting, for its surface and health. */
-  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null; lastCheckedAt?: string | null; lastCheckResult?: "present" | "missing" | "unreachable" | null };
 }
 
 export interface ConnectionListing {
@@ -315,7 +325,7 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
   for (const site of snapshot.connectedSites) {
     const rebuilt = systems.find(item => item.references.connectedSiteId === site.id);
     if (rebuilt) {
-      rebuilt.connectedSite = { siteUrl: site.siteUrl, siteHost: site.siteHost, verified: site.verifiedAt !== null, lastEventAt: site.lastEventAt };
+      rebuilt.connectedSite = { siteUrl: site.siteUrl, siteHost: site.siteHost, verified: site.verifiedAt !== null, lastEventAt: site.lastEventAt, ...checkFields(site) };
       // A draft alternative does not pause the site that is already live.
       if (rebuilt.system.lifecycle === "draft" && site.status === "active" && site.verifiedAt) {
         rebuilt.system.lifecycle = "live";
@@ -335,7 +345,7 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
       system, provenance: "existing",
       basis: site.status === "revoked" ? "Disconnected from Strelva; the site itself is unchanged." : verified ? `Connected; ${site.siteHost} is proven to be this business's.` : `Waiting for proof that ${site.siteHost} is this business's.`,
       references: { savedWorkId: null, tenantStableId: null, tenantId: null, connectedSiteId: site.id },
-      connectedSite: { siteUrl: site.siteUrl, siteHost: site.siteHost, verified, lastEventAt: site.lastEventAt },
+      connectedSite: { siteUrl: site.siteUrl, siteHost: site.siteHost, verified, lastEventAt: site.lastEventAt, ...checkFields(site) },
     });
     connections.push({ provenance: "existing", connection: existingConnection(system, "read",
       { type: "business_resource", resource: "business_record:facts" }, verified && site.status === "active" ? "connected" : "disconnected",

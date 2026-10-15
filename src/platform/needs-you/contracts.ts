@@ -175,6 +175,7 @@ export const SOURCE_LIFECYCLES = [
   "listings_sync",
   "app_intake_live",
   "app_intake_visit",
+  "connected_site_change",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

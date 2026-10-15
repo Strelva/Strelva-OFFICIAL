@@ -97,7 +97,7 @@ interface HighLevelConnection { status: "connected" | "needs_reauth" | "revoked"
 /** One row of the agency's list. `uid` is its place in this list; two rows may share a source ref. */
 interface Item { uid: number; sheetRow: number; entry: ClientImportPreviewRow }
 
-export function AgencyImportClients({ agencyWorkspaceId, highLevel = false, initialSource, initialNotice, initialError }: { agencyWorkspaceId: string; highLevel?: boolean; initialSource?: "highlevel"; initialNotice?: string; initialError?: string }) {
+export function AgencyImportClients({ agencyWorkspaceId, highLevel = false, keepYourSite = false, initialSource, initialNotice, initialError }: { agencyWorkspaceId: string; highLevel?: boolean; /** Keep your site could be on: point to Clients → Client websites after an import. */ keepYourSite?: boolean; initialSource?: "highlevel"; initialNotice?: string; initialError?: string }) {
   const id = useId().replace(/:/g, "");
   const agencyHref = `/workspace?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`;
   const [step, setStep] = useState<Step>("source");
@@ -335,6 +335,8 @@ export function AgencyImportClients({ agencyWorkspaceId, highLevel = false, init
         {source === "sheet" ? <StTextButton onClick={() => setStep("columns")}>Change columns</StTextButton> : <StTextButton onClick={() => setStep("source")}>Use a different source</StTextButton>}
       </div> : null}
     </StSection> : null}
+
+    {step === "done" && keepYourSite ? <StNotice action={<StTextButton href={`/workspace?${new URLSearchParams({ workspaceId: agencyWorkspaceId, view: "clients" })}`}>Open Client websites</StTextButton>}>See which of these clients&rsquo; sites are on Wix, Squarespace, WordPress and others in Clients &rarr; Client websites.</StNotice> : null}
 
     {step === "done" ? <StSection title="Owner claim links" meta={`${links.length} ${links.length === 1 ? "link" : "links"}`} action={links.length ? <span className="inline-flex flex-wrap gap-4">
       <StTextButton onClick={() => void copy(links.map((row) => `${row.row.name ?? row.row.url ?? ""}\t${row.row.ownerEmail ?? ""}\t${absolute(row.ownerClaimPath!)}`).join("\n"), "all")}>{copied === "all" ? <><Check size={14} aria-hidden="true" />Copied</> : <><Copy size={14} aria-hidden="true" />Copy all</>}</StTextButton>

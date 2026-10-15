@@ -40,6 +40,10 @@ import { createSiteChangeStore, siteChangeOwnerEmailEnabled, sitesByCodeReleased
 import { listingsSyncAdapter } from "@/platform/needs-you/sources/listings-sync";
 import { intakeOwnerEmailEnabled } from "@/products/vertical-intake/server";
 import { appIntakeLiveAdapter, appIntakeVisitAdapter } from "@/server/needs-you/sources/app-intake";
+import { connectedSiteChangeAdapter } from "@/platform/needs-you/sources/connected-site-change";
+import { editGuide } from "@/products/connected-sites/client";
+import type { SitePlatform } from "@/products/connected-sites/contracts";
+import { connectedSiteChangeOwnerEmailEnabled, connectedSiteChangesStore, keepYourSiteReleasedFor, readConnectedSiteChangeHandled } from "@/products/connected-sites/server";
 
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -84,6 +88,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       if (row.sourceLifecycle === "listings_sync") return (await import("@/products/listings-sync/server")).listingsOwnerEmailEnabled();
       if (row.sourceLifecycle === "app_intake_live" || row.sourceLifecycle === "app_intake_visit") return intakeOwnerEmailEnabled();
       if (row.sourceLifecycle === "website_change") return siteChangeOwnerEmailEnabled();
+      // Built and default off: owners are not emailed about a planned change on their site unless this switch is on too.
+      if (row.sourceLifecycle === "connected_site_change") return connectedSiteChangeOwnerEmailEnabled();
       if (row.sourceLifecycle !== "website_domain") return true;
       const domains = await import("@/platform/needs-you/sources/website-domain-store");
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
@@ -126,6 +132,13 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         apply: async (actor, id, hash) => (await import("@/products/listings-sync/server")).applyListingFixes(actor, id, hash),
         decline: async (id, revision, by) => { await (await import("@/products/listings-sync/server")).listingsSyncStore.declinePlan(id, revision, by); },
       }),
+      // A planned change on a connected site waits for the owner (keep your site, off by default).
+      connectedSiteChangeAdapter({
+        enabled: (actor, workspaceId) => keepYourSiteReleasedFor(actor, workspaceId),
+        pending: (actor, workspaceId) => connectedSiteChangesStore().reviews(actor, workspaceId),
+        decide: (actor, workspaceId, changeId, decision) => connectedSiteChangesStore().decide(actor, workspaceId, changeId, decision).then(changed => ({ stage: changed.stage })),
+        platformLabel: platform => editGuide(platform as SitePlatform).label,
+      }),
       ...systemsSourceAdapters(store, effects.google),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
@@ -165,14 +178,15 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const decided = decidedTenantEventIds(rows);
   // The actor-scoped handled read must succeed before unscoped tenant discovery.
   // Receipt sources recheck their own access; required failures still reject.
-  const [events, reports, notices] = await Promise.all([
+  const [events, reports, notices, siteChanges] = await Promise.all([
     store.linkedTenants(workspaceId).catch(() => []).then(tenants => Promise.all(tenants.map(async link =>
       (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
         .filter(event => !decided.has(`${link.tenantId}:${event.id}`)))).then(rows => rows.flat())),
     readCatalogReportHandled(actor, workspaceId, sinceIso),
     readToolNoticeHandled(actor, workspaceId, sinceIso),
+    readConnectedSiteChangeHandled(actor, workspaceId, sinceIso),
   ]);
-  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports, ...notices], since).slice(0, 50);
+  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports, ...notices, ...siteChanges], since).slice(0, 50);
 }
 
 /** Booking capture opens only this request; the hourly cron remains recovery. */

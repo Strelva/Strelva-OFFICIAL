@@ -7,6 +7,8 @@ import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import type { WebsiteHistoryItem, WebsiteRequestItem, WebsiteSystemDetail, WebsiteWaitingItem } from "./website-detail";
 import { mergeWebsiteHistory } from "./website-detail";
+import { ConnectedSiteChanges } from "@/experience/connected-sites/ConnectedSiteChanges";
+import { connectedSiteHealth } from "@/products/connected-sites/client";
 import type { SystemHistoryRow } from "./model";
 import styles from "./website-panels.module.css";
 
@@ -78,6 +80,23 @@ function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspa
   const [verified, setVerified] = useState(site.verified);
   const [checking, setChecking] = useState(false);
   const [message, setMessage] = useState<{ tone: "status" | "alert"; text: string } | null>(null);
+  // Keep your site: install health from the stored evidence, refreshed by a live re-check.
+  const keep = site.keepYourSite === true;
+  const [health, setHealth] = useState(site.health);
+  const [rechecking, setRechecking] = useState(false);
+  async function recheck() {
+    setRechecking(true); setMessage(null);
+    try {
+      const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "check", workspaceId, siteId: site.siteId }) });
+      const body = await response.json().catch(() => null) as { site?: Parameters<typeof connectedSiteHealth>[0]; error?: string } | null;
+      if (response.ok && body?.site) { const next = connectedSiteHealth(body.site); setHealth(next); setMessage({ tone: "status", text: `${next.label}. ${next.detail}` }); }
+      else setMessage({ tone: "alert", text: body?.error || "We couldn't check the site just now. Nothing changed." });
+    } catch {
+      setMessage({ tone: "alert", text: "We couldn't reach Strelva just now. Nothing changed." });
+    } finally {
+      setRechecking(false);
+    }
+  }
   async function check() {
     setChecking(true); setMessage(null);
     try {
@@ -93,8 +112,14 @@ function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspa
   }
   const counts = Object.entries(site.activity).filter(([kind]) => ACTIVITY_WORDS[kind]).map(([kind, n]) => `${n} ${ACTIVITY_WORDS[kind]![n === 1 ? 0 : 1]}`);
   const install = site.install ? [site.install.meta, site.install.script].filter(Boolean).join("\n") : "";
-  return <StSection id={`${systemId}-connected`} title="Connected site" meta={<StState kind={verified ? "live" : "need"}>{verified ? "Connected" : "Not connected yet"}</StState>}>
+  const meta = keep && health ? <StState kind={health.tone}>{health.label}</StState> : <StState kind={verified ? "live" : "need"}>{verified ? "Connected" : "Not connected yet"}</StState>;
+  return <><StSection id={`${systemId}-connected`} title="Connected site" meta={meta}>
     <p className={styles.description}>Your site stays where it is. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.</p>
+    {keep && health ? <StRows label="About this connection">
+      <StRow title="Install" detail={health.detail} />
+      <StRow title="Built with" detail={site.platform ? `${site.platform.label}${site.platform.detected ? " (found on the live page)" : ""}` : "Not recognized"} />
+    </StRows> : null}
+    {keep && verified && !readOnly ? <div><StPill variant="soft" busy={rechecking} onClick={() => void recheck()}>{rechecking ? "Checking…" : "Check the live site"}</StPill></div> : null}
     {!verified ? site.install && !readOnly ? <div className={styles.connectSteps}>
       <StSurface label="Installation lines"><div className={styles.stack}>
         <h3 className={styles.stepTitle}>1. Add the installation lines</h3>
@@ -111,7 +136,7 @@ function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspa
     </StRows>}
     {message ? <StNotice tone={message.tone === "alert" ? "critical" : undefined}><span role={message.tone}>{message.text}</span></StNotice> : null}
     {site.inquiries.length ? <StRows label={`Inquiries from ${site.siteHost}`}>{site.inquiries.map(item => <StRow key={item.id} title={item.name} detail={<>{item.message ? <>{item.message.slice(0, 160)}<br /></> : null}{item.email}</>} end={<StMono as="time" dateTime={item.capturedAt}>{when(item.capturedAt)}</StMono>} />)}</StRows> : verified ? <StEmpty>No inquiries yet.</StEmpty> : null}
-  </StSection>;
+  </StSection>{keep ? <ConnectedSiteChanges workspaceId={workspaceId} systemId={systemId} /> : null}</>;
 }
 
 /**

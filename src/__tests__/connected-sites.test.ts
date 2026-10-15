@@ -21,6 +21,7 @@ function store(overrides: Partial<ConnectedSitesStore> = {}): ConnectedSitesStor
   return {
     create: vi.fn(async () => stored), list: vi.fn(async () => [stored]), update: vi.fn(async () => stored), revoke: vi.fn(async () => stored),
     confirmVerification: vi.fn(async () => ({ ...stored, verifiedAt: "2026-10-08T01:00:00Z", verificationToken: null })),
+    recordCheck: vi.fn(async () => stored),
     inquiries: vi.fn(async () => []), activity: vi.fn(async () => ({})), resolve: vi.fn(async () => site),
     context: vi.fn(async () => ({ revision: 4, facts: { display_name: "Fictional Bakery", phone: "716-555-0100", hours: { timezone: "America/New_York", weekly: [{ day: 1, opens: "08:00", closes: "16:00" }] }, links: [{ kind: "booking", url: "https://book.example/bakery" }, { kind: "instagram", url: "https://instagram.com/bakery" }], address: { line1: "1 Main St", city: "Buffalo", region: "NY", postalCode: "14201" } }, services: [{ name: "Custom cakes", description: null, priceText: "From $40" }], site: { captureForms: true, injectSchema: true } })),
     recordEvents: vi.fn(async (_key, _origin, events) => events.length),

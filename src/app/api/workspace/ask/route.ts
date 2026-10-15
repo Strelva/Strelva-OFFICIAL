@@ -21,6 +21,7 @@ import {
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
 import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
 import { withWebsiteChangeRequests } from "./site-requests";
+import { withConnectedSiteChangeRequests } from "./connected-site-requests";
 import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
 import { createAskPossibilityPort } from "./possibilities-server";
@@ -108,7 +109,8 @@ export async function POST(request: Request) {
     // ADR 0015: a Request goes to the business's recorded agency, never a default one.
     const serviceRequests = new ServiceRequestService(PostgresServiceRequestStore);
     // With sites_by_code on, a code change to a repo site files as a website Request a coding agent can pick up.
-    const requests = withWebsiteChangeRequests(createServiceRequestAdapter(serviceRequests,
+    // A change asked about a connected-site System is a connected-site Request (keep your site); everything else files as before.
+    const requests = withConnectedSiteChangeRequests(withWebsiteChangeRequests(createServiceRequestAdapter(serviceRequests,
       async (current, workspaceId) => askAgencyFromOptions(await readServiceRequestProviders(current, workspaceId))), {
       released: (workspaceId) => sitesByCodeReleased(workspaceId, { operator: false, tester: false, userId: actor.userId }),
       async repoSite(current, workspaceId, systemId) {
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
       },
       provider: readSiteChangeProvider,
       execute: (current, command) => serviceRequests.execute(current, command),
-    });
+    }));
     const needsYou = askNeedsYou(actor);
     const deps: AskTurnDeps = {
       isOperator: await isSuperAdmin(),

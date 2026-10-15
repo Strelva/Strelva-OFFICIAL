@@ -25,6 +25,7 @@ marketing site in lockstep. Their `package.json` versions must always match.
   (`STRELVA_CARE_REPORTS_RELEASE`); share links (`STRELVA_CARE_REPORT_SHARE_LINKS`)
   and email (`STRELVA_CARE_REPORT_EMAIL`) are separate switches, also off. Held
   migration and SQL fixture only; nothing is applied or sent.
+- Prepare Keep your site for connected sites behind `keep_your_site` (off): install health, what a site is built with, agency change Requests with the exact edit, live-page checks and Releases, and Clients → Client websites. Three held migrations; no owner email, no prices.
 
 This is the prepared source cut, not a production deployment or tag receipt.
 October 12–13 go-live claims and October 14 observations are recorded separately

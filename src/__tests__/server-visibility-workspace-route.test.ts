@@ -11,7 +11,8 @@ vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => 
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: async () => true }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
-vi.mock("@/lib/pinned-public-text", () => ({ fetchPinnedPublicText: deps.fetchPage }));
+// Live page reads go through the platform pinned fetch (site-checks.ts).
+vi.mock("@/platform/infra/pinned-public-text", async (importOriginal) => ({ ...(await importOriginal<object>()), fetchPinnedPublicText: deps.fetchPage }));
 
 import { setConnectedSitesStoreForTests } from "@/products/connected-sites/store";
 import { setBusinessPagesStoreForTests } from "@/products/connected-sites/business-pages-store";

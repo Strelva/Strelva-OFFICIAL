@@ -17,7 +17,7 @@ vi.mock("@/lib/website-page-data", () => ({ loadSiteEditorData: f.editor, loadBr
 vi.mock("@/products/websites/server", async (importOriginal) => ({ ...(await importOriginal<object>()), resolveWorkspaceSite: f.resolve }));
 vi.mock("@/products/websites/index", () => ({ listWebsiteRebuilds: f.records, websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleasedFor: f.rebuild }));
-vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: f.connected, readConnectedSites: f.sites }));
+vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: f.connected, keepYourSiteReleasedFor: async () => false, readConnectedSites: f.sites }));
 vi.mock("@/products/agency-clients/server", () => ({ providerSeatBusiness: f.seat }));
 vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => createElement("main", {}, children) }));
 import WorkspaceSitePage from "@/app/workspace/site/page";

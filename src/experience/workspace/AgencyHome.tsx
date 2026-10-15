@@ -1,5 +1,6 @@
 "use client";
 
+import { AgencyClientSites } from "@/experience/connected-sites/AgencyClientSites";
 import { AgencyProposals } from "./agency/AgencyProposals";
 
 import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, RefreshCw, Users } from "lucide-react";
@@ -344,6 +345,7 @@ export function AgencyHome({
     <AgencyPanel labelled={Boolean(controlledView) || !released} id={tab(view === "home" ? "home" : "clients").panelId} tabId={tab(view === "home" ? "home" : "clients").id} active={view === "home" || view === "clients"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       {clientList}
       {clients.status === "ready" && (view === "clients" || !released) ? <AgencyCareReports agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} request={request} /> : null}
+      {snapshot.releases?.keepYourSite && view === "clients" ? <AgencyClientSites agencyWorkspaceId={snapshot.workspaceId} request={request} /> : null}
       {!released ? <StSection title="Needs attention across clients">{queueList}<AgencyProposals key={snapshot.workspaceId} onAccepted={retry} agencyWorkspaceId={snapshot.workspaceId} agencyName={agencyName} canManage={current?.role === "owner" || current?.role === "admin"} transport={request} showListing={false} /><ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /></StSection> : null}
     </AgencyPanel>
 

@@ -1521,6 +1521,17 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
    business first (`on`; the link has no viewer, so `operators` never
    applies), Jacob approves one Make real plan from the email, then the
    next business. Each row is its own yes.
+8e. Keep your site (`keep_your_site`, held batch `keep-your-site-2026-10-15`:
+   `20261027160000`, `20261027160100`, `20261027160200`). Before any
+   `STRELVA_KEEP_YOUR_SITE_RELEASE` value, these must be applied: batch 6
+   (`20261008151000`), Connections core `20261026100000` and
+   `20261026120100` (`connectSite` calls `create_connected_site_for_installer`
+   and `read_connected_site_installer`, which only those create; flipping the
+   env without them fails on connect), agency ceilings `20261021093000` and
+   `20261024123500`. Then `STRELVA_KEEP_YOUR_SITE_RELEASE=workspace` and a
+   row per business that already has `connected_sites` on. Owner-facing plans
+   also need step 8. `STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL` stays unset
+   until step 10.
 9. One at a time: `STRELVA_INQUIRIES_RELEASE` and
    `STRELVA_WEBSITE_REBUILD_RELEASE` per business through `workspace` rows,
    then `1` only when every converted business is `on` or explicitly `off`

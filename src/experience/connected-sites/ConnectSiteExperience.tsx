@@ -21,6 +21,8 @@ export interface ConnectableSite {
   snippet: { script: string; meta: string | null };
   /** What the owner said the site is built with, when known. */
   platform?: SitePlatform;
+  /** Keep your site: what the live page says it is built with. Display only; never changes the saved platform. */
+  detectedPlatform?: SitePlatform | null;
 }
 
 const PLATFORM_OPTIONS = GUIDE_ORDER.filter(value => (PLATFORMS as readonly string[]).includes(value)).map(value => ({ value, label: installGuide(value).label }));
@@ -28,7 +30,7 @@ const UNCONFIRMED_CONNECTION = "We couldn't confirm the connection's current sta
 const connectedResponse = z.object({ site: z.object({
   id: z.string().uuid(), siteHost: z.string().min(1), siteUrl: z.string().url(), status: z.enum(["active", "revoked"]),
   verifiedAt: z.string().nullable(), systemId: z.string().uuid(), snippet: z.object({ script: z.string(), meta: z.string().nullable() }),
-  platform: z.enum(PLATFORMS).optional(),
+  platform: z.enum(PLATFORMS).optional(), detectedPlatform: z.enum(PLATFORMS).nullable().optional(),
 }) });
 // Confirmation mirrors normalizeSiteUrl's stored address; the server owns validation.
 function submittedAddress(raw: string): { siteUrl: string; siteHost: string } | null {
@@ -128,7 +130,9 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     catch { setError("Copy is unavailable. Select the lines and copy them manually."); }
   }
   // The guide follows what the owner chose; they can switch it without changing the saved site.
-  const shownPlatform: SitePlatform = guidePlatform ?? site?.platform ?? platform;
+  // A site saved as "unknown" follows what its live page says it is built with, when we have read that.
+  const detected = site && (!site.platform || site.platform === "unknown") && site.detectedPlatform && site.detectedPlatform !== "unknown" ? site.detectedPlatform : null;
+  const shownPlatform: SitePlatform = guidePlatform ?? detected ?? site?.platform ?? platform;
   const guide = installGuide(shownPlatform);
   async function copySteps() {
     if (!site) return;
@@ -176,6 +180,7 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
         </StSection>
       </div>
       {!site.verifiedAt ? <StSection title="Where to paste them" meta={guide.label}>
+          {detected && !guidePlatform ? <p className={styles.body}>Looks like {installGuide(detected).label}, from the live page.</p> : null}
           <SelectInput label="Your site is built with" value={shownPlatform} options={PLATFORM_OPTIONS} onChange={event => { setGuidePlatform(event.target.value as SitePlatform); setStepsCopied(false); }} />
           {guide.supported ? null : <StNotice>{guide.label} can&rsquo;t run these lines.</StNotice>}
           <StRows label={`Steps for ${guide.label}`}>{guide.steps.map((step, index) => <StRow key={step} lead={<StMono>{index + 1}</StMono>} title={step} stackOnPhone={false} />)}</StRows>

@@ -14,10 +14,6 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { scoreLeadSpam } from "@/lib/lead-spam";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
-import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { releaseFlagEnvMode } from "@/platform/release-flags/resolve";
-import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   BEACON_EVENT_KINDS, PLATFORMS, SITE_KEY_PATTERN, VERIFICATION_META_NAME, beaconBatchSchema, businessJsonLd, contactFromFields,
@@ -26,7 +22,7 @@ import {
 } from "./contracts";
 import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { recordPlatformSchema } from "./schema-conflicts";
-import { systemOriginId } from "@/platform/systems/invariants";
+import { connectedSiteSystemId } from "./system-id";
 import { connectionEligibilityFor } from "@/platform/connections/server";
 import { recordConnectionHolder } from "@/platform/connections/holders";
 import { resolveConnectedSiteInstaller } from "./installer";
@@ -35,40 +31,15 @@ export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
 export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
 export { platformSchemaFromHtml, comparePlatformSchema, type PlatformSchemaReport } from "./schema-facts";
 export { publicFactsFromRecord, type PublicFacts } from "./contracts";
+export { checkClientSites, connectClientSite, detectClientSites, readAgencyClientSites } from "./agency-sites";
+export { readConnectedSiteChangeHandled } from "./changes-handled";
+export { askConnectedSiteChange, checkConnectedSiteChange, connectedSiteChangeView, markConnectedSiteChangeDone, planConnectedSiteChange } from "./changes";
+export { connectedSiteChangesStore, createConnectedSiteChangesStore, setConnectedSiteChangesStoreForTests, type ConnectedSiteChangesStore } from "./changes-store";
+export { checkConnectedSite, fetchLiveSitePage, fetchSiteFingerprint, recordDetectedBuilder, type SiteFingerprint } from "./site-checks";
+import { fetchLiveSitePage } from "./site-checks";
+export { connectedSiteChangeOwnerEmailEnabled, keepYourSiteMayBeOn, keepYourSiteReleasedFor } from "./keep-your-site-release";
 
-/**
- * The cheap early gate: connected sites could be on for at least one
- * business (workspace release, and STRELVA_CONNECTED_SITES_RELEASE `1` or
- * `workspace`). Every path that knows its business then asks the
- * per-business check below.
- */
-export function connectedSitesReleaseEnabled(): boolean {
-  return workspaceReleaseEnabled() && releaseFlagEnvMode("connected_sites") !== "off";
-}
-
-/**
- * Per workspace, wherever the workspace is known (release-flag rule): the
- * business's own `connected_sites` row, and Systems on for it (a connected
- * site becomes a website System, so it also follows Systems).
- */
-export async function connectedSitesReleasedFor(actor: { userId: string }, workspaceId: string): Promise<boolean> {
-  if (!connectedSitesReleaseEnabled()) return false;
-  const { releaseViewerFor } = await import("@/platform/release-flags/viewer");
-  if (!(await workspaceReleaseFlagEnabled("connected_sites", workspaceId, await releaseViewerFor(actor)))) return false;
-  const { systemsReleasedFor } = await import("@/platform/systems-release");
-  return systemsReleasedFor(actor, workspaceId);
-}
-
-/**
- * The public `/api/v1/connect/*` gate for one site, resolved to its business.
- * There is no viewer on a public request: a business row `on` or
- * `operators` (an operator testing the real install) opens it; `off`, or no
- * row under `workspace`, closes it.
- */
-export async function connectedSitesPublicFor(businessId: string): Promise<boolean> {
-  if (!connectedSitesReleaseEnabled()) return false;
-  return workspaceReleaseFlagEnabled("connected_sites", businessId, { operator: true, tester: false });
-}
+export { connectedSitesPublicFor, connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "./release";
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 function randomSlug(length: number): string {
@@ -141,17 +112,12 @@ export async function connectSite(actor: WorkspaceActor, raw: unknown, store: Co
   return site;
 }
 
-/** A connected site's live page, read the one way Strelva reads them: pinned, public addresses only, bounded. */
-export function fetchLiveSitePage(url: string): Promise<string | null> {
-  return fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 });
-}
-
 /**
  * Domain-ownership proof: read the live page at the site's address (pinned,
  * public addresses only) and pass the tokens found there to SQL, which
  * accepts only this site's own verification token or key.
  */
-export async function verifySite(actor: WorkspaceActor, businessId: string, siteId: string, deps: { store?: ConnectedSitesStore; fetchPage?: (url: string) => Promise<string | null> } = {}): Promise<ConnectedSite> {
+export async function verifySite(actor: WorkspaceActor, businessId: string, siteId: string, deps: { store?: ConnectedSitesStore; fetchPage?: (url: string) => Promise<string | null>; observe?: (site: ConnectedSite, html: string) => Promise<unknown> } = {}): Promise<ConnectedSite> {
   const store = deps.store ?? connectedSitesStore();
   const site = (await store.list(actor, businessId)).find(item => item.id === siteId && item.status === "active");
   if (!site) throw new WorkspaceConflictError("This connected site is no longer active here. Reload and try again.");
@@ -159,7 +125,12 @@ export async function verifySite(actor: WorkspaceActor, businessId: string, site
   let html: string | null = null;
   try { html = await (deps.fetchPage ?? fetchLiveSitePage)(site.siteUrl); } catch { html = null; }
   if (html === null) throw new WorkspaceConflictError(`We couldn't open ${site.siteHost} just now. Check the site is published, then try again.`);
-  return store.confirmVerification(actor, businessId, siteId, verificationProofs(html));
+  const confirmed = await store.confirmVerification(actor, businessId, siteId, verificationProofs(html));
+  if (deps.observe) {
+    // Best effort: what the page is built with never undoes a proven host.
+    try { await deps.observe(confirmed, html); } catch { console.warn("[connected-sites] post-verify check failed"); }
+  }
+  return confirmed;
 }
 
 export async function resolvePublicSite(publicKey: string, store: ConnectedSitesStore = connectedSitesStore()): Promise<ResolvedConnectedSite | null> {
@@ -232,10 +203,7 @@ export async function submitPublicInquiry(publicKey: string, site: ResolvedConne
   return { status: result.status === "recorded" ? "recorded" : "duplicate", id: result.id };
 }
 
-/** The website System a connected site is: connected_site:<id>, the same id the projection derives. */
-export function connectedSiteSystemId(site: Pick<ConnectedSite, "id" | "workspaceId">): string {
-  return systemOriginId(site.workspaceId, { kind: "connected_site", ref: site.id });
-}
+export { connectedSiteSystemId } from "./system-id";
 
 /** A site as the workspace sees it: its install lines and the System it is. */
 export function presentConnectedSite(site: ConnectedSite) {
