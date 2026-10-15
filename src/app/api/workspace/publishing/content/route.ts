@@ -6,6 +6,7 @@ import { contentTarget } from "@/products/publishing/server";
 import { prepareContentDraft, readContentWorkspace, prepareContentRestore } from "@/products/publishing/server";
 import { getEventRaw } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
+import { decideTenantEventOnce } from "@/server/needs-you/tenant-event-decision";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
 
@@ -39,7 +40,9 @@ export async function POST(request: Request) {
     if (!ctx.target.canApprove) return workspaceJson({ error: "This issue needs the business owner's approval." }, 403);
     const event = command.eventId ? await getEventRaw(command.eventId) : null;
     if (!event || event.tenantId !== ctx.target.tenantId || event.metadata?.businessId !== command.workspaceId || event.metadata?.systemId !== command.systemId) return workspaceJson({ error: "This draft is unavailable here." }, 404);
-    const result = await resolveEventAction(ctx.target.tenantId, event.id, command.action === "approve" ? "approved" : "dismissed", ctx.actor.userId);
+    const decision = command.action === "approve" ? "approved" : "dismissed";
+    // Records through Needs you for a converted business (STRELVA_ONE_APPROVAL_PATH).
+    const result = await decideTenantEventOnce({ tenantId: ctx.target.tenantId, eventId: event.id, workspaceId: command.workspaceId, action: decision, by: { kind: "session", actor: ctx.actor }, fallback: () => resolveEventAction(ctx.target.tenantId, event.id, decision, ctx.actor.userId) });
     return workspaceJson({ result }, result.changed ? 200 : 409);
   } catch (error) { return workspaceHttpFailure(error); }
 }
