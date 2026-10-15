@@ -7,6 +7,7 @@ import { connectionActorArgs, connectionRpc, type ConnectionsDb } from "./db";
 import { readProviderAccess } from "./access";
 import { agencyHoldsArea } from "./area";
 import { providerEligibility } from "./eligibility";
+import { providerKeyStatus } from "./provider-keys";
 import { readConnectionHolders } from "./holders";
 import { composeWorkspaceConnections } from "./read-model";
 import { listConnectionSources } from "./sources";
@@ -19,14 +20,14 @@ export async function connectionEligibilityFor(actor: WorkspaceActor, input: { p
   const scope = await connectionScope(actor, input.businessWorkspaceId, db);
   const access = readProviderAccess(input.provider);
   return providerEligibility({ access, businessWorkspaceId: input.businessWorkspaceId,
-    actingAgencyWorkspaceId: actingAgencyFor(scope, access.through.kind === "agency" ? access.through.workspaceId : null), agencyHoldsArea: (a, b, area) => agencyHoldsArea(a, b, area, db) });
+    actingAgencyWorkspaceId: actingAgencyFor(scope, access.through.kind === "agency" ? access.through.workspaceId : null), agencyHoldsArea: (a, b, area) => agencyHoldsArea(a, b, area, db), keys: providerKeyStatus(input.provider) });
 }
 export async function listWorkspaceConnections(actor: WorkspaceActor, workspaceId: string) {
   const scope = await connectionScope(actor, workspaceId);
   const eligibility: ProviderEligibilityMap = Object.fromEntries(await Promise.all(CONNECTION_PROVIDERS.map(async provider => {
     const access = readProviderAccess(provider);
     return [provider, await providerEligibility({ access, businessWorkspaceId: workspaceId,
-      actingAgencyWorkspaceId: actingAgencyFor(scope, access.through.kind === "agency" ? access.through.workspaceId : null), agencyHoldsArea })];
+      actingAgencyWorkspaceId: actingAgencyFor(scope, access.through.kind === "agency" ? access.through.workspaceId : null), agencyHoldsArea, keys: providerKeyStatus(provider) })];
   })));
   const holders = await readConnectionHolders(workspaceId);
   const result = await composeWorkspaceConnections({ workspaceId, holders, sources: listConnectionSources(), accessFor: readProviderAccess,
@@ -35,7 +36,7 @@ export async function listWorkspaceConnections(actor: WorkspaceActor, workspaceI
       const desiredAgency = access.through.kind === "agency" ? access.through.workspaceId : holders.accountHolder.kind === "agency" ? holders.accountHolder.workspaceId : null;
       const actingAgency = actingAgencyFor(scope, desiredAgency);
       const eligibility = await providerEligibility({ access, businessWorkspaceId: workspaceId,
-        actingAgencyWorkspaceId: actingAgency, agencyHoldsArea });
+        actingAgencyWorkspaceId: actingAgency, agencyHoldsArea, keys: providerKeyStatus(provider) });
       if (!eligibility.eligible) return eligibility;
       return (await accountHolderEligibility(holders, provider, workspaceId, actingAgency)) ?? eligibility;
     },

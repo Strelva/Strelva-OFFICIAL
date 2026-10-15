@@ -54,7 +54,7 @@ export type ProviderAccess = z.infer<typeof providerAccessSchema>;
 export const CONNECTION_STATES = ["connected", "stale", "disconnected", "unavailable"] as const;
 export type WorkspaceConnectionState = (typeof CONNECTION_STATES)[number];
 
-export const UNAVAILABLE_REASONS = ["coming_soon", "not_configured", "approval_pending", "not_your_agency", "area_not_granted"] as const;
+export const UNAVAILABLE_REASONS = ["coming_soon", "not_configured", "approval_pending", "not_your_agency", "area_not_granted", "not_set_up"] as const;
 export type UnavailableReason = (typeof UNAVAILABLE_REASONS)[number];
 
 /** One row on a workspace's Connections page, whatever store it came from. */

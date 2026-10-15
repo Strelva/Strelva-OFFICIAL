@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubAllProviderKeys } from "./helpers/provider-keys";
 import { readProviderAccess } from "@/platform/connections/access";
 import { providerEligibility } from "@/platform/connections/eligibility";
 import { composeWorkspaceConnections } from "@/platform/connections/read-model";
@@ -19,6 +20,7 @@ const holders = { accountHolder: { kind: "business" as const, workspaceId: busin
 const row: WorkspaceConnection = { ref: "google_calendar:calendar-1", provider: "google_calendar", workspaceId: business,
   accountLabel: "Harbor Dental", ...holders, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] };
 const source: ConnectionSource = { provider: row.provider, list: async () => [row] };
+beforeEach(() => stubAllProviderKeys());
 afterEach(() => { setConnectionsDb(null); vi.unstubAllEnvs(); });
 
 describe("connection access configuration and neutral eligibility", () => {
@@ -102,6 +104,11 @@ describe("holder persistence and actor boundary", () => {
     setConnectionsDb({ rpc: async () => ({ data: "not a map", error: null }) });
     await expect(readConnectionHolders(business)).rejects.toBeInstanceOf(WorkspaceStoreError);
     expect(await agencyHoldsArea(agency, business, "google")).toBe(false);
+  });
+  it("reports not_set_up in the eligibility map when a provider's keys are missing", async () => {
+    vi.stubEnv("HIGHLEVEL_CLIENT_ID", "");
+    setConnectionsDb({ rpc: async name => ({ data: name === "read_connection_actor_scope" ? { actingAgencyWorkspaceId: null } : [], error: null }) });
+    expect((await listWorkspaceConnections(actor, business)).providerEligibility.highlevel).toMatchObject({ eligible: false, reason: "not_set_up" });
   });
   it("resolves agency solely from the verified database scope", async () => {
     vi.stubEnv("STRELVA_CONNECTION_ACCESS_GOOGLE_BUSINESS_PROFILE", `agency:${agency}`);

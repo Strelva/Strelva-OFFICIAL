@@ -1,5 +1,6 @@
 import type { ConnectionArea, ProviderAccess, ProviderEligibility } from "./contracts";
 import { providerDefinition } from "./providers";
+import type { ProviderKeyStatus } from "./provider-keys";
 
 export interface EligibilityInput {
   access: ProviderAccess;
@@ -9,6 +10,8 @@ export interface EligibilityInput {
   actingAgencyWorkspaceId: string | null;
   /** Reads the business's current area grant to an agency. Fails closed on error. */
   agencyHoldsArea(agencyWorkspaceId: string, businessWorkspaceId: string, area: ConnectionArea): Promise<boolean>;
+  /** Whether Strelva holds this provider's keys. Omitted by callers that do not check. */
+  keys?: ProviderKeyStatus;
 }
 
 /**
@@ -22,7 +25,11 @@ export interface EligibilityInput {
 export async function providerEligibility(input: EligibilityInput): Promise<ProviderEligibility> {
   const { access } = input;
   const definition = providerDefinition(access.provider);
-  if (access.approval === "pending") return unavailable("approval_pending", `${definition.label} is waiting on the provider's approval.`);
+  // Deliberately off ("none" or unknown) still wins below; this only speaks for a provider Strelva meant to offer.
+  if ((access.through.kind === "platform" || access.through.kind === "agency") && input.keys && !input.keys.ready) {
+    return unavailable("not_set_up", `${definition.label} isn't set up on Strelva yet.`);
+  }
+  if (access.approval === "pending") return unavailable("approval_pending", `${definition.label} is waiting on ${definition.approver}'s approval.`);
   if (access.approval === "none" || access.through.kind === "unknown" || access.through.kind === "business") {
     return unavailable("not_configured", `${definition.label} is coming soon.`);
   }

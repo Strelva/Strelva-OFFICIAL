@@ -7,7 +7,7 @@ const SECRET = "fictional-value-9f3a";
 
 function fullEnv(integration: (typeof KEYED_INTEGRATIONS)[number]): Record<string, string> {
   const env: Record<string, string> = {};
-  for (const requirement of PROVIDER_KEY_REQUIREMENTS[integration]) env[requirement.anyOf[0]] = SECRET;
+  for (const requirement of PROVIDER_KEY_REQUIREMENTS[integration]) env[requirement.anyOf[0]!] = SECRET;
   return env;
 }
 
@@ -45,7 +45,7 @@ describe("provider key readiness", () => {
     const log = vi.fn();
     for (let i = 0; i < 3; i++) providerKeyStatus("stripe", {}, log);
     expect(log).toHaveBeenCalledTimes(1);
-    expect(log.mock.calls[0][0]).toBe("[connections] stripe not set up yet: missing STRIPE_SECRET_KEY");
+    expect(log.mock.calls[0]?.[0]).toBe("[connections] stripe not set up yet: missing STRIPE_SECRET_KEY");
     providerKeyStatus("calendly", { CALENDLY_CLIENT_ID: "x" }, log);
     providerKeyStatus("calendly", {}, log);
     expect(log).toHaveBeenCalledTimes(3);

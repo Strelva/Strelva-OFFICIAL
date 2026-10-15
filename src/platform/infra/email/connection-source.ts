@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ConnectionSource, WorkspaceConnection } from "@/platform/connections/contracts";
 import { providerEligibility } from "@/platform/connections/eligibility";
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 import { resolveEmailBusinessContext, type EmailBusinessContext } from "./business-context";
 import { getClientEmailOverride, type ClientEmailOverride } from "./client-override";
 import { customerEmailEnabled, emailSendingEnabled } from "./enabled";
@@ -41,7 +42,7 @@ export function createEmailConnectionSource(deps: EmailConnectionSourceDependenc
         state: "disconnected", unavailableReason: null, connectedAt: null, systemIds: [],
       };
       const eligibility = await providerEligibility({ access, businessWorkspaceId: workspaceId,
-        actingAgencyWorkspaceId: null, agencyHoldsArea: async () => false });
+        actingAgencyWorkspaceId: null, agencyHoldsArea: async () => false, keys: providerKeyStatus("resend") });
       if (!eligibility.eligible) return [{ ...row, state: "unavailable", unavailableReason: eligibility.reason }];
       if (!(deps.clientEnabled ?? emailSendingEnabled)() || !(deps.customerEnabled ?? customerEmailEnabled)()) return [row];
       const context = await (deps.context ?? resolveEmailBusinessContext)({ workspaceId });

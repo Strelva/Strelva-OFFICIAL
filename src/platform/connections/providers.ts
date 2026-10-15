@@ -13,6 +13,8 @@ export interface ProviderDefinition {
   acts: string | null;
   /** A provider rule that limits who may use an app/project; shown to operators, not a legal finding. */
   policyNote: string | null;
+  /** Who approves Strelva's access, for "Waiting on <approver>". */
+  approver: string;
 }
 
 const definitions: readonly ProviderDefinition[] = [
@@ -20,44 +22,44 @@ const definitions: readonly ProviderDefinition[] = [
     provider: "google_business_profile", label: "Google Business Profile", area: "google",
     accountHolders: ["business", "agency"], accessThrough: ["platform", "agency"],
     reads: "Listing details, reviews and performance", acts: "Hours, posts and review replies",
-    policyNote: "Google restricts third-party programmatic access through another provider's project. An agency's approved project serves only that agency's own clients.",
+    policyNote: "Google restricts third-party programmatic access through another provider's project. An agency's approved project serves only that agency's own clients.", approver: "Google",
   },
   {
     provider: "google_calendar", label: "Google Calendar", area: "bookings",
     accountHolders: ["business"], accessThrough: ["platform"],
-    reads: "Busy times", acts: "Booking events", policyNote: null,
+    reads: "Busy times", acts: "Booking events", policyNote: null, approver: "Google",
   },
   {
     provider: "calendly", label: "Calendly", area: "bookings",
     accountHolders: ["business"], accessThrough: ["platform"],
-    reads: "Event types and scheduled events", acts: null, policyNote: null,
+    reads: "Event types and scheduled events", acts: null, policyNote: null, approver: "Calendly",
   },
   {
     provider: "highlevel", label: "HighLevel", area: null,
     accountHolders: ["agency"], accessThrough: ["platform", "agency"],
     reads: "Sub-accounts and their users, for Import clients", acts: null,
-    policyNote: "An agency-level connection lists only that agency's own sub-accounts.",
+    policyNote: "An agency-level connection lists only that agency's own sub-accounts.", approver: "HighLevel",
   },
   {
     provider: "connected_site", label: "Website script", area: "website",
     accountHolders: ["business", "agency"], accessThrough: ["platform"],
     reads: "Form inquiries and page events on the connected site", acts: "Business facts and structured data shown on the site",
-    policyNote: null,
+    policyNote: null, approver: "the provider",
   },
   {
     provider: "stripe", label: "Stripe", area: null,
     accountHolders: ["business", "agency", "platform"], accessThrough: ["platform"],
-    reads: "Payments and payouts", acts: "Checkout and payment links", policyNote: null,
+    reads: "Payments and payouts", acts: "Checkout and payment links", policyNote: null, approver: "Stripe",
   },
   {
     provider: "resend", label: "Email sending", area: null,
     accountHolders: ["platform"], accessThrough: ["platform"],
-    reads: "Delivery results", acts: "Sends email from the business's name", policyNote: null,
+    reads: "Delivery results", acts: "Sends email from the business's name", policyNote: null, approver: "Resend",
   },
   {
     provider: "instagram", label: "Instagram", area: "website",
     accountHolders: ["business"], accessThrough: ["platform"],
-    reads: "Recent posts", acts: null, policyNote: null,
+    reads: "Recent posts", acts: null, policyNote: null, approver: "Meta",
   },
 ];
 

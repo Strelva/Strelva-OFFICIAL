@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { stubAllProviderKeys } from "./helpers/provider-keys";
 import type { ConnectionProvider, ConnectionSource, WorkspaceConnection } from "@/platform/connections/contracts";
 
 const f = vi.hoisted(() => ({ rows: new Map<string, WorkspaceConnection[]>(), failed: new Set<string>(), reads: vi.fn() }));
@@ -37,6 +38,7 @@ function fixtureRow(provider: ConnectionProvider): WorkspaceConnection {
     accountHolder: { kind: "unknown" }, accessThrough: { kind: "unknown" }, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] };
 }
 beforeEach(() => {
+  stubAllProviderKeys();
   vi.clearAllMocks(); f.rows.clear(); f.failed.clear(); acting = agency; area = true; recorded = true;
   registerProductConnectionSources();
   vi.stubEnv("STRELVA_CONNECTION_ACCESS_GOOGLE_BUSINESS_PROFILE", `agency:${agency}`);
