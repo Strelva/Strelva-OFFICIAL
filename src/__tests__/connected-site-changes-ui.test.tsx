@@ -69,7 +69,7 @@ describe("changes on a connected site", () => {
     await type(node, "What should change?", "Update the Saturday hours to 9–2");
     await click(button(node, "Ask North Studio"));
     expect(posted).toMatchObject({ action: "ask", workspaceId: WS, systemId: SYSTEM, words: "Update the Saturday hours to 9–2", idempotencyKey: "11111111-1111-4111-8111-111111111111" });
-    expect(node.textContent).toContain("Asked North Studio. You'll see the planned edit in Needs you before anything changes.");
+    expect(node.textContent).toContain("Asked North Studio. When the planned edit needs your yes, it shows in Needs you.");
     expect(node.textContent).toContain("Asked · waiting for North Studio to plan it");
   });
   it("shows a 409 from asking with the server's words", async () => {
@@ -153,6 +153,17 @@ describe("changes on a connected site", () => {
     const owner = await mount(serve(() => view("owner", [notSeen])));
     expect(button(owner.node, "Check again")).toBeUndefined();
     expect(button(owner.node, "Record without confirmation")).toBeUndefined();
+  });
+  it("lets the agency recover a change stuck at checking, and no one else", async () => {
+    let posted: Record<string, unknown> | null = null;
+    const stuck = change("checking", [planned, step("a3", "marked_done")]);
+    const agency = await mount(serve(() => view("agency", [stuck]), false, body => { posted = body; return json({ view: view("agency", [stuck]) }); }));
+    expect(agency.node.textContent).toContain("Checking the live page");
+    expect(button(agency.node, "Withdraw")).toBeTruthy();
+    await click(button(agency.node, "Check again"));
+    expect(posted).toMatchObject({ action: "check", changeId: CHANGE });
+    const owner = await mount(serve(() => view("owner", [stuck])));
+    expect(button(owner.node, "Check again")).toBeUndefined();
   });
   it("says the page could not be opened, not that the text is missing", async () => {
     const unreachable = change("not_seen", [planned, step("a3", "marked_done"), step("a4", "checked", { checkResult: "unreachable" })]);

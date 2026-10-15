@@ -222,7 +222,13 @@ export function ConnectedSiteChanges({ workspaceId, systemId, focusRequestId }: 
             <p className={styles.body}>Mark it done once it&rsquo;s published. Strelva then reads the live page.</p>
           </div> : <p className={styles.body}>{agencyName} is making this edit in {platformLabel}.</p>;
         case "checking":
-          return <p className={styles.body} role="status" aria-busy="true">Checking the live page…</p>;
+          return <div className={styles.stack}>
+            <p className={styles.body} role="status" aria-busy="true">Checking the live page…</p>
+            {agency ? <div className={styles.actions}>
+              <StPill variant="soft" busy={busy === `check:${change.id}`} disabled={locked} onClick={() => void act(`check:${change.id}`, { action: "check", changeId: change.id }, release)}>Check again</StPill>
+              <StTextButton tone="danger" disabled={locked} onClick={() => void act(`withdraw:${change.id}`, { action: "withdraw", changeId: change.id })}>Withdraw</StTextButton>
+            </div> : null}
+          </div>;
         case "not_seen":
           return <div className={styles.stack}>
             <p className={styles.body}>Strelva didn&rsquo;t see &ldquo;{planned?.expectText}&rdquo; on {planned?.pageUrl ?? view.site.siteHost} yet.</p>
@@ -269,7 +275,7 @@ export function ConnectedSiteChanges({ workspaceId, systemId, focusRequestId }: 
       event.preventDefault();
       if (!ask.words.trim()) { setNotice({ tone: "alert", text: "Say what should change." }); return; }
       const page = ask.page.trim();
-      void act("ask", { action: "ask", words: ask.words.trim(), ...(page ? { page } : {}), idempotencyKey: crypto.randomUUID() }, () => `Asked ${agencyName}. You'll see the planned edit in Needs you before anything changes.`).then(done => { if (done) setAsk({ words: "", page: "" }); });
+      void act("ask", { action: "ask", words: ask.words.trim(), ...(page ? { page } : {}), idempotencyKey: crypto.randomUUID() }, () => `Asked ${agencyName}. When the planned edit needs your yes, it shows in Needs you.`).then(done => { if (done) setAsk({ words: "", page: "" }); });
     }}>
       <TextArea label="What should change?" placeholder="Update the Saturday hours to 9–2" value={ask.words} maxLength={3000} readOnly={locked} onChange={event => setAsk(current => ({ ...current, words: event.target.value }))} />
       <TextInput label="Which page? (optional)" placeholder={view.site.siteUrl} value={ask.page} maxLength={500} readOnly={locked} onChange={event => setAsk(current => ({ ...current, page: event.target.value }))} />
