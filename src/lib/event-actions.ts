@@ -3,16 +3,12 @@ import { claimEventAction, finishEventAction, getEvent, getEventRaw, markExecuti
 import { updateSuggestion } from "./suggestions";
 import { isCustomChangeRequestMetadata } from "./custom-repos";
 import {
-  appendVersion,
   clearDraft,
   getContent,
   getDraftContent,
   logActivity,
-  recordSectionUpdate,
-  setContent,
 } from "./storage";
-import { clientRevalidationTargetForSections } from "./content-revalidation";
-import { diffFields } from "./utils";
+import { publishTenantSections } from "@/products/websites/publish/tenant-sections";
 import { recordApproval, recordRejection } from "./ai-auto-approve";
 import { GBP_OPERATIONS } from "./agent/gbp-operations";
 import {
@@ -474,31 +470,21 @@ async function executeResolvedEventAction(
       const current = (await getContent(section, tenantId)) as unknown as Record<string, unknown>;
       // The live write is the authoritative effect. Resolve only after it
       // succeeds so a storage failure cannot produce a false "Made live" state.
-      await setContent(section, draft as ContentMap[typeof section], tenantId);
-      const resolved = await resolveEvent(eventId, action, { actor: resolvedBy(actorId) });
-      if (!resolved.changed) return { changed: false, reason: "already_resolved" };
-      await appendVersion(
-        section,
-        draft,
-        isDelegateActor(actorId) ? "admin" : "user",
+      const published = await publishTenantSections({
         tenantId,
-        diffFields(current, draft as unknown as Record<string, unknown>),
-        eventId,
-      );
-      await recordSectionUpdate(section, tenantId);
-      const { revalidatePath } = await import("next/cache");
-      revalidatePath("/");
-      const { revalidateClientSite } = await import("./revalidate-client");
-      const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
-      await clearDraft(section, tenantId);
-      // The trust streak counts the owner's approvals only. An operator's or
-      // agency's approval must never earn the owner's auto-publish.
-      if (event.source === "ai" && !isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {});
-      try {
-        await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
-          tenantId, section, expected: draft, actorId, publicationRef: eventId, revalidation,
-        });
-      } catch { /* The approved publish remains accepted when read-back fails. */ }
+        writes: [{ section, data: draft as ContentMap[typeof section], prior: current }],
+        author: isDelegateActor(actorId) ? "admin" : "user",
+        requestId: eventId,
+        afterWrite: async () => (await resolveEvent(eventId, action, { actor: resolvedBy(actorId) })).changed,
+        versions: "strict",
+        clearDrafts: "strict",
+        clearDraftsAt: "after_revalidation",
+        // The trust streak counts the owner's approvals only. An operator's or
+        // agency's approval must never earn the owner's auto-publish.
+        onPublished: () => { if (event.source === "ai" && !isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {}); },
+        readBack: { actorId, publicationRef: eventId },
+      });
+      if (published.status === "already_resolved") return { changed: false, reason: "already_resolved" };
       return { changed: true };
     }
 

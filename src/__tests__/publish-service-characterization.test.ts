@@ -156,7 +156,7 @@ describe("approved content_update event", () => {
   it("an operator or agency approval is versioned as admin and earns no trust streak", async () => {
     const { operatorActorId } = await import("@/lib/event-actions");
     expect(await approve(operatorActorId("11111111-1111-4111-8111-111111111111"))).toEqual({ changed: true });
-    expect(log.args.appendVersion![0]![2]).toBe("admin");
+    expect((log.args.appendVersion![0] as unknown[])[2]).toBe("admin");
     expect(order()).not.toContain("recordApproval");
   });
 
@@ -189,7 +189,7 @@ describe("agent auto-published update", () => {
     expect(result).toMatchObject({ status: "published", section: "hero" });
     expect(order()).toEqual(["getContent", "setContent", "appendVersion", "revalidatePath", "revalidateClientSite", "observeAcceptedNativePublish", "logActivity", "recordSectionUpdate"]);
     expect(log.args.appendVersion![0]).toEqual(["hero", { title: "New" }, "ai", "tenant-a", [{ field: "title", before: "Old", after: "New" }], "step-1"]);
-    expect(log.args.logActivity![0]![0]).toMatchObject({ text: "AI updated hero", actor: "ai", eventStatus: "auto_approved", suppressEvent: false });
+    expect((log.args.logActivity![0] as unknown[])[0]).toMatchObject({ text: "AI updated hero", actor: "ai", eventStatus: "auto_approved", suppressEvent: false });
   });
 
   it("without a request id the version call carries no request id", async () => {

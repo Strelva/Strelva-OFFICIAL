@@ -17,7 +17,7 @@
  * surface's existing manifest behavior while still unifying everything else.
  */
 
-import type { ContentSection, SiteCapabilityManifest, TenantConfig } from "./types";
+import type { ContentMap, ContentSection, SiteCapabilityManifest, TenantConfig } from "./types";
 import {
   assessRisk,
   classifyOperation,
@@ -29,10 +29,7 @@ import { decideAiContentGovernance } from "./ai-governance";
 import { maybeAutoApprove } from "./ai-auto-approve";
 import { queueAiContentReview } from "./ai-review-queue";
 import { manifestAllowsAction } from "./site-capabilities";
-import { clientRevalidationTargetForSections } from "./content-revalidation";
-import { revalidateClientSite } from "./revalidate-client";
 import { diffFields } from "./utils";
-import { workspacePorts } from "./workspace-ports";
 
 type Governance = Awaited<ReturnType<typeof maybeAutoApprove>>;
 type FieldChange = ReturnType<typeof diffFields>[number];
@@ -118,7 +115,7 @@ export async function applySectionUpdate(
     return { status: "failed", section, error: parsed.error.message };
   }
 
-  const { getContent, setContent } = await import("./storage");
+  const { getContent } = await import("./storage");
   const current = (await getContent(section, tenantId)) as unknown as Record<string, unknown>;
 
   const operation = classifyOperation(section, current, data);
@@ -175,9 +172,26 @@ export async function applySectionUpdate(
   let eventId: string | undefined;
 
   if (autoPublish) {
+    const { publishTenantSections, isSectionWriteFailure } = await import("@/products/websites/publish/tenant-sections");
     try {
-      await setContent(section, parsed.data as Parameters<typeof setContent>[1], tenantId);
+      // Version history is bookkeeping: the content is already durably saved, so
+      // a version-write hiccup must not turn a successful publish into a failure.
+      // The activity log and section timestamp below stay with this function,
+      // because the queued branch shares them.
+      await publishTenantSections({
+        tenantId,
+        writes: [{ section, data: parsed.data as ContentMap[ContentSection], prior: current, changes }],
+        author: "ai",
+        ...(input.requestId ? { requestId: input.requestId } : {}),
+        versions: "best_effort",
+        sectionTimestamp: false,
+        clearDrafts: "none",
+        onRevalidateError: (err) => console.error("[agent] Failed to revalidate client site:", err),
+        readBack: { actorId: "ai", publicationRef: input.requestId },
+        messages: { versions: () => ["[agent] appendVersion failed after publish:"] },
+      });
     } catch (err) {
+      if (!isSectionWriteFailure(err)) throw err;
       return {
         status: "failed",
         section,
@@ -186,24 +200,6 @@ export async function applySectionUpdate(
         diffs,
       };
     }
-    // Version history is bookkeeping — the content is already durably saved, so
-    // a version-write hiccup must not turn a successful publish into a failure.
-    try {
-      if (input.requestId) await appendVersion(section, parsed.data, "ai", tenantId, changes, input.requestId);
-      else await appendVersion(section, parsed.data, "ai", tenantId, changes);
-    } catch (err) {
-      console.error("[agent] appendVersion failed after publish:", err);
-    }
-    const { revalidatePath } = await import("next/cache");
-    revalidatePath("/");
-    const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
-      console.error("[agent] Failed to revalidate client site:", err);
-    });
-    try {
-      await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
-        tenantId, section, expected: parsed.data, actorId: "ai", publicationRef: input.requestId, revalidation,
-      });
-    } catch { /* Public observation cannot turn the accepted write into failure. */ }
   } else {
     const event = await queueAiContentReview({
       tenantId,
@@ -216,7 +212,7 @@ export async function applySectionUpdate(
       ...(input.preparer ? { preparer: input.preparer } : {}),
     });
     eventId = event.id;
-    await setDraftContent(section, parsed.data as Parameters<typeof setContent>[1], tenantId);
+    await setDraftContent(section, parsed.data as ContentMap[ContentSection], tenantId);
   }
 
   // Activity log + section-timestamp bump are best-effort: the real work
