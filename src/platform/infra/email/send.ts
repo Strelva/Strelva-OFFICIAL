@@ -1,5 +1,6 @@
 import { resolveEmailBusinessContext, type EmailBusinessContext, type EmailBusinessScope } from "@/platform/infra/email/business-context";
 import { formatEmailFrom } from "@/platform/infra/email/from";
+import { warnMissingProviderKeysOnce } from "@/platform/connections/provider-keys";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { resolveAgencyEmailIdentity, resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import {
@@ -168,7 +169,11 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   }
 
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  if (!apiKey) {
+    // A missing key is logged once, by name; it sends nothing and changes no switch.
+    warnMissingProviderKeysOnce("resend", ["RESEND_API_KEY"]);
+    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  }
 
   const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
   const suppliedBrand = input.options?.brand ?? input.brand;

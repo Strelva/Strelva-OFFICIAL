@@ -1,4 +1,5 @@
 import { getActorContext } from "@/platform/infra/auth";
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 import { assertTenantGoogleConnectionEligible } from "@/products/google-listing/server";
 /**
  * Google OAuth Initiation Route
@@ -49,10 +50,11 @@ export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-  if (!clientId || !appUrl) {
+  // Missing keys are Strelva's to add, not a server fault: say so, and log the missing names once.
+  if (!providerKeyStatus("google_sign_in_legacy").ready || !clientId || !appUrl) {
     return NextResponse.json(
-      { error: "OAuth not configured" },
-      { status: 500 }
+      { error: "Google isn't set up on Strelva yet." },
+      { status: 503 }
     );
   }
 

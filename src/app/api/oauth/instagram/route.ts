@@ -1,4 +1,5 @@
 import { beginOAuthHolder } from "../calendly/connection-holder";
+import { providerKeyStatus } from "@/platform/connections/provider-keys";
 /**
  * Instagram OAuth Initiation Route
  *
@@ -38,10 +39,11 @@ export async function GET() {
   const clientId = process.env.INSTAGRAM_CLIENT_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
-  if (!clientId || !appUrl) {
+  // Missing keys are Strelva's to add, not a server fault: say so, and log the missing names once.
+  if (!providerKeyStatus("instagram").ready || !clientId || !appUrl) {
     return NextResponse.json(
-      { error: "OAuth not configured" },
-      { status: 500 }
+      { error: "Instagram isn't set up on Strelva yet." },
+      { status: 503 }
     );
   }
 
