@@ -136,7 +136,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
 
     // A gentle informational event, not the scary change_verify_failed FAILED path.
     const calls = mockAddEvent.mock.calls as MockEventCall[];
@@ -162,7 +162,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
     expect(mockSendSlack).not.toHaveBeenCalled();
   });
 
@@ -178,7 +178,7 @@ describe("GBP pending-approval soft-fail", () => {
 
     expect(result.success).toBe(false);
     expect(result.pendingSetup).toBe(true);
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
   });
 
   it("a GENUINE 403 (real permission problem) stays a hard failure, not 'being set up'", async () => {
@@ -215,7 +215,7 @@ describe("Google approval pending (STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_P
     const { updateBusinessHours } = await import("@/lib/gbp-management");
     const result = await updateBusinessHours(TENANT, { regularHours });
     expect(result).toMatchObject({ success: false, pendingSetup: true });
-    expect(result.ownerMessage).toContain("being set up");
+    expect(result.ownerMessage).toContain("Google hasn't approved");
     expect(mockFetch).not.toHaveBeenCalled();
     expect(mockSendSlack).not.toHaveBeenCalled();
   });

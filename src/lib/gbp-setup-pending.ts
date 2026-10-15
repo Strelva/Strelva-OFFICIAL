@@ -13,7 +13,7 @@ import { addEvent } from "./events";
  * as "being set up", never a raw error or a crash.
  */
 export const SETUP_PENDING_MESSAGE =
-  "Your Google Business connection is being set up. This will publish automatically once Google approves access (usually within a few days).";
+  "Google hasn't approved Strelva's Business Profile access yet, so nothing was posted. The change stays in Needs you; approve it again once Google approves.";
 
 /**
  * True when a GBP API rejection is the "access not granted / quota 0" setup
@@ -68,7 +68,7 @@ export async function emitSetupPending(
       tenantId,
       source: "ai",
       type: "change_verify_failed",
-      title: "Google Business connection is being set up",
+      title: "Waiting on Google",
       body: SETUP_PENDING_MESSAGE,
       status: "auto_approved",
       metadata: { kind: "gbp_setup_pending", operation, evidence },
