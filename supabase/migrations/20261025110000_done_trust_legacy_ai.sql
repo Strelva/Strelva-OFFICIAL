@@ -1,6 +1,7 @@
 -- Preserve paid legacy AI access through the canonical tenant/workspace link.
 -- Native current-period caps win; legacy active/trialing relationships are
--- subscribed without inventing a new spending cap. No records are rewritten.
+-- subscribed without inventing a new spending cap, as are active managed clients
+-- served outside Stripe (subscription_status none). No records are rewritten.
 begin;
 set local lock_timeout = '5s';
 create or replace function public.business_ai_budget(p_workspace_id uuid) returns jsonb
@@ -31,7 +32,9 @@ begin
     'subscribed', ent.period_start is not null or exists (
       select 1 from public.tenant_workspace_links l
       join public.tenants t on t.stable_id = l.tenant_stable_id
-      where l.workspace_id = p_workspace_id and t.subscription_status in ('active','trialing')
+      where l.workspace_id = p_workspace_id and (t.subscription_status in ('active','trialing')
+        -- An active managed client served outside Stripe (case study or agreed tier) keeps the AI it had before 1.0.
+        or (t.active is true and coalesce(t.subscription_status,'none') = 'none'))
     ), 'unknownCostCalls', unknown_calls);
 end;
 $$;

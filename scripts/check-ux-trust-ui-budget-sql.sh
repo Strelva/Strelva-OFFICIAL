@@ -14,7 +14,7 @@ create role service_role nologin bypassrls;
 create role authenticated nologin;
 create role anon nologin;
 create table public.workspaces(id uuid primary key);
-create table public.tenants(id text primary key, stable_id uuid unique, subscription_status text not null default 'none');
+create table public.tenants(id text primary key, stable_id uuid unique, subscription_status text not null default 'none', active boolean not null default true);
 create table public.tenant_workspace_links(tenant_stable_id uuid references public.tenants(stable_id), workspace_id uuid references public.workspaces(id));
 create table public.work_allowance_subscription_entitlements(id uuid primary key default gen_random_uuid(), workspace_id uuid references public.workspaces(id), spending_cap_cents int, period_start timestamptz, period_end timestamptz, status text);
 insert into public.workspaces values ('11111111-1111-4111-8111-111111111111'), ('22222222-2222-4222-8222-222222222222');
