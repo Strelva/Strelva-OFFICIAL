@@ -117,3 +117,10 @@ or account, only if that agency is among the verified current seats. The code
 never selects an agency by UUID ordering. Direct business membership still wins.
 Optional DB arguments on the server eligibility, area and holder readers keep an
 injected Versions adapter on the same database throughout a command.
+
+### Provider keys
+
+Which keys Strelva must hold before a provider works, and what the Connections
+state reads before and after, is in `src/platform/connections/provider-keys.ts`
+and `docs/operations/integration-keys.md`. A missing set reads `not_set_up`
+("Not set up yet") and is logged once per process, by env name only.
