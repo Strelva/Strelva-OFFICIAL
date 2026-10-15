@@ -13,6 +13,7 @@
 
 import { mirrorRecord, readSetting, durableRecordAuthority, writeDurableRecord } from "../client-records";
 import { getRedis } from "@/platform/infra/redis";
+import { readTenantAiControls } from "@/platform/ai-controls/service";
 // The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
 // port src/lib declares (Strelva Reborn section 7).
 import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "../workspace-ports";
@@ -36,6 +37,9 @@ export interface ReplyTemplate {
 
 export interface ReplyVoice {
   mode: ReplyMode;
+  /** Set when an agency or Strelva operator holds automatic replies; the owner's stored choice is kept. */
+  heldBy?: "agency" | "operator";
+  heldByName?: string | null;
   guidance: string;
   templates: ReplyTemplate[];
   updatedAt: string | null;
@@ -62,7 +66,23 @@ export async function getReplyVoice(tenantId: string, options: BridgeOptions = {
   if (voice.mode === "off") return voice;
   const policy = await workspacePorts().tenantPolicy();
   const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
-  return route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice;
+  return withAgencyHold(tenantId, route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice);
+}
+
+/**
+ * An agency or Strelva operator can hold automatic replies, or pause the
+ * client, with STRELVA_AI_CONTROLS_RELEASE on. Then "auto" reads as "approve"
+ * everywhere (the poller's timer, the backlog, the due-post cron, the reviews
+ * place), so every reply waits for the owner. The stored choice is untouched
+ * and returns when the hold lifts. An unreadable hold fails closed.
+ */
+async function withAgencyHold(tenantId: string, voice: ReplyVoice): Promise<ReplyVoice> {
+  if (voice.mode !== "auto") return voice;
+  const controls = await readTenantAiControls(tenantId);
+  if (!controls) return voice;
+  if ("unavailable" in controls) return { ...voice, mode: "approve", heldBy: "operator", heldByName: null };
+  if (controls.reviewAutoPost !== "held" && !controls.paused) return voice;
+  return { ...voice, mode: "approve", heldBy: controls.setBy?.kind ?? "operator", heldByName: controls.setBy?.agencyName ?? null };
 }
 
 async function readRedisVoice(tenantId: string): Promise<ReplyVoice> {

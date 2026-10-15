@@ -2,7 +2,7 @@
  * Plain words for routes and change kinds, shared by the owner and operator
  * settings screens. Pure; safe to import in client components.
  */
-import type { ConfigurableKind, LadderRoute } from "./contracts";
+import { NOTICE_WINDOW_MS, type ConfigurableKind, type LadderRoute } from "./contracts";
 
 export const ROUTE_WORDS: Record<LadderRoute, { label: string; detail: string }> = {
   handle: { label: "Strelva handles it", detail: "Strelva does it and tells you after." },
@@ -10,6 +10,13 @@ export const ROUTE_WORDS: Record<LadderRoute, { label: string; detail: string }>
   strelva_reviews: { label: "Strelva reviews it", detail: "A Strelva person checks it before it happens." },
   owner_decides: { label: "You decide", detail: "Nothing happens until you say yes." },
 };
+
+/** The route's detail, with the hours Strelva really waits when the kind has a notice window. */
+export function routeDetail(route: LadderRoute, kind: ConfigurableKind): string {
+  const window = NOTICE_WINDOW_MS[kind];
+  if (route === "handle_after_notice" && window) return `Strelva waits ${Math.round(window / 3_600_000)} hours so you can stop it, then does it.`;
+  return ROUTE_WORDS[route].detail;
+}
 
 /** The kinds the settings screens list, in the order an owner thinks about them. */
 export const POLICY_KIND_ORDER: readonly ConfigurableKind[] = [
@@ -22,7 +29,7 @@ export const POLICY_KIND_ORDER: readonly ConfigurableKind[] = [
 ];
 
 export const KIND_WORDS: Record<ConfigurableKind, { label: string; example: string }> = {
-  "review.reply": { label: "Replies to good reviews", example: "Answering a 4 or 5 star Google review" },
+  "review.reply": { label: "Replies to good reviews", example: "Answering a 3, 4 or 5 star Google review" },
   "review.reply_critical": { label: "Replies to bad reviews", example: "Answering a 1 or 2 star Google review" },
   "google.post": { label: "Google posts", example: "A post on your Google listing" },
   "google.photo": { label: "Google photos", example: "A photo on your Google listing" },

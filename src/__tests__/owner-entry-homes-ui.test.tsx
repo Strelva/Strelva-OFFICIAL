@@ -63,7 +63,7 @@ describe("Inquiries", () => {
 
 describe("Reviews", () => {
   const review = (patch: Partial<ReviewView>): ReviewView => ({ id: "r1", source: "google", author: "Jane", rating: 5, text: "Great", date: "2026-09-01", reply: null, repliedAt: null, draft: null, ...patch });
-  const siteReviews = (reviews: ReviewView[], patch = {}) => ({ tenantId: "lakeshore", siteName: "Lakeshore", reviews, googleConnected: true, googlePlaceId: "PLACE", replyMode: "auto" as const, unavailable: false, ...patch });
+  const siteReviews = (reviews: ReviewView[], patch = {}) => ({ tenantId: "lakeshore", siteName: "Lakeshore", reviews, googleConnected: true, googlePlaceId: "PLACE", replyMode: "auto" as const, autoPostHeld: null, unavailable: false, ...patch });
 
   it("prefills Strelva's draft, says when it posts itself, and posts to Google when connected", () => {
     const page = html(createElement(WorkspaceReviewsView, { workspaceId: WS, state: { kind: "ready", data: { sites: [siteReviews([review({ draft: { reply: "Thanks, Jane!", autoPostAt: "2026-09-02T12:00:00Z" } })])], denied: [] } } }));

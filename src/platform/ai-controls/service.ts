@@ -3,7 +3,6 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { logger } from "@/platform/infra/logger";
 import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { aiControlsReleaseEnabled } from "@/platform/infra/ai-controls-release";
-import { withdrawPendingAutoPosts } from "@/lib/reviews/auto-reply";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   agencyAiControlsViewSchema,
@@ -52,6 +51,8 @@ export async function readAgencyAiControls(actor: WorkspaceActor, input: { agenc
 
 /** Best effort: a hold or pause withdraws timers on replies already waiting to post. Never fails the control change. */
 async function withdrawForTenants(tenantIds: readonly string[], by: "agency" | "operator"): Promise<void> {
+  // Loaded here, not at the top: the reply voice reads these controls and auto-reply reads the voice.
+  const { withdrawPendingAutoPosts } = await import("@/lib/reviews/auto-reply");
   for (const tenantId of tenantIds) {
     try { await withdrawPendingAutoPosts(tenantId, { by }); }
     catch (error) { logger.warn("[ai-controls] Could not withdraw pending auto-posts", { tenantId, error: error instanceof Error ? error.message : "unknown" }); }

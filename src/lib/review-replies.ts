@@ -8,9 +8,13 @@
  * violations fed back, then falling to a deterministic template if both
  * AI paths fail or the lint still fires.
  *
- * Governance: review replies are customer-facing copy. They are ALWAYS
- * queued for human approval — never auto-published. The cron caller and
- * publishReviewReply both enforce this.
+ * Governance: review replies are customer-facing copy. Every draft is queued
+ * as a pending `review_reply_draft`. In `auto` mode (the owner's choice), a
+ * model-written draft for a 3-5 star Google review carries `autoPostAt` =
+ * drafted + 12 hours (AUTO_POST_DELAY_MS), and src/lib/reviews/auto-reply.ts
+ * posts it through the same approval path unless it is edited or dismissed
+ * first. 1-2 star reviews, template drafts, and clients whose agency or
+ * Strelva holds automatic replies always wait for the owner.
  */
 
 import { generateModelText } from "@/platform/infra/model-calls";

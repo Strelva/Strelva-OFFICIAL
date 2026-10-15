@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { StSection, StRows, StRow, StSegmented, StNotice, StEmpty, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
 import { LADDER_ROUTES } from "@/platform/needs-you/contracts";
 import type { ConfigurableKind, LadderRoute } from "@/platform/needs-you/contracts";
-import { OPERATOR_ONLY_KIND_LIST, ROUTE_WORDS } from "@/platform/needs-you/policy-words";
+import { OPERATOR_ONLY_KIND_LIST, ROUTE_WORDS, routeDetail } from "@/platform/needs-you/policy-words";
 import type { PolicyKindView, PolicyView } from "@/platform/needs-you/policy-model";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
@@ -134,7 +134,7 @@ function PolicyRow({ item, canChange, busy, locked, notice, onChange }: {
 }) {
   const strelva = ROUTE_WORDS[item.strelvaRoute].label;
   const options = LADDER_ROUTES.map(route => ({ value: route, label: route === "owner_decides" ? "Ask me first" : ROUTE_WORDS[route].label }));
-  return <StRow title={item.label} detail={<>{item.example}{!canChange || item.ownerChoices.length < 2 ? <span className="block">{ROUTE_WORDS[item.route].label}. {ROUTE_WORDS[item.route].detail}</span> : null}{item.ownerRoute ? <span className="block">{canChange ? "Your setting." : "The owner's setting."} Strelva&apos;s default is “{strelva}”.</span> : null}{notice ? <span role="status" className="block">{notice.text}</span> : null}</>} end={<div className="grid gap-2">
+  return <StRow title={item.label} detail={<>{item.example}{!canChange || item.ownerChoices.length < 2 ? <span className="block">{ROUTE_WORDS[item.route].label}. {routeDetail(item.route, item.kind)}</span> : null}{item.ownerRoute ? <span className="block">{canChange ? "Your setting." : "The owner's setting."} Strelva&apos;s default is “{strelva}”.</span> : null}{notice ? <span role="status" className="block">{notice.text}</span> : null}</>} end={<div className="grid gap-2">
     <StSegmented label={`Who decides: ${item.label}`} value={item.route} options={options} disabledValues={LADDER_ROUTES.filter(route => !item.ownerChoices.includes(route))} disabledReason="Looser than Strelva allows for this kind. You can only choose its default or stricter." onChange={canChange && !locked ? route => {
       if (route === item.route || !item.ownerChoices.includes(route)) return;
       if (route === item.ownerChoices[0] && item.ownerRoute) onChange(item, { action: "reset", kind: item.kind, systemId: null, expectedVersion: item.ownerVersion }, `Back to Strelva's default: ${ROUTE_WORDS[route].label.toLowerCase()}.`);

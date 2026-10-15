@@ -162,8 +162,9 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   // review lands in the activity feed but is lost from the Reviews tab forever.
   const mirrorFailed = new Set<string>();
 
-  // Emit events for new reviews and queue drafted replies for human approval.
-  // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
+  // Emit events for new reviews and queue drafted replies as pending. When a
+  // draft posts by itself, and when it never does, is stated in the
+  // governance paragraph of src/lib/review-replies.ts.
   for (const review of newReviews) {
     if (typeof review.reviewId !== "string" || !review.reviewId.trim()) throw new Error("Google review identity unavailable.");
     const rating = starRatingToNumber(review.starRating);
