@@ -16,9 +16,9 @@ describe("Connect Google on the Google place", () => {
     expect(page).toContain("Nothing changes on Google until you approve it");
     expect(page).not.toMatch(/Ask Strelva|Strelva Agency/);
   });
-  it("gives an agency a copy-a-link action and says Strelva doesn't send it", () => {
+  it("gives an agency an access check and says Strelva does not send a message", () => {
     const page = render({ viewer: "agency" });
-    expect(page).toContain("Send the owner a connect link"); expect(page).toContain("Strelva doesn&#x27;t send it");
+    expect(page).toContain("Check Google connection options"); expect(page).toContain("Strelva doesn&#x27;t send it");
     expect(page).not.toContain(">Connect Google<");
   });
   it("tells a member the owner connects and offers no connect action", () => {

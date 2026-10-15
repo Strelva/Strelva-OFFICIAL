@@ -27,6 +27,7 @@ while IFS= read -r migration; do
   # Keep the original twelve contracts at their historical boundary. Pass 2
   # changes admission and captures these bodies, so install it after the
   # original retained inverse/refusal proofs instead of applying it early.
+  if [[ "$migration_name" == 20261026* ]]; then continue; fi
   if [[ "$migration_name" == 2026102413* || "$migration_name" == 20261025110000_done_trust_legacy_ai.sql || "$migration_name" == 20261025133000_done_agency_website_decisions.sql || "$migration_name" == 20261025170000_done_integrate_readonly_authorization.sql ]]; then continue; fi
   if [[ "$migration_name" == 2026102412* || "$migration_name" == 20261025120000_done_owner_signup_releases.sql ]]; then
     fingerprint before
@@ -118,4 +119,8 @@ apply "$repo_root/supabase/migrations/20261025170000_done_integrate_readonly_aut
 for lane_runner in check-ux-trust-email-sql.sh check-ux-trust-ui-budget-sql.sh check-ux-owner-agency-access-sql.sh check-agency-qualification-sql.sh check-ux-owner2-sql.sh check-ux-agency-proposal-identity-sql.sh check-ux-agency-native-pages-sql.sh check-agency2-decisions-sql.sh; do
   bash "$repo_root/scripts/$lane_runner"
 done
+# Connections follows the complete held October 25 schema, never its historical
+# inverse boundaries above. Both workspace SQL entry points call this runner.
+source "$repo_root/scripts/sql/connections-contracts.sh"
+check_connections_contracts
 printf 'UX audit SQL passed: eighteen ordered forwards, exact empty inverses/reapply, every new native fixture, signup enrollment/populated refusal, snapshot refusal and lane race/authority proofs. Local only.\n'

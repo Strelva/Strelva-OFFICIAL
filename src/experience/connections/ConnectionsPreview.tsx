@@ -18,7 +18,9 @@ export function ConnectionsPreview({ state, kind, mode }: { state: string; kind:
       { ref: "resend:harbor", provider: "resend", workspaceId, accountLabel: "Business email", accountHolder: { kind: "platform" }, accessThrough: { kind: "platform" }, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] },
       { ref: "calendly:legacy", provider: "calendly", workspaceId, accountLabel: "Twin Trees appointments", accountHolder: { kind: "unknown" }, accessThrough: { kind: "unknown" }, state: "stale", unavailableReason: null, connectedAt: null, systemIds: [] }];
     if (state === "unavailable") rows[0] = { ...rows[0]!, state: "unavailable", unavailableReason: "coming_soon" };
-    return Response.json({ connections: state === "empty" ? [] : rows, sourceErrors: state === "partial" ? ["instagram"] : [] });
+    return Response.json({ connections: state === "empty" || state === "coming-soon" ? [] : rows, sourceErrors: state === "partial" ? ["instagram"] : [],
+      ...(state === "coming-soon" ? { providerEligibility: { google_business_profile: { eligible: false, reason: "coming_soon", message: "Google Business Profile for businesses on Strelva is coming soon." } } } : {}),
+    });
   }, [state, workspaceId]);
   return <div data-workspace-theme="linen" data-workspace-mode={mode}><StrelvaShell connectionsAvailable active="connections" workspaceName={kind === "agency" ? "North Studio" : "Harbor Dental"} workspaceId={workspaceId} title="Connections" accountName="You" signOut={null} systemsReleased agencyNavigation={kind === "agency" ? { active: "home" } : undefined}>
     <WorkspaceConnections key={`${workspaceId}:${state}`} workspaceId={workspaceId} workspaceKind={kind} workspaceName={kind === "agency" ? "North Studio" : "Harbor Dental"} names={new Map([[agency, "North Studio"]])} systems={[{ id: system, name: "Google listing" }]} canManage request={request} />

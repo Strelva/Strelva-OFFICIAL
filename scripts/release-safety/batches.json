@@ -2337,10 +2337,10 @@
       "items": [
         {
           "file": "20261026110000_conn_google_agency_oauth.sql",
-          "sha256": "fea5e9e22f632f27e127ab43752e280b3ef38a8dcd57ebe0e388b29693fcba62",
+          "sha256": "a2a90f542e86967b99762f9cc2804c0571d763e1383683ae05eadc657f373d4e",
           "rollback": "rollback-20261026110000_conn_google_agency_oauth.sql",
-          "rollbackSha256": "e675c203275831f51e70ca73dbf2119f915e070ccba5300c6b8a479691b8a647",
-          "rollbackStatus": "Empty inverse/reapply prepared. Populated attempts refuse inverse; SQL execution remains UNRUN."
+          "rollbackSha256": "0ace8db71cea75496f26ac2abf845da66b5c02e939ef7d5701b512e7547694dd",
+          "rollbackStatus": "Exact empty inverse/reapply and later function, ACL/caller refusal prepared. Inverse fences attempt creation and refuses retained attempts; SQL execution remains UNRUN."
         }
       ]
     },

@@ -15,6 +15,10 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// These cases exercise provider responses after local admission. The real
+// fail-closed admission and zero-provider-call matrix is in connections-integration.
+vi.mock("@/platform/account-bindings/google-policy", async original => ({ ...await original<object>(), assertGoogleGrantEligible: async () => {} }));
+
 // HTTP is mocked below. Resolve its public test hosts without a real DNS lookup.
 vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "93.184.216.34", family: 4 })) } }));
 

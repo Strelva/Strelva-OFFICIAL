@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { StHead, StPage } from "@/components/ui/strelva/Kit";
+import { AgencyGooglePreview } from "@/experience/workspace/preview/AgencyGooglePreview";
 import { GoogleConnect } from "@/experience/places/GoogleConnect";
 import { GoogleReadGrant } from "@/experience/places/GoogleReadGrant";
 import styles from "@/experience/publishing/publishing.module.css";
@@ -22,7 +23,7 @@ export default async function GoogleConnectPreview({ searchParams }: { searchPar
     { id: "f3", key: "website" as const, value: "https://synthetic-bakery.example/", foundAt: "2026-10-12T15:00:00Z" },
     { id: "f4", key: "categories" as const, value: ["Bakery", "Cake shop"], foundAt: "2026-10-12T15:00:00Z" },
   ];
-  const body = state === "choose" ? <GoogleConnect workspaceId={WS} viewer="owner" enabled hasListing={false} params={{ connect: "choose" }} actions={actions} choices={{ googleEmail: "owner@gmail.example", more: false, listings: [{ accountId: "accounts/1", locationId: "1", title: "Synthetic Bakery", address: "1 Main St, Buffalo" }, { accountId: "accounts/1", locationId: "2", title: "Synthetic Bakery Uptown", address: "900 Elmwood Ave, Buffalo" }] }} />
+  const body = state.startsWith("agency-") || state === "owner-link" ? <AgencyGooglePreview state={state} /> : state === "choose" ? <GoogleConnect workspaceId={WS} viewer="owner" enabled hasListing={false} params={{ connect: "choose" }} actions={actions} choices={{ googleEmail: "owner@gmail.example", more: false, listings: [{ accountId: "accounts/1", locationId: "1", title: "Synthetic Bakery", address: "1 Main St, Buffalo" }, { accountId: "accounts/1", locationId: "2", title: "Synthetic Bakery Uptown", address: "900 Elmwood Ave, Buffalo" }] }} />
     : state === "agency" ? <GoogleConnect workspaceId={WS} viewer="agency" enabled hasListing={false} params={{}} actions={actions} />
     : state === "member" ? <GoogleConnect workspaceId={WS} viewer="member" enabled hasListing={false} params={{}} actions={actions} />
     : state === "found" ? <><GoogleConnect workspaceId={WS} viewer="owner" enabled hasListing params={{ connect: "connected", read: "found" }} actions={actions} foundFacts={facts} />

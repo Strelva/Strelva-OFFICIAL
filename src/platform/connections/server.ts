@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import type { ConnectionProvider, ProviderEligibility } from "./contracts";
+import { CONNECTION_PROVIDERS, type ConnectionProvider, type ProviderEligibility, type ProviderEligibilityMap } from "./contracts";
 import { providerDefinition } from "./providers";
 import type { ConnectionHolders } from "./holders";
 import { connectionActorArgs, connectionRpc, type ConnectionsDb } from "./db";
@@ -23,8 +23,13 @@ export async function connectionEligibilityFor(actor: WorkspaceActor, input: { p
 }
 export async function listWorkspaceConnections(actor: WorkspaceActor, workspaceId: string) {
   const scope = await connectionScope(actor, workspaceId);
+  const eligibility: ProviderEligibilityMap = Object.fromEntries(await Promise.all(CONNECTION_PROVIDERS.map(async provider => {
+    const access = readProviderAccess(provider);
+    return [provider, await providerEligibility({ access, businessWorkspaceId: workspaceId,
+      actingAgencyWorkspaceId: actingAgencyFor(scope, access.through.kind === "agency" ? access.through.workspaceId : null), agencyHoldsArea })];
+  })));
   const holders = await readConnectionHolders(workspaceId);
-  return composeWorkspaceConnections({ workspaceId, holders, sources: listConnectionSources(), accessFor: readProviderAccess,
+  const result = await composeWorkspaceConnections({ workspaceId, holders, sources: listConnectionSources(), accessFor: readProviderAccess,
     eligibilityFor: async (provider, holders) => {
       const access = readProviderAccess(provider);
       const desiredAgency = access.through.kind === "agency" ? access.through.workspaceId : holders.accountHolder.kind === "agency" ? holders.accountHolder.workspaceId : null;
@@ -35,6 +40,7 @@ export async function listWorkspaceConnections(actor: WorkspaceActor, workspaceI
       return (await accountHolderEligibility(holders, provider, workspaceId, actingAgency)) ?? eligibility;
     },
   });
+  return { ...result, providerEligibility: eligibility };
 }
 
 async function accountHolderEligibility(holders: ConnectionHolders, provider: ConnectionProvider, workspaceId: string, actingAgency: string | null): Promise<ProviderEligibility | null> {

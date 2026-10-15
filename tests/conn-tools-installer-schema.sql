@@ -75,6 +75,23 @@ select pg_temp.expect_error($q$select public.create_connected_site_for_installer
 select pg_temp.expect_error($q$select public.create_connected_site_for_installer('bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000002','ct-staff@example.test','{"installerHolder":{"kind":"business","workspaceId":"bc120000-0000-4000-8000-000000000011"}}')$q$,'workspace_access_denied');
 select public.create_connected_site_for_installer('bc120000-0000-4000-8000-000000000011','bc120000-0000-4000-8000-000000000002','ct-staff@example.test',jsonb_build_object('installerHolder',jsonb_build_object('kind','agency','workspaceId','bc120000-0000-4000-8000-000000000012'),'publicKey','sk_pub_'||repeat('n',24),'verificationToken',repeat('t',32),'label','Harbor Dental','siteUrl','https://harbor.example/','siteHost','harbor.example','allowedOrigins',jsonb_build_array('https://harbor.example'),'platform','unknown'));
 select pg_temp.assert_true(jsonb_array_length(public.read_connected_site_connection_metadata('bc120000-0000-4000-8000-000000000011'))=1,'source lists metadata for exact business');
+-- Cross-lane installer/source contract: record the actual newly inserted site,
+-- preserve its agency holder, and require verification before a Version binds.
+select public.record_connection_holder('bc120000-0000-4000-8000-000000000011',
+ 'bc120000-0000-4000-8000-000000000002','ct-staff@example.test','connected_site:'||s.id,'connected_site',
+ '{"kind":"agency","workspaceId":"bc120000-0000-4000-8000-000000000012"}','{"kind":"platform"}',gen_random_uuid(),repeat('b',64))
+from public.connected_sites s where s.business_workspace_id='bc120000-0000-4000-8000-000000000011';
+select pg_temp.assert_true(public.read_system_version_connection_owner('bc120000-0000-4000-8000-000000000002',
+ 'ct-staff@example.test','connected_site:'||s.id) is null,'unverified installed site cannot bind')
+from public.connected_sites s where s.business_workspace_id='bc120000-0000-4000-8000-000000000011';
+update public.connected_sites set verified_at=clock_timestamp() where business_workspace_id='bc120000-0000-4000-8000-000000000011';
+select pg_temp.assert_true(public.read_system_version_connection_owner('bc120000-0000-4000-8000-000000000002',
+ 'ct-staff@example.test','connected_site:'||s.id)='bc120000-0000-4000-8000-000000000011'::uuid,'verified agency-installed site binds for staffed agency')
+from public.connected_sites s where s.business_workspace_id='bc120000-0000-4000-8000-000000000011';
+select pg_temp.assert_true(public.read_system_version_connection_owner('bc120000-0000-4000-8000-000000000001',
+ 'ct-owner@example.test','connected_site:'||s.id) is null,'business cannot borrow agency-installed site')
+from public.connected_sites s where s.business_workspace_id='bc120000-0000-4000-8000-000000000011';
+
 select pg_temp.assert_true(public.read_connected_site_connection_metadata('bc120000-0000-4000-8000-000000000013')='[]','sibling workspace has no metadata');
 select pg_temp.assert_true((select array_agg(k order by k)=array['business_workspace_id','created_at','id','label','status','verified_at'] from jsonb_object_keys(public.read_connected_site_connection_metadata('bc120000-0000-4000-8000-000000000011')->0) k),'metadata has only safe display fields');
 rollback;

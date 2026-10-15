@@ -38,3 +38,33 @@ it("allows the assigned agency's access only with its current area", async () =>
   granted = false;
   expect(await ownership.ownerOf(actor, ref)).toBeNull();
 });
+
+it("bindAccount preserves source/sibling isolation and admits an agency-held ref only while eligible", async () => {
+  const { createInMemoryVersionStore } = await import("@/platform/system-versions/store");
+  const { createSystemVersions } = await import("@/platform/system-versions/service");
+  vi.stubEnv("STRELVA_CONNECTION_ACCESS_GOOGLE_BUSINESS_PROFILE", `agency:${agency}`);
+  vi.stubEnv("STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE", "approved");
+  let granted = true;
+  const sourceBusiness = "b1000000-0000-4000-8000-000000000005";
+  const sibling = "b1000000-0000-4000-8000-000000000006";
+  const combined: VersionsDb = { rpc: async (name, args) => ({ data: name === "read_system_version_connection_owner"
+    ? args.p_connection_ref === "google_business_profile:source" ? sourceBusiness : args.p_connection_ref === "google_business_profile:sibling" ? sibling : business
+    : name === "read_connection_actor_scope" ? { actingAgencyWorkspaceId: agency }
+      : name === "connection_agency_holds_area" ? granted
+        : [{ ref: args.p_workspace_id === business ? ref : `google_business_profile:${args.p_workspace_id === sibling ? "sibling" : "source"}`, accountHolder: { kind: "agency", workspaceId: agency }, accessThrough: { kind: "agency", workspaceId: agency } }], error: null }) };
+  const store = createInMemoryVersionStore();
+  const versions = createSystemVersions({ store, connections: createSupabaseConnectionOwnership(combined) });
+  const owner = { ...actor, memberships: [...actor.memberships, { businessId: sourceBusiness, role: "owner" as const }] };
+  const source = { businessId: sourceBusiness, systemId: crypto.randomUUID() };
+  const revision = await versions.publishSourceRevision(owner, { source, definition: { kind: "website_section", title: "Questions", items: [{ question: "Hours?", answer: "Ask our team." }] }, summary: "Fictional section" });
+  await versions.shareSource(owner, source, business);
+  const draft = await versions.createVersion(owner, { source: revision.source, version: { businessId: business, systemId: crypto.randomUUID() }, context: { kind: "agency_client", label: "Harbor Dental" } });
+  for (const connectionId of ["google_business_profile:source", "google_business_profile:sibling"]) {
+    await expect(versions.bindAccount(owner, draft.id, { kind: "google", connectionId, expectedRowRevision: 1 })).rejects.toThrow(/another business/);
+  }
+  granted = false;
+  await expect(versions.bindAccount(owner, draft.id, { kind: "google", connectionId: ref, expectedRowRevision: 1 })).rejects.toThrow(/another business/);
+  expect((await store.getLineage(owner, draft.id))?.bindings).toEqual([]);
+  granted = true;
+  expect((await versions.bindAccount(owner, draft.id, { kind: "google", connectionId: ref, expectedRowRevision: 1 })).bindings).toEqual([expect.objectContaining({ connectionId: ref, ownerBusinessId: business })]);
+});

@@ -93,3 +93,10 @@ export type RequiredConnection = z.infer<typeof requiredConnectionSchema>;
 export type ProviderEligibility =
   | { eligible: true; through: CredentialHolder }
   | { eligible: false; reason: UnavailableReason; message: string };
+
+/** Additive read evidence, including providers with no account rows yet. */
+export const providerEligibilitySchema = z.union([
+  z.object({ eligible: z.literal(true), through: credentialHolderSchema }).strict(),
+  z.object({ eligible: z.literal(false), reason: z.enum(UNAVAILABLE_REASONS), message: z.string() }).strict(),
+]);
+export type ProviderEligibilityMap = Partial<Record<ConnectionProvider, ProviderEligibility>>;

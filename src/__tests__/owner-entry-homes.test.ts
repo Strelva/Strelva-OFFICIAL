@@ -1,3 +1,9 @@
+// This suite starts after admission and exercises downstream read/maintenance
+// behavior. connections-integration.test.ts proves the real eligibility matrix.
+vi.mock("@/platform/connections/server", () => ({
+  connectionEligibilityFor: vi.fn(async () => ({ eligible: true, through: { kind: "platform" } })),
+}));
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";

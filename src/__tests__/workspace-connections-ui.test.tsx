@@ -7,6 +7,8 @@ import { accountHolderLabel, connectionNextStep } from "@/experience/connections
 import { StrelvaSidebar } from "@/experience/app-frame/StrelvaSidebar";
 import { readWorkspaceLocation, workspaceLocationHref } from "@/platform/workspaces/location";
 import type { WorkspaceConnection } from "@/platform/connections/contracts";
+import { CONNECTION_PROVIDERS } from "@/platform/connections/contracts";
+import { providerDefinition } from "@/platform/connections/providers";
 const business = "11111111-1111-4111-8111-111111111111", agency = "22222222-2222-4222-8222-222222222222";
 const row: WorkspaceConnection = { ref: "google_business_profile:1", provider: "google_business_profile", workspaceId: business, accountLabel: "Harbor Dental", accountHolder: { kind: "agency", workspaceId: agency }, accessThrough: { kind: "agency", workspaceId: agency }, state: "connected", unavailableReason: null, connectedAt: null, systemIds: [] };
 let root: Root, node: HTMLDivElement;
@@ -15,6 +17,19 @@ afterEach(async () => { await act(async () => root.unmount()); node.remove(); vi
 const render = async (request: typeof fetch, workspaceId = business, canRead = true) => act(async () => root.render(<WorkspaceConnections workspaceId={workspaceId} workspaceKind="customer" workspaceName="Harbor Dental" names={new Map([[agency, "North Studio"]])} request={request} canRead={canRead} canManage />));
 
 describe("workspace Connections", () => {
+  it("lists rows from every provider while naming their recorded account holder", async () => {
+    await render(async () => Response.json({ connections: CONNECTION_PROVIDERS.map(provider => ({ ...row, provider, ref: `${provider}:fixture`, accountHolder: { kind: "business", workspaceId: business }, accessThrough: { kind: "platform" } })), sourceErrors: [] }));
+    for (const provider of CONNECTION_PROVIDERS) expect(node.textContent).toContain(providerDefinition(provider).label);
+    expect(node.textContent?.match(/Whose account: Your business/g)).toHaveLength(8);
+  });
+  it("shows Coming soon for unavailable providers before there are any account rows", async () => {
+    await render(async () => Response.json({ connections: [], sourceErrors: [], providerEligibility: {
+      google_business_profile: { eligible: false, reason: "coming_soon", message: "Google Business Profile for businesses on Strelva is coming soon." },
+    } }));
+    expect(node.textContent).toContain("Google Business Profile for businesses on Strelva is coming soon.");
+    expect(node.querySelector('a[href*="/workspace/google"]')).toBeNull();
+    expect(node.querySelector('a[href*="view=scheduling"]')).not.toBeNull();
+  });
   it("distinguishes account holder, agency access and legacy unknowns without inventing platform access", async () => {
     const request = vi.fn<typeof fetch>(async () => Response.json({ connections: [row, { ...row, ref: "calendly:old", provider: "calendly", accountHolder: { kind: "unknown" }, accessThrough: { kind: "unknown" }, state: "stale" }], sourceErrors: [] }));
     await render(request);

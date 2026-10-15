@@ -19,6 +19,8 @@ fingerprint() { psql "${psql_args[@]}" -At --file="$repo_root/tests/support/publ
 apply "$repo_root/scripts/sql/local-supabase-shim.sql"
 for earlier in "$repo_root"/supabase/migrations/20*.sql; do
  [[ "$(basename "$earlier")" < "$migration_name" ]] || break
+ [[ "$(basename "$earlier")" == 20261005090000_tenant_leads.sql ]] && continue
+ if [[ "$(basename "$earlier")" == 20261001120000_website_documents.sql ]]; then apply "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"; fi
  apply "$earlier"
 done
 fingerprint >"$cluster_root/before.catalog"

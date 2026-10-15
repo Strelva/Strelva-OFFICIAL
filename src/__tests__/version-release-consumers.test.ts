@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { connectedEmail } from "./fixtures/connected-email";
 import { createInMemoryConnectionOwnership, createInMemoryVersionStore, createSystemVersions, VersionStaleError, type JsonObject, type VersionLineage } from "@/platform/system-versions";
 import { projectVersionPossibilities } from "@/platform/system-versions/possibilities";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
@@ -14,7 +15,7 @@ const inquiry: JsonObject = { kind: "inquiry_pattern", name: "Intake", title: "H
 
 async function fixture() {
   const store = createInMemoryVersionStore();
-  const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership() });
+  const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership(), requiredConnections: connectedEmail });
   const owner = { ...actor, memberships: [{ businessId, role: "owner" as const }, { businessId: sourceBusinessId, role: "owner" as const }] };
   const source = { businessId: sourceBusinessId, systemId: crypto.randomUUID() };
   const revision = await versions.publishSourceRevision(owner, { source, definition: inquiry, summary: "First intake" });

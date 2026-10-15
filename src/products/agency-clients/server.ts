@@ -5,3 +5,4 @@ export * from "./gohighlevel/index";
 export { assertGhlAgencyManager, defaultGhlServiceDeps } from "./gohighlevel/service";
 
 export { agencyClaimEmailReleased } from "./claim-email";
+export { ghlConnectionSource } from "./gohighlevel/connection-source";

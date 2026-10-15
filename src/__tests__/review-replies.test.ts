@@ -13,6 +13,13 @@
  * All external APIs (Gemini, GBP HTTP, Redis, Slack, connections) are mocked.
  */
 
+// These provider-response fixtures begin after connection admission; the real
+// eligibility and holder boundaries are covered by connections-integration.test.ts.
+vi.mock("@/platform/account-bindings/google-policy", async (original) => ({
+  ...await original<typeof import("@/platform/account-bindings/google-policy")>(),
+  assertGoogleGrantEligible: vi.fn(async () => {}),
+}));
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticatedCronRequest } from "@/__tests__/support/cron";
 // Load the route once during collection. Its cold dependency transformation

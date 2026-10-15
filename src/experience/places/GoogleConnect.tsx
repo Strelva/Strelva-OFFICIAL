@@ -94,7 +94,7 @@ export function GoogleConnect({ workspaceId, viewer, enabled, hasListing, params
       {/* One click, never a GET: link scanners and prefetch can't start a Google sign-in. */}
       <form action={actions.start} className={styles.actions}>{hidden}{returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}<StPill type="submit">Connect Google</StPill>{returnTo ? <StTextButton href={returnTo}>Skip for now</StTextButton> : null}</form>
     </StSection> : viewer === "agency" && enabled ? <StSection title="Google isn't connected yet">
-      <p className={styles.copy}>The owner connects Google with their own account. Copy a link and send it to them yourself; Strelva doesn&apos;t send it.</p>
+      <p className={styles.copy}>Check how Google is available for this business. Your agency can connect its own account when it holds access, or copy a link for the owner. Strelva doesn&apos;t send it.</p>
       <AgencyConnectLinkButton workspaceId={workspaceId} request={agencyRequest} />
     </StSection> : <StEmpty>No Google listing is connected here yet. The business owner connects it with their own Google account.</StEmpty> : null}
 

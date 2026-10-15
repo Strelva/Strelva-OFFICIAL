@@ -14,7 +14,9 @@ forward="$repo_root/supabase/migrations/20261026120100_conn_tools_installer.sql"
 inverse="$repo_root/supabase/migrations/rollback-20261026120100_conn_tools_installer.sql"
 apply "$repo_root/scripts/sql/local-supabase-shim.sql"
 for migration in "$repo_root"/supabase/migrations/20*.sql; do
- [[ "$(basename "$migration")" > "$(basename "$forward")" || "$migration" == "$forward" ]] && continue
+ [[ "$(basename "$migration")" < "$(basename "$forward")" ]] || break
+ [[ "$(basename "$migration")" == 20261005090000_tenant_leads.sql ]] && continue
+ if [[ "$(basename "$migration")" == 20261001120000_website_documents.sql ]]; then apply "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"; fi
  apply "$migration"
 done
 fingerprint() { psql "${psql_args[@]}" -At -f "$repo_root/tests/support/public-catalog-fingerprint.sql"; }

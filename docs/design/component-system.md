@@ -2489,3 +2489,40 @@ Library filters with normal and failure states. DOM and source checks are local.
 Desktop/mobile rendering, keyboard/focus visual acceptance and actual connected
 provider reads remain the coordinator's post-integration checks under the lane
 brief's explicit browser/build prohibition.
+
+### October 14 · agency Google listing selection (integration)
+
+[AgencyConnectLinkButton](../../src/experience/places/AgencyConnectLink.tsx) checks
+the current Google path before offering an action. `agency_connect` offers
+**Connect your agency’s Google account**; platform `first_connect`/`reconnect`
+responses retain selectable owner wording and an explicit **Copy message**.
+Clipboard failure keeps the original message available. No message is sent.
+
+[AgencyGooglePicker](../../src/experience/places/AgencyGooglePicker.tsx) reuses
+StSection, StRows, StRow, StPill, StNotice and StTextButton with the publishing
+stack/action layout and shared tokens. Browser discovery returns to
+`/workspace/google/agency`, where current ordinary agency authority is checked
+before exposing the signed listings. Choosing submits the exact listing and
+workspace to the existing native consent boundary. Expired/session, missing
+area, sign-in, unavailable access, cancelled consent and empty account states
+retain a recovery path. All listing choices are disabled during a request.
+Owner connect and reconnect stay separate; no provider rights are implied.
+
+Local source/DOM/HTTP proof: `agency-google-connect-ui.test.tsx`,
+`agency-google-picker-routes.test.tsx` and `google-connect-ui.test.tsx` pass
+27 tests. Rendered desktop/mobile, focus, contrast, authenticated consent and
+provider operation remain unrun here. The closed fictional preview is
+`/preview/strelva/google-connect?state=agency-choose`; also `agency-options`,
+`owner-link`, `agency-expired`, `agency-permission`, `agency-pending`,
+`agency-empty`, `agency-refused`, `agency-loading` and `agency-error`. Loading
+and error fixtures activate on **Connect this listing**; options and owner-link
+fixtures activate on **Check Google connection options**. No live transport is
+used by these added fixtures.
+
+The composed Connections response also reports current provider eligibility
+before an account exists. `WorkspaceConnections` and App `RequiredConnections`
+show Coming soon with the server's plain reason, while eligible providers keep
+setup links. Old responses remain readable without inventing eligibility.
+`/preview/strelva/connections?state=coming-soon` exercises an empty business
+with unavailable Google access. Source/DOM tests cover this additive evidence;
+rendered desktop/mobile acceptance remains with the coordinator.

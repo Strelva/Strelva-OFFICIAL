@@ -37,15 +37,19 @@ digest or actor conflicts. Reconnect uses a new command id. Scope and current
 agency authority are checked again even on replay. No credentials enter this
 table. Missing refs are overlaid as unknown by the read model, never platform.
 
-### Wiring product sources (integration lane)
+### Wiring product sources
 
 Each product exports a `ConnectionSource` object or factory from its own module.
 Its imports must not register sources. At the server composition root, explicitly
 call `registerConnectionSource(source)` for each chosen object once, before
 `listWorkspaceConnections`. Registration is idempotent by object identity and
 returns a cleanup function for tests. `listConnectionSources()` takes a snapshot.
-The core registry intentionally imports no products. The integration lane owns
-the final explicit source list and production entry-point initialization.
+The core registry intentionally imports no products. Next's Node instrumentation
+calls `registerProductConnectionSources` in `src/server/connections/sources.ts`
+before requests run. Its stable lazy wrappers cover all eight providers for
+both workspace GETs and server live gates. Imports and registration perform no
+storage reads or provider calls; each source loads inside the authorized read,
+so an import/storage failure remains isolated to that source.
 
 Refs use `<ConnectionProvider>:<source row id>`, including `highlevel:` rather
 than the storage provider's `gohighlevel` name. Sources return contract-valid
@@ -60,6 +64,11 @@ optional eligibility callback; the server supplies the acting agency and account
 holder checks. Unknown holders and changed provider access need reconnection;
 ineligible rows are unavailable. Stored account-holder metadata alone grants no
 permission and no provider access.
+
+The authorized server response additionally includes `providerEligibility`,
+including providers without saved accounts. Connections setup and App Needs
+use it to show Coming soon before the first connect. It is read evidence only;
+the live command independently checks current eligibility and account state.
 
 ### Versions
 

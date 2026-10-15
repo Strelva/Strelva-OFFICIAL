@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { connectionProviderSchema, workspaceConnectionSchema, type ConnectionProvider, type CredentialHolder, type WorkspaceConnection } from "@/platform/connections/contracts";
+import { connectionProviderSchema, providerEligibilitySchema, workspaceConnectionSchema, type ConnectionProvider, type CredentialHolder, type WorkspaceConnection } from "@/platform/connections/contracts";
 import { providerDefinition } from "@/platform/connections/providers";
 
 export const connectionsResponseSchema = z.object({
   connections: z.array(workspaceConnectionSchema),
   sourceErrors: z.array(connectionProviderSchema),
+  providerEligibility: z.partialRecord(connectionProviderSchema, providerEligibilitySchema).optional(),
 });
 export type ConnectionsResponse = z.infer<typeof connectionsResponseSchema>;
 

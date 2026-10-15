@@ -17,6 +17,9 @@ import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn() }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams(window.location.search) }));
+// Runtime use starts with an already qualified fictional release. Publication
+// refusal/recovery is covered independently by required-connections-live.
+vi.mock("@/platform/connections/server", async () => (await import("./fixtures/connected-email")).connectedEmail);
 
 const member: WorkspaceActor = { userId: "member", verifiedEmail: "member@example.com" };
 const SYSTEM = "51000000-0000-4000-8000-000000000001";

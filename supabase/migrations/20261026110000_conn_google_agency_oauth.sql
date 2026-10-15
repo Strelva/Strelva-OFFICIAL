@@ -1,6 +1,11 @@
 begin;
 set local lock_timeout='3s';
 set local statement_timeout='20s';
+create schema conn_google_rollback;
+revoke all on schema conn_google_rollback from public,anon,authenticated,service_role;
+create table conn_google_rollback.functions(signature text primary key,fingerprint text not null);
+alter table conn_google_rollback.functions enable row level security;
+revoke all on conn_google_rollback.functions from public,anon,authenticated,service_role;
 -- A separate attempt store prevents an owner callback consuming an agency attempt.
 create table public.conn_google_agency_oauth_attempts (like public.native_google_oauth_attempts including all,
  agency_workspace_id uuid not null references public.workspaces(id),
@@ -65,4 +70,8 @@ begin
 end $$;
 revoke all on function public.conn_google_agency_oauth(uuid,text,uuid,uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.conn_google_agency_oauth(uuid,text,uuid,uuid,text,jsonb) to service_role;
+insert into conn_google_rollback.functions
+select p.oid::regprocedure::text,md5(pg_get_functiondef(p.oid)||':'||p.proowner::text||':'||coalesce(p.proacl::text,''))
+from pg_proc p where p.oid='public.conn_google_agency_oauth(uuid,text,uuid,uuid,text,jsonb)'::regprocedure;
+notify pgrst,'reload schema';
 commit;

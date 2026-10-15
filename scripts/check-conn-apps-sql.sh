@@ -15,7 +15,7 @@ forward="$repo_root/supabase/migrations/20261026130000_conn_apps_declarations.sq
 inverse="$repo_root/supabase/migrations/rollback-20261026130000_conn_apps_declarations.sql"
 apply "$repo_root/scripts/sql/local-supabase-shim.sql"
 for migration in "$repo_root"/supabase/migrations/20*.sql; do
- [[ "$migration" == "$forward" ]] && continue
+ [[ "$(basename "$migration")" < "$(basename "$forward")" ]] || break
  # Retained historical ordering: tenant_leads precedes website_documents.
  [[ "$(basename "$migration")" == 20261005090000_tenant_leads.sql ]] && continue
  if [[ "$(basename "$migration")" == 20261001120000_website_documents.sql ]]; then apply "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"; fi

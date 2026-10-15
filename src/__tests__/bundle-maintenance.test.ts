@@ -1,3 +1,9 @@
+// This suite starts after admission and exercises downstream read/maintenance
+// behavior. connections-integration.test.ts proves the real eligibility matrix.
+vi.mock("@/platform/connections/server", () => ({
+  connectionEligibilityFor: vi.fn(async () => ({ eligible: true, through: { kind: "platform" } })),
+}));
+
 import {afterEach,describe,it,expect,vi} from "vitest";
 import {queueBundleMaintenanceDraft,prepareBundleMaintenance,type MaintenanceDeps,type MaintenanceRpc} from "@/products/google-listing/maintenance";
 import {businessRecordSchema} from "@/platform/business-record/contracts";

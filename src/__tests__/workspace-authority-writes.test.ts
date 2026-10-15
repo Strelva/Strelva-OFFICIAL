@@ -1,3 +1,12 @@
+// Connection admission is already satisfied in these calendar RPC authority
+// fixtures; connection eligibility and holder persistence have dedicated tests.
+vi.mock("@/platform/connections/server", () => ({
+  connectionEligibilityFor: vi.fn(async () => ({ eligible: true, through: { kind: "platform" } })),
+}));
+vi.mock("@/platform/connections/holders", () => ({
+  recordConnectionHolder: vi.fn(async () => {}),
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptSecret } from "@/platform/infra/crypto/secrets";
 

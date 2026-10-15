@@ -48,5 +48,21 @@ do $$ declare attempt uuid:='ec110000-0000-4000-8000-000000000030'; result jsonb
  result:=pg_temp.agency_call('finish_oauth',jsonb_build_object('id',attempt,'subject','north-fixture-subject','scopes',jsonb_build_array('openid','https://www.googleapis.com/auth/business.manage'),'accessTokenCiphertext','enc:v1:AAAA:BBBB:CCCC','refreshTokenCiphertext','enc:v1:DDDD:EEEE:FFFF','tokenExpiresAt',(clock_timestamp()+interval '1 hour')::text));
  if result->>'status'<>'connected' or not exists(select 1 from public.workspace_google_locations where binding_id=(result->>'bindingId')::uuid and account_id='accounts/north' and location_id='harbor') then raise exception 'exact agency binding missing'; end if;
  if exists(select 1 from public.workspace_memberships where workspace_id='ec110000-0000-4000-8000-000000000020' and user_id='ec110000-0000-4000-8000-000000000001') then raise exception 'agency became owner'; end if;
+ -- Cross-lane source identity: the native OAuth result must be usable by core's
+ -- real holder/Version reader, without relabeling the agency's login as business.
+ perform public.record_connection_holder('ec110000-0000-4000-8000-000000000020',
+  'ec110000-0000-4000-8000-000000000001','staff@north.example',
+  'google_business_profile:'||(result->>'bindingId'),'google_business_profile',
+  '{"kind":"agency","workspaceId":"ec110000-0000-4000-8000-000000000010"}',
+  '{"kind":"agency","workspaceId":"ec110000-0000-4000-8000-000000000010"}',gen_random_uuid(),repeat('d',64));
+ if public.read_system_version_connection_owner('ec110000-0000-4000-8000-000000000001','staff@north.example',
+  'google_business_profile:'||(result->>'bindingId')) is distinct from 'ec110000-0000-4000-8000-000000000020'::uuid then
+  raise exception 'core refused native agency OAuth source';
+ end if;
+ if public.read_system_version_connection_owner('ec110000-0000-4000-8000-000000000002','owner@harbor.example',
+  'google_business_profile:'||(result->>'bindingId')) is not null then
+  raise exception 'business borrowed agency OAuth source';
+ end if;
+
 end $$;
 rollback;

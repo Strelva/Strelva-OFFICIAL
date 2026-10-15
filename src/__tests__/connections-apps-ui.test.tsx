@@ -68,3 +68,14 @@ it("retries a connection read without installing anything", async () => {
   expect(request.mock.calls.filter(([input]) => String(input).startsWith("/api/workspace/connections"))).toHaveLength(2);
   expect(request.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
 });
+
+it("uses explicit provider eligibility before the first account is connected", async () => {
+  const delegate = bundlePreviewRequest("ready");
+  const request: typeof fetch = async (input, init) => String(input).startsWith("/api/workspace/connections")
+    ? Response.json({ connections: [], sourceErrors: [], providerEligibility: { resend: { eligible: false, reason: "not_configured", message: "Email sending is coming soon." } } }) : delegate(input, init);
+  await mount("ready", request);
+  const needs = host.querySelector('[aria-label="Connections this App needs"]')!;
+  expect(needs.textContent).toContain("Coming soon");
+  expect(needs.textContent).toContain("Email sending is coming soon.");
+  expect(needs.textContent).not.toContain("Connect Email sending to confirm access");
+});

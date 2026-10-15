@@ -9,6 +9,8 @@ export async function register() {
     // Plug the workspace layers into the ports src/lib declares (Strelva
     // Reborn section 7) before any request runs.
     await import("./src/register-workspace-ports");
+    const { registerProductConnectionSources } = await import("./src/server/connections/sources");
+    registerProductConnectionSources();
   }
 
   if (process.env.NEXT_RUNTIME === "edge") {

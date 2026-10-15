@@ -1,3 +1,10 @@
+// These provider-response fixtures begin after connection admission; the real
+// eligibility and holder boundaries are covered by connections-integration.test.ts.
+vi.mock("@/platform/account-bindings/google-policy", async (original) => ({
+  ...await original<typeof import("@/platform/account-bindings/google-policy")>(),
+  assertGoogleGrantEligible: vi.fn(async () => {}),
+}));
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantConfig } from "../lib/types";
 
