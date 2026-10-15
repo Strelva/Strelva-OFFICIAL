@@ -4,7 +4,7 @@ import path from "path";
 import type { SiteCapabilityManifest } from "@/lib/types";
 import { resolveEditableSections, resolveGbpWriteAllowed, buildGbpTools } from "@/lib/agent-shared";
 import { streamAssistantTurn } from "@/platform/assistant/core";
-import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES } from "@/platform/infra/assistant-policy";
 
 // tool() passthrough so we can call .execute directly; events.addEvent mocked so
 // the shared GBP factory queues against a fake rather than Redis.

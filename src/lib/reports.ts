@@ -1,6 +1,6 @@
 import { workspacePorts } from "./workspace-ports";
 import { generateModelText } from "@/platform/infra/model-calls";
-import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/assistant/policy";
+import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/infra/assistant-policy";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";

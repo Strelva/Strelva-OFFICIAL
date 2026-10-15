@@ -1,4 +1,4 @@
-import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES } from "@/platform/infra/assistant-policy";
 import { consumeAssistantParts } from "@/platform/assistant/core";
 import { ModelAgencyCapReachedError, ModelAiPausedError, ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";

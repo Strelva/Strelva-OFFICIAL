@@ -9,6 +9,7 @@ import { workspacePortLoaders } from "@/server/workspace-ports";
 import { registerTenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 
 import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
+import { registerAutoPostWithdrawal } from "@/platform/ai-controls/runtime-ports";
 
 const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
@@ -36,3 +37,5 @@ registerTenantPublishingPorts(async () => ({
 // Product/provider callbacks stay at the app edge; platform booking rules own no product implementation.
 registerCalendarBusyProviderRead(async (...args) => (await import("@/products/scheduling/server")).readWorkspaceProviderAvailability(...args));
 registerBookingRequestNotifier(async (booking) => (await import("@/server/needs-you/server")).notifyBookingRequestNow(booking));
+// A usage-controls hold withdraws reply timers already waiting; the tenant review code stays in src/lib.
+registerAutoPostWithdrawal(async (...args) => (await import("@/lib/reviews/auto-reply")).withdrawPendingAutoPosts(...args));

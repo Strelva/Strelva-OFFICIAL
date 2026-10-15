@@ -1,5 +1,5 @@
 import { generateModelText } from "@/platform/infra/model-calls";
-import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/assistant/policy";
+import { TEXT_PURPOSE_MAX_OUTPUT_TOKENS } from "@/platform/infra/assistant-policy";
 import { promises as fs } from "fs";
 import path from "path";
 import { detectStaleSections } from "./reports";

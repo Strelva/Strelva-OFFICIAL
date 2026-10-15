@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASSISTANT_POLICIES, ASSISTANT_SURFACES, TEXT_PURPOSE_MAX_OUTPUT_TOKENS, assistantCallOptions } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES, ASSISTANT_SURFACES, TEXT_PURPOSE_MAX_OUTPUT_TOKENS, assistantCallOptions } from "@/platform/infra/assistant-policy";
 
 describe("assistant policy", () => {
   it("bounds every surface", () => {

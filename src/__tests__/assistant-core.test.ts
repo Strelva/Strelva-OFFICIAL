@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ModelBudgetPausedError } from "@/platform/infra/business-ai-budget";
-import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES } from "@/platform/infra/assistant-policy";
 import { assistantFailure, consumeAssistantParts, type AssistantHandlers, type AssistantPart } from "@/platform/assistant/core";
 
 async function* parts(...items: AssistantPart[]): AsyncIterable<AssistantPart> {

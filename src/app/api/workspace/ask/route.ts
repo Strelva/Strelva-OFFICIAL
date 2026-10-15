@@ -1,4 +1,4 @@
-import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/infra/assistant-policy";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";

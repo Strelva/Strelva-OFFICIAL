@@ -1,4 +1,4 @@
-import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES } from "@/platform/infra/assistant-policy";
 import { assistantFailure, streamAssistantTurn } from "@/platform/assistant/core";
 import type { ModelMessage } from "ai";
 import { z } from "zod";

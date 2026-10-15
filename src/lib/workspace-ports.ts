@@ -352,6 +352,20 @@ export interface PublishingContentPort {
   executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
 }
 
+// ── Usage controls on a business (src/platform/ai-controls) ────────────────────
+
+/** An agency or operator hold on a business (STRELVA_AI_CONTROLS_RELEASE). */
+export interface TenantAiControlsState {
+  paused: boolean;
+  reviewAutoPost: "client_choice" | "held";
+  setBy: { kind: "agency" | "operator"; agencyName: string | null } | null;
+}
+
+export interface AiControlsPort {
+  /** null when the release is off or no workspace holds the tenant; `unavailable` means callers fail closed. */
+  readTenantAiControls(tenantId: string): Promise<TenantAiControlsState | { unavailable: true } | null>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
@@ -374,6 +388,7 @@ export interface WorkspacePorts {
   websites(): Promise<WebsitesPort>;
   websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
   publishingContent(): Promise<PublishingContentPort>;
+  aiControls(): Promise<AiControlsPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

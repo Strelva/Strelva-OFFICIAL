@@ -1,7 +1,7 @@
 import type { ModelMessage, Tool } from "ai";
 import { streamModelText, type ModelCallContext } from "@/platform/infra/model-calls";
 import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
-import { assistantCallOptions, type AssistantPolicy } from "./policy";
+import { assistantCallOptions, type AssistantPolicy } from "@/platform/infra/assistant-policy";
 
 /**
  * The one place a streamed assistant turn is read. Each surface keeps its own

@@ -84,4 +84,6 @@ export const workspacePortLoaders = {
   websitePublicationReadback: () => import("@/app/api/publish/native-readback"),
 
   publishingContent: () => import("@/products/publishing/server"),
+
+  aiControls: () => import("@/platform/ai-controls/service"),
 };

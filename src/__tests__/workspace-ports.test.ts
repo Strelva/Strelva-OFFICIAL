@@ -51,6 +51,7 @@ describe("workspace ports", () => {
       publishingContent: ["executePublishingEvent", "authorizePublishingEvent", "prepareTenantCollectionDraft"],
       websites: ["websiteRebuildReleaseMayBeOn", "websiteRebuildReleasedFor", "websiteDocumentStore", "readWebsiteRebuild", "readSiteNodes", "patchWebsiteRebuild"],
       websitePublicationReadback: ["observeAcceptedNativePublish"],
+      aiControls: ["readTenantAiControls"],
     };
     expect(Object.keys(ports).sort()).toEqual(Object.keys(expected).sort());
     for (const [name, members] of Object.entries(expected) as [keyof WorkspacePorts, string[]][]) {

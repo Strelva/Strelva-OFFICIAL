@@ -34,7 +34,7 @@ import { systemOriginId } from "@/platform/systems";
 import type { ExistingSystemsSnapshot, SystemListing } from "@/platform/systems/from-existing";
 import type { WorkspaceRole } from "@/platform/workspaces/types";
 import { createInMemoryAskHistory } from "@/platform/ask/history";
-import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/infra/assistant-policy";
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const OTHER_WS = "22222222-2222-4222-8222-222222222222";

@@ -13,7 +13,6 @@
 
 import { mirrorRecord, readSetting, durableRecordAuthority, writeDurableRecord } from "../client-records";
 import { getRedis } from "@/platform/infra/redis";
-import { readTenantAiControls } from "@/platform/ai-controls/service";
 // The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
 // port src/lib declares (Strelva Reborn section 7).
 import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "../workspace-ports";
@@ -80,7 +79,7 @@ export async function getReplyVoice(tenantId: string, { applyHold = true, ...opt
  */
 async function withAgencyHold(tenantId: string, voice: ReplyVoice): Promise<ReplyVoice> {
   if (voice.mode !== "auto") return voice;
-  const controls = await readTenantAiControls(tenantId);
+  const controls = await (await workspacePorts().aiControls()).readTenantAiControls(tenantId);
   if (!controls) return voice;
   if ("unavailable" in controls) return { ...voice, mode: "approve", heldBy: "operator", heldByName: null };
   if (controls.reviewAutoPost !== "held" && !controls.paused) return voice;

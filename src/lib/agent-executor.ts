@@ -1,5 +1,5 @@
 import { tool } from "ai";
-import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/infra/assistant-policy";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
 import { getRedis } from "@/platform/infra/redis";
