@@ -167,7 +167,7 @@ export async function applySectionUpdate(
     !shouldRouteToReview &&
     (!siteManifest || manifestAllowsAction(siteManifest, section, "publish"));
 
-  const { appendVersion, setDraftContent, logActivity, recordSectionUpdate } = await import("./storage");
+  const { setDraftContent, logActivity, recordSectionUpdate } = await import("./storage");
 
   let eventId: string | undefined;
 

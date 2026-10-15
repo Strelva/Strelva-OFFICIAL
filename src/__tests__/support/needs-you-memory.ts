@@ -61,7 +61,7 @@ export function needsYouMemoryStore(options: {
       const i = [...items.values()].filter((row) => row.workspaceId === ws && row.sourceLifecycle === lifecycle && row.sourceId === sourceId && row.state === "open")[0];
       return i ? structuredClone(i) : null;
     },
-    async claimPolicy(ws, p, policy) {
+    async claimPolicy(ws, p) {
       const same = [...items.values()].find((i) => i.workspaceId === ws && i.sourceLifecycle === p.sourceLifecycle && i.sourceId === p.sourceId && i.revisionHash === p.revisionHash);
       if (same) return { status: "already_handled", item: same };
       if ([...items.values()].some((i) => i.workspaceId === ws && i.sourceLifecycle === p.sourceLifecycle && i.sourceId === p.sourceId && i.state === "open")) {
