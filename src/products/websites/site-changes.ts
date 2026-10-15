@@ -37,6 +37,22 @@ function failure(error: DbError): never {
   throw new WorkspaceStoreError("Website change requests are unavailable.");
 }
 
+/** A Request whose newest receipt is a preview: it waits on the owner's Make it live (Needs you). */
+export const pendingSiteChangeReviewSchema = z.object({
+  requestId: z.string().uuid(),
+  systemId: z.string().uuid(),
+  request: z.string(),
+  page: z.string().nullable(),
+  siteName: z.string(),
+  previewReceiptId: z.string().uuid(),
+  previewUrl: z.string(),
+  summary: z.string().nullable(),
+  ownerFacing: z.boolean().nullable().transform(value => value !== false),
+  reportedBy: z.enum(["person", "coding_agent"]),
+  recordedAt: z.string(),
+});
+export type PendingSiteChangeReview = z.infer<typeof pendingSiteChangeReviewSchema>;
+
 export function createSiteChangeStore(db?: SiteChangesDb) {
   const client = (): SiteChangesDb => {
     if (db) return db;
@@ -51,6 +67,13 @@ export function createSiteChangeStore(db?: SiteChangesDb) {
       if (error) failure(error);
       const parsed = z.array(siteChangeRequestSchema).safeParse(data);
       if (!parsed.success) throw new WorkspaceStoreError("Website change requests could not be read.");
+      return parsed.data;
+    },
+    async pendingReviews(actor: WorkspaceActor, workspaceId: string): Promise<PendingSiteChangeReview[]> {
+      const { data, error } = await client().rpc("list_website_change_reviews", { p_workspace_id: workspaceId, ...identity(actor) });
+      if (error) failure(error);
+      const parsed = z.array(pendingSiteChangeReviewSchema).safeParse(data);
+      if (!parsed.success) throw new WorkspaceStoreError("Website changes waiting for review could not be read.");
       return parsed.data;
     },
     async record(actor: WorkspaceActor, workspaceId: string, requestId: string, step: RecordSiteChange): Promise<SiteChangeReceipt> {

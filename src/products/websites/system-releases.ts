@@ -4,7 +4,6 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { systemOriginSchema, type SystemOrigin } from "@/platform/systems/contracts";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
-import { CONTENT_READING_REPOS } from "./site-editing";
 
 export interface WebsiteReleaseTarget {
   systemId: string;
@@ -32,7 +31,8 @@ export async function reconcileWebsiteSystemReleases(
     p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),
     p_system_id: z.string().uuid().parse(target.systemId),
     p_origin_kind: origin.kind, p_origin_ref: origin.ref,
-    p_content_reading: target.tenantId ? CONTENT_READING_REPOS.has(target.tenantId) : false,
+    // Null: the database reads the site's declared content source (customRepo.contentSource).
+    p_content_reading: target.tenantId ? null : false,
   });
   if (error) {
     if (/business_record_access_denied|system_not_found/.test(error.message ?? "")) throw new WorkspaceAccessError();

@@ -23,10 +23,11 @@ const SECTIONS: Record<string, SectionData> = {
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
-function siteChangesFixture(mode: "ready" | "empty" | "error"): typeof fetch {
+function siteChangesFixture(mode: "ready" | "empty" | "error", byCodeAgent = false): typeof fetch {
   let requests: SiteChangeRequest[] = mode === "empty" ? [] : [
     { id: "c7a1e0b2-0000-4000-8000-000000000001", request: "Add a private events page with a short inquiry form", status: "requested", accepted: "accepted", createdAt: "2026-10-03T14:00:00Z", updatedAt: "2026-10-05T16:20:00Z",
-      receipts: [{ id: "d0000000-0000-4000-8000-000000000001", kind: "preview", previewUrl: "https://mclears-git-private-events.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: "The preview includes a form that sends inquiries to this business.", recordedAt: "2026-10-05T16:20:00Z" }] },
+      receipts: [{ id: "d0000000-0000-4000-8000-000000000001", kind: "preview", previewUrl: "https://mclears-git-private-events.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: "The preview includes a form that sends inquiries to this business.", recordedAt: "2026-10-05T16:20:00Z",
+        ...(byCodeAgent ? { summary: "A private events page with a short inquiry form", ownerFacing: true, reportedBy: "coding_agent" as const, note: null } : {}) }] },
     { id: "c7a1e0b2-0000-4000-8000-000000000002", request: "Swap the footer phone number to the new line", status: "requested", accepted: "accepted", createdAt: "2026-09-28T10:00:00Z", updatedAt: "2026-09-30T12:00:00Z",
       receipts: [
         { id: "d0000000-0000-4000-8000-000000000002", kind: "preview", previewUrl: "https://mclears-git-footer.vercel.app", commitSha: null, deploymentUrl: null, readBack: null, note: null, recordedAt: "2026-09-29T09:00:00Z" },
@@ -51,8 +52,8 @@ function siteChangesFixture(mode: "ready" | "empty" | "error"): typeof fetch {
 }
 
 /** Local preview of the workspace website: fictional site, real frame and panels, no live actions. */
-export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light" }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found"; mode?: "light" | "dark" }) {
-  const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready"), "on", role === "operator"), [state, role]);
+export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light", codeAgent = false }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found"; mode?: "light" | "dark"; codeAgent?: boolean }) {
+  const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready", codeAgent), "on", role === "operator"), [state, role, codeAgent]);
   if (state === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/preview/strelva" action="Open your workspace" />;
   if (state === "not_found") return <WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href="/preview/strelva" action="Back to Home" />;
   const { tab: current, tabs } = managedSiteNavigation(kind, role === "operator", tab);
@@ -66,7 +67,7 @@ export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light" }:
       {current === "edit" && readOnly ? <p className="p-8 text-sm text-gray-muted">Only an owner or admin can edit this site. The page links to History instead.</p>
         : current === "edit" ? <ContentWorkspace siteName="Great Lakes Dried Fruit" ownerName="Ruth" sectionData={SECTIONS} timestamps={{}}
         assistant={<AskStrelva compact canAskOnBehalf={role === "operator"} request={request} workspaceId={WS} businessName="Great Lakes Dried Fruit" systemId={SYSTEM} systemName={siteLabel} readOnly={readOnly} />} />
-        : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} />
+        : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} codeAgent={codeAgent ? { mcpUrl: "https://app.strelva.com/api/mcp/public", ownerEmail: false } : null} />
         : <p className="p-8 text-sm text-gray-muted">This tab reuses the dashboard&apos;s own panel against the tenant&apos;s API. The local fixture serves the editor and requests only.</p>}
     </WorkspaceSiteFrame>
   </WorkspaceRequestContext.Provider>;

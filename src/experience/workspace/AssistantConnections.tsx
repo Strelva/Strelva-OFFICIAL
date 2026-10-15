@@ -14,7 +14,7 @@ const connectionSchema = z.object({
 const responseSchema = z.object({ connections: z.array(connectionSchema) });
 const permissionLabels: Record<string, string> = {
   "business:read": "Business facts and services", "website:read": "Read saved websites",
-  "website:propose": "Prepare website changes for your review", "inquiries:read": "Customer inquiries",
+  "website:propose": "Prepare website changes for your review", "website:code": "Pick up website changes and report previews and deploys from a coding agent", "inquiries:read": "Customer inquiries",
   "quotes:approve": "Approve quote terms", "offline_access": "Renew this connection",
 };
 const statusLabels = { active: "Connected", expired: "Expired — connect again in your assistant", revoked: "Disconnected", authority_removed: "Business access ended" };

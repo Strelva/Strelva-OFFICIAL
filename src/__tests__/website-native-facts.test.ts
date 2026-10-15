@@ -24,7 +24,7 @@ const makePorts = () => {
     enabled: vi.fn(() => true), released: vi.fn(async () => true), record: vi.fn(async () => record()),
     confirmed: vi.fn(async () => confirmed()),
     sites: vi.fn(async () => ({ systems: [{ system: { id: ws, kind: "website", lifecycle: "live" }, references: { tenantId: "gldf" } }] })),
-    tenant: vi.fn(async () => ({ id: "gldf", active: true, deliveryModel: "custom_repo" })),
+    tenant: vi.fn(async () => ({ id: "gldf", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } })),
     allowed: vi.fn(async () => true), template: vi.fn(async () => ({ contentSections: ["contact"] })),
     manifest: vi.fn(async () => ({ sections: { contact: { allowedActions: ["read", "draft", "publish"] } } })),
     current: vi.fn(async () => current), draft: vi.fn(async () => null), queueAvailable: vi.fn(() => true),
@@ -84,8 +84,8 @@ describe("native website facts review", () => {
   it.each(["permission", "subscription", "inactive", "repo", "template", "manifest", "release", "stale", "queue", "private", "unchanged"])("does not dispatch an unsupported %s path", async reason => {
     const { ports, service } = makePorts();
     if (reason === "permission" || reason === "subscription") ports.allowed.mockResolvedValue(false);
-    if (reason === "inactive") ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo" });
-    if (reason === "repo") ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    if (reason === "inactive") ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } });
+    if (reason === "repo") ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "repo" } });
     if (reason === "template") ports.template.mockResolvedValue({ contentSections: ["hero"] });
     if (reason === "manifest") ports.manifest.mockResolvedValue({ sections: { contact: { allowedActions: ["read"] } } });
     if (reason === "release") ports.released.mockResolvedValue(false);
@@ -103,7 +103,7 @@ describe("native website facts review", () => {
     const { ports, service } = makePorts();
     if (reason === "manifest") ports.manifest.mockResolvedValueOnce({ sections: { contact: { allowedActions: ["draft"] } } }).mockResolvedValueOnce({ sections: { contact: { allowedActions: ["read"] } } });
     if (reason === "template") ports.template.mockResolvedValueOnce({ contentSections: ["contact"] }).mockResolvedValueOnce({ contentSections: [] });
-    if (reason === "native") ports.tenant.mockResolvedValueOnce({ id: "gldf", active: true, deliveryModel: "custom_repo" }).mockResolvedValueOnce({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    if (reason === "native") ports.tenant.mockResolvedValueOnce({ id: "gldf", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } }).mockResolvedValueOnce({ id: "mclears", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "repo" } });
     if (reason === "revision") ports.record.mockResolvedValueOnce(record()).mockResolvedValueOnce({ ...record(), revision: 4 });
     if (reason === "pause") ports.sites.mockResolvedValueOnce({ systems: [{ system: { id: ws, kind: "website", lifecycle: "live" }, references: { tenantId: "gldf" } }] }).mockResolvedValueOnce({ systems: [{ system: { id: ws, kind: "website", lifecycle: "paused" }, references: { tenantId: "gldf" } }] });
     await service(actor, ws, 3, ["phone"]);
@@ -129,8 +129,8 @@ describe("native preparation outcome (#509 round 3)", () => {
   });
   it.each(["inactive", "repo", "template", "manifest", "unchanged", "private", "release"])("a site that takes no contact review (%s) is neither ready nor reported", async reason => {
     const { ports, service } = makePorts();
-    if (reason === "inactive") ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo" });
-    if (reason === "repo") ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    if (reason === "inactive") ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } });
+    if (reason === "repo") ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "repo" } });
     if (reason === "template") ports.template.mockResolvedValue({ contentSections: ["hero"] });
     if (reason === "manifest") ports.manifest.mockResolvedValue({ sections: { contact: { allowedActions: ["read"] } } });
     if (reason === "unchanged") ports.current.mockResolvedValue({ ...current, phone: "716-555-0123" });

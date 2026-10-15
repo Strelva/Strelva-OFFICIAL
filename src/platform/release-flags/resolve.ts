@@ -39,8 +39,12 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * link for an owner with no account (20261009131000). Its own row per
  * business, under STRELVA_MAKE_REAL_OWNER_LINK_RELEASE, off by default. Off:
  * the link answers "Sign in to decide this", as before 20261009131000.
+ *
+ * `sites_by_code` (20261027120000): coding agents pick up website Requests over
+ * the MCP, reported previews/deploys, Needs you approval, declared content
+ * source refresh. Off by default.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel", "sites_by_code"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -51,6 +55,7 @@ export function isMakeRealLiveFlag(flag: string): flag is MakeRealLiveFlag {
 
 export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   agent_channel: "STRELVA_AGENT_CHANNEL_RELEASE",
+  sites_by_code: "STRELVA_SITES_BY_CODE_RELEASE",
   finite_jobs: "STRELVA_FINITE_JOBS_RELEASE",
   approval_store: "STRELVA_APPROVAL_STORE_RELEASE",
   owner_entry: "STRELVA_OWNER_ENTRY",
@@ -75,6 +80,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   agent_channel: "Agent customer confirmation (owner consent required)",
+  sites_by_code: "Website changes by coding agent",
   finite_jobs: "Unified finite jobs",
   approval_store: "Unified approval store",
   owner_entry: "Owner entry",

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebsiteChangeRequests, type WebsiteChangeRequestsProps } from "@/experience/websites/WebsiteChangeRequests";
 
 const BUSINESS = "11111111-1111-4111-8111-111111111111";
@@ -130,4 +130,69 @@ it.each([false, true])("accepts only the exact returned receipt target (wrong ta
     expect(node.querySelector('[role="alert"]')).toBeNull();
     expect(request.mock.calls.filter(([, init]) => !init?.method)).toHaveLength(2);
   }
+});
+
+describe("with a coding agent connected (sites_by_code on)", () => {
+  const codeAgent = { mcpUrl: "https://app.strelva.com/api/mcp/public", ownerEmail: false };
+  const preview = { id: "66666666-6666-4666-8666-666666666666", kind: "preview", previewUrl: "https://preview.example.test", commitSha: null, deploymentUrl: null, readBack: null, note: null, recordedAt: "2026-10-09T00:00:00Z", summary: "A menu page", ownerFacing: true, reportedBy: "coding_agent" };
+  const approval = { ...preview, id: "77777777-7777-4777-8777-777777777777", kind: "approved", previewUrl: null, summary: null, reportedBy: "person" };
+  const listing = (receipts: unknown[], accepted = "accepted") => vi.fn(async () => new Response(JSON.stringify({ requests: [{ ...saved(), accepted, receipts }] }))) as unknown as typeof fetch;
+
+  it("shows who recorded the preview and says the owner is also waiting in Needs you", async () => {
+    const { node } = await mount(listing([preview]), { codeAgent });
+    expect(node.textContent).toContain("Your agency's coding agent recorded a preview. A menu page");
+    expect(node.textContent).toContain("This is also waiting in Needs you.");
+    expect(node.textContent).toContain("Ready for your review");
+  });
+
+  it("says plainly that the owner was not emailed when someone else is looking", async () => {
+    const { node } = await mount(listing([preview]), { codeAgent, canDecide: false });
+    expect(node.textContent).toContain("Owner email is off, so the owner wasn't emailed. They see this in Needs you when they sign in.");
+    const withEmail = await mount(listing([preview]), { codeAgent: { ...codeAgent, ownerEmail: true }, canDecide: false });
+    expect(withEmail.node.textContent).not.toContain("Owner email is off");
+  });
+
+  it("notes a change visitors can't see", async () => {
+    const { node } = await mount(listing([{ ...preview, ownerFacing: false }]), { codeAgent });
+    expect(node.textContent).toContain("No visible change.");
+  });
+
+  it("has no read-back to choose, and records a deploy by hand without one", async () => {
+    const request = vi.fn(async (_url: string, init?: RequestInit) => init?.method === "POST"
+      ? new Response('{"error":"stop"}', { status: 500 })
+      : new Response(JSON.stringify({ requests: [{ ...saved(), accepted: "accepted", receipts: [{ ...preview, reportedBy: "person" }, approval] }] })));
+    const { node } = await mount(request as unknown as typeof fetch, { codeAgent, operator: true, canDecide: false });
+    expect(node.querySelector("select")).toBeNull();
+    expect(node.querySelector("details summary")?.textContent).toBe("Record by hand");
+    expect(node.textContent).toContain("Approved · Your agency's coding agent puts it live next");
+    const [commit, url] = [...node.querySelectorAll("details input")] as HTMLInputElement[];
+    const setValue = (field: HTMLInputElement, value: string) => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value); field.dispatchEvent(new Event("input", { bubbles: true })); };
+    await act(async () => { setValue(commit!, "abc1234"); setValue(url!, "https://x.vercel.app"); });
+    await act(async () => { node.querySelector("details form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
+    const post = request.mock.calls.find(([, init]) => init?.method === "POST")!;
+    expect(JSON.parse(String(post[1]!.body))).toEqual({ action: "record", workspaceId: BUSINESS, requestId: REQUEST, systemId: SYSTEM, step: { kind: "deployed", commitSha: "abc1234", deploymentUrl: "https://x.vercel.app" } });
+  });
+
+  it("offers the MCP command with its URL, and copies it", async () => {
+    const writeText = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    const { node } = await mount(listing([]), { codeAgent });
+    expect(node.textContent).toContain("claude mcp add --transport http strelva https://app.strelva.com/api/mcp/public");
+    expect(node.textContent).toContain("Pick up the Strelva Requests for Bakery.");
+    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Copy the command")!.click());
+    expect(writeText).toHaveBeenCalledWith("claude mcp add --transport http strelva https://app.strelva.com/api/mcp/public");
+    expect(node.textContent).toContain("Copied");
+    writeText.mockRejectedValueOnce(new Error("blocked"));
+    await act(async () => [...node.querySelectorAll("button")].find(button => button.textContent === "Copy the command")!.click());
+    expect(node.textContent).toContain("Copy failed");
+  });
+
+  it("without a coding agent, renders the page as before with its read-back select", async () => {
+    const request = vi.fn(async () => new Response(JSON.stringify({ requests: [{ ...saved(), accepted: "accepted", receipts: [{ ...preview, reportedBy: "person" }, approval] }] }))) as unknown as typeof fetch;
+    const { node } = await mount(request, { operator: true, canDecide: false });
+    expect(node.querySelector("select")).not.toBeNull();
+    expect(node.querySelector("details")).toBeNull();
+    expect(node.textContent).not.toContain("Use a coding agent");
+    expect(node.textContent).toContain("Approved · Deployment requires current provider authority");
+  });
 });

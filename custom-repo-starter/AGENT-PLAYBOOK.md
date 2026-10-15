@@ -73,9 +73,16 @@ curl -s "$U/llms.txt" -o /dev/null -w "llms.txt: %{http_code}\n"          # want
 curl -sI "$U" | grep -icE "content-security-policy|x-frame-options|strict-transport|referrer-policy|permissions-policy|x-content-type"  # want 5-6
 curl -s "$U" | grep -oE '"@type":"FAQPage"' | head -1                      # want a match
 curl -s "$U" | grep -oE '"sameAs":\[[^]]*\]' | head -1                      # want the real profiles
+curl -s "$U/api/capabilities" | grep -o '"commitSha":"[0-9a-f]*"'          # want the commit this deploy was built from
 ```
 
 **The real grade check (operator, from `~/strelva-platform`):** `pnpm audit:full $U` — target **grade A**. Report the grade and any remaining findings back to the human; note any gap you couldn't fill because you lacked a real value (a social URL, a credential, a review).
+
+---
+
+## Part D — Strelva Requests (code changes after launch)
+
+Once the site is live, changes to it arrive as Strelva Requests that you pick up with your own coding agent. Paste the block in [`CLAUDE.strelva.md`](./CLAUDE.strelva.md) into this repo's `CLAUDE.md` (or `AGENTS.md`). It says how to connect, the loop to follow, and the rules. For the loop to end in a recorded Release, the capabilities route (A3) must also declare `contentSource` and `release.commitSha`, because Strelva reads the live commit from it and never takes anyone's word for it.
 
 ---
 
@@ -88,4 +95,5 @@ curl -s "$U" | grep -oE '"sameAs":\[[^]]*\]' | head -1                      # wa
 - [ ] B4 LocalBusiness schema with real `sameAs`
 - [ ] B5 Reviews rendered (if any real ones)
 - [ ] B6 Team/About link · trust/credentials · full contact info · form labels · privacy/terms
+- [ ] D1 `CLAUDE.strelva.md` block in `CLAUDE.md` · D2 capabilities route declares `contentSource` and `release.commitSha`
 - [ ] C build passes, self-checks green, and `pnpm audit:full` returns **A** — or the honest ceiling with every real-data gap (socials / phone / testimonials) reported to the human

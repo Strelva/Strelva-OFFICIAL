@@ -73,6 +73,10 @@ export interface SiteCapabilityManifest {
     requestableChanges?: string[];
   }>;
   customRequestEndpoint?: string;
+  /** Where this site reads its content: Strelva's v1 content API, or its own repo. */
+  contentSource?: "strelva" | "repo";
+  /** The commit this deploy was built from, so Strelva can check what is live. */
+  release?: { commitSha: string | null; builtAt?: string | null };
 }
 
 function requiredEnv(name: string): string {
@@ -327,6 +331,8 @@ export function buildSiteCapabilityManifest(
     supportsFooterConfig?: boolean;
     supportsDraftPreview?: boolean;
     supportsInlineEditing?: boolean;
+    contentSource?: SiteCapabilityManifest["contentSource"];
+    release?: SiteCapabilityManifest["release"];
   }
 ): SiteCapabilityManifest {
   const sectionEntries = sections.map((section): [string, SectionCapability] => [
@@ -346,6 +352,9 @@ export function buildSiteCapabilityManifest(
     customOnlyFeatures: opts?.customOnlyFeatures ?? [],
     customComponents: opts?.customComponents ?? [],
     customRequestEndpoint: opts?.customRequestEndpoint,
+    // Only when declared, so a repo that says nothing publishes the same manifest as before.
+    ...(opts?.contentSource ? { contentSource: opts.contentSource } : {}),
+    ...(opts?.release ? { release: opts.release } : {}),
   };
 }
 

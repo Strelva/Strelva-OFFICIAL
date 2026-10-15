@@ -34,6 +34,7 @@
     "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:agency-door": "bash scripts/check-agency-door-sql.sh",
     "check:owner-reach-sql": "bash scripts/check-owner-reach-sql.sh",
+    "check:sites-by-code": "bash scripts/check-sites-by-code-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
     "check:money-pay-links-sql": "bash scripts/check-money-pay-links-sql.sh",
     "check:inquiry-forwarding-sql": "bash scripts/check-inquiry-forwarding-sql.sh",

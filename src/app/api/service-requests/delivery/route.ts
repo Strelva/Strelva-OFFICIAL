@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { oauthEnabled, resourceUrl } from "@/platform/agent-channel/oauth";
+import { sitesByCodeReleased } from "@/products/websites/server";
 import { readWorkspaceBody } from "@/platform/workspaces/http";
 import {
   DeliveryCommitmentService, mutateServiceRequestCommitment, readServiceDeliveryWork, readServiceDeliveryPermissions,
@@ -37,7 +39,10 @@ export async function GET(request: Request) {
       const id = z.string().uuid().parse(requestId);
       const saved = await new ServiceRequestService(PostgresServiceRequestStore).read(current, id);
       const permissions = await readServiceDeliveryPermissions(current, id);
-      return json({ actorId: current.userId, request: saved, permissions });
+      // A website Request with sites_by_code on can be handed to the agency's coding agent. Otherwise the key is absent.
+      const codeAgent = saved.context.source === "website_change" && oauthEnabled() && await sitesByCodeReleased(saved.businessId).catch(() => false)
+        ? { mcpUrl: resourceUrl(), requestId: saved.id } : null;
+      return json({ actorId: current.userId, request: saved, permissions, ...(codeAgent ? { codeAgent } : {}) });
     }
     const providerWorkspaceId = params.get("providerWorkspaceId");
     if (!providerWorkspaceId && params.get("providerKind") !== "strelva") throw new ServiceRequestValidationError();

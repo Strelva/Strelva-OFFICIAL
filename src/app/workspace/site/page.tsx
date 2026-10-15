@@ -15,7 +15,8 @@ import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
 import { loadWebsiteStoreData, loadWebsiteMembersData, loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
-import { resolveWorkspaceSite } from "@/products/websites/server";
+import { resolveWorkspaceSite, siteChangeOwnerEmailEnabled, codeAgentReleased } from "@/products/websites/server";
+import { resourceUrl } from "@/platform/agent-channel/oauth";
 import { WorkspaceSiteFrame, WorkspaceSiteMessage } from "@/experience/websites/WorkspaceSiteFrame";
 import { WebsiteChangeRequests } from "@/experience/websites/WebsiteChangeRequests";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
@@ -152,7 +153,10 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     const data = await loadGoogleBusinessData(site.tenantId);
     panel = <GoogleBusinessPanel connected={data.connected} state={data.state} />;
   } else {
-    panel = <WebsiteChangeRequests workspaceId={workspaceId} systemId={systemId} siteLabel={siteLabel} editing={editing} canAsk={!readOnly} canDecide={state.role === "owner"} operator={operator} />;
+    // Coding agents need the MCP sign-in as well as the business's sites_by_code row. Off: the page is as it was.
+    const codeAgent = await codeAgentReleased(workspaceId, actor.userId)
+      ? { mcpUrl: resourceUrl(), ownerEmail: siteChangeOwnerEmailEnabled() } : null;
+    panel = <WebsiteChangeRequests workspaceId={workspaceId} systemId={systemId} siteLabel={siteLabel} editing={editing} canAsk={!readOnly} canDecide={state.role === "owner"} operator={operator} codeAgent={codeAgent} />;
   }
 
   return <WorkspaceSurfaceShell workspaceId={workspaceId} businessName={state.workspaceName} systemsReleased><WorkspaceSiteFrame workspaceId={workspaceId} systemId={systemId} workspaceName={state.workspaceName} siteLabel={siteLabel} tab={tab} tabs={visibleTabs}

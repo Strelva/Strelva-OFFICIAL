@@ -29,13 +29,21 @@ describe("website release reconciliation", () => {
     expect(dependencies.list).not.toHaveBeenCalled();
   });
 
-  it("passes membership identity and stable origin, with manifest content coverage", async () => {
+  it("passes membership identity and stable origin, leaving content coverage to the site's declaration", async () => {
     dependencies.released.mockResolvedValue(true);
     await expect(reconcileWebsiteSystemReleases(actor, businessId, target)).resolves.toBe(2);
     expect(dependencies.rpc).toHaveBeenCalledWith("reconcile_website_system_releases", {
       p_workspace_id: businessId, p_user_id: actor.userId, p_verified_email: "owner@example.test",
-      p_system_id: systemId, p_origin_kind: "tenant", p_origin_ref: target.origin.ref, p_content_reading: true,
+      p_system_id: systemId, p_origin_kind: "tenant", p_origin_ref: target.origin.ref, p_content_reading: null,
     });
+  });
+
+  it("lets the database read the site's declared content source, and never claims coverage for a non-tenant origin", async () => {
+    dependencies.released.mockResolvedValue(true);
+    await reconcileWebsiteSystemReleases(actor, businessId, target);
+    expect(dependencies.rpc).toHaveBeenLastCalledWith("reconcile_website_system_releases", expect.objectContaining({ p_content_reading: null }));
+    await reconcileWebsiteSystemReleases(actor, businessId, { ...target, tenantId: null });
+    expect(dependencies.rpc).toHaveBeenLastCalledWith("reconcile_website_system_releases", expect.objectContaining({ p_content_reading: false }));
   });
 
   it("fails closed on access denial and malformed storage results", async () => {

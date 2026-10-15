@@ -7,9 +7,10 @@ import { systemOriginId } from "@/platform/systems/invariants";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { PostgresServiceRequestStore, ServiceRequestAccessError, ServiceRequestConflictError, ServiceRequestService } from "@/platform/service-requests";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { WorkspaceAccessError } from "@/platform/workspaces/types";
-import { createSiteChangeStore } from "@/products/websites/server";
-import { recordSiteChangeSchema, siteChangeRequestCommand } from "@/products/websites/client";
+import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { createSiteChangeStore, codeAgentReleased } from "@/products/websites/server";
+import { verifySiteRelease } from "@/app/api/_site-declaration";
+import { recordSiteChangeSchema, siteChangeRequestCommand, siteChangeStage } from "@/products/websites/client";
 import { siteEditingFor } from "@/products/websites/client";
 
 import { readSiteChangeProvider } from "@/platform/service-requests/provider-options";
@@ -29,12 +30,28 @@ const recordSchema = z.object({
   action: z.literal("record"),
   workspaceId: uuid,
   requestId: uuid,
+  /** The System the Request is on. A deploy names it so Strelva can check that site's live commit. */
+  systemId: uuid.optional(),
   step: recordSiteChangeSchema,
 }).strict();
 const bodySchema = z.discriminatedUnion("action", [askSchema, recordSchema]);
 
 async function released(workspaceId: string, userId: string): Promise<boolean> {
   return workspaceReleaseEnabled() && await systemsReleaseEnabledForWorkspace(workspaceId, { operator: false, tester: false, userId }).catch(() => false);
+}
+
+/**
+ * The read-back for a deploy: the live site's own declared commit against the
+ * one reported. Only an approved Request is checked; any other falls through to
+ * the database, which refuses it by order or by authority before anything is recorded.
+ */
+async function checkedReadBack(actor: WorkspaceActor, store: ReturnType<typeof createSiteChangeStore>, workspaceId: string, systemId: string, requestId: string, commitSha: string) {
+  const item = (await store.list(actor, workspaceId, systemId)).find((entry) => entry.id === requestId);
+  if (!item || siteChangeStage(item) !== "approved") return "not_checked" as const;
+  const snapshot = await readExistingSystemsSnapshot(actor, workspaceId);
+  const site = snapshot.managedWebsites.find((entry) => systemOriginId(workspaceId, { kind: "tenant", ref: entry.tenantStableId }) === systemId);
+  if (!site) return "not_checked" as const;
+  return (await verifySiteRelease(site.tenantId, commitSha)).readBack;
 }
 
 /**
@@ -64,7 +81,8 @@ export async function GET(request: Request) {
  *   Request to the current agency at Asked; nothing on the site changes.
  * - `record`: a step on that Request. The agency records previews and deploys;
  *   an owner approves or declines a preview. The database enforces who and
- *   in what order.
+ *   in what order. With `sites_by_code` on, a deploy's read-back is Strelva's
+ *   own check of the live site, never what the caller sent.
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "Not available." }, 404);
@@ -78,7 +96,16 @@ export async function POST(request: Request) {
     if (!(await released(body.workspaceId, actor.userId))) return workspaceJson({ error: "Not available." }, 404);
     const store = createSiteChangeStore();
     if (body.action === "record") {
-      const receipt = await store.record(actor, body.workspaceId, body.requestId, body.step);
+      let step = body.step;
+      if (step.kind === "deployed") {
+        if (await codeAgentReleased(body.workspaceId, actor.userId)) {
+          if (!body.systemId) return workspaceJson({ error: "Check the request. Some fields are missing or invalid." }, 400);
+          step = { ...step, readBack: await checkedReadBack(actor, store, body.workspaceId, body.systemId, body.requestId, step.commitSha) };
+        } else if (!step.readBack) {
+          return workspaceJson({ error: "Choose whether the deploy was checked on the live site." }, 400);
+        }
+      }
+      const receipt = await store.record(actor, body.workspaceId, body.requestId, step);
       return workspaceJson({ receipt });
     }
     // The System must be this business's own managed website, found through its link.

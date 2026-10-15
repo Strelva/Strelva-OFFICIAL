@@ -339,6 +339,10 @@ export interface SiteCapabilityManifest {
   customOnlyFeatures: string[];
   customRequestEndpoint?: string;
   customComponents: CustomComponentCapability[];
+  /** Where the site reads its content: Strelva's v1 content API or its own repo. */
+  contentSource?: "strelva" | "repo";
+  /** The commit the live site was built from, when the site can say. */
+  release?: { commitSha: string | null; builtAt?: string | null };
 }
 
 // --- Review Types ---
@@ -517,6 +521,14 @@ export interface CustomRepoMetadata {
   lastDeploymentUrl?: string;
   lastDeploymentAt?: string;
   supportedSections?: ContentSection[];
+  /**
+   * What the site declares: `strelva` = it reads its content from Strelva's v1
+   * content API, so content edits happen in Strelva; `repo` = every change is a
+   * code change. Set from the site's capability manifest, never from a name list.
+   */
+  contentSource?: "strelva" | "repo";
+  /** When the site's declaration was last read (ISO). */
+  declarationCheckedAt?: string;
   capabilityManifestUrl?: string;
   supportedDesignTokens?: DesignTokenScope[];
   supportsPageConfig?: boolean;

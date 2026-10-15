@@ -20,7 +20,7 @@ beforeEach(() => {
   ports.systems.mockResolvedValue({ systems: [{ system: { id: systemId, kind: "website" }, references: { tenantId: "gldf", tenantStableId: workspaceId, savedWorkId: workId } }] });
   ports.operator.mockResolvedValue(false); ports.canWrite.mockResolvedValue(true); ports.subscribed.mockResolvedValue(true);
   ports.audit.mockReset().mockResolvedValue({});
-  ports.tenant.mockResolvedValue({ id: "gldf", active: true, deliveryModel: "custom_repo" });
+  ports.tenant.mockResolvedValue({ id: "gldf", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } });
   ports.template.mockResolvedValue({ contentSections: ["hero"] }); ports.capabilities.mockResolvedValue({ fixture: "manifest" });
   ports.versions.mockResolvedValue([{ id: input.versionId, data: { headline: "Earlier reviewed headline" } }]);
   ports.apply.mockResolvedValue({ status: "queued", section: "hero", eventId: "review-event" });
@@ -56,7 +56,7 @@ describe("saved copy restore Requests", () => {
     expect(ports.apply).not.toHaveBeenCalled();
   });
   it("supports repository clients through the same reviewed Request delivery", async () => {
-    ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "repo" } });
     await restore(actor, savedCopy);
     expect(ports.request).toHaveBeenCalledWith(actor, expect.objectContaining({ context: expect.objectContaining({ implementation: "custom_repo" }) }));
   });
@@ -143,9 +143,9 @@ describe("website History restore authority and review", () => {
     await expect(restore(actor, { ...input, section: "settings" })).rejects.toThrow("not editable");expect(ports.apply).not.toHaveBeenCalled();
   });
   it("refuses repo-only, inactive and unsubscribed sites", async () => {
-    ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo", customRepo: { contentSource: "repo" } });
     await expect(restore(actor, input)).rejects.toThrow("Requests");
-    ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo" });await expect(restore(actor, input)).rejects.toThrow("Requests");
+    ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo", customRepo: { contentSource: "strelva" } });await expect(restore(actor, input)).rejects.toThrow("Requests");
     ports.subscribed.mockResolvedValue(false);await expect(restore(actor, input)).rejects.toThrow("service is not active");expect(ports.apply).not.toHaveBeenCalled();
   });
   it("never retries a queue write after an unconfirmed result", async () => {

@@ -4,3 +4,8 @@
 .scope dt { color: var(--st-text-2); font-size: 13px; margin-bottom: 4px; }
 .scope dd { margin: 0; }
 @media (max-width: 767px) { .detailColumns { grid-template-columns: minmax(0, 1fr); gap: 28px; } }
+.copyBlock { display: grid; gap: 6px; margin-block: 12px; }
+.copyLabel { font-size: 13px; font-weight: 500; }
+.copyText { padding: 10px 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; user-select: all; }
+.copyNote { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.copyActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }

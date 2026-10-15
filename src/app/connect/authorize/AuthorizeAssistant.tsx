@@ -11,7 +11,7 @@ export interface AssistantChoice {
     agencyId: string | null;
     agencyName: string | null;
 }
-const descriptions: Record<string, string> = { 'business:read': 'Read this business’s facts and services.', 'website:read': 'Read saved website content and its current revision.', 'website:propose': 'Save website changes for owner review. Cannot publish them.', 'inquiries:read': 'Read recent inquiries, including customer contact details.', 'quotes:approve': 'Record a price and terms you approve. Does not send email or charge customers.' };
+const descriptions: Record<string, string> = { 'business:read': 'Read this business’s facts and services.', 'website:read': 'Read saved website content and its current revision.', 'website:propose': 'Save website changes for owner review. Cannot publish them.', 'website:code': 'Read website change Requests and record previews, deploys and releases from your coding agent. Cannot approve or make anything live.', 'inquiries:read': 'Read recent inquiries, including customer contact details.', 'quotes:approve': 'Record a price and terms you approve. Does not send email or charge customers.' };
 export function AuthorizeAssistant({ clientName, clientHost, returnHost, params, scopes, choices }: {
     clientName: string;
     clientHost?: string;
@@ -20,7 +20,7 @@ export function AuthorizeAssistant({ clientName, clientHost, returnHost, params,
     scopes: string[];
     choices: AssistantChoice[];
 }) {
-    const available = choices.filter(c => !c.agencyId || scopes.every(s => s === 'business:read'));
+    const available = choices.filter(c => !c.agencyId || scopes.every(s => s === 'business:read' || s === 'website:code'));
     const ready = useSyncExternalStore(subscribeReady, controlsReady, serverControlsReady);
     const [choice, setChoice] = useState('0'), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
     async function decide(decision: 'approve' | 'deny') { setBusy(true); setError(null); try {

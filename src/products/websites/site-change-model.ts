@@ -18,6 +18,12 @@ export const siteChangeReceiptSchema = z.object({
   note: z.string().nullable(),
   recordedAt: z.string(),
   actor: recordedActorSchema.nullable().optional().catch(null),
+  /** Provenance of a preview or deploy a coding agent reported (20261027120200). Absent on older rows. */
+  sourceCommitSha: z.string().nullable().optional(),
+  branch: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  ownerFacing: z.boolean().nullable().optional(),
+  reportedBy: z.enum(["person", "coding_agent"]).optional().catch("person"),
 });
 export type SiteChangeReceipt = z.infer<typeof siteChangeReceiptSchema>;
 
@@ -26,6 +32,7 @@ export const siteChangeRequestSchema = z.object({
   request: z.string(),
   status: z.enum(["draft", "requested", "withdrawn"]),
   accepted: z.enum(["pending", "accepted", "declined"]),
+  page: z.string().nullable().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
   receipts: z.array(siteChangeReceiptSchema),
@@ -56,6 +63,13 @@ export const SITE_CHANGE_STAGE_LABEL: Record<SiteChangeStage, string> = {
   withdrawn: "Withdrawn",
 };
 
+/** Stage words when a coding agent does the building and deploying. Other stages read the same. */
+export const SITE_CHANGE_STAGE_LABEL_BY_CODE: Record<SiteChangeStage, string> = {
+  ...SITE_CHANGE_STAGE_LABEL,
+  in_progress: "In progress · Your agency is building it on a branch of the site's code",
+  approved: "Approved · Your agency's coding agent puts it live next",
+};
+
 export const recordSiteChangeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("preview"), previewUrl: z.string().trim().url().max(500).startsWith("https://"), note: z.string().trim().min(1).max(1_000).optional() }).strict(),
   z.object({ kind: z.literal("approved"), note: z.string().trim().min(1).max(1_000).optional() }).strict(),
@@ -64,7 +78,8 @@ export const recordSiteChangeSchema = z.discriminatedUnion("kind", [
     kind: z.literal("deployed"),
     commitSha: z.string().trim().regex(/^[0-9a-fA-F]{7,40}$/),
     deploymentUrl: z.string().trim().url().max(500).startsWith("https://"),
-    readBack: z.enum(["confirmed", "not_confirmed", "not_checked"]),
+    /** Chosen by hand only while sites_by_code is off; with it on, Strelva checks the live site and sets this. */
+    readBack: z.enum(["confirmed", "not_confirmed", "not_checked"]).optional(),
     note: z.string().trim().min(1).max(1_000).optional(),
   }).strict(),
 ]);
@@ -73,16 +88,20 @@ export type RecordSiteChange = z.infer<typeof recordSiteChangeSchema>;
 /** The service-request command that files "Ask for a change" on a website System. */
 export function siteChangeRequestCommand(input: {
   provider: { kind: "agency"; agencyWorkspaceId: string }; workspaceId: string; systemId: string; tenantStableId: string; editing: "native" | "request"; words: string; page?: string; idempotencyKey: string;
+  /** Set when Ask files it for the person; `outcome` is then what Ask understood. */
+  origin?: "ask_strelva"; outcome?: string;
 }) {
   const words = input.words.trim().slice(0, 3_000);
+  const outcome = input.origin ? (input.outcome?.trim().slice(0, 3_000) || words) : words;
   return {
     action: "save" as const,
     businessId: input.workspaceId,
     status: "requested" as const,
     request: words,
-    outcome: words,
+    outcome,
     context: {
       source: "website_change",
+      ...(input.origin ? { origin: input.origin } : {}),
       systemId: input.systemId,
       tenantStableId: input.tenantStableId,
       implementation: input.editing === "request" ? "custom_repo" : "custom_repo_content",
