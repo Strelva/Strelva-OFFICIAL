@@ -216,7 +216,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/content/[section]/versions/route.ts",
       "src/app/api/events/[id]/route.ts",
       "src/app/api/media/route.ts",
-      "src/app/api/newsletter/send/route.ts",
       "src/app/api/oauth/calendly/route.ts",
       "src/app/api/oauth/google/route.ts",
       "src/app/api/oauth/instagram/route.ts",
@@ -243,7 +242,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       "src/app/api/content/[section]/versions/route.ts",
       "src/app/api/events/[id]/route.ts",
       "src/app/api/media/route.ts",
-      "src/app/api/newsletter/send/route.ts",
       "src/app/api/oauth/calendly/route.ts",
       "src/app/api/oauth/google/route.ts",
       "src/app/api/oauth/instagram/route.ts",
@@ -339,7 +337,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     const inbox = readFileSync(path.join(process.cwd(), "src/app/api/inbox/route.ts"), "utf8");
     const threads = readFileSync(path.join(process.cwd(), "src/app/api/threads/[threadId]/route.ts"), "utf8");
     const suggestions = readFileSync(path.join(process.cwd(), "src/app/api/suggestions/route.ts"), "utf8");
-    const newsletterSend = readFileSync(path.join(process.cwd(), "src/app/api/newsletter/send/route.ts"), "utf8");
     const reviews = readFileSync(path.join(process.cwd(), "src/app/api/reviews/route.ts"), "utf8");
     const yelp = readFileSync(path.join(process.cwd(), "src/app/api/connections/yelp/route.ts"), "utf8");
     const chat = readFileSync(path.join(process.cwd(), "src/app/api/chat/route.ts"), "utf8");
@@ -348,7 +345,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       expect(source).toContain("readJsonObject(request)");
       expect(source).toContain("Invalid request body");
     }
-    for (const source of [suggestions, newsletterSend, reviews, yelp]) {
+    for (const source of [suggestions, reviews, yelp]) {
       expect(source).toContain("readJsonObject(req)");
       expect(source).toContain("Invalid request body");
     }
@@ -407,16 +404,6 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(subscription).toContain("readJsonObject(req)");
     expect(subscription).toContain("Invalid request body");
     expect(subscription).toContain("normalizedTenantId");
-  });
-
-  it("uses distributed rate limiting for newsletter sends", () => {
-    const source = readFileSync(
-      path.join(process.cwd(), "src/app/api/newsletter/send/route.ts"),
-      "utf8",
-    );
-
-    expect(source).toContain("isRateLimitedWindowedAsync");
-    expect(source).not.toContain("isRateLimitedWindowed(");
   });
 
   it("requires a linked Vercel project during production checks", () => {

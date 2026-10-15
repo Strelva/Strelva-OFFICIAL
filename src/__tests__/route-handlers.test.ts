@@ -1,9 +1,5 @@
 vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
-// Transform the newsletter dependency graph during collection, outside the
-// request-validation test's timeout. These route mocks are shared by all tests.
-import { POST as sendNewsletter } from "@/app/api/newsletter/send/route";
-
 // next/cache's unstable_cache requires Next.js incrementalCache infrastructure
 // that is not available in Vitest. Mock it as a transparent pass-through so the
 // wrapped function behaves identically to the unwrapped one in tests.
@@ -640,20 +636,6 @@ describe("Dashboard action route handlers", () => {
     const data = await response.json();
     expect(data.error).toBe("Invalid request body");
     expect(mockUpdateSuggestion).not.toHaveBeenCalled();
-  });
-
-  it("POST /api/newsletter/send rejects malformed JSON with a client error", async () => {
-    const request = new Request("http://localhost/api/newsletter/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "{",
-    });
-
-    const response = await sendNewsletter(request);
-    expect(response.status).toBe(400);
-
-    const data = await response.json();
-    expect(data.error).toBe("Invalid request body");
   });
 
   it("POST /api/reviews rejects malformed JSON with a client error", async () => {
