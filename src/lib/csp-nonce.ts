@@ -12,15 +12,13 @@ export function createCspNonce(): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
-export function buildNonceReportOnlyPolicy(params: { nonce: string; reportUri: string | null; dev: boolean }): string {
-  return [
-    "default-src 'self'",
-    `script-src 'self' 'nonce-${params.nonce}' 'strict-dynamic' https://va.vercel-scripts.com${params.dev ? " 'unsafe-eval'" : ""}`,
-    // React style attributes and inline styles cannot carry a nonce.
-    "style-src 'self' 'unsafe-inline'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    ...(params.reportUri ? [`report-uri ${params.reportUri}`] : []),
-  ].join("; ");
+/**
+ * The enforced policy with only script-src swapped for the nonce version, so every
+ * other directive reports exactly what enforcement would and the evidence is script-src only.
+ */
+export function buildNonceReportOnlyPolicy(params: { nonce: string; enforced: string; reportUri: string | null; dev: boolean }): string {
+  const scriptSrc = `script-src 'self' 'nonce-${params.nonce}' 'strict-dynamic' https://va.vercel-scripts.com${params.dev ? " 'unsafe-eval'" : ""}`;
+  const directives = params.enforced.split("; ").filter((d) => !d.startsWith("report-uri "));
+  const swapped = directives.some((d) => d.startsWith("script-src ")) ? directives.map((d) => (d.startsWith("script-src ") ? scriptSrc : d)) : [...directives, scriptSrc];
+  return [...swapped, ...(params.reportUri ? [`report-uri ${params.reportUri}`] : [])].join("; ");
 }

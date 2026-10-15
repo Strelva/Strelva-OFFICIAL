@@ -420,9 +420,14 @@ export function buildContentSecurityPolicy(params: {
 // forwardInit returns exactly what each call site passed before.
 const REQUEST_NONCE = new WeakMap<NextRequest, string>();
 
-function nonceReportOnlyPolicy(nonce: string): string {
+function nonceReportOnlyPolicy(nonce: string, req: NextRequest): string {
   return buildNonceReportOnlyPolicy({
     nonce,
+    enforced: buildContentSecurityPolicy({
+      isPreview: isPreviewRequest(req),
+      host: req.headers.get("host") || "",
+      protocol: req.nextUrl.protocol,
+    }),
     reportUri: sentrySecurityReportUri(process.env.NEXT_PUBLIC_SENTRY_DSN, process.env.VERCEL_ENV),
     dev: process.env.NODE_ENV !== "production",
   });
@@ -432,7 +437,7 @@ function forwardInit(req: NextRequest, headers?: Headers): { request: { headers:
   const nonce = REQUEST_NONCE.get(req);
   if (!nonce) return headers ? { request: { headers } } : undefined;
   const forwarded = headers ?? new Headers(req.headers);
-  forwarded.set("content-security-policy-report-only", nonceReportOnlyPolicy(nonce));
+  forwarded.set("content-security-policy-report-only", nonceReportOnlyPolicy(nonce, req));
   return { request: { headers: forwarded } };
 }
 
@@ -452,7 +457,7 @@ function applySecurityHeaders(response: NextResponse, req: NextRequest): NextRes
   );
   const nonce = REQUEST_NONCE.get(req);
   if (nonce && !websiteCandidate && !livePreviewRequest) {
-    response.headers.set("Content-Security-Policy-Report-Only", nonceReportOnlyPolicy(nonce));
+    response.headers.set("Content-Security-Policy-Report-Only", nonceReportOnlyPolicy(nonce, req));
   }
   if (websiteCandidate) {
     response.headers.set("X-Frame-Options", "SAMEORIGIN");

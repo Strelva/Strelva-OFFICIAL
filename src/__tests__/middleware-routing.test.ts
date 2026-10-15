@@ -375,7 +375,14 @@ describe("report-only nonce policy", () => {
       const reported = res.headers.get("Content-Security-Policy-Report-Only");
       expect(reported).toContain("'nonce-");
       expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBe(reported);
-      expect(res.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline'");
+      const enforced = res.headers.get("Content-Security-Policy")!;
+      expect(enforced).toContain("script-src 'self' 'unsafe-inline'");
+      const directive = (policy: string, name: string) => policy.split("; ").find((d) => d.startsWith(`${name} `));
+      for (const name of ["default-src", "connect-src", "img-src", "font-src", "frame-src", "worker-src"]) {
+        expect(directive(reported!, name)).toBe(directive(enforced, name));
+      }
+      expect(directive(reported!, "connect-src")).toBeDefined();
+      expect(directive(reported!, "img-src")).toBeDefined();
     } finally {
       vi.unstubAllEnvs();
     }

@@ -107,9 +107,33 @@ export function formatReport(report: ProdFlagReport): string {
   return lines.join("\n");
 }
 
-/** Fails closed if any env value of 4+ characters shows up in what is about to print. */
+const VALUE_FREE_ROW = /^ {2}[A-Z][A-Z0-9_]*: (unset|on|off|workspace|operators|set \(value hidden\)|set)( {2}\(.*\))?$/;
+const FIXED_LINES = new Set([
+  "Strelva prod flag report (names and normalized states only; values never printed)",
+  "Client email (must be off)",
+  "Release flags",
+  "Switches",
+  "Keys (set/unset)",
+  "In env file but unused by this source",
+  "  (none)",
+  "Silent rollout: safe",
+  'A key pulled from Vercel as a Sensitive variable may arrive as a placeholder; "set" proves presence of a name, not a working value.',
+]);
+
+/**
+ * Fails closed if any env value of 4+ characters shows up in what is about to print.
+ * Only the value-bearing text is checked: fixed template lines, rows that match the
+ * name-and-state shape, and env names (so VERCEL_ENV=production does not trip on
+ * STRELVA_..._PRODUCTION_APPROVED) are removed before the substring test.
+ */
 export function assertNoValues(output: string, env: Record<string, string>): void {
-  const lowered = output.toLowerCase();
+  const labels = Object.values(RELEASE_FLAG_LABELS);
+  const rest = output
+    .split("\n")
+    .filter((line) => !FIXED_LINES.has(line) && !VALUE_FREE_ROW.test(line))
+    .join("\n")
+    .replace(/\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/g, " ");
+  const lowered = labels.reduce((text, label) => text.split(label.toLowerCase()).join(" "), rest.toLowerCase());
   for (const value of Object.values(env)) {
     if (value.length < 4 || ["true", "false", "workspace", "operators"].includes(value.toLowerCase())) continue;
     if (lowered.includes(value.toLowerCase())) throw new Error("Report would print an env value; refusing.");
@@ -129,7 +153,12 @@ export function main(argv: string[], log: (line: string) => void = console.log):
   const env = parseRolloutEnv(readFileSync(resolve(args[1]), "utf8"));
   const report = buildReport(env, scanEnvNames(process.cwd()));
   const output = json ? JSON.stringify(report, null, 2) : formatReport(report);
-  assertNoValues(output, env);
+  try {
+    assertNoValues(output, env);
+  } catch {
+    console.error("Report refused: it would have printed an env value. Nothing was printed.");
+    return 3;
+  }
   log(output);
   return report.stops.length ? 1 : 0;
 }

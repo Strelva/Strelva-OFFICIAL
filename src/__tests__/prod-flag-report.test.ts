@@ -35,6 +35,19 @@ describe("prod flag report", () => {
     expect(() => assertNoValues("leaked re_fixture_value_123456", env)).toThrow();
   });
 
+  it("passes on a pulled Vercel file whose values echo parts of printed names", () => {
+    const pulled = parseRolloutEnv(["VERCEL_ENV=production", "NODE_ENV=production", "STRELVA_PLAN=strelva", "EMAIL_SENDING_ENABLED=false"].join("\n"));
+    const text = formatReport(buildReport(pulled, scanned));
+    expect(() => assertNoValues(text, pulled)).not.toThrow();
+    expect(() => assertNoValues(JSON.stringify(buildReport(pulled, scanned), null, 2), pulled)).not.toThrow();
+  });
+
+  it("still throws on a crafted row that leaks a value", () => {
+    const pulled = parseRolloutEnv("VERCEL_ENV=production\nSTRELVA_PLAN=strelva");
+    expect(() => assertNoValues("  STRELVA_PLAN: strelva", pulled)).toThrow();
+    expect(() => assertNoValues("  STRELVA_PLAN: set  (strelva)\nnote production", pulled)).toThrow();
+  });
+
   it("derives the inventory from source, including flags the readiness snapshot misses", () => {
     expect(scanned).toContain("STRELVA_AGENCY_ADD_CLIENT_RELEASE");
     expect(scanned).toContain("NEXT_PUBLIC_SENTRY_DSN");
@@ -54,5 +67,11 @@ describe("prod flag report", () => {
     expect(main(["--env-file", file], log)).toBe(1);
     expect(log.mock.calls.join("\n")).not.toContain("re_fixture_value_123456");
     expect(main(["--env-file", file, "--json"], log)).toBe(1);
+    const leaky = join(mkdtempSync(join(tmpdir(), "flags-")), "env");
+    writeFileSync(leaky, "OLD_THING=x\nMYSTERY=secretvalue\nsecretvalue=secretvalue");
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const out = vi.fn();
+    expect(main(["--env-file", leaky], out)).toBe(3);
+    quiet.mockRestore();
   });
 });
