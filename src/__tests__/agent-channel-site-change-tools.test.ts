@@ -87,6 +87,39 @@ describe("coding agent site Requests", () => {
   });
 });
 
+describe("owner releases", () => {
+  const ownerAuth = { ...auth, agencyId: null, verifiedEmail: "owner@example.test" };
+  const requestKey = "81000000-0000-4000-8000-000000000006";
+  const release = { systemId, requestKey, commitSha: FULL.toUpperCase(), deploymentUrl: "https://client.example", summary: "New menu page" };
+
+  it("finds the site, checks the live commit, records and observes, in that order", async () => {
+    const order: string[] = [];
+    const rpc = vi.fn(async (name: string, _args: Record<string, unknown>): Promise<unknown> => {
+      order.push(name);
+      return name === "agent_website_code_release_target" ? { tenantId: "client-site", tenantStableId: crypto.randomUUID() } : { id: crypto.randomUUID(), readBack: "confirmed" };
+    });
+    const verifyRelease = vi.fn(async () => { order.push("verify"); return { readBack: "confirmed" as const, revalidated: true, declaration: { reachable: true, contentSource: null, liveCommit: FULL } }; });
+    const observe = vi.fn(async () => { order.push("observe"); });
+    const service = createAgentSiteChangeAdapter({ rpc, released: async () => true, verifyRelease, observe, ownerEmail: () => false, origin: "https://app.strelva.com" });
+    const value = await service.call("report_site_release", release, ownerAuth) as { readBack: string };
+    expect(order).toEqual(["agent_website_code_release_target", "verify", "agent_record_website_code_release", "observe"]);
+    expect(verifyRelease).toHaveBeenCalledWith("client-site", FULL.toUpperCase());
+    expect(rpc.mock.calls[1]![1]).toMatchObject({ p_system_id: systemId, p_request_key: requestKey, p_commit_sha: FULL, p_read_back: "confirmed", p_summary: "New menu page" });
+    expect(observe).toHaveBeenCalledWith({ userId, verifiedEmail: "owner@example.test" }, workspaceId, systemId);
+    expect(value.readBack).toBe("confirmed");
+  });
+
+  it("refuses an agency principal before any database call, and an agent-chosen read-back", async () => {
+    const h = harness([wire()]);
+    await expect(h.service.call("report_site_release", release, auth)).rejects.toThrow("website_change_operator_required");
+    expect(h.rpc).not.toHaveBeenCalled();
+    expect(h.verifyRelease).not.toHaveBeenCalled();
+    await expect(h.service.call("report_site_release", { ...release, readBack: "confirmed" }, ownerAuth)).rejects.toThrow();
+    await expect(h.service.call("report_site_release", { ...release, requestKey: "not-a-uuid" }, ownerAuth)).rejects.toThrow();
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("site Request brief", () => {
   const row = (over: Record<string, unknown> = {}): SiteRequestRow => ({ ...(wire(over) as unknown as SiteRequestRow), status: "requested", updatedAt: at });
   it("tells the agent the next step from the stage, acceptance and publish permission", () => {

@@ -22,6 +22,9 @@ const previewSchema = z.object({
 }).strict();
 const deploySchema = z.object({ requestId: uuid, commitSha: sha, deploymentUrl: httpsUrl, summary: z.string().trim().min(1).max(500).optional() }).strict();
 
+const releaseSchema = z.object({ systemId: uuid, requestKey: uuid, commitSha: sha, deploymentUrl: httpsUrl, summary: z.string().trim().min(1).max(500) }).strict();
+const targetSchema = z.object({ tenantId: z.string().min(1), tenantStableId: uuid });
+
 const rowSchema = siteChangeRequestSchema.omit({ status: true, updatedAt: true }).extend({
   outcome: z.string().nullable().optional(),
   systemId: z.string().nullable(),
@@ -90,6 +93,19 @@ export function createAgentSiteChangeAdapter(deps: AgentSiteChangeDeps): AgentSi
           ownerNotice: deps.ownerEmail() ? "The owner gets a Needs you notice." : "Owner email is off, so nobody was emailed. The owner sees this in Needs you when they sign in.",
           nextStep: "Stop here. Check read_site_request later; merge only when the stage is approved.",
         };
+      }
+      if (name === "report_site_release") {
+        // The owner's own coding agent, no agency Request. An agency principal can never skip the owner's approval this way.
+        if (auth.agencyId !== null) throw new Error("website_change_operator_required");
+        const input = releaseSchema.parse(args);
+        const target = targetSchema.parse(await deps.rpc("agent_website_code_release_target", { ...identity(auth), p_system_id: input.systemId }));
+        const check = await deps.verifyRelease(target.tenantId, input.commitSha);
+        const release = await deps.rpc("agent_record_website_code_release", {
+          ...identity(auth), p_system_id: input.systemId, p_request_key: input.requestKey, p_commit_sha: input.commitSha.toLowerCase(),
+          p_deployment_url: input.deploymentUrl, p_read_back: check.readBack, p_summary: input.summary,
+        });
+        await deps.observe({ userId: auth.userId, verifiedEmail: auth.verifiedEmail }, auth.workspaceId, input.systemId).catch(() => undefined);
+        return { release, readBack: check.readBack, revalidated: check.revalidated, liveCommit: check.declaration.liveCommit, explanation: READ_BACK_WORDS[check.readBack] };
       }
       const input = deploySchema.parse(args);
       const row = await find(auth, input.requestId);

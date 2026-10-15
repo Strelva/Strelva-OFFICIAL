@@ -176,7 +176,7 @@ describe("assistant business context", () => {
   });
 });
 describe("coding agent site Request tools", () => {
-  const siteTools = ["list_site_requests", "read_site_request", "report_site_preview", "report_site_deploy"];
+  const siteTools = ["list_site_requests", "read_site_request", "report_site_preview", "report_site_deploy", "report_site_release"];
   it("are absent without the port and listed with it, as a reviewed write", () => {
     expect(server().tools.filter(t => siteTools.includes(t.name))).toEqual([]);
     const listed = serverWithSiteChanges().tools;

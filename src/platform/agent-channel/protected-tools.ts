@@ -23,6 +23,7 @@ const siteChangeDescriptions = {
   read_site_request: ["Read a website Request", "Read one Request as a task brief: what to change, which site and repo, its receipts, and the exact next step. Call it again before each report.", "website:code"],
   report_site_preview: ["Report a preview", "After you build the change on a branch and its preview deploy is ready, record the https preview URL, the branch, the commit and a one-line summary. The owner reviews it in Strelva and decides whether to make it live. Do not merge to production until read_site_request says the stage is approved.", "website:code"],
   report_site_deploy: ["Report the deploy", "After the owner approved and you merged and deployed, record the production commit and deployment URL. Strelva checks the live site's declared commit, refreshes the site and records a Release. Never call this for a Request that is not approved.", "website:code"],
+  report_site_release: ["Report a release (owner)", "For a business owner's own coding agent with no agency Request: record a production commit you shipped to this business's website so it appears as a Release. Agencies use report_site_preview and report_site_deploy instead. The systemId is in the Strelva block of the repo's CLAUDE.md.", "website:code"],
 } as const;
 const siteChangeInputs: Record<string, { properties: Record<string, unknown>; required: string[] }> = {
   list_site_requests: { properties: {}, required: [] },
@@ -46,6 +47,16 @@ const siteChangeInputs: Record<string, { properties: Record<string, unknown>; re
       summary: { type: "string", minLength: 1, maxLength: 500 },
     },
     required: ["requestId", "commitSha", "deploymentUrl"],
+  },
+  report_site_release: {
+    properties: {
+      systemId: { type: "string", format: "uuid" },
+      requestKey: { type: "string", format: "uuid", description: "Generate once; reuse only for an identical retry." },
+      commitSha: { type: "string", pattern: "^[0-9a-fA-F]{7,40}$" },
+      deploymentUrl: { type: "string", pattern: "^https://[^\\s]+$", maxLength: 500 },
+      summary: { type: "string", minLength: 1, maxLength: 500 },
+    },
+    required: ["systemId", "requestKey", "commitSha", "deploymentUrl", "summary"],
   },
 };
 const siteChangeTools: McpTool[] = Object.entries(siteChangeDescriptions).map(([name, [title, description]]) => ({

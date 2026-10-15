@@ -155,5 +155,56 @@ begin
   perform pg_temp.sc_expect(format('select public.agent_list_website_change_requests(%L, %L, %L)', tok, res, ws), '%oauth_invalid_token%');
 end $$;
 
+-- ---- owner door: an owner's own coding agent records a Release ----
+do $$
+declare
+  owner_id uuid := '5bc00000-0000-4000-8000-000000000001';
+  a_staff uuid := '5bc00000-0000-4000-8000-000000000003';
+  ws uuid := '5bc00000-0000-4000-8000-000000000010';
+  agency_a uuid := '5bc00000-0000-4000-8000-000000000020';
+  stable constant uuid := '5bc00000-0000-4000-8000-0000000000a0';
+  res constant text := 'https://strelva.example.test/api/mcp';
+  owner_tok constant text := repeat('b', 64);
+  agency_tok constant text := repeat('d', 64);
+  key1 constant uuid := '5bc00000-0000-4000-8000-0000000000f1';
+  site_system uuid; target jsonb; saved jsonb; again jsonb; seat uuid; n integer; ref text;
+begin
+  insert into public.tenant_workspace_links(tenant_stable_id, tenant_slug_at_link, workspace_id, linked_by, command_id, command_digest, receipt)
+    values (stable, 'sc-code-client', ws, owner_id, '5bc00000-0000-4000-8000-0000000000f9', repeat('0', 64), '{}');
+  site_system := public.system_origin_id(ws, 'tenant', stable::text);
+  select id into seat from public.provider_seats where customer_workspace_id = ws and agency_workspace_id = agency_a and status = 'active';
+  insert into public.assistant_tokens(token_hash, client_id, resource, scopes, workspace_id, user_id, verified_email, agency_id, seat_id)
+    values (agency_tok, 'client', res, array['website:code'], ws, a_staff, 'sc-a-staff@agency-a.example.test', agency_a, seat);
+
+  target := public.agent_website_code_release_target(owner_tok, res, ws, site_system);
+  perform pg_temp.sc_assert(target->>'tenantId' = 'sc-code-client' and (target->>'tenantStableId')::uuid = stable, 'the owner''s site is found through its link');
+  perform pg_temp.sc_expect(format('select public.agent_website_code_release_target(%L, %L, %L, %L)', owner_tok, res, ws, '5bc00000-0000-4000-8000-0000000000aa'), '%system_not_found%');
+  perform pg_temp.sc_expect(format('select public.agent_website_code_release_target(%L, %L, %L, %L)', agency_tok, res, ws, site_system), '%website_change_operator_required%');
+  perform pg_temp.sc_expect(format($q$select public.agent_record_website_code_release(%L, %L, %L, %L, %L, 'abc1234', 'https://code-client.example.test', 'confirmed', 'Shipped')$q$, agency_tok, res, ws, site_system, key1), '%website_change_operator_required%');
+  perform pg_temp.sc_expect(format($q$select public.agent_record_website_code_release(%L, %L, %L, %L, %L, 'nope', 'https://code-client.example.test', 'confirmed', 'Shipped')$q$, owner_tok, res, ws, site_system, key1), '%website_release_invalid%');
+  perform pg_temp.sc_expect(format($q$select public.agent_record_website_code_release(%L, %L, %L, %L, %L, 'abc1234', 'http://code-client.example.test', 'confirmed', 'Shipped')$q$, owner_tok, res, ws, site_system, key1), '%website_release_invalid%');
+
+  saved := public.agent_record_website_code_release(owner_tok, res, ws, site_system, key1, 'ABC1234DEF', 'https://code-client.example.test', 'confirmed', 'New menu page');
+  perform pg_temp.sc_assert(saved->>'commitSha' = 'abc1234def' and saved->>'readBack' = 'confirmed', 'the release is recorded');
+  again := public.agent_record_website_code_release(owner_tok, res, ws, site_system, key1, 'abc1234def', 'https://code-client.example.test', 'confirmed', 'New menu page');
+  perform pg_temp.sc_assert(again->>'id' = saved->>'id', 'the same requestKey is idempotent');
+  perform pg_temp.sc_expect(format($q$select public.agent_record_website_code_release(%L, %L, %L, %L, %L, 'fffffff', 'https://code-client.example.test', 'confirmed', 'New menu page')$q$, owner_tok, res, ws, site_system, key1), '%website_release_conflict%');
+
+  -- Immutable.
+  reset role;
+  perform pg_temp.sc_expect('update public.website_code_releases set summary = ''changed''', '%website_document_immutable%');
+  perform pg_temp.sc_expect('delete from public.website_code_releases', '%website_document_immutable%');
+  set local role service_role;
+
+  -- The release becomes a numbered revision on the website System.
+  n := public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, false);
+  perform pg_temp.sc_assert(n >= 1, 'reconcile appended revisions');
+  reset role;
+  select r.implementation->>'ref' into ref from public.systems s join public.system_revisions r on r.id = s.current_revision_id where s.id = site_system;
+  perform pg_temp.sc_assert(ref like 'code:%@abc1234def', 'the System''s current revision is the code release: ' || coalesce(ref, 'none'));
+  set local role service_role;
+  perform pg_temp.sc_assert(public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, false) = 0, 'observing again adds nothing');
+end $$;
+
 rollback;
 \echo 'Sites by code SQL checks passed.'

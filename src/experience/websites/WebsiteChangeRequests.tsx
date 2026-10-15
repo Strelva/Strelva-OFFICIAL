@@ -248,6 +248,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
         {copied ? <small role="status">{copied === "copied" ? "Copied" : "Copy failed. Select the command and copy it."}</small> : null}
       </div>
       <p className={styles.muted}>Then ask it: “Pick up the Strelva Requests for {siteLabel}.” It reads Requests your agency accepted, records a preview and records the deploy. It can&apos;t approve. You make it live.</p>
+      {canDecide && !operator ? <p className={styles.muted}>Your own coding agent can also record releases you ship yourself.</p> : null}
     </StSection> : null}
   </StPage></section>;
 }

@@ -18,7 +18,8 @@ while IFS= read -r migration; do
   fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 psql "${psql_args[@]}" --file="$repo_root/tests/sites-by-code-schema.sql"
-# The rollback must restore the previous bodies and leave nothing behind.
+# The rollbacks, newest first, must restore the previous bodies and leave nothing behind.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261027120300_website_code_releases.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261027120200_site_change_agent_tools.sql"
-psql "${psql_args[@]}" --command="select 1/(case when to_regprocedure('public.agent_record_website_change(text,text,uuid,uuid,text,jsonb)') is null and to_regclass('sites_by_code_rollback.functions') is null and not exists(select 1 from information_schema.columns where table_name='website_change_receipts' and column_name='reported_by_connection') then 1 else 0 end)" >/dev/null
+psql "${psql_args[@]}" --command="select 1/(case when to_regprocedure('public.agent_record_website_change(text,text,uuid,uuid,text,jsonb)') is null and to_regclass('sites_by_code_rollback.functions') is null and not exists(select 1 from information_schema.columns where table_name='website_change_receipts' and column_name='reported_by_connection') and to_regclass('public.website_code_releases') is null and pg_get_functiondef('public.reconcile_website_system_releases(uuid,uuid,text,uuid,text,text,boolean)'::regprocedure) not like '%website_code_releases%' then 1 else 0 end)" >/dev/null
 printf 'Sites by code (agent list, preview, owner decision, deploy, rollback) passed on local Postgres. No email, Auth, provider or deploy.\n'
