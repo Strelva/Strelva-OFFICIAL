@@ -43,6 +43,24 @@ test("licenses are inventoried without blanket commercial exceptions", () => {
   for (const license of ["UNKNOWN", "FSL-1.1-MIT", "custom"]) assert.ok(classifyLicenses({ [license]: [item(license)] }, policy).issues.length);
   assert.ok(classifyLicenses({}, policy).issues.length);
 });
+test("a per-package license review unblocks only its exact name, license and versions", () => {
+  const item = { name: "tool", versions: ["1.0.0"], license: "FSL-1.1-MIT" };
+  const review = { name: "tool", versions: ["1.0.0"], license: "FSL-1.1-MIT", use: "build-tool", owner: "Jacob", reviewedAt: "2026-10-15", reason: "Build-time only.", source: "https://example.com/LICENSE" };
+  const withReview = (...entries) => ({ ...clone(), reviewedPackages: entries });
+  assert.deepEqual(classifyLicenses({ "FSL-1.1-MIT": [item] }, withReview()).issues, ["license_review_required:tool"]);
+  const passed = classifyLicenses({ "FSL-1.1-MIT": [item] }, withReview(review));
+  assert.deepEqual(passed.issues, []);
+  assert.equal(passed.packages[0].classification, "reviewed");
+  assert.ok(classifyLicenses({ "FSL-1.1-MIT": [{ ...item, versions: ["1.0.1"] }] }, withReview(review)).issues.length);
+  assert.ok(classifyLicenses({ "FSL-1.1-MIT": [item] }, withReview({ ...review, license: "FSL-1.1-Apache-2.0" })).issues.length);
+  assert.ok(classifyLicenses({ "FSL-1.1-MIT": [item] }, withReview({ ...review, name: "tool-*" })).issues.length);
+  assert.deepEqual(validatePolicy(withReview(review), {}, {}, "2026-10-15"), []);
+  const codes = config => validatePolicy(config, {}, {}, "2026-10-15");
+  assert.ok(codes(withReview({ ...review, owner: undefined })).includes("reviewed_package_invalid"));
+  assert.ok(codes(withReview({ ...review, reviewedAt: "2026-11-01" })).includes("reviewed_package_invalid"));
+  assert.ok(codes(withReview(review, { ...review })).includes("reviewed_package_duplicate"));
+  assert.ok(codes({ ...clone(), reviewedPackages: {} }).includes("reviewed_packages_invalid"));
+});
 test("scanner summaries cannot print credential fields", () => {
   const values = summarizeFindings([{ RuleID: "stripe", File: "seed", StartLine: 1, Secret: "forbidden-value", Match: "forbidden-line", Author: "private", Email: "private" }]);
   assert.deepEqual(values, [{ rule: "stripe", file: "seed", line: 1, commit: null }]);

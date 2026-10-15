@@ -24,6 +24,20 @@ security workflow should continue to fail on those two until Jacob authorizes
 rotation of both client revalidation secrets and the signed readback is retained.
 History is public; deleting the old file did not revoke its credentials.
 
+October 15 update. A local `node scripts/check-supply-chain.mjs` on the base
+returned `blocked` with `license_review_required` for `@sentry/cli`,
+`@sentry/cli-darwin` (`-linux-x64` on the CI runner) and `gsap`. The braces
+advisory sat under `audit.all.excepted` (valid until October 23) and the production
+audit had 0 findings, so braces was not the cause of the red "Audit dependencies"
+step. `scripts/supply-chain-policy.json` now has a `reviewedPackages` list: each
+entry names one package, its exact license string and exact versions, a use
+(`build-tool` or `distributed`), an owner, a review date and a license source.
+The list is empty. `@sentry/cli` 2.58.5 (FSL-1.1-MIT, build-time only, nine
+platform packages) and `gsap` 3.14.2 (GSAP Standard License, ships in client
+website components) need Jacob's approval before any entry is added. The
+registry audit was not run in this lane (no network calls to the registry
+without Jacob's allowance).
+
 ## Replay and migration order
 
 Push and nightly select the same PostgreSQL 18 server/client tools through
