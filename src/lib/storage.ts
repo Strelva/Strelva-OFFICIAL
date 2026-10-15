@@ -13,7 +13,6 @@
  * - inbox-store.ts: notifications
  * - activity-store.ts: audit logging
  * - chat-store.ts: chat message persistence
- * - upload-store.ts: file uploads
  * - analytics-store.ts: click tracking, metrics
  * - booking-store.ts: appointments
  * - newsletter-store.ts: subscribers

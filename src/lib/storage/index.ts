@@ -35,9 +35,6 @@ export type { AuditLogEntry } from "./audit-store";
 // Chat
 export { saveChatMessages, loadChatMessages } from "./chat-store";
 
-// Uploads
-export { uploadFile, uploadTenantFile } from "./upload-store";
-
 // Analytics
 export {
   trackClick,

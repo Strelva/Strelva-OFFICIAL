@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { uploadTenantFile } from "@/lib/storage/upload-store";
+import { uploadTenantImageFile, mediaUploadErrorResponse } from "@/platform/infra/media/store";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
@@ -31,10 +31,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { url } = await uploadTenantFile(tenant, file);
-    return NextResponse.json({ url });
+    const asset = await uploadTenantImageFile(tenant, file);
+    return NextResponse.json({ url: asset.url, asset });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Upload failed";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const { status, error } = mediaUploadErrorResponse(err);
+    return NextResponse.json({ error }, { status });
   }
 }
