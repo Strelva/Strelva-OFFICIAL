@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), eligibility: vi.fn(), tables: {} as Record<string, unknown> }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), rate: vi.fn(), eligibility: vi.fn(), tables: {} as Record<string, unknown>, connect: vi.fn() }));
+vi.mock("@/products/agency-clients/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/products/agency-clients/server")>()), connectGhlAgency: mocks.connect }));
 vi.mock("@/platform/connections/server", () => ({ connectionEligibilityFor: mocks.eligibility }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
@@ -82,14 +83,28 @@ describe("GoHighLevel import routes", () => {
       expect(JSON.stringify(body)).not.toContain("fixture-secret");
     });
 
-    it("shows a successful callback on the import page", async () => {
+    it("sends a finished callback to the import page marked connected", async () => {
+      mocks.connect.mockResolvedValue(undefined);
       const state = createGhlOAuthState({ workspaceId: AGENCY, userId: USER });
       const response = await callback(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth/callback?code=c&state=${encodeURIComponent(state)}`));
       const target = new URL(response.headers.get("location")!);
-      // Without fixture HighLevel tokens the exchange fails, which must also land on the import page.
+      expect(mocks.connect).toHaveBeenCalledTimes(1);
       expect(target.pathname).toBe("/workspace/agency/clients/import");
       expect(target.searchParams.get("workspaceId")).toBe(AGENCY);
-      expect(target.searchParams.get("highlevel") ?? target.searchParams.get("highlevelError")).toBeTruthy();
+      expect(target.searchParams.get("highlevel")).toBe("connected");
+      expect(target.searchParams.get("highlevelError")).toBeNull();
+      expect(target.searchParams.get("source")).toBe("highlevel");
+    });
+
+    it("sends a failed token exchange to the import page with an error, not connected", async () => {
+      mocks.connect.mockRejectedValue(new Error("exchange failed"));
+      const state = createGhlOAuthState({ workspaceId: AGENCY, userId: USER });
+      const response = await callback(new Request(`${ORIGIN}/api/workspace/agency-clients/gohighlevel/oauth/callback?code=c&state=${encodeURIComponent(state)}`));
+      const target = new URL(response.headers.get("location")!);
+      expect(target.pathname).toBe("/workspace/agency/clients/import");
+      expect(target.searchParams.get("workspaceId")).toBe(AGENCY);
+      expect(target.searchParams.get("highlevelError")).toBeTruthy();
+      expect(target.searchParams.get("highlevel")).toBeNull();
     });
 
     it("refuses consent when provider access is unavailable, even with the release and credentials on", async () => {
