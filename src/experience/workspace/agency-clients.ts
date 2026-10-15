@@ -18,6 +18,7 @@
  */
 import { z } from "zod";
 import { requiredConnectionSchema } from "@/platform/connections/contracts";
+import { OWNER_REACH_STATES } from "@/platform/owner-reach/model";
 
 export const AGENCY_CLIENT_PAGE_SIZE = 100;
 
@@ -59,11 +60,21 @@ export const agencyClientRowSchema = z.object({
   improvementsStatus: z.enum(["ready", "unavailable"]).optional(),
   lastReceiptAt: iso.nullable(),
   agentBookings: z.boolean().optional(),
+  /** Whether this client's owner can be reached, and what the agency can do about it. Present only with STRELVA_OWNER_REACH_RELEASE. Never an address. */
+  ownerReach: z.object({
+    state: z.enum(OWNER_REACH_STATES),
+    reachable: z.boolean(),
+    reason: z.string().max(200),
+    canIssueClaim: z.boolean(),
+    contactProposed: z.boolean(),
+    openDecisions: z.number().int().min(0),
+    lapsedRecently: z.number().int().min(0),
+  }).strict().optional(),
 }).strict();
 
 export const agencyQueueItemSchema = z.object({
   id: z.string().min(1).max(200),
-  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator", "owner_claim"]),
+  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator", "owner_claim", "owner_unreachable"]),
   workspaceId: uuid,
   clientName: z.string().min(1).max(120),
   title: z.string().min(1).max(300),
@@ -76,6 +87,9 @@ export const agencyQueueItemSchema = z.object({
   label: z.string().max(200).optional(),
   /** owner_claim only: whether the claim reached the owner, never the address or link. */
   claimDelivery: z.enum(["not_sent", "sent", "unconfirmed", "no_link"]).optional(),
+  /** needs_you only, with owner reach on: when this owner decision lapses, and whether its owner can be reached. */
+  expiresAt: iso.optional(),
+  ownerReachable: z.boolean().optional(),
   href: z.string().startsWith("/").max(500).optional(),
 }).strict();
 

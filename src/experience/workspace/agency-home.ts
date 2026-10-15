@@ -141,6 +141,7 @@ const QUEUE_KIND_LABEL: Record<AgencyQueueItem["kind"], string> = {
   owner_email: "Owner email",
   owner_claim: "Waiting for the business to claim",
   operator: "Platform support",
+  owner_unreachable: "Owner not reachable",
 };
 
 export function queueKindLabel(kind: AgencyQueueItem["kind"]): string {

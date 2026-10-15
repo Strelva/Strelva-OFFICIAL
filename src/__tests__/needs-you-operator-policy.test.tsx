@@ -146,6 +146,7 @@ describe("owner not told", () => {
     expect(notToldReason(row({ lastDelivery: null }))).toBe("Not emailed yet");
     expect(notToldReason(row({ recipientKnown: false, lastDelivery: null }))).toMatch(/^Not sent: no trusted owner address/);
     expect(notToldReason(row({ lastDelivery: { kind: "digest", status: "suppressed", reason: "no_trusted_owner_recipient", at: "2026-10-05T09:00:00Z" } }))).toBe("Not sent: no trusted owner address");
+    expect(notToldReason(row({ lastDelivery: { kind: "urgent", status: "suppressed", reason: "owner_recipient_is_staff", at: "2026-10-05T09:00:00Z" } }))).toBe("Not sent: the trusted owner address is a staff address. Invite the real owner");
   });
 
   it("renders the list, the empty state and the outage, and nothing when off or denied", () => {

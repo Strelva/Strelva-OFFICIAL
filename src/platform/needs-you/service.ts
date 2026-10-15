@@ -39,6 +39,8 @@ export interface NeedsYouDeps {
   /** New immediate inquiry delivery stays off unless the host supplies the
    * release switches and strict global/customer/per-tenant email gates. */
   urgentInquiryAllowed?(tenantId: string | null): Promise<boolean>;
+  /** True when the trusted recipient is platform or agency staff (#524). Errors hold the send. */
+  recipientIsStaff?(workspaceId: string, email: string): Promise<boolean>;
 }
 
 export type DecideStatus =
@@ -329,6 +331,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "no_trusted_owner_recipient");
       summary.ownerNotTold += rows.length;
       return;
+    }
+    // Staff must never receive an owner's links: they could approve as the owner (#524). The address is not stored on the row.
+    if (deps.recipientIsStaff && await deps.recipientIsStaff(first.workspaceId, recipient).catch(() => true)) {
+      for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "owner_recipient_is_staff");
+      summary.ownerNotTold += rows.length;
+      return "suppressed";
     }
     const inquiryUrgent = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
     const inquiryRows = (await Promise.all(rows.map(async row => ({ row, inquiry: row.sourceLifecycle === "inquiry_fact"

@@ -11,6 +11,10 @@
  * owner's address, an owner claim link. A failed assessment leaves the added
  * client and owner link intact; a repeated add recovers the same assessment.
  *
+ * An owner claim is never issued to a staff address (platform operators and
+ * agency members or their domains): the database refuses it, because staff
+ * could otherwise approve owner decisions as the owner.
+ *
  * Copy-only is the default. Explicit claim delivery is behind its own
  * default-off release plus the shared client-email policy; converted clients
  * remain silent. The transactional invitation reserves an exact current claim
@@ -111,6 +115,7 @@ const FAILURES: Array<[string, number, string]> = [
   ["agency_client_claim_recipient_mismatch", 403, "This link was made for a different email address. Sign in with the address it was sent to."],
   ["agency_client_claim_identity_required", 401, "Sign in with a confirmed email to continue."],
   ["agency_client_claim_not_found", 404, "This link is missing or no longer works."],
+  ["agency_client_claim_recipient_staff", 400, "Use the owner's own email address. This one belongs to platform or agency staff."],
   ["agency_client_claim_invalid", 400, "Check the owner's email address."],
   ["agency_client_claim_review_invalid", 400, "Choose what to do in each area, and check the details you changed."],
   ["agency_client_claim_review_changed", 409, "Something on this page changed. Reload and review it again."],

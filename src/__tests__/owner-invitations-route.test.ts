@@ -54,6 +54,7 @@ beforeEach(() => {
       tenants: state().tenants,
     }, error: null };
     if (name === "revoke_operator_owner_invitation_audited") return { data: "revoked", error: null };
+    if (name === "owner_contact_staff_reason") return { data: null, error: null };
     throw new Error(`Unexpected RPC ${name}`);
   });
   setBusinessOwnershipDb({ rpc });
@@ -117,6 +118,7 @@ describe("owner invitation mutations", () => {
         invitationId: INVITATION, workspaceId: WORKSPACE, workspaceName: "Test Business", recipientEmail: args.p_recipient_email,
         role: "owner", status: "pending", expiresAt: args.p_expires_at, createdAt: "2026-10-01", createdBy: OPERATOR, tenants: state().tenants,
       }, error: null };
+      if (name === "owner_contact_staff_reason") return { data: null, error: null };
       throw new Error(`Unexpected RPC ${name}`);
     });
     expect((await POST(request(), ctx)).status).toBe(409);

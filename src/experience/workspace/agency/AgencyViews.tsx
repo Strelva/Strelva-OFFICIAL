@@ -8,6 +8,7 @@ import { AgencyClientDecisions } from "./AgencyClientDecisions";
 import { AgencyClientUsage } from "./AgencyClientUsage";
 import { AgencyUsageSummary } from "./AgencyUsageSummary";
 import { StBeacon, StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StTable, StTextButton } from "@/components/ui/strelva/Kit";
+import { lapseLabel } from "@/platform/owner-reach/model";
 import { agencyQueueOrder, type AgencyClientRow, type AgencyQueueItem, type AgencyTeamMember } from "../agency-clients";
 import { clientSystemLabel, lastReceiptLabel, needsYouLabel, openRequestsLabel, queueKindLabel, waitLabel, type AgencyClientsView } from "../agency-home";
 
@@ -56,7 +57,7 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
           {client.agentBookings ? <StTextButton href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`}>Booked through assistants · {client.name}</StTextButton> : null}
           {read.systems.length || (!unavailable && client.provider) ? <details><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Client details</summary>{read.provider ? <small className="block text-xs font-normal text-gray-muted">Operated by {agencyName}</small> : null}<ul className="space-y-2 py-2 text-xs font-normal text-gray-muted">{read.systems.map(system => <li key={system.id}>{clientSystemLabel(system)}</li>)}</ul>{!unavailable && client.provider ? <>{agencyWorkspaceId ? <StTextButton onClick={() => setReviewing(client.workspaceId)}>Review decisions</StTextButton> : null}<ClientAdditionalControls workspaceId={client.workspaceId} clientName={client.name} agencyWorkspaceId={agencyWorkspaceId} request={request} /></> : null}</details> : null}</>,
         health: unavailable ? <><StState kind="need">{client.name} could not be loaded.</StState><small className="block text-xs">{lastGood ? `Showing the last good read from ${new Date(lastGood.readAt).toLocaleString()}.` : "No last good read is available in this visit."}</small><StPill variant="soft" busy={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</StPill></> : health(client),
-        waiting: unavailable && !lastGood ? "Could not be read" : read.ownerClaimWaiting ? `Waiting on ${client.name} to claim${read.needsYou.count ? ` · ${needsYouLabel(read, now)}` : ""}` : needsYouLabel(read, now),
+        waiting: unavailable && !lastGood ? "Could not be read" : <>{read.ownerClaimWaiting ? `Waiting on ${client.name} to claim${read.needsYou.count ? ` · ${needsYouLabel(read, now)}` : ""}` : needsYouLabel(read, now)}<OwnerReachLines client={read} agencyWorkspaceId={agencyWorkspaceId} /></>,
         requests: unavailable && !lastGood ? "Unknown" : <>{openRequestsLabel(read.openRequests)}{read.improvementsWaiting ? ` · ${read.improvementsWaiting} improvement${read.improvementsWaiting === 1 ? "" : "s"} to review` : ""}{read.improvementsStatus === "unavailable" ? ` · ${read.improvementsWaiting ? "Some improvements unavailable" : "Improvements unavailable"}` : ""}</>,
         receipt: unavailable && !lastGood ? "Unknown" : lastReceiptLabel(read.lastReceiptAt, now),
       } };
@@ -66,6 +67,24 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
     {moreError ? <StNotice tone="critical">More clients could not be loaded. Access has not changed. Try again.</StNotice> : null}
     {agencyWorkspaceId ? <AgencyUsageSummary agencyWorkspaceId={agencyWorkspaceId} request={request} /> : null}
   </div>;
+}
+
+/** Whether this client's owner can be reached, and the one next step. Renders nothing without owner reach data. */
+function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRow; agencyWorkspaceId?: string }) {
+  const reach = client.ownerReach;
+  if (!reach) return null;
+  if (reach.reachable) return <small className="block text-xs text-gray-muted">{reach.reason}</small>;
+  return <span id={`owner-${client.workspaceId}`} className="block">
+    <StState kind="need">Owner not reachable</StState>
+    <small className="block text-xs">{reach.reason}</small>
+    {reach.openDecisions ? <small className="block text-xs text-gray-muted">{reach.openDecisions} owner {reach.openDecisions === 1 ? "decision" : "decisions"} waiting. Only {client.name} can decide.</small> : null}
+    {reach.lapsedRecently ? <small className="block text-xs text-gray-muted">{reach.lapsedRecently} lapsed in the last 30 days, nothing changed</small> : null}
+    {reach.canIssueClaim && agencyWorkspaceId
+      ? <StTextButton href={`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, client: client.workspaceId })}`}>Fix owner contact</StTextButton>
+      : client.reach === "member"
+        ? <><StTextButton href={`/workspace/business-details?workspaceId=${encodeURIComponent(client.workspaceId)}`}>{"Add the owner's email"}</StTextButton><small className="block text-xs text-gray-muted">An address you add waits for the owner to confirm it.</small></>
+        : <small className="block text-xs text-gray-muted">Ask {client.name} for {"the owner's email"}.</small>}
+  </span>;
 }
 
 function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; request?: typeof fetch }) {
@@ -81,13 +100,13 @@ function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {
 /** Queue: oldest first within each kind, with the client's own entrance. */
 export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork, complete = true }: { complete?: boolean; items: readonly AgencyQueueItem[]; now: number; onWorkspace: (workspaceId: string) => void; onOpenClientWork: (workspaceId: string, workId: string) => void }) {
   if (!items.length) return <StEmpty>{complete ? "Nothing is waiting across clients." : "Nothing is waiting in the loaded clients. The Queue is incomplete."}</StEmpty>;
-  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email", "owner_claim"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
+  const groups: { title: string; kinds: AgencyQueueItem["kind"][] }[] = [{ title: "Broken", kinds: ["health"] }, { title: "Requests", kinds: ["request"] }, { title: "Waiting on owners", kinds: ["needs_you", "owner_email", "owner_claim", "owner_unreachable"] }, { title: "Improvements to offer", kinds: ["improvement"] }, { title: "Platform support", kinds: ["operator"] }];
   return <div className="space-y-8">{groups.map(group => {
     const rows = agencyQueueOrder(items.filter(item => group.kinds.includes(item.kind)));
     if (!rows.length) return null;
     return <StSection key={group.title} title={group.title} meta={<StMono>{rows.length}</StMono>}><StRows label={`${group.title}, oldest first`}>{rows.map(item => {
       const wait = waitLabel(item.since, now);
-      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" || item.claimDelivery === "sent" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.kind === "needs_you" || item.kind === "owner_email" ? `Waiting on ${item.clientName}` : item.label ?? queueKindLabel(item.kind)}`} href={item.href} onClick={item.href ? undefined : () => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<><StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
+      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" || item.claimDelivery === "sent" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.kind === "needs_you" || item.kind === "owner_email" ? `Waiting on ${item.clientName}` : item.label ?? queueKindLabel(item.kind)}${item.ownerReachable === false ? " · Owner not reachable" : ""}`} href={item.href} onClick={item.href ? undefined : () => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<>{item.expiresAt ? <StMono>{lapseLabel(item.expiresAt, now)}</StMono> : null}<StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
     })}</StRows></StSection>;
   })}</div>;
 }
