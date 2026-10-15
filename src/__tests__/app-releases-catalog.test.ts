@@ -85,4 +85,24 @@ describe("built-in App catalog", () => {
       app("inquiries", [release("inquiries", 1)], { name: "Inquiries", systemKinds: ["booking"] }),
     ])).toThrow(/both claim/);
   });
+
+  it("checks event subscriptions: scope, duplicates and handler keys", () => {
+    const r1 = release("bookings", 1);
+    const sub = { event: "booking.made", handler: "stop_follow_ups", scope: "bookings" } as const;
+    const withSubs = (eventSubscriptions: BuiltInAppRelease["eventSubscriptions"]) => [app("bookings", [r1, release("bookings", 2, { eventSubscriptions })])];
+    expect(() => assertBuiltInAppCatalog(withSubs([sub]))).not.toThrow();
+    expect(() => assertBuiltInAppCatalog(withSubs([{ ...sub, scope: "inquiries" }]))).toThrow(/Bookings Release 2: booking\.made needs scope bookings\./);
+    expect(() => assertBuiltInAppCatalog(withSubs([sub, sub]))).toThrow(/duplicate event subscription/);
+    expect(() => assertBuiltInAppCatalog(withSubs([{ ...sub, handler: "Bad-Key" }]))).toThrow(/Bookings Release 2: invalid event subscription\./);
+    expect(() => assertBuiltInAppCatalog(withSubs([{ ...sub, maxAttempts: 13 }]))).toThrow(/invalid event subscription/);
+    // The same handler may take two different events.
+    expect(() => assertBuiltInAppCatalog(withSubs([sub, { event: "booking.changed", handler: "stop_follow_ups", scope: "bookings" }]))).not.toThrow();
+  });
+
+  it("declares no subscription on the six 1.0 Apps", () => {
+    for (const item of BUILT_IN_APPS) {
+      if (!["bookings", "inquiries", "recaps", "documents", "ask", "internal_tools"].includes(item.id)) continue;
+      expect(item.releases[0]!.eventSubscriptions ?? [], item.id).toEqual([]);
+    }
+  });
 });
