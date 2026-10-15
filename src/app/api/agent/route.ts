@@ -1,8 +1,7 @@
-import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
-import { stepCountIs } from "ai";
+import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { assistantFailure, streamAssistantTurn } from "@/platform/assistant/core";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
-import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import { logger } from "@/platform/infra/logger";
 import { trackError } from "@/platform/infra/monitoring";
 import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/platform/infra/auth";
@@ -215,47 +214,8 @@ Only use tools for manifest-supported sections and actions. If the user requests
     async start(controller) {
       // Tracks whether anything visible has been emitted on THIS request, so
       // the fallback only fires when retrying is still safe (no partial output).
-      let emittedToClient = false;
-
-      const consume = async (result: ModelTextStream): Promise<void> => {
-        for await (const part of result.fullStream) {
-          if (part.type === "error") {
-            // Surface as a thrown error so the catch below can decide on fallback.
-            throw part.error;
-          } else if (part.type === "tool-call") {
-            emittedToClient = true;
-            const toolName = part.toolName;
-            const input = ("args" in part ? part.args : "input" in part ? part.input : undefined) as Record<string, unknown> | undefined;
-            const section = input?.section as string | undefined;
-
-            // Proof-signal: fire-and-forget Slack + Redis counter (Workstream E).
-            // Do NOT await — chat latency must not depend on Slack.
-            void recordAgentToolCall({
-              tenantId: tenant,
-              siteName: signalSiteName,
-              userMessage: lastUserMessage,
-              toolName,
-              source: signalSource,
-            });
-            const label = chatToolLabel(toolName, section);
-            controller.enqueue(encoder.encode(`__TOOL__${label}\n`));
-          } else if (part.type === "tool-result") {
-            const output = ("result" in part ? part.result : "output" in part ? part.output : undefined) as unknown;
-            // Inline display tools (show_report/show_content/show_photos/...) return
-            // { __inlineTool, ...cardData }. Stream it as a __CARD__ line so the chat
-            // renders the rich card — the data was built here but never sent (H5).
-            if (output && typeof output === "object" && "__inlineTool" in output) {
-              controller.enqueue(encoder.encode(`__CARD__${JSON.stringify(output)}\n`));
-            }
-            const actionResult = agentResultFromToolOutput(output);
-            if (actionResult) recordActionResult(actionResult);
-          } else if (part.type === "text-delta") {
-            const text = "text" in part ? part.text : "";
-            if (text) emittedToClient = true;
-            controller.enqueue(encoder.encode(text));
-          }
-        }
-      };
+      const state = { emitted: false };
+      const write = (text: string) => controller.enqueue(encoder.encode(text));
 
       try {
         // Primary/fallback model resilience through the one model-call helper:
@@ -263,18 +223,45 @@ Only use tools for manifest-supported sections and actions. If the user requests
         // configured fallback model, but only when the primary fails *before*
         // any content reached the client, so a half-streamed answer is never
         // duplicated. One cost row per provider call.
-        await streamModelText(
-          { purpose: "ask", tenantId: tenant, actorKind: askerIsOperator ? "operator" : "member" },
-          { system: systemPrompt, messages, tools, stopWhen: stepCountIs(8) },
-          consume,
-          { emitted: () => emittedToClient },
-        );
+        await streamAssistantTurn({
+          policy: ASSISTANT_POLICIES.tenant_chat,
+          context: { tenantId: tenant, actorKind: askerIsOperator ? "operator" : "member" },
+          system: systemPrompt,
+          messages,
+          tools,
+          state,
+          handlers: {
+            toolCall: ({ toolName, input }) => {
+              const section = input?.section as string | undefined;
+              // Proof-signal: fire-and-forget Slack + Redis counter (Workstream E).
+              // Do NOT await — chat latency must not depend on Slack.
+              void recordAgentToolCall({
+                tenantId: tenant,
+                siteName: signalSiteName,
+                userMessage: lastUserMessage,
+                toolName,
+                source: signalSource,
+              });
+              return chatToolLabel(toolName, section);
+            },
+            toolResult: ({ output }) => {
+              const actionResult = agentResultFromToolOutput(output);
+              if (actionResult) recordActionResult(actionResult);
+              // Inline display tools (show_report/show_content/show_photos/...) return
+              // { __inlineTool, ...cardData }. Stream it as a __CARD__ line so the chat
+              // renders the rich card — the data was built here but never sent (H5).
+              return output && typeof output === "object" && "__inlineTool" in output ? output : null;
+            },
+            text: write,
+            line: write,
+          },
+        });
       } catch (err) {
         // Both models failed (or the client disconnected). If nothing was
         // streamed, send a plain-English line so the chat doesn't go silent.
-        if (!emittedToClient) {
-          const budgetPaused = err instanceof ModelBudgetPausedError || err instanceof ModelBudgetUnavailableError;
-          if (!budgetPaused) {
+        if (!state.emitted) {
+          const failure = assistantFailure(err, state.emitted, ASSISTANT_POLICIES.tenant_chat);
+          if (failure.kind === "no_answer") {
             logger.error("[agent-chat] Chat turn failed with no fallback recovery", {
               tenant,
               error: err instanceof Error ? err.message : "unknown",
@@ -283,11 +270,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             trackError(err, { tenant, op: "agent.chat" });
           }
           try {
-            controller.enqueue(
-              encoder.encode(
-                budgetPaused ? err.message : "Strelva can't answer right now. Nothing was changed. Please try again in a moment."
-              )
-            );
+            if (failure.kind !== "partial") write(failure.message);
           } catch {
             // Client already gone.
           }

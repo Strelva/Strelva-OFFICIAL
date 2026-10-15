@@ -173,3 +173,47 @@ it("retains a stream hold and unknown-cost error when its consumer fails before 
   expect(sink.rows).toEqual([expect.objectContaining({ outcome: "error", costUsd: null, budgetReservationId: expect.any(String) })]);
   expect(reservations()).toHaveLength(1);
 });
+
+describe("list-price ceiling", () => {
+  const toolRequest = { ...request, maxOutputTokens: 4096, tools: [{ type: "function", name: "read", description: "Read", inputSchema: { type: "object" } }] };
+  async function listPriceConfig() {
+    const { withListPriceCeiling } = await vi.importActual<typeof import("@/platform/infra/ai-models")>("@/platform/infra/ai-models");
+    const model = adapter();
+    delete model.config.billingCeiling;
+    return { ...model, config: withListPriceCeiling(model.config) };
+  }
+  it("gives no ceiling with the flag off, so capped tool runs stay paused", async () => {
+    const { config } = await listPriceConfig();
+    expect(config.billingCeiling).toBeUndefined();
+  });
+  it("admits a capped tool run per provider step until the cap", async () => {
+    vi.stubEnv("STRELVA_AI_LIST_PRICE_CEILING", "1");
+    const controls = { paused: false, monthlyCapCents: null, reviewAutoPost: "client_choice", revision: 0, setBy: null, changedAt: null };
+    const v2 = { ...budget, capCents: 500, controls };
+    let held = 0;
+    mocks.rpc.mockImplementation(async (name: string) => ({ error: null, data: name === "business_ai_budget_v2" ? v2 : { status: "reserved", reason: null, reservationId: `d0000000-0000-4000-8000-${String(++held).padStart(12, "0")}`, budget: v2 } }));
+    const model = await listPriceConfig();
+    expect(model.config.billingCeiling).toMatchObject({ source: "list_price", acceptsTools: true });
+    mocks.primary = model.config;
+    mocks.text.mockImplementation(async (options: { model: { doGenerate: (request: unknown) => Promise<unknown> } }) => {
+      await options.model.doGenerate(toolRequest);
+      await options.model.doGenerate(toolRequest);
+      return { text: "done" };
+    });
+    await generateModelText(context, { prompt: "hi", tools: { read: {} } } as never, { models: [model.config], sink: createMemoryModelCallSink() });
+    expect(model.generate).toHaveBeenCalledTimes(2);
+    const reserved = mocks.rpc.mock.calls.filter(([name]) => name === "reserve_business_ai_budget_v2");
+    expect(reserved).toHaveLength(2);
+    expect(reservations()).toHaveLength(0);
+    expect(reserved[0]?.[1]).toMatchObject({ p_workspace_id: workspaceId, p_apply_base_cap: true, p_ceiling_source: "list_price", p_apply_controls: false });
+    expect(Number(reserved[0]?.[1].p_maximum_cost_usd)).toBeGreaterThan(0);
+  });
+  it("leaves a request it cannot bound paused", async () => {
+    vi.stubEnv("STRELVA_AI_LIST_PRICE_CEILING", "1");
+    const model = await listPriceConfig();
+    mocks.primary = model.config;
+    mocks.text.mockImplementation(async (options: { model: { doGenerate: (request: unknown) => Promise<unknown> } }) => options.model.doGenerate({ ...toolRequest, maxOutputTokens: undefined }));
+    await expect(generateModelText(context, { prompt: "hi" }, { models: [model.config], sink: createMemoryModelCallSink() })).rejects.toBeInstanceOf(ModelBudgetUnavailableError);
+    expect(model.generate).not.toHaveBeenCalled();
+  });
+});

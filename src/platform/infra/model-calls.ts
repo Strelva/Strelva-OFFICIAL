@@ -17,6 +17,11 @@
  *     receipt when the caller has one.
  *
  * A failed log write never fails the call (see model-call-log.ts).
+ *
+ * Capped work is admitted per provider request. With the list-price ceiling on
+ * (STRELVA_AI_LIST_PRICE_CEILING=1) that includes tool runs: each step reserves
+ * its own bound at the provider boundary. Without it, capped work with tools
+ * stays paused.
  */
 import { generateObject, generateText, streamText } from "ai";
 import { getFallbackModel, getPrimaryModel, isTransientModelError, type ModelConfig } from "@/platform/infra/ai-models";
@@ -31,6 +36,8 @@ import {
 import { assertBusinessAiBudget, isBusinessPaidModelPurpose, ModelBudgetPausedError, ModelBudgetUnavailableError } from "./business-ai-budget";
 import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { estimateModelCost, UNKNOWN_COST, type ModelCost } from "./model-prices";
+import { boundedProviderRequest } from "./model-price-ceiling";
+import { listPriceCeilingEnabled } from "./ai-controls-release";
 
 export type { ModelConfig } from "@/platform/infra/ai-models";
 export type { ModelCallActorKind, ModelCallPurpose, ModelCallRow, ModelCallSink } from "./model-call-log";
@@ -221,23 +228,11 @@ function providerUsage(value: unknown): StepUsage {
   return { inputTokens: tokens("inputTokens"), outputTokens: tokens("outputTokens") };
 }
 
-/** The initial qualified path is text only, with a hard output/reasoning ceiling. */
-function boundedTextRequest(request: unknown): boolean {
-  if (!request || typeof request !== "object") return false;
-  const value = request as Record<string, unknown>;
-  if (!Number.isSafeInteger(value.maxOutputTokens) || Number(value.maxOutputTokens) <= 0 || value.providerOptions) return false;
-  if (Array.isArray(value.tools) && value.tools.length > 0) return false;
-  if (!Array.isArray(value.prompt)) return false;
-  return value.prompt.every(message => {
-    if (!message || typeof message !== "object") return false;
-    const content = (message as { content?: unknown }).content;
-    return typeof content === "string" || (Array.isArray(content) && content.every(part => part && typeof part === "object" && part.type === "text" && typeof part.text === "string"));
-  });
-}
-
 /** SDK hooks can substitute another model or perform hidden calls. Capped work pauses. */
 async function assertSdkOptions(context: ModelCallContext, options: Record<string, unknown>) {
-  if (options.prepareStep || options.experimental_repairToolCall || options.tools) await assertBusinessAiBudget(context);
+  if (options.prepareStep || options.experimental_repairToolCall) await assertBusinessAiBudget(context);
+  // With the list-price ceiling on, each tool step is admitted at the provider boundary instead.
+  else if (options.tools && !listPriceCeilingEnabled()) await assertBusinessAiBudget(context);
 }
 
 /**
@@ -251,8 +246,8 @@ function providerBoundary(context: ModelCallContext, config: ModelConfig, log: A
   log.providerBoundary = true;
   const admit = async (request: unknown, operation: "generate" | "stream") => {
     try {
-      const reservation = await assertBusinessAiBudget({ ...context, maximumCostUsd: () => {
-        if (!config.billingCeiling?.qualification.trim() || !boundedTextRequest(request)) return undefined;
+      const reservation = await assertBusinessAiBudget({ ...context, ceilingSource: config.billingCeiling?.source ?? "qualified", maximumCostUsd: () => {
+        if (!config.billingCeiling?.qualification.trim() || !boundedProviderRequest(request, { allowTools: config.billingCeiling.acceptsTools === true })) return undefined;
         return config.billingCeiling.maximumCostUsd(request, operation) ?? undefined;
       } });
       log.startProviderUnit(reservation);

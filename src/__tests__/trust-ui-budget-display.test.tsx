@@ -39,3 +39,23 @@ it("unknown historical spend is disclosed without falsely pausing an uncapped pa
   expect(html).toContain("No spending limit is recorded");
   expect(html).not.toContain("stays paused");
 });
+
+const controls = (over = {}) => ({ paused: false, monthlyCapCents: null, reviewAutoPost: "client_choice" as const, revision: 1, setBy: null, changedAt: null, ...over });
+it("renders today's output with no controls row", () => {
+  const without = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced />);
+  const withNull = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={null} />);
+  expect(withNull).toBe(without);
+});
+it("names the agency that paused Strelva work", () => {
+  const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ paused: true, setBy: { kind: "agency", agencyName: "North Studio" }, changedAt: "2026-10-12T15:00:00Z" })} />);
+  expect(html).toContain("North Studio paused Strelva work for this business on October 12, 2026 (UTC).");
+});
+it("shows an agency limit with its amount, who set it and the reset", () => {
+  const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ monthlyCapCents: 2500, setBy: { kind: "agency", agencyName: "North Studio" }, changedAt: "2026-10-12T15:00:00Z" })} />);
+  expect(html).toContain("Usage limit $25.00 set by North Studio. Resets November 1, 2026 (UTC).");
+});
+it("names a Strelva operator without inventing an agency, and never says AI in the new lines", () => {
+  const html = renderToStaticMarkup(<BusinessAiBudgetSummary budget={budget} capUsd={10} enforced controls={controls({ paused: true, monthlyCapCents: 500, setBy: { kind: "operator", agencyName: null } })} />);
+  expect(html).toContain("A Strelva operator paused Strelva work for this business.");
+  expect(html).toContain("Usage limit $5.00 set by Strelva.");
+});

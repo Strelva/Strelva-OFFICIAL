@@ -1,4 +1,6 @@
-import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
+import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
+import { consumeAssistantParts } from "@/platform/assistant/core";
+import { ModelAgencyCapReachedError, ModelAiPausedError, ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
 import { selfServeBillingConfig } from "@/platform/business-billing/workspace-checkout";
 import type { AskWorkspaceDraftPort } from "./workspace-drafts";
 import type { AskNativeSystemPort } from "./native-systems";
@@ -95,7 +97,7 @@ export type AskTurnStart =
   | { kind: "refused"; status: number; error: string }
   | { kind: "stream"; run(emit: (chunk: string) => void): Promise<void> };
 
-const NO_ANSWER = "Strelva can't answer right now. Nothing was changed.";
+const NO_ANSWER = ASSISTANT_POLICIES.workspace_ask.noAnswer;
 
 function siteNames(sites: ResolvedSite[]): string {
   return sites.map((site) => site.name).join(" or ");
@@ -203,11 +205,11 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         if (item.kind !== "refusal") resultKind = item.kind;
         else if (resultKind === "answer") resultKind = "refusal";
       };
-      let emitted = false;
+      const state = { emitted: false };
       let replyText = "";
       // Control lines (`__TOOL__`, `__CARD__`) only count at a line start, so one never lands mid-sentence.
       let atLineStart = true;
-      const say = (text: string) => { emitted = true; replyText += text; atLineStart = text.endsWith("\n"); emit(text); };
+      const say = (text: string) => { state.emitted = true; replyText += text; atLineStart = text.endsWith("\n"); emit(text); };
       const marker = (line: string) => { emit(`${atLineStart ? "" : "\n"}${line}`); atLineStart = true; };
 
       // The authority snapshot, re-read before every tool call.
@@ -320,31 +322,26 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         });
         await deps.stream(
           { system, messages: modelMessages, tools, context: { workspaceId: request.workspaceId, systemId, tenantId: site?.tenantId ?? null, actorKind } },
-          async (parts) => {
-            for await (const part of parts) {
-              if (part.type === "error") throw part.error;
-              if (part.type === "tool-call") {
-                emitted = true;
-                marker(`__TOOL__${askToolLabel(String(part.toolName))}\n`);
-              } else if (part.type === "tool-result") {
-                const output = ("output" in part ? part.output : undefined) as unknown;
-                if (output && typeof output === "object" && "__inlineTool" in output) marker(`__CARD__${JSON.stringify(output)}\n`);
-                const action = agentResultFromToolOutput(output);
-                if (action) record(action);
-              } else if (part.type === "text-delta") {
-                const text = typeof part.text === "string" ? part.text : "";
-                if (text) say(text);
-              }
-            }
-          },
-          () => emitted,
+          (parts) => consumeAssistantParts(parts, ASSISTANT_POLICIES.workspace_ask, {
+            toolCall: (part) => askToolLabel(part.toolName),
+            toolResult: (part) => {
+              const action = agentResultFromToolOutput(part.output);
+              if (action) record(action);
+              return part.output && typeof part.output === "object" && "__inlineTool" in part.output ? part.output : null;
+            },
+            text: say,
+            line: marker,
+          }, state),
+          () => state.emitted,
         );
       } catch (error) {
         if (error instanceof ModelBudgetPausedError || error instanceof ModelBudgetUnavailableError) {
           onReceipt({ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: error instanceof ModelBudgetPausedError ? "budget_paused" : "budget_unavailable" });
-          if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
+          // An agency or operator pause or limit is lifted by the agency, never by buying a plan.
+          if (error instanceof ModelAiPausedError || error instanceof ModelAgencyCapReachedError) budgetRecovery = (error instanceof ModelAiPausedError ? error.pausedBy : error.setBy)?.kind === "agency" ? "agency" : null;
+          else if (error instanceof ModelBudgetPausedError) budgetRecovery = process.env.STRELVA_BUSINESS_BILLING === "1" && role === "owner" && selfServeBillingConfig().enabled ? "plan" : "agency";
           try { say(`${replyText ? "\n\n" : ""}${error.message}`); } catch { /* client gone */ }
-        } else if (!emitted) {
+        } else if (!state.emitted) {
           replyText = NO_ANSWER;
           try { emit(replyText); } catch { /* client gone */ }
         }

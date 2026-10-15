@@ -1,4 +1,5 @@
-import { tool, stepCountIs } from "ai";
+import { tool } from "ai";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
 import { getRedis } from "@/platform/infra/redis";
@@ -395,13 +396,12 @@ export async function executeAgentPromptDetailed(
   // Primary then fallback (transient failures only) through the one
   // model-call helper, which writes one cost row per provider step.
   const { result, modelLabel: modelUsed } = await generateModelText(
-    { purpose: "ask.background", tenantId, actorKind: "strelva" },
-    {
+    { purpose: ASSISTANT_POLICIES.background.purpose, tenantId, actorKind: "strelva" },
+    assistantCallOptions(ASSISTANT_POLICIES.background, {
       system: systemPrompt,
       messages: [{ role: "user" as const, content: userMessage }],
       tools,
-      stopWhen: stepCountIs(8),
-    },
+    }),
   );
 
   const toolCalls: AgentExecutionToolTrace[] = result.steps.flatMap((step) => {

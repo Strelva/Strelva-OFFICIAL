@@ -86,3 +86,14 @@ describe("model call sites", () => {
     expect(sdk.rpc).toHaveBeenCalledExactlyOnceWith("resolve_billing_workspace", { p_workspace_id: null, p_tenant_id: "gldf" });
   });
 });
+
+describe("single-shot text purposes", () => {
+  it.each([
+    ["weekly_brief", "src/lib/weekly-brief.ts"],
+    ["suggestion", "src/lib/suggestions.ts"],
+    ["report", "src/lib/reports.ts"],
+  ])("%s carries an output token limit", (purpose, file) => {
+    const source = readFileSync(path.resolve(__dirname, "../..", file), "utf8");
+    expect(source).toContain(`maxOutputTokens: TEXT_PURPOSE_MAX_OUTPUT_TOKENS.${purpose}`);
+  });
+});

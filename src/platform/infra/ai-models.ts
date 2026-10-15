@@ -12,6 +12,8 @@
 import { google } from "@ai-sdk/google";
 import type { LanguageModel } from "ai";
 import { logger } from "@/platform/infra/logger";
+import { listPriceCeilingEnabled } from "./ai-controls-release";
+import { LIST_PRICE_CEILING_QUALIFICATION, listPriceCeiling } from "./model-price-ceiling";
 
 const PRIMARY_MODEL_ID = "gemini-2.5-flash";
 
@@ -19,22 +21,38 @@ export interface ModelConfig {
   model: LanguageModel;
   label: string;
   /**
-   * Only a qualified adapter with an enforced billing ceiling may supply this.
-   * It must reject unsupported modalities/options and bound every billable input,
-   * output (including reasoning), tool and provider-internal request. This is
-   * never derived from our list-price estimate. No production adapter is qualified.
+   * Only an adapter with an enforced billing ceiling may supply this. It must
+   * reject unsupported modalities/options and bound every billable input,
+   * output (including reasoning), tool and provider-internal request. A
+   * "qualified" ceiling comes from a provider-enforced bound. Only a
+   * "list_price" ceiling derives from our own list-price table; it exists only
+   * with STRELVA_AI_LIST_PRICE_CEILING=1, and its hold releases once the call's
+   * estimated cost is logged. No production adapter is "qualified".
    */
   billingCeiling?: {
     qualification: string;
+    /** Default "qualified". */
+    source?: "qualified" | "list_price";
+    /** Whether a request carrying function tools can be bounded. Default false. */
+    acceptsTools?: boolean;
     maximumCostUsd: (request: unknown, operation: "generate" | "stream") => string | null;
   };
 }
 
-export function getPrimaryModel(): ModelConfig {
+/** Attach the list-price ceiling when its flag is on. Priced labels only; an unpriced label yields no ceiling. */
+export function withListPriceCeiling(config: ModelConfig): ModelConfig {
+  if (!listPriceCeilingEnabled()) return config;
   return {
+    ...config,
+    billingCeiling: { qualification: LIST_PRICE_CEILING_QUALIFICATION, source: "list_price", acceptsTools: true, maximumCostUsd: listPriceCeiling(config.label) },
+  };
+}
+
+export function getPrimaryModel(): ModelConfig {
+  return withListPriceCeiling({
     model: google(PRIMARY_MODEL_ID),
     label: `google/${PRIMARY_MODEL_ID}`,
-  };
+  });
 }
 
 export function getFallbackModel(): ModelConfig | null {
@@ -48,12 +66,12 @@ export function getFallbackModel(): ModelConfig | null {
       case "anthropic": {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { anthropic } = require("@ai-sdk/anthropic");
-        return { model: anthropic(modelId), label: `anthropic/${modelId}` };
+        return withListPriceCeiling({ model: anthropic(modelId), label: `anthropic/${modelId}` });
       }
       case "openai": {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { openai } = require("@ai-sdk/openai");
-        return { model: openai(modelId), label: `openai/${modelId}` };
+        return withListPriceCeiling({ model: openai(modelId), label: `openai/${modelId}` });
       }
       default:
         logger.warn("[ai-models] Unknown fallback provider", { provider });

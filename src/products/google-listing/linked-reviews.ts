@@ -36,6 +36,8 @@ export interface SiteReviews {
   googleConnected: boolean;
   googlePlaceId: string | null;
   replyMode: ReplyMode;
+  /** An agency or Strelva operator holds automatic replies: every reply waits for the owner. */
+  autoPostHeld: { by: "agency" | "operator"; name: string | null } | null;
   unavailable: boolean;
 }
 
@@ -50,6 +52,8 @@ export interface ReviewDependencies {
   googleConnected: (tenantId: string) => Promise<boolean>;
   placeId: (tenantId: string) => Promise<string | null>;
   replyMode: (tenantId: string) => Promise<ReplyMode>;
+  /** Who holds automatic replies for this site, if anyone. Absent means no hold. */
+  replyHold?: (tenantId: string) => Promise<{ by: "agency" | "operator"; name: string | null } | null>;
   pendingDrafts: (tenantId: string) => Promise<Array<{ metadata?: Record<string, unknown> }>>;
 }
 
@@ -59,6 +63,10 @@ const defaults: ReviewDependencies = {
   googleConnected: async (tenantId) => (await getConnection(tenantId, "google"))?.status === "connected",
   placeId: async (tenantId) => (await getTenantConfig(tenantId))?.reviewsConfig?.googlePlaceId ?? null,
   replyMode: async (tenantId) => (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode,
+  replyHold: async (tenantId) => {
+    const voice = await getReplyVoice(tenantId).catch(() => defaultReplyVoice());
+    return voice.heldBy ? { by: voice.heldBy, name: voice.heldByName ?? null } : null;
+  },
   // Same bounded scan as /dashboard/reviews.
   pendingDrafts: (tenantId) => getEvents(tenantId, { status: "pending", limit: 1000 }),
 };
@@ -91,13 +99,14 @@ export async function readWorkspaceReviews(actor: WorkspaceActor, workspaceId: s
   return {
     denied,
     sites: await Promise.all(sites.map(async (site): Promise<SiteReviews> => {
-      const [connected, placeId, mode, pending] = await Promise.all([
+      const [connected, placeId, mode, hold, pending] = await Promise.all([
         dependencies.googleConnected(site.tenantId).catch(() => false),
         dependencies.placeId(site.tenantId).catch(() => null),
         dependencies.replyMode(site.tenantId).catch(() => "approve" as const),
+        (dependencies.replyHold?.(site.tenantId) ?? Promise.resolve(null)).catch(() => null),
         dependencies.pendingDrafts(site.tenantId).catch(() => []),
       ]);
-      const base = { tenantId: site.tenantId, siteName: site.siteName, googleConnected: connected, googlePlaceId: placeId, replyMode: mode };
+      const base = { tenantId: site.tenantId, siteName: site.siteName, googleConnected: connected, googlePlaceId: placeId, replyMode: mode, autoPostHeld: hold };
       try {
         const drafts = draftsByReview(pending);
         const reviews = (await dependencies.reviews(site.tenantId)).map((review) => reviewView(review, drafts)).sort((a, b) => b.date.localeCompare(a.date));

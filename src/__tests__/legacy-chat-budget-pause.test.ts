@@ -27,6 +27,7 @@ it.each([new ModelBudgetPausedError(0, 0, {}), new ModelBudgetUnavailableError()
   expect(text).toContain(error.message);
   expect(text).not.toContain("try again in a moment");
   expect(mocks.stream).toHaveBeenCalledOnce();
+  expect(mocks.stream.mock.calls[0]![1]).toMatchObject({ maxOutputTokens: 4096 });
   expect(mocks.track).not.toHaveBeenCalled();
   expect(mocks.error).not.toHaveBeenCalled();
 });

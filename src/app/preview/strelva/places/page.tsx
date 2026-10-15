@@ -58,7 +58,7 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
   const { place, state, result } = params;
 
   if (place === "reviews") {
-    const site = { tenantId: "juniper", siteName: "Juniper Bakery", googleConnected: true, googlePlaceId: "ChIJ-fictional-juniper", replyMode: "auto" as const, unavailable: false, reviews: [
+    const site = { tenantId: "juniper", siteName: "Juniper Bakery", googleConnected: true, googlePlaceId: "ChIJ-fictional-juniper", replyMode: "auto" as const, autoPostHeld: null, unavailable: false, reviews: [
       { id: "r3", source: "google" as const, author: "Dana K.", rating: 5, text: "The cardamom buns are the best in Buffalo. Friendly staff too.", date: "2026-10-04", reply: null, repliedAt: null, draft: { reply: "Thank you, Dana! We'll save you a cardamom bun next Saturday.", autoPostAt: "2026-10-05T21:00:00Z" } },
       { id: "r2", source: "google" as const, author: "Sam P.", rating: 2, text: "Waited 20 minutes for a cake order I had paid for.", date: "2026-10-01", reply: null, repliedAt: null, draft: null },
       { id: "r1", source: "yelp" as const, author: "Lee", rating: 4, text: "Great bread.", date: "2026-09-20", reply: "Thanks, Lee!", repliedAt: "2026-09-21", draft: null },

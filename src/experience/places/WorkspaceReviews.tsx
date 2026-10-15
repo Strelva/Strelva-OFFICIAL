@@ -25,7 +25,8 @@ export function ReviewRows({ workspaceId, site, publishing = false, readOnly = f
   if (site.unavailable) return <StNotice tone="critical">Reviews for {site.siteName} couldn&apos;t be read right now. Nothing changed on your listing.</StNotice>;
   if (!site.reviews.length) return <StEmpty>No reviews yet. {site.googleConnected ? "New Google reviews appear here after Strelva reads them." : "Once your Google listing is connected, reviews show up here with a drafted reply. The business owner connects it on the Google page."}</StEmpty>;
   const firstPending = site.reviews.find(review => !review.reply)?.id;
-  return <StRows label={`Reviews for ${site.siteName}`}>{site.reviews.map(review => <StRow key={review.id} align="start" title={<span className={styles.reviewHead}><span>{review.author}</span><span aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span><StMono as="time" dateTime={review.date}>{whenLabel(review.date)}</StMono></span>}>
+  const holder = site.autoPostHeld ? site.autoPostHeld.name ?? (site.autoPostHeld.by === "operator" ? "A Strelva operator" : "Strelva") : null;
+  return <>{holder ? <StNotice>{holder} holds automatic replies for this business. Every reply waits for your okay.</StNotice> : null}<StRows label={`Reviews for ${site.siteName}`}>{site.reviews.map(review => <StRow key={review.id} align="start" title={<span className={styles.reviewHead}><span>{review.author}</span><span aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span><StMono as="time" dateTime={review.date}>{whenLabel(review.date)}</StMono></span>}>
     <article aria-label={`${SOURCE[review.source]} review by ${review.author}`} className={styles.stack}>
       <p className={styles.copy}>{review.text || "A rating with no written review."}</p>
       {review.reply ? <div className={styles.draft}><StLabel>Your reply{review.repliedAt ? ` · ${whenLabel(review.repliedAt)}` : ""}</StLabel><p className={styles.copy}>{review.reply}</p>{publishing && review.source === "google" && review.externalId ? <StTextButton href={`/workspace/google?${new URLSearchParams({ workspaceId, reviewId: review.externalId, replyText: review.reply })}`}>Edit or withdraw on Google</StTextButton> : null}</div> : <>
@@ -33,7 +34,7 @@ export function ReviewRows({ workspaceId, site, publishing = false, readOnly = f
         <ReviewReplyForm workspaceId={workspaceId} tenantId={site.tenantId} reviewId={review.id} author={review.author} initial={review.draft?.reply ?? ""} postsToGoogle={review.source === "google" && site.googleConnected} readOnly={readOnly} primary={review.id === firstPending} request={request} />
       </>}
     </article>
-  </StRow>)}</StRows>;
+  </StRow>)}</StRows></>;
 }
 
 export function WorkspaceReviewsView({ workspaceId, state, publishing = false }: { workspaceId: string; state: PublishingState<WorkspaceReviews>; publishing?: boolean }) {
