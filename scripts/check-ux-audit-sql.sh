@@ -27,7 +27,8 @@ while IFS= read -r migration; do
   # Keep the original twelve contracts at their historical boundary. Pass 2
   # changes admission and captures these bodies, so install it after the
   # original retained inverse/refusal proofs instead of applying it early.
-  if [[ "$migration_name" == 20261026* ]]; then continue; fi
+  # Everything after October 25 waits for the Connections contracts below.
+  if [[ "$migration_name" > 20261026 ]]; then continue; fi
   if [[ "$migration_name" == 2026102413* || "$migration_name" == 20261025110000_done_trust_legacy_ai.sql || "$migration_name" == 20261025133000_done_agency_website_decisions.sql || "$migration_name" == 20261025170000_done_integrate_readonly_authorization.sql ]]; then continue; fi
   if [[ "$migration_name" == 2026102412* || "$migration_name" == 20261025120000_done_owner_signup_releases.sql ]]; then
     fingerprint before
@@ -123,4 +124,14 @@ done
 # inverse boundaries above. Both workspace SQL entry points call this runner.
 source "$repo_root/scripts/sql/connections-contracts.sh"
 check_connections_contracts
+# Then every later forward Connections does not own, in the same sorted order
+# as a fresh database (App events triggers need connection_holders).
+while IFS= read -r migration; do
+  migration_name="$(basename "$migration")"
+  [[ "$migration_name" > 20261026 ]] || continue
+  case "$migration_name" in
+    20261026100000_conn_core_holders.sql|20261026110000_conn_google_agency_oauth.sql|20261026120100_conn_tools_installer.sql|20261026130000_conn_apps_declarations.sql) continue ;;
+  esac
+  apply "$migration"
+done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 printf 'UX audit SQL passed: eighteen ordered forwards, exact empty inverses/reapply, every new native fixture, signup enrollment/populated refusal, snapshot refusal and lane race/authority proofs. Local only.\n'
