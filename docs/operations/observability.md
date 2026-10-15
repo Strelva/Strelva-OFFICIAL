@@ -35,3 +35,22 @@ separate database and Redis probe.
 Set `NEXT_PUBLIC_SENTRY_DSN` before a production build and its ingest host is
 added to the CSP `connect-src` automatically. Unset, browser reporting is off and
 the CSP is unchanged.
+
+## CSP
+
+The enforced policy still allows `script-src 'unsafe-inline'`. Next 16 stamps a
+nonce on its own scripts when the request carries a CSP header, and the JSON-LD
+blocks are data that CSP does not execute-block, so enforcing nonces is possible.
+Two things stop it today: every pass-through in the proxy must forward the nonce,
+and any prerendered page has no per-request nonce and would break. `style-src
+'unsafe-inline'` has to stay, because React style attributes and inline styles
+cannot carry a nonce.
+
+So enforcement is not on. `STRELVA_CSP_NONCE_REPORT_ONLY=1` adds a
+`Content-Security-Policy-Report-Only` nonce policy (reports go to Sentry when
+`NEXT_PUBLIC_SENTRY_DSN` is set) and forwards the nonce to Next. Unset, which is
+the default, responses and forwarded requests are identical to before.
+
+To gather evidence, set it in Preview first. Enforcement needs about a week of
+Sentry CSP reports with zero `script-src` violations on app routes, and it is a
+separate release decision.

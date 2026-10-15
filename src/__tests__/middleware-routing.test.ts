@@ -353,3 +353,31 @@ describe("proxy frame policy", () => {
     expect(csp).toContain("connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com ws://localhost:* http://localhost:* http://127.0.0.1:*");
   });
 });
+
+describe("report-only nonce policy", () => {
+  async function publicResponse() {
+    const { NextRequest } = await import("next/server");
+    const proxy = (await import("../proxy")).default;
+    return proxy(new NextRequest("https://strelva.com/no-access", { headers: { host: "strelva.com" } }));
+  }
+
+  it("adds nothing when the flag is unset", async () => {
+    const res = await publicResponse();
+    expect(res.headers.get("Content-Security-Policy-Report-Only")).toBeNull();
+    expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBeNull();
+    expect(res.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline'");
+  });
+
+  it("reports and forwards the same nonce policy when the flag is 1", async () => {
+    vi.stubEnv("STRELVA_CSP_NONCE_REPORT_ONLY", "1");
+    try {
+      const res = await publicResponse();
+      const reported = res.headers.get("Content-Security-Policy-Report-Only");
+      expect(reported).toContain("'nonce-");
+      expect(res.headers.get("x-middleware-request-content-security-policy-report-only")).toBe(reported);
+      expect(res.headers.get("Content-Security-Policy")).toContain("script-src 'self' 'unsafe-inline'");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
