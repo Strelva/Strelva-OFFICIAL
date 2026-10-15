@@ -82,7 +82,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
     },
     canDeliver: publishingDecisionDeliveryAllowed,
     recipientIsStaff: async (workspaceId, email) => {
-      const client = getSupabase();
+      const client = getSupabase() as unknown as { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> } | null;
       if (!client) throw new Error("storage not configured");
       const { data, error } = await client.rpc("owner_contact_staff_reason", { p_customer_workspace_id: workspaceId, p_email: email });
       if (error) throw error;

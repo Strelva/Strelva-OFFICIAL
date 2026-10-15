@@ -30,7 +30,7 @@ describe("public mail domains", () => {
     const sql = readFileSync("supabase/migrations/20261027100000_owner_reach.sql", "utf8");
     const body = sql.match(/owner_reach_public_mail_domains\(\) returns text\[\][\s\S]*?array\[([^\]]+)\]/);
     expect(body).not.toBeNull();
-    const fromSql = [...body![1].matchAll(/'([^']+)'/g)].map(match => match[1]);
+    const fromSql = [...(body?.[1] ?? "").matchAll(/'([^']+)'/g)].map(match => match[1]);
     expect(fromSql).toEqual([...PUBLIC_MAIL_DOMAINS]);
   });
 });
