@@ -13,6 +13,13 @@ import { buildSiteCapabilityManifest } from "./scaffold-client";
  * whatever this repo ships. Commerce (cart/checkout) and rewards are declared as
  * `customOnlyFeatures` — the AI requests those changes rather than editing them
  * directly. Adjust both for what your repo really mounts.
+ *
+ * It also declares where the site's content lives (`contentSource`) and the
+ * commit it was built from (`release.commitSha`). `force-static` means both are
+ * fixed per deploy, which is exactly the deployed commit. Strelva reads them to
+ * decide whether content edits happen in Strelva or as code changes, and to
+ * confirm a deploy a coding agent reports. Set `REB_CONTENT_SOURCE=strelva` only
+ * if the site reads Strelva's v1 content API; otherwise leave it unset.
  */
 
 // Commerce flow + rewards are managed by the repo, not AI-editable content.
@@ -23,6 +30,8 @@ export const dynamic = "force-static";
 export function GET() {
   const manifest = buildSiteCapabilityManifest(Object.keys(defaults), {
     customOnlyFeatures: CUSTOM_ONLY_FEATURES,
+    contentSource: process.env.REB_CONTENT_SOURCE === "strelva" ? "strelva" : "repo",
+    release: { commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null, builtAt: new Date().toISOString() },
   });
   return NextResponse.json(manifest);
 }

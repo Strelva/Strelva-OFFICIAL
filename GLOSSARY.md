@@ -91,6 +91,12 @@ Releases may label the collection. Internal revision IDs and contracts stay as
 they are; a Release is not a Version adapted to another business or context.
 _Avoid_: r12, r12+1, Package r13, Source revisions (on screen)
 
+**Coding agent**:
+Someone's own Claude Code, Codex or similar, working in a website's code repo.
+It picks up a Request, records a preview and records the deploy. It never
+approves; the owner makes it live.
+_Avoid_: bot, AI developer, Strelva AI (for this)
+
 **Time this month**:
 The agency's usage column for the current month's recorded time.
 _Avoid_: Minutes · Oct (as the column label)

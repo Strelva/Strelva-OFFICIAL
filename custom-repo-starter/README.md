@@ -34,7 +34,18 @@ Strelva remains the control plane; the custom repo is the public website runtime
 | `PageRenderer.tsx` | Config-driven section renderer — turns a page's `PageSectionConfig[]` into rendered sections so page layout is DATA, not code |
 | `dynamic-page-route.template.tsx` | Template for `app/[...slug]/page.tsx` — renders ANY page from the platform's page config (new pages become a data op, no per-page code) |
 | `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
+| `CLAUDE.strelva.md` | The block a client repo pastes into its `CLAUDE.md` or `AGENTS.md`: how its coding agent picks up, reports and waits on Strelva Requests |
 | `README.md` | This file |
+
+## Changes through your coding agent
+
+After launch, changes to a custom site arrive as Strelva Requests. Paste
+[`CLAUDE.strelva.md`](./CLAUDE.strelva.md) into the repo's `CLAUDE.md` so its coding
+agent knows how to pick one up, build it on a branch, report a preview and report
+the deploy. The owner decides in Strelva (Needs you); the agent cannot approve.
+Strelva records each deploy as a Release after checking the commit the live site
+declares in its capabilities manifest (`release.commitSha`, `contentSource`), so
+keep the starter's capabilities route in place.
 
 ## Versioned inquiry capability
 
