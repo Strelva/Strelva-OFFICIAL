@@ -251,3 +251,27 @@ export async function claimPendingBusinessOwner(actor: WorkspaceActor, tenantId:
     p_tenant_id: z.string().regex(/^[a-z0-9-]+$/).parse(tenantId),
   }, uuid.nullable(), "The pending owner invitation could not be claimed.");
 }
+
+/**
+ * Tenants whose converted business holds a still-pending operator-issued owner
+ * invitation for this exact address. Read-only; each claim still goes through
+ * claim_pending_business_owner, which rechecks identity, sponsor and expiry.
+ */
+export async function pendingOwnerInvitationTenants(verifiedEmail: string): Promise<string[]> {
+  const client = getSupabase();
+  if (!client) return [];
+  const recipient = email.parse(verifiedEmail).trim().toLowerCase();
+  const { data: invitations, error } = await client.from("workspace_invitations").select("workspace_id")
+    .eq("recipient_email", recipient).eq("role", "owner").eq("issued_by_kind", "operator").eq("status", "pending")
+    .gt("expires_at", new Date().toISOString());
+  if (error) throw new WorkspaceStoreError("Pending owner invitations could not be read.");
+  const workspaceIds = [...new Set((invitations ?? []).map((row: { workspace_id: string }) => row.workspace_id))];
+  if (!workspaceIds.length) return [];
+  const { data: links, error: linkError } = await client.from("tenant_workspace_links").select("tenant_stable_id").in("workspace_id", workspaceIds);
+  if (linkError) throw new WorkspaceStoreError("Pending owner invitations could not be read.");
+  const stableIds = [...new Set((links ?? []).map(row => row.tenant_stable_id).filter((id): id is string => Boolean(id)))];
+  if (!stableIds.length) return [];
+  const { data: tenants, error: tenantError } = await client.from("tenants").select("id").in("stable_id", stableIds);
+  if (tenantError) throw new WorkspaceStoreError("Pending owner invitations could not be read.");
+  return (tenants ?? []).map((row: { id: string }) => row.id).filter(id => /^[a-z0-9-]+$/.test(id) && id !== "demo").sort();
+}

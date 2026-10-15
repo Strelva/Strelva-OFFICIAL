@@ -7,7 +7,7 @@ import { resolveTenantOwnerEntry, workspaceReleaseFlagEnabled } from "@/platform
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { decideOwnerEntry, entryDestination, routeDashboardRequest, type DashboardRouting, type OwnerEntryDecision } from "./decision";
-import { claimPendingBusinessOwner } from "@/platform/workspaces/business-ownership";
+import { claimPendingBusinessOwner, pendingOwnerInvitationTenants } from "@/platform/workspaces/business-ownership";
 import { ownerEntryPossible } from "./env";
 import { effectiveDisposition, routeForDashboardPath, type DispositionGate } from "./dispositions";
 
@@ -73,4 +73,28 @@ export async function redirectIfDashboardPageMoved(tenant: string, route: string
 /** Where a signed-in person lands after sign-in on this tenant's admin host. */
 export async function ownerEntryLanding(tenant: string, clientFallbackRoot: string): Promise<string> {
   return entryDestination(await ownerEntryForTenant(tenant), withClientFallbackRoot(clientFallbackRoot, "/dashboard"));
+}
+
+/**
+ * App-host sign-in: accept every still-pending operator-issued owner invitation
+ * for the signed-in person's verified address, so an owner who simply signs in
+ * lands in their business. Nothing is sent; the same claim transaction as tenant
+ * entry rechecks identity, sponsor and expiry. Failure keeps the old landing.
+ */
+export async function claimOwnerInvitationsOnSignIn(): Promise<string[]> {
+  if (!ownerEntryPossible() || process.env.STRELVA_OWNER_INVITATION_CLAIM !== "1") return [];
+  try {
+    const user = await getSessionUser();
+    if (!user?.id || !user.email || !user.email_confirmed_at) return [];
+    const actor = { userId: user.id, verifiedEmail: user.email };
+    const claimed: string[] = [];
+    for (const tenant of await pendingOwnerInvitationTenants(user.email)) {
+      const workspaceId = await claimPendingBusinessOwner(actor, tenant);
+      if (workspaceId) claimed.push(workspaceId);
+    }
+    return claimed;
+  } catch (error) {
+    console.error("[owner-entry] sign-in owner claim failed; keeping the ordinary landing", { error: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
 }
