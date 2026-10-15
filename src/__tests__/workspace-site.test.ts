@@ -156,10 +156,12 @@ describe("website change Requests", () => {
     });
   });
 
-  it("only accepts https previews and complete deploy receipts", () => {
+  it("only accepts https previews and complete deploy receipts (the route supplies a missing read-back)", () => {
     expect(recordSiteChangeSchema.safeParse({ kind: "preview", previewUrl: "http://x.test" }).success).toBe(false);
     expect(recordSiteChangeSchema.safeParse({ kind: "preview", previewUrl: "https://x.vercel.app" }).success).toBe(true);
-    expect(recordSiteChangeSchema.safeParse({ kind: "deployed", commitSha: "abc1234", deploymentUrl: "https://x.vercel.app" }).success).toBe(false);
+    expect(recordSiteChangeSchema.safeParse({ kind: "deployed", commitSha: "abc1234", deploymentUrl: "https://x.vercel.app" }).success).toBe(true);
+    expect(recordSiteChangeSchema.safeParse({ kind: "deployed", commitSha: "abc1234", deploymentUrl: "http://x.vercel.app" }).success).toBe(false);
+    expect(recordSiteChangeSchema.safeParse({ kind: "deployed", commitSha: "nope", deploymentUrl: "https://x.vercel.app" }).success).toBe(false);
     expect(recordSiteChangeSchema.safeParse({ kind: "deployed", commitSha: "abc1234", deploymentUrl: "https://x.vercel.app", readBack: "confirmed" }).success).toBe(true);
     expect(recordSiteChangeSchema.safeParse({ kind: "approved", approve: true }).success).toBe(false);
   });

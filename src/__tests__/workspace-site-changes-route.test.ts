@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  actor: vi.fn(), rpc: vi.fn(), execute: vi.fn(), snapshot: vi.fn(), released: vi.fn(), workspaceRelease: vi.fn(),
+  actor: vi.fn(), rpc: vi.fn(), execute: vi.fn(), snapshot: vi.fn(), released: vi.fn(), workspaceRelease: vi.fn(), byCode: vi.fn(), verify: vi.fn(),
 }));
 
+vi.mock("@/products/websites/sites-by-code-release", () => ({ sitesByCodeMayBeOn: () => true, sitesByCodeReleased: (...args: unknown[]) => mocks.byCode(...args) }));
+vi.mock("@/products/websites/site-declaration", () => ({ verifySiteRelease: (...args: unknown[]) => mocks.verify(...args), readSiteDeclaration: vi.fn(), refreshSiteDeclaration: vi.fn(), sameCommit: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, deliveryModel: "custom_repo" }) }));
@@ -35,6 +37,7 @@ describe("/api/workspace/site-changes", () => {
   beforeEach(() => {
     for (const mock of Object.values(mocks)) mock.mockReset();
     mocks.workspaceRelease.mockReturnValue(true);
+    mocks.byCode.mockResolvedValue(false);
     mocks.released.mockResolvedValue(true);
     mocks.actor.mockResolvedValue(actor);
     mocks.snapshot.mockResolvedValue({ managedWebsites: [{ link: "tenant_link", tenantStableId: MCLEARS, tenantId: "mclears", siteName: "McClear's", tenantActive: true, linkedAt: "2026-10-01T00:00:00Z" }] });
@@ -115,5 +118,40 @@ describe("/api/workspace/site-changes", () => {
     expect((await GET(new Request(`http://localhost/api/workspace/site-changes?workspaceId=${WS}&systemId=${SYSTEM}`))).status).toBe(403);
     mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "timeout" } });
     expect((await GET(new Request(`http://localhost/api/workspace/site-changes?workspaceId=${WS}&systemId=${SYSTEM}`))).status).toBe(503);
+  });
+
+  describe("deploy read-back", () => {
+    const requestRow = (receipts: unknown[]) => ({ id: REQUEST, request: "Add a page", status: "requested", accepted: "accepted", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z", receipts });
+    const receipt = (kind: string) => ({ id: crypto.randomUUID(), kind, previewUrl: kind === "preview" ? "https://p.example" : null, commitSha: null, deploymentUrl: null, readBack: null, note: null, recordedAt: "2026-10-02T00:00:00Z" });
+    const deployed = (step: Record<string, unknown>, systemId = SYSTEM) => ({ action: "record", workspaceId: WS, requestId: REQUEST, ...(systemId ? { systemId } : {}), step: { kind: "deployed", commitSha: "abc1234", deploymentUrl: "https://x.vercel.app", ...step } });
+    const recordedKinds = () => mocks.rpc.mock.calls.filter(([name]) => name === "record_website_change_receipt");
+
+    it("with sites_by_code off, still needs a read-back and sends the one given", async () => {
+      expect((await post(deployed({}))).status).toBe(400);
+      expect(recordedKinds()).toHaveLength(0);
+      mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "website_change_out_of_order" } });
+      await post(deployed({ readBack: "confirmed" }));
+      expect(recordedKinds()[0]![1]).toMatchObject({ p_details: { readBack: "confirmed" } });
+      expect(mocks.verify).not.toHaveBeenCalled();
+    });
+
+    it("with sites_by_code on, records Strelva's own check even when the client sent another", async () => {
+      mocks.byCode.mockResolvedValue(true);
+      mocks.verify.mockResolvedValue({ readBack: "not_confirmed", revalidated: true, declaration: { reachable: true, contentSource: null, liveCommit: "fffffff" } });
+      mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "list_website_change_requests" ? [requestRow([receipt("preview"), receipt("approved")])] : { id: "d0000000-0000-4000-8000-000000000002", kind: "deployed", previewUrl: null, commitSha: "abc1234", deploymentUrl: "https://x.vercel.app", readBack: "not_confirmed", note: null, recordedAt: "2026-10-06T00:00:00Z", systemId: SYSTEM }, error: null }));
+      const response = await post(deployed({ readBack: "confirmed" }));
+      expect(response.status).toBe(200);
+      expect(mocks.verify).toHaveBeenCalledWith("mclears", "abc1234");
+      expect(recordedKinds()[0]![1]).toMatchObject({ p_details: { readBack: "not_confirmed" } });
+      expect((await post(deployed({}, ""))).status).toBe(400);
+    });
+
+    it("with sites_by_code on, checks nothing for a Request that is not approved", async () => {
+      mocks.byCode.mockResolvedValue(true);
+      mocks.rpc.mockImplementation(async (name: string) => name === "list_website_change_requests"
+        ? { data: [requestRow([receipt("preview")])], error: null } : { data: null, error: { message: "website_change_out_of_order" }, });
+      expect((await post(deployed({}))).status).toBe(409);
+      expect(mocks.verify).not.toHaveBeenCalled();
+    });
   });
 });

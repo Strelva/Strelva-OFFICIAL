@@ -73,7 +73,7 @@ export function websitePreviewIsCurrent(website: import("./contracts").Website):
 export { AGENCY_DOCUMENT_NODE_SECTIONS, AGENCY_DOCUMENT_SECTIONS } from "./agency-document-contracts";
 
 // Repo-change Requests on a managed website: shapes, stages and the filing command (browser-safe).
-export { SITE_CHANGE_SCOPE, SITE_CHANGE_STAGE_LABEL, recordSiteChangeSchema, siteChangeReceiptSchema, siteChangeRequestCommand, siteChangeRequestSchema, siteChangeStage, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest, type SiteChangeStage } from "./site-change-model";
+export { SITE_CHANGE_SCOPE, SITE_CHANGE_STAGE_LABEL, SITE_CHANGE_STAGE_LABEL_BY_CODE, recordSiteChangeSchema, siteChangeReceiptSchema, siteChangeRequestCommand, siteChangeRequestSchema, siteChangeStage, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest, type SiteChangeStage } from "./site-change-model";
 export { siteEditingFor, contentSourceFor, readsStrelvaContent, type SiteEditing, type SiteContentSource } from "./site-editing";
 
 export { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest, type WebsiteCutoverUndoReceipt } from "./recovery-contracts";

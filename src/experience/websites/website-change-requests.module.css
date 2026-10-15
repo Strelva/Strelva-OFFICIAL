@@ -20,3 +20,6 @@
 .operator p { color: var(--st-text-2); font-size: 13px; }
 .operator label { display: grid; gap: 4px; }
 .wrap :is(input, textarea, select):focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.command { display: block; margin-block: 8px; padding: 10px 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; user-select: all; }
+.byHand { margin-top: 12px; font-size: 13px; }
+.byHand summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--st-text-2); }

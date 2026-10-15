@@ -66,7 +66,7 @@ export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light" }:
       {current === "edit" && readOnly ? <p className="p-8 text-sm text-gray-muted">Only an owner or admin can edit this site. The page links to History instead.</p>
         : current === "edit" ? <ContentWorkspace siteName="Great Lakes Dried Fruit" ownerName="Ruth" sectionData={SECTIONS} timestamps={{}}
         assistant={<AskStrelva compact canAskOnBehalf={role === "operator"} request={request} workspaceId={WS} businessName="Great Lakes Dried Fruit" systemId={SYSTEM} systemName={siteLabel} readOnly={readOnly} />} />
-        : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} />
+        : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} codeAgent={null} />
         : <p className="p-8 text-sm text-gray-muted">This tab reuses the dashboard&apos;s own panel against the tenant&apos;s API. The local fixture serves the editor and requests only.</p>}
     </WorkspaceSiteFrame>
   </WorkspaceRequestContext.Provider>;
