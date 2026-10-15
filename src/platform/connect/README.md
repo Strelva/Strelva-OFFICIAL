@@ -37,3 +37,34 @@ pnpm typecheck
 The focused SQL option applies every ordered historical migration before real money authority, replay, loss-before-accrual, fee/currency/source, deposit, export, provider-notice and READ ONLY proofs. The integrator must also run the complete baseline suite against all lanes. Preview `/preview/strelva/payments` uses the existing local `STRELVA_UI_PREVIEW` gate; `state=manager`, `paid`, `expired`, `cancelled` are synthetic visual fixtures, not production proof.
 
 Primary provider evidence: [Accounts v2 configuration](https://docs.stripe.com/connect/accounts-v2/connected-account-configuration), [thin events](https://docs.stripe.com/webhooks/migrate-snapshot-to-thin-events), [separate charges/transfers](https://docs.stripe.com/connect/separate-charges-and-transfers), [private seller custom integration](https://docs.stripe.com/agentic-commerce/sellers/custom).
+
+## Agency payment links
+
+Any agency can create Payment links that charge on its own connected Stripe account, at an amount the agency sets for each link. Strelva sets no price and takes no fee: `application_fee_cents` is pinned to 0 in SQL. Each link gets a numbered, immutable Invoice, and each paid link a numbered Payment receipt. Neither is emailed; both are printable pages.
+
+Flags, all default off:
+
+- `STRELVA_CONNECT` is required by every Connect path.
+- `STRELVA_AGENCY_PAY_LINKS` turns on creation, the Stripe setup panel, the connected `/pay` checkout and the document pages. It also needs `STRIPE_SECRET_KEY` to be an `sk_test_` key.
+- `STRELVA_AGENCY_PAY_LINKS_LIVE` allows an `sk_live_` key. Jacob's decision.
+- `STRELVA_PAY_LINK_STORE=postgres` reads and expires legacy links from `agency_pay_links` once the backfill verifies. Until then Redis stays the store.
+- The liability profile (`STRELVA_CONNECT_PROFILE_VERSION`, `STRELVA_CONNECT_FEES_COLLECTOR`, `STRELVA_CONNECT_LOSSES_COLLECTOR`) and `STRIPE_CONNECT_WEBHOOK_SECRET` stay unset until Jacob approves the profile. The full Dashboard refuses platform-held losses, so the workable profile is Stripe collecting fees and losses.
+
+Design. A link checks out through the existing `checkout` purpose, with `reference_id = agency_pay_link:<id>`. `assert_business_checkout_admission` is md5-pinned by `scripts/sql/checkout-final-admission-contract.sql`, so it is not changed. Instead `startAgencyPayLinkCheckout` runs `assert_agency_pay_link_checkout_open` through `beforeProviderMutation` after the payment is reserved and before Stripe is called. That assertion refuses a revoked, paid, exited or foreign link. A link is "paid" only when the Connect webhook records a `paid` event; the success page never claims it.
+
+The SQL surface (migration `20261026180000_money_agency_pay_links.sql`, inverse refuses when populated): tables `agency_pay_links`, `agency_pay_link_commands`, `money_document_counters`, `money_documents`; RPCs `agency_pay_link_command`, `read_agency_pay_links`, `read_public_agency_pay_link`, `list_agency_pay_links_for_support`, `begin_agency_pay_link_checkout`, `assert_agency_pay_link_checkout_open`, `advance_agency_pay_link_checkout`, `read_agency_pay_link_open_checkouts`, `issue_agency_pay_link_receipt`, `read_money_document`, `backfill_legacy_agency_pay_link`. All are `service_role` only.
+
+Proof commands (local only, no Stripe call):
+
+```
+pnpm check:money-pay-links-sql
+pnpm check:workspace-sql
+pnpm exec vitest run src/__tests__/connect-onboarding-return.test.ts src/__tests__/agency-pay-links-store.test.ts src/__tests__/agency-pay-links-checkout.test.ts src/__tests__/agency-payment-links.test.ts src/__tests__/agency-payment-links-ui.test.tsx src/__tests__/pay-link-connected-route.test.ts src/__tests__/pay-link-connected-page.test.tsx src/__tests__/pay-link-resolver.test.ts src/__tests__/money-documents.test.tsx src/__tests__/pay-links-backfill-plan.test.ts src/__tests__/pay-links-store-switch.test.ts
+pnpm typecheck
+```
+
+The legacy backfill is `npx tsx scripts/pay-links-backfill.ts` (dry run), then `--verify`. It has not been run anywhere. `--apply` against a non-local database needs Jacob's yes, and links with no recorded owner need `--legacy-agency=<agency workspace id>`.
+
+## Rewards storage
+
+Rewards already have a durable Postgres authority: `20261022175000_reward_durable_mutations.sql`, with the `reward_members` and `reward_transactions` stores in `src/platform/client-records/stores.ts`. No new code is needed. The one-time backfill is `npx tsx scripts/client-records-move.ts backfill --store=reward_members,reward_transactions` (a dry run; `--apply` needs Jacob's yes off a local database). Then watch `parity` for 7 days, then add both stores to `STRELVA_CLIENT_RECORDS_READ`. None of this has been run.

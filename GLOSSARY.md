@@ -696,6 +696,21 @@ The durable record that the exact message was sent under the stated approval,
 including who acted.
 _Avoid_: delivery receipt, provider receipt, guaranteed delivery
 
+**Payment link**:
+A web address an agency shares so a client can pay an agreed amount by card. It
+charges on the agency's own Stripe account; Strelva never holds the money.
+_Avoid_: pay link (in UI), checkout link
+
+**Invoice**:
+The numbered document for one Payment link: who charges, who is billed, what for
+and how much. Issued when the link is created and never edited.
+_Avoid_: bill, quote
+
+**Payment receipt**:
+The numbered document showing Stripe reported a payment on a Payment link. Not a
+Receipt, which is evidence of an action.
+_Avoid_: Receipt (alone), confirmation
+
 ## Open naming questions
 
 - **AI Visibility:** whether it is an App whose install gives a business a System,
