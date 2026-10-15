@@ -42,6 +42,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
+import { newsletterNotSentRefusal } from "@/lib/operator-decisions";
 import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
 import { isManagedReviewApproval, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
 
@@ -228,6 +229,11 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
       return noticePage({ status: 403, heading: "This link isn't for this account", body: "Nothing was done.", dashboardUrl: open, buttonLabel: "Open" });
     case "not_found":
       return noticePage({ status: 400, ...INVALID.bad });
+    case "failed": {
+      const notSent = newsletterNotSentRefusal(result.item?.outcomeReason ?? undefined);
+      if (notSent) return noticePage({ status: 200, heading: "Not sent", body: notSent.error, dashboardUrl: openItem, buttonLabel: "Open your workspace" });
+      return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
+    }
     default:
       return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
   }
@@ -368,6 +374,18 @@ async function postPage(request: Request): Promise<NextResponse> {
       status: 403,
       heading: "This link isn't for this account",
       body: "This approval link doesn't match your account. Open your workspace to review it there.",
+      dashboardUrl,
+      buttonLabel: "Open your workspace",
+    });
+  }
+
+  // A newsletter that was approved but not sent stays pending: say so plainly.
+  const notSent = newsletterNotSentRefusal(result.reason);
+  if (notSent) {
+    return noticePage({
+      status: 200,
+      heading: "Not sent",
+      body: `${notSent.error} (${businessName})`,
       dashboardUrl,
       buttonLabel: "Open your workspace",
     });

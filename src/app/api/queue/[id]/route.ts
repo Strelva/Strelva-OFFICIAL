@@ -4,7 +4,7 @@ import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import type { EventWorkflowAction } from "@/lib/event-actions";
-import { decideTenantEvent, decideTenantEventAsOperator, operatorRefusal, sessionTenantDecider, verifiedOperator } from "@/lib/operator-decisions";
+import { decideTenantEvent, decideTenantEventAsOperator, newsletterNotSentRefusal, operatorRefusal, sessionTenantDecider, verifiedOperator } from "@/lib/operator-decisions";
 import { readJsonObject } from "@/lib/request-body";
 
 const ALLOWED_ACTIONS = new Set<EventWorkflowAction>([
@@ -83,6 +83,8 @@ export async function PATCH(
   }
   const refused = operatorRefusal(result.reason);
   if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+  const notSent = newsletterNotSentRefusal(result.reason);
+  if (notSent) return NextResponse.json({ error: notSent.error, notSent: true }, { status: notSent.status });
   if (result.reason === "permission_denied") return NextResponse.json({ error: "Only the current business owner can decide on this change. Nothing changed." }, { status: 403 });
   if (result.reason === "not_found") {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });

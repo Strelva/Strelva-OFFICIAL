@@ -146,6 +146,20 @@ export async function decideTenantEvent(
   return resolveEventAction(input.tenantId, input.eventId, input.action, decider.actorId);
 }
 
+/**
+ * HTTP status and message when approving a newsletter did not send it, or null.
+ * The event stays pending, so no surface may show it as handled.
+ */
+export function newsletterNotSentRefusal(reason: string | undefined): { status: number; error: string } | null {
+  if (reason === "paused") return { status: 409, error: "Sending is paused. The newsletter was not sent and stays in Needs you." };
+  if (reason === "not_configured") return { status: 409, error: "Email sending isn't set up. The newsletter was not sent and stays in Needs you." };
+  if (reason === "business_identity_unavailable") return { status: 409, error: "The business name or reply-to email is missing. The newsletter was not sent and stays in Needs you." };
+  if (reason === "no_subscribers") return { status: 409, error: "There are no active subscribers. Nothing was sent." };
+  if (reason === "send_failed") return { status: 502, error: "Some emails were not accepted. The newsletter stays in Needs you so it can be retried." };
+  if (reason === "newsletter_invalid") return { status: 422, error: "This newsletter draft is missing its subject or body. Nothing was sent." };
+  return null;
+}
+
 /** HTTP status and message for a refused delegate decision, or null. */
 export function operatorRefusal(reason: string | undefined): { status: number; error: string } | null {
   if (reason === "platform_content_authority_retired") return { status: 403, error: "Platform support cannot decide client content or accept client work. Open the business workspace with ordinary agency or owner access." };

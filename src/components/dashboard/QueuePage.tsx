@@ -41,6 +41,7 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
   const [resolved, setResolved] = useState(initialResolved);
   const [pendingCount, setPendingCount] = useState(initialCount);
   const [, startTransition] = useTransition();
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
 
   const handleResolve = useCallback(async (id: string, action: QueueAction) => {
@@ -83,13 +84,18 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
           body: JSON.stringify({ action }),
         });
         if (!res.ok) {
+          const error = ((await res.json().catch(() => null)) as { error?: string } | null)?.error;
+          setDecisionError(error || "That didn't go through. Nothing changed.");
           setPending((prev) => terminal ? [event, ...prev] : prev.map((e) => e.id === id ? event : e));
           if (terminal) {
             setResolved((prev) => prev.filter((e) => e.id !== id));
             setPendingCount((prev) => prev + 1);
           }
+        } else {
+          setDecisionError(null);
         }
       } catch {
+        setDecisionError("That didn't go through. Nothing changed.");
         setPending((prev) => terminal ? [event, ...prev] : prev.map((e) => e.id === id ? event : e));
         if (terminal) {
           setResolved((prev) => prev.filter((e) => e.id !== id));
@@ -168,6 +174,9 @@ export function QueuePage({ initialPending, initialResolved, pendingCount: initi
       {/* Content with crossfade */}
       <div className={`flex-1 overflow-y-auto py-5 ${compact ? "px-4" : "px-4 sm:px-8"}`}>
         <div className={`queue-tab-content ${compact ? "max-w-none" : "max-w-3xl"}`}>
+          {decisionError && (
+            <p role="alert" className="mb-3 text-[13px] text-critical">{decisionError}</p>
+          )}
           {tab === "resolved" && aiHandledThisMonth > 0 && (
             <p className="text-[13px] text-gray-muted mb-3">
               Completed {aiHandledThisMonth} update{aiHandledThisMonth === 1 ? "" : "s"} this month.
