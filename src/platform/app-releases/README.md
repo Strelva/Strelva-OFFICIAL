@@ -34,8 +34,8 @@ Turning off Release N's own gate returns the business to Release N-1.
 `rollbackPlan(app, n)` says which gates to turn off and the scope:
 
 - `business`: workspace flags only. Turn it off for one business (agency
-  Client feature availability, the operator panel, or `pnpm
-  workspace-release-flag`).
+  Client feature availability, the operator panel, or `npx tsx
+  scripts/workspace-release-flag.ts`).
 - `everywhere`: an env switch. Set it to 0 for everyone.
 - `redeploy`: no gate. Only a redeploy returns it.
 
