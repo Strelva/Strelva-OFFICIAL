@@ -57,6 +57,26 @@ describe("workspace calendar OAuth HTTP boundary", () => {
     expect(mocks.manager).toHaveBeenCalledWith(actor, workspaceId);
   });
 
+  it.each(["outlook", "google"])("sends %s back to the scheduling view with the reason when Strelva lacks its keys", async provider => {
+    mocks.config.mockReturnValue(null);
+    const response = await start(new Request(`https://workspace.test/api/workspace/calendar-connections/oauth/${provider}?workspaceId=${workspaceId}`), { params: Promise.resolve({ provider }) });
+    expect(response.status).toBe(307);
+    const location = new URL(response.headers.get("location")!);
+    expect(location.hostname).toBe("workspace.test");
+    expect(location.hostname).not.toContain("microsoftonline");
+    expect(location.searchParams.get("view")).toBe("scheduling");
+    expect(location.searchParams.get("workspaceId")).toBe(workspaceId);
+    expect(location.searchParams.get("calendarError")).toBe(`${provider === "outlook" ? "Microsoft Outlook" : "Google Calendar"} isn't set up on Strelva yet.`);
+    expect(mocks.createState).not.toHaveBeenCalled();
+  });
+
+  it("returns to the scheduling view with the reason when the state secret throws", async () => {
+    mocks.createState.mockImplementationOnce(() => { throw new Error("OAuth state secret not configured"); });
+    const response = await start(new Request(`https://workspace.test/api/workspace/calendar-connections/oauth/outlook?workspaceId=${workspaceId}`), { params: Promise.resolve({ provider: "outlook" }) });
+    expect(response.status).toBe(307);
+    expect(new URL(response.headers.get("location")!).searchParams.get("calendarError")).toContain("isn't set up on Strelva yet");
+  });
+
   it("returns to the same workspace after the callback saves an authorized connection", async () => {
     const response = await callback(new Request("https://workspace.test/api/workspace/calendar-connections/oauth/outlook/callback?code=fixture-code&state=signed-state"), { params: Promise.resolve({ provider: "outlook" }) });
     expect(response.status).toBe(307);

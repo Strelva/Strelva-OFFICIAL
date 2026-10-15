@@ -12,9 +12,25 @@ describe("workspace calendar OAuth", () => {
     vi.unstubAllEnvs();
   });
 
+  it("is not ready for Outlook until the Microsoft secret, state secret and app URL exist too", async () => {
+    const { calendarOAuthConfiguration } = await import("@/products/scheduling/calendar/oauth");
+    vi.stubEnv("MICROSOFT_CLIENT_ID", "outlook-client");
+    expect(calendarOAuthConfiguration("outlook", "https://workspace.example.test")).toBeNull();
+    vi.stubEnv("MICROSOFT_CLIENT_SECRET", "outlook-secret");
+    vi.stubEnv("OAUTH_STATE_SECRET", "state-secret");
+    expect(calendarOAuthConfiguration("outlook", "https://workspace.example.test")).toBeNull();
+    vi.stubEnv("APP_URL", "https://workspace.example.test");
+    expect(calendarOAuthConfiguration("outlook", "https://workspace.example.test")).not.toBeNull();
+    vi.unstubAllEnvs();
+  });
+
   it("builds provider-specific authorization scopes without a tenant binding", () => {
     vi.stubEnv("MICROSOFT_CLIENT_ID", "outlook-client");
+    vi.stubEnv("MICROSOFT_CLIENT_SECRET", "outlook-secret");
     vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID", "google-calendar-client");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET", "google-calendar-secret");
+    vi.stubEnv("OAUTH_STATE_SECRET", "state-secret");
+    vi.stubEnv("APP_URL", "https://workspace.example.test");
     expect(calendarOAuthConfiguration("outlook", "https://workspace.example.test")?.scopes).toContain("Calendars.ReadWrite");
     expect(calendarOAuthConfiguration("google", "https://workspace.example.test")?.scopes).toEqual(["https://www.googleapis.com/auth/calendar"]);
     vi.unstubAllEnvs();
@@ -67,6 +83,9 @@ describe("booking calendar least privilege and disconnect", () => {
   it("keeps scopes unchanged off and uses only event/busy/list scopes when enabled", async () => {
     const { calendarOAuthConfiguration } = await import("@/products/scheduling/calendar/oauth");
     vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID","fixture-client");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_SECRET","fixture-secret");
+    vi.stubEnv("OAUTH_STATE_SECRET","state-secret");
+    vi.stubEnv("APP_URL","https://app.example");
     vi.stubEnv("STRELVA_BOOKING_CALENDAR_SCOPES","0");
     expect(calendarOAuthConfiguration("google","https://app.example")?.scopes).toEqual(["https://www.googleapis.com/auth/calendar"]);
     vi.stubEnv("STRELVA_BOOKING_CALENDAR_SCOPES","1");
