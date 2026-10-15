@@ -11,6 +11,10 @@ export function QueueView({ queue, me, actionsEnabled = false }: { queue: Operat
   return <StPage>
     <StHead title={OPERATOR_DESTINATIONS.queue.label} meta={<>Support, incidents and releases only Strelva staff can do. Every action here is logged.</>}
       actions={<StMono>P1 harm now · P4 can wait</StMono>} />
+    {queue.delegated?.length ? (() => {
+      const total = queue.delegated.reduce((sum, row) => sum + row.count, 0);
+      return <p role="status" className="text-[13px] text-gray-muted">{total} client item{total === 1 ? " is" : "s are"} in their agency&apos;s Queue. Each agency works them from its own Queue.</p>;
+    })() : null}
     <QueueBoard queue={queue} me={me} actionsEnabled={actionsEnabled} />
     <details>
       <summary className="cursor-pointer text-[13px] text-gray-muted">Queue details · <StMono>{open}</StMono> open{late ? <> · <StMono>{late}</StMono> late</> : null} · Read <StMono>{new Date(queue.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</StMono></summary>

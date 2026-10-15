@@ -5,6 +5,10 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getEvents, getQueueCount } from "@/lib/events";
 import { requireActiveSubscription } from "@/lib/subscription";
 
+// Legacy tenant dashboard read (QueuePage on /dashboard/review), kept for
+// unconverted tenants. Approve and dismiss from that page record through Needs
+// you for a converted business (see api/queue/[id]). Removal waits until
+// owner-entry redirects cover every tenant.
 export async function GET() {
   const authed = await verifyAuth();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

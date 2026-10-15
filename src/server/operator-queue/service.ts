@@ -9,6 +9,8 @@ import { readAllSources } from "@/server/operator-queue/sources";
 import { readQueueContext, writeQueueMark } from "@/platform/operator-queue/store";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { readQueueLeadCounts } from "@/platform/operator-queue/lead-counts";
+import { delegateClientWork } from "@/platform/operator-queue/delegation";
+import { oneQueueEnabled } from "@/platform/provider-client-queue/release";
 
 /**
  * Read the whole queue for a verified operator. The SQL boundary rechecks the
@@ -51,7 +53,9 @@ export async function readOperatorQueue(
     tenantFailure = "Tenants could not be read";
   }
   const reads = await deps.readSources({ tenants, context, actor, now });
-  const queue = projectQueue({ reads, context, tenants, emailPaused: deps.emailPaused(), now });
+  const projected = projectQueue({ reads, context, tenants, emailPaused: deps.emailPaused(), now });
+  // Client work for a business an agency holds is that agency's Queue now (STRELVA_ONE_QUEUE).
+  const queue = oneQueueEnabled() ? delegateClientWork(projected, context) : projected;
   if (operatorQueueReleaseEnabled() && deps.readLeadCounts) {
     queue.businessLeads = await deps.readLeadCounts(tenants, context?.links ?? [], now);
     if (queue.businessLeads.some(row => row.failure)) {

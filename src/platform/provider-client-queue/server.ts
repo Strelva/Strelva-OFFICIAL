@@ -1,10 +1,8 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { providerQueuePageSchema, type ProviderQueueCursor } from "./contracts";
-/** STRELVA_ONE_QUEUE (off by default): the agency Queue also lists its clients' Strelva reviews drafts and Requests waiting for its acceptance. */
-export function oneQueueEnabled(): boolean {
-  return process.env.STRELVA_ONE_QUEUE === "1";
-}
+import { oneQueueEnabled } from "./release";
+export { oneQueueEnabled } from "./release";
 type Db = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
 export async function readProviderClientQueue(actor: WorkspaceActor, agencyWorkspaceId: string, cursor: ProviderQueueCursor | null, db: Db | null = getSupabase() as unknown as Db | null) {
   if (!db) throw new WorkspaceStoreError("The client queue is unavailable.");
