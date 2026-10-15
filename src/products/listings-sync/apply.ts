@@ -70,11 +70,14 @@ export async function applyListingFixes(actor: WorkspaceActor, workspaceId: stri
   if (!plan || plan.hash !== expectedHash) throw new ListingsPlanChangedError("These details changed since they were shown. Check again.");
   if (record.revision !== plan.recordRevision) {
     // The plan was made from an older record; never write it. Re-read so a fresh plan can appear.
-    await deps.queue(workspaceId, "after_fix", actor.userId).catch(() => null);
+    const id = await deps.queue(workspaceId, "after_fix", actor.userId).catch(() => null);
+    if (id) await deps.run({ checkId: id, limit: 1, budgetMs: 30_000 }).catch(() => undefined);
     throw new ListingsPlanChangedError("These details changed since they were shown. Check again.");
   }
 
-  const pending = await deps.reviews().read(workspaceId).catch(() => null);
+  // If the review read fails we cannot tell what is unconfirmed, so no Google write goes out.
+  let reviewUnknown = false;
+  const pending = await deps.reviews().read(workspaceId).catch(() => { reviewUnknown = true; return null; });
   const blocked = new Set((pending?.changes ?? []).filter(change => change.entity === "fact").map(change => change.id));
 
   let applied = 0;
@@ -100,6 +103,7 @@ export async function applyListingFixes(actor: WorkspaceActor, workspaceId: stri
       } else if (fix.kind === "google_hours" || fix.kind === "google_info") {
         if (!(await deps.googleFix(workspaceId))) { await mark(fix, "failed", null, "Google changes are off for this business."); continue; }
         // The draft is built from the full record, which can hold unconfirmed provider edits (#509).
+        if (reviewUnknown) { await mark(fix, "failed", null, "Confirm your changed details first."); continue; }
         if (blocked.has(fix.kind === "google_hours" ? "hours" : "phone")) { await mark(fix, "failed", null, "Confirm your changed details first."); continue; }
         const draft = await deps.prepareGoogle(actor, {
           workspaceId, tenantId: str(proposed.tenantId), locationId: str(proposed.locationId), kind: fix.kind === "google_hours" ? "hours" : "info",

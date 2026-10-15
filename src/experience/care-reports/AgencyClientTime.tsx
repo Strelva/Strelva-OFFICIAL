@@ -6,7 +6,8 @@ import { agencyTimeListSchema, type AgencyTimeList } from "@/platform/care-repor
 import { careShortDate, careTimeLabel, currentCareMonth } from "@/platform/care-reports/model";
 
 type State = { kind: "loading" } | { kind: "off" } | { kind: "error" } | { kind: "ready"; entries: AgencyTimeList };
-const today = () => new Date().toISOString().slice(0, 10);
+// The viewer's local date, never later than the server's UTC date for US time zones.
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 /**
  * Minutes this agency spent on one client this month. They feed the monthly

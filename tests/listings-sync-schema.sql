@@ -147,11 +147,35 @@ select public.listing_sync_finish_check((select id from ls_d1), (select claim_to
   '[{"surfaceKey":"booking:main","facts":[{"fact":"hours","state":"differs"}]}]', 1, 1, null);
 select pg_temp.ls_assert((select count(*) from jsonb_array_elements(public.listing_sync_open_plan('29100000-0000-4000-8000-000000000010')->'fixes') x
   where x->>'surfaceKey' = 'booking:main' and x->>'checkId' = (select id::text from ls_d1)) = 1, 'open_plan lists the re-opened fix with its new checkId');
+-- a proposed fix whose place later reads matching at the same revision drops out; it reopens when it differs again
+create temp table ls_d2 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
+select public.listing_sync_finish_check((select id from ls_d2), (select claim_token from ls_d2), 'done',
+  '[{"surfaceKey":"booking:main","state":"read","facts":[{"fact":"hours","state":"matches"}]}]', 0, 0, null);
+select pg_temp.ls_assert((select count(*) from jsonb_array_elements(coalesce(public.listing_sync_open_plan('29100000-0000-4000-8000-000000000010')->'fixes', '[]'::jsonb)) x
+  where x->>'surfaceKey' = 'booking:main') = 0, 'a proposed fix whose place now reads matching drops out of open_plan');
+reset role;
+select pg_temp.ls_assert((select status from public.listing_sync_fixes where surface_key = 'booking:main' and record_revision = 3) = 'superseded', 'the no-longer-needed fix is superseded');
+set local role service_role;
+create temp table ls_d3 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
+select pg_temp.ls_assert((select count(*) from public.listing_sync_save_fixes((select id from ls_d3), (select claim_token from ls_d3),
+  '[{"surfaceKey":"booking:main","factKey":"hours","kind":"booking_hours","proposed":{"weekly":[]}}]') f where f.status = 'proposed' and f.surface_key = 'booking:main') = 1,
+  'a superseded fix reopens when the drift returns');
+select public.listing_sync_finish_check((select id from ls_d3), (select claim_token from ls_d3), 'done',
+  '[{"surfaceKey":"booking:main","state":"read","facts":[{"fact":"hours","state":"differs"}]}]', 1, 1, null);
+select pg_temp.ls_assert((select count(*) from jsonb_array_elements(public.listing_sync_open_plan('29100000-0000-4000-8000-000000000010')->'fixes') x where x->>'surfaceKey' = 'booking:main') = 1, 'the reopened fix is back in open_plan');
+-- an unreadable surface keeps its fix
+create temp table ls_d4 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'sweep'));
+select public.listing_sync_finish_check((select id from ls_d4), (select claim_token from ls_d4), 'done',
+  '[{"surfaceKey":"booking:main","state":"unreadable","facts":[]}]', 0, 0, null);
+reset role;
+select pg_temp.ls_assert((select status from public.listing_sync_fixes where surface_key = 'booking:main' and record_revision = 3) = 'proposed', 'an unreadable place keeps its fix');
+set local role service_role;
 reset role;
 
 -- ---- supersede and decline ----
 update public.business_records set revision = 4 where workspace_id = '29100000-0000-4000-8000-000000000010';
 set local role service_role;
+select pg_temp.ls_assert(public.listing_sync_open_plan('29100000-0000-4000-8000-000000000010') is null, 'a plan from an older record revision is not open');
 create temp table ls_c5 as select * from public.listing_sync_claim_checks(1, public.listing_sync_queue_check('29100000-0000-4000-8000-000000000010', 'fact.confirmed'));
 select pg_temp.ls_assert((select count(*) from public.listing_sync_save_fixes((select id from ls_c5), (select claim_token from ls_c5),
   '[{"surfaceKey":"google:loc1","factKey":"phone","kind":"google_info","proposed":{}},{"surfaceKey":"google:loc1","factKey":"address","kind":"owner_todo","proposed":{"lines":["x"]}}]')) = 2,

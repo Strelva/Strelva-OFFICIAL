@@ -106,6 +106,7 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
 
   const signedInLink = careReportWorkspaceUrl(origin, report.id, report.businessWorkspaceId, latest || undefined);
   const noteTooLong = note.length > NOTE_MAX;
+  const noteDirty = note !== (view.report.agencyNote ?? "");
 
   return <>
     {facts.success
@@ -123,7 +124,8 @@ export function CareReportEditor({ initial, brand, emailOn, shareLinksOn, origin
           <StPill variant="soft" busy={busy === "note"} disabled={busy !== null || noteTooLong} onClick={() => void saveNote()}>Save note</StPill>
           <StPill variant="soft" busy={busy === "refresh"} disabled={busy !== null} onClick={() => void refresh()}>Refresh the numbers</StPill>
         </div>
-        <StHold label={`Hold to share ${careReleaseLabel(latest + 1)} with ${business}`} disabled={busy !== null || !facts.success} onAccept={() => void publish()} />
+        {noteDirty ? <StCopy muted>Save the note before sharing.</StCopy> : null}
+        <StHold label={`Hold to share ${careReleaseLabel(latest + 1)} with ${business}`} disabled={busy !== null || !facts.success || noteDirty} onAccept={() => void publish()} />
       </StSection> : <StNotice>You can read this report. Only an agency owner or admin can add a note or share it.</StNotice>}
       <StSection title="Releases">
         {releases.length ? <StRows label="Releases of this report">

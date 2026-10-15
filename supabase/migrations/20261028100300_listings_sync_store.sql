@@ -151,7 +151,7 @@ begin
       on conflict (workspace_id, surface_key, fact_key, record_revision) do update
         set status = 'proposed', proposed = excluded.proposed, check_id = excluded.check_id, outcome_ref = null, reason = null,
           decided_by = null, updated_at = clock_timestamp()
-        where public.listing_sync_fixes.status = 'verified';
+        where public.listing_sync_fixes.status in ('verified','superseded');
   end loop;
   update public.listing_sync_fixes set status = 'superseded', updated_at = clock_timestamp()
     where workspace_id = chk.workspace_id and status = 'proposed' and record_revision < chk.record_revision;
@@ -185,6 +185,16 @@ begin
                     and exists (select 1 from jsonb_array_elements(r->'facts') f where f->>'state' = 'matches'))
               or (fx.fact_key <> 'page' and exists (select 1 from jsonb_array_elements(r->'facts') f
                     where f->>'fact' = fx.fact_key and f->>'state' in ('matches','follows')))));
+    -- A fix this revision no longer needs (its place was fixed by hand) is withdrawn, not offered again.
+    update public.listing_sync_fixes fx set status = 'superseded', updated_at = clock_timestamp()
+      where fx.workspace_id = chk.workspace_id and fx.record_revision = chk.record_revision
+        and fx.status in ('proposed','failed') and fx.kind <> 'owner_todo'
+        and exists (
+          select 1 from jsonb_array_elements(p_readings) r
+          where r->>'surfaceKey' = fx.surface_key and r->>'state' = 'read'
+            and not exists (select 1 from jsonb_array_elements(coalesce(r->'facts', '[]'::jsonb)) f
+              where f->>'state' = 'differs'
+                and ((fx.fact_key = 'page') or (fx.fact_key = 'hours' and f->>'fact' in ('hours','special_hours')) or (fx.fact_key not in ('page','hours') and f->>'fact' = fx.fact_key))));
   end if;
   if p_status = 'done' and coalesce(p_differs, 0) = 0 and coalesce(p_compared, 0) > 0 then
     perform pg_advisory_xact_lock(hashtextextended('listing-sync-release:' || chk.workspace_id::text, 0));
@@ -259,6 +269,8 @@ begin
   select * into last from public.listing_sync_checks where workspace_id = p_workspace_id and status = 'done'
     order by finished_at desc, id limit 1;
   if not found then return null; end if;
+  -- A plan from an older record revision can never be applied; withdraw it until a new check finishes.
+  if last.record_revision <> (select revision from public.business_records where workspace_id = p_workspace_id) then return null; end if;
   return jsonb_build_object('recordRevision', last.record_revision, 'readings', last.readings,
     'fixes', coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'surfaceKey', f.surface_key, 'factKey', f.fact_key,
         'kind', f.kind, 'proposed', f.proposed, 'status', f.status, 'outcomeRef', f.outcome_ref, 'reason', f.reason,

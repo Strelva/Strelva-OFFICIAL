@@ -170,6 +170,20 @@ describe("CareReportEditor", () => {
     expect(node.textContent).toContain("Hold to share Release 3 with Harbor Dental");
     expect(node.querySelector("textarea")).not.toBeNull();
   });
+
+  it("holds sharing while the note is typed but not saved", async () => {
+    await mountEditor();
+    const hold = () => button("Hold to share") as HTMLButtonElement;
+    expect(hold().disabled).toBe(false);
+    expect(node.textContent).not.toContain("Save the note before sharing.");
+    const area = node.querySelector("textarea")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(area, "A note that is not saved yet");
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(hold().disabled).toBe(true);
+    expect(node.textContent).toContain("Save the note before sharing.");
+  });
 });
 
 describe("AgencyClientTime", () => {

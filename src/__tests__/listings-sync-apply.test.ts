@@ -63,6 +63,27 @@ describe("applyListingFixes", () => {
     expect(raw.queue).toHaveBeenCalledWith(WS, "after_fix", actor.userId);
   });
 
+  it("runs the after-fix check it queues for a stale plan, then refuses", async () => {
+    const f = fix({ proposed: { scope: "scope1", weekly: [] } });
+    const { deps, raw } = setup([f], { record: vi.fn(async () => ({ access: "owner", revision: 5 })) });
+    (raw.openPlan as ReturnType<typeof vi.fn>).mockResolvedValue({ workspaceId: WS, recordRevision: 4, hash: "h1", lines: [], requests: 0, strelvaChanges: 0, fixes: [f], readings: [] });
+    await expect(applyListingFixes(actor, WS, "h1", deps)).rejects.toBeInstanceOf(ListingsPlanChangedError);
+    expect(raw.run).toHaveBeenCalledWith({ checkId: "check1", limit: 1, budgetMs: 30_000 });
+  });
+
+  it("fails a Google fix, and never prepares a draft, when the unconfirmed-edit read fails", async () => {
+    const google = fix({ kind: "google_hours", proposed: { tenantId: "t1", locationId: "loc1" } });
+    const booking = fix({ kind: "booking_hours", proposed: { scope: "s", weekly: [] } });
+    const { deps, raw, setFix } = setup([google, booking], { reviews: () => ({ read: vi.fn(async () => { throw new Error("down"); }) }) });
+    const result = await applyListingFixes(actor, WS, "h1", deps);
+    expect(raw.prepareGoogle).not.toHaveBeenCalled();
+    expect(raw.approveGoogle).not.toHaveBeenCalled();
+    expect(result.failed).toContainEqual({ fixId: google.id, reason: "Confirm your changed details first." });
+    expect(lastStatus(setFix, google.id)).toMatchObject({ to: "failed" });
+    expect(raw.bookingHours).toHaveBeenCalled();
+    expect(result.applied).toBe(1);
+  });
+
   it("runs the queued after-fix check right away", async () => {
     const { deps, raw } = setup([fix({ proposed: { scope: "s", weekly: [] } })]);
     await applyListingFixes(actor, WS, "h1", deps);
