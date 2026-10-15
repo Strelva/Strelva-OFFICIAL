@@ -11,6 +11,7 @@ export { readListingControl, setListingPaused, noteListingAccess } from "./contr
 
 
 export type { RecordInfo } from "./record";
+export { hoursMatch, hoursToGoogle, normalizeHours, infoMatches } from "./record";
 
 export { googleDraftInputSchema } from "./contracts";
 

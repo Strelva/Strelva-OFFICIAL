@@ -12,14 +12,16 @@
  *          run: async (event, context) => (await import("@/products/…/server")).handleX(event, context) },
  *   3. Make the handler idempotent on event.id: delivery is at least once.
  * A test fails the build if a Release declares a subscription with no handler here.
- * Nothing is registered today: the six 1.0 Apps declare no subscription.
+ * Listings in sync queues a check on fact.confirmed. The six 1.0 Apps declare no subscription.
  */
 import { registerAppEventHandler, type AppEventHandler } from "@/platform/app-events/handlers";
 import type { BuiltInAppId } from "@/platform/app-releases/contracts";
 
 interface ProductAppEventHandler { appId: BuiltInAppId; handler: string; run: AppEventHandler }
 
-const productHandlers: readonly ProductAppEventHandler[] = [];
+const productHandlers: readonly ProductAppEventHandler[] = [
+  { appId: "listings_sync", handler: "queue_check", run: async event => { await (await import("@/products/listings-sync/server")).handleFactEvent(event); } },
+];
 
 /** Called before the cron delivers. Repeated calls change nothing. */
 export function registerProductAppEventHandlers(): void {

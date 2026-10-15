@@ -100,3 +100,5 @@ Strelva reads reviews once a day, can draft a reply, and cannot post it: Yelp ha
 no way for apps to post replies. A refused key shows "Needs reconnect".
 **UNVERIFIED (2026-10-15):** whether Yelp's current plan terms allow this use.
 Yelp is not in the ADR 0016 Connections model yet.
+Listings in sync reads the business endpoint (phone, address, hours) when
+`STRELVA_LISTINGS_SYNC_YELP=1`, and keeps only the check's readings, never the raw response.

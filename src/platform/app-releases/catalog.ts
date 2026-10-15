@@ -101,6 +101,43 @@ export const BUILT_IN_APPS: readonly BuiltInApp[] = Object.freeze([
       ]),
     ],
   } satisfies BuiltInApp),
+  Object.freeze({
+    id: "listings_sync",
+    name: "Listings in sync",
+    publisher: "platform",
+    systemKinds: [],
+    labelOnSystems: false,
+    makeRealChannels: [],
+    availability: [{ kind: "workspace_flag", flag: "listings_sync" }],
+    releases: [
+      Object.freeze({
+        key: "listings_sync.compare",
+        number: 1,
+        summary: "Compares your confirmed details with your website, Google listing and booking page, and asks before changing any of them.",
+        shippedIn: null,
+        changesLiveBehavior: true,
+        gates: [],
+        requiredConnections: [
+          { provider: "google_business_profile", access: "read", optional: true, purpose: "Read your Google listing's hours, phone and address to compare them" },
+          { provider: "connected_site", access: "read", optional: true, purpose: "Read your website's published details to compare them" },
+        ],
+        eventSubscriptions: [{ event: "fact.confirmed", handler: "queue_check", scope: "business_record" }],
+      } satisfies BuiltInAppRelease),
+      Object.freeze({
+        key: "listings_sync.google_fix",
+        number: 2,
+        summary: "Puts your confirmed hours and phone on your Google listing when you make it live.",
+        shippedIn: null,
+        changesLiveBehavior: true,
+        gates: [{ kind: "env", name: "STRELVA_LISTINGS_SYNC_GOOGLE_FIX", values: ["1"] }],
+        requiredConnections: [
+          { provider: "google_business_profile", access: "act", optional: true, purpose: "Change hours, phone and website on your Google listing" },
+          { provider: "connected_site", access: "read", optional: true, purpose: "Read your website's published details to compare them" },
+        ],
+        eventSubscriptions: [{ event: "fact.confirmed", handler: "queue_check", scope: "business_record" }],
+      } satisfies BuiltInAppRelease),
+    ],
+  } satisfies BuiltInApp),
 ]);
 
 export function builtInApp(id: string): BuiltInApp {

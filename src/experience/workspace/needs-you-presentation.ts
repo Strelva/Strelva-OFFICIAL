@@ -26,6 +26,7 @@ function isBooking(item: OwnerDecision): boolean {
 }
 
 function source(item: OwnerDecision): string {
+  if (item.sourceLifecycle === "listings_sync") return "Your listings";
   if (item.sourceLifecycle === "connected_site_schema") return "Website";
   if (isBooking(item)) return "Bookings";
   if (item.kind.startsWith("google.") || item.kind.startsWith("review.")) return "Google";

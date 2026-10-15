@@ -37,6 +37,8 @@ import { businessPaymentAdapter } from "@/platform/needs-you/sources/business-pa
 import { inquiryFactAdapter } from "@/platform/needs-you/sources/inquiry-fact";
 import { websiteChangeAdapter } from "@/platform/needs-you/sources/website-change";
 import { createSiteChangeStore, siteChangeOwnerEmailEnabled, sitesByCodeReleased } from "@/products/websites/server";
+import { listingsSyncAdapter } from "@/platform/needs-you/sources/listings-sync";
+import { applyListingFixes, listingsOwnerEmailEnabled, listingsSyncAvailable, listingsSyncStore, readListingsPlanForService } from "@/products/listings-sync/server";
 
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 export { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -78,6 +80,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
     },
     emailAllowed: async row => {
       // Off unless both the global email switch and this notice's own switch are on.
+      if (row.sourceLifecycle === "listings_sync") return listingsOwnerEmailEnabled();
       if (row.sourceLifecycle === "website_change") return siteChangeOwnerEmailEnabled();
       if (row.sourceLifecycle !== "website_domain") return true;
       const domains = await import("@/platform/needs-you/sources/website-domain-store");
@@ -112,6 +115,13 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         enabled: id => sitesByCodeReleased(id),
         pending: (actor, id) => createSiteChangeStore().pendingReviews(actor, id),
         approve: (actor, id, requestId) => createSiteChangeStore().record(actor, id, requestId, { kind: "approved", note: "Approved in Needs you." }),
+      }),
+      // Make your listings match: one owner decision per business (Listings in sync, off by default).
+      listingsSyncAdapter({
+        enabled: id => listingsSyncAvailable(id),
+        plan: id => readListingsPlanForService(id),
+        apply: (actor, id, hash) => applyListingFixes(actor, id, hash),
+        decline: async (id, revision, by) => { await listingsSyncStore.declinePlan(id, revision, by); },
       }),
       ...systemsSourceAdapters(store, effects.google),
       ...deliverySourceAdapters(),

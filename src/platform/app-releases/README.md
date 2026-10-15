@@ -15,6 +15,7 @@ are the existing release flags and env switches.
   adapted per business as a Version with its own Releases and lineage. Not
   touched by this module. Internal tools keep their own application Releases,
   so `labelOnSystems` is false for them and no built-in label is shown.
+- **Listings in sync** maintains a condition across Systems, so it claims no System kind and no Make it live channel.
 
 ## The gate rule
 
@@ -116,4 +117,4 @@ events are in `src/platform/app-events/README.md`.
 
 Release lists are full lists. A subscription declared on Release 1 must be
 repeated on every later Release or it switches off when that Release is reached.
-The six 1.0 Apps declare none.
+The six 1.0 Apps declare none. Listings in sync declares `fact.confirmed` on both Releases.

@@ -721,6 +721,31 @@ after the owner chooses an agency. No agency is selected automatically.
 Local route and DOM tests cover these continuations; desktop/mobile rendering
 is reserved for the coordinator under the October 14 disk restriction.
 
+### Listings in sync, October 15 (flag off)
+
+[ListingsSyncPanel](../../src/experience/listings-sync/ListingsSyncPanel.tsx)
+is the "Where your details appear" section on Business details
+(`#listings`), shown only where the App is on for the business
+(`STRELVA_LISTINGS_SYNC_RELEASE`). Props: `workspaceId`, `request`,
+`viewerIsOwner`, `businessName`, `initial` (fixtures; omit to fetch
+`GET /api/workspace/listings-sync`, where 404 renders nothing). Composed from
+the 1.0 kit only: `StSection` (headline as the meta, "Check now" as the
+action), `StRows`/`StRow` with `StState` per place, `StMono` for values,
+`StNotice`, `StPillLink`, `StTextButton`. States: loading, off, error, checked
+with everything matching, places that differ, Waiting on Google (never shown as
+a difference), a place Strelva could not read, reconnect Google, changes
+waiting on the owner (owner sees a link to Needs you; an agency sees "Waiting on
+[business]"), changes in progress, "Change these yourself" lines with Copy,
+details waiting for the owner to confirm, Checking…. Nothing here approves a
+change: approval is only "Hold to make it live" in Needs you.
+
+[ListingsSyncSummary](../../src/experience/listings-sync/ListingsSyncSummary.tsx)
+is the one line in the agency client row, inside "Responsibility and
+availability", after usage and before events: the headline (or "Waiting on
+[business]") and an "Open" link to the panel. Renders nothing while the App is
+off. Proof at `/preview/strelva/listings-sync` (five fictional states, Harbor
+Dental and North Studio).
+
 ## Extending the foundation
 
 Use the existing source owners and references. Keep changes small enough to
