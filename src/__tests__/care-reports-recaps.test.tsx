@@ -1,11 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { WorkspaceRecaps } from "@/experience/recaps/WorkspaceRecaps";
+import { WorkspaceRecaps, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
 import { PREVIEW_OWNER_REPORTS } from "@/experience/care-reports/preview-fixture";
 
 const WS = "5e000000-0000-4000-8000-0000000000b0";
-const state = { kind: "ready", sites: [] } as const;
+const state: WorkspaceRecapsState = { kind: "ready", sites: [] };
 const render = (careReports?: Parameters<typeof WorkspaceRecaps>[0]["careReports"]) =>
   renderToStaticMarkup(createElement(WorkspaceRecaps, { workspaceId: WS, state, period: "all", careReports }));
 

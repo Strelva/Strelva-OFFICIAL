@@ -238,6 +238,8 @@ export function AgencyHome({
     : <AgencyClientList
         clients={combined!.clients}
         agencyWorkspaceId={snapshot.workspaceId}
+        viewerEmail={snapshot.actor.email}
+        canManage={current?.role === "owner" || current?.role === "admin"}
         request={request}
         lastGoodReads={storedClients?.key.startsWith(`${snapshot.workspaceId}:`) ? storedClients.lastGoodReads : undefined}
         total={combined!.total}

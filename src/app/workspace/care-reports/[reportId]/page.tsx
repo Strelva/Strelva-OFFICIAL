@@ -32,6 +32,21 @@ export default async function CareReportPage({ params, searchParams }: { params:
   const brand = await resolveOwnerBrand(view.report.agencyWorkspaceId);
 
   if (view.audience === "agency") {
+    const agencyId = view.report.agencyWorkspaceId;
+    const wantedRelease = Number(release);
+    const sharedRelease = release && Number.isInteger(wantedRelease) ? view.releases.find(item => item.number === wantedRelease) : undefined;
+    if (sharedRelease) {
+      const shared = careReportReleaseSnapshotSchema.safeParse(sharedRelease.snapshot);
+      if (!shared.success) notFound();
+      return <StrelvaShell title="" workspaceId={agencyId} workspaceName={brand.name} ownerBrand={brand} agencyNavigation={{ active: "clients" }}>
+        <StPage>
+          <CareReportDocument snapshot={shared.data} brand={brand} releaseNumber={sharedRelease.number} audience="agency"
+            releases={view.releases.map(item => ({ number: item.number, publishedAt: item.publishedAt }))}
+            releaseHref={number => `/workspace/care-reports/${reportId}?workspaceId=${agencyId}&release=${number}`}
+            back={{ label: "Report", href: `/workspace/care-reports/${reportId}?workspaceId=${agencyId}` }} />
+        </StPage>
+      </StrelvaShell>;
+    }
     const origin = requestOrigin(await headers());
     return <StrelvaShell title="" workspaceId={view.report.agencyWorkspaceId} workspaceName={brand.name} ownerBrand={brand} agencyNavigation={{ active: "clients" }}>
       <StPage>

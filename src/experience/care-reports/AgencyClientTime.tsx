@@ -10,9 +10,10 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Minutes this agency spent on one client this month. They feed the monthly
- * Care plan report. Renders nothing while the App is off (the route answers 503).
+ * Care plan report. Renders nothing while the App is off (the route answers 503). Remove shows only on
+ * the viewer's own entries, or for agency owners and admins.
  */
-export function AgencyClientTime({ agencyWorkspaceId, workspaceId, clientName, request = fetch }: { agencyWorkspaceId: string; workspaceId: string; clientName: string; request?: typeof fetch }) {
+export function AgencyClientTime({ agencyWorkspaceId, workspaceId, clientName, viewerEmail = "", canManage = false, request = fetch }: { agencyWorkspaceId: string; workspaceId: string; clientName: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [minutes, setMinutes] = useState("");
@@ -103,7 +104,7 @@ export function AgencyClientTime({ agencyWorkspaceId, workspaceId, clientName, r
     {live.length ? <StRows label="Time recorded this month">
       {live.map(entry => <StRow key={entry.id} title={`${careTimeLabel(entry.minutes)} · ${BUSINESS_EFFORT_CATEGORY_LABELS[entry.category]}`}
         detail={`${careShortDate(entry.occurredOn)} · ${entry.recordedBy}${entry.note ? ` · ${entry.note}` : ""}`}
-        end={removing?.id === entry.id
+        end={!canManage && !(viewerEmail && entry.recordedBy.toLowerCase() === viewerEmail.toLowerCase()) ? undefined : removing?.id === entry.id
           ? <span className="flex items-center gap-2">
             <StTextField label="Reason" maxLength={280} value={removing.reason} onChange={event => setRemoving({ id: entry.id, reason: event.target.value })} />
             <StTextButton tone="danger" disabled={!removing.reason.trim()} onClick={() => void remove(entry.id, removing.reason)}>Remove</StTextButton>

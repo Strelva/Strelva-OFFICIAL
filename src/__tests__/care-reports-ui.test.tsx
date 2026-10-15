@@ -178,7 +178,7 @@ describe("AgencyClientTime", () => {
     { id: "5e000000-0000-4000-8000-0000000000d2", minutes: 75, category: "delivery", occurredOn: "2026-10-06", note: "Newsletter", recordedBy: "staff@example.test", recordedAt: "2026-10-06T10:00:00Z", voided: false },
     { id: "5e000000-0000-4000-8000-0000000000d3", minutes: 500, category: "other", occurredOn: "2026-10-06", note: null, recordedBy: "staff@example.test", recordedAt: "2026-10-06T11:00:00Z", voided: true },
   ];
-  const mountTime = (request: typeof fetch) => mount(createElement(AgencyClientTime, { agencyWorkspaceId: AGENCY, workspaceId: WS, clientName: "Harbor Dental", request }));
+  const mountTime = (request: typeof fetch, who: { viewerEmail?: string; canManage?: boolean } = { canManage: true }) => mount(createElement(AgencyClientTime, { agencyWorkspaceId: AGENCY, workspaceId: WS, clientName: "Harbor Dental", ...who, request }));
 
   it("renders nothing while the App is off", async () => {
     await mountTime(vi.fn<typeof fetch>().mockResolvedValue(Response.json({}, { status: 503 })));
@@ -213,5 +213,23 @@ describe("AgencyClientTime", () => {
     expect(node.textContent).toContain("Reason");
     const remove = [...node.querySelectorAll("button")].filter(item => item.textContent === "Remove");
     expect(remove.some(item => item.disabled)).toBe(true);
+  });
+
+  const removeButtons = () => [...node.querySelectorAll("button")].filter(item => item.textContent === "Remove");
+
+  it("shows Remove only on the viewer's own entries for staff", async () => {
+    await mountTime(vi.fn<typeof fetch>().mockImplementation(async () => Response.json(entries)), { viewerEmail: "Staff@example.test", canManage: false });
+    expect(removeButtons()).toHaveLength(1);
+    expect(node.textContent).toContain("Newsletter");
+  });
+
+  it("hides Remove when the viewer recorded nothing and cannot manage", async () => {
+    await mountTime(vi.fn<typeof fetch>().mockImplementation(async () => Response.json(entries)), { viewerEmail: "other@example.test", canManage: false });
+    expect(removeButtons()).toHaveLength(0);
+  });
+
+  it("shows Remove on every entry for owners and admins", async () => {
+    await mountTime(vi.fn<typeof fetch>().mockImplementation(async () => Response.json(entries)), { viewerEmail: "other@example.test", canManage: true });
+    expect(removeButtons()).toHaveLength(2);
   });
 });
