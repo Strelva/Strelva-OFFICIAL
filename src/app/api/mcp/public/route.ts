@@ -4,8 +4,8 @@
 import { methodNotAllowed, serveMcp } from "@/platform/agent-channel/protocol";
 import { platformMcpServer } from "@/platform/agent-channel/public-tools";
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
-import { createAgentSiteChangeAdapter, createAgentWebsiteAdapter, siteChangeOwnerEmailEnabled, sitesByCodeMayBeOn, sitesByCodeReleased, verifySiteRelease } from "@/products/websites/server";
-import { observeWebsiteSystemRelease } from "@/products/websites/system-releases";
+import { createAgentSiteChangeAdapter, createAgentWebsiteAdapter, observeWebsiteSystemRelease, siteChangeOwnerEmailEnabled, sitesByCodeMayBeOn, sitesByCodeReleased } from "@/products/websites/server";
+import { verifySiteRelease } from "@/app/api/_site-declaration";
 import { oauthRpc, oauthOrigin } from "@/platform/agent-channel/oauth";
 import { tenantDirectory } from "../_directory";
 

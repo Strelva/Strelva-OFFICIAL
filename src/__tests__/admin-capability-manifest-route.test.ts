@@ -16,7 +16,7 @@ vi.mock("@/lib/tenants", () => ({
 }));
 vi.mock("@/lib/storage", () => ({ logAuditEvent: mockLogAuditEvent }));
 const mockRefresh = vi.hoisted(() => vi.fn());
-vi.mock("@/products/websites/site-declaration", () => ({ refreshSiteDeclaration: mockRefresh }));
+vi.mock("@/app/api/_site-declaration", () => ({ refreshSiteDeclaration: mockRefresh }));
 // safe-fetch is used as-is (real https/private-host guard).
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });

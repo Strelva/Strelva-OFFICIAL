@@ -4,8 +4,10 @@
 -- deployed Request receipt does. Agencies never use this path: their deploys follow
 -- an accepted Request and the owner's approval (20261027120200).
 --
--- reconcile_website_system_releases is a verbatim copy of the newest definition
--- (20261010113000_website_system_releases.sql) plus one more source branch.
+-- reconcile_website_system_releases is a copy of the newest definition
+-- (20261010113000_website_system_releases.sql) plus one more source branch, and
+-- two lines that let a null p_content_reading follow the site's declared content
+-- source instead of a list of tenant names. A false or true argument is unchanged.
 begin;
 set local lock_timeout='3s';
 
@@ -107,6 +109,8 @@ begin
       select 1 from public.tenant_workspace_links where workspace_id=p_workspace_id and tenant_stable_id=t.stable_id
       union all select 1 from public.offering_website_bindings where business_workspace_id=p_workspace_id and tenant_stable_id=t.stable_id and status='active'
     ) or not public.system_in_scope(p_workspace_id,p_origin_kind,p_origin_ref,scope.work_ids) then raise exception 'system_not_found'; end if;
+    -- A caller that passes null lets the site's own declaration decide (customRepo.contentSource, 20261027120100).
+    p_content_reading:=coalesce(p_content_reading,t.delivery_model is distinct from 'platform_template' and coalesce(t.custom_repo->>'contentSource','')='strelva');
     select coalesce(array_agg(distinct x.website_work_id),'{}') into work_ids from (
       select p.website_work_id from public.website_document_publications p where p.workspace_id=p_workspace_id and p.tenant_id=t.id
       union all select l.website_work_id from public.website_linked_publications l where l.workspace_id=p_workspace_id and l.tenant_stable_id=t.stable_id
@@ -137,6 +141,7 @@ begin
     initial:=jsonb_build_object('kind','connected_site','ref',c.id::text||'@initial');
     source_actor:=c.created_by; source_name:=c.label; source_live:=c.verified_at is not null and c.status='active';
   end if;
+  p_content_reading:=coalesce(p_content_reading,false);
   perform pg_advisory_xact_lock(hashtextextended('website-releases:'||p_system_id::text,7419));
   select * into s from public.systems where id=p_system_id;
   if not found then

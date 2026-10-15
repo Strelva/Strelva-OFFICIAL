@@ -565,7 +565,8 @@ export { createSiteChangeStore, SiteChangeOrderError, type PendingSiteChangeRevi
 export { createAgentSiteChangeAdapter, type AgentSiteChangeDeps } from "./agent-site-changes";
 export { siteRequestBrief, siteRequestNextStep, siteRequestNextStepWords, siteRequestBranch, siteRequestReviewHref, type SiteRequestRow, type SiteRequestNextStep } from "./site-change-brief";
 export { siteChangeOwnerEmailEnabled } from "./site-change-email";
-export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type ReadBack, type SiteDeclaration, type SiteReleaseCheck } from "./site-declaration";
+export { readSiteDeclaration, refreshSiteDeclaration, verifySiteRelease, sameCommit, type DeclaredTenant, type ReadBack, type SiteDeclaration, type SiteDeclarationPorts, type SiteReleaseCheck } from "./site-declaration";
+export { observeWebsiteSystemRelease } from "./system-releases";
 export { sitesByCodeMayBeOn, sitesByCodeReleased } from "./sites-by-code-release";
 
 /** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */

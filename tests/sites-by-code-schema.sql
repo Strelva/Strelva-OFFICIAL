@@ -197,13 +197,19 @@ begin
   set local role service_role;
 
   -- The release becomes a numbered revision on the website System.
-  n := public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, false);
+  -- A null p_content_reading follows the site's declared content source.
+  reset role;
+  update public.tenants set custom_repo = custom_repo || '{"contentSource":"strelva"}' where stable_id = stable;
+  set local role service_role;
+  n := public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, null);
   perform pg_temp.sc_assert(n >= 1, 'reconcile appended revisions');
   reset role;
   select r.implementation->>'ref' into ref from public.systems s join public.system_revisions r on r.id = s.current_revision_id where s.id = site_system;
   perform pg_temp.sc_assert(ref like 'code:%@abc1234def', 'the System''s current revision is the code release: ' || coalesce(ref, 'none'));
+  perform pg_temp.sc_assert((select r.implementation->>'kind' from public.systems s join public.system_revisions r on r.id = s.current_revision_id where s.id = site_system) = 'custom_repo_content',
+    'a site that declares strelva content reads as custom_repo_content');
   set local role service_role;
-  perform pg_temp.sc_assert(public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, false) = 0, 'observing again adds nothing');
+  perform pg_temp.sc_assert(public.reconcile_website_system_releases(ws, owner_id, 'sc-owner@example.test', site_system, 'tenant', stable::text, null) = 0, 'observing again adds nothing');
 end $$;
 
 rollback;

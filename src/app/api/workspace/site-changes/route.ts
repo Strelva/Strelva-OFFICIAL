@@ -8,7 +8,8 @@ import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { PostgresServiceRequestStore, ServiceRequestAccessError, ServiceRequestConflictError, ServiceRequestService } from "@/platform/service-requests";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { createSiteChangeStore, sitesByCodeReleased, verifySiteRelease } from "@/products/websites/server";
+import { createSiteChangeStore, sitesByCodeReleased } from "@/products/websites/server";
+import { verifySiteRelease } from "@/app/api/_site-declaration";
 import { recordSiteChangeSchema, siteChangeRequestCommand, siteChangeStage } from "@/products/websites/client";
 import { siteEditingFor } from "@/products/websites/client";
 

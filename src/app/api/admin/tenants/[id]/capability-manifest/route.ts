@@ -4,7 +4,7 @@ import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { logAuditEvent } from "@/lib/storage";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
-import { refreshSiteDeclaration } from "@/products/websites/site-declaration";
+import { refreshSiteDeclaration } from "@/app/api/_site-declaration";
 
 /**
  * Per-tenant capability-manifest URL (B4). A custom repo can publish a manifest

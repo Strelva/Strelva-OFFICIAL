@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/products/websites/sites-by-code-release", () => ({ sitesByCodeMayBeOn: () => true, sitesByCodeReleased: (...args: unknown[]) => mocks.byCode(...args) }));
-vi.mock("@/products/websites/site-declaration", () => ({ verifySiteRelease: (...args: unknown[]) => mocks.verify(...args), readSiteDeclaration: vi.fn(), refreshSiteDeclaration: vi.fn(), sameCommit: vi.fn() }));
+vi.mock("@/app/api/_site-declaration", () => ({ verifySiteRelease: (...args: unknown[]) => mocks.verify(...args), readSiteDeclaration: vi.fn(), refreshSiteDeclaration: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, deliveryModel: "custom_repo" }) }));

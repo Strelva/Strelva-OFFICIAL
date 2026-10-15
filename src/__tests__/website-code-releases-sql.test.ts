@@ -35,7 +35,11 @@ describe("website code releases migration", () => {
     const body = (text: string) => text.slice(text.indexOf("function public.reconcile_website_system_releases(") + "function ".length, text.indexOf("return n;"));
     const strip = (text: string) => text.replace(/--[^\n]*/g, "").replace(/\s+/g, " ").trim();
     // Take the new branch out and the rest is the earlier definition, word for word.
-    const withoutBranch = body(up).replace(/select 'code:'[\s\S]*?cr\.system_id=p_system_id\s+union all\s+/, "");
+    const withoutBranch = body(up)
+      .replace(/select 'code:'[\s\S]*?cr\.system_id=p_system_id\s+union all\s+/, "")
+      .replace(/p_content_reading:=coalesce\(p_content_reading,t\.delivery_model[^;]*;/, "")
+      .replace("p_content_reading:=coalesce(p_content_reading,false);", "");
+    expect(up).toContain("coalesce(t.custom_repo->>'contentSource','')='strelva'");
     expect(withoutBranch).not.toContain("website_code_releases");
     expect(strip(withoutBranch)).toBe(strip(body(earlier)));
     expect(up.indexOf("'code:'||cr.id::text")).toBeLessThan(up.indexOf("'undo:'||u.command_id::text"));
