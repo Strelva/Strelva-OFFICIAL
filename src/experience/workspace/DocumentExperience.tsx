@@ -42,7 +42,7 @@ const serverTransport: DocumentTransport = {
     return documentHistoryPageSchema.parse(body);
   },
 };
-type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (workId: string) => void; transport?: DocumentTransport; initialRequestText?: string; sources?: readonly WorkspaceWork[]; context?: ReactNode; receiptLabel?: (receipt: DocumentReceipt) => ReactNode; receiptActor?: (receipt: DocumentReceipt) => ReactNode };
+type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (workId: string) => void; transport?: DocumentTransport; initialRequestText?: string; sources?: readonly WorkspaceWork[]; context?: ReactNode; receiptLabel?: (receipt: DocumentReceipt) => ReactNode; receiptActor?: (receipt: DocumentReceipt) => ReactNode; releaseLabel?: string };
 
 export function DocumentExperience(props: Props) {
   const intent = useWorkspaceIntent();
@@ -51,7 +51,7 @@ export function DocumentExperience(props: Props) {
   return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequestText={props.initialRequestText || (!props.workId ? intentRequestFor(intent, "document") : undefined)} />;
 }
 
-function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = serverTransport, initialRequestText, sources = [], context, receiptLabel, receiptActor }: Props) {
+function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = serverTransport, initialRequestText, sources = [], context, receiptLabel, receiptActor, releaseLabel }: Props) {
   const [saved, setSaved] = useState<DocumentSaved | null>(null);
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -88,7 +88,7 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
   const disabled = Boolean(readOnly || busy || (workId && !saved));
   return <section aria-label="Workspace document" aria-busy={busy}><StPage>
     <StHead title={saved?.document.title ?? "Write something your business can use"} crumb={{ label: "Documents" }}
-      meta="Private · never on the website" actions={saved && !readOnly && !editing ? <StTextButton onClick={() => setEditing(true)}>Edit document</StTextButton> : undefined} />
+      meta={<>Private · never on the website{releaseLabel ? <> · <StMono>{releaseLabel}</StMono></> : null}</>} actions={saved && !readOnly && !editing ? <StTextButton onClick={() => setEditing(true)}>Edit document</StTextButton> : undefined} />
     {!saved && !readOnly && transport.mode === "server" ? <div className="flex flex-wrap gap-3"><StPill type="button" variant="soft" onClick={() => setDrafting(true)}>Draft with Strelva</StPill>{drafting ? <StPill type="button" variant="soft" onClick={() => setDrafting(false)}>Write it myself</StPill> : null}</div> : null}
     {drafting ? <WorkPlanExperience workspaceId={workspaceId} initialRequest={initialRequestText || "Draft a private document for my business."} sources={sources} presentation="document" /> : <>
     {initialRequestText && !saved ? <aside className="space-y-2 border-y border-gray-border py-4 text-sm"><h2 className="font-medium">What you asked</h2><p className="whitespace-pre-wrap">{initialRequestText}</p><p className="text-gray-muted">Your request stays with this document. Write below or ask Strelva to prepare a draft.</p></aside> : null}

@@ -115,7 +115,7 @@ export function SystemPage(props: SystemPageProps) {
 
   if (system.surface.kind !== "website") return <StPage className={paper.page}>
     <div aria-busy={loading || undefined} className={paper.stack}>
-      {titled ? <StHead crumb={{ label: "Home", onClick: onHome }} title={system.name} meta={<><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState> · {SYSTEM_KIND_LABEL[system.kind]}{system.detail ? ` · ${system.detail}` : ""}</>} actions={<StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton>} />
+      {titled ? <StHead crumb={{ label: "Home", onClick: onHome }} title={system.name} meta={<><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState> · {system.builtInApp ? <StMono>{system.builtInApp.label}</StMono> : SYSTEM_KIND_LABEL[system.kind]}{system.detail ? ` · ${system.detail}` : ""}</>} actions={<StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton>} />
         : <div className={paper.workMeta}><StTextButton onClick={onHome}>← Home</StTextButton><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState><StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton></div>}
       <StNotice tone={system.health.state === "blocked" ? "critical" : system.health.state === "degraded" ? "need" : undefined}>{HEALTH_LABEL[system.health.state]}. {system.health.summary}</StNotice>
       {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
@@ -156,7 +156,7 @@ export function SystemPage(props: SystemPageProps) {
         {back}
         {titled ? <h1 className="font-display">{system.name}</h1> : null}
         <p className={styles.meta}>
-          <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
+          <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{system.builtInApp ? <StMono>{system.builtInApp.label}</StMono> : SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
           <LifecyclePill lifecycle={system.lifecycle} />
           <HealthSignal health={system.health} detailed />
           {system.operatedBy ? <span>Agency of record: {system.operatedBy}</span> : system.providerIdentityStatus === "unavailable" ? <span>Agency identity could not be loaded</span> : system.providerIdentityStatus === "unassigned" ? <span>No agency of record</span> : null}

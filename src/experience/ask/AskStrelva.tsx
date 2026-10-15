@@ -38,6 +38,8 @@ export interface AskStrelvaProps {
   renderResult?: (message: AskMessageView) => ReactNode;
   /** Local previews keep recovery navigation inside their fictional business. */
   refusalLinks?: { needsYou: string; help: string };
+  /** Built-in Release label ("Ask Strelva Release 1") when STRELVA_APP_RELEASES is on. */
+  release?: string;
 
 }
 
@@ -49,7 +51,7 @@ type HistoryState = "loading" | "ready" | "unavailable" | "off";
  * shows what it actually did: answered, drafted (not live), opened a
  * Possibility, or filed a Request. Nothing typed here approves anything.
  */
-export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride, initialMessages = [], renderResult, refusalLinks }: AskStrelvaProps) {
+export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride, initialMessages = [], renderResult, refusalLinks, release }: AskStrelvaProps) {
   const contextRequest = useWorkspaceRequest();
   const request = requestOverride ?? contextRequest;
   const [canAskOnBehalf, setCanAskOnBehalf] = useState(initialCanAskOnBehalf);
@@ -193,7 +195,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const composer = <StComposerBar scope={place} placeholder={blockedReason ?? `Ask about ${place}`} value={input} onChange={setInput} onSubmit={() => void send()} disabled={streaming || Boolean(blockedReason)} inputLabel={`Ask Strelva about ${place}`} multiline textareaRef={inputRef} maxLength={20_000} />;
 
   return <section className={styles.ask} data-compact={compact || undefined} aria-labelledby="ask-strelva-title">
-    <StHead title="Ask Strelva" titleId="ask-strelva-title" meta={<>{systemName ? `About ${systemName}.` : `About ${businessName}.`} Strelva answers, drafts a change, opens a Possibility or files a Request. Decisions stay in Needs you.</>} actions={<StTextButton onClick={startNew} disabled={streaming || (!conversationId && messages.length === 0)}>New conversation</StTextButton>} />
+    <StHead title="Ask Strelva" titleId="ask-strelva-title" meta={<>{systemName ? `About ${systemName}.` : `About ${businessName}.`} Strelva answers, drafts a change, opens a Possibility or files a Request. Decisions stay in Needs you.{release ? <> · <StMono>{release}</StMono></> : null}</>} actions={<StTextButton onClick={startNew} disabled={streaming || (!conversationId && messages.length === 0)}>New conversation</StTextButton>} />
 
     <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
       {messages.length === 0 ? <StSection title="Ask in your own words" meta="For example">

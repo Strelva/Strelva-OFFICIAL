@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/platform/infra/db/server-client";
+import { builtInApp, builtInAppReleaseLabel } from "@/platform/app-releases/catalog";
+import { appReleaseLabelsEnabled } from "@/platform/app-releases/release";
+import { readBuiltInAppRelease } from "@/platform/app-releases/server";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readWorkspaceRecaps } from "@/products/recaps/server";
@@ -32,5 +36,10 @@ export default async function RecapsPage({ searchParams }: { searchParams: Promi
       state = { kind: "error" };
     }
   }
-  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} />;
+  const releaseLabel = appReleaseLabelsEnabled() && state.kind === "ready"
+    ? await readBuiltInAppRelease("recaps", workspaceId, await releaseViewerFor({ userId: user.id }))
+      .then(release => release.available ? builtInAppReleaseLabel(builtInApp("recaps"), release.release) : undefined)
+      .catch(() => undefined)
+    : undefined;
+  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} releaseLabel={releaseLabel} />;
 }

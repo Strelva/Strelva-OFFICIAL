@@ -21,7 +21,7 @@ type Props = {
   localPreview?: boolean;
 } & (
   | { productId: "tracker"; templateId?: ComponentProps<typeof TrackerExperience>["templateId"] }
-  | { productId: "documents"; initialRequestText?: string }
+  | { productId: "documents"; initialRequestText?: string; releaseLabel?: string }
   | ({ productId: "websites" } & Pick<ComponentProps<typeof WebsiteExperience>, "rebuildEnabled" | "managed" | "canPublish" | "agency" | "initialRequest">)
   | { productId: "onboarding"; initialRequest?: string }
   | { productId: "custom-applications" }
