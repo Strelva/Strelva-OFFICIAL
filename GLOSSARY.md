@@ -476,6 +476,14 @@ _Avoid_: System Version, service acceptance
 An application release, such as 1.0.0.
 _Avoid_: Version, History
 
+**Built-in App**:
+An App the platform ships in code to every business (Bookings, Inquiries, Recaps,
+Documents, Ask Strelva, Internal tools), declared in `src/platform/app-releases`.
+Its Releases are numbered and turned on by release flags; turning a Release's
+flag off returns the business to the Release before it. Credited to Strelva, never
+to an agency.
+_Avoid_: Library App, Version, Strelva Agency App
+
 **Stopped workspace**:
 A workspace whose exit has completed, with readable records and no new work.
 _Avoid_: deleted, archived, frozen

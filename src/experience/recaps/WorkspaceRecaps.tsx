@@ -45,11 +45,11 @@ export function RecapOutcome({ recap, outcome, siteName }: { recap: RecapView; o
   </article>;
 }
 
-export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean }) {
+export function WorkspaceRecaps({ workspaceId, state, period, outcomes, preview = false, releaseLabel }: { workspaceId: string; state: WorkspaceRecapsState; period: RecapPeriodFilter; outcomes?: Record<string, OutcomeRecap>; preview?: boolean; releaseLabel?: string }) {
   const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
   const filterHref = (value: RecapPeriodFilter) => `${preview ? "/preview/strelva/recaps" : "/workspace/recaps"}?workspaceId=${encodeURIComponent(workspaceId)}${value === "all" ? "" : `&period=${value}`}`;
   return <main className={styles.paper} data-dashboard data-workspace-theme="linen"><StPage>
-    <StHead crumb={{ label: "Back to Home", href: homeHref }} title="Recaps" meta="What Strelva saw on your site each week and month." />
+    <StHead crumb={{ label: "Back to Home", href: homeHref }} title="Recaps" meta={<>What Strelva saw on your site each week and month.{releaseLabel ? <> · <StMono>{releaseLabel}</StMono></> : null}</>} />
     {state.kind === "loading" ? <><StSkeleton label="Loading recaps" width="70%" /><StSkeleton /></> : state.kind === "permission" ? <StNotice tone="critical"><strong>These recaps belong to another business</strong><p>Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p><StTextButton href="/workspace">Open your workspace</StTextButton></StNotice> : state.kind === "error" ? <StNotice tone="critical"><strong>Recaps couldn&apos;t load</strong><p>Your saved recaps are kept. Reload the page to try again.</p><StTextButton href={filterHref(period)}>Reload recaps</StTextButton></StNotice> : <>
       <nav aria-label="Recap period" className={styles.actions}>{FILTERS.map(filter => <StPillLink key={filter.value} current={period === filter.value} variant="soft" href={filterHref(filter.value)}>{filter.label}{period === filter.value ? " · selected" : ""}</StPillLink>)}</nav>
       {!state.sites.length ? <StEmpty>No site is connected to this business yet. Recaps start once a website is connected or published here.</StEmpty> : state.sites.map(site => {

@@ -1,3 +1,5 @@
+import { appReleaseLabelsEnabled } from "@/platform/app-releases/release";
+import { appReleasesForSnapshot, readBuiltInAppReleases } from "@/platform/app-releases/server";
 import { recordFunnelEvent } from "@/platform/infra/funnel";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { readBusinessFoundFacts } from "@/products/found-facts/server";
@@ -253,6 +255,12 @@ export async function GET(request: Request) {
       return Promise.all([systemsReleaseEnabledForWorkspace(selected.id, viewer),
         inquiryReleaseEnabledForWorkspace(selected.id, viewer), websiteRebuildReleaseEnabledForWorkspace(selected.id, viewer)]);
     });
+    // Exposure only (STRELVA_APP_RELEASES): a failed read drops the labels, never the snapshot.
+    const appReleases = appReleaseLabelsEnabled() && selected.kind === "customer"
+      ? operator.then(isOperator => readBuiltInAppReleases(selected.id, { operator: isOperator, tester: false, userId: current.userId }))
+        .then(appReleasesForSnapshot)
+        .catch(error => { console.error("[app-releases] snapshot read failed", { workspaceId: selected.id, error: error instanceof Error ? error.message : String(error) }); return null; })
+      : Promise.resolve(null);
     // Attach every required read to the same aggregate before awaiting. Only
     // visible work gates delegations; Systems also need managed domains/releases.
     const [work, managedPresence, [systemsReleased, inquiryRelease, websiteRebuildReleased], exit,
@@ -292,6 +300,7 @@ export async function GET(request: Request) {
           .then(([record, found]) => gettingStartedStatus(record, found.length)).catch(() => "unavailable" as const)
         : undefined,
     ]);
+    const apps = await appReleases;
     // #241 remains undecided: a seat alone adds no inquiry entry or inbox grant.
     const inquiriesReleased = inquiryRelease && !providerSeat;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
@@ -327,7 +336,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { businessBilling: process.env.STRELVA_BUSINESS_BILLING === "1", exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { businessBilling: process.env.STRELVA_BUSINESS_BILLING === "1", exportSchema3: process.env.STRELVA_EXPORT_SCHEMA_3 === "1", ...(oauthEnabled() ? { assistantConnections: true } : {}), ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(businessSignupReleaseEnabled() ? { businessSignup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ...(agencyImportReleaseEnabled() ? { agencyImportClients: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}), ...(apps && Object.keys(apps).length ? { apps } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

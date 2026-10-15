@@ -13,6 +13,7 @@
  * Unless the snapshot says STRELVA_SYSTEMS_RELEASE is on, there are no
  * Systems: every saved result stays a file, as before the Systems model.
  */
+import { builtInAppForSystemKind } from "@/platform/app-releases/catalog";
 import type { OfferingInstallation } from "@/platform/offerings";
 import type { ManagedWork, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 import { sameAppHref } from "@/experience/workspace/workspace-discovery";
@@ -158,6 +159,9 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     // Lineage comes only from stored Version rows (system_versions). Saved
     // work's sourceWorkId is work-to-work history and never a Version.
     const stored = versionBySystem.get(entry.ref.systemId);
+    // A stored Version has its own Releases; a built-in label would confuse them.
+    const app = !stored ? builtInAppForSystemKind(entry.kind) : null;
+    const appView = app?.labelOnSystems ? snapshot.releases?.apps?.[app.id] : undefined;
     if (stored) {
       const sourceBusiness = stored.source.businessId === snapshot.workspaceId ? null : agencyNames.get(stored.source.businessId);
       const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your agency keeps");
@@ -186,6 +190,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
       ...(stored ? { storedVersionId: stored.id } : {}),
+      ...(appView ? { builtInApp: appView } : {}),
       ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
       ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
         ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),

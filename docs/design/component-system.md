@@ -2478,6 +2478,9 @@ App declarations in `PackageCatalog` and agency Library. Providers stay filter
 choices rather than catalog Apps. Missing, unknown, failed or ineligible account
 reads never imply connection readiness. Installation still prepares Drafts;
 server boundaries independently re-read required accounts before a live action.
+Its optional `footer` prop replaces the closing line (default: the install line);
+built-in App System pages pass "Required accounts are checked again when you
+make it live." and read Connections through `useConnectionRead`.
 StrelvaSidebar and StrelvaShell expose `connectionsAvailable` (default false)
 for this workspace section, independent of the Systems release. The existing
 workspace release remains its outer gate.

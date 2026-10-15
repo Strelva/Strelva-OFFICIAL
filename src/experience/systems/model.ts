@@ -1,3 +1,4 @@
+import type { BuiltInAppReleaseView } from "@/platform/app-releases/contracts";
 import { PLACE_LABELS, KIND_LABELS, STATE_LABELS, CONNECTION_LABELS } from "@/platform/presentation/place-labels";
 import type { RecordedActor } from "@/platform/presentation/actor";
 /**
@@ -143,6 +144,8 @@ export interface SystemView {
   /** Set only by the released publishing projection for a linked tenant. */
   publishing?: boolean;
   connections: SystemConnection[];
+  /** The built-in App this System runs on and its current Release (STRELVA_APP_RELEASES). Absent for Library Versions and Systems with their own Releases. */
+  builtInApp?: BuiltInAppReleaseView;
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
   /** Stored lineage in this business; enables its own improvement decision. */

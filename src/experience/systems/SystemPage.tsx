@@ -20,6 +20,8 @@ import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
+import { RequiredConnections } from "./RequiredConnections";
+import { useConnectionRead } from "./use-connection-read";
 import {
   CONNECTION_KIND_LABEL, HEALTH_LABEL, INCOMING_CONNECTION_LABEL, LIFECYCLE_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
@@ -115,7 +117,7 @@ export function SystemPage(props: SystemPageProps) {
 
   if (system.surface.kind !== "website") return <StPage className={paper.page}>
     <div aria-busy={loading || undefined} className={paper.stack}>
-      {titled ? <StHead crumb={{ label: "Home", onClick: onHome }} title={system.name} meta={<><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState> · {SYSTEM_KIND_LABEL[system.kind]}{system.detail ? ` · ${system.detail}` : ""}</>} actions={<StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton>} />
+      {titled ? <StHead crumb={{ label: "Home", onClick: onHome }} title={system.name} meta={<><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState> · {system.builtInApp ? <StMono>{system.builtInApp.label}</StMono> : SYSTEM_KIND_LABEL[system.kind]}{system.detail ? ` · ${system.detail}` : ""}</>} actions={<StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton>} />
         : <div className={paper.workMeta}><StTextButton onClick={onHome}>← Home</StTextButton><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState><StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton></div>}
       <StNotice tone={system.health.state === "blocked" ? "critical" : system.health.state === "degraded" ? "need" : undefined}>{HEALTH_LABEL[system.health.state]}. {system.health.summary}</StNotice>
       {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
@@ -156,7 +158,7 @@ export function SystemPage(props: SystemPageProps) {
         {back}
         {titled ? <h1 className="font-display">{system.name}</h1> : null}
         <p className={styles.meta}>
-          <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
+          <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{system.builtInApp ? <StMono>{system.builtInApp.label}</StMono> : SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
           <LifecyclePill lifecycle={system.lifecycle} />
           <HealthSignal health={system.health} detailed />
           {system.operatedBy ? <span>Agency of record: {system.operatedBy}</span> : system.providerIdentityStatus === "unavailable" ? <span>Agency identity could not be loaded</span> : system.providerIdentityStatus === "unassigned" ? <span>No agency of record</span> : null}
@@ -200,7 +202,7 @@ export function SystemPage(props: SystemPageProps) {
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
 export function hasContext(system: SystemView): boolean {
   return Boolean(system.storedVersionId || system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
-    || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length);
+    || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length || system.builtInApp?.requiredConnections.length);
 }
 
 function ActivationsPanel({ system }: { system: SystemView }) {
@@ -447,7 +449,14 @@ function SystemContextSections(props: SystemPageProps & { system: SystemView; si
     {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!props.readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={props.onPrepared} onAskRestore={props.onAskRestore}>{history}</WebsiteHistoryPanel>
       : system.history?.length || system.storedVersionId ? <HistoryPanel system={system}>{history}</HistoryPanel> : null}
   </>;
-  return system.storedVersionId ? <SystemVersionManagement workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? props.readOnly} compose={compose} /> : compose({});
+  const needs = system.builtInApp?.requiredConnections.length ? <BuiltInNeeds workspaceId={props.workspaceId} requirements={system.builtInApp.requiredConnections} /> : null;
+  return system.storedVersionId ? <SystemVersionManagement workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? props.readOnly} compose={compose} /> : <>{compose({})}{needs}</>;
+}
+
+/** What a built-in App's current Release needs, with each Connection's real state. Reads Connections only when it renders. */
+function BuiltInNeeds({ workspaceId, requirements }: { workspaceId: string; requirements: NonNullable<SystemView["builtInApp"]>["requiredConnections"] }) {
+  const needs = useConnectionRead(workspaceId, useWorkspaceRequest(), true);
+  return <RequiredConnections requirements={requirements} read={needs.read} workspaceId={workspaceId} retry={needs.retry} footer="Required accounts are checked again when you make it live." />;
 }
 
 function SystemNeedsYou({ system, state, agencyState, businessName, workspaceId, appBase = "" }: { system: SystemView; state?: NeedsYouState; agencyState?: AgencyClientHomeState; businessName?: string; workspaceId: string; appBase?: string }) {
