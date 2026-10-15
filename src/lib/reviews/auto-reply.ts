@@ -192,3 +192,26 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
 
   return { posted, failed };
 }
+
+/**
+ * An agency or Strelva operator held automatic replies (or paused the client):
+ * take the post timer off every model draft still waiting. The drafts stay
+ * pending, so the owner decides each one. Best-effort; returns how many it changed.
+ */
+export async function withdrawPendingAutoPosts(
+  tenantId: string,
+  input: { by: "agency" | "operator" },
+  nowMs = Date.now(),
+): Promise<number> {
+  const pending = await getEventsRaw(tenantId, { status: "pending", limit: 200 });
+  let withdrawn = 0;
+  for (const e of pending) {
+    if (e.metadata?.kind !== "review_reply_draft" || typeof e.metadata?.autoPostAt !== "string") continue;
+    const { event, changed } = await updateEvent(e.id, (ev) => {
+      const { autoPostAt: _autoPostAt, ...metadata } = ev.metadata ?? {};
+      return { ...ev, metadata: { ...metadata, autoPostWithdrawnAt: new Date(nowMs).toISOString(), autoPostWithdrawnBy: input.by } };
+    });
+    if (event && changed) withdrawn += 1;
+  }
+  return withdrawn;
+}
