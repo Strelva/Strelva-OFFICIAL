@@ -12,6 +12,7 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-US", { month: "sh
 /** Operator usage controls for one client: pause, monthly limit and review-reply hold, with the last 20 changes. */
 export function OperatorUsageControls({ tenantId, request = fetch }: { tenantId: string; request?: typeof fetch }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [saved, setSaved] = useState(false);
   const endpoint = `/api/admin/tenants/${encodeURIComponent(tenantId)}/ai-controls`;
   function read(value: unknown): State {
     const parsed = operatorAiControlsResponseSchema.safeParse(value);
@@ -50,13 +51,13 @@ export function OperatorUsageControls({ tenantId, request = fetch }: { tenantId:
       if (!response.ok) return { ok: false, error: (value && typeof value.error === "string" && value.error) || "Usage controls were not changed. Refresh to check the current state." };
       const next = read(value);
       if (next.kind !== "ready") return { ok: false, error: "Usage controls were not confirmed. Refresh to check the current state." };
-      setState(next);
+      setState(next); setSaved(true);
       return { ok: true };
     } catch { return { ok: false, error: "Usage controls were not changed. Refresh to check the current state." }; }
   }
   return <section aria-label="Operator usage controls" className="grid gap-4">
     <StLabel>Operator usage controls</StLabel>
-    <UsageControlsPanel key={view.budget.controls.revision} client={view} enforcement={{ budgetEnforced: state.budgetEnforced, freeCapUsd: state.freeCapUsd }} clientName={view.name} who="operator" canChange save={save} />
+    <UsageControlsPanel key={view.budget.controls.revision} client={view} enforcement={{ budgetEnforced: state.budgetEnforced, freeCapUsd: state.freeCapUsd }} clientName={view.name} who="operator" canChange save={save} saved={saved} onEdit={() => setSaved(false)} />
     {view.history.length ? <StRows label="Recent usage control changes">{view.history.map(change => <StRow key={`${change.at}:${change.reason}`} title={change.reason} detail={`${change.kind === "agency" ? change.agencyName ?? "An agency" : "A Strelva operator"} · ${when(change.at)}`} />)}</StRows> : null}
   </section>;
 }

@@ -17,6 +17,7 @@ const CONFLICT = "These controls changed since you opened them. Refresh, then sa
  */
 export function AgencyClientUsage({ agencyWorkspaceId, workspaceId, clientName, request = fetch }: { agencyWorkspaceId: string; workspaceId: string; clientName: string; request?: typeof fetch }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [saved, setSaved] = useState(false);
   const read = useCallback((value: unknown): State => {
     const parsed = agencyAiControlsResponseSchema.safeParse(value);
     const client = parsed.success ? parsed.data.clients.find(row => row.workspaceId === workspaceId) : undefined;
@@ -52,12 +53,12 @@ export function AgencyClientUsage({ agencyWorkspaceId, workspaceId, clientName, 
       if (!response.ok) return { ok: false, error: (value && typeof value.error === "string" && value.error) || "Usage controls were not changed. Refresh to check the current state." };
       const next = read(value);
       if (next.kind !== "ready") return { ok: false, error: "Usage controls were not confirmed. Refresh to check the current state." };
-      setState(next);
+      setState(next); setSaved(true);
       return { ok: true };
     } catch { return { ok: false, error: "Usage controls were not changed. Refresh to check the current state." }; }
   }
   return <section aria-label="Strelva usage" className="mx-2 mb-4 grid gap-3">
     <h3 className="text-sm font-medium">Strelva usage</h3>
-    <UsageControlsPanel key={data.client.budget.controls.revision} client={data.client} enforcement={{ budgetEnforced: data.budgetEnforced, freeCapUsd: data.freeCapUsd }} clientName={clientName} who="agency" canChange={data.canChange} save={save} />
+    <UsageControlsPanel key={data.client.budget.controls.revision} client={data.client} enforcement={{ budgetEnforced: data.budgetEnforced, freeCapUsd: data.freeCapUsd }} clientName={clientName} who="agency" canChange={data.canChange} save={save} saved={saved} onEdit={() => setSaved(false)} />
   </section>;
 }

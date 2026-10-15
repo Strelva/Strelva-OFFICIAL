@@ -27,7 +27,7 @@ create function pg_temp.aic_set(paused boolean,cap integer,auto text,rev bigint)
 select pg_temp.aic_assert(not has_table_privilege('service_role','public.business_ai_controls','select'),'no table bypass');
 select pg_temp.aic_assert(not has_function_privilege('authenticated','public.set_agency_ai_controls(uuid,uuid,uuid,text,boolean,integer,text,bigint,text)','execute'),'no public command');
 select pg_temp.aic_assert(not has_function_privilege('service_role','public.agency_ai_controls_scope(uuid,uuid,uuid,text,boolean)','execute'),'scope helper not granted');
-select pg_temp.aic_assert(has_function_privilege('service_role','public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text)','execute'),'service role admits');
+select pg_temp.aic_assert(has_function_privilege('service_role','public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text,boolean)','execute'),'service role admits');
 -- No row: neutral state.
 select pg_temp.aic_assert((public.business_ai_controls_state('26100000-0000-4000-8000-000000000010')->>'revision')='0','neutral revision');
 select pg_temp.aic_assert(public.business_ai_controls_state('26100000-0000-4000-8000-000000000010')->'setBy'='null'::jsonb,'neutral setBy');
@@ -50,23 +50,25 @@ select pg_temp.aic_assert((public.business_ai_controls_state('26100000-0000-4000
 select pg_temp.aic_assert((select count(*) from public.business_ai_control_changes where workspace_id='26100000-0000-4000-8000-000000000010')=1,'one change row');
 select pg_temp.aic_assert((select before from public.business_ai_control_changes limit 1) is null,'first change has no before');
 -- Admission: the agency limit ($1.00) binds even where the base cap is off.
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price')->>'status'='reserved','first reservation fits the limit');
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price')->>'reason'='agency_cap','second is held at the agency limit');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price',true)->>'status'='reserved','first reservation fits the limit');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price',true)->>'reason'='agency_cap','second is held at the agency limit');
 -- A list-price hold is released once its own estimated cost is logged.
 select public.record_model_calls(jsonb_build_array(jsonb_build_object('calledAt',clock_timestamp(),'purpose','ask','workspaceId','26100000-0000-4000-8000-000000000010','budgetReservationId',(select id::text from public.business_ai_budget_reservations limit 1),'actorKind','owner','modelLabel','fixture/text','attempt',1,'step',1,'latencyMs',1,'outcome','ok','costUsd','.1','costSource','estimate','priceTableVersion','fixture')));
 select pg_temp.aic_assert((public.business_ai_budget_v2('26100000-0000-4000-8000-000000000010')->>'reservedUsd')::numeric=0,'list-price hold released after cost');
 select pg_temp.aic_assert((public.business_ai_budget_v2('26100000-0000-4000-8000-000000000010')->>'spentUsd')::numeric=.1,'spend counted');
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price')->>'status'='reserved','room again after release');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.6,0,false,'list_price',true)->>'status'='reserved','room again after release');
 -- A qualified hold keeps its upper bound after cost.
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.2,0,false,'qualified')->>'status'='reserved','qualified reservation fits');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.2,0,false,'qualified',true)->>'status'='reserved','qualified reservation fits');
 -- Pause refuses everything, naming the controls.
 set local role service_role;
 select pg_temp.aic_set(true,100,'held',1);
 reset role;
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified')->>'reason'='controls','pause refuses');
-select pg_temp.aic_assert((public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified')->'budget'->'controls'->>'paused')='true','budget carries controls');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified',true)->>'reason'='controls','pause refuses');
+select pg_temp.aic_assert((public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified',true)->'budget'->'controls'->>'paused')='true','budget carries controls');
+-- With the controls release off, a stored pause or limit is read but not enforced.
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified',false)->>'status'='reserved','controls off: pause not enforced');
 -- Invalid ceiling source.
-select pg_temp.aic_refuse($$select public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'guess')$$,'business_ai_budget_invalid');
+select pg_temp.aic_refuse($$select public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'guess',true)$$,'business_ai_budget_invalid');
 -- v1 is unchanged and ignores controls.
 select pg_temp.aic_assert(public.business_ai_budget('26100000-0000-4000-8000-000000000010') ? 'spentUsd','v1 still readable');
 -- Operator path.
@@ -78,7 +80,7 @@ select public.set_operator_ai_controls('aic-operator@example.test','26100000-000
 reset role;
 select pg_temp.aic_assert((public.business_ai_controls_state('26100000-0000-4000-8000-000000000010')->'setBy'->>'kind')='operator','operator named');
 select pg_temp.aic_assert(jsonb_array_length(public.read_operator_ai_controls('aic-operator@example.test','26100000-0000-4000-8000-000000000010')->'history')=3,'history lists changes');
-select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified')->>'status'='reserved','lifted control admits against the base cap');
+select pg_temp.aic_assert(public.reserve_business_ai_budget_v2('26100000-0000-4000-8000-000000000010',.01,5,true,'qualified',true)->>'status'='reserved','lifted control admits against the base cap');
 -- A client whose seat ended is outside the agency's reach.
 update public.provider_seats set status='ended',ended_by='26100000-0000-4000-8000-000000000002',ended_at=now() where customer_workspace_id='26100000-0000-4000-8000-000000000010';
 select pg_temp.aic_refuse($$select pg_temp.aic_set(true,null,'client_choice',3)$$,'workspace_access_denied');

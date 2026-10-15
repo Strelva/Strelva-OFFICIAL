@@ -12,7 +12,7 @@ export async function GET() {
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
   await authorizeTenantOperatorRead(tenant);
-  return NextResponse.json({ voice: await getReplyVoice(tenant) });
+  return NextResponse.json({ voice: await getReplyVoice(tenant, { applyHold: false }) });
 }
 
 /** PUT { mode, guidance, templates } to update the reply voice. */

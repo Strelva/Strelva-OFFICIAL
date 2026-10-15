@@ -16,6 +16,7 @@ import { commandAgencyInvoice } from "@/platform/agency-billing";
 import { readCheckoutAvailability, type CheckoutAvailability } from "@/platform/connect/checkout-availability";
 import { AgencyCheckoutStatus } from "@/experience/workspace/billing/AgencyCheckoutStatus";
 import { AgencyPayerRequests } from "@/experience/workspace/billing/AgencyPayerRequests";
+import { aiControlsReleaseEnabled } from "@/platform/infra/ai-controls-release";
 import { businessAiCapUsd, readBusinessAiBudget, type AiControlsState, type BusinessAiBudget } from "@/platform/infra/business-ai-budget";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 
@@ -52,6 +53,8 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
     } catch { budget = null; capUsd = null; }
   }
   const budgetEnforced = process.env.STRELVA_BUSINESS_AI_BUDGET === "1";
+  // Business budget v2 is also read for the list-price ceiling alone; its controls show only with their own release.
+  const controlsOn = aiControlsReleaseEnabled();
   const needsPlan = (!billing || billing.state === "none") && canManage && budget !== null && !budget.subscribed;
   const showStartPlan = needsPlan && selfServeBillingConfig().enabled;
   let agencyChoices: { id: string; name: string }[] = [];
@@ -73,7 +76,7 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   }
   return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
     <BusinessBillingView workspaceId={workspaceId} canManage={canManage} billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
-    {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={budget?.controls ?? null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={budget?.controls ?? null} /> : null}
+    {showStartPlan ? <StartWorkspacePlan workspaceId={workspaceId} budget={budget} capUsd={capUsd} budgetEnforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : customerMember ? <BusinessAiBudgetSummary budget={budget} capUsd={capUsd} enforced={budgetEnforced} controls={controlsOn ? budget?.controls ?? null : null} /> : null}
     {needsPlan && !showStartPlan ? <WorkspacePlanUnavailable workspaceId={workspaceId} /> : null}
     <nav aria-label="Payment and agency settings" className="flex flex-wrap gap-4">
       {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><StTextButton href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</StTextButton><StTextButton href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</StTextButton></> : null}

@@ -55,7 +55,7 @@ describe("per-client usage controls in admission", () => {
     const reserveV2 = vi.fn(async () => ({ status: "reserved" as const, reason: null, reservationId: ID, budget: budget({ spentUsd: "0.5" }, { monthlyCapCents: 100 }) }));
     const read = async () => budget({ spentUsd: "0.5" }, { monthlyCapCents: 100 });
     await expect(assertBusinessAiBudget({ ...context, ceilingSource: "list_price" }, { environment: controlsOnly, read, reserveV2 })).resolves.toBe(ID);
-    expect(reserveV2).toHaveBeenCalledWith(WS, "0.01", null, false, "list_price");
+    expect(reserveV2).toHaveBeenCalledWith(WS, "0.01", null, false, "list_price", true);
   });
 
   it("takes the lower of the payer cap and the agency limit, and says who set it when reached", async () => {

@@ -125,12 +125,12 @@ export async function reserveBusinessAiBudget(workspaceId: string, maximumCostUs
 }
 
 /** Same admission as reserveBusinessAiBudget, with the per-client controls and the ceiling's source. */
-export async function reserveBusinessAiBudgetV2(workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null, applyBaseCap: boolean, ceilingSource: "qualified" | "list_price", client: Rpc | null = getSupabase() as unknown as Rpc | null): Promise<BusinessAiReservationV2 | null> {
+export async function reserveBusinessAiBudgetV2(workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null, applyBaseCap: boolean, ceilingSource: "qualified" | "list_price", applyControls: boolean, client: Rpc | null = getSupabase() as unknown as Rpc | null): Promise<BusinessAiReservationV2 | null> {
   if (!client) return null;
   try {
     const { data, error } = await client.rpc("reserve_business_ai_budget_v2", {
       p_workspace_id: workspaceId, p_maximum_cost_usd: maximumCostUsd, p_free_cap_usd: freeCapUsd,
-      p_apply_base_cap: applyBaseCap, p_ceiling_source: ceilingSource,
+      p_apply_base_cap: applyBaseCap, p_ceiling_source: ceilingSource, p_apply_controls: applyControls,
     });
     if (error) return null;
     const parsed = reservationV2Schema.safeParse(data);
@@ -148,7 +148,7 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
   environment?: Record<string, string | undefined>;
   read?: (workspaceId: string) => Promise<(BusinessAiBudget & { controls?: AiControlsState }) | null>;
   reserve?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null) => Promise<BusinessAiReservation | null>;
-  reserveV2?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null, applyBaseCap: boolean, ceilingSource: "qualified" | "list_price") => Promise<BusinessAiReservationV2 | null>;
+  reserveV2?: (workspaceId: string, maximumCostUsd: string, freeCapUsd: string | null, applyBaseCap: boolean, ceilingSource: "qualified" | "list_price", applyControls: boolean) => Promise<BusinessAiReservationV2 | null>;
 } = {}): Promise<string | null> {
   const environment = deps.environment ?? process.env;
   const budgetOn = environment.STRELVA_BUSINESS_AI_BUDGET === "1";
@@ -183,7 +183,7 @@ export async function assertBusinessAiBudget(context: { purpose: ModelCallPurpos
   const freeCap = budget.subscribed || !budgetOn ? null : environment.STRELVA_FREE_MONTHLY_AI_CAP_USD ?? null;
   if (v2) {
     const reservationV2 = await (deps.reserveV2 ?? reserveBusinessAiBudgetV2)(
-      context.workspaceId, maximumCostUsd!, freeCap, budgetOn, context.ceilingSource ?? "qualified",
+      context.workspaceId, maximumCostUsd!, freeCap, budgetOn, context.ceilingSource ?? "qualified", controlsOn,
     ).catch(() => null);
     const outcome = reservationV2Schema.safeParse(reservationV2);
     if (!outcome.success || outcome.data.budget.unknownCostCalls > 0) throw new ModelBudgetUnavailableError();

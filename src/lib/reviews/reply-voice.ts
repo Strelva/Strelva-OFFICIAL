@@ -59,14 +59,16 @@ function key(tenantId: string): string {
  * tenant is linked to a business, the release is on and the setting has
  * moved there (src/platform/needs-you/tenant-settings.ts). "off" (draft
  * nothing) is not a route and stays with the selected settings blob, as do
- * the guidance and templates.
+ * the guidance and templates. `applyHold: false` is for the owner's own
+ * settings form, which saves back what it read: it must see the stored mode.
  */
-export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
+export async function getReplyVoice(tenantId: string, { applyHold = true, ...options }: BridgeOptions & { applyHold?: boolean } = {}): Promise<ReplyVoice> {
   const voice = await readSetting(tenantId, "reply_voice", () => readRedisVoice(tenantId), defaultReplyVoice());
   if (voice.mode === "off") return voice;
   const policy = await workspacePorts().tenantPolicy();
   const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
-  return withAgencyHold(tenantId, route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice);
+  const routed = route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice;
+  return applyHold ? withAgencyHold(tenantId, routed) : routed;
 }
 
 /**

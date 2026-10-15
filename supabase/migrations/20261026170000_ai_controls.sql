@@ -103,7 +103,7 @@ end;
 $$;
 
 create function public.reserve_business_ai_budget_v2(p_workspace_id uuid, p_maximum_cost_usd numeric, p_free_cap_usd numeric,
-  p_apply_base_cap boolean, p_ceiling_source text) returns jsonb
+  p_apply_base_cap boolean, p_ceiling_source text, p_apply_controls boolean) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare current_budget jsonb; controls jsonb; base_cap numeric; agency_cap numeric; cap numeric; reservation uuid;
 begin
@@ -112,7 +112,7 @@ begin
     or p_maximum_cost_usd > 999999.99999999 or scale(p_maximum_cost_usd) > 8
     or (p_free_cap_usd is not null and (p_free_cap_usd < 0 or scale(p_free_cap_usd) > 8
       or p_free_cap_usd::text in ('NaN','Infinity','-Infinity')))
-    or p_apply_base_cap is null or p_ceiling_source is null or p_ceiling_source not in ('qualified','list_price') then
+    or p_apply_base_cap is null or p_apply_controls is null or p_ceiling_source is null or p_ceiling_source not in ('qualified','list_price') then
     raise exception 'business_ai_budget_invalid';
   end if;
   -- Same locks in the same order as v1: a control change and an admission for
@@ -131,13 +131,14 @@ begin
     raise exception 'business_ai_budget_unavailable';
   end if;
   controls := current_budget->'controls';
-  if (controls->>'paused')::boolean then
+  -- With STRELVA_AI_CONTROLS_RELEASE off the stored controls are not enforced, only read.
+  if p_apply_controls and (controls->>'paused')::boolean then
     return jsonb_build_object('status','paused','reason','controls','reservationId',null,'budget',current_budget);
   end if;
   base_cap := case when not p_apply_base_cap then null
     when (current_budget->>'subscribed')::boolean then (current_budget->>'capCents')::numeric / 100
     else p_free_cap_usd end;
-  agency_cap := (controls->>'monthlyCapCents')::numeric / 100;
+  agency_cap := case when p_apply_controls then (controls->>'monthlyCapCents')::numeric / 100 else null end;
   cap := least(base_cap, agency_cap);
   if cap is null then raise exception 'business_ai_budget_unavailable'; end if;
   if (current_budget->>'spentUsd')::numeric + (current_budget->>'reservedUsd')::numeric + p_maximum_cost_usd > cap then
@@ -296,7 +297,7 @@ $$;
 revoke all on function
   public.business_ai_controls_state(uuid),
   public.business_ai_budget_v2(uuid),
-  public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text),
+  public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text,boolean),
   public.agency_ai_controls_scope(uuid,uuid,uuid,text,boolean),
   public.read_agency_ai_controls(uuid,uuid,text,uuid),
   public.set_agency_ai_controls(uuid,uuid,uuid,text,boolean,integer,text,bigint,text),
@@ -307,7 +308,7 @@ revoke all on function
 grant execute on function
   public.business_ai_controls_state(uuid),
   public.business_ai_budget_v2(uuid),
-  public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text),
+  public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text,boolean),
   public.read_agency_ai_controls(uuid,uuid,text,uuid),
   public.set_agency_ai_controls(uuid,uuid,uuid,text,boolean,integer,text,bigint,text),
   public.operator_ai_controls_view(uuid),

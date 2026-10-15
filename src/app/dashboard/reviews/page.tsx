@@ -19,7 +19,7 @@ export default async function ReviewsPage() {
     getReviews(tenant).catch(() => []),
     getTenantConfig(tenant).catch(() => null),
     getConnection(tenant, "google").catch(() => null),
-    getReplyVoice(tenant).catch(() => defaultReplyVoice()),
+    getReplyVoice(tenant, { applyHold: false }).catch(() => defaultReplyVoice()),
     // Fetch only review_reply_draft events. The kind filter is applied post-fetch
     // inside this component, so use a generous limit here. The governed-work
     // migration caps event retention at 90 days; at most one draft per incoming

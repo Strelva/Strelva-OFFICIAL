@@ -3,12 +3,16 @@ import { readFileSync } from "fs";
 import path from "path";
 import type { SiteCapabilityManifest } from "@/lib/types";
 import { resolveEditableSections, resolveGbpWriteAllowed, buildGbpTools } from "@/lib/agent-shared";
+import { streamAssistantTurn } from "@/platform/assistant/core";
+import { ASSISTANT_POLICIES } from "@/platform/assistant/policy";
 
 // tool() passthrough so we can call .execute directly; events.addEvent mocked so
 // the shared GBP factory queues against a fake rather than Redis.
 const mockAddEvent = vi.hoisted(() => vi.fn());
-vi.mock("ai", () => ({ tool: (def: unknown) => def }));
+vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
 vi.mock("@/lib/events", () => ({ addEvent: (...a: unknown[]) => mockAddEvent(...a) }));
+const mockStream = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/infra/model-calls", async importOriginal => ({ ...(await importOriginal<typeof import("@/platform/infra/model-calls")>()), streamModelText: mockStream }));
 
 /**
  * Parity between the two AI-agent execution paths (streaming route + background
@@ -236,5 +240,17 @@ describe("buildGbpTools", () => {
     const out = await def.execute({ hours: [{ day: "MONDAY", open: "09:00", close: "17:00" }] });
     expect(out).toMatchObject({ success: false, agentResultStatus: "failed" });
     expect(errors).toEqual(["boom"]);
+  });
+});
+
+// ── Output limit: the tenant chat path bounds every provider request ────────
+describe("tenant chat output limit", () => {
+  it("passes the tenant_chat policy limits to the stream", async () => {
+    mockStream.mockResolvedValue({ modelLabel: "test", attempt: 1 });
+    await streamAssistantTurn({
+      policy: ASSISTANT_POLICIES.tenant_chat, context: { tenantId: "t", actorKind: "owner" } as never,
+      system: "s", messages: [], tools: {}, handlers: { toolCall: () => "", toolResult: () => null, text: () => undefined, line: () => undefined }, state: { emitted: false },
+    });
+    expect(mockStream.mock.calls[0]![1]).toMatchObject({ maxOutputTokens: 4096, system: "s" });
   });
 });

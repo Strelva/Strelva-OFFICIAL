@@ -205,7 +205,7 @@ describe("list-price ceiling", () => {
     const reserved = mocks.rpc.mock.calls.filter(([name]) => name === "reserve_business_ai_budget_v2");
     expect(reserved).toHaveLength(2);
     expect(reservations()).toHaveLength(0);
-    expect(reserved[0]?.[1]).toMatchObject({ p_workspace_id: workspaceId, p_apply_base_cap: true, p_ceiling_source: "list_price" });
+    expect(reserved[0]?.[1]).toMatchObject({ p_workspace_id: workspaceId, p_apply_base_cap: true, p_ceiling_source: "list_price", p_apply_controls: false });
     expect(Number(reserved[0]?.[1].p_maximum_cost_usd)).toBeGreaterThan(0);
   });
   it("leaves a request it cannot bound paused", async () => {

@@ -16,7 +16,7 @@ drop function public.operator_ai_controls_view(uuid);
 drop function public.set_agency_ai_controls(uuid,uuid,uuid,text,boolean,integer,text,bigint,text);
 drop function public.read_agency_ai_controls(uuid,uuid,text,uuid);
 drop function public.agency_ai_controls_scope(uuid,uuid,uuid,text,boolean);
-drop function public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text);
+drop function public.reserve_business_ai_budget_v2(uuid,numeric,numeric,boolean,text,boolean);
 drop function public.business_ai_budget_v2(uuid);
 drop function public.business_ai_controls_state(uuid);
 alter table public.business_ai_budget_reservations drop column ceiling_source;

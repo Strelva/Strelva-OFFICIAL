@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("ai", () => ({ tool: (def: unknown) => def }));
+vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
 
 import {
   type AskAgency,
@@ -34,6 +34,7 @@ import { systemOriginId } from "@/platform/systems";
 import type { ExistingSystemsSnapshot, SystemListing } from "@/platform/systems/from-existing";
 import type { WorkspaceRole } from "@/platform/workspaces/types";
 import { createInMemoryAskHistory } from "@/platform/ask/history";
+import { ASSISTANT_POLICIES, assistantCallOptions } from "@/platform/assistant/policy";
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const OTHER_WS = "22222222-2222-4222-8222-222222222222";
@@ -571,6 +572,15 @@ describe("startAskTurn", () => {
     expect(result.text).toContain("I read your services.");
     expect(result.text).toContain("paus");
     expect(result.result).toMatchObject({ ask: { kind: "refusal", budgetRecovery: "agency" } });
+  });
+
+  it("bounds the provider request the route builds from the stream input", async () => {
+    const h = harness();
+    await run(h.deps, "What are my services?");
+    const input = h.modelCalls[0] as { system: string; messages: unknown; tools: unknown };
+    // src/app/api/workspace/ask/route.ts builds the options exactly this way.
+    expect(assistantCallOptions(ASSISTANT_POLICIES.workspace_ask, input as never)).toMatchObject({ maxOutputTokens: 4096, system: input.system, tools: input.tools });
+    expect(readFileSync(path.join(process.cwd(), "src/app/api/workspace/ask/route.ts"), "utf8")).toContain("assistantCallOptions(ASSISTANT_POLICIES.workspace_ask, input)");
   });
 
   it("when both models fail before output, says Strelva can't answer and nothing changed", async () => {

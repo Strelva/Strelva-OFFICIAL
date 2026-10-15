@@ -73,6 +73,7 @@ describe("agency client usage", () => {
     expect(url).toBe("/api/workspace/agency-ai-controls");
     expect(JSON.parse(String(init!.body))).toEqual({ agencyWorkspaceId: AGENCY, workspaceId: WS, paused: true, monthlyCapCents: null, reviewAutoPost: "client_choice", expectedRevision: 2, reason: "Owner asked us to pause" });
     expect(node.textContent).toContain("Strelva work for Harbor Dental is paused.");
+    expect(node.textContent).toContain("Saved. Harbor Dental sees who changed this.");
   });
 
   it("turns 12.50 into 1250 cents and rejects a bad limit inline", async () => {
