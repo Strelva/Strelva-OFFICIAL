@@ -35,12 +35,17 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * Systems is on) unless a business's row says `off`; `workspace` turns it on
  * business by business, including the public `/api/v1/connect/*` gate.
  *
+ * `keep_your_site` (20261027160000): for a connected site, platform detection,
+ * install health, agency change Requests with the exact edit, live-page check
+ * and Releases, and the agency Client websites view. It requires
+ * `connected_sites` on for the same business. Off by default.
+ *
  * `make_real_owner_link` (20261009140000): Make real approved by signed email
  * link for an owner with no account (20261009131000). Its own row per
  * business, under STRELVA_MAKE_REAL_OWNER_LINK_RELEASE, off by default. Off:
  * the link answers "Sign in to decide this", as before 20261009131000.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links", "finite_jobs", "approval_store", "agent_channel", "keep_your_site"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -51,6 +56,7 @@ export function isMakeRealLiveFlag(flag: string): flag is MakeRealLiveFlag {
 
 export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   agent_channel: "STRELVA_AGENT_CHANNEL_RELEASE",
+  keep_your_site: "STRELVA_KEEP_YOUR_SITE_RELEASE",
   finite_jobs: "STRELVA_FINITE_JOBS_RELEASE",
   approval_store: "STRELVA_APPROVAL_STORE_RELEASE",
   owner_entry: "STRELVA_OWNER_ENTRY",
@@ -75,6 +81,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   agent_channel: "Agent customer confirmation (owner consent required)",
+  keep_your_site: "Keep your site: health, changes and Releases",
   finite_jobs: "Unified finite jobs",
   approval_store: "Unified approval store",
   owner_entry: "Owner entry",
