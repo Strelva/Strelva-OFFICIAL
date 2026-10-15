@@ -23,6 +23,7 @@ import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { GBP_WRITE_SCOPE, connectionHasWriteScope } from "./gbp-replies";
 import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
+import { SETUP_PENDING_MESSAGE, emitSetupPending, googleBusinessProfileApprovalPending, isSetupPendingError } from "./gbp-setup-pending";
 
 // ─── GBP API base URLs ────────────────────────────────────────────────────────
 
@@ -109,68 +110,6 @@ export interface GbpManagementResult {
   ownerMessage?: string;
 }
 
-/**
- * Owner-facing copy for the pending-approval / quota-not-live state. The GBP
- * (My Business) API quota is 0 until Google grants access (a 3–10 day
- * application), so during that window every write is rejected. We surface this
- * as "being set up", never a raw error or a crash.
- */
-const SETUP_PENDING_MESSAGE =
-  "Your Google Business connection is being set up. This will publish automatically once Google approves access (usually within a few days).";
-
-/**
- * True when a GBP API rejection is the "access not granted / quota 0" setup
- * state rather than a real error. While the Business Profile API access grant
- * is pending, Google returns 403 with reason `SERVICE_DISABLED` /
- * `accessNotConfigured` ("… API has not been used in project … before or it is
- * disabled"), or 429 `RESOURCE_EXHAUSTED` for the 0 quota. A generic 403
- * (a genuine permission problem) is intentionally NOT matched — that stays a
- * real failure that tells the owner to reconnect.
- */
-function isSetupPendingError(status: number, body: string): boolean {
-  if (status !== 403 && status !== 429) return false;
-  const b = body.toLowerCase();
-  return (
-    b.includes("accessnotconfigured") ||
-    b.includes("service_disabled") ||
-    b.includes("service has been disabled") ||
-    b.includes("service is disabled") ||
-    b.includes("has not been used in project") ||
-    b.includes("not been used in project") ||
-    b.includes("business profile api") ||
-    b.includes("resource_exhausted") ||
-    b.includes("quota")
-  );
-}
-
-/**
- * Emit a gentle, owner-facing "being set up" signal for the quota-pending
- * window. Deliberately NOT the scary `emitFailure` path — no "FAILED" Slack
- * ping, and a terminal (`auto_approved`) informational event so it never adds
- * a second item to the approval queue. The owner's original draft stays
- * pending (event-actions leaves it pending on a non-success write), so it
- * publishes on a later approval once access is live.
- */
-async function emitSetupPending(
-  tenantId: string,
-  operation: string,
-  evidence: string
-): Promise<void> {
-  try {
-    await addEvent({
-      tenantId,
-      source: "ai",
-      type: "change_verify_failed",
-      title: "Google Business connection is being set up",
-      body: SETUP_PENDING_MESSAGE,
-      status: "auto_approved",
-      metadata: { kind: "gbp_setup_pending", operation, evidence },
-    });
-  } catch {
-    // Informational only — never propagate.
-  }
-}
-
 // ─── Shared error emitter ─────────────────────────────────────────────────────
 
 async function emitFailure(
@@ -199,12 +138,25 @@ async function emitFailure(
 /** Guard: scope check + token + meta. Returns the context or a failure result. */
 type WriteContextResult =
   | { ok: true; accessToken: string; accountId: string; locationId: string }
-  | { ok: false; evidence: string };
+  | { ok: false; evidence: string; pending?: boolean };
+
+/** A context that could not be resolved: "waiting on Google" while approval is pending, else a plain failure. */
+function contextFailure(ctx: { evidence: string; pending?: boolean }): GbpManagementResult {
+  return ctx.pending
+    ? { success: false, verified: false, evidence: ctx.evidence, pendingSetup: true, ownerMessage: SETUP_PENDING_MESSAGE }
+    : { success: false, verified: false, evidence: ctx.evidence };
+}
 
 async function resolveWriteContext(
   tenantId: string,
   operation: string
 ): Promise<WriteContextResult> {
+  // While Google's approval is pending nothing is sent and nothing is a failure.
+  if (googleBusinessProfileApprovalPending()) {
+    const evidence = "google_access_pending";
+    await emitSetupPending(tenantId, operation, evidence);
+    return { ok: false, evidence, pending: true };
+  }
   const grant = await getGoogleGrant(tenantId);
   if (!grant || grant.status !== "connected") {
     const evidence = `tenant=${tenantId} error=no_connected_google_account`;
@@ -258,7 +210,7 @@ async function receiptedGoogleWrite(
 ): Promise<GbpManagementResult & { providerRef?: string }> {
   const operation = kind === "gbp_hours" ? "update_hours" : kind === "gbp_post" ? "create_post" : "upload_photo";
   const ctx = await resolveWriteContext(tenantId, operation);
-  if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
+  if (!ctx.ok) return contextFailure(ctx);
   const { accessToken, accountId, locationId } = ctx;
   const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
   const location = locationId.startsWith("locations/") ? locationId : `locations/${locationId}`;
@@ -386,7 +338,7 @@ export async function updateBusinessHours(
 ): Promise<GbpManagementResult> {
   if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") return receiptedGoogleWrite(tenantId, "gbp_hours", hours, options);
   const ctx = await resolveWriteContext(tenantId, "update_hours");
-  if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
+  if (!ctx.ok) return contextFailure(ctx);
 
   const { accessToken, locationId } = ctx;
 
@@ -508,7 +460,7 @@ export async function createGbpPost(
     return { ...result, postName: result.providerRef };
   }
   const ctx = await resolveWriteContext(tenantId, "create_post");
-  if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
+  if (!ctx.ok) return contextFailure(ctx);
 
   // SSRF guard at the egress boundary: ctaUrl/photoUrl come from an AI draft
   // (owner-approved, but the agent prompt is attacker-influencable) and Google's
@@ -655,7 +607,7 @@ export async function uploadGbpPhoto(
     return { ...result, mediaName: result.providerRef };
   }
   const ctx = await resolveWriteContext(tenantId, "upload_photo");
-  if (!ctx.ok) return { success: false, verified: false, evidence: ctx.evidence };
+  if (!ctx.ok) return contextFailure(ctx);
 
   // SSRF guard at the egress boundary — Google fetches sourceUrl. Same defense
   // createGbpPost applies; uploadGbpPhoto was missing it.

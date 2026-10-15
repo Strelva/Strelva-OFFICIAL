@@ -598,7 +598,7 @@ async function executeResolvedEventAction(
             return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
               ledger: "legacy", ledgerId, request: { reviewId, reply: replyText, providerTarget } });
           } } : {}) });
-        if (!result.published) return { changed: false, reason: "review_reply_failed" };
+        if (!result.published) return { changed: false, reason: result.pendingSetup ? "google_access_pending" : "review_reply_failed" };
       }
       // Reply accepted by Google — mark acceptance before resolving so a lost
       // lock / crash can't let a retry re-post it.

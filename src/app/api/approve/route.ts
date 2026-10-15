@@ -133,6 +133,17 @@ function confirmPage(params: {
   return shell(200, headingBody(params.heading, params.body) + preview + review + form);
 }
 
+/** Google has not approved Strelva's Business Profile access yet: nothing failed, the reply is saved. */
+function googleAccessPendingPage(businessName: string, dashboardUrl?: string): NextResponse {
+  return noticePage({
+    status: 200,
+    heading: "Waiting on Google",
+    body: `Your reply for ${businessName} is saved. It goes out once Google approves Strelva's Business Profile access. Nothing else to do.`,
+    dashboardUrl,
+    buttonLabel: "Open your workspace",
+  });
+}
+
 const INVALID = {
   missing: {
     heading: "This link is missing something",
@@ -372,6 +383,8 @@ async function postPage(request: Request): Promise<NextResponse> {
       buttonLabel: "Open your workspace",
     });
   }
+
+  if (result.reason === "google_access_pending") return googleAccessPendingPage(businessName, dashboardUrl);
 
   // Any other reason (e.g. the external publish failed) — keep it honest: the
   // item is still pending, point them to the dashboard.
