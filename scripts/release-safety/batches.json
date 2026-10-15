@@ -2257,7 +2257,7 @@
       "items": [
         {
           "file": "20261025110000_done_trust_legacy_ai.sql",
-          "sha256": "3f85cf5730ccbd60112ca593e3ca0b2b4314cad7dd4ebc223442428688d78d8a",
+          "sha256": "a3cf8f2c284d3693e834c43e16a003adcad3a29bf5c612c0a8e6aedf90669638",
           "rollback": "rollback-20261025110000_done_trust_legacy_ai.sql",
           "rollbackSha256": "b523d50441370b2c08692d3a139885c7c3e8953846da5b36b31b0f7e77ce9f59",
           "rollbackStatus": "Function-only inverse preserves model-call and reservation rows. Ordered disposable SQL, inverse/reapply and native fixture UNRUN; coordinator must run scripts/check-ux-audit-sql.sh."

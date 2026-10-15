@@ -12,6 +12,7 @@ import Link from "next/link";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { inquiryReleaseEnabled } from "@/products/inquiries/server";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
+import { claimOwnerInvitationsOnSignIn } from "@/platform/owner-entry/server";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,9 @@ export default async function AccountPage({
   }
 
   const claimedInvite = await claimPendingInviteForCurrentUser();
+  // An owner whose business was converted for them gets in by signing in; nothing is sent.
+  const [claimedOwnerWorkspace] = await claimOwnerInvitationsOnSignIn();
+  if (claimedOwnerWorkspace && workspaceReleaseEnabled() && !workspaceTarget) redirect(`/workspace?workspaceId=${encodeURIComponent(claimedOwnerWorkspace)}`);
   if (inquiryReleaseEnabled() && !managedRequested) {
     if (workspaceTarget) redirect(workspaceTarget);
     redirect("/business");

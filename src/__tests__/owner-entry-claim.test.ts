@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), resolve: vi.fn(), claim: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), resolve: vi.fn(), claim: vi.fn(), pending: vi.fn() }));
 vi.mock("react", () => ({ cache: (fn: unknown) => fn }));
 vi.mock("next/headers", () => ({ headers: vi.fn() }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/release-flags/store", () => ({ resolveTenantOwnerEntry: mocks.resolve, workspaceReleaseFlagEnabled: vi.fn() }));
-vi.mock("@/platform/workspaces/business-ownership", () => ({ claimPendingBusinessOwner: mocks.claim }));
-import { ownerEntryForTenant } from "@/platform/owner-entry/server";
+vi.mock("@/platform/workspaces/business-ownership", () => ({ claimPendingBusinessOwner: mocks.claim, pendingOwnerInvitationTenants: mocks.pending }));
+import { claimOwnerInvitationsOnSignIn, ownerEntryForTenant } from "@/platform/owner-entry/server";
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const user = { id: "7f000000-0000-4000-8000-000000000002", email: "owner@example.test", email_confirmed_at: "2026-10-07T00:00:00Z" };
@@ -57,5 +57,34 @@ describe("verified owner invitation claim on tenant entry", () => {
     mocks.claim.mockRejectedValue(new Error("local storage down"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await ownerEntryForTenant("fictional")).toEqual({ kind: "dashboard", reason: "unavailable" });
+  });
+});
+
+describe("owner invitation claim on app-host sign-in", () => {
+  it("claims each pending invitation for the verified address through the claim transaction", async () => {
+    mocks.pending.mockResolvedValue(["first-site", "second-site"]);
+    mocks.claim.mockResolvedValueOnce(WS).mockResolvedValueOnce(null);
+    expect(await claimOwnerInvitationsOnSignIn()).toEqual([WS]);
+    expect(mocks.pending).toHaveBeenCalledWith(user.email);
+    expect(mocks.claim).toHaveBeenNthCalledWith(1, { userId: user.id, verifiedEmail: user.email }, "first-site");
+    expect(mocks.claim).toHaveBeenNthCalledWith(2, { userId: user.id, verifiedEmail: user.email }, "second-site");
+  });
+  it.each(["STRELVA_OWNER_ENTRY", "STRELVA_OWNER_INVITATION_CLAIM", "STRELVA_WORKSPACE_RELEASE"])("%s off reads and claims nothing", async flag => {
+    vi.stubEnv(flag, "0");
+    expect(await claimOwnerInvitationsOnSignIn()).toEqual([]);
+    expect(mocks.pending).not.toHaveBeenCalled();
+    expect(mocks.claim).not.toHaveBeenCalled();
+  });
+  it("never claims for an unconfirmed address or a signed-out visitor", async () => {
+    mocks.session.mockResolvedValueOnce({ ...user, email_confirmed_at: null }).mockResolvedValueOnce(null);
+    expect(await claimOwnerInvitationsOnSignIn()).toEqual([]);
+    expect(await claimOwnerInvitationsOnSignIn()).toEqual([]);
+    expect(mocks.pending).not.toHaveBeenCalled();
+  });
+  it("keeps the ordinary landing when the invitation read fails", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.pending.mockRejectedValue(new Error("store down"));
+    expect(await claimOwnerInvitationsOnSignIn()).toEqual([]);
+    expect(mocks.claim).not.toHaveBeenCalled();
   });
 });

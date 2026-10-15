@@ -23,8 +23,13 @@ select pg_temp.legacy_ai_assert(not (public.business_ai_budget('da110000-0000-40
  and public.reserve_business_ai_budget('da110000-0000-4000-8000-000000000020',.01,0)->>'status'='paused','another tenant cannot entitle an unpaid workspace');
 update public.tenants set subscription_status='trialing' where id='done-trust-ai-linked';
 select pg_temp.legacy_ai_assert((public.business_ai_budget('da110000-0000-4000-8000-000000000010')->>'subscribed')::boolean,'legacy trialing is subscribed');
+update public.tenants set subscription_status='none', active=true where id='done-trust-ai-linked';
+select pg_temp.legacy_ai_assert((public.business_ai_budget('da110000-0000-4000-8000-000000000010')->>'subscribed')::boolean,'active managed client outside Stripe keeps AI');
+update public.tenants set active=false where id='done-trust-ai-linked';
+select pg_temp.legacy_ai_assert(not (public.business_ai_budget('da110000-0000-4000-8000-000000000010')->>'subscribed')::boolean,'inactive client without a subscription is not entitled');
+update public.tenants set active=true where id='done-trust-ai-linked';
 do $$ declare status text; begin
- foreach status in array array['none','past_due','canceled','unpaid','incomplete','incomplete_expired','paused'] loop
+ foreach status in array array['past_due','canceled','unpaid','incomplete','incomplete_expired','paused'] loop
   update public.tenants set subscription_status=status where id='done-trust-ai-linked';
   perform pg_temp.legacy_ai_assert(not (public.business_ai_budget('da110000-0000-4000-8000-000000000010')->>'subscribed')::boolean,'non-entitled status '||status);
  end loop;
