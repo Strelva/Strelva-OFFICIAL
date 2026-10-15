@@ -74,6 +74,8 @@ export const agencyQueueItemSchema = z.object({
   workId: uuid.nullable(),
   since: iso,
   label: z.string().max(200).optional(),
+  /** owner_claim only: whether the claim reached the owner, never the address or link. */
+  claimDelivery: z.enum(["not_sent", "sent", "unconfirmed", "no_link"]).optional(),
   href: z.string().startsWith("/").max(500).optional(),
 }).strict();
 

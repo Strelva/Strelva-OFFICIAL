@@ -84,7 +84,7 @@ export function AgencyQueueList({ items, now, onWorkspace, onOpenClientWork, com
     if (!rows.length) return null;
     return <StSection key={group.title} title={group.title} meta={<StMono>{rows.length}</StMono>}><StRows label={`${group.title}, oldest first`}>{rows.map(item => {
       const wait = waitLabel(item.since, now);
-      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.kind === "needs_you" || item.kind === "owner_email" ? `Waiting on ${item.clientName}` : item.label ?? queueKindLabel(item.kind)}`} href={item.href} onClick={item.href ? undefined : () => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<><StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
+      return <StRow key={`${item.workspaceId}:${item.id}`} lead={<StBeacon kind={item.kind === "health" ? "down" : item.kind === "improvement" || item.claimDelivery === "sent" ? "draft" : "need"} />} title={item.title} detail={`${item.clientName} · ${item.kind === "needs_you" || item.kind === "owner_email" ? `Waiting on ${item.clientName}` : item.label ?? queueKindLabel(item.kind)}`} href={item.href} onClick={item.href ? undefined : () => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)} end={<><StMono>{wait === "today" ? "Today" : wait}</StMono><span>Open →</span></>} />;
     })}</StRows></StSection>;
   })}</div>;
 }
