@@ -21,6 +21,17 @@ beforeEach(() => {
 });
 const render = async () => renderToStaticMarkup(await AgenciesPage());
 describe("neutral public agency destination", () => {
+  it.each([[false, "Agency signup is coming soon", "/sign-up?as=agency"], [true, "/sign-up?as=agency", "Agency signup is coming soon"]])("describes the real first-client path with signup %s", async (signup, shown, hidden) => {
+    mock.signup = signup;
+    const html = await render();
+    expect(html).toContain("Add a client, then copy its owner claim link and share it yourself.");
+    expect(html).toContain("doesn’t email your clients yet");
+    expect(html).not.toContain("Owner invitations are paused");
+    expect(html).toContain(shown);
+    expect(html).not.toContain(hidden);
+    if (signup) expect(html).toContain("Create your agency");
+  });
+
   it("reads listed agencies with verified identity and opens only owned businesses in Help", async () => {
     const html = await render();
     expect(mock.directory).toHaveBeenCalledWith({ userId: "owner", verifiedEmail: "owner@example.test" });

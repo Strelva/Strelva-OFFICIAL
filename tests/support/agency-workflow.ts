@@ -131,7 +131,7 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
     const businessId = result.client.customerWorkspaceId;
     workspaceIds.push(businessId);
     await expect(agencyPage.getByRole("heading", { name: "Elmwood Bakery", exact: true })).toBeVisible();
-    await expect(agencyPage.getByText("Not sent.", { exact: true })).toBeVisible();
+    await expect(agencyPage.getByText("Claim not sent: email to owners is off.", { exact: true })).toBeVisible();
     expect(result.ownerClaim.delivery.status).toBe("not_sent");
     expect(sql(`select count(*) from public.workspace_memberships where workspace_id='${businessId}'`)).toBe("0");
     expect(sql(`select count(*) from public.provider_seats where customer_workspace_id='${businessId}' and agency_workspace_id='${agencyId}' and status='active'`)).toBe("1");

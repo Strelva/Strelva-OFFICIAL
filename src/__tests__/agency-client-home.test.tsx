@@ -40,6 +40,25 @@ describe("agency client shared read", () => {
     expect(html).toContain(`id="decision-${id}"`); expect(html).not.toContain("<button");
     expect(html).not.toContain("Hold to approve");
   });
+  it("lists what the business decided under Recently decided, newest first, and only on the default view", () => {
+    const [open] = projection.decisions;
+    const approved = { id: "b9200000-0000-4000-8000-0000000000b1", title: "Approved intake", systemId: null, since: "2026-10-12T12:00:00Z", state: "approved" as const };
+    const declined = { id: "b9200000-0000-4000-8000-0000000000b2", title: "Declined banner", systemId: null, since: "2026-10-13T12:00:00Z", state: "declined" as const };
+    const data = { ...projection, decisions: [open!, approved, declined] };
+    const render = (selectedId?: string) => renderToStaticMarkup(createElement(AgencyClientDecisionStatus, { state: { status: "ready", data }, businessName: "Harbor Dental", workspaceId, selectedId, onRetry: vi.fn() }));
+    const html = render();
+    expect(html).toContain("Make the intake live");
+    expect(html).toContain("Recently decided");
+    expect(html).toContain("Approved by the business");
+    expect(html).toContain("Not yet");
+    expect(html.indexOf("Declined banner")).toBeLessThan(html.indexOf("Approved intake"));
+    expect(html).not.toContain("<button");
+    const selected = render(approved.id);
+    expect(selected).not.toContain("Recently decided");
+    expect(selected).toContain("Approved intake");
+    expect(selected).not.toContain("Declined banner");
+    expect(renderToStaticMarkup(createElement(AgencyClientDecisionStatus, { state: { status: "ready", data: projection }, businessName: "Harbor Dental", workspaceId, onRetry: vi.fn() }))).not.toContain("Recently decided");
+  });
   it.each(["loading", "error"] as const)("shows %s instead of a false all-clear", status => {
     const html = renderToStaticMarkup(createElement(AgencyClientDecisionStatus, { state: { status }, businessName: "Harbor Dental", workspaceId, onRetry: vi.fn() }));
     expect(html).toContain(status === "error" ? "could not be checked" : "Checking shared decision status");

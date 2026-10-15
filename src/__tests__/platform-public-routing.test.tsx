@@ -85,7 +85,7 @@ describe("honest two-door entry", () => {
     expect(html).toContain("coming soon"); expect(html).toContain('href="/audit"');
     expect(html).not.toContain("Request your build");
     const agency = renderToStaticMarkup(await AgenciesPage());
-    expect(agency).toContain("Agency signup is coming soon"); expect(agency).toContain("Owner invitations are paused"); expect(agency).not.toContain("invite the business owner"); expect(agency).not.toContain('href="/sign-up?as=agency"');
+    expect(agency).toContain("Agency signup is coming soon"); expect(agency).toContain("Add a client, then copy its owner claim link and share it yourself."); expect(agency).not.toContain("invite the business owner"); expect(agency).not.toContain('href="/sign-up?as=agency"');
   });
   it("opens each existing door only when its release gates permit it", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");

@@ -54,7 +54,7 @@ export type AgencyOnboardingStepId = "profile" | "team" | "verification" | "firs
 export interface AgencyOnboardingStep {
   id: AgencyOnboardingStepId;
   done: boolean;
-  /** Whether this actor can act on the step now. "first_client" stays false until adding clients ships (#259). */
+  /** Whether this actor can act on the step now. "first_client" is true once adding clients is released (#259) and the actor is not a plain member. */
   available: boolean;
 }
 
@@ -71,14 +71,14 @@ export interface AgencySummary { id: string; name: string; role: WorkspaceRole }
  * The checklist from facts. Verification is "done" only when every effect is
  * verified; the agency cannot do it here, so it is never the next step.
  */
-export function deriveAgencyOnboarding(facts: AgencyOnboardingFacts): AgencyOnboarding {
+export function deriveAgencyOnboarding(facts: AgencyOnboardingFacts, options?: { addClient?: boolean }): AgencyOnboarding {
   const owner = facts.agency.role === "owner";
   const verifiedEffects = facts.effects.filter((effect) => effect.verified).length;
   const steps: AgencyOnboardingStep[] = [
     { id: "profile", done: facts.agency.name.trim().length > 0, available: true },
     { id: "team", done: facts.members > 1 || (facts.pendingInvitations ?? 0) > 0, available: owner },
     { id: "verification", done: facts.effects.length === AGENCY_EFFECTS.length && verifiedEffects === AGENCY_EFFECTS.length, available: false },
-    { id: "first_client", done: facts.clients > 0, available: false },
+    { id: "first_client", done: facts.clients > 0, available: options?.addClient === true && facts.agency.role !== "member" },
   ];
   const next = steps.find((step) => !step.done && step.available)?.id
     ?? steps.find((step) => !step.done && step.id === "first_client")?.id
@@ -142,6 +142,7 @@ export async function readAgencyOnboarding(
   inputActor: WorkspaceActor,
   agencyWorkspaceId: string,
   deps: AgencyOnboardingDeps = defaultDeps,
+  options: { addClient?: boolean } = {},
 ): Promise<AgencyOnboarding> {
   const actor = cleanActor(inputActor);
   if (!uuid.safeParse(agencyWorkspaceId).success) throw new WorkspaceAccessError();
@@ -173,5 +174,5 @@ export async function readAgencyOnboarding(
       const row = byEffect.get(effect);
       return { effect, verified: row?.status === "verified", recordedAt: row?.recorded ? row.recordedAt : null };
     }),
-  });
+  }, options);
 }
