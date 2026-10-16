@@ -2598,7 +2598,7 @@
     },
     {
       "id": "xa-build-2026-10-16",
-      "status": "Held and unapplied. XA build presentation reads: read_access_review returns an optional 'since' for provider entries (XA \u00b7 R4, lane XA-8), and application_action_actor_snapshot also records the acting agency member's own account name so owner screens can name the person at the agency (lane XA-3). No grant, gate or authority change; existing History is not backfilled. Not run against any database in this build. No production, provider, email or flag change authorized.",
+      "status": "Held and unapplied. XA build presentation reads: read_access_review returns an optional 'since' for provider entries (XA \u00b7 R4, lane XA-8), and application_action_actor_snapshot also records the acting agency member's own account name so owner screens can name the person at the agency (lane XA-3). Plus owner email confirmations (switch-on): an operator-recorded confirmation that an address is a business owner's, read by the email transport before any owner claim or Needs you email. Otherwise no grant, gate or authority change; existing History is not backfilled. Not run against any database in this build. No production, provider, email or flag change authorized.",
       "items": [
         {
           "file": "20261028100800_access_review_since.sql",
@@ -2611,6 +2611,13 @@
           "file": "20261028110000_agency_actor_person_name.sql",
           "sha256": "ce86ed687c9d0a1b58a102d3febfb4bfffa3112839a7e93025ada316cd266f4a",
           "rollbackStatus": "No rollback file prepared yet; the prior application_action_actor_snapshot is in 20261021181000_application_actor_snapshots.sql. Snapshots written after apply keep personName. No production application authorized."
+        },
+        {
+          "file": "20261028120000_owner_email_confirmations.sql",
+          "sha256": "b9dfeac22e05db40d6bb5be74b6dcf764b117a08d88f463ca406c11816c6233b",
+          "rollback": "rollback-20261028120000_owner_email_confirmations.sql",
+          "rollbackSha256": "1da5d7658ca7cf2b7f457aa5a81a2c482fb75892ad028e5d732531cf0fb7aad3",
+          "rollbackStatus": "Drops owner_email_confirmations, its forget trigger and the three RPCs. Recorded confirmations are lost (capture them first); with owner_email_confirmed gone every owner email stream send is held."
         }
       ]
     }

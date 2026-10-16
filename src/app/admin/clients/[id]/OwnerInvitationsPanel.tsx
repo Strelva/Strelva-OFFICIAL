@@ -9,7 +9,7 @@ import type { OwnerInvitationResult } from "@/platform/workspaces/business-owner
 export function ownerInvitationNotice(deliveryStatus: string, recipientEmail: string): string {
   return deliveryStatus === "sent" || deliveryStatus === "accepted"
     ? `Invitation emailed to ${recipientEmail}.`
-    : "Client email is off, so nothing was emailed. Copy this link and send it yourself.";
+    : "Not emailed: owner email is off, or this address isn't confirmed for the business. Copy this link and send it yourself.";
 }
 
 export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { tenantId: string; load: OwnerInvitationsLoad; request?: typeof fetch }) {
@@ -95,8 +95,8 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
             <StPill type="submit" disabled={busy || !recipient.trim() || (!recipientIsTrusted && !approvalId.trim())} busy={busy}>Prepare invitation link</StPill>
           </form>}
       </>}
-    <StState kind="draft">Owner emails off globally during rollout</StState>
-    <StNotice>Email delivery remains disabled. The link appears only in this authenticated response.</StNotice>
+    <StState kind="draft">Owner email goes only to confirmed addresses</StState>
+    <StNotice>Strelva emails an owner invitation only when owner email is on and the address is confirmed for this business. Otherwise the link appears only in this authenticated response.</StNotice>
     {message && <div role="status"><StNotice>{message}</StNotice></div>}
     {acceptUrl && <StInput label="Invitation link — keep private" value={acceptUrl} readOnly hint="Available only now. Revoke and prepare a new invitation if the link is lost." onFocus={event => event.target.select()} />}
     {error && <StNotice tone="critical">{error}</StNotice>}

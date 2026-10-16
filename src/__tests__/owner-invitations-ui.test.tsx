@@ -10,7 +10,7 @@ describe("operator owner invitations presentation", () => {
     expect(html).toContain("owner@example.test");
     expect(html).toContain("trusted owner address");
     expect(html).toContain("sign-in from the last 10 minutes");
-    expect(html).toContain("Email delivery remains disabled.");
+    expect(html).toContain("Strelva emails an owner invitation only when owner email is on and the address is confirmed for this business.");
     expect(html).not.toContain("jacobApproved");
     expect(html).not.toContain("Jacob approved");
     expect(html).not.toContain("Email invitation");
@@ -19,7 +19,7 @@ describe("operator owner invitations presentation", () => {
 
   it("says plainly that nothing was emailed and to copy the link, whatever the reason", () => {
     for (const status of ["not_sent", "unknown"]) {
-      expect(ownerInvitationNotice(status, "owner@example.test")).toBe("Client email is off, so nothing was emailed. Copy this link and send it yourself.");
+      expect(ownerInvitationNotice(status, "owner@example.test")).toBe("Not emailed: owner email is off, or this address isn't confirmed for the business. Copy this link and send it yourself.");
     }
     expect(ownerInvitationNotice("accepted", "owner@example.test")).toBe("Invitation emailed to owner@example.test.");
   });

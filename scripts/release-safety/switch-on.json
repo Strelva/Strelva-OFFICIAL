@@ -1,0 +1,2346 @@
+{
+  "$comment": "Switch-on plan for Vercel production (strelva-admin). Generated with design-notes/SWITCH-ON.md. Names and values only; no secrets. 'rollback' is the value to set to undo; an empty string means remove the variable. Each rollback assumes the variable was unset before; if step 0 read another value, roll back to that value instead. 'from' is what the vault records, 'unknown' where nothing is recorded: confirm with step 0 before changing.",
+  "generatedFrom": "xa/fix-switch-on",
+  "date": "2026-10-16",
+  "decisions": {
+    "email": "Owner claim and Needs you only, to owner addresses confirmed in data. Booking, inquiry, reminder and marketing email off. The 6 candidate owner emails in the vault are unconfirmed: never record them as confirmed, never send to them.",
+    "money": "Honest not yet. No price, no Stripe switch-on.",
+    "external": "Google Business Profile writes, provider keys (HighLevel, Microsoft, Instagram) and Dental vertical_intake stay off and render honestly."
+  },
+  "step0": [
+    "vercel env pull --environment=production into a temp file, then: pnpm tsx scripts/prod-flag-report.ts <file> (names and normalized states only). Replace every 'unknown' 'from' below with what it reports.",
+    "Read-only: list reb:client-email:* in Redis and tenant_settings rows with recordId client_email. Every value must be inherit or off. An 'on' arms ALL client email for that tenant (send.ts audience gate), so set it to inherit before deploy 2 (rollback: its previous value).",
+    "Read-only: confirm the 29 held migrations from MIGRATION-PLAN.md are applied, including 20261028120000_owner_email_confirmations.sql, before the deploy that sets their flags."
+  ],
+  "mustStayUnset": [
+    "CUSTOMER_EMAIL_ENABLED",
+    "EMAIL_SENDING_ENABLED",
+    "STRELVA_AGENCY_PAY_LINKS",
+    "STRELVA_AGENCY_PAY_LINKS_LIVE",
+    "STRELVA_AGENT_CHANNEL_RELEASE",
+    "STRELVA_AGENT_INQUIRIES",
+    "STRELVA_AGENT_PAYMENTS",
+    "STRELVA_AGENT_PAYMENT_MERCHANT_PROFILES",
+    "STRELVA_AGENT_PAYMENT_PROTOCOL",
+    "STRELVA_AGENT_PAYMENT_SELLER_TERMS_APPROVED",
+    "STRELVA_AGENT_READABLE",
+    "STRELVA_BACKGROUND_WORK_RELEASE",
+    "STRELVA_BOOKING_AGENTS",
+    "STRELVA_BOOKING_AGENT_VISIBILITY",
+    "STRELVA_BOOKING_CALENDAR_SCOPES",
+    "STRELVA_BOOKING_MESSAGES",
+    "STRELVA_BOOKING_OWNER_NOTICE",
+    "STRELVA_BOOKING_REMINDERS",
+    "STRELVA_BUNDLE_MAINTENANCE_RELEASE",
+    "STRELVA_BUSINESS_BILLING",
+    "STRELVA_BUSINESS_OUTCOME_REPORTS",
+    "STRELVA_BUSINESS_PAGES",
+    "STRELVA_CARE_REPORT_EMAIL",
+    "STRELVA_CATALOG_REPORTS_RELEASE",
+    "STRELVA_CONNECT",
+    "STRELVA_CONNECTED_SITE_EMAIL_ENABLED",
+    "STRELVA_CONNECT_CHECKOUT_TENANTS",
+    "STRELVA_CONNECT_FEES_COLLECTOR",
+    "STRELVA_CONNECT_LOSSES_COLLECTOR",
+    "STRELVA_CONNECT_PROFILE_VERSION",
+    "STRELVA_CUSTOMERS_RELEASE",
+    "STRELVA_CUSTOM_APPLICATION_BUILD_PROVIDER",
+    "STRELVA_EXPORT_LINK_EMAIL",
+    "STRELVA_GHL_IMPORT_RELEASE",
+    "STRELVA_GOOGLE_MAKE_REAL_RELEASE",
+    "STRELVA_GOOGLE_OWNER_CONNECT",
+    "STRELVA_GOOGLE_READ_GRANT",
+    "STRELVA_INQUIRY_BOOKING_HANDOFF",
+    "STRELVA_INQUIRY_FORWARDING_RELEASE",
+    "STRELVA_INQUIRY_OWNER_NOTICES",
+    "STRELVA_INQUIRY_REPLIES",
+    "STRELVA_INTAKE_OWNER_EMAIL",
+    "STRELVA_INTAKE_SENSITIVE_FIELDS",
+    "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+    "STRELVA_LISTINGS_SYNC_GOOGLE_FIX",
+    "STRELVA_LISTINGS_SYNC_YELP",
+    "STRELVA_MONEY_RECONCILIATION",
+    "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+    "STRELVA_NEWSLETTER_SENDER_RELEASE",
+    "STRELVA_PLANNING_ENABLED",
+    "STRELVA_PLATFORM_COLLECTION",
+    "STRELVA_PRODUCT_LEARNING_RELEASE",
+    "STRELVA_PUBLISHING_NOTICES_SEND",
+    "STRELVA_PUBLISHING_RELEASE",
+    "STRELVA_RECORD_GOOGLE_APPROVAL_POLICY",
+    "STRELVA_REVENUE_SPLITS",
+    "STRELVA_SANDBOX_2048MB_CONTRACT_APPROVED",
+    "STRELVA_SANDBOX_RUNTIME_APPROVED",
+    "STRELVA_SELF_SERVE_BILLING",
+    "STRELVA_SPLIT_PAYOUTS_DRY_RUN",
+    "STRELVA_SPLIT_PAYOUT_EXECUTION",
+    "STRELVA_SUBSCRIPTION_ALLOWANCE_CONFIG",
+    "STRELVA_VERTICAL_INTAKE_RELEASE",
+    "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
+    "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
+    "STRELVA_WEBSITE_REBUILD_RELEASE",
+    "STRELVA_WEBSITE_REPORT_EMAIL_ENABLED",
+    "STRELVA_WORKSPACE_ALLOWANCE_KEY",
+    "STRELVA_WORKSPACE_PRICE_ID"
+  ],
+  "mustStayAsIs": [
+    "CONTENT_SOURCE",
+    "DATA_SOURCE",
+    "DUAL_WRITE_PG",
+    "GOVERNED_WORK_DUAL_WRITE",
+    "GOVERNED_WORK_READ_PG",
+    "OPERATOR_EMAILS_ENABLED",
+    "PROSPECT_EMAILS_ENABLED",
+    "REB_DEV_TENANT",
+    "REB_DEV_UNGATED_ACCESS",
+    "STRELVA_AGENCY_ADD_CLIENT_RELEASE",
+    "STRELVA_AGENCY_IMPORT_RELEASE",
+    "STRELVA_AGENCY_SIGNUP_RELEASE",
+    "STRELVA_AGENCY_WORKSPACE_ID",
+    "STRELVA_APPROVAL_STORE_RELEASE",
+    "STRELVA_ASK_RELEASE",
+    "STRELVA_AUTH_EMAIL_CODE",
+    "STRELVA_AUTH_EMAIL_READY",
+    "STRELVA_BOOKING_CALENDAR_BUSY",
+    "STRELVA_BOOKING_CALENDAR_MIRROR",
+    "STRELVA_BOOKING_INQUIRY_OFFERS",
+    "STRELVA_BOOKING_MANAGE_PAGE",
+    "STRELVA_BOOKING_MANUAL",
+    "STRELVA_BOOKING_READ_POSTGRES_DEFAULT",
+    "STRELVA_BOOKING_RECORD_FALLBACK",
+    "STRELVA_BOOKING_SETTINGS",
+    "STRELVA_BOOKING_STORE_READ",
+    "STRELVA_BOOKING_STORE_WRITE",
+    "STRELVA_BUSINESS_AI_BUDGET",
+    "STRELVA_BUSINESS_SIGNUP_RELEASE",
+    "STRELVA_CALENDAR_FIXTURE",
+    "STRELVA_CLAIM_REVIEW_RELEASE",
+    "STRELVA_CLIENT_RECORDS_DUAL_WRITE",
+    "STRELVA_CLIENT_RECORDS_READ",
+    "STRELVA_CONNECTIONS_LEGACY_GOOGLE",
+    "STRELVA_CSP_NONCE_REPORT_ONLY",
+    "STRELVA_FINITE_JOBS_RELEASE",
+    "STRELVA_FREE_MONTHLY_AI_CAP_USD",
+    "STRELVA_FULL_MODEL_PROFILE",
+    "STRELVA_GOOGLE_BINDINGS",
+    "STRELVA_INQUIRY_RECORDS",
+    "STRELVA_LEADS_AUTHORITY",
+    "STRELVA_LEADS_READ",
+    "STRELVA_LOCAL_AUTH_PROOF",
+    "STRELVA_NATIVE_GOOGLE_ONLY",
+    "STRELVA_NEEDS_YOU_RELEASE",
+    "STRELVA_OWNER_ENTRY",
+    "STRELVA_OWNER_INVITATION_CLAIM",
+    "STRELVA_PAY_LINK_STORE",
+    "STRELVA_SYSTEMS_RELEASE",
+    "STRELVA_TENANT_CONVERSION",
+    "STRELVA_TENANT_CONVERSION_PRODUCTION_APPROVED",
+    "STRELVA_TENANT_RECEIPT_RETENTION",
+    "STRELVA_UI_PREVIEW",
+    "STRELVA_WORKSPACE_RELEASE",
+    "STRIPE_BILLING_GRANDFATHER_TENANTS",
+    "TENANTS_SOURCE"
+  ],
+  "phases": [
+    {
+      "phase": "A",
+      "after": "No held migration needed",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_AGENCY_PROSPECTING_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_AGENT_ABUSE_MONITOR",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_AGENT_IDENTITY_LIMITS",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_APP_RELEASES",
+          "from": "off (grade Oct 15: absent)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_BUSINESS_RECORD_READS",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE",
+          "from": "unknown (not recorded in vault)",
+          "to": "pending",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_DOCUMENT_HISTORY_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_EXIT_HANDOFF",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_EXPORT_RECOVERY",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_EXPORT_SCHEMA_3",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_INQUIRIES_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_INQUIRY_BUSINESS_FACTS",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_INQUIRY_OUTCOMES",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_MAKE_REAL_LIVE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_MCP_OAUTH",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_ONE_INVITATION_PATH",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_OPERATOR_QUEUE_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_OWNER_INVITATIONS_RELEASE",
+          "from": "likely 1 (silent invitations issued Oct 14), unverified",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_PROVIDER_CHANGE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        },
+        {
+          "name": "STRELVA_WEBSITE_NATIVE_FACTS_ENABLED",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": []
+        }
+      ]
+    },
+    {
+      "phase": "B",
+      "after": "After 20261026170000 (AI controls)",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_AI_CONTROLS_RELEASE",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261026170000_ai_controls.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_AI_LIST_PRICE_CEILING",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261026170000_ai_controls.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "C",
+      "after": "After 20261027100000 (owner reach)",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_OWNER_REACH_RELEASE",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027100000_owner_reach.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "D",
+      "after": "After 20261027110000 + 20261027111000 (one approval path, one queue)",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_AUTO_POST_DECISION_RECORD",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027110000_dedupe_flows_owner_decisions.sql",
+            "20261027111000_provider_client_queue_v3.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_ONE_APPROVAL_PATH",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027110000_dedupe_flows_owner_decisions.sql",
+            "20261027111000_provider_client_queue_v3.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_ONE_QUEUE",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027110000_dedupe_flows_owner_decisions.sql",
+            "20261027111000_provider_client_queue_v3.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "E",
+      "after": "After 20261026100000 + 20261026120100 (Connections core, installer)",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_CONNECTED_SITES_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261026100000_conn_core_holders.sql",
+            "20261026120100_conn_tools_installer.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "F",
+      "after": "After keep-your-site 20261027160000..160200",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_KEEP_YOUR_SITE_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261026100000_conn_core_holders.sql",
+            "20261026120100_conn_tools_installer.sql",
+            "20261027160000_keep_your_site_flag.sql",
+            "20261027160100_keep_your_site_changes.sql",
+            "20261027160200_keep_your_site_agency_home.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "G",
+      "after": "After sites-by-code 20261027120000..120300 (120100 before or with the code)",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_SITES_BY_CODE_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027120000_sites_by_code_flag.sql",
+            "20261027120100_site_content_source_backfill.sql",
+            "20261027120200_site_change_agent_tools.sql",
+            "20261027120300_website_code_releases.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "H",
+      "after": "After app events 20261028100000 + 100100",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_APP_EVENTS_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100000_app_events.sql",
+            "20261028100100_app_event_sources.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_APP_EVENT_WEBHOOKS_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100000_app_events.sql",
+            "20261028100100_app_event_sources.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "I",
+      "after": "After listings sync 20261028100200 + 100300",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_LISTINGS_SYNC_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100200_listings_sync_flag.sql",
+            "20261028100300_listings_sync_store.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "J",
+      "after": "After care reports 20261028100400",
+      "deploy": 1,
+      "changes": [
+        {
+          "name": "STRELVA_CARE_REPORTS_RELEASE",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100400_care_reports.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_CARE_REPORT_SHARE_LINKS",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100400_care_reports.sql"
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "K",
+      "after": "Deploy 2, email. After 20261028120000 (owner email confirmations) and after Jacob has confirmed at least one owner address in data. Same deploy carries every line below.",
+      "deploy": 2,
+      "changes": [
+        {
+          "name": "STRELVA_OWNER_EMAIL_SINCE",
+          "from": "unset (new in this build)",
+          "to": "<cutover instant, ISO with zone, e.g. 2026-10-16T18:00:00Z>",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_OWNER_EMAIL_STREAMS",
+          "from": "unset (new in this build)",
+          "to": "owner_claim,needs_you",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE",
+          "from": "off (vault Oct 14: claim email off)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_INVITATION_EMAIL_RELEASE",
+          "from": "off (grade Oct 15)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_OWNER_DECISION_LINKS_RELEASE",
+          "from": "unknown (not recorded in vault)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+          "from": "off (silent rollout preflight)",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_SITE_CHANGE_OWNER_EMAIL",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261027120000_sites_by_code_flag.sql",
+            "20261027120100_site_content_source_backfill.sql",
+            "20261027120200_site_change_agent_tools.sql",
+            "20261027120300_website_code_releases.sql",
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261026100000_conn_core_holders.sql",
+            "20261026120100_conn_tools_installer.sql",
+            "20261027160000_keep_your_site_flag.sql",
+            "20261027160100_keep_your_site_changes.sql",
+            "20261027160200_keep_your_site_agency_home.sql",
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        },
+        {
+          "name": "STRELVA_LISTINGS_SYNC_OWNER_EMAIL",
+          "from": "off",
+          "to": "1",
+          "rollback": "",
+          "requires": [
+            "20261028100200_listings_sync_flag.sql",
+            "20261028100300_listings_sync_store.sql",
+            "20261028120000_owner_email_confirmations.sql"
+          ]
+        }
+      ]
+    }
+  ],
+  "perTenantOverrides": [
+    {
+      "key": "reb:client-email:{tenant} (Redis) and tenant_settings client_email (Postgres)",
+      "from": "unknown per tenant",
+      "to": "inherit (or off); never on",
+      "rollback": "the value read in step 0",
+      "why": "An 'on' override arms every client-audience email for that tenant, bypassing the global switch. 'off' silences that business's owner streams too."
+    },
+    {
+      "key": "public.owner_email_confirmations (one row per Jacob-confirmed owner address and business)",
+      "from": "none (table is new)",
+      "to": "select public.confirm_owner_email(<operator user id>, <operator verified email>, <business workspace id>, <owner email>, <how Jacob confirmed it>) for each address Jacob confirms",
+      "rollback": "select public.revoke_owner_email_confirmation(<operator user id>, <operator verified email>, <business workspace id>, <owner email>)",
+      "why": "The transport mails a claim or Needs you email only to an address confirmed here or to the business's own signed-in owner. None of the 6 vault candidates may be added until Jacob confirms that exact address."
+    },
+    {
+      "key": "workspace_release_flags rows",
+      "from": "systems: one business 'off' (vault Oct 14); others unknown",
+      "to": "unchanged; no row for vertical_intake",
+      "rollback": "unchanged",
+      "why": "Env '1' means on except where a row says off; rows stay the per-business kill switch."
+    }
+  ],
+  "rollback": {
+    "email": "Set STRELVA_OWNER_EMAIL_STREAMS to empty (remove it) and redeploy fresh: every owner stream send is held at once. Revoking a confirmation stops mail to that address without a deploy.",
+    "flags": "Set each changed variable to its rollback value and make a fresh production deploy (env changes need a new deploy, not a redeploy). Or promote the previous deployment.",
+    "migration": "rollback-20261028120000_owner_email_confirmations.sql drops the table and RPCs; with owner_email_confirmed gone every stream send is held."
+  },
+  "flags": [
+    {
+      "name": "CONTENT_SOURCE",
+      "where": "src/platform/infra/db/source-flags.ts:26",
+      "controls": "Content read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "CUSTOMER_EMAIL_ENABLED",
+      "where": "src/platform/infra/email/enabled.ts:81",
+      "controls": "End-customer (visitor) email: booking confirmations, inquiry replies, intake patients, newsletters",
+      "prod": "off (vault Oct 14)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Booking, inquiry and marketing email stay off by Jacob's call (Oct 15)."
+    },
+    {
+      "name": "DATA_SOURCE",
+      "where": "src/platform/infra/db/source-flags.ts:53",
+      "controls": "Data read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "DUAL_WRITE_PG",
+      "where": "src/platform/infra/db/dual-write.ts:20",
+      "controls": "Dual write to Postgres",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "EMAIL_SENDING_ENABLED",
+      "where": "src/platform/infra/email/enabled.ts:19",
+      "controls": "Global client (owner) email gate for every client-audience sender: weekly/monthly reports, domain, reconnect, exports, invitations, Needs you without a stream",
+      "prod": "off (vault Oct 14/15: client email off)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Opening it would turn on every owner email, not just claim + Needs you. The two chosen kinds go out on their own streams (STRELVA_OWNER_EMAIL_STREAMS)."
+    },
+    {
+      "name": "GOVERNED_WORK_DUAL_WRITE",
+      "where": "src/platform/infra/db/dual-write.ts:32",
+      "controls": "Governed work dual write",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "GOVERNED_WORK_READ_PG",
+      "where": "src/platform/infra/db/dual-write.ts:46",
+      "controls": "Governed work read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "OPERATOR_EMAILS_ENABLED",
+      "where": "src/platform/infra/email/enabled.ts:40",
+      "controls": "Operator alerts to Strelva staff (default on; 'false' kills)",
+      "prod": "default on",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Internal staff alerts; not owner or customer mail."
+    },
+    {
+      "name": "PROSPECT_EMAILS_ENABLED",
+      "where": "src/platform/infra/email/enabled.ts:61",
+      "controls": "Audit-report email to someone who ran the free /audit (default on)",
+      "prod": "default on",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on; prospect mail warms the domain. Not part of this decision."
+    },
+    {
+      "name": "REB_DEV_TENANT",
+      "where": "src/platform/infra/dev-access.ts:12",
+      "controls": "Dev tenant",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Dev only."
+    },
+    {
+      "name": "REB_DEV_UNGATED_ACCESS",
+      "where": "src/platform/infra/dev-access.ts:6",
+      "controls": "Dev ungated access",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Dev only; never in production."
+    },
+    {
+      "name": "STRELVA_AGENCY_ADD_CLIENT_RELEASE",
+      "where": "src/products/agency-clients/index.ts:7",
+      "controls": "Agency adds a client and issues the owner claim link",
+      "prod": "1 (vault Oct 7/12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_AGENCY_IMPORT_RELEASE",
+      "where": "src/products/agency-clients/index.ts:20",
+      "controls": "Agency CSV client import",
+      "prod": "1 (vault Oct 12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE",
+      "where": "src/products/agency-clients/claim-email.ts:14",
+      "controls": "Agency 'email the owner the claim link' (also needs STRELVA_WORKSPACE_RELEASE and the owner_claim stream)",
+      "prod": "off (vault Oct 14: claim email off)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261028120000_owner_email_confirmations.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Owner claim email, confirmed owners only. SQL still refuses clients already linked to a tenant (the 11 legacy clients)."
+    },
+    {
+      "name": "STRELVA_AGENCY_PAY_LINKS",
+      "where": "src/platform/agency-pay-links/release.ts:9",
+      "controls": "Agency pay links (needs STRELVA_CONNECT)",
+      "prod": "off (grade: stub)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261026180000_money_agency_pay_links.sql"
+      ],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_AGENCY_PAY_LINKS_LIVE",
+      "where": "src/platform/agency-pay-links/release.ts:10",
+      "controls": "Pay links with a live Stripe key",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261026180000_money_agency_pay_links.sql"
+      ],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_AGENCY_PROSPECTING_RELEASE",
+      "where": "src/platform/agency-prospecting/server.ts:6",
+      "controls": "Agency prospecting (find businesses to add)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate; adds nothing without the agency acting."
+    },
+    {
+      "name": "STRELVA_AGENCY_SIGNUP_RELEASE",
+      "where": "src/platform/agency-signup-release.ts:14",
+      "controls": "Agency front door and setup checklist",
+      "prod": "1 (vault Oct 12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_AGENCY_WORKSPACE_ID",
+      "where": "src/platform/workspaces/strelva-agency.ts:5",
+      "controls": "Strelva Agency's workspace id (config, not a switch)",
+      "prod": "set (vault Oct 12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Config."
+    },
+    {
+      "name": "STRELVA_AGENT_ABUSE_MONITOR",
+      "where": "src/server/operator-queue/sources.ts:488",
+      "controls": "Operator queue guard for agent booking confirmations",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "A protection; on is safer."
+    },
+    {
+      "name": "STRELVA_AGENT_CHANNEL_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:77",
+      "controls": "Agent customer confirmation (owner consent required)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Confirms bookings to customers; customer email is off."
+    },
+    {
+      "name": "STRELVA_AGENT_IDENTITY_LIMITS",
+      "where": "src/platform/agent-channel/limits.ts:27",
+      "controls": "Rate limits per agent identity",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "A protection; on is safer."
+    },
+    {
+      "name": "STRELVA_AGENT_INQUIRIES",
+      "where": "src/platform/agent-channel/inquiries.ts:13",
+      "controls": "Assistants send inquiries",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Inquiry email off; needs its own proof."
+    },
+    {
+      "name": "STRELVA_AGENT_PAYMENTS",
+      "where": "src/platform/connect/agent-payments.ts:14",
+      "controls": "Agent payments",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money; needs seller terms."
+    },
+    {
+      "name": "STRELVA_AGENT_PAYMENT_MERCHANT_PROFILES",
+      "where": "src/platform/connect/stripe-agent-payments.ts:28",
+      "controls": "Agent payment merchant profiles",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_AGENT_PAYMENT_PROTOCOL",
+      "where": "src/platform/connect/stripe-agent-payments.ts:22",
+      "controls": "Agent payment protocol version",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_AGENT_PAYMENT_SELLER_TERMS_APPROVED",
+      "where": "src/platform/connect/stripe-agent-payments.ts:23",
+      "controls": "Agent payment seller terms approved",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money; external terms."
+    },
+    {
+      "name": "STRELVA_AGENT_READABLE",
+      "where": "src/app/robots.ts:24",
+      "controls": "robots allows assistants to read business pages",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Changes robots on public pages; needs Jacob's SEO call."
+    },
+    {
+      "name": "STRELVA_AI_CONTROLS_RELEASE",
+      "where": "src/platform/infra/ai-controls-release.ts:9",
+      "controls": "Per-client AI pause, monthly limit and review-reply hold",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261026170000_ai_controls.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Turn on before Google approval lands so the review hold exists (grade risk)."
+    },
+    {
+      "name": "STRELVA_AI_LIST_PRICE_CEILING",
+      "where": "src/platform/infra/ai-controls-release.ts:14",
+      "controls": "List-price ceiling for capped model calls (cost accounting, not a customer price)",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261026170000_ai_controls.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Shares business_ai_budget_v2 with the controls; shows no price."
+    },
+    {
+      "name": "STRELVA_APPROVAL_STORE_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:85",
+      "controls": "Unified approval store for Needs you",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path; own proof."
+    },
+    {
+      "name": "STRELVA_APP_EVENTS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:79",
+      "controls": "Delivery of business events to App handlers (capture is a separate DB switch, off)",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261028100000_app_events.sql",
+        "20261028100100_app_event_sources.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Capture stays off per business until enabled in data."
+    },
+    {
+      "name": "STRELVA_APP_EVENT_WEBHOOKS_RELEASE",
+      "where": "src/platform/app-events/release.ts:41",
+      "controls": "Signed outbound webhooks for App events",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261028100000_app_events.sql",
+        "20261028100100_app_event_sources.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Needs app events; endpoints are registered by agencies."
+    },
+    {
+      "name": "STRELVA_APP_RELEASES",
+      "where": "src/platform/app-releases/release.ts:5",
+      "controls": "App Releases catalog for agencies and operators",
+      "prod": "off (grade Oct 15: absent)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate."
+    },
+    {
+      "name": "STRELVA_ASK_RELEASE",
+      "where": "src/platform/ask/release.ts:14",
+      "controls": "Ask Strelva (the one composer)",
+      "prod": "1 (vault Oct 14)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on; paused for unsubscribed businesses by the $0 cap."
+    },
+    {
+      "name": "STRELVA_AUTH_EMAIL_CODE",
+      "where": "src/components/auth/email-readiness.ts:12",
+      "controls": "Sign-in code instead of link",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Auth presentation; not part of this decision."
+    },
+    {
+      "name": "STRELVA_AUTH_EMAIL_READY",
+      "where": "src/components/auth/email-readiness.ts:3",
+      "controls": "Sign-in link email via Supabase Auth SMTP",
+      "prod": "1 (vault Oct 15, dpl_J975)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_AUTO_POST_DECISION_RECORD",
+      "where": "src/lib/reviews/auto-reply.ts:140",
+      "controls": "Review auto-reply records a policy decision",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261027110000_dedupe_flows_owner_decisions.sql",
+        "20261027111000_provider_client_queue_v3.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Records only; posting still needs Google approval."
+    },
+    {
+      "name": "STRELVA_BACKGROUND_WORK_RELEASE",
+      "where": "src/app/api/cron/workspace-work/route.ts:44",
+      "controls": "Background work cron",
+      "prod": "off (capabilities doc)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Spends AI money unattended; money call."
+    },
+    {
+      "name": "STRELVA_BOOKING_AGENTS",
+      "where": "src/products/websites/site-seo.ts:46",
+      "controls": "Booking pages declared to assistants",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs the Postgres booking store."
+    },
+    {
+      "name": "STRELVA_BOOKING_AGENT_VISIBILITY",
+      "where": "src/platform/agent-channel/public-tools.ts:167",
+      "controls": "Booking tools visible to assistants",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs the Postgres booking store."
+    },
+    {
+      "name": "STRELVA_BOOKING_CALENDAR_BUSY",
+      "where": "src/platform/bookings/flags.ts:79",
+      "controls": "Read calendar busy times",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Calendar provider proof."
+    },
+    {
+      "name": "STRELVA_BOOKING_CALENDAR_MIRROR",
+      "where": "src/platform/bookings/calendar-mirror.ts:34",
+      "controls": "Mirror bookings into calendars",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Blocked by the booking store parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_CALENDAR_SCOPES",
+      "where": "src/products/scheduling/calendar/oauth.ts:84",
+      "controls": "Google Calendar write scopes",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs Google OAuth verification for the scopes."
+    },
+    {
+      "name": "STRELVA_BOOKING_INQUIRY_OFFERS",
+      "where": "src/platform/bookings/inquiry-offers.ts:17",
+      "controls": "Offer times from an inquiry",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Blocked by the booking store parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_MANAGE_PAGE",
+      "where": "src/platform/bookings/flags.ts:69",
+      "controls": "Visitor manage-booking page",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Blocked by the booking store parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_MANUAL",
+      "where": "src/platform/bookings/manual.ts:21",
+      "controls": "Manual bookings (needs Postgres store)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Blocked by the booking store parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_MESSAGES",
+      "where": "src/platform/bookings/flags.ts:118",
+      "controls": "Booking messages to customers",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Customer email stays off."
+    },
+    {
+      "name": "STRELVA_BOOKING_OWNER_NOTICE",
+      "where": "src/platform/bookings/flags.ts:53",
+      "controls": "Immediate owner email for a new booking request",
+      "prod": "off (vault Oct 6/15)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Booking email stays off. Requests still wait on Home."
+    },
+    {
+      "name": "STRELVA_BOOKING_READ_POSTGRES_DEFAULT",
+      "where": "src/platform/bookings/flags.ts:49",
+      "controls": "Default booking read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_RECORD_FALLBACK",
+      "where": "src/platform/bookings/record-fallback.ts:28",
+      "controls": "Booking record fallback",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_REMINDERS",
+      "where": "src/platform/bookings/flags.ts:64",
+      "controls": "Booking 24 h / 72 h reminders and expiry",
+      "prod": "off (vault Oct 6/15)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Reminder email stays off."
+    },
+    {
+      "name": "STRELVA_BOOKING_SETTINGS",
+      "where": "src/platform/bookings/setup.ts:24",
+      "controls": "Booking settings (needs Postgres store)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Blocked by the booking store parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_STORE_READ",
+      "where": "src/platform/bookings/flags.ts:47",
+      "controls": "Read bookings from Postgres",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Parity gate."
+    },
+    {
+      "name": "STRELVA_BOOKING_STORE_WRITE",
+      "where": "src/platform/bookings/flags.ts:43",
+      "controls": "Write bookings to the Postgres store",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Needs 7 parity days (grade)."
+    },
+    {
+      "name": "STRELVA_BUNDLE_MAINTENANCE_RELEASE",
+      "where": "src/products/operations/recurring.ts:24",
+      "controls": "Bundled maintenance (recurring paid work)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_BUSINESS_AI_BUDGET",
+      "where": "src/app/workspace/billing/page.tsx:213",
+      "controls": "Enforce the AI budget for unsubscribed businesses",
+      "prod": "1 (vault Oct 13)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Jacob kept the $0 cap (Oct 14). The paused state must say plans aren't open yet."
+    },
+    {
+      "name": "STRELVA_BUSINESS_BILLING",
+      "where": "src/app/api/workspace/route.ts:342",
+      "controls": "Owner billing surfaces (Plan and billing)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money: honest 'not yet', no Stripe switch-on."
+    },
+    {
+      "name": "STRELVA_BUSINESS_OUTCOME_REPORTS",
+      "where": "src/platform/business-outcomes/reports.ts:9",
+      "controls": "Monthly outcome reports grouping",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Report email is off; needs its own proof."
+    },
+    {
+      "name": "STRELVA_BUSINESS_PAGES",
+      "where": "src/products/connected-sites/business-pages.ts:28",
+      "controls": "Business pages on connected sites",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Writes pages onto client sites; separate yes."
+    },
+    {
+      "name": "STRELVA_BUSINESS_RECORD_READS",
+      "where": "src/platform/business-record/public-reader.ts:7",
+      "controls": "Public reads of confirmed business facts",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Confirmed facts only."
+    },
+    {
+      "name": "STRELVA_BUSINESS_SIGNUP_RELEASE",
+      "where": "src/platform/business-signup-release.ts:16",
+      "controls": "Direct business sign-up",
+      "prod": "1 (vault Oct 12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_CALENDAR_FIXTURE",
+      "where": "src/products/scheduling/server.ts:176",
+      "controls": "Fixture calendar adapter",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Tests only; never set in production."
+    },
+    {
+      "name": "STRELVA_CARE_REPORTS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:81",
+      "controls": "Care plan reports App",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261028100400_care_reports.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "No generation cron yet (grade); reports are made on request."
+    },
+    {
+      "name": "STRELVA_CARE_REPORT_EMAIL",
+      "where": "src/platform/care-reports/release.ts:16",
+      "controls": "Email a shared care report to the owner (needs EMAIL_SENDING_ENABLED)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261028100400_care_reports.sql"
+      ],
+      "reason": "A report email, not claim or Needs you. The page says it was not sent."
+    },
+    {
+      "name": "STRELVA_CARE_REPORT_SHARE_LINKS",
+      "where": "src/platform/care-reports/release.ts:21",
+      "controls": "Revocable read-only care report links",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261028100400_care_reports.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Strelva-controlled; no email."
+    },
+    {
+      "name": "STRELVA_CATALOG_REPORTS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:101",
+      "controls": "Search Console catalog reports",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs Search Console access (provider key), unverified."
+    },
+    {
+      "name": "STRELVA_CLAIM_REVIEW_RELEASE",
+      "where": "src/products/agency-clients/index.ts:35",
+      "controls": "Owner reviews what the agency prepared before claiming",
+      "prod": "1 (vault Oct 12)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_CLIENT_RECORDS_DUAL_WRITE",
+      "where": "src/platform/account-bindings/flip-readiness.ts:22",
+      "controls": "Client records dual write",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "STRELVA_CLIENT_RECORDS_READ",
+      "where": "src/platform/account-bindings/flip-readiness.ts:13",
+      "controls": "Client records read list",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "STRELVA_CONNECT",
+      "where": "src/app/workspace/billing/page.tsx:133",
+      "controls": "Stripe Connect",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_CONNECTED_SITES_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:96",
+      "controls": "Connect a site that runs elsewhere (per-business rows)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261026100000_conn_core_holders.sql",
+        "20261026120100_conn_tools_installer.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate; installer authority comes with 20261026120100."
+    },
+    {
+      "name": "STRELVA_CONNECTED_SITE_CHANGE_OWNER_EMAIL",
+      "where": "src/products/connected-sites/keep-your-site-release.ts:27",
+      "controls": "Needs you email for a planned connected-site change",
+      "prod": "off",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261026100000_conn_core_holders.sql",
+        "20261026120100_conn_tools_installer.sql",
+        "20261027160000_keep_your_site_flag.sql",
+        "20261027160100_keep_your_site_changes.sql",
+        "20261027160200_keep_your_site_agency_home.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "A Needs you email. Only reaches confirmed owners through the stream."
+    },
+    {
+      "name": "STRELVA_CONNECTED_SITE_EMAIL_ENABLED",
+      "where": "src/products/connected-sites/notify.ts:69",
+      "controls": "Connected-site rollout notices",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Not claim or Needs you."
+    },
+    {
+      "name": "STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE",
+      "where": "src/platform/needs-you/release.ts:24",
+      "controls": "Connected-site published-fact observations (record only)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Records only."
+    },
+    {
+      "name": "STRELVA_CONNECTIONS_LEGACY_GOOGLE",
+      "where": "src/app/api/oauth/google/legacy-connection-source.ts:16",
+      "controls": "Legacy Google connection source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "STRELVA_CONNECTION_APPROVAL_GOOGLE_BUSINESS_PROFILE",
+      "where": "src/lib/gbp-setup-pending.ts:50",
+      "controls": "Tells Strelva Google's Business Profile approval is pending so writes read as 'waiting on Google'",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "pending",
+      "rollback": "",
+      "reason": "Honest state for the GBP gate: 'pending' is not approval and turns nothing on."
+    },
+    {
+      "name": "STRELVA_CONNECT_CHECKOUT_TENANTS",
+      "where": "src/app/api/checkout/route.ts:146",
+      "controls": "Tenants using Connect checkout",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_CONNECT_FEES_COLLECTOR",
+      "where": "src/platform/connect/index.ts:27",
+      "controls": "Connect fee collector profile",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_CONNECT_LOSSES_COLLECTOR",
+      "where": "src/platform/connect/index.ts:27",
+      "controls": "Connect losses collector profile",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_CONNECT_PROFILE_VERSION",
+      "where": "src/platform/connect/index.ts:27",
+      "controls": "Connect liability profile version",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_CSP_NONCE_REPORT_ONLY",
+      "where": "src/lib/csp-nonce.ts:6",
+      "controls": "Nonce CSP in report-only mode",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Security header rollout; separate proof."
+    },
+    {
+      "name": "STRELVA_CUSTOMERS_RELEASE",
+      "where": "src/platform/customers/release.ts:3",
+      "controls": "Enterprise customers",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Not a 1.0 surface."
+    },
+    {
+      "name": "STRELVA_CUSTOM_APPLICATION_BUILD_PROVIDER",
+      "where": "src/products/custom-applications/lifecycle.ts:543",
+      "controls": "Vercel Sandbox build provider for custom Apps",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Paid provider, not authorized."
+    },
+    {
+      "name": "STRELVA_DOCUMENT_HISTORY_RELEASE",
+      "where": "src/products/documents/server.ts:10",
+      "controls": "Document history",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate."
+    },
+    {
+      "name": "STRELVA_EXIT_HANDOFF",
+      "where": "src/app/api/workspace-exit/handoff/route.ts:6",
+      "controls": "Site handoff when a business leaves",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Owner control."
+    },
+    {
+      "name": "STRELVA_EXPORT_LINK_EMAIL",
+      "where": "src/app/api/workspace-export/v3/route.ts:59",
+      "controls": "Emailing a v3 export link",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Not claim or Needs you; the export page shows the link."
+    },
+    {
+      "name": "STRELVA_EXPORT_RECOVERY",
+      "where": "src/platform/workspace-exports/recovery.ts:9",
+      "controls": "Export recovery for failed v3 exports",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Pairs with v3."
+    },
+    {
+      "name": "STRELVA_EXPORT_SCHEMA_3",
+      "where": "src/app/api/workspace/route.ts:342",
+      "controls": "Workspace export v3",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Owner's data, no external gate. Link email stays off; the page shows the link."
+    },
+    {
+      "name": "STRELVA_FINITE_JOBS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:84",
+      "controls": "Unified finite jobs",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path; own proof."
+    },
+    {
+      "name": "STRELVA_FREE_MONTHLY_AI_CAP_USD",
+      "where": "src/app/api/workspace/agency-ai-controls/route.ts:11",
+      "controls": "Free monthly AI usage for unsubscribed businesses",
+      "prod": "0 (vault Oct 13)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Money: stays $0 until pricing is decided."
+    },
+    {
+      "name": "STRELVA_FULL_MODEL_PROFILE",
+      "where": "src/products/websites/owned-proof-readback.ts:6",
+      "controls": "Local proof profile",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Local proof only."
+    },
+    {
+      "name": "STRELVA_GHL_IMPORT_RELEASE",
+      "where": "src/products/agency-clients/gohighlevel/config.ts:22",
+      "controls": "HighLevel client import",
+      "prod": "off (vault Oct 12)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "HighLevel provider keys are not in hand."
+    },
+    {
+      "name": "STRELVA_GOOGLE_BINDINGS",
+      "where": "src/platform/account-bindings/store.ts:55",
+      "controls": "Google token binding store (with DUAL_WRITE_PG and the READ list)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Alone it breaks every reconnect (grade). Data path, own proof."
+    },
+    {
+      "name": "STRELVA_GOOGLE_MAKE_REAL_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:95",
+      "controls": "Make it live on the Google listing",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Google Business Profile writes have no approval."
+    },
+    {
+      "name": "STRELVA_GOOGLE_OWNER_CONNECT",
+      "where": "src/products/google-listing/connect/flags.ts:13",
+      "controls": "Owner connects their own Google account",
+      "prod": "off (vault Oct 12)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "GBP approval unknown."
+    },
+    {
+      "name": "STRELVA_GOOGLE_READ_GRANT",
+      "where": "src/products/google-listing/connect/flags.ts:14",
+      "controls": "Google read grant",
+      "prod": "off (vault Oct 12)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "GBP approval unknown."
+    },
+    {
+      "name": "STRELVA_INQUIRIES_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:87",
+      "controls": "Workspace inquiries inbox and /business",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Exposure only; tenant authority still checked. Inquiry email stays off."
+    },
+    {
+      "name": "STRELVA_INQUIRY_BOOKING_HANDOFF",
+      "where": "src/products/inquiries/booking-handoff.ts:15",
+      "controls": "Inquiry to booking handoff",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs Postgres inquiry records and booking store."
+    },
+    {
+      "name": "STRELVA_INQUIRY_BUSINESS_FACTS",
+      "where": "src/products/inquiries/business-context.ts:28",
+      "controls": "Inquiry context from confirmed business facts",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Read only."
+    },
+    {
+      "name": "STRELVA_INQUIRY_FORWARDING_RELEASE",
+      "where": "src/products/inquiry-forwarding/release.ts:17",
+      "controls": "Forward your inquiries (inbound mail)",
+      "prod": "off (vault Oct 12)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Needs Postgres inquiry records and an inbound domain (DNS/receiving)."
+    },
+    {
+      "name": "STRELVA_INQUIRY_OUTCOMES",
+      "where": "src/products/inquiries/outcome-proof.ts:10",
+      "controls": "Inquiry outcomes (answered, booked)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Read only."
+    },
+    {
+      "name": "STRELVA_INQUIRY_OWNER_NOTICES",
+      "where": "src/products/inquiries/owner-notice.ts:11",
+      "controls": "Immediate owner email for a new inquiry (also needs CUSTOMER_EMAIL_ENABLED)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Inquiry email stays off. Inquiries still land in the inbox."
+    },
+    {
+      "name": "STRELVA_INQUIRY_RECORDS",
+      "where": "src/products/connected-sites/store.ts:49",
+      "controls": "Durable Postgres inquiry records",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path with DUAL_WRITE_PG."
+    },
+    {
+      "name": "STRELVA_INQUIRY_REPLIES",
+      "where": "src/products/inquiries/workspace-replies.ts:11",
+      "controls": "Owner replies to an inquiry by email from the workspace",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Customer email stays off."
+    },
+    {
+      "name": "STRELVA_INTAKE_OWNER_EMAIL",
+      "where": "src/products/vertical-intake/release.ts:41",
+      "controls": "Needs you email for Dental intake",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261028100500_vertical_intake_flag.sql",
+        "20261028100600_business_record_insurance_fact.sql",
+        "20261028100700_vertical_intake.sql"
+      ],
+      "reason": "Dental intake is blocked until counsel."
+    },
+    {
+      "name": "STRELVA_INTAKE_SENSITIVE_FIELDS",
+      "where": "src/products/vertical-intake/release.ts:27",
+      "controls": "Dental member ID field (ciphertext)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261028100500_vertical_intake_flag.sql",
+        "20261028100600_business_record_insurance_fact.sql",
+        "20261028100700_vertical_intake.sql"
+      ],
+      "reason": "Blocked until counsel."
+    },
+    {
+      "name": "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:100",
+      "controls": "Internal tool submit notices (email)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Not claim or Needs you."
+    },
+    {
+      "name": "STRELVA_INVITATION_EMAIL_RELEASE",
+      "where": "src/platform/workspaces/invitation-delivery.ts:23",
+      "controls": "Workspace invitation email. Owner invitations ride the owner_claim stream; team invitations still need the global switches",
+      "prod": "off (grade Oct 15)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261028120000_owner_email_confirmations.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "The operator's owner invitation is the claim for a converted client (gldf, rohlax). Team invitations stay off."
+    },
+    {
+      "name": "STRELVA_KEEP_YOUR_SITE_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:83",
+      "controls": "Connected-site health, change Requests and Releases",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261026100000_conn_core_holders.sql",
+        "20261026120100_conn_tools_installer.sql",
+        "20261027160000_keep_your_site_flag.sql",
+        "20261027160100_keep_your_site_changes.sql",
+        "20261027160200_keep_your_site_agency_home.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Needs connected_sites on for the business."
+    },
+    {
+      "name": "STRELVA_LEADS_AUTHORITY",
+      "where": "src/lib/lead-reads.ts:51",
+      "controls": "Lead authority (postgres)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "STRELVA_LEADS_READ",
+      "where": "src/lib/lead-reads.ts:46",
+      "controls": "Lead read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    },
+    {
+      "name": "STRELVA_LISTINGS_SYNC_GOOGLE_FIX",
+      "where": "src/platform/app-releases/catalog.ts:133",
+      "controls": "Listings in sync applies fixes to Google",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261028100200_listings_sync_flag.sql",
+        "20261028100300_listings_sync_store.sql"
+      ],
+      "reason": "GBP writes have no approval."
+    },
+    {
+      "name": "STRELVA_LISTINGS_SYNC_OWNER_EMAIL",
+      "where": "src/products/listings-sync/release.ts:25",
+      "controls": "Needs you email for a listings fix",
+      "prod": "off",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261028100200_listings_sync_flag.sql",
+        "20261028100300_listings_sync_store.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "A Needs you email. Only reaches confirmed owners through the stream."
+    },
+    {
+      "name": "STRELVA_LISTINGS_SYNC_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:80",
+      "controls": "Listings in sync App: compare details with website, Google listing and booking page",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261028100200_listings_sync_flag.sql",
+        "20261028100300_listings_sync_store.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Compare only; Google fixes stay off (GBP). Cron is not scheduled in vercel.json (grade)."
+    },
+    {
+      "name": "STRELVA_LISTINGS_SYNC_YELP",
+      "where": "src/products/listings-sync/release.ts:22",
+      "controls": "Listings in sync reads Yelp",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Provider key / terms not in hand."
+    },
+    {
+      "name": "STRELVA_LOCAL_AUTH_PROOF",
+      "where": "src/products/google-listing/native/server.ts:60",
+      "controls": "Local auth proof harness",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Local proof only."
+    },
+    {
+      "name": "STRELVA_MAKE_REAL_LIVE",
+      "where": "src/platform/release-flags/resolve.ts:90",
+      "controls": "Make it live with real effects: hosted website, sections, inquiry form, booking page, internal app (per-business rows)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "The owner's yes is what makes it live; nothing changes on a client site without one. Google listing is separate (STAYS_OFF)."
+    },
+    {
+      "name": "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:97",
+      "controls": "Make it live approved by signed email link for an owner with no account",
+      "prod": "off (silent rollout preflight)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Same reason for Make it live decisions. scripts/silent-rollout.ts lists it; that preflight is superseded for this cutover."
+    },
+    {
+      "name": "STRELVA_MCP_OAUTH",
+      "where": "src/platform/agent-channel/oauth.ts:12",
+      "controls": "Public MCP OAuth for assistants (Connections · assistants)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Strelva-controlled; scopes are granted by the owner."
+    },
+    {
+      "name": "STRELVA_MONEY_RECONCILIATION",
+      "where": "src/app/workspace/money-reconciliation/page.tsx:28",
+      "controls": "Money reconciliation page",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_NATIVE_GOOGLE_ONLY",
+      "where": "src/products/google-listing/native/server.ts:37",
+      "controls": "Native-only Google grants",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Proof harness / data path."
+    },
+    {
+      "name": "STRELVA_NEEDS_YOU_RELEASE",
+      "where": "src/platform/needs-you/release.ts:9",
+      "controls": "Needs you: Home decisions, /api/approve workspace links, the hourly chase",
+      "prod": "1 (vault Oct 14)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on; its email now rides the needs_you stream."
+    },
+    {
+      "name": "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:102",
+      "controls": "Newsletter contacts in the business record",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Only useful with newsletter sending, which stays off."
+    },
+    {
+      "name": "STRELVA_NEWSLETTER_SENDER_RELEASE",
+      "where": "src/products/publishing/newsletter-sender.ts:43",
+      "controls": "Receipted newsletter batch sender",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Marketing email stays off."
+    },
+    {
+      "name": "STRELVA_ONE_APPROVAL_PATH",
+      "where": "src/platform/needs-you/release.ts:20",
+      "controls": "One approval path: tenant /api/approve links decide through Needs you",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261027110000_dedupe_flows_owner_decisions.sql",
+        "20261027111000_provider_client_queue_v3.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Removes the second decision authority."
+    },
+    {
+      "name": "STRELVA_ONE_INVITATION_PATH",
+      "where": "src/platform/owner-entry/operator-invitations.ts:20",
+      "controls": "Operator invitations go through the one owner invitation path",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Closes /api/admin/invites as a grant path that bypasses agency grants (grade)."
+    },
+    {
+      "name": "STRELVA_ONE_QUEUE",
+      "where": "src/platform/provider-client-queue/release.ts:8",
+      "controls": "One agency Queue for client work",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261027110000_dedupe_flows_owner_decisions.sql",
+        "20261027111000_provider_client_queue_v3.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate."
+    },
+    {
+      "name": "STRELVA_OPERATOR_QUEUE_RELEASE",
+      "where": "src/platform/operator-queue/release.ts:3",
+      "controls": "Portfolio operator queue in the console",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Operator-only surface."
+    },
+    {
+      "name": "STRELVA_OWNER_DECISION_LINKS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:103",
+      "controls": "Owner decides a Needs you item from the email link without an account (owner_decision_links)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Without it the Needs you email's yes answers 'Sign in to decide this'. Links bind to the recipient the item was sent to."
+    },
+    {
+      "name": "STRELVA_OWNER_EMAIL_SINCE",
+      "where": "src/platform/infra/email/owner-streams.ts:57",
+      "controls": "NEW. Switch time; nothing that happened before it is mailed (no backfill). Unset = no stream mail",
+      "prod": "unset (new in this build)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261028120000_owner_email_confirmations.sql"
+      ],
+      "to": "<cutover instant, ISO with zone, e.g. 2026-10-16T18:00:00Z>",
+      "rollback": "",
+      "reason": "Set to the moment of the email deploy so decisions already waiting are never blasted."
+    },
+    {
+      "name": "STRELVA_OWNER_EMAIL_STREAMS",
+      "where": "src/platform/infra/email/owner-streams.ts:51",
+      "controls": "NEW. Owner email streams that open the client gate for themselves only: owner_claim, needs_you, needs_you_reminders",
+      "prod": "unset (new in this build)",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261028120000_owner_email_confirmations.sql"
+      ],
+      "to": "owner_claim,needs_you",
+      "rollback": "",
+      "reason": "Jacob: claim + Needs you on, reminders off. Mails only addresses confirmed for the business (owner_email_confirmed)."
+    },
+    {
+      "name": "STRELVA_OWNER_ENTRY",
+      "where": "src/platform/release-flags/resolve.ts:86",
+      "controls": "Owner sign-in into the workspace (per-business rows)",
+      "prod": "1 (vault Oct 14)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_OWNER_INVITATIONS_RELEASE",
+      "where": "src/platform/owner-entry/operator-invitations.ts:9",
+      "controls": "Operator owner invitations",
+      "prod": "likely 1 (silent invitations issued Oct 14), unverified",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Needed for the operator owner claim; no send by itself."
+    },
+    {
+      "name": "STRELVA_OWNER_INVITATION_CLAIM",
+      "where": "src/platform/owner-entry/server.ts:33",
+      "controls": "/account claims a pending owner invitation by verified email",
+      "prod": "1 (vault Oct 14)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRELVA_OWNER_REACH_RELEASE",
+      "where": "src/platform/owner-reach/release.ts:9",
+      "controls": "Owner reach: can this owner be told, agency and operator views",
+      "prod": "off (grade Oct 15)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261027100000_owner_reach.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "No external gate; tells agencies why an owner can't be reached."
+    },
+    {
+      "name": "STRELVA_PAY_LINK_STORE",
+      "where": "src/platform/agency-pay-links/release.ts:15",
+      "controls": "Pay link store (redis or postgres)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [
+        "20261026180000_money_agency_pay_links.sql"
+      ],
+      "reason": "Data path; money stays off."
+    },
+    {
+      "name": "STRELVA_PLANNING_ENABLED",
+      "where": "src/products/work-plans/generation.ts:52",
+      "controls": "Work plan generation",
+      "prod": "off (capabilities doc)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Spends AI money on Strelva's account; money call."
+    },
+    {
+      "name": "STRELVA_PLATFORM_COLLECTION",
+      "where": "src/platform/connect/platform-collection.ts:7",
+      "controls": "Platform collection of payments",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_PRODUCT_LEARNING_RELEASE",
+      "where": "src/products/product-learning/server.ts:9",
+      "controls": "Product learning",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Out of 1.0 scope (Oct 6 spec)."
+    },
+    {
+      "name": "STRELVA_PROVIDER_CHANGE",
+      "where": "src/app/workspace/provider-change/page.tsx:10",
+      "controls": "Owner changes agency (provider change page)",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Owner control; no external gate."
+    },
+    {
+      "name": "STRELVA_PUBLISHING_NOTICES_SEND",
+      "where": "src/platform/needs-you/publishing-delivery.ts:15",
+      "controls": "Needs you email for publishing items (needs global + customer email)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Publishing is off (Google writes and newsletters are gated)."
+    },
+    {
+      "name": "STRELVA_PUBLISHING_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:98",
+      "controls": "Listing and newsletter Systems",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Both effects are gated (GBP, marketing email); showing them now would be a wall."
+    },
+    {
+      "name": "STRELVA_RECORD_GOOGLE_APPROVAL_POLICY",
+      "where": "src/platform/release-flags/resolve.ts:99",
+      "controls": "Record approval includes the Google write",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "GBP writes have no approval."
+    },
+    {
+      "name": "STRELVA_REVENUE_SPLITS",
+      "where": "src/experience/workspace/money/SourceAttributionView.tsx:64",
+      "controls": "Revenue splits",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_SANDBOX_2048MB_CONTRACT_APPROVED",
+      "where": "src/products/custom-applications/sandbox-runtime.ts:18",
+      "controls": "Sandbox 2 GB contract",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Paid provider, not authorized."
+    },
+    {
+      "name": "STRELVA_SANDBOX_RUNTIME_APPROVED",
+      "where": "src/products/custom-applications/sandbox-runtime.ts:17",
+      "controls": "Sandbox runtime approval",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Paid provider, not authorized."
+    },
+    {
+      "name": "STRELVA_SELF_SERVE_BILLING",
+      "where": "src/platform/business-billing/workspace-checkout.ts:20",
+      "controls": "Self-serve plan checkout",
+      "prod": "off (grade: unpriced)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money: no price decided."
+    },
+    {
+      "name": "STRELVA_SITES_BY_CODE_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:78",
+      "controls": "Coding agents pick up website Requests over MCP; previews need the owner's Make it live",
+      "prod": "off",
+      "class": "STRELVA_ON",
+      "heldMigrations": [
+        "20261027120000_sites_by_code_flag.sql",
+        "20261027120100_site_content_source_backfill.sql",
+        "20261027120200_site_change_agent_tools.sql",
+        "20261027120300_website_code_releases.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "Apply 20261027120100 before or with the code (it backfills gldf, rohlax, rhm content source)."
+    },
+    {
+      "name": "STRELVA_SITE_CHANGE_OWNER_EMAIL",
+      "where": "src/products/websites/site-change-email.ts:10",
+      "controls": "Needs you email for a website change preview (needs a sending gate: global or the needs_you stream)",
+      "prod": "off",
+      "class": "EMAIL_ON",
+      "heldMigrations": [
+        "20261027120000_sites_by_code_flag.sql",
+        "20261027120100_site_content_source_backfill.sql",
+        "20261027120200_site_change_agent_tools.sql",
+        "20261027120300_website_code_releases.sql"
+      ],
+      "to": "1",
+      "rollback": "",
+      "reason": "A Needs you email. Only reaches confirmed owners through the stream."
+    },
+    {
+      "name": "STRELVA_SPLIT_PAYOUTS_DRY_RUN",
+      "where": "src/app/api/cron/split-payouts/route.ts:8",
+      "controls": "Split payout dry-run cron",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_SPLIT_PAYOUT_EXECUTION",
+      "where": "src/app/admin/money/page.tsx:21",
+      "controls": "Split payout execution",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_SUBSCRIPTION_ALLOWANCE_CONFIG",
+      "where": "src/platform/work-economics/subscription-entitlements.ts:94",
+      "controls": "Subscription allowance config",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_SYSTEMS_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:89",
+      "controls": "Systems: Home, System pages, Possibilities, Make it live, Versions (per-business rows)",
+      "prod": "1 (vault Oct 14)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on; one row is 'off'."
+    },
+    {
+      "name": "STRELVA_TENANT_CONVERSION",
+      "where": "src/server/tenant-conversion/review.ts:21",
+      "controls": "Tenant to workspace conversion",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Operator migration tool."
+    },
+    {
+      "name": "STRELVA_TENANT_CONVERSION_PRODUCTION_APPROVED",
+      "where": "src/server/tenant-conversion/review.ts:22",
+      "controls": "Conversion approved for production",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Operator migration tool."
+    },
+    {
+      "name": "STRELVA_TENANT_RECEIPT_RETENTION",
+      "where": "src/lib/deprovision.ts:199",
+      "controls": "Keep receipts on deprovision",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data retention."
+    },
+    {
+      "name": "STRELVA_UI_PREVIEW",
+      "where": "src/app/preview/strelva/agency-events/page.tsx:5",
+      "controls": "Preview routes (development only)",
+      "prod": "n/a",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Dev only; never set in production."
+    },
+    {
+      "name": "STRELVA_VERTICAL_INTAKE_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:82",
+      "controls": "Dental intake App (new-patient form)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [
+        "20261028100500_vertical_intake_flag.sql",
+        "20261028100600_business_record_insurance_fact.sql",
+        "20261028100700_vertical_intake.sql"
+      ],
+      "reason": "Blocked until counsel. Off, the App is simply not offered."
+    },
+    {
+      "name": "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+      "where": "src/experience/systems/server.ts:375",
+      "controls": "Website System reads business facts",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Read only."
+    },
+    {
+      "name": "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
+      "where": "src/platform/needs-you/sources/website-domain-store.ts:53",
+      "controls": "Needs you email for website domain requests (needs global + customer email)",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Website building stays Coming soon (Oct 14). Domain decisions still show on Home."
+    },
+    {
+      "name": "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
+      "where": "src/products/websites/rebuild-runtime.ts:28",
+      "controls": "Model calls for website rebuild",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Rebuild stays off; AI cost is a money call."
+    },
+    {
+      "name": "STRELVA_WEBSITE_NATIVE_FACTS_ENABLED",
+      "where": "src/app/workspace/business-details/native-website-facts.ts:71",
+      "controls": "Native websites follow confirmed business facts",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STRELVA_ON",
+      "heldMigrations": [],
+      "to": "1",
+      "rollback": "",
+      "reason": "Confirmed facts only."
+    },
+    {
+      "name": "STRELVA_WEBSITE_REBUILD_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:88",
+      "controls": "Website rebuild and hosted website documents",
+      "prod": "unknown (not recorded in vault)",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Website building stays Coming soon (Oct 14, no sites domain)."
+    },
+    {
+      "name": "STRELVA_WEBSITE_REPORT_EMAIL_ENABLED",
+      "where": "src/products/websites/site-report.ts:105",
+      "controls": "Website report email",
+      "prod": "off",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Report email, not claim or Needs you."
+    },
+    {
+      "name": "STRELVA_WORKSPACE_ALLOWANCE_KEY",
+      "where": "src/platform/business-billing/workspace-checkout.ts:18",
+      "controls": "Included-usage key for the plan",
+      "prod": "unset",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money."
+    },
+    {
+      "name": "STRELVA_WORKSPACE_PRICE_ID",
+      "where": "src/platform/business-billing/workspace-checkout.ts:17",
+      "controls": "Stripe price for the self-serve plan",
+      "prod": "unset",
+      "class": "STAYS_OFF",
+      "heldMigrations": [],
+      "reason": "Money: no price decided."
+    },
+    {
+      "name": "STRELVA_WORKSPACE_RELEASE",
+      "where": "src/platform/release-flags/resolve.ts:151",
+      "controls": "Kill switch for the whole workspace: off, every workspace flag is off",
+      "prod": "1 (since Sep 30)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Already on."
+    },
+    {
+      "name": "STRIPE_BILLING_GRANDFATHER_TENANTS",
+      "where": "src/lib/subscription.ts:31",
+      "controls": "Grandfathered tenants (gldf, rohlax)",
+      "prod": "set",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Money config."
+    },
+    {
+      "name": "TENANTS_SOURCE",
+      "where": "src/platform/infra/db/source-flags.ts:68",
+      "controls": "Tenants read source",
+      "prod": "unknown (not recorded in vault)",
+      "class": "UNCHANGED",
+      "heldMigrations": [],
+      "reason": "Data path."
+    }
+  ]
+}

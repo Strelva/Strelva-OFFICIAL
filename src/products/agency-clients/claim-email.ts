@@ -4,11 +4,15 @@
 import { createHash } from "node:crypto";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
 import { publicAppOrigin } from "@/platform/infra/brand";
+import { ownerEmailStreamOn } from "@/platform/infra/email/owner-streams";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { OwnerClaim, OwnerClaimDelivery } from "./contracts";
 
+/** The claim email is offered only when its release and the owner_claim email
+ * stream are both on; the transport then mails confirmed owner addresses only. */
 export function agencyClaimEmailReleased(): boolean {
-  return process.env.STRELVA_WORKSPACE_RELEASE === "1" && process.env.STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE === "1";
+  return process.env.STRELVA_WORKSPACE_RELEASE === "1" && process.env.STRELVA_AGENCY_OWNER_CLAIM_EMAIL_RELEASE === "1"
+    && ownerEmailStreamOn("owner_claim");
 }
 export interface ClaimEmailDeps {
   rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
@@ -69,10 +73,12 @@ export async function emailOwnerClaim(actor: WorkspaceActor, agencyWorkspaceId: 
     const result = await deps.send({ audience: "client", authorship: "platform", workspaceId: claim.customerWorkspaceId,
       fromAddress: "hello@updates.strelva.com", to: claim.recipientEmail,
       subject: `Claim ${claim.workspaceName} on Strelva`, idempotencyKey: `agency-owner-claim:${claim.claimId}`,
+      // Only to an address confirmed for this business, for a claim issued after the switch time.
+      ownerStream: { stream: "owner_claim", workspaceId: claim.customerWorkspaceId, eventAt: claim.createdAt },
       options: claimEmailOptions(claim, new URL(claim.claimPath, origin.origin).toString(), agencyName) });
     delivery = result.status === "accepted"
       ? { ...claim.delivery, status: "accepted", reason: "provider_accepted", providerMessageId: result.providerMessageId, acceptedAt: result.acceptedAt }
-      : { ...held, reason: "email_suppressed" };
+      : { ...held, reason: result.reason === "owner_email_unconfirmed" ? "owner_email_unconfirmed" : "email_suppressed" };
   } catch { delivery = { ...claim.delivery, status: "unknown", reason: "delivery_unconfirmed" }; }
   // Acceptance remains acceptance if its receipt cannot be read back. This path
   // never retries the provider after a successful or uncertain send.
