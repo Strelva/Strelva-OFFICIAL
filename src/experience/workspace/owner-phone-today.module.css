@@ -1,0 +1,5 @@
+/* XA · E6: one column for a thumb. Spacing from the E6 render (20 px gutter, 28/24 rhythm). */
+.page { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 520px; margin: 0 auto; padding: 24px 20px 40px; }
+.greeting { display: flex; flex-direction: column; gap: 6px; }
+.running { display: flex; flex-direction: column; gap: 8px; }
+.fact { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 20px; }

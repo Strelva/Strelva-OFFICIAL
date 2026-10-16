@@ -74,7 +74,9 @@ describe("/api/approve through Needs you", () => {
   it("GET shows the item and decides nothing", async () => {
     const { review } = await tokens();
     const html = await (await get(review)).text();
-    expect(html).toContain("Approve: Reply to Dana");
+    expect(html).toContain("<h1>Reply to Dana");
+    expect(html).toContain("Waits for you");
+    expect(html).toContain("data-xa-primary");
     expect(html).toContain("Posts this reply on Google.");
     expect(html).toContain(review);
     expect(needsYou.decide).not.toHaveBeenCalled();

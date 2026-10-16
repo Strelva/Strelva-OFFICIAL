@@ -63,9 +63,9 @@ function block(b: PaperBlock): string {
     case "actions": return actions(b.actions, b.full);
     case "draft": return table(`<tr><td style="padding:16px;background:${b.surface ? t.surface : t.inset};border-radius:12px;${b.surface ? `border:1px solid ${t.line};` : ""}">${label(b.label)}${text(b.text)}${b.note ? `<p style="margin:8px 0 0;font-size:12px;line-height:18px;color:${t.faint};">${e(b.note)}</p>` : ""}</td></tr>`);
     case "rows": return table(b.rows.map(r => `<tr><td style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:14px;line-height:20px;color:${t.muted};">${e(r.label)}</td><td align="right" style="padding:12px 16px;border-bottom:1px solid ${t.line};font-size:13px;line-height:20px;color:${r.tone ? t[r.tone] : t.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${t.line};`);
-    case "metrics": return table(b.rows.map(r => `<tr><td width="76" valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${t.line};font-family:${t.mono};font-size:28px;line-height:32px;">${e(r.value)}</td><td style="padding:12px 0;border-bottom:1px solid ${t.line};font-size:15px;line-height:22px;">${e(r.label)}${r.note ? `<div style="font-size:12px;line-height:18px;color:${t.faint};">${e(r.note)}</div>` : ""}</td></tr>`).join(""));
+    case "metrics": return table(b.rows.map(r => `<tr><td width="76" valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${t.line};font-family:${t.figures};font-size:28px;line-height:32px;">${e(r.value)}</td><td style="padding:12px 0;border-bottom:1px solid ${t.line};font-size:15px;line-height:22px;">${e(r.label)}${r.note ? `<div style="font-size:12px;line-height:18px;color:${t.faint};">${e(r.note)}</div>` : ""}</td></tr>`).join(""));
     case "decision": return table(`<tr><td style="padding:0 0 16px;border-bottom:1px solid ${t.line};">${label(`●  ${b.category}`)}<h2 style="margin:0 0 6px;font-size:16px;font-weight:600;line-height:24px;">${e(b.title)}</h2>${text(b.detail, true)}<div style="height:8px;"></div>${actions(b.actions)}</td></tr>`);
-    case "file": return table(`<tr><td style="padding:16px;border:1px solid ${t.line};border-radius:12px;background:${t.surface};"><p style="margin:0;font-family:${t.mono};font-size:14px;line-height:20px;overflow-wrap:anywhere;">${e(b.name)}</p><p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};">${e(b.detail)}</p></td></tr>`);
+    case "file": return table(`<tr><td style="padding:16px;border:1px solid ${t.line};border-radius:12px;background:${t.surface};"><p style="margin:0;font-family:${t.figures};font-size:14px;line-height:20px;overflow-wrap:anywhere;">${e(b.name)}</p><p style="margin:0;font-size:12px;line-height:18px;color:${t.faint};">${e(b.detail)}</p></td></tr>`);
     case "possibility": return table(`<tr><td style="padding:16px;border:1px solid ${t.line};border-radius:12px;background:${t.surface};"><h2 style="margin:0 0 6px;font-size:15px;line-height:22px;font-weight:600;">${e(b.title)}</h2>${text(b.detail, true)}<a href="${url(b.action.url)}" style="display:inline-block;padding:8px 0 0;color:${t.accent};font-size:14px;line-height:22px;font-weight:600;text-decoration:none;">${e(b.action.label)}</a></td></tr>`);
   }
 }
@@ -93,7 +93,7 @@ export function renderPaperEmailText(email: PaperEmail): string {
       case "draft": lines.push(b.label, b.text, b.note ?? ""); break;
       case "actions": lines.push(...b.actions.map(a => `${a.label}: ${a.url}`)); break;
       case "rows": lines.push(...b.rows.map(r => `${r.label}: ${r.value}`)); break;
-      case "metrics": lines.push(...b.rows.map(r => `${r.value} ${r.label}${r.note ? ` — ${r.note}` : ""}`)); break;
+      case "metrics": lines.push(...b.rows.map(r => `${r.value} ${r.label}${r.note ? `: ${r.note}` : ""}`)); break;
       case "decision": lines.push(b.category, b.title, b.detail, ...b.actions.map(a => `${a.label}: ${a.url}`)); break;
       case "file": lines.push(b.name, b.detail); break;
       case "possibility": lines.push(b.title, b.detail, `${b.action.label}: ${b.action.url}`); break;

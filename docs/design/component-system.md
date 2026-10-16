@@ -20,6 +20,28 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 [design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
 `/preview/strelva/xa`.
 
+### XA-7 · Outside the app (local, branch xa/lane-xa7-outside)
+
+- **E2, the yes on the phone:** `/api/approve` pages render through
+  [xa-page.ts](../../src/app/api/approve/xa-page.ts) (`xaDecisionPageHtml`,
+  `brandXaPage`, `xaYesLabel`): paper, one ink pill naming the consequence,
+  Pebble in frame for bad news, light and dark from the phone. GET still only
+  shows the confirm; the POST decides. An agency's accent replaces the pill.
+- **E1 and E3 emails (templates only, never sent):**
+  [xa-mail.ts](../../src/platform/infra/email/xa-mail.ts) `waitsForYouEmail`,
+  `mondayEmail`, `renderXaMailHtml/Text`. Paper emails no longer set Geist Mono.
+- **E4, public booking:** [VisitorSlotWeek](../../src/experience/bookings/VisitorSlotWeek.tsx)
+  inside `InquiryBookingChoice` and `InquiryBookingOffer`: one radio group, one
+  submit; columns on desktop, rows on a phone. `visitor.module.css` reads the
+  client's `--visitor-*` first and falls back to XA; `.frame` shows a visitor
+  page inside the workspace.
+- **E5, patient form:** [VisitorIntakeForm](../../src/experience/vertical-intake/VisitorIntakeForm.tsx)
+  renders a real `PublicIntakeForm`, checks with `validateIntakeAnswers`, and is
+  the "What patients see" preview on the Dental intake panel.
+- **E6, Today on the phone:** [OwnerPhoneToday](../../src/experience/workspace/OwnerPhoneToday.tsx)
+  on `NeedsYouState` and `SystemView[]`. Not yet mounted by `BusinessHome`.
+- Previews: `/preview/strelva/xa/xa7-outside/{waits-email,phone-yes,monday-email,booking,patient-form,today-phone}`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

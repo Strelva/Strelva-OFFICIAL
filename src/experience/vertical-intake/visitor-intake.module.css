@@ -1,0 +1,18 @@
+/* XA · E5 patient form. Layout only; colors and controls come from the visitor stylesheet. */
+.form { display: flex; flex-direction: column; max-width: 520px; }
+.fields { display: flex; flex-direction: column; gap: 20px; margin-top: 24px; }
+.form > .hint { margin-top: 10px; }
+.question { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.label { margin: 0; padding: 0; font-size: 15px; font-weight: 500; line-height: 1.4; }
+.optional { color: var(--v-muted, #6b6f68); font-weight: 400; }
+.hint { margin: 0; color: var(--v-muted, #6b6f68); font-size: 13px; line-height: 1.5; }
+.select { appearance: none; padding-right: 40px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236b6f68' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position: right 16px center; background-repeat: no-repeat; }
+.area { min-height: 96px; resize: vertical; line-height: 1.5; }
+.fieldError { margin: 0; color: var(--v-danger, #9c522c); font-size: 14px; line-height: 1.5; }
+.triage { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; font-size: 15px; line-height: 1.5; }
+.triage p { margin: 0; }
+.triageTitle { color: var(--v-danger, #9c522c); font-weight: 600; }
+.callLink { display: inline-flex; align-items: center; min-height: 44px; color: var(--v-accent, #161715); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.send { margin-top: 32px; }
+.fine { margin: 10px 0 0; color: var(--v-muted, #6b6f68); font-size: 12px; line-height: 1.5; text-align: center; }
+.call { margin-top: 24px; }

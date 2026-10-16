@@ -1,7 +1,8 @@
 import { ModelBudgetPausedError, ModelBudgetUnavailableError } from "@/platform/infra/business-ai-budget";
-import { actorCopy, actorLabel } from "@/platform/presentation/actor";
+import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
-import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { brandXaPage, xaDecisionPageHtml, xaYesLabel, type XaPageTone } from "./xa-page";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * One-click approve-from-email (with a confirm step).
@@ -56,47 +57,20 @@ import type { OwnerDecision } from "@/platform/needs-you/contracts";
 
 export const dynamic = "force-dynamic";
 
-const PAGE_BG = "#f3f4f5";
-const CARD = "#ffffff";
-const ACCENT = "#447a4f";
-const INK = "#14181c";
-const MUTED = "#565d64";
-const HAIRLINE = "#e6e7e9";
-const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function shell(status: number, inner: string): NextResponse {
-  const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Strelva</title></head>
-<body style="margin:0;background:${PAGE_BG};font-family:${FONT};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:48px 16px;"><tr><td align="center">
-    <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:${CARD};border:1px solid ${HAIRLINE};border-radius:14px;">
-      <tr><td style="padding:40px 36px;text-align:center;">${inner}</td></tr>
-    </table>
-  </td></tr></table>
-</body></html>`;
-  return new NextResponse(html, {
+function html(status: number, page: string): NextResponse {
+  return new NextResponse(page, {
     status,
     headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
   });
 }
 
-function headingBody(heading: string, body: string): string {
-  return `<h1 style="margin:0 0 14px;font-size:23px;line-height:1.3;color:${INK};font-weight:700;">${escapeHtml(heading)}</h1>
-        <p style="margin:0;font-size:15px;line-height:1.6;color:${MUTED};">${escapeHtml(body)}</p>`;
-}
-
-function linkButton(dashboardUrl?: string, label?: string): string {
-  if (!dashboardUrl || !label) return "";
-  return `<a href="${escapeHtml(dashboardUrl)}" style="display:inline-block;margin-top:22px;padding:12px 26px;border-radius:999px;background:${ACCENT};color:#fff;font-weight:600;font-size:15px;text-decoration:none;">${escapeHtml(label)}</a>`;
+/** Done, quiet or bad, read from the result itself. Bad news keeps Pebble in frame. */
+function toneFor(status: number, heading: string): { tone: XaPageTone; statusLabel: string } {
+  if (heading === "Approved") return { tone: "done", statusLabel: "Done" };
+  if (heading === "Not yet" || heading === "Skipped") return { tone: "quiet", statusLabel: "Nothing changed" };
+  if (heading === "Already handled") return { tone: "quiet", statusLabel: "Nothing to do" };
+  if (status >= 400 || /could not|couldn|snag|checking|waiting on google|not sent|paused|too many|invalid|missing|isn't for|expired|changed since|sign in/i.test(heading)) return { tone: "bad", statusLabel: "Nothing went live from this link" };
+  return { tone: "quiet", statusLabel: "Strelva" };
 }
 
 /** A terminal result/notice page (no action to take). */
@@ -104,42 +78,49 @@ function noticePage(params: {
   status: number;
   heading: string;
   body: string;
+  by?: string;
   dashboardUrl?: string;
   buttonLabel?: string;
 }): NextResponse {
-  return shell(
-    params.status,
-    headingBody(params.heading, params.body) + linkButton(params.dashboardUrl, params.buttonLabel),
-  );
+  const { tone, statusLabel } = toneFor(params.status, params.heading);
+  return html(params.status, xaDecisionPageHtml({
+    status: params.status, tone, statusLabel, heading: params.heading, body: params.body, by: params.by,
+    ...(params.dashboardUrl && params.buttonLabel ? { primary: { label: params.buttonLabel, url: params.dashboardUrl } } : {}),
+  }));
 }
 
 /** The confirm step: a real human clicks the button, which POSTs back to resolve.
- *  A scanner/prefetcher that GETs the email link only ever sees this — no action. */
+ *  A scanner/prefetcher that GETs the email link only ever sees this, never an action. */
 function confirmPage(params: {
   token: string;
   heading: string;
   body: string;
   confirmLabel: string;
+  by?: string;
   dashboardUrl?: string;
   previewUrl?: string;
   /** Every value the confirm applies, in full (Needs you sources with a review). */
   lines?: readonly string[];
 }): NextResponse {
-  const review = params.lines?.length
-    ? `<ul style="margin:22px 0 0;padding:0 0 0 18px;text-align:left;font-size:14px;line-height:1.55;color:${INK};">${params.lines
-      .map(line => `<li style="margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(line)}</li>`).join("")}</ul>`
-    : "";
-  const secondary = params.dashboardUrl
-    ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your workspace instead</a></div>`
-    : "";
-  const form = `<form method="POST" action="/api/approve" style="margin:22px 0 0;">
-          <input type="hidden" name="token" value="${escapeHtml(params.token)}">
-          <button type="submit" style="display:inline-block;padding:12px 26px;border:0;border-radius:999px;background:${ACCENT};color:#fff;font-weight:600;font-size:15px;cursor:pointer;">${escapeHtml(params.confirmLabel)}</button>
-        </form>${secondary}`;
-  const preview = params.previewUrl
-    ? `<p style="margin-top:22px;"><a href="${escapeHtml(params.previewUrl)}" style="color:${INK};text-decoration:underline;">Review the complete website preview before deciding</a></p>`
-    : "";
-  return shell(200, headingBody(params.heading, params.body) + preview + review + form);
+  return html(200, xaDecisionPageHtml({
+    status: 200, tone: "waits", statusLabel: "Waits for you", heading: params.heading, body: params.body, by: params.by,
+    ...(params.lines?.length ? { lines: params.lines } : {}),
+    ...(params.previewUrl ? { preview: { url: params.previewUrl, label: "Review the complete website preview before deciding" } } : {}),
+    primary: { label: params.confirmLabel, token: params.token },
+    ...(params.dashboardUrl ? { secondary: { label: "Open your workspace instead", url: params.dashboardUrl } } : {}),
+  }));
+}
+
+/** Who acted, in the owner's words; never a builder phrase when it wasn't recorded. */
+function whoActed(actor: unknown): string {
+  const { name, credit } = actorPresentation(actor);
+  return name ? `${name}${credit ? ` · ${credit}` : ""}` : "Strelva didn't record who made this change.";
+}
+
+/** "Prepared by Maya at North Studio", when the source recorded who prepared it. */
+function preparedBy(actor: unknown): string | undefined {
+  const { name } = actorPresentation(actor);
+  return name ? `Prepared by ${name}.` : undefined;
 }
 
 /** Google has not approved Strelva's Business Profile access yet: nothing failed, the reply is saved. */
@@ -196,9 +177,10 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   const isApprove = claims.action === "approve";
   return confirmPage({
     token,
-    heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
+    heading: item.title,
+    by: preparedBy(item.actor),
     body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
-    confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
+    confirmLabel: xaYesLabel(item.kind, isApprove ? "approve" : "not_yet"),
     dashboardUrl: open,
     ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
     ...(lines ? { lines } : {}),
@@ -236,9 +218,9 @@ function decisionPage(result: DecideResult, origin: string, workspaceId: string,
     case "done":
     case "done_unverified":
       return isApprove
-        ? noticePage({ status: 200, heading: "Approved", body: result.receipt
-            ? `${result.receipt.sentence}\n${actorLabel(result.receipt.actor)}\n${result.receipt.changed ?? result.item?.title ?? "Decision recorded"}\n${result.receipt.evidence?.readBack === "verified" ? "Confirmed live." : result.status === "done_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
-            : `Decision recorded: ${result.item?.title ?? "your approval"}. Actor not recorded. ${result.status === "done_unverified" ? "Confirmation is still pending." : "Completion recorded; the change receipt is unavailable here."}`,
+        ? noticePage({ status: 200, heading: "Approved", by: whoActed(result.receipt?.actor), body: result.receipt
+            ? `${result.receipt.sentence}\n${result.receipt.changed ?? result.item?.title ?? "Decision recorded"}\n${result.receipt.evidence?.readBack === "verified" ? "Confirmed live." : result.status === "done_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
+            : `Decision recorded: ${result.item?.title ?? "your approval"}. ${result.status === "done_unverified" ? "Confirmation is still pending." : "Completion recorded; the change receipt is unavailable here."}`,
           dashboardUrl: openItem, buttonLabel: result.item?.systemId ? "Open System" : "Open item" })
         : noticePage({ status: 200, heading: "Not yet", body: "Nothing was done. It's still in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
     case "already_handled":
@@ -346,9 +328,10 @@ async function getPage(request: Request): Promise<NextResponse> {
     if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl, buttonLabel: "Open your workspace" });
     return confirmPage({
       token,
-      heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
+      heading: item.title,
+      by: preparedBy(item.actor),
       body: `${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
-      confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
+      confirmLabel: xaYesLabel(item.kind, isApprove ? "approve" : "not_yet"),
       dashboardUrl,
       ...(lines ? { lines } : {}),
     });
@@ -358,9 +341,9 @@ async function getPage(request: Request): Promise<NextResponse> {
     token,
     heading: isApprove ? "Approve this reply?" : "Skip this reply?",
     body: isApprove
-      ? `We'll post the drafted reply for ${businessName}. Tap confirm to publish it — nothing goes live until you do.`
-      : `We won't post the drafted reply for ${businessName}. Tap confirm to skip it.`,
-    confirmLabel: isApprove ? "Confirm — approve" : "Confirm — skip",
+      ? `We'll post the drafted reply for ${businessName}. Nothing goes live until you press Post this reply.`
+      : `We won't post the drafted reply for ${businessName}. Nothing is posted.`,
+    confirmLabel: isApprove ? "Post this reply" : "Skip this reply",
     dashboardUrl,
   });
 }
@@ -432,16 +415,17 @@ async function postPage(request: Request): Promise<NextResponse> {
       ? noticePage({
           status: 200,
           heading: "Approved",
+          by: whoActed(receiptEvent?.tenantId === claims.tenantId ? receiptEvent.metadata?.actor : null),
           body: receiptEvent?.tenantId === claims.tenantId
-            ? `${actorCopy(receiptEvent.title, receiptEvent.metadata?.actor)}\n${actorLabel(receiptEvent.metadata?.actor)}\nFor ${businessName}. ${result.reason === "accepted_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
-            : `Decision recorded for ${businessName}. Actor not recorded. The change receipt is unavailable here.`,
+            ? `${actorCopy(receiptEvent.title, receiptEvent.metadata?.actor)}\nFor ${businessName}. ${result.reason === "accepted_unverified" ? "Accepted. Confirmation is still pending." : "Completion recorded. Live confirmation is not recorded here."}`
+            : `Decision recorded for ${businessName}. The change receipt is unavailable here.`,
           dashboardUrl,
           buttonLabel: "Open your workspace",
         })
       : noticePage({
           status: 200,
           heading: "Skipped",
-          body: `No problem — we won't post that reply for ${businessName}. You can always reply yourself in your workspace.`,
+          body: `We won't post that reply for ${businessName}. You can always reply yourself in your workspace.`,
           dashboardUrl,
           buttonLabel: "Open your workspace",
         });
@@ -453,7 +437,7 @@ async function postPage(request: Request): Promise<NextResponse> {
     return noticePage({
       status: 200,
       heading: "Already handled",
-      body: `This was already taken care of for ${businessName} — nothing more to do. Open your workspace to see the latest.`,
+      body: `This was already taken care of for ${businessName}. Nothing more to do. Open your workspace to see the latest.`,
       dashboardUrl,
       buttonLabel: "Open your workspace",
     });
@@ -496,11 +480,7 @@ async function postPage(request: Request): Promise<NextResponse> {
 
 async function brandPage(response: NextResponse, brand: OwnerBrand): Promise<NextResponse> {
   if (!brand.agencyId) return response;
-  const colors = brandColors(brand.accentColor);
-  const image = brand.logoUrl ? `<img src="${escapeHtml(brand.logoUrl)}" alt="" width="132" style="max-height:64px;object-fit:contain;">` : "";
-  const identity = `<div style="margin-bottom:24px;">${image}<p style="color:${INK};font-weight:600;overflow-wrap:anywhere;">${escapeHtml(brand.name)}</p><small style="color:${MUTED};">${BRAND_CREDIT}</small>${brand.replyTo ? `<p><a href="mailto:${escapeHtml(brand.replyTo)}" style="color:${MUTED};">Contact ${escapeHtml(brand.name)}</a></p>` : ""}</div>`;
-  const html = (await response.text()).replace('padding:40px 36px;text-align:center;">', `padding:40px 36px;text-align:center;">${identity}`).replaceAll(`background:${ACCENT};color:#fff`, `background:${colors.accent};color:${colors.onAccent}`);
-  return new NextResponse(html, { status: response.status, headers: response.headers });
+  return new NextResponse(brandXaPage(await response.text(), brand), { status: response.status, headers: response.headers });
 }
 export async function GET(request: Request): Promise<NextResponse> {
   const response = await getPage(request);

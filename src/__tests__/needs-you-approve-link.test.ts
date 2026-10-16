@@ -104,7 +104,8 @@ describe("GET with a workspace link (scanner-safe)", () => {
     const res = await get(token);
     const html = await res.text();
     expect(res.status).toBe(200);
-    expect(html).toContain("Approve: Reply to a new inquiry");
+    expect(html).toContain("<h1>Reply to a new inquiry");
+    expect(html).toContain(">Approve</button>");
     expect(html).toContain("The reply sends.");
     expect(html).toContain('method="POST"');
     expect(mockDecide).not.toHaveBeenCalled();
