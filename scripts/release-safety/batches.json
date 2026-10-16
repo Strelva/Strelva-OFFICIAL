@@ -2598,7 +2598,7 @@
     },
     {
       "id": "xa-build-2026-10-16",
-      "status": "Held and unapplied. XA build presentation reads: read_access_review returns an optional 'since' for provider entries (XA \u00b7 R4, lane XA-8), and application_action_actor_snapshot also records the acting agency member's own account name so owner screens can name the person at the agency (lane XA-3). Plus owner email confirmations (switch-on): an operator-recorded confirmation that an address is a business owner's, read by the email transport before any owner claim or Needs you email. Otherwise no grant, gate or authority change; existing History is not backfilled. Not run against any database in this build. No production, provider, email or flag change authorized.",
+      "status": "Held and unapplied. XA build presentation reads: read_access_review returns an optional 'since' for provider entries (XA \u00b7 R4, lane XA-8), and application_action_actor_snapshot also records the acting agency member's own account name so owner screens can name the person at the agency (lane XA-3). Plus owner email confirmations (switch-on): an operator-recorded confirmation that an address is a business owner's, read by the email transport before any owner claim or Needs you email. Otherwise no grant, gate or authority change; existing History is not backfilled. The first two files were rehearsed with the other 26 held files on the restored October 16 production schema (PostgreSQL 17.11): forward, reverse, reapply with exact catalog equality (design-notes/MIGRATION-PLAN.md). 20261028120000_owner_email_confirmations.sql arrived after that rehearsal and has not been rehearsed on the restored schema. No production, provider, email or flag change authorized.",
       "items": [
         {
           "file": "20261028100800_access_review_since.sql",
@@ -2610,7 +2610,9 @@
         {
           "file": "20261028110000_agency_actor_person_name.sql",
           "sha256": "ce86ed687c9d0a1b58a102d3febfb4bfffa3112839a7e93025ada316cd266f4a",
-          "rollbackStatus": "No rollback file prepared yet; the prior application_action_actor_snapshot is in 20261021181000_application_actor_snapshots.sql. Snapshots written after apply keep personName. No production application authorized."
+          "rollback": "rollback-20261028110000_agency_actor_person_name.sql",
+          "rollbackSha256": "32dca215841358093cff615f4a37bbaffad402220384303a73291990e78ed337",
+          "rollbackStatus": "Restores application_action_actor_snapshot exactly as production runs it before this migration (body from 20261021181000); refuses when the installed body is not this migration's (md5 guard). Snapshots written after apply keep personName. Rehearsed on the restored October 16 production schema on PostgreSQL 17.11 (forward, reverse, reapply; exact catalog). No production application authorized."
         },
         {
           "file": "20261028120000_owner_email_confirmations.sql",

@@ -5,7 +5,18 @@ import { isIP } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+/**
+ * PostgreSQL 18 (Homebrew) by default. Set STRELVA_PG_BIN to another bin
+ * directory (e.g. /opt/homebrew/opt/postgresql@17/bin) to rehearse against the
+ * production major version. A configured directory must contain the binary.
+ */
 export function pgBinary(name: string): string {
+  const configured = process.env.STRELVA_PG_BIN;
+  if (configured) {
+    const pinned = join(configured, name);
+    if (!existsSync(pinned)) throw new Error(`STRELVA_PG_BIN has no ${name}: ${pinned}`);
+    return pinned;
+  }
   const candidate = join("/opt/homebrew/opt/postgresql@18/bin", name);
   return existsSync(candidate) ? candidate : name;
 }

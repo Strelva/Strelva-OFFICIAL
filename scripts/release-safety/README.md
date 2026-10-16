@@ -33,6 +33,27 @@ reversal, and archive reuse. A receipt and private database cluster remain in
 the printed temporary directory; the cluster is stopped on exit. Archive
 deletion inside this disposable proof cluster is test cleanup only.
 
+## PostgreSQL 17 (production's major version)
+
+Every tool here resolves binaries through `pgBinary` in `postgres.ts`.
+`STRELVA_PG_BIN=/opt/homebrew/opt/postgresql@17/bin` selects PostgreSQL 17 for
+any of them (a configured directory missing the binary throws; it never falls
+back). Without it, Homebrew PostgreSQL 18 remains the default.
+
+## Rehearsing held files on a restored production schema
+
+`rehearse-pending-on-restored-schema.sh <input-dir> <out-dir>` restores a
+separately authorized schema-only dump (plus the target's migration versions and
+role attributes/memberships, no passwords) on a private socket-only cluster, seeds
+fictional tenants for the content-source backfill, then applies every pending
+forward as the non-superuser `postgres`, reverses every rollback, and reapplies.
+It exits nonzero unless the reversed catalog equals the restored one and the
+reapplied catalog equals the first forward (`catalog-wide.sql`: every app schema,
+ACL items sorted). `stage-pending.sh` stages only pinned pending forwards for a
+CLI push; `verify-pending-20261016.sql` is the read-only post-push check for the
+October 16 packet. The plan and evidence are in `design-notes/MIGRATION-PLAN.md`.
+None of these grants production authority.
+
 ## Batch 8 runtime recovery
 
 Batch 8 is **forward-only schema**. Its inquiry, approval, provider, export and
