@@ -46,7 +46,7 @@ export function XaIconButton({ label, children, tone = "raised", ...rest }: Omit
 }
 
 /** An inline text action, the way Strelva offers "See it · Undo" inside a sentence. */
-export function XaTextLink({ href, onClick, children, ...rest }: { href?: string; onClick?: () => void; children: ReactNode; "aria-label"?: string }) {
+export function XaTextLink({ href, onClick, children, disabled, ...rest }: { href?: string; onClick?: () => void; children: ReactNode; "aria-label"?: string; disabled?: boolean }) {
   if (href) return <Link href={href} className={styles.textLink} onClick={onClick} aria-label={rest["aria-label"]}>{children}</Link>;
-  return <button type="button" className={styles.textLink} onClick={onClick} aria-label={rest["aria-label"]}>{children}</button>;
+  return <button type="button" className={styles.textLink} onClick={onClick} disabled={disabled} aria-label={rest["aria-label"]}>{children}</button>;
 }

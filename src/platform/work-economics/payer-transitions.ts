@@ -19,6 +19,8 @@ export type PayerTransition = {
   successorWorkspaceId: string | null;
   successorWorkspaceName: string | null;
   proposerEmail: string;
+  /** The proposer's display name, when the read carries one. Screens prefer it to the email. */
+  proposerName?: string;
   status: PayerTransitionStatus;
   proposedAt: string;
   resolvedAt: string | null;
@@ -76,6 +78,7 @@ function map(row: Record<string, unknown>): PayerTransition {
     successorWorkspaceId: typeof row.successor_workspace_id === "string" ? row.successor_workspace_id : null,
     successorWorkspaceName: typeof row.successor_workspace_name === "string" ? row.successor_workspace_name : null,
     proposerEmail: string("proposer_email"),
+    ...(typeof row.proposer_name === "string" && row.proposer_name.trim() ? { proposerName: row.proposer_name.trim() } : {}),
     status: string("status") as PayerTransitionStatus, proposedAt: string("proposed_at"),
     resolvedAt: typeof row.resolved_at === "string" ? row.resolved_at : null,
     acceptedAt: typeof row.accepted_at === "string" ? row.accepted_at : null,

@@ -1,54 +1,510 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
+import {
+  XaButton,
+  XaDecision,
+  XaField,
+  XaSegmented,
+  XaSelect,
+  XaStatus,
+  XaTextArea,
+  XaTextLink,
+  XaYes,
+  type XaYesState,
+} from "@/components/ui/strelva/Xa";
 import type { AgencyInvoice } from "@/platform/agency-billing/types";
 import type { CheckoutAvailability } from "@/platform/connect/checkout-availability";
-import { AgencyCheckoutStatus, UNRELEASED_CHECKOUT } from "./AgencyCheckoutStatus";
+import {
+  AgencyCheckoutStatus,
+  UNRELEASED_CHECKOUT,
+} from "./AgencyCheckoutStatus";
+import styles from "@/experience/workspace/money/money.module.css";
 
-function ReceiptState({invoice}:{invoice:AgencyInvoice}) {
- if(invoice.payment_receipt_state==="review")return <p role="alert" className="text-critical">Payment needs review. The provider receipt could not be matched to the accepted agreement. Your agency must reconcile it.</p>;
- if(invoice.payment_receipt_state==="matched")return <p role="status">Payment is confirmed for these accepted terms.{invoice.kind==="rebill"&&invoice.status==="awaiting_payment"?" The subscription’s current state still needs reconciliation.":""}</p>;
- return invoice.kind==="rebill"&&invoice.status==="active"?<p role="status">The subscription is active. Payment is not yet confirmed.</p>:null;
+const price = (invoice: Pick<AgencyInvoice, "amount_cents" | "currency">) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: invoice.currency || "usd",
+  }).format(invoice.amount_cents / 100);
+const STATUS_WORDS: Record<AgencyInvoice["status"], string> = {
+  proposed: "Waiting for the owner",
+  accepted: "Accepted",
+  declined: "Declined",
+  revoked: "Withdrawn",
+  awaiting_payment: "Waiting for payment",
+  active: "Active",
+  paid: "Paid",
+  cancelled: "Cancelled",
+};
+
+function ReceiptState({ invoice }: { invoice: AgencyInvoice }) {
+  if (invoice.payment_receipt_state === "review")
+    return (
+      <p role="alert" className={styles.critical}>
+        Payment needs review. Stripe&apos;s record could not be matched to the
+        accepted agreement. Your agency must reconcile it.
+      </p>
+    );
+  if (invoice.payment_receipt_state === "matched")
+    return (
+      <p role="status" className={styles.body}>
+        Payment is confirmed for these accepted terms.
+        {invoice.kind === "rebill" && invoice.status === "awaiting_payment"
+          ? " The subscription’s current state still needs reconciliation."
+          : ""}
+      </p>
+    );
+  return invoice.kind === "rebill" && invoice.status === "active" ? (
+    <p role="status" className={styles.body}>
+      The subscription is active. Payment is not yet confirmed.
+    </p>
+  ) : null;
 }
 
-type ControlsProps = {agencyWorkspaceId:string;businessWorkspaceId:string;initialInvoices?:AgencyInvoice[];checkoutAvailability?:CheckoutAvailability;request?:typeof fetch};
-export function AgencyInvoiceControls(props:ControlsProps) {
- return <ScopedAgencyInvoiceControls key={`${props.agencyWorkspaceId}:${props.businessWorkspaceId}`} {...props}/>;
+type ControlsProps = {
+  agencyWorkspaceId: string;
+  businessWorkspaceId: string;
+  initialInvoices?: AgencyInvoice[];
+  checkoutAvailability?: CheckoutAvailability;
+  request?: typeof fetch;
+};
+/** The agency sets a retail price for one client, inline in that client's row. The owner says yes on their own billing page. */
+export function AgencyInvoiceControls(props: ControlsProps) {
+  return (
+    <ScopedAgencyInvoiceControls
+      key={`${props.agencyWorkspaceId}:${props.businessWorkspaceId}`}
+      {...props}
+    />
+  );
 }
-function ScopedAgencyInvoiceControls({agencyWorkspaceId,businessWorkspaceId,initialInvoices=[],checkoutAvailability=UNRELEASED_CHECKOUT,request=fetch}:ControlsProps) {
- const [kind,setKind]=useState("rebill");const [invoice,setInvoice]=useState<AgencyInvoice|null>(initialInvoices[0]??null);const [idempotencyKey,setIdempotencyKey]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
- const inflight=useRef<AbortController|null>(null);
- useEffect(()=>()=>inflight.current?.abort(),[]);
- async function command(body:Record<string,unknown>) {
-  if(inflight.current || (body.action==="fulfill" && checkoutAvailability.status!=="ready"))return;
-  const controller=new AbortController();inflight.current=controller;
-  setBusy(true);setError("");try {
-   const response=await request((body.action==="propose"?kind:invoice?.kind)==="rebill"?`/api/agency/clients/${businessWorkspaceId}/rebill`:"/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
-   const value=await response.json();if(controller.signal.aborted)return;if(!response.ok)throw new Error(value.error??"The invoice could not be confirmed.");setInvoice(value);if(body.action==="propose")setIdempotencyKey("");
-  }catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"The invoice could not be confirmed.");}finally{if(!controller.signal.aborted){inflight.current=null;setBusy(false);}}
- }
- return <details className="mt-4"><summary className="cursor-pointer text-sm">Set a client retail agreement</summary>
-  <p className="mt-3 text-sm text-gray-muted">The business owner reviews the exact terms before any checkout or subscription is created. Your wholesale bill stays separate.</p>
-  <AgencyCheckoutStatus availability={checkoutAvailability} paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`} />
-  <form className="mt-4 grid gap-3" onSubmit={event=>{event.preventDefault();const form=new FormData(event.currentTarget);void command({action:"propose",agencyWorkspaceId,businessWorkspaceId,kind,amountCents:Number(form.get("amountCents")),currency:"usd",description:form.get("description"),idempotencyKey:idempotencyKey||(()=>{const key=crypto.randomUUID();setIdempotencyKey(key);return key;})()});}}>
-   <SelectInput label="Agreement" value={kind} disabled={busy} onChange={event=>setKind(event.target.value)} options={[{value:"rebill",label:"Monthly retail subscription"},{value:"pay_link",label:"One-off invoice"}]} />
-   <TextInput label="Amount in cents (USD)" name="amountCents" type="number" min={1} max={100000000} step={1} required disabled={busy} />
-   <TextInput label="What this covers" name="description" maxLength={300} required disabled={busy}/><Button type="submit" disabled={busy}>Prepare client agreement</Button>
-  </form>
-  {initialInvoices.length > 1 ? <SelectInput className="mt-4" label="Existing client agreements" disabled={busy} value={invoice?.id ?? ""} onChange={event=>{if(!inflight.current){setInvoice(initialInvoices.find(item=>item.id===event.target.value)??null);setError("");}}} options={initialInvoices.map(item=>({value:item.id,label:`${item.description} · ${item.status.replaceAll("_"," ")}`}))} /> : null}
-  {invoice?<div className="mt-4 space-y-3 text-sm"><p role="status">Agreement {invoice.status.replaceAll("_"," ")}. ${(invoice.amount_cents/100).toFixed(2)}{invoice.kind==="rebill"?" / month":" once"}.</p><ReceiptState invoice={invoice}/><a className="underline" href={`/workspace/billing?workspaceId=${businessWorkspaceId}&invoiceId=${invoice.id}`}>Client review page</a>{invoice.status==="accepted"?<Button disabled={busy || checkoutAvailability.status!=="ready"} onClick={()=>void command({action:"fulfill",intentId:invoice.id})}>Create accepted checkout</Button>:null}{checkoutAvailability.status==="ready"&&invoice.checkout_url&&(!invoice.payment_receipt_state||invoice.payment_receipt_state==="unconfirmed")?<a className="block underline" href={invoice.checkout_url}>Open payment page</a>:null}</div>:null}
-  {error?<p role="alert" className="mt-3 text-sm text-critical">{error}</p>:null}
- </details>;
+function ScopedAgencyInvoiceControls({
+  agencyWorkspaceId,
+  businessWorkspaceId,
+  initialInvoices = [],
+  checkoutAvailability = UNRELEASED_CHECKOUT,
+  request = fetch,
+}: ControlsProps) {
+  const [kind, setKind] = useState<"rebill" | "pay_link">("rebill");
+  const [invoice, setInvoice] = useState<AgencyInvoice | null>(
+    initialInvoices[0] ?? null,
+  );
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const inflight = useRef<AbortController | null>(null);
+  useEffect(() => () => inflight.current?.abort(), []);
+  async function command(body: Record<string, unknown>) {
+    if (
+      inflight.current ||
+      (body.action === "fulfill" && checkoutAvailability.status !== "ready")
+    )
+      return;
+    const controller = new AbortController();
+    inflight.current = controller;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await request(
+        (body.action === "propose" ? kind : invoice?.kind) === "rebill"
+          ? `/api/agency/clients/${businessWorkspaceId}/rebill`
+          : "/api/agency/pay-links",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        },
+      );
+      const value = await response.json();
+      if (controller.signal.aborted) return;
+      if (!response.ok)
+        throw new Error(value.error ?? "The agreement could not be confirmed.");
+      setInvoice(value);
+      if (body.action === "propose") setIdempotencyKey("");
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The agreement could not be confirmed.",
+        );
+    } finally {
+      if (!controller.signal.aborted) {
+        inflight.current = null;
+        setBusy(false);
+      }
+    }
+  }
+  return (
+    <>
+      {invoice ? (
+        <p className={styles.clientFigure}>
+          {price(invoice).replace(/\.00$/, "")}
+          <span className={styles.figureQuiet}>
+            {invoice.kind === "rebill" ? " / month" : " once"}
+          </span>
+        </p>
+      ) : null}
+      <details className={styles.history}>
+        <summary className={styles.detailsToggle}>
+          {invoice
+            ? `Retail price${invoice.status === "proposed" ? " waits on the owner" : `, ${STATUS_WORDS[invoice.status].toLowerCase()}`}`
+            : "Set a retail price for this client"}
+        </summary>
+        <div className={styles.inlinePanel}>
+          <p className={styles.note}>
+            The business owner sees these exact terms and says yes before any
+            checkout or subscription is made. Your wholesale bill stays
+            separate.
+          </p>
+          <AgencyCheckoutStatus
+            availability={checkoutAvailability}
+            paymentsHref={`/workspace/payments?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}
+          />
+          <form
+            className={styles.form}
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = new FormData(event.currentTarget);
+              const dollars = String(form.get("amount") ?? "").trim();
+              if (!/^\d+(\.\d{1,2})?$/.test(dollars) || Number(dollars) <= 0) {
+                setError(
+                  "Enter an amount above $0, with at most two decimals.",
+                );
+                return;
+              }
+              void command({
+                action: "propose",
+                agencyWorkspaceId,
+                businessWorkspaceId,
+                kind,
+                amountCents: Math.round(Number(dollars) * 100),
+                currency: "usd",
+                description: form.get("description"),
+                idempotencyKey:
+                  idempotencyKey ||
+                  (() => {
+                    const key = crypto.randomUUID();
+                    setIdempotencyKey(key);
+                    return key;
+                  })(),
+              });
+            }}
+          >
+            <XaSegmented
+              label="How the client pays"
+              value={kind}
+              onChange={(value) => {
+                if (!busy) setKind(value);
+              }}
+              options={[
+                { value: "rebill", label: "Every month" },
+                { value: "pay_link", label: "Once" },
+              ]}
+            />
+            <XaField
+              label={
+                kind === "rebill"
+                  ? "Amount each month, in dollars"
+                  : "Amount, in dollars"
+              }
+              name="amount"
+              inputMode="decimal"
+              required
+              disabled={busy}
+            />
+            <XaTextArea
+              label="What this covers"
+              name="description"
+              maxLength={300}
+              required
+              disabled={busy}
+            />
+            <div className={styles.actions}>
+              <XaButton type="submit" disabled={busy}>
+                Send to the owner for a yes
+              </XaButton>
+            </div>
+          </form>
+          {initialInvoices.length > 1 ? (
+            <XaSelect
+              label="Earlier agreements with this client"
+              disabled={busy}
+              value={invoice?.id ?? ""}
+              onChange={(event) => {
+                if (!inflight.current) {
+                  setInvoice(
+                    initialInvoices.find(
+                      (item) => item.id === event.target.value,
+                    ) ?? null,
+                  );
+                  setError("");
+                }
+              }}
+              options={initialInvoices.map((item) => ({
+                value: item.id,
+                label: `${item.description} · ${STATUS_WORDS[item.status]}`,
+              }))}
+            />
+          ) : null}
+          {invoice ? (
+            <div className={styles.section}>
+              <p className={styles.body} role="status">
+                {invoice.description}: {price(invoice)}
+                {invoice.kind === "rebill" ? " a month" : " once"}.{" "}
+                {STATUS_WORDS[invoice.status]}.
+              </p>
+              <ReceiptState invoice={invoice} />
+              <div className={styles.links}>
+                <XaTextLink
+                  href={`/workspace/billing?workspaceId=${businessWorkspaceId}&invoiceId=${invoice.id}`}
+                >
+                  See what the owner sees
+                </XaTextLink>
+                {checkoutAvailability.status === "ready" &&
+                invoice.checkout_url &&
+                (!invoice.payment_receipt_state ||
+                  invoice.payment_receipt_state === "unconfirmed") ? (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <a
+                      className={styles.detailsToggle}
+                      href={invoice.checkout_url}
+                    >
+                      Open payment page
+                    </a>
+                  </>
+                ) : null}
+              </div>
+              {invoice.status === "accepted" ? (
+                <div className={styles.actions}>
+                  <XaButton
+                    size="sm"
+                    disabled={busy || checkoutAvailability.status !== "ready"}
+                    onClick={() =>
+                      void command({ action: "fulfill", intentId: invoice.id })
+                    }
+                  >
+                    Create accepted checkout
+                  </XaButton>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {error ? (
+            <p role="alert" className={styles.critical}>
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </details>
+    </>
+  );
 }
-type AcceptanceProps={invoiceId:string;checkoutAvailability?:CheckoutAvailability;request?:typeof fetch};
-export function AgencyInvoiceAcceptance(props:AcceptanceProps) {return <ScopedAgencyInvoiceAcceptance key={props.invoiceId} {...props}/>;}
-function ScopedAgencyInvoiceAcceptance({invoiceId,checkoutAvailability=UNRELEASED_CHECKOUT,request=fetch}:AcceptanceProps) {
- const [invoice,setInvoice]=useState<AgencyInvoice|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
- const inflight=useRef<AbortController|null>(null);
- useEffect(()=>()=>inflight.current?.abort(),[]);
- const load=useCallback(async(signal:AbortSignal)=> {const response=await request(`/api/agency/pay-links?intentId=${invoiceId}`,{cache:"no-store",signal});const value=await response.json();if(signal.aborted)return;if(!response.ok)throw new Error(value.error??"The agreement could not be loaded.");setInvoice(value);},[invoiceId,request]);
- useEffect(()=>{const controller=new AbortController();void load(controller.signal).catch(cause=>{if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"The agreement could not be loaded.");});return()=>controller.abort();},[load]);
- async function respond(action:"accept"|"decline"|"fulfill") {if(inflight.current || (action==="fulfill" && checkoutAvailability.status!=="ready"))return;const controller=new AbortController();inflight.current=controller;setBusy(true);setError("");try {const response=await request("/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,intentId:invoiceId}),signal:controller.signal});const value=await response.json();if(controller.signal.aborted)return;if(!response.ok)throw new Error(value.error??"Your answer could not be confirmed.");setInvoice(value);}catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"Your answer could not be confirmed.");}finally{if(!controller.signal.aborted){inflight.current=null;setBusy(false);}}}
- return <section className="mt-8" aria-labelledby="retail-agreement"><h2 id="retail-agreement" className="font-medium">Agency retail agreement</h2>{invoice?<><p className="mt-3">{invoice.description}</p><p className="mt-3 tabular-nums">{new Intl.NumberFormat(undefined,{style:"currency",currency:invoice.currency}).format(invoice.amount_cents/100)}{invoice.kind==="rebill"?" / month":" once"}</p><p className="mt-3 text-sm text-gray-muted">Your agency is the seller. This agreement is separate from its wholesale bill and existing job limits. Status: {invoice.status.replaceAll("_"," ")}.</p><ReceiptState invoice={invoice}/><AgencyCheckoutStatus availability={checkoutAvailability} />{invoice.status==="proposed"&&invoice.can_accept?<div className="mt-4 flex flex-wrap gap-3"><Button disabled={busy} onClick={()=>void respond("accept")}>Accept these terms</Button><Button variant="secondary" disabled={busy} onClick={()=>void respond("decline")}>Decline</Button></div>:null}{invoice.status==="accepted"&&invoice.can_manage?<Button className="mt-4" disabled={busy || checkoutAvailability.status!=="ready"} onClick={()=>void respond("fulfill")}>Create accepted checkout</Button>:null}{invoice.status==="awaiting_payment"&&!invoice.checkout_url&&(!invoice.payment_receipt_state||invoice.payment_receipt_state==="unconfirmed")?<p role="status" className="mt-4 text-sm">The subscription is recorded. Its payment page still needs reconciliation; no new subscription is being created.</p>:null}{checkoutAvailability.status==="ready"&&invoice.checkout_url&&(!invoice.payment_receipt_state||invoice.payment_receipt_state==="unconfirmed")?<a className="mt-4 inline-flex min-h-12 items-center underline" href={invoice.checkout_url}>Pay this agreement</a>:null}</>:error?null:<p role="status" className="mt-4 text-sm">Loading agreement…</p>}{error?<p role="alert" className="mt-4 text-sm text-critical">{error}</p>:null}</section>;
+
+type AcceptanceProps = {
+  invoiceId: string;
+  checkoutAvailability?: CheckoutAvailability;
+  request?: typeof fetch;
+  /** Agencies serving this business, by workspace id, so the agency is named. */
+  agencyNames?: Readonly<Record<string, string>>;
+  /** What the business pays Strelva each month, so the owner can tell the two apart. */
+  planCents?: number | null;
+};
+/** The owner agrees to a price their agency prepared (XA · O3): the terms, then the one yes. */
+export function AgencyInvoiceAcceptance(props: AcceptanceProps) {
+  return <ScopedAgencyInvoiceAcceptance key={props.invoiceId} {...props} />;
+}
+function ScopedAgencyInvoiceAcceptance({
+  invoiceId,
+  checkoutAvailability = UNRELEASED_CHECKOUT,
+  request = fetch,
+  agencyNames = {},
+  planCents = null,
+}: AcceptanceProps) {
+  const [invoice, setInvoice] = useState<AgencyInvoice | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<null | "accept" | "decline" | "fulfill">(
+    null,
+  );
+  const inflight = useRef<AbortController | null>(null);
+  useEffect(() => () => inflight.current?.abort(), []);
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      const response = await request(
+        `/api/agency/pay-links?intentId=${invoiceId}`,
+        { cache: "no-store", signal },
+      );
+      const value = await response.json();
+      if (signal.aborted) return;
+      if (!response.ok)
+        throw new Error(value.error ?? "The agreement could not be loaded.");
+      setInvoice(value);
+    },
+    [invoiceId, request],
+  );
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal).catch((cause) => {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The agreement could not be loaded.",
+        );
+    });
+    return () => controller.abort();
+  }, [load]);
+  async function respond(action: "accept" | "decline" | "fulfill") {
+    if (
+      inflight.current ||
+      (action === "fulfill" && checkoutAvailability.status !== "ready")
+    )
+      return;
+    const controller = new AbortController();
+    inflight.current = controller;
+    setBusy(action);
+    setError("");
+    try {
+      const response = await request("/api/agency/pay-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, intentId: invoiceId }),
+        signal: controller.signal,
+      });
+      const value = await response.json();
+      if (controller.signal.aborted) return;
+      if (!response.ok)
+        throw new Error(value.error ?? "Your answer could not be confirmed.");
+      setInvoice(value);
+    } catch (cause) {
+      if (!controller.signal.aborted)
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Your answer could not be confirmed.",
+        );
+    } finally {
+      if (!controller.signal.aborted) {
+        inflight.current = null;
+        setBusy(null);
+      }
+    }
+  }
+  if (!invoice)
+    return (
+      <section className={styles.section} aria-label="Agency retail agreement">
+        {error ? (
+          <p role="alert" className={styles.critical}>
+            {error}
+          </p>
+        ) : (
+          <p role="status" className={styles.note}>
+            Loading the agreement…
+          </p>
+        )}
+      </section>
+    );
+  const proposed = invoice.status === "proposed" && invoice.can_accept;
+  const agency = agencyNames[invoice.agency_workspace_id] ?? "your agency";
+  const Agency = agency.charAt(0).toUpperCase() + agency.slice(1);
+  const plan =
+    planCents && planCents > 0
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+        })
+          .format(planCents / 100)
+          .replace(/\.00$/, "")
+      : null;
+  const yesState: XaYesState =
+    busy === "accept" ? "going" : error && proposed ? "failed" : "waiting";
+  const status =
+    invoice.status === "proposed" ? (
+      <XaStatus kind="waits">Waits for you</XaStatus>
+    ) : invoice.status === "declined" ||
+      invoice.status === "revoked" ||
+      invoice.status === "cancelled" ? (
+      <XaStatus kind="draft">{STATUS_WORDS[invoice.status]}</XaStatus>
+    ) : (
+      <XaStatus kind="live">{STATUS_WORDS[invoice.status]}</XaStatus>
+    );
+  return (
+    <XaDecision
+      label="Agency retail agreement"
+      status={status}
+      meta={`Prepared by ${agency}`}
+      yes={
+        proposed ? (
+          <XaYes
+            state={yesState}
+            yesLabel="Accept these terms"
+            notYetLabel="Decline"
+            onYes={() => void respond("accept")}
+            onNotYet={busy ? undefined : () => void respond("decline")}
+            working={{
+              title: "Recording your yes",
+              steps: [
+                {
+                  id: "accept",
+                  label: "Saving these exact terms with your name",
+                  state: "active",
+                },
+              ],
+            }}
+            failure={error || undefined}
+          />
+        ) : null
+      }
+    >
+      <div className={styles.section}>
+        <p className={styles.amount}>
+          {price(invoice)}
+          <small>{invoice.kind === "rebill" ? "a month" : "once"}</small>
+        </p>
+        <p className={styles.body}>{invoice.description}</p>
+        <p className={styles.note}>
+          {plan
+            ? `This is what ${agency} charges you, on its own Stripe account, separate from Strelva's ${plan} a month.`
+            : `This is what ${agency} charges you, on its own Stripe account, separate from what you pay Strelva.`}
+        </p>
+        <AgencyCheckoutStatus
+          availability={checkoutAvailability}
+          agencyName={Agency}
+        />
+      </div>
+      <ReceiptState invoice={invoice} />
+      {invoice.status === "accepted" && invoice.can_manage ? (
+        <div className={styles.actions}>
+          <XaButton
+            disabled={Boolean(busy) || checkoutAvailability.status !== "ready"}
+            onClick={() => void respond("fulfill")}
+          >
+            Create accepted checkout
+          </XaButton>
+        </div>
+      ) : null}
+      {invoice.status === "awaiting_payment" &&
+      !invoice.checkout_url &&
+      (!invoice.payment_receipt_state ||
+        invoice.payment_receipt_state === "unconfirmed") ? (
+        <p role="status" className={styles.note}>
+          The subscription is recorded. Its payment page still needs
+          reconciliation; no new subscription is being made.
+        </p>
+      ) : null}
+      {checkoutAvailability.status === "ready" &&
+      invoice.checkout_url &&
+      (!invoice.payment_receipt_state ||
+        invoice.payment_receipt_state === "unconfirmed") ? (
+        <a className={styles.detailsToggle} href={invoice.checkout_url}>
+          Pay this agreement
+        </a>
+      ) : null}
+      {error && !proposed ? (
+        <p role="alert" className={styles.critical}>
+          {error}
+        </p>
+      ) : null}
+    </XaDecision>
+  );
 }

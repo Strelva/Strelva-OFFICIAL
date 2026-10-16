@@ -1,0 +1,878 @@
+/* Money in the XA language (xs-money lane, Oct 15).
+   Workspace screens follow R1 (a column of open answers) and AG6 (rows with a
+   quiet number); a decision about a price follows O3; public pages follow E4.
+   Only the decision (XaDecision) is raised. Documents and the public payment
+   panel read as paper: a hairline, 12-16px corners, almost no shadow. Nothing
+   else gets a background: waiting things are plain lines with the decision on
+   the same line. */
+
+.screen {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  max-width: 1080px;
+  flex-direction: column;
+  gap: 40px;
+  padding: 64px 48px 128px 96px;
+}
+.screen > * {
+  max-width: 760px;
+}
+.screen > .split,
+.screen > .wide {
+  max-width: none;
+}
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  align-items: start;
+  gap: 64px;
+}
+.column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 32px;
+}
+.side {
+  position: sticky;
+  top: 32px;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 20px;
+}
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.section {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+.sectionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.heading {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.heading:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.block ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.body {
+  margin: 0;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.note {
+  margin: 0;
+  color: var(--st-text-3);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.critical {
+  margin: 0;
+  color: var(--st-critical);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  color: var(--st-text-3);
+  font-size: 14px;
+}
+.form {
+  display: flex;
+  width: 100%;
+  max-width: 520px;
+  flex-direction: column;
+  gap: 18px;
+}
+.form > button,
+.section > button,
+.block > button {
+  align-self: flex-start;
+}
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.figure {
+  color: var(--st-text);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.figureQuiet {
+  color: var(--st-text-3);
+  font-size: 13px;
+  font-weight: 400;
+}
+.detailsToggle {
+  color: var(--st-accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.detailsToggle::-webkit-details-marker {
+  display: none;
+}
+.detailsToggle:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.inlinePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0 4px;
+}
+.waiting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* One line: what waits, who asked, then its answers as text links. */
+.line {
+  margin: 0;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.line strong {
+  color: var(--st-text);
+  font-weight: 500;
+}
+.lineActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+  margin-left: 6px;
+  color: var(--st-text-3);
+}
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  color: var(--st-text-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.ask > span:first-child {
+  color: var(--st-need);
+}
+
+/* AG6 right column: Pebble doing one job beside the list. */
+.pebbleAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.pebbleAside p {
+  margin: 0;
+}
+.pebblePhoneAvatar {
+  display: none;
+}
+.pebbleLead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.pebbleList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--st-text-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.pebbleList li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+}
+.pebbleList b {
+  color: var(--st-text);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.fixtureNote {
+  color: var(--st-text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Pebble's sentence next to the clay, no dot (payment link setup, setup states). */
+.pebbleBeside {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+}
+.pebbleBeside p {
+  margin: 0;
+}
+@media (max-width: 767px) {
+  .pebbleBeside {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* The payer inbox: one list, the decision on each line. */
+.inbox {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.inbox > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 0;
+}
+.inbox > li + li::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--st-line);
+  content: "";
+}
+.inboxTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--st-text);
+  font-size: 15px;
+  font-weight: 500;
+}
+.inbox .yesSlot {
+  max-width: 360px;
+  margin-top: 8px;
+}
+.waitingHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.waitingTitle {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.history > summary {
+  width: max-content;
+}
+
+/* R1 answers: the detail on the left, who said it on the right. */
+.said {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.saidHead,
+.saidRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, max-content);
+  column-gap: 32px;
+}
+.saidHead {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--st-line);
+  color: var(--st-text-3);
+  font-size: 13px;
+}
+.saidRow {
+  row-gap: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--st-line);
+}
+.saidRow dt {
+  grid-column: 1;
+  color: var(--st-text-3);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.saidRow dd {
+  grid-column: 1;
+  margin: 0;
+  color: var(--st-text);
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.saidRow dd.saidBy {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--st-text-2);
+  font-size: 14px;
+}
+.saidWord {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (max-width: 767px) {
+  .saidWord {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+  }
+  .saidHead {
+    display: none;
+  }
+  .saidHead,
+  .saidRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .saidRow dd.saidBy {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 13px;
+  }
+}
+
+/* AG6 lines: initial, name and its retail price inline, the number on the right. */
+.clientList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.clientLine {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 16px 0;
+}
+.clientLine + .clientLine::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--st-line);
+  content: "";
+}
+.clientText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.clientText > a {
+  width: max-content;
+  max-width: 100%;
+  color: var(--st-text);
+}
+.clientFigure {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.6px;
+  line-height: 32px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+/* Row placement when the retail price controls sit directly in the line:
+   the figure on the right of the name, the controls under the name. */
+.clientLine > :first-child {
+  grid-row: 1 / span 2;
+}
+.clientLine > .clientText {
+  grid-column: 2;
+  grid-row: 1;
+}
+.clientLine > .clientFigure {
+  grid-column: 3;
+  grid-row: 1;
+}
+.clientLine > details {
+  grid-column: 2 / 4;
+  grid-row: 2;
+}
+.clientDetail {
+  color: var(--st-text-2);
+  font-size: 14px;
+  font-weight: 400;
+}
+@media (max-width: 767px) {
+  .clientLine {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .clientFigure,
+  .clientLine > .clientFigure {
+    grid-column: 2;
+    grid-row: auto;
+    text-align: left;
+    font-size: 20px;
+  }
+  .clientLine > details {
+    grid-column: 2;
+    grid-row: auto;
+  }
+  .clientLine {
+    row-gap: 6px;
+  }
+  .clientLine > :first-child {
+    grid-row: 1;
+  }
+}
+
+/* The amount people agree to: the biggest figure on the screen, DM Sans figures. */
+.amount {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 44px;
+  font-weight: 500;
+  letter-spacing: -1.2px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.amount small {
+  margin-left: 6px;
+  color: var(--st-text-3);
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* ---------- Document (Invoice, Payment receipt) ---------- */
+.docFrame {
+  display: flex;
+  width: 100%;
+  max-width: 720px;
+  flex-direction: column;
+  gap: 20px;
+}
+.doc {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 36px 40px 40px;
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-r-md, 12px);
+  background: var(--st-surface);
+  box-shadow: 0 1px 2px #0000000a;
+}
+.docTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.docIssuer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+}
+.docKind {
+  margin: 0;
+  color: var(--st-text-2);
+  font-size: 14px;
+  text-align: right;
+}
+.docKind strong {
+  display: block;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.docLines {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+.docLine {
+  position: relative;
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.docLine + .docLine::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--st-line);
+  content: "";
+}
+.docLine dt {
+  color: var(--st-text-2);
+}
+.docLine dd {
+  margin: 0;
+  color: var(--st-text);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.docTotal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--st-line-strong, var(--st-line));
+}
+.docTotal span {
+  color: var(--st-text-2);
+  font-size: 15px;
+}
+
+/* ---------- Payment links: the form beside the page it makes ---------- */
+.maker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  align-items: start;
+  gap: 56px;
+}
+.preview {
+  position: sticky;
+  top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.previewPay {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.previewPay p {
+  margin: 0;
+}
+.previewPlaceholder {
+  margin: 0;
+  color: var(--st-text-3);
+  font-size: 17px;
+  line-height: 1.3;
+}
+.previewPill {
+  display: grid;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--st-line);
+  border-radius: 999px;
+  background: var(--st-inset);
+  color: var(--st-text-2);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* ---------- Public pay pages (E4) ---------- */
+.public {
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--st-canvas);
+  color: var(--st-text);
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
+}
+.publicHeader {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 auto;
+  padding: 28px 40px;
+}
+.publicBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--st-text);
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.publicBrand img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+.publicMain {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  max-width: 1200px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+  align-items: start;
+  gap: 64px;
+  margin: 0 auto;
+  padding: 32px 40px 96px;
+}
+.publicMain[data-single="true"] {
+  max-width: 820px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.publicLead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 12px;
+}
+.publicKicker {
+  margin: 0;
+  color: var(--st-accent);
+  font-size: 14px;
+  font-weight: 500;
+}
+.publicTitle {
+  margin: 0;
+  color: var(--st-text);
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -1.6px;
+  line-height: 1.04;
+  text-wrap: balance;
+}
+.publicCopy {
+  margin: 0;
+  max-width: 520px;
+  color: var(--st-text-2);
+  font-size: 17px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.panel {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 30px 24px;
+  border: 1px solid var(--st-line);
+  border-radius: var(--st-r-lg, 16px);
+  background: var(--st-surface);
+  box-shadow: 0 1px 2px #0000000a, 0 6px 18px #0000000a;
+}
+.covers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 520px;
+  margin: 12px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--st-line);
+  list-style: none;
+  color: var(--st-text-2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.secure svg {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+.statusLine {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.panelFoot {
+  margin: 0;
+  color: var(--st-text-3);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+.range {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--st-text);
+  cursor: pointer;
+}
+.range:focus-visible {
+  outline: 2px solid var(--st-accent);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+.rangeEnds {
+  display: flex;
+  justify-content: space-between;
+  color: var(--st-text-3);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1180px) {
+  .screen {
+    padding: 48px 32px 112px 48px;
+  }
+  .split,
+  .maker {
+    gap: 40px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .screen {
+    gap: 32px;
+    padding: 20px 16px 120px;
+  }
+  .split,
+  .maker {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .side,
+  .preview {
+    position: static;
+  }
+  .split > .side {
+    order: -1;
+  }
+  /* Agency billing: the headline and the list lead on a phone; Pebble follows. */
+  .split[data-phone="main-first"] > .side {
+    order: 0;
+  }
+  .pebbleArt {
+    display: none;
+  }
+  .pebblePhoneAvatar {
+    display: inline-flex;
+  }
+  .doc {
+    gap: 22px;
+    padding: 24px 20px 28px;
+  }
+  .docLine {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+  .docKind {
+    text-align: left;
+  }
+  .publicHeader {
+    padding: 20px 16px;
+  }
+  .publicMain {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 8px 16px 64px;
+  }
+  .publicTitle {
+    font-size: 36px;
+    letter-spacing: -1px;
+  }
+  .amount {
+    font-size: 38px;
+  }
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media print {
+  .screen {
+    padding: 0;
+  }
+  .doc {
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+}

@@ -55,6 +55,8 @@
 /* The keyboard hint is for people already reaching for keys: shown on hover or keyboard focus only. */
 .button:hover .buttonHint, .button:focus-visible .buttonHint { opacity: 0.55; }
 @media (pointer: coarse) { .buttonHint { display: none; } .button[data-size="sm"] { height: 44px; } }
+/* A keyboard hint is a desktop affordance: never on a phone, even with a mouse attached. */
+@media (max-width: 767px) { .buttonHint { display: none; } }
 
 .iconButton {
   display: inline-grid;
@@ -309,6 +311,10 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .fieldControl:disabled { cursor: not-allowed; }
 .fieldHint { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 1.45; }
 .fieldHint[data-error="true"] { color: var(--st-critical); }
+.selectWrap { position: relative; display: block; }
+.fieldControl[data-select] { appearance: none; padding-right: 40px; cursor: pointer; }
+.fieldControl[data-select]:not(:disabled) { background: var(--st-surface); color: var(--st-text); }
+.selectChevron { position: absolute; top: 50%; right: 14px; translate: 0 -50%; color: var(--st-text-2); pointer-events: none; }
 @media (max-width: 767px) { .fieldControl { font-size: 16px; } }
 
 .choices { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
@@ -383,6 +389,7 @@ textarea.fieldControl { min-height: 96px; resize: vertical; field-sizing: conten
 .saysLinks { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-left: 6px; color: var(--st-text-3); }
 .textLink { padding: 0; border: 0; background: none; color: var(--st-accent); font: inherit; font-weight: 500; text-decoration: none; cursor: pointer; }
 .textLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.textLink:disabled { color: var(--st-text-3); cursor: default; text-decoration: none; }
 .textLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------- Motion helpers ---------- */

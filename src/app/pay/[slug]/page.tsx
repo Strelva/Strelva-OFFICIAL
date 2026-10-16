@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
-import { StEntry, StHead, StNotice } from "@/components/ui/strelva/Kit";
+import { XaStatus } from "@/components/ui/strelva/Xa";
+import { PublicMoneyPage } from "@/experience/workspace/money/PublicMoneyPage";
+import styles from "@/experience/workspace/money/money.module.css";
 import { PayLinkForm } from "./PayLinkForm";
 import { formatPayLinkAmount } from "@/lib/pay-links";
 import { resolvePublicPayLink } from "@/platform/agency-pay-links/public";
@@ -16,12 +17,24 @@ interface PageProps {
   searchParams?: Promise<{ payment?: string; amount?: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   const { slug } = await params;
   const resolved = await resolvePublicPayLink(slug);
   if (resolved?.kind === "connected") {
-    if (resolved.link.status === "expired") return { title: { absolute: "Payment link expired" }, robots: { index: false, follow: false } };
-    return { title: { absolute: `Pay ${resolved.link.agencyDisplayName || "your agency"}` }, robots: { index: false, follow: false }, referrer: "no-referrer" };
+    if (resolved.link.status === "expired")
+      return {
+        title: { absolute: "Payment link expired" },
+        robots: { index: false, follow: false },
+      };
+    return {
+      title: {
+        absolute: `Pay ${resolved.link.agencyDisplayName || "your agency"}`,
+      },
+      robots: { index: false, follow: false },
+      referrer: "no-referrer",
+    };
   }
   const config = resolved?.config;
   if (config?.revokedAt) return { title: { absolute: "Payment link expired" } };
@@ -30,7 +43,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
   return {
     title: { absolute: `Your ${config.clientName} website` },
-    description: `Your new ${config.clientName} website — secure payment to get started.`,
+    description: `Your new ${config.clientName} website. Secure payment to get started.`,
   };
 }
 
@@ -45,99 +58,109 @@ export default async function PayLinkPage({ params, searchParams }: PageProps) {
     const sp = await searchParams;
     const brand = await resolveOwnerBrand(link.agencyWorkspaceId ?? "");
     // Public fields only: never who created or revoked the link.
-    return <ConnectedPayLink brand={brand} payment={sp?.payment} link={{ slug: link.slug, clientName: link.clientName, description: link.description ?? "", amountCents: link.amountCents, minCents: link.minCents, maxCents: link.maxCents, currency: link.currency, status: link.status, receiptNumber: link.receiptNumber }} />;
+    return (
+      <ConnectedPayLink
+        brand={brand}
+        payment={sp?.payment}
+        link={{
+          slug: link.slug,
+          clientName: link.clientName,
+          description: link.description ?? "",
+          amountCents: link.amountCents,
+          minCents: link.minCents,
+          maxCents: link.maxCents,
+          currency: link.currency,
+          status: link.status,
+          receiptNumber: link.receiptNumber,
+        }}
+      />
+    );
   }
   const config = resolved.config;
 
-  if (config.revokedAt) return <StEntry brand={config.agencyDisplayName || "Strelva Agency"}><StHead title="Payment link expired" /><StNotice>This payment link has expired. Ask the agency for a new link. Payments already started in Stripe may still complete.</StNotice></StEntry>;
+  const agency = config.agencyDisplayName || "Strelva Agency";
+  if (config.revokedAt)
+    return (
+      <PublicMoneyPage
+        brand={agency}
+        lead={
+          <>
+            <h1 className={styles.publicTitle}>Payment link expired</h1>
+            <p className={styles.publicCopy}>
+              This payment link has expired. Ask {agency} for a new link.
+              Payments already started in Stripe may still complete.
+            </p>
+          </>
+        }
+      />
+    );
 
   const sp = await searchParams;
   const payment = sp?.payment;
   const amountParam = sp?.amount;
   const successAmountCents =
-    amountParam && /^\d+$/.test(amountParam) ? Number.parseInt(amountParam, 10) : null;
+    amountParam && /^\d+$/.test(amountParam)
+      ? Number.parseInt(amountParam, 10)
+      : null;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#f5f6f9] to-[#e7eaf1] text-[#1d1d1f]">
-      {/* Entrance motion — staggered rise. Honors reduced-motion. */}
-      <style>{`
-        @keyframes reb-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-        .reb-rise { animation: reb-rise .65s cubic-bezier(.22,.61,.36,1) both; }
-        @media (prefers-reduced-motion: reduce) { .reb-rise { animation: none; } }
-      `}</style>
-
-      {/* Ambient backdrop — gives the glass something to refract. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-24 -top-32 h-[440px] w-[440px] rounded-full bg-[#f7dcc6] opacity-55 blur-[130px]" />
-        <div className="absolute -bottom-40 -right-24 h-[480px] w-[480px] rounded-full bg-[#c6d6f1] opacity-55 blur-[140px]" />
-        <div className="absolute left-1/2 top-1/2 h-[380px] w-[380px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#dfe6ee] opacity-50 blur-[150px]" />
-      </div>
-
-      <div className="mx-auto flex min-h-screen w-full max-w-[540px] flex-col px-5 py-10 sm:py-14">
-        {/* Top bar */}
-        <div className="reb-rise flex items-center justify-between" style={{ animationDelay: "0ms" }}>
+    <PublicMoneyPage
+      brand={agency}
+      lead={
+        <>
+          <p className={styles.publicKicker}>
+            {payLinkDoorBadge(config.door)} · {agency} · Runs on Strelva
+          </p>
+          <h1 className={styles.publicTitle}>
+            Your new {config.clientName} website.
+          </h1>
+          <p className={styles.publicCopy}>{payLinkDoorTerms(config)}</p>
+          {config.customCopy ? (
+            <p className={styles.publicCopy}>{config.customCopy}</p>
+          ) : null}
           {config.returnUrl ? (
-            <a
-              href={config.returnUrl}
-              className="group inline-flex items-center gap-1.5 text-[14px] font-medium text-[#52525b] transition-colors hover:text-[#1d1d1f]"
-            >
-              <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
-              {config.clientName}
-            </a>
-          ) : (
-            <span className="text-[14px] font-medium text-[#52525b]">{config.clientName}</span>
-          )}
-          <span className="rounded-full border border-white/70 bg-white/55 px-3 py-1 text-[12px] font-medium text-[#52525b] backdrop-blur-md">
-            {payLinkDoorBadge(config.door)}
-          </span>
-        </div>
-
-        <div className="flex flex-1 flex-col justify-center py-10">
-          {payment === "success" && (
-            <div className="reb-rise mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-[#bfe3c4] bg-[#eafaec]/80 px-4 py-2 text-[13px] font-medium text-[#1f7a32] backdrop-blur-md">
-              <CheckCircle2 size={16} />
-              Thank you
-              {successAmountCents
-                ? ` — payment received for ${formatPayLinkAmount(successAmountCents)}`
-                : " — payment received"}
-            </div>
-          )}
-          {payment === "cancelled" && (
-            <div className="reb-rise mx-auto mb-7 rounded-full border border-[#ecd9b6] bg-[#fff7e8]/80 px-4 py-2 text-[13px] font-medium text-[#8a6516] backdrop-blur-md">
-              No charge made. You can try again below.
-            </div>
-          )}
-
-          {/* Headline */}
-          <div className="mb-8 text-center">
-            <span
-              className="reb-rise inline-flex items-center rounded-full bg-[#1d1d1f] px-3 py-1 text-[12px] font-medium tracking-wide text-white"
-              style={{ animationDelay: "60ms" }}
-            >
-              {config.agencyDisplayName || "Strelva Agency"} · Runs on Strelva
-            </span>
-            <h1
-              className="reb-rise mx-auto mt-5 max-w-[460px] text-[34px] font-semibold leading-[1.06] tracking-[-0.025em] text-[#1d1d1f] sm:text-[42px]"
-              style={{ animationDelay: "120ms" }}
-            >
-              Your new {config.clientName} website.
-            </h1>
-            <p
-              className="reb-rise mx-auto mt-4 max-w-[440px] text-[16px] leading-7 text-[#56565c]"
-              style={{ animationDelay: "180ms" }}
-            >
-              {payLinkDoorTerms(config)}
+            <p className={styles.note}>
+              <a className={styles.detailsToggle} href={config.returnUrl}>
+                Back to {config.clientName}
+              </a>
             </p>
-            {config.customCopy && (
-              <p
-                className="reb-rise mx-auto mt-3 max-w-[440px] text-[15px] leading-7 text-[#56565c]"
-                style={{ animationDelay: "210ms" }}
-              >
-                {config.customCopy}
+          ) : null}
+          <p className={styles.note}>
+            Questions about this payment go to {agency}.
+          </p>
+        </>
+      }
+      panel={
+        <>
+          {payment === "success" ? (
+            <p className={styles.body} role="status">
+              <XaStatus kind="live" size="sm">
+                Thank you
+              </XaStatus>{" "}
+              Payment received
+              {successAmountCents
+                ? ` for ${formatPayLinkAmount(successAmountCents)}`
+                : ""}
+              .
+            </p>
+          ) : null}
+          {payment === "cancelled" ? (
+            <p className={styles.body} role="status">
+              No charge made. You can try again below.
+            </p>
+          ) : null}
+          {typeof config.amountCents === "number" ? (
+            <>
+              <p className={styles.note}>
+                {config.door === "build"
+                  ? "Your website build"
+                  : "Your start payment"}
               </p>
-            )}
-          </div>
-
+              <p className={styles.amount}>
+                {formatPayLinkAmount(config.amountCents)}
+              </p>
+            </>
+          ) : null}
           <PayLinkForm
             slug={config.slug}
             door={config.door}
@@ -145,21 +168,8 @@ export default async function PayLinkPage({ params, searchParams }: PageProps) {
             minCents={config.minCents}
             maxCents={config.maxCents}
           />
-        </div>
-
-        <p
-          className="reb-rise text-center text-[13px] text-[#86868b]"
-          style={{ animationDelay: "320ms" }}
-        >
-          Questions?{" "}
-          <a
-            href="mailto:jacob@strelva.com"
-            className="font-medium text-[#52525b] underline-offset-2 hover:underline"
-          >
-            Contact Jacob
-          </a>
-        </p>
-      </div>
-    </main>
+        </>
+      }
+    />
   );
 }

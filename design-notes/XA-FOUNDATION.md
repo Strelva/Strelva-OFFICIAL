@@ -92,6 +92,7 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaEmpty pose job title action secondary` | `Xa` | xLm8z | `job` is required, so Pebble is always doing something |
 | `XaSheet open onClose title actions art` | `Xa` | zY9qV | A native `<dialog>`. Use it for a confirmation that needs its own moment, never for an inline task. |
 | `XaField`, `XaTextArea` | `Xa` | UzKBr, SZgyj | Native inputs; errors are announced |
+| `XaSelect label options hint error` | `Xa` | UzKBr look | A native select in the field look, for long or recorded lists (agreements, payments). Added by the money lane. |
 | `XaChoices` | `Xa` | jDLle, GCgEy | A radiogroup of open rows; the chosen one gets an ink ring and a check |
 | `XaDoors` | `Xa` | XkDG8 | Choices that change what happens next. Each says where it leads. |
 | `XaSegmented` | `Xa` | qIVLf | The thumb glides on Fast. Arrow, Home and End keys work. |

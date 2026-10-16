@@ -41,7 +41,7 @@ it("shows no payer controls to nonowners or agency-paid businesses", async () =>
   expect(button(node, "Manage payments and receipts")).toBeUndefined();
   const billing = { workspaceId: "business", payerParty: { kind: "agency", workspaceId: "agency", name: "Cedar" }, paymentStatus: "active", state: "subscription", sites: [], monthlyCents: 15000 } as unknown as BusinessBilling;
   await act(async () => root.render(createElement(BusinessBillingView, { ...props, billing })));
-  expect(button(node, "Manage payments and receipts")).toBeUndefined(); expect(node.textContent).toContain("Your agency manages its payment method");
+  expect(button(node, "Manage payments and receipts")).toBeUndefined(); expect(node.textContent).toContain("Cedar manages its payment method");
 });
 it("preserves cancellation review on provider failure and refuses foreign navigation", async () => {
   const { node, root } = host(); const navigate = vi.fn();
@@ -71,4 +71,24 @@ it.each([null, { futureWork: "paused", providerParticipation: "kept", maintained
   await act(async () => root.render(createElement(WorkspaceExit, { workspaceId: "business", request, businessBillingReleased: true })));
   const link = [...node.querySelectorAll("a")].find(item => item.textContent === "Manage payments or cancel your plan");
   expect(link?.getAttribute("href")).toBe("/workspace/billing?workspaceId=business"); expect(node.innerHTML).not.toContain("/dashboard");
+});
+it("puts Pay directly instead in Pebble's past-due line, names the agency and asks for a business payer", async () => {
+  const { node, root } = host();
+  const transport = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(async () => Response.json({ transitions: [], current: null, pending: null }));
+  const heard = vi.fn(); window.addEventListener("strelva:payer-transition", heard);
+  const billing = { workspaceId: "business", payerParty: { kind: "agency", workspaceId: "agency", name: "North Studio" }, paymentStatus: "past_due", state: "subscription", sites: [], monthlyCents: 15000 } as unknown as BusinessBilling;
+  await act(async () => root.render(createElement(BusinessBillingView, { ...props, billing, transport })));
+  expect(node.textContent).toContain("North Studio’s payment needs attention.");
+  await act(async () => button(node, "Pay directly instead").click());
+  expect(transport).toHaveBeenCalledWith("/api/work-economics/payer-transition", expect.objectContaining({ method: "POST" }));
+  expect(JSON.parse(String(transport.mock.calls[0]![1]!.body))).toEqual({ action: "propose", workspaceId: "business", successorKind: "business" });
+  expect(heard).toHaveBeenCalledOnce(); expect(node.textContent).toContain("You asked to pay directly");
+  expect(button(node, "Pay directly instead")).toBeUndefined();
+  window.removeEventListener("strelva:payer-transition", heard);
+});
+it("offers no Pay directly instead to someone who cannot manage billing", async () => {
+  const { node, root } = host();
+  const billing = { workspaceId: "business", payerParty: { kind: "agency", workspaceId: "agency", name: "North Studio" }, paymentStatus: "past_due", state: "subscription", sites: [], monthlyCents: 15000 } as unknown as BusinessBilling;
+  await act(async () => root.render(createElement(BusinessBillingView, { ...props, billing, canManage: false })));
+  expect(button(node, "Pay directly instead")).toBeUndefined();
 });
