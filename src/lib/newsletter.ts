@@ -5,7 +5,8 @@ import { resolveEmailBusinessContext } from "@/platform/infra/email/business-con
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
 import { CLIENT_MAIL_DOMAIN, batchEmailSuppression, sendBatchWithReceipt } from "@/platform/infra/email/send";
-import { escapeEmailHtml } from "@/platform/infra/email/escape";
+import { visitorNewsletterMail } from "@/platform/infra/email/visitor-mail";
+import { renderXaMailHtml } from "@/platform/infra/email/xa-mail";
 import { buildUnsubscribeUrl } from "./newsletter-unsubscribe";
 
 export interface SendNewsletterInput {
@@ -115,7 +116,8 @@ export async function sendNewsletter(
           return {
             to: subscriber.email,
             subject: safeSubject,
-            html: `<header><p>${escapeEmailHtml(fromName)}</p></header>${safeHtml}<footer><a href="${escapeEmailHtml(unsubscribe)}">Unsubscribe from ${escapeEmailHtml(fromName)} newsletter</a></footer>`,
+            // XA visitor layout: the business's name, the issue, then a quiet unsubscribe line.
+            html: renderXaMailHtml(visitorNewsletterMail({ business: fromName, subject: safeSubject, html: safeHtml, text: safeText, previewText, unsubscribeUrl: unsubscribe })),
             text: `${fromName}\n\n${safeText}\n\nUnsubscribe: ${unsubscribe}`,
             headers: {
               "List-Unsubscribe": `<${unsubscribe}>`,

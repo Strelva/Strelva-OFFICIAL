@@ -47,7 +47,22 @@ export type XaMailBlock =
   | { kind: "figure"; value: string; label: string; detail?: string }
   | { kind: "changes"; label: string; rows: readonly XaMailChange[] }
   | { kind: "sentence"; text: string; muted?: boolean }
-  | { kind: "rule" };
+  | { kind: "rule" }
+  /* Visitor blocks (xs-visitor, Oct 16): the business writing to its own customers. */
+  /** A state as a dot and a word: clay for what waits on the reader, moss for confirmed, quiet for ended. */
+  | { kind: "status"; tone: "waits" | "live" | "ended"; label: string }
+  /** The one thing the email is about: a day, a time in large figures, then what and where. */
+  | { kind: "when"; day: string; time: string; detail?: string; struck?: boolean }
+  /** Plain label and value lines with a hairline between. */
+  | { kind: "rows"; rows: readonly { label: string; value: string }[] }
+  /** The reader's own words, quoted back in a tint. */
+  | { kind: "quote"; label: string; text: string }
+  /** Times or dates to choose from, each a link to the page where the choice is confirmed. */
+  | { kind: "choices"; label?: string; items: readonly XaMailAction[] }
+  /** One quiet text action under the primary, or on its own. */
+  | { kind: "link"; action: XaMailAction }
+  /** Already sanitized HTML (a newsletter issue). Never pass unsanitized content. */
+  | { kind: "html"; html: string; text: string };
 
 export interface XaMail {
   subject: string;
@@ -55,9 +70,12 @@ export interface XaMail {
   /** Who it is from, as the mail client shows it: "North Studio via Strelva". */
   fromName: string;
   blocks: readonly XaMailBlock[];
-  /** One quiet line under the card. Always ends with an email settings link. */
+  /** One quiet line under the card. */
   footer: string;
-  settings: XaMailAction;
+  /** Owner and agency mail end with an email settings link. Visitor mail has none. */
+  settings?: XaMailAction;
+  /** Further quiet links after the footer, e.g. "Unsubscribe". */
+  footerLinks?: readonly XaMailAction[];
 }
 
 const e = escapeEmailHtml;
@@ -87,16 +105,25 @@ function block(b: XaMailBlock): string {
     case "changes": return `<p style="margin:0 0 6px;font-size:13px;line-height:18px;color:${X.faint};">${e(b.label)}</p>${table(b.rows.map(r => `<tr><td valign="top" style="padding:8px 16px 8px 0;font-size:14px;line-height:22px;color:${X.faint};white-space:nowrap;">${e(r.date)}</td><td valign="top" style="padding:8px 0;width:100%;font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.text)}</td><td valign="top" align="right" style="padding:8px 0 8px 16px;font-size:13px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.who)}</td></tr>`).join(""))}`;
     case "sentence": return `<p style="margin:0;font-size:14px;line-height:22px;color:${b.muted ? X.faint : X.body};">${e(b.text)}</p>`;
     case "rule": return `<div style="height:1px;line-height:1px;font-size:1px;background:${X.line};">&nbsp;</div>`;
+    case "status": { const color = b.tone === "waits" ? X.need : b.tone === "live" ? X.moss : X.muted; const dot = b.tone === "waits" ? X.needDot : b.tone === "live" ? "#3e8e5a" : X.faint;
+      return `<p style="margin:0;font-size:15px;line-height:22px;color:${color};"><span style="display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:999px;background:${dot};vertical-align:1px;"></span>${e(b.label)}</p>`; }
+    case "when": return table(`<tr><td style="padding:18px 0;border-top:1px solid ${X.line};border-bottom:1px solid ${X.line};"><p style="margin:0;font-size:15px;line-height:22px;color:${X.muted};">${e(b.day)}</p><p style="margin:2px 0 0;font-size:34px;line-height:40px;font-weight:600;letter-spacing:-0.8px;color:${b.struck ? X.muted : X.text};font-variant-numeric:tabular-nums;${b.struck ? "text-decoration:line-through;" : ""}">${e(b.time)}</p>${b.detail ? `<p style="margin:6px 0 0;font-size:15px;line-height:22px;color:${X.body};overflow-wrap:anywhere;">${e(b.detail)}</p>` : ""}</td></tr>`);
+    case "rows": return table(b.rows.map(r => `<tr><td valign="top" style="padding:12px 16px 12px 0;border-bottom:1px solid ${X.line};font-size:14px;line-height:22px;color:${X.muted};white-space:nowrap;">${e(r.label)}</td><td valign="top" align="right" style="padding:12px 0;border-bottom:1px solid ${X.line};font-size:15px;line-height:22px;color:${X.text};overflow-wrap:anywhere;">${e(r.value)}</td></tr>`).join(""), `border-top:1px solid ${X.line};`);
+    case "quote": return `<p style="margin:0 0 8px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>${table(`<tr><td style="padding:12px 14px;background:${X.inset};border-radius:10px;font-size:15px;line-height:23px;color:${X.body};white-space:pre-line;overflow-wrap:anywhere;">${e(b.text)}</td></tr>`)}`;
+    case "choices": return `${b.label ? `<p style="margin:0 0 8px;font-size:13px;line-height:18px;color:${X.muted};">${e(b.label)}</p>` : ""}${table(b.items.map((item, i) => `<tr><td style="padding-top:${i ? 8 : 0}px;">${table(`<tr><td style="border:1px solid ${X.line};border-radius:12px;background:${X.surface};"><a href="${url(item.url)}" style="display:block;padding:14px 16px;font-size:16px;line-height:22px;font-weight:600;color:${X.text};text-decoration:none;font-variant-numeric:tabular-nums;">${e(item.label)}</a></td></tr>`)}</td></tr>`).join(""))}`;
+    case "link": return `<p style="margin:0;text-align:center;"><a href="${url(b.action.url)}" style="display:inline-block;padding:4px 0;font-size:15px;line-height:22px;font-weight:600;color:${X.moss};text-decoration:none;">${e(b.action.label)}</a></p>`;
+    case "html": return `<div style="font-size:16px;line-height:26px;color:${X.body};overflow-wrap:anywhere;">${b.html}</div>`;
   }
 }
 
-const GAP: Partial<Record<XaMailBlock["kind"], number>> = { identity: 0, waits: 20, headline: 8, page: 24, primary: 20, art: 0, period: 24, figure: 20, changes: 20, sentence: 16, rule: 24 };
+const GAP: Partial<Record<XaMailBlock["kind"], number>> = { identity: 0, waits: 20, status: 20, headline: 8, page: 24, primary: 20, art: 0, period: 24, figure: 20, changes: 20, sentence: 16, rule: 24, when: 24, rows: 20, quote: 20, choices: 20, link: 12, html: 20 };
 
 /** The card body. Also what the preview frames, so preview and mail never drift. */
 export function renderXaMailBody(mail: XaMail): string {
   const rows = mail.blocks.map((b, i) => `<tr><td style="padding-top:${i ? GAP[b.kind] ?? 16 : 0}px;">${block(b)}</td></tr>`).join("");
   const card = table(`<tr><td style="padding:36px 40px 32px;">${table(rows)}</td></tr>`, `max-width:640px;background:${X.surface};border-radius:24px;`, "100%");
-  const footer = `<p style="margin:20px 0 0;text-align:center;font-size:12px;line-height:18px;color:${X.faint};">${e(mail.footer)} · <a href="${url(mail.settings.url)}" style="color:${X.faint};text-decoration:underline;">${e(mail.settings.label)}</a></p>`;
+  const links = [...(mail.settings ? [mail.settings] : []), ...(mail.footerLinks ?? [])].map(link => ` · <a href="${url(link.url)}" style="color:${X.faint};text-decoration:underline;">${e(link.label)}</a>`).join("");
+  const footer = `<p style="margin:20px 0 0;text-align:center;font-size:12px;line-height:18px;color:${X.faint};">${e(mail.footer)}${links}</p>`;
   return table(`<tr><td align="center" style="padding:32px 16px 40px;font-family:${X.font};color:${X.text};">${card}${footer}</td></tr>`, `background:${X.canvas};`);
 }
 
@@ -119,10 +146,17 @@ export function renderXaMailText(mail: XaMail): string {
       case "changes": lines.push(b.label, ...b.rows.map(r => `${r.date}  ${r.text} (${r.who})`)); break;
       case "sentence": lines.push(b.text); break;
       case "rule": break;
+      case "status": lines.push(b.label); break;
+      case "when": lines.push(`${b.day}, ${b.time}`, ...(b.detail ? [b.detail] : [])); break;
+      case "rows": lines.push(...b.rows.map(r => `${r.label}: ${r.value}`)); break;
+      case "quote": lines.push(b.label, b.text); break;
+      case "choices": lines.push(...(b.label ? [b.label] : []), ...b.items.map(item => `${item.label}: ${item.url}`)); break;
+      case "link": lines.push(`${b.action.label}: ${b.action.url}`); break;
+      case "html": lines.push(b.text); break;
     }
     lines.push("");
   }
-  lines.push(`${mail.footer} · ${mail.settings.label}: ${mail.settings.url}`);
+  lines.push([mail.footer, ...[...(mail.settings ? [mail.settings] : []), ...(mail.footerLinks ?? [])].map(link => `${link.label}: ${link.url}`)].join(" · "));
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 

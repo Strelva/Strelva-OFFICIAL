@@ -30,7 +30,7 @@ describe("token-verified public identity", () => {
     expect(await confirmation()).toContain("Waiting on Lakeview Yoga"); expect(await confirmation()).not.toContain("Confirmed");
   });
   it("uses the persisted booking status even if the query claims a different outcome", async () => {
-    m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "confirmed" }); expect(await confirmation("pending")).toContain("Confirmed");
+    m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "confirmed" }); expect(await confirmation("pending")).toContain("You’re booked");
     m.rpc.mockResolvedValue({ ...identity, state: "placed", bookingStatus: "cancelled" }); expect(await confirmation()).toContain("Your booking is no longer active");
   });
   it("holds the confirmation form when identity is unavailable", async () => {
@@ -39,7 +39,7 @@ describe("token-verified public identity", () => {
   it("renders a readable zoned time and the recorded confirmation deadline", async () => {
     m.rpc.mockResolvedValue({ ...identity, timeZone: "America/New_York", expiresAt: "2026-11-06T12:15:00Z" });
     const html = await confirmation();
-    expect(html).toContain("7:00 AM Eastern Time"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time");
+    expect(html).toContain("7:00 AM</span><span"); expect(html).toContain("Eastern Time"); expect(html).toContain("Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time");
     expect(html).not.toContain("2026-11-06T12:00");
     expect(html).not.toContain("America/New_York");
     expect(html).toContain(`<p class="${styles.deadline}">Confirm by Friday, Nov 6, 2026, 7:15 AM Eastern Time.</p>`);

@@ -1,11 +1,13 @@
 .publicRoot { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), sans-serif; }
-.publicHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 40px; }
-.brand { display: inline-flex; align-items: center; gap: 12px; color: var(--st-text); font-size: 16px; text-decoration: none; }
-.profileColumns { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); align-items: start; gap: 48px; }
+.publicHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1200px; margin: 0 auto; padding: 20px 40px; }
+.brand { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--st-text-2); font-size: 15px; font-weight: 500; text-decoration: none; }
+.brand:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; border-radius: 8px; }
+.profileColumns { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: 80px; }
 .ownerColumns { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; gap: 32px; }
-.stack { display: flex; min-width: 0; flex-direction: column; gap: 20px; }
-.evidenceLine { display: flex; align-items: center; gap: 8px; color: var(--st-text-2); font-size: 13px; line-height: 20px; margin: 0; overflow-wrap: anywhere; }
-.evidenceLine svg { flex-shrink: 0; color: var(--st-live); }
+.stack { display: flex; min-width: 0; flex-direction: column; gap: 32px; }
+.evidenceLine { display: flex; align-items: flex-start; gap: 8px; color: var(--st-text-2); font-size: 13px; line-height: 20px; margin: 0; overflow-wrap: anywhere; }
+.evidenceLine svg { flex-shrink: 0; margin-top: 2px; color: var(--st-live); }
+.evidenceLine[data-confirmed] { color: var(--st-accent); }
 .muted, .about, .fixture { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 22px; }
 .endpoint { margin: 0; overflow-wrap: anywhere; }
 .about { display: flex; flex-direction: column; gap: 8px; padding-top: 16px; }
@@ -21,3 +23,28 @@
 
 .factLabel { width: 120px; flex-shrink: 0; color: var(--st-text-2); font-size: 13px; line-height: 22px; }
 @media (max-width: 767px) { .factLabel { width: 80px; } }
+
+/* xs-visitor (Oct 16): the public business page in XA. */
+.profile { max-width: 1200px; margin: 0 auto; padding: 40px 40px 96px; display: flex; flex-direction: column; gap: 32px; }
+.reach { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
+.reachLink { display: inline-flex; flex-direction: column; min-height: 44px; justify-content: center; color: var(--st-text); font-size: 15px; line-height: 20px; text-decoration: none; overflow-wrap: anywhere; }
+.reachLink:hover .reachVerb, .reachLink:focus-visible .reachVerb { color: var(--st-accent); }
+.reachLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; border-radius: 8px; }
+.reachVerb { color: var(--st-text-2); font-size: 13px; font-weight: 500; transition: color var(--motion-fast) var(--ease-settle); }
+.factBlock { display: flex; flex-direction: column; gap: 12px; }
+.answer { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
+.answerDetail { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.aside { display: flex; flex-direction: column; gap: 14px; padding-top: 8px; }
+.asideText { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.endpoint { color: var(--st-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.withheld { display: flex; align-items: flex-start; gap: 12px; max-width: 560px; padding: 24px 0; color: var(--st-text); font-size: 16px; line-height: 24px; }
+.withheld p { margin: 4px 0 0; }
+.loading { display: flex; max-width: 640px; flex-direction: column; gap: 14px; }
+.loading span { display: block; height: 16px; width: 90%; border-radius: 8px; background: var(--st-inset); animation: profileSheen var(--motion-loop) var(--ease-breathe) infinite; }
+.loading span[data-size="sm"] { width: 40%; }
+.loading span[data-size="lg"] { height: 44px; width: 60%; }
+.loading span[data-size="md"] { width: 75%; }
+@keyframes profileSheen { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .loading span { animation: none; } .reachVerb { transition: none; } }
+@media (max-width: 899px) { .profileColumns { grid-template-columns: minmax(0, 1fr); gap: 40px; } .aside { padding-top: 24px; border-top: 1px solid var(--st-line); } }
+@media (max-width: 767px) { .profile { padding: 16px 16px 64px; gap: 24px; } }

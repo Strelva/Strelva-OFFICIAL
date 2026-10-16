@@ -40,7 +40,7 @@
 .notice { margin: 20px 0 0; font-size: 15px; line-height: 1.5; }
 .error { color: var(--v-danger); }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-.button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: var(--visitor-button-radius, 999px); padding: 10px 24px; background: var(--v-accent); color: var(--v-on-accent); font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; transition: opacity var(--motion-fast, 140ms) ease, transform var(--motion-press, 80ms) ease; }
+.button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: var(--visitor-button-radius, 999px); padding: 10px 24px; background: var(--v-accent); color: var(--v-on-accent); font: inherit; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; transition: opacity var(--motion-fast) var(--ease-settle), transform var(--motion-press) var(--ease-settle); }
 .button:active:not(:disabled) { transform: scale(.98); }
 .button:disabled { opacity: .45; cursor: not-allowed; }
 .secondary { background: var(--v-surface); color: var(--v-text); border-color: var(--v-line); }
@@ -66,7 +66,7 @@
 .dayHead b { color: var(--v-text); font-size: 18px; font-weight: 600; }
 .day[data-empty] .dayHead b { color: var(--v-muted); font-weight: 500; }
 .times { display: flex; flex-direction: column; gap: 8px; }
-.time { position: relative; display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 4px; border-radius: 10px; background: color-mix(in srgb, var(--v-accent) 8%, var(--v-surface)); color: var(--v-text); font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast, 140ms) ease, color var(--motion-fast, 140ms) ease; }
+.time { position: relative; display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 4px; border-radius: 10px; background: color-mix(in srgb, var(--v-accent) 8%, var(--v-surface)); color: var(--v-text); font-size: 14px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle); }
 .time:hover { background: color-mix(in srgb, var(--v-accent) 16%, var(--v-surface)); }
 .time:has(input:checked) { background: var(--v-accent); color: var(--v-on-accent); }
 .noTimes { padding-top: 10px; text-align: center; color: var(--v-muted); font-size: 13px; }
@@ -92,3 +92,87 @@
   .noTimes { padding-top: 12px; text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .button, .time { transition: none; } .button:active:not(:disabled) { transform: none; } }
+
+/*
+ * xs-visitor (October 16, 2026): the booking object, the change-time rows,
+ * the in-place cancel, loading, and dark. Same rules as above: the business's
+ * --visitor-* first, XA paper and ink as the fallback, one primary per page.
+ */
+@media (prefers-color-scheme: dark) {
+  .shell, .frame { --v-canvas: var(--visitor-canvas, #141513); --v-surface: var(--visitor-surface, #1c1d1b); --v-text: var(--visitor-text, #f1f0ec); --v-muted: var(--visitor-muted, #a3a69f); --v-line: var(--visitor-line, #2c2d2a); --v-inset: var(--visitor-inset, #222320); --v-accent: var(--visitor-accent, #f1f0ec); --v-on-accent: var(--visitor-on-accent, #141513); --v-danger: var(--visitor-danger, #e0a27a); }
+}
+:global([data-workspace-mode="dark"]) .shell, :global([data-workspace-mode="dark"]) .frame { --v-canvas: var(--visitor-canvas, #141513); --v-surface: var(--visitor-surface, #1c1d1b); --v-text: var(--visitor-text, #f1f0ec); --v-muted: var(--visitor-muted, #a3a69f); --v-line: var(--visitor-line, #2c2d2a); --v-inset: var(--visitor-inset, #222320); --v-accent: var(--visitor-accent, #f1f0ec); --v-on-accent: var(--visitor-on-accent, #141513); --v-danger: var(--visitor-danger, #e0a27a); }
+.brandHold { width: 140px; height: 18px; }
+.brand[data-unknown] { color: var(--v-muted); font-weight: 500; }
+
+/* The page: a column that reads top to bottom, never a centered stack. */
+.page { display: flex; flex-direction: column; }
+.page > .appointment { margin-top: 32px; }
+
+/* The booking itself: the one object on the page. */
+.appointment { position: relative; padding: 28px 32px 30px; background: var(--v-surface); border: 1px solid var(--v-line); border-radius: 20px; box-shadow: 0 1px 2px rgba(22, 23, 21, .04), 0 12px 32px -18px rgba(22, 23, 21, .18); }
+.state { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 15px; line-height: 1.4; color: var(--v-muted); }
+.state[data-tone="waits"] { color: var(--visitor-need, #9c522c); }
+.state[data-tone="live"] { color: var(--visitor-live-text, #2f5236); }
+.stateDot { width: 7px; height: 7px; flex: none; border-radius: 999px; background: var(--v-muted); }
+.state[data-tone="waits"] .stateDot { background: #c9773f; animation: visitorPulse var(--motion-slow) var(--ease-settle) 1; }
+.state[data-tone="live"] .stateDot { background: #3e8e5a; }
+.apDay { margin: 0; font-size: 17px; line-height: 1.4; color: var(--v-muted); }
+.apTime { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.apClock { font-size: 52px; line-height: 1.05; font-weight: 600; letter-spacing: -1.6px; }
+.apZone { font-size: 15px; color: var(--v-muted); }
+.apService { margin: 10px 0 0; font-size: 17px; line-height: 1.45; font-weight: 500; overflow-wrap: anywhere; }
+.appointment[data-struck] .apClock, .appointment[data-struck] .apService { color: var(--v-muted); text-decoration: line-through; text-decoration-thickness: 2px; }
+.apMore { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--v-line); font-size: 15px; line-height: 1.5; color: var(--v-muted); }
+.apMore p { margin: 0; }
+.apMore strong { color: var(--v-text); font-weight: 500; }
+
+/* A sentence beside the booking after something happened ("Your new time is booked."). */
+.said { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 0; font-size: 16px; line-height: 1.5; }
+.said[data-tone="problem"] { color: var(--v-danger); }
+
+/* Change the time: one row per day, each time a choice. */
+.changeTitle { margin: 40px 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -.3px; }
+.dayRows { margin: 16px 0 0; }
+.dayRow { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0; border-top: 1px solid var(--v-line); }
+.dayRow:first-child { border-top: 0; }
+.dayName { flex: 0 0 168px; padding-top: 10px; font-size: 15px; font-weight: 500; }
+.dayRow .times { flex: 1; flex-direction: row; flex-wrap: wrap; }
+.dayRow .time { min-width: 92px; min-height: 44px; padding: 0 12px; }
+
+/* Cancel, in place: a quiet text action that opens one sentence and one button. */
+.cancel { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--v-line); }
+.cancel > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--v-text); font-size: 15px; font-weight: 600; cursor: pointer; list-style: none; }
+.cancel > summary::-webkit-details-marker { display: none; }
+.cancel > summary:hover { text-decoration: underline; text-underline-offset: 4px; }
+.cancel > summary:focus-visible { outline: 2px solid var(--v-accent); outline-offset: 3px; border-radius: 6px; }
+.cancel[open] > summary { color: var(--v-muted); }
+.cancelBody { animation: visitorIn var(--motion-base) var(--ease-settle); }
+.danger { background: var(--v-surface); color: var(--v-danger); border-color: color-mix(in srgb, var(--v-danger) 40%, var(--v-line)); }
+
+/* Loading: the booking's shape, drawn once, while the page reads it. */
+.skeleton { display: block; height: 14px; border-radius: 8px; background: var(--v-inset); }
+.skeleton + .skeleton { margin-top: 12px; }
+.skeleton[data-size="lg"] { height: 48px; width: 55%; }
+.skeleton[data-size="md"] { width: 70%; }
+.skeleton[data-size="sm"] { width: 40%; }
+.loading .skeleton { animation: visitorSheen var(--motion-loop) var(--ease-breathe) infinite; }
+
+@keyframes visitorIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes visitorPulse { 0% { box-shadow: 0 0 0 0 rgba(201, 119, 63, .45); } 100% { box-shadow: 0 0 0 8px rgba(201, 119, 63, 0); } }
+@keyframes visitorSheen { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+
+@media (max-width: 767px) {
+  .appointment { padding: 22px 20px 24px; border-radius: 16px; }
+  .apClock { font-size: 44px; letter-spacing: -1.2px; }
+  .dayRow { flex-direction: column; gap: 8px; }
+  .dayName { flex: none; padding-top: 0; }
+  .dayRow .times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dayRow .time { min-width: 0; }
+  .changeTitle { margin-top: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cancelBody, .state[data-tone="waits"] .stateDot { animation: none; }
+  .loading .skeleton { animation: visitorFade var(--motion-fast) linear 1; }
+}
+@keyframes visitorFade { from { opacity: .6; } to { opacity: 1; } }

@@ -13,6 +13,7 @@ import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { bookingAgentsEnabled, bookingManagePageEnabled, bookingMessagesEnabled, bookingOwnerNoticeEnabled } from "./flags";
 import { bookingLifecyclePorts, bookingAppOrigin } from "./lifecycle-ports";
 import { bookingWhen } from "./emails";
+import { visitorBookingMail } from "@/platform/infra/email/visitor-mail";
 import { nativeRpc } from "./native";
 import { parseStoreBooking, type StoreBooking } from "./store";
 
@@ -93,7 +94,8 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
         ...(row.audience === "customer" ? { fromName: business.name, businessName: business.name, fromAddress: "bookings@mail.strelva.com" } : {}),
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
         idempotencyKey: `booking-update:${row.messageId}`,
-        options: { heading: title, paragraphs: [row.audience === "client"
+        options: { ...(row.audience === "customer" ? { xa: bookingUpdateVisitorMail({ title, state, rescheduled, business, booking, when, agentSource, url }) } : {}),
+          heading: title, paragraphs: [row.audience === "client"
           ? state === "requested" ? `${booking.customer.name} requested ${booking.serviceName} on ${when.day} at ${when.time}. Confirm or decline in Bookings.`
           : state === "confirmed" ? `${booking.customer.name} ${rescheduled ? "rescheduled" : "booked"} ${booking.serviceName} on ${when.day} at ${when.time}.`
           : state === "held" ? `${booking.customer.name} requested this time and still needs to confirm their email.`
@@ -126,4 +128,22 @@ export async function notifyBookingRequestNow(booking: StoreBooking) {
     if (!bookingRequestNotifier) throw new Error("booking_notice_unconfigured");
     await bookingRequestNotifier(booking);
   } catch { /* The durable request will be reconciled by the cron. */ }
+}
+
+/** The customer's copy of a booking update, in the XA visitor language. Pure; the cron above sends it. */
+export function bookingUpdateVisitorMail(input: { title: string; state: StoreBooking["status"]; rescheduled: boolean; business: { name: string; address?: string | null }; booking: Pick<StoreBooking, "serviceName">; when: { day: string; time: string }; agentSource?: string | null; url?: string | null }) {
+  const { title, state, rescheduled, business, booking, when, agentSource, url } = input;
+  return visitorBookingMail({
+    business: business.name, subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`, headline: title,
+    status: state === "held" ? { tone: "waits", label: "Confirm within 15 minutes" } : state === "requested" ? { tone: "waits", label: `Waiting on ${business.name}` }
+      : state === "confirmed" ? { tone: "live", label: "Booked" } : { tone: "ended", label: state === "cancelled" ? "Cancelled" : "Not booked" },
+    lede: state === "held" ? "You asked for this time. Nothing is booked until you confirm."
+      : state === "requested" ? `${business.name} will confirm or suggest another time.`
+      : state === "cancelled" ? "This booking is cancelled, and the time is open for someone else."
+      : state === "declined" ? "This time was not confirmed. Reply to ask about another time."
+      : rescheduled ? "Your new time is booked." : "Your time is booked.",
+    when: { day: when.day, time: when.time, detail: booking.serviceName, struck: state === "cancelled" || state === "declined" },
+    ...(business.address || agentSource ? { note: [business.address ? `Where: ${business.address}.` : "", agentSource ? `Booked through ${agentSource}.` : ""].filter(Boolean).join(" ") } : {}),
+    ...(url ? { primary: { label: state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}),
+  });
 }

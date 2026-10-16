@@ -42,6 +42,46 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
   on `NeedsYouState` and `SystemView[]`. Not yet mounted by `BusinessHome`.
 - Previews: `/preview/strelva/xa/xa7-outside/{waits-email,phone-yes,monday-email,booking,patient-form,today-phone}`.
 
+### xs-visitor · What a business's visitors see (local, branch xa/lane-xs-visitor)
+
+No Pen render exists for these; they are designed in the XA language from
+E4, E2 and S2. Visitor pages name the business, never Strelva; emails carry the
+quiet "Runs on Strelva" credit, newsletters none.
+
+- **The booking as one object:** [VisitorAppointment](../../src/experience/bookings/VisitorAppointment.tsx)
+  (day, time in large figures, zone small, service; a dot and a word only when
+  it waits, is booked, or no longer holds; a time that no longer holds is struck).
+  Used by [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) (`/b/[token]`:
+  change the time as day rows under it, one primary; cancel opens in place in a
+  `<details>`, never a modal), [BookingConfirmation](../../src/experience/bookings/BookingConfirmation.tsx)
+  (`/booking-confirm/[token]`), and [VisitorBookingOutcome](../../src/experience/bookings/VisitorBookingOutcome.tsx)
+  for the booked states of `InquiryBookingChoice` and `InquiryBookingOffer`.
+  `VisitorBookingLoading` draws the booking's shape. `visitor.module.css` adds
+  dark (device setting, or `data-workspace-mode="dark"` on an ancestor).
+- **Visitor mail:** [visitor-mail.ts](../../src/platform/infra/email/visitor-mail.ts).
+  `renderEmailHtml` renders every customer email (options carry `businessName`)
+  through `visitorMailFromOptions` in XA; options and plain text are unchanged,
+  so inquiry digests hold. `EmailOptions.xa` lets a builder give its own XA mail:
+  booking reminders, today, lapsed, the owner's "still waiting" chase
+  (`bookings/emails.ts`) and booking updates (`bookingUpdateVisitorMail`).
+  `offeredDatesMail` and `visitorNewsletterMail` (used by `sendNewsletter`).
+  `xa-mail.ts` gains `status`, `when`, `rows`, `quote`, `choices`, `link` and
+  `html` blocks; `settings` is optional, `footerLinks` added.
+- **Unsubscribe:** [unsubscribe-page.ts](../../src/platform/infra/email/unsubscribe-page.ts),
+  standalone HTML (mail clients POST to it), ink pill, light and dark.
+- **Site pages Strelva draws:** [SiteLinks](../../src/components/public/SiteLinks.tsx)
+  (`/links`), [SiteBlog](../../src/components/public/SiteBlog.tsx) (`/blog`, `/blog/[slug]`),
+  `(public)/error.tsx`, new `(public)/not-found.tsx` and `sites/[tenant]/not-found.tsx`,
+  all on `site-pages.module.css`: the site's `--site-*` first, then paper and ink;
+  never the app's `--color-*`. The native catalog CSS uses 16 px cards and
+  images and pill buttons, and centers a statement hero's actions.
+- **Business page:** [PublicBusinessProfile](../../src/experience/product/assistants/PublicBusinessProfile.tsx)
+  (`/biz/[handle]`) on the XA kit: headline with the place, one primary "Book a
+  time", call/email/visit as labeled links, facts as `XaAnswers` with the source
+  said once, policies, evidence, and "For assistants" beside it. No mono.
+  `biz/[handle]/not-found.tsx` puts Pebble in frame.
+- Previews: `/preview/strelva/xa/xs-visitor` (index of every screen and state).
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and
