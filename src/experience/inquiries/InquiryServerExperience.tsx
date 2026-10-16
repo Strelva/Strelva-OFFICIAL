@@ -51,14 +51,14 @@ function ServerInquiryBridge({
     fetch(`${endpoint}?tenantId=${encodeURIComponent(tenantId)}`, { credentials: "include", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const body: unknown = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(readApiError(body) || "This business could not be loaded.");
+        if (!response.ok) throw new Error(readApiError(body) || "Inquiries didn't load.");
         const next = readSnapshot(body);
-        if (!next) throw new Error("The business inquiry state could not be verified.");
+        if (!next) throw new Error("Inquiries didn't load.");
         if (!controller.signal.aborted) setSnapshot(next);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
-        setError(cause instanceof Error ? cause.message : "This business could not be loaded.");
+        setError(cause instanceof Error ? cause.message : "Inquiries didn't load.");
       });
     return () => controller.abort();
   }, [adapter, endpoint, initialSnapshot, tenantId]);
@@ -119,11 +119,16 @@ function readResult(value: unknown): InquirySurfaceResult | null {
   return readSnapshot(candidate.snapshot) ? result as InquirySurfaceResult : null;
 }
 
-/** Loading and failure for one business, in XA: Pebble is reading it, or Pebble is in frame with what failed. */
-export function ServerStatus({ error }: { error: string }) {
-  return <main className={styles.unavailablePage} data-workspace-theme="linen" id="strelva-main"><XaPlace width="read" label="Your business">
-    {error ? <XaPlaceTrouble title="This business could not be loaded." quiet="No preview data was substituted." action={<><XaButton variant="primary" onClick={() => window.location.reload()}>Try again</XaButton><XaTextLink href="/business">Choose another business</XaTextLink></>}>
-      <p>{error}</p>
-    </XaPlaceTrouble> : <XaWorking title="Loading inquiries…" steps={[{ id: "auth", label: "Checking the authorized inquiry state", state: "active" }]} />}
+/**
+ * Loading and failure for one business, in XA: Pebble is reading it, or
+ * Pebble is in frame with what failed and two ways forward. `businessName`
+ * is known when the route read it; the API error text is never shown to the
+ * owner because it is written for builders.
+ */
+export function ServerStatus({ error, businessName }: { error: string; businessName?: string }) {
+  const whose = businessName ? `${businessName}'s inquiries` : "Your inquiries";
+  return <main className={styles.unavailablePage} data-workspace-theme="linen" id="strelva-main"><XaPlace width="read" label={businessName ?? "Your business"}>
+    {error ? <XaPlaceTrouble title={`${whose} didn't load.`} quiet="Nothing changed. Try again, or open another business." action={<><XaButton variant="primary" onClick={() => window.location.reload()}>Try again</XaButton><XaTextLink href="/business">Choose another business</XaTextLink></>} />
+      : <XaWorking title={businessName ? `Opening ${businessName}…` : "Opening your inquiries…"} steps={[{ id: "read", label: "Reading inquiries and replies", state: "active" }]} />}
   </XaPlace></main>;
 }

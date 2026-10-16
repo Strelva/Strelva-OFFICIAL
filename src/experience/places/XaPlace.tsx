@@ -55,10 +55,13 @@ export function XaFigure({ value, label, note, id }: { value: ReactNode; label: 
   </div>;
 }
 
-/** Bad news, with Pebble in frame already on it, and one way forward. */
-export function XaPlaceTrouble({ title, quiet, children, action, pose = "fixing", role = "alert" }: { title: ReactNode; quiet?: ReactNode; children?: ReactNode; action?: ReactNode; pose?: "fixing" | "resting" | "waving"; role?: "alert" | "status" }) {
+/**
+ * Bad news (or a quiet empty), with Pebble standing on the canvas already on
+ * it, and one way forward. No felt circle: Pebble is in frame, not in a badge.
+ */
+export function XaPlaceTrouble({ title, quiet, children, action, pose = "fixing", role = "alert" }: { title: ReactNode; quiet?: ReactNode; children?: ReactNode; action?: ReactNode; pose?: "fixing" | "resting" | "waving" | "website" | "alone"; role?: "alert" | "status" }) {
   return <section className={styles.trouble} role={role}>
-    <XaPebbleScene pose={pose} size={180} />
+    <span className={styles.troubleArt}><XaPebbleScene pose={pose} size={300} bare /></span>
     <XaHeadline as="h2" size="sm" quiet={quiet}>{title}</XaHeadline>
     {children ? <div className={styles.troubleBody}>{children}</div> : null}
     {action ? <div className={styles.troubleActions}>{action}</div> : null}
@@ -84,6 +87,27 @@ export function XaPlaceLoading({ label }: { label: string }) {
 /** Strelva saying one plain sentence inline, smaller than XaSays, for list footers and in-pane notes. */
 export function XaNote({ children, tone, pebble = false, role }: { children: ReactNode; tone?: "waits" | "trouble"; pebble?: boolean; role?: "status" | "alert" }) {
   return <div className={styles.note} data-tone={tone} role={role}>{pebble ? <XaPebbleAvatar size={24} /> : null}<p>{children}</p></div>;
+}
+
+/**
+ * Clay standing on the canvas, cropped to the figures (E3 header: Pebble and
+ * the Systems lined up). Decorative; the sentence beside it carries meaning.
+ */
+export function XaClay({ pose, height = 72 }: { pose: "lineup" | "alone" | "resting" | "waving" | "fixing" | "adds" | "website"; height?: number }) {
+  // The pose art keeps its figures in the middle half of the image: show only that band.
+  const art = Math.round(height / 0.52);
+  return <span className={styles.clayBand} style={{ height }} aria-hidden="true">
+    <img className={styles.clay} src={`/xa/pose-${pose}.webp`} alt="" draggable={false} decoding="async" style={{ height: art, marginTop: -Math.round(art * 0.26) }} />
+  </span>;
+}
+
+/** "today", "yesterday" or "on Oct 12", against a fixed now (server and browser agree when now is passed). */
+export function xaDayPhrase(value: string, now: Date = new Date()): string {
+  const date = new Date(value.length === 10 ? `${value}T12:00:00Z` : value);
+  if (Number.isNaN(date.getTime())) return value;
+  const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const diff = Math.round((day(now) - day(date)) / 86400000);
+  return diff === 0 ? "today" : diff === 1 ? "yesterday" : `on ${xaShortDate(value)}`;
 }
 
 /** Deterministic short date (server and browser agree): "Oct 12". */

@@ -24,7 +24,7 @@ export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHos
   const where = site.siteHost.replace(/^www\./, "");
   const url = `${appOrigin()}/workspace?workspaceId=${encodeURIComponent(site.workspaceId)}`;
   const quote = inquiry.message ? `“${inquiry.message.slice(0, 1200)}”` : null;
-  const footerNote = `Sent because ${where} is connected to your Strelva workspace.`;
+  const footerNote = `Sent because ${where} is connected to Strelva.`;
   // XA · E1 presentation: who wrote, their words, where it is kept, one button.
   // The plain options stay for the text part and older mail clients.
   const paper: PaperEmail = {
@@ -37,7 +37,7 @@ export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHos
       { kind: "label", text: [inquiry.name, inquiry.email].filter(Boolean).join(" · ") },
       ...(quote ? [{ kind: "paragraph" as const, text: quote }] : []),
       { kind: "rule" },
-      { kind: "paragraph", text: `It came through the form on ${where} and is saved in your workspace. A quick reply is the best way to win the work.` },
+      { kind: "paragraph", text: `It came through the form on ${where} and is saved in Strelva. A quick reply is the best way to win the work.` },
       { kind: "actions", actions: [{ label: `Open ${inquiry.name}'s inquiry`, url, style: "primary" }], full: false },
     ],
   };

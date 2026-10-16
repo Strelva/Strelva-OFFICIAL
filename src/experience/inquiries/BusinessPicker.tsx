@@ -1,15 +1,16 @@
 "use client";
 /**
- * Which business (shaped like XA · B2): the businesses this account can open,
- * each a row that opens it, beside Pebble in the felt. No sidebar: nothing
- * is open yet, so there is nothing to navigate.
+ * Which business (shaped like XA · B2): the businesses this account can
+ * open, as open rows on the canvas. Each row is the link, carries the
+ * business's own identity color and one fact that tells it apart (who runs
+ * it, its site). No sidebar: nothing is open yet, so there is nothing to
+ * navigate. No Pebble panel: there is nothing for Pebble to do here yet.
  */
 import { useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { XaButtonLink, XaField, XaHeadline, XaInitial, XaMark, XaPebbleScene, XaTextLink } from "@/components/ui/strelva/Xa";
+import { XaButtonLink, XaField, XaHeadline, XaInitial, XaMark, XaTextLink } from "@/components/ui/strelva/Xa";
 import styles from "./business-picker.module.css";
 
-export type BusinessPickerItem = { id: string; name: string };
+export type BusinessPickerItem = { id: string; name: string; detail?: string; color?: string };
 
 export function BusinessPicker({ businesses, accountName, mode }: { businesses: BusinessPickerItem[]; accountName?: string; mode?: "light" | "dark" }) {
   const [query, setQuery] = useState("");
@@ -32,17 +33,11 @@ export function BusinessPicker({ businesses, accountName, mode }: { businesses: 
           <XaTextLink onClick={() => { setQuery(""); search.current?.focus(); }}>Clear search</XaTextLink>
         </div> : <ul className={styles.list} aria-label="Your businesses">{visible.map((business) => <li key={business.id}>
           <a className={styles.row} href={`/business/${encodeURIComponent(business.id)}`}>
-            <XaInitial name={business.name} size={32} />
-            <span className={styles.name}>{business.name}</span>
-            <span className={styles.open}>Open<ChevronRight size={16} aria-hidden="true" /></span>
+            <XaInitial name={business.name} size={36} color={business.color} />
+            <span className={styles.text}><span className={styles.name}>{business.name}</span>{business.detail ? <span className={styles.detail}>{business.detail}</span> : null}</span>
           </a>
         </li>)}</ul>}
       </div>
     </main>
-    <aside className={styles.felt} aria-label="Pebble">
-      <XaPebbleScene pose="lineup" size={360} bare />
-      <p className={styles.feltTitle}>Pebble keeps each business apart.</p>
-      <p className={styles.feltBody}>Inquiries, replies and records never mix between businesses.</p>
-    </aside>
   </div>;
 }

@@ -76,7 +76,7 @@ export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initi
   return <div className={styles.stack}>
     {editing
       ? <XaTextArea label={`Your reply to ${author}`} value={text} disabled={readOnly || outcome.kind === "sending"} onChange={event => setText(event.target.value)} rows={4} maxLength={4000} />
-      : <><p className={styles.quiet}>{initial ? "Reply drafted, not posted" : "Your reply, not posted"}</p><p className={styles.said}>{text}</p></>}
+      : <p className={styles.said}>{text}</p>}
     {readOnly ? <p className={styles.quiet}>Only an authorized owner can post this reply.</p> : <div className={styles.detailFoot}>
       <XaButton variant={primary ? "primary" : "secondary"} title={postsToGoogle ? "Reply on Google" : "Save reply"} busy={outcome.kind === "sending"} disabled={!text.trim()} onClick={() => void send()}>
         {outcome.kind === "sending" ? "Sending…" : postsToGoogle ? "Post reply" : "Save reply"}

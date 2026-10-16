@@ -25,7 +25,7 @@ export interface AgencyNavigation {
   leadsCurrent?: boolean;
   active?: AgencyPlace;
   onNavigate?: (view: AgencyNavigationView) => void;
-  hrefs?: Partial<Record<AgencyPlace | "minutes", string>>;
+  hrefs?: Partial<Record<AgencyPlace | "minutes" | "leads", string>>;
   /** XA: the agency's clients, read through ordinary agency scope. */
   clients?: readonly StrelvaClientLink[];
   /** XA: cross-client Queue items, when known. */

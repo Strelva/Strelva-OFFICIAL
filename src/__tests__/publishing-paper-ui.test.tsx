@@ -8,7 +8,7 @@ import { NewsletterSurface } from "@/experience/publishing/NewsletterSurface";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
 import { WorkspaceReviewsView } from "@/experience/places/WorkspaceReviews";
 import { ReviewReplyForm } from "@/experience/places/ReviewReplyForm";
-import { RecapOutcome } from "@/experience/recaps/WorkspaceRecaps";
+import { RecapOutcome, recapOutcomeSentences } from "@/experience/recaps/WorkspaceRecaps";
 import { UnsubscribeView } from "@/experience/publishing/UnsubscribeView";
 import { PUBLISHING_RECAP, PUBLISHING_RECAP_OUTCOME } from "@/experience/workspace/preview/publishing-fixture";
 import { recapView } from "@/products/recaps/server";
@@ -105,12 +105,15 @@ describe("publishing distinguishes evidence and unavailable state", () => {
     delete (navigator as { clipboard?: unknown }).clipboard;
   });
 
-  it("marks missing outcome counts without turning customer clicks into bookings; recorded zero stays zero", () => {
+  it("says outcome counts as sentences without turning customer clicks into bookings; recorded zero stays zero", () => {
     const html = renderToStaticMarkup(<RecapOutcome recap={PUBLISHING_RECAP} siteName="Fixture site" />);
-    expect(html.match(/Not counted in this saved recap/g)).toHaveLength(4);
-    expect(html).toContain("clicks, not confirmed bookings");
+    // A count that wasn't saved is left out, never shown as zero and never contradicted by a "not counted" line.
+    expect(html).not.toContain("Not counted"); expect(html).not.toContain("booked.");
+    expect(html).toContain("aren&#x27;t confirmed bookings or answered calls");
     const fixture = renderToStaticMarkup(<RecapOutcome recap={PUBLISHING_RECAP} siteName="Fixture site" outcome={PUBLISHING_RECAP_OUTCOME} />);
-    expect(fixture).not.toContain("Not counted in this saved recap"); expect(fixture).toContain("New reviews"); expect(fixture).toContain('data-counted="true">0<');
+    expect(fixture).not.toContain("Not counted");
+    expect(recapOutcomeSentences(PUBLISHING_RECAP, { ...PUBLISHING_RECAP_OUTCOME, reviews: 0 })).toContain("No new reviews.");
+    expect(recapOutcomeSentences(PUBLISHING_RECAP, { inquiries: 0, answered: 0, bookings: 0, reviews: 0 })).toEqual(expect.arrayContaining(["Nobody asked a question through the site.", "0 visits booked."]));
   });
 
   it("uses already saved inquiry proof and review events without claiming bookings, delivery or a review provider", () => {
@@ -118,11 +121,11 @@ describe("publishing distinguishes evidence and unavailable state", () => {
     const view = recapView(brief);
     expect(view.inquiryOutcome).toBe(brief.stats.inquiryOutcomeProof); expect(view.newReviews).toBe(0);
     const html = renderToStaticMarkup(<RecapOutcome recap={view} siteName="Fixture site" />);
-    expect(html.match(/Not counted in this saved recap/g)).toHaveLength(1);
-    expect(html).toContain("delivery not verified"); expect(html).toContain("provider isn&#x27;t identified");
-    expect(html).not.toContain("New Google reviews");
+    expect(html).toContain("4 people asked a question, and Strelva or you replied to 3, 2 within a day.");
+    expect(html).not.toContain("got an answer"); expect(html).not.toContain("Google"); expect(html).not.toContain("booked");
+    expect(html).not.toMatch(/delivery not verified|provider isn|Recorded form submissions/);
     const unavailable = renderToStaticMarkup(<RecapOutcome recap={recapView({ ...brief, stats: { ...brief.stats, inquiryOutcomeProof: { status: "unavailable", reason: "Read failed" } } })} siteName="Fixture site" />);
-    expect(unavailable.match(/couldn&#x27;t be read when this recap was saved/g)).toHaveLength(2);
+    expect(unavailable.match(/couldn&#x27;t be counted when this recap was saved/g)).toHaveLength(1);
     expect(recapView({ ...brief, stats: { ...brief.stats, inquiryOutcomeProof: undefined } }).inquiryOutcome).toBeUndefined();
   });
 

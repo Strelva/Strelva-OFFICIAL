@@ -34,7 +34,6 @@ const ALLOWED: Record<string, string> = {
   "src/experience/workspace/billing/AgencyCheckoutStatus.tsx": "money",
   "src/experience/workspace/billing/AgencyPaymentLinks.tsx": "money",
   "src/experience/workspace/billing/payment-links-server.ts": "money",
-  "src/experience/workspace/leads/AgencyLeads.tsx": "money",
   "src/lib/audit/impact.ts": "detector",
   "src/lib/audit/modules/ai-readability.ts": "detector",
   "src/lib/features/registry.ts": "detector",

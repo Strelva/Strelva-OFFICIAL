@@ -81,7 +81,7 @@ export function InquiryWorkspaceExperience({
 }
 
 function MissingAdapter() {
-  return <main className={styles.unavailablePage} data-workspace-theme="linen"><XaPlace width="read" label="Your business"><XaPlaceTrouble title="This business could not be loaded." quiet="Refresh to try again." action={<XaTextLink href="/business">Choose another business</XaTextLink>}><p>No preview data was substituted for the authorized business state.</p></XaPlaceTrouble></XaPlace></main>;
+  return <main className={styles.unavailablePage} data-workspace-theme="linen"><XaPlace width="read" label="Your business"><XaPlaceTrouble title="Your inquiries didn't load." quiet="Nothing changed. Refresh the page to try again." action={<XaTextLink href="/business">Choose another business</XaTextLink>} /></XaPlace></main>;
 }
 
 function titleForView(view: InquiryView, audience: "business" | "agency"): string {
@@ -159,7 +159,9 @@ export function InquirySurfaceContent() {
 }
 
 function UnavailableBusiness() {
-  return <XaPlace width="read" label="Your business"><XaPlaceTrouble title="This business could not be loaded." quiet="No preview data was substituted." action={<XaTextLink href="/business">Choose another business</XaTextLink>}><p id="inquiries-unavailable-title">The authorized inquiry state is unavailable right now.</p></XaPlaceTrouble></XaPlace>;
+  const { snapshot } = useInquiry();
+  const name = snapshot.business?.name;
+  return <XaPlace width="read" label="Your business"><XaPlaceTrouble title={name ? `${name}'s inquiries didn't load.` : "Your inquiries didn't load."} quiet="Nothing changed. Refresh the page to try again." action={<XaTextLink href="/business">Choose another business</XaTextLink>} /></XaPlace>;
 }
 
 export function InquiryNotice() {

@@ -1,6 +1,4 @@
-import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceResultsView, type WorkspaceResultsState } from "@/experience/places/WorkspaceResults";
-import { StNotice, StPage } from "@/components/ui/strelva/Kit";
 import { resolveRange, type RangeKey } from "@/platform/infra/analytics/range";
 import type { SiteResults } from "@/products/websites/server";
 
@@ -25,8 +23,8 @@ export function L13Results({ state: name, mode, range: selected }: { state?: str
     sites: name === "empty" ? [] : name === "unavailable" ? [{ ...site, stats: null, searchPerf: { ...site.searchPerf!, status: "unavailable" }, gaPerf: { ...site.gaPerf!, status: "unavailable" }, aiVisibility: { ...site.aiVisibility!, hasData: false }, health: null }] : name === "disconnected" ? [{ ...site, searchPerf: null, gaPerf: null }] : [site],
     denied: name === "denied" ? [{ ...SITE, tenantId: "juniper-east", siteName: "Juniper East" }] : [],
   } };
-  return <div data-workspace-theme="linen" data-workspace-mode={mode === "dark" ? "dark" : "light"}><StrelvaShell signedIn signOut={null} appBase="/preview/strelva" active="home" title="Results" workspaceName="Juniper Bakery" systemsReleased>
-    <StPage><StNotice>Local rehearsal · fictional bakery results. This is presentation proof, not measured customer outcomes or connected Google accounts.</StNotice></StPage>
-    <WorkspaceResultsView workspaceId={WORKSPACE} state={state} range={range} />
-  </StrelvaShell></div>;
+  // WorkspaceResultsView brings its own StrelvaShell; the preview only supplies its rail.
+  return <div data-workspace-theme="linen" data-workspace-mode={mode === "dark" ? "dark" : "light"}>
+    <WorkspaceResultsView workspaceId={WORKSPACE} state={state} range={range} chrome={{ signedIn: true, signOut: null, appBase: "/preview/strelva", workspaceName: "Juniper Bakery", systemsReleased: true, mode: mode === "dark" ? "dark" : "light" }} />
+  </div>;
 }

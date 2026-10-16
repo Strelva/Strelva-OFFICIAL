@@ -2,7 +2,7 @@
 
 import { XaButton } from "@/components/ui/strelva/Xa";
 
-/** Preserve the complete selected window when retrying a failed read. */
-export function ResultsRetry() {
-  return <XaButton onClick={() => window.location.reload()}>Reload results</XaButton>;
+/** After a failed read: reload the page, which keeps the complete selected window in its address. */
+export function ResultsRetry({ reload = () => window.location.reload() }: { reload?: () => void }) {
+  return <XaButton variant="primary" onClick={reload}>Try again</XaButton>;
 }

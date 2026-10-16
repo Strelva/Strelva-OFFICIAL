@@ -17,7 +17,8 @@ import styles from "./workspace-results.module.css";
  * original source.
  */
 const RANGES: Array<{ key: Exclude<RangeKey, "custom">; label: string }> = [
-  { key: "live", label: "Live" }, { key: "week", label: "This week" }, { key: "month", label: "This month" },
+  // The segment names the window the figure shows ("Last 7 days" is the live window).
+  { key: "live", label: "Last 7 days" }, { key: "week", label: "This week" }, { key: "month", label: "This month" },
 ];
 
 export function resultsHref(workspaceId: string, range: RangeKey = "live", window?: { from: string; to: string }): string {
@@ -31,6 +32,43 @@ const count = (value: number) => value.toLocaleString("en-US");
 function change(value: number, priorLabel: string): string {
   return value === 0 ? `Unchanged ${priorLabel}` : `${value > 0 ? "Up" : "Down"} ${count(Math.abs(value))} ${priorLabel}`;
 }
+/** Where a business usually shows up on Google, in words an owner uses (never "rank 2.1"). */
+export function searchPlace(position: number): string {
+  if (!Number.isFinite(position) || position <= 0) return "Not placed yet";
+  const spot = Math.round(position);
+  if (spot <= 1) return "Usually first";
+  if (spot <= 3) return `Usually ${spot === 2 ? "2nd" : "3rd"}`;
+  if (spot <= 6) return "Page 1, near the top";
+  if (spot <= 10) return "Page 1, near the bottom";
+  return `Page ${Math.ceil(spot / 10)}`;
+}
+
+/** Where visitors came from, in words. */
+export function sourceName(source: string): string {
+  const value = source.trim().toLowerCase();
+  if (value === "(direct)" || value === "(direct) / (none)") return "Typed your address or used a bookmark";
+  if (value.startsWith("google / organic") || value === "google") return "Google searches";
+  if (value.includes("maps")) return "Google Maps";
+  if (value.includes("facebook")) return "Facebook";
+  if (value.includes("instagram")) return "Instagram";
+  if (value.includes("bing")) return "Bing searches";
+  return source.split(" / ")[0]!;
+}
+
+/** The one finding for the head: the change, then where most visits came from. */
+export function resultsFinding(site: SiteResults): string | null {
+  const stats = site.stats;
+  if (!stats?.hasData) return null;
+  const prior = stats.range.priorLabel.replace(/^vs /, "");
+  const change = stats.pageViewsDelta === 0 ? `Visits held steady against ${prior}.` : `${stats.pageViewsDelta > 0 ? "Up" : "Down"} ${count(Math.abs(stats.pageViewsDelta))} visits from ${prior}.`;
+  const top = site.gaPerf?.status === "ok" ? site.gaPerf.topSources.filter(source => source.sessions > 0).sort((a, b) => b.sessions - a.sessions)[0] : undefined;
+  const query = site.searchPerf?.status === "ok" ? site.searchPerf.topQueries[0]?.query : undefined;
+  const from = top ? sourceName(top.source) : null;
+  if (!from) return change;
+  if (from.startsWith("Typed")) return `${change} Most people typed your address or used a bookmark.`;
+  return `${change} Most came from ${from === "Google searches" && query ? `Google searches like \u201c${query}\u201d` : from}.`;
+}
+
 /** A page's name as an owner says it, never its path. */
 export function pageName(path: string): string {
   const clean = path.split(/[?#]/)[0]!.replace(/\/+$/, "");
@@ -47,12 +85,9 @@ function SiteHealth({ site }: { site: SiteResults }) {
     {!health ? <XaNote pebble><XaStatus kind="draft" size="sm">Not checked yet</XaStatus> Strelva hasn&apos;t finished a check of {site.siteName} yet. The daily check covers speed, security, search and accessibility.</XaNote>
       : issues.length ? <>
         <XaStatus kind="waits">{issues.length === 1 ? "1 thing to fix" : `${Math.min(issues.length, 5)} things to fix`}</XaStatus>
-        <XaRows label="What to fix">{issues.slice(0, 5).map((issue, index) => <XaRow key={index} title={issue.message} />)}</XaRows>
-        <p className={place.quiet}>Grade {health.grade} · {Math.round(health.overallScore)} out of 100 · checked {xaShortDate(health.scannedAt)}</p>
-      </> : <>
-        <XaStatus kind="live">Nothing needs fixing</XaStatus>
-        <p className={place.quiet}>Grade {health.grade} · {Math.round(health.overallScore)} out of 100 · checked {xaShortDate(health.scannedAt)}</p>
-      </>}
+        <ul className={place.facts} aria-label="What to fix">{issues.slice(0, 5).map((issue, index) => <li key={index}><span>{issue.message}</span></li>)}</ul>
+        <p className={place.quiet}>Strelva checked {xaShortDate(health.scannedAt)}. It checks again every day.</p>
+      </> : <XaStatus kind="live">Nothing needs fixing (checked {xaShortDate(health.scannedAt)})</XaStatus>}
   </section>;
 }
 
@@ -68,7 +103,7 @@ function Visits({ site }: { site: SiteResults }) {
       <div className={styles.chart} role="img" aria-label={`Daily visits for ${stats.range.label}: ${series.map(day => `${day.date}: ${day.pageViews}`).join(", ")}`}>
         {series.map(day => <span key={day.date} className={styles.bar} style={{ height: `${Math.max(2, day.pageViews / max * 100)}%` }} title={`${xaShortDate(day.date)}: ${count(day.pageViews)} visits`} />)}
       </div>
-      <figcaption className={styles.chartLabels}><span>{xaShortDate(series[0]!.date)}</span><span>{xaShortDate(series[series.length - 1]!.date)}</span></figcaption>
+      <figcaption className={styles.chartLabels}><span>{xaShortDate(series[0]!.date)}</span><span className={styles.today}>{stats.range.key === "custom" ? xaShortDate(series[series.length - 1]!.date) : `Today, ${count(series[series.length - 1]!.pageViews)}`}</span></figcaption>
     </figure> : <p className={place.quiet}>Not enough visits yet to draw the days. This fills in as more people find you.</p>}
     <p className={place.body}>{stats.hasData ? <>{count(stats.actions)} people clicked to book or call: {count(stats.bookingClicks)} to book, {count(stats.phoneClicks)} to call. {change(stats.actionsDelta, stats.range.priorLabel)}.</> : "No clicks to book or call yet in this window."}</p>
     <p className={place.quiet}>Visits can include repeat visits. A click doesn&apos;t confirm a booking or an answered call.</p>
@@ -81,8 +116,8 @@ function Searched({ site, connectHref }: { site: SiteResults; connectHref: strin
   return <section className={place.stack} aria-labelledby={`search-${site.tenantId}`}>
     <XaLabel as="h2" id={`search-${site.tenantId}`}>What people searched · Google, last 4 weeks</XaLabel>
     {search?.status === "ok" ? <>
-      <p className={place.body}>{count(search.clicks)} clicks from {count(search.impressions)} times you showed up, {(search.ctr * 100).toFixed(1)}% of the time. Average rank {search.position.toFixed(1)}.</p>
-      {search.topQueries.length ? <XaRows label="Search queries">{search.topQueries.slice(0, 5).map((query, index) => <XaRow key={index} title={query.query} detail={`Rank ${query.position.toFixed(1)}`} meta={`${count(query.clicks)} clicks`} />)}</XaRows>
+      <p className={place.body}>You showed up {count(search.impressions)} times and {count(search.clicks)} people clicked through. {searchPlace(search.position) === "Not placed yet" ? "" : `Across all searches you're ${searchPlace(search.position).replace(/^Usually /, "usually ").replace(/^Page/, "on page")}.`}</p>
+      {search.topQueries.length ? <ul className={place.facts} aria-label="What people searched">{search.topQueries.slice(0, 5).map((query, index) => <li key={index}><span className={place.factMain}>{query.query}<small>{searchPlace(query.position)}</small></span><span>{count(query.clicks)} clicks</span></li>)}</ul>
         : <p className={place.quiet}>Google is connected. No search queries have been reported yet.</p>}
     </> : search?.status === "unavailable" ? <XaNote pebble>Search results couldn&apos;t be read right now. Your Google connection is kept.</XaNote>
       : <XaNote>Google search isn&apos;t connected. <XaTextLink href={connectHref}>Connect Google</XaTextLink></XaNote>}
@@ -97,8 +132,8 @@ function Sources({ site, connectHref }: { site: SiteResults; connectHref: string
     <XaLabel as="h2" id={`sources-${site.tenantId}`}>Where visitors came from · last 4 weeks</XaLabel>
     {ga?.status === "ok" ? <>
       <p className={place.body}>{count(ga.users)} visitors made {count(ga.sessions)} visits and viewed {count(ga.pageviews)} pages.</p>
-      {sources.length ? <XaRows label="Visitor sources">{sources.slice(0, 6).map((source, index) => <XaRow key={index} title={source.source === "(direct)" ? "Typed your address or used a bookmark" : source.source} meta={`${count(source.sessions)} visits`} />)}</XaRows> : <p className={place.quiet}>No visitor sources have been reported yet.</p>}
-      {pages.length ? <><XaLabel as="h3">Where they landed</XaLabel><XaRows label="Where they landed">{pages.slice(0, 5).map((page, index) => <XaRow key={index} title={pageName(page.path)} meta={`${count(page.views)} views`} />)}</XaRows></> : null}
+      {sources.length ? <ul className={place.facts} aria-label="Visitor sources">{sources.slice(0, 6).map((source, index) => <li key={index}><span>{sourceName(source.source)}</span><span>{count(source.sessions)} visits</span></li>)}</ul> : <p className={place.quiet}>No visitor sources have been reported yet.</p>}
+      {pages.length ? <><XaLabel as="h3">Where they landed</XaLabel><ul className={place.facts} aria-label="Where they landed">{pages.slice(0, 5).map((page, index) => <li key={index}><span>{pageName(page.path)}</span><span>{count(page.views)} views</span></li>)}</ul></> : null}
     </> : ga?.status === "unavailable" ? <XaNote pebble>Visitor sources couldn&apos;t be read right now. Your Google connection is kept.</XaNote>
       : <XaNote>Visitor sources aren&apos;t connected. <XaTextLink href={connectHref}>Connect Google</XaTextLink></XaNote>}
   </section>;
@@ -145,10 +180,11 @@ export function WorkspaceResultsView({ workspaceId, state, range, chrome, hrefFo
   const custom = data?.sites.find(site => site.stats?.range.key === "custom")?.stats?.range;
   const ready = state.kind === "ready";
   const art = <XaSystemTile kind="website" size={56} />;
+  const finding = data?.sites.length === 1 ? resultsFinding(data.sites[0]!) : null;
   return <StrelvaShell title="Results" workspaceId={workspaceId} active="system" {...chrome}>
     <XaPlace label="Results">
       <XaPlaceHead art={art} title="Results" back={{ href: placeHomeHref(workspaceId), label: `Back to ${XA_PLACE_LABELS.today}` }}
-        status={<span>Who found your site, who acted, and how the site is holding up.{range === "custom" ? ` · ${custom?.label || "Custom window"}` : ""}</span>}
+        status={finding || range === "custom" ? <span>{finding}{range === "custom" ? `${finding ? " " : ""}${custom?.label || "Custom window"}.` : ""}</span> : undefined}
         aside={ready ? <XaLinkSegmented label="Time window" options={RANGES.map(item => ({ href: hrefFor(workspaceId, item.key), label: item.label, current: range === item.key }))} /> : <XaButtonLink size="sm" href={`/workspace/recaps?workspaceId=${encodeURIComponent(workspaceId)}`}>Recaps</XaButtonLink>} />
       {state.kind === "loading" ? <XaPlaceLoading label="Loading results" />
         : state.kind === "permission" ? <XaPlaceNotMember />

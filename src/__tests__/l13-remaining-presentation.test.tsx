@@ -18,10 +18,10 @@ describe("L13 remaining page presentation", () => {
     expect(html).not.toContain("Send inquiry");
     expect(request).not.toHaveBeenCalled();
   });
-  it("keeps a recorded zero score and labels the check without inventing health", () => {
+  it("labels the check and its grade without a score readout or invented health", () => {
     const html = renderToStaticMarkup(<AgencyProspectsView prospects={[prospect]} workspaceId={workspaceId} />);
-    expect(html).toContain("Answer check");
-    expect(html).toContain("F (0/100)");
+    expect(html).toContain("Answer check: F");
+    expect(html).not.toContain("/100");
     expect(html).not.toContain("Latest checks passed");
     expect(html).not.toContain("Add as client");
   });
@@ -31,11 +31,11 @@ describe("L13 remaining page presentation", () => {
     expect(renderToStaticMarkup(<AgencyProspectsView prospects={[prospect]} addClientEnabled />)).not.toContain("Add as client");
   });
   it("keeps loading, unavailable and empty reads distinct", () => {
-    expect(renderToStaticMarkup(<AgencyProspectsView prospects={[]} loading />)).toContain("Reading prospects…");
+    expect(renderToStaticMarkup(<AgencyProspectsView prospects={[]} loading />)).toContain("Reading who ran your check links");
     const failed = renderToStaticMarkup(<AgencyProspectsView prospects={[]} error="Agency membership is required." />);
     expect(failed).toContain('role="alert"');
-    expect(failed).not.toContain("No prospects yet.");
+    expect(failed).not.toContain("No one has run your check yet.");
     expect(failed).not.toContain("<table");
-    expect(renderToStaticMarkup(<AgencyProspectsView prospects={[]} />)).toContain("No prospects yet.");
+    expect(renderToStaticMarkup(<AgencyProspectsView prospects={[]} />)).toContain("No one has run your check yet.");
   });
 });

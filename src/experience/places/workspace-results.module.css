@@ -5,5 +5,6 @@
 .chart { display: flex; height: 160px; align-items: flex-end; gap: 4px; border-bottom: 1px solid var(--st-line); }
 .bar { flex: 1; min-width: 0; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--st-accent) 34%, var(--st-canvas)); }
 .bar:last-child { background: var(--st-accent); }
+.today { color: var(--st-text); font-weight: 500; }
 .chartLabels { display: flex; justify-content: space-between; gap: 12px; color: var(--st-text-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 @media (max-width: 767px) { .chart { height: 128px; gap: 3px; } }

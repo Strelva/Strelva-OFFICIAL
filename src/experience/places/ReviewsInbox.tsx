@@ -13,12 +13,12 @@ import styles from "./xa-place.module.css";
 export interface ReviewItem { site: SiteReviews; review: ReviewView }
 const SOURCE: Record<ReviewView["source"], string> = { google: "Google", yelp: "Yelp", manual: "Added by hand" };
 
-export function ReviewsInbox({ head, notes, getMore, items }: { head: { status: ReactNode; back: { href: string; label: string } }; notes?: ReactNode; getMore?: ReactNode; items: readonly (ReviewItem & { detail: ReactNode })[] }) {
+export function ReviewsInbox({ head, notes, getMore, items, initialOpen = false }: { head: { status: ReactNode; back: { href: string; label: string } }; notes?: ReactNode; getMore?: ReactNode; items: readonly (ReviewItem & { detail: ReactNode })[]; initialOpen?: boolean }) {
   const waiting = items.filter(item => !item.review.reply);
   const replied = items.filter(item => item.review.reply);
   const [view, setView] = useState<"waiting" | "replied">(waiting.length ? "waiting" : "replied");
   const [picked, setPicked] = useState<string | null>(null);
-  const [opened, setOpened] = useState(false);
+  const [opened, setOpened] = useState(initialOpen);
   const shown = view === "waiting" ? waiting : replied;
   const current = shown.find(item => item.review.id === picked) ?? shown[0] ?? null;
   return <>

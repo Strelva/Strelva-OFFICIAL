@@ -4,7 +4,7 @@ import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
 import { readWorkspaceResults } from "@/products/websites/server";
 import { WorkspaceResultsView } from "@/experience/places/WorkspaceResults";
-import { systemsReleasedFor } from "@/platform/systems-release";
+import { readOwnerPlaceChrome } from "@/experience/places/place-chrome-server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Results", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -16,6 +16,7 @@ export default async function ResultsPage({ searchParams }: { searchParams: Prom
   const text = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
   const range = resolveRange(text(params.range), text(params.from), text(params.to));
   const state = await readPlace("results", workspaceId, () => readWorkspaceResults(actor, workspaceId, range));
-  const systemsReleased = await systemsReleasedFor(actor, workspaceId).catch(() => false);
-  return <WorkspaceResultsView workspaceId={workspaceId} state={state} range={range.key} chrome={{ systemsReleased }} />;
+  // The real rail: pinned Systems (this place marked current), the business name and its agency.
+  const chrome = await readOwnerPlaceChrome(actor, workspaceId, "website");
+  return <WorkspaceResultsView workspaceId={workspaceId} state={state} range={range.key} chrome={chrome} />;
 }

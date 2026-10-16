@@ -34,7 +34,12 @@
 .figureNote { color: var(--st-text-2); font-size: 14px; line-height: 1.4; }
 
 /* ---------- Trouble, loading, note ---------- */
-.trouble { display: flex; max-width: 480px; flex-direction: column; align-items: flex-start; gap: 18px; padding: 24px 0; }
+.trouble { display: flex; max-width: 480px; flex-direction: column; align-items: flex-start; gap: 18px; padding: 8px 0 24px; }
+/* Pebble on the canvas: the bare scene's art fills the middle half, so crop the empty top and bottom. */
+.troubleArt { display: block; height: 150px; margin: -10px 0 0 -12px; overflow: hidden; }
+.troubleArt > span { margin-top: -75px; }
+.clayBand { display: block; overflow: hidden; }
+.clay { display: block; width: auto; max-width: 100%; object-fit: contain; object-position: left center; user-select: none; }
 .troubleBody { display: flex; flex-direction: column; gap: 10px; color: var(--st-text-2); font-size: 15px; line-height: 1.45; }
 .troubleBody p { margin: 0; }
 .troubleActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
@@ -62,7 +67,9 @@
 .pickLine[data-quiet="true"] { color: var(--st-text-3); }
 .pickDot { grid-column: 3; grid-row: 2; align-self: center; justify-self: end; }
 
-.detail { box-sizing: border-box; display: flex; min-width: 0; min-height: 560px; flex-direction: column; gap: 22px; padding: 28px 32px 28px; border-radius: 24px; background: var(--st-surface); box-shadow: var(--st-shadow-lg); }
+/* The opened item: white paper, 16 px corners, the small shadow (no ivory card with a big shadow). */
+.detail { box-sizing: border-box; display: flex; min-width: 0; min-height: 520px; flex-direction: column; gap: 22px; padding: 28px 32px 28px; border-radius: 16px; background: var(--st-surface); box-shadow: var(--st-shadow-sm); }
+.detail[data-fit="true"] { min-height: 0; }
 .detailHead { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 18px; border-bottom: 1px solid var(--st-line); }
 .detailWho { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
 .detailName { margin: 0; font-size: 17px; font-weight: 500; line-height: 24px; }
@@ -109,9 +116,9 @@
   .headAside > nav, .headAside > [role="radiogroup"] { width: 100%; }
   .headAside .segment { flex: 1; justify-content: center; }
   .split { grid-template-columns: minmax(0, 1fr); }
-  .split[data-open="true"] > .list { display: none; }
+  .split[data-open="true"] > :not(.detail) { display: none; }
   .split:not([data-open="true"]) > .detail { display: none; }
-  .detail { min-height: 0; padding: 20px 18px; border-radius: 20px; }
+  .detail { min-height: 0; padding: 20px 18px; border-radius: 16px; }
   .detailFootNote { width: 100%; margin-left: 0; }
   .backToList { display: inline-flex; align-self: flex-start; }
   .columns { grid-template-columns: minmax(0, 1fr); }
@@ -128,3 +135,15 @@
 .reviewList > li + li { border-top: 1px solid var(--st-line); }
 .reviewLine { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0; color: var(--st-text-3); font-size: 13px; line-height: 19px; }
 .reviewLine b { color: var(--st-text); font-size: 15px; font-weight: 500; }
+
+/* Plain facts in a list: hairlines, no hover, nothing to click (Results search and sources). */
+.facts { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.facts > li { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 11px 0; border-top: 1px solid var(--st-line); color: var(--st-text); font-size: 15px; line-height: 21px; cursor: default; }
+.facts > li > span:last-child { flex-shrink: 0; color: var(--st-text-3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.factMain { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.factMain small { color: var(--st-text-2); font-size: 13px; line-height: 18px; }
+
+/* Strelva speaking inside an opened item, right above its actions. */
+.speaks { display: flex; align-items: flex-start; gap: 12px; max-width: 560px; color: var(--st-text); font-size: 15px; line-height: 1.45; }
+.speaks p { margin: 0; padding-top: 5px; }
+.speaks a { color: var(--st-accent); font-weight: 500; }
