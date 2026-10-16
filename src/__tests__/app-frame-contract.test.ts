@@ -12,14 +12,17 @@ const managedShell = () => readFileSync(path.join(root, "src/components/dashboar
 const workspaceSignOut = () => readFileSync(path.join(root, "src/experience/workspace/WorkspaceSignOutButton.tsx"), "utf8");
 
 describe("shared app frame accessibility contract", () => {
-  it("places configured agency Leads next to Payment links and hides it without current admission", () => {
+  it("places configured agency Leads (XA: Service requests) and hides it without current admission", () => {
     const workspaceId = "11111111-1111-4111-8111-111111111111";
     const base = { workspaceId, workspaceName: "Strelva Agency", children: createElement("p", null, "Agency"), signOut: null };
     for (const theme of ["paper", "linen"] as const) {
       const authorized = renderToStaticMarkup(createElement(StrelvaShell, { ...base, theme, agencyNavigation: { leadsAvailable: true, leadsCurrent: true } }));
       expect(authorized).toContain(`/workspace/leads?workspaceId=${workspaceId}`);
-      expect(authorized).toContain('aria-current="page"'); expect(authorized).toContain("Payment links");
-      // XA keeps Leads and Payment links in the agency details sidebar; Payment links opens it.
+      expect(authorized).toContain('aria-current="page"');
+      // Paper keeps Leads beside Payment links. XA puts Service requests in the agency shell's main places;
+      // Payment links stays in the agency details sidebar, which it opens.
+      if (theme === "paper") expect(authorized).toContain("Payment links");
+      else { expect(authorized).toContain("Service requests"); expect(authorized).toContain(">Queue<"); expect(authorized).not.toContain("Payment links"); }
       for (const agencyNavigation of theme === "paper" ? [{ leadsAvailable: false }, {}] : [{ leadsAvailable: false, paymentLinksCurrent: true }, { paymentLinksCurrent: true }]) {
         const html = renderToStaticMarkup(createElement(StrelvaShell, { ...base, theme, agencyNavigation }));
         expect(html).not.toContain("/workspace/leads?"); expect(html).toContain("Payment links");

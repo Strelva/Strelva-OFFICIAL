@@ -46,7 +46,10 @@ export const XA_PLACE_LABELS = {
   today: "Today", requests: PLACE_LABELS.requests, minutes: "Running", newRequest: "New request", search: "Search",
   yourBusiness: "Your business", yourAgency: "Your agency", addToBusiness: "Add to your business",
   queue: "Queue", library: "Library", clients: "Clients", addClient: "Add a client", team: "Team", verification: "Verification",
-  leads: "Leads", paymentLinks: "Payment links",
+  // GLOSSARY: "Lead" is internal inquiry storage and "Prospect" is Strelva's own sales record, so the
+  // agency places use "Service request" (a Request sent to an agency) and the check link's own words.
+  // Routes keep /workspace/leads and /workspace/prospects. Pending Jacob's call (lane xs-leads, Oct 16).
+  leads: "Service requests", checkResults: "Check results", paymentLinks: "Payment links",
   businessRecord: "Business record", access: PLACE_LABELS.access, plan: "Plan and usage", takeItWithYou: "Take it with you",
   connections: "Connections", help: PLACE_LABELS.help, account: PLACE_LABELS.account, details: PLACE_LABELS.businessDetails, agencyDetails: "Agency details",
 } as const;

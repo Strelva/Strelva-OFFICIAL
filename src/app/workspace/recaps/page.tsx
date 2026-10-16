@@ -10,6 +10,7 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { careReportsMayBeOn } from "@/platform/care-reports/release";
 import { listOwnerCareReports } from "@/platform/care-reports/service";
 import { readWorkspaceRecaps } from "@/products/recaps/server";
+import { readOwnerPlaceChrome } from "@/experience/places/place-chrome-server";
 import { WorkspaceRecaps, type OwnerCareReportsState, type RecapPeriodFilter, type WorkspaceRecapsState } from "@/experience/recaps/WorkspaceRecaps";
 
 export const dynamic = "force-dynamic";
@@ -52,5 +53,8 @@ export default async function RecapsPage({ searchParams }: { searchParams: Promi
       .then(release => release.available ? builtInAppReleaseLabel(builtInApp("recaps"), release.release) : undefined)
       .catch(() => undefined)
     : undefined;
-  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} releaseLabel={releaseLabel} careReports={careReports} />;
+  const recapId = typeof params.recap === "string" && /^[\w:-]{1,80}$/.test(params.recap) ? params.recap : undefined;
+  // The real rail: pinned Systems, the business name and its agency.
+  const chrome = await readOwnerPlaceChrome({ userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId);
+  return <WorkspaceRecaps workspaceId={workspaceId} state={state} period={period} releaseLabel={releaseLabel} careReports={careReports} recapId={recapId} chrome={chrome} />;
 }

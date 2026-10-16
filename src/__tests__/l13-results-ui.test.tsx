@@ -8,11 +8,12 @@ const html = (state?: string) => renderToStaticMarkup(createElement(L13Results, 
 describe("remaining owner results presentation", () => {
   it("distinguishes clicks, visits and sampled answers with their source periods", () => {
     const page = html();
-    expect(page).toContain("Booking-link and phone-link clicks");
+    expect(page).toContain("clicked to book or call");
     expect(page).toContain("A click doesn&#x27;t confirm a booking or an answered call");
-    expect(page).toContain("Google Search Console · last 4 weeks");
-    expect(page).toContain("Google Analytics · last 4 weeks");
-    expect(page).toContain("Strelva sampled");
+    expect(page).toContain("What people searched · Google, last 4 weeks");
+    expect(page).toContain("Where visitors came from · last 4 weeks");
+    expect(page).toContain("Strelva asked 4 questions");
+    expect(page).not.toMatch(/Rank \d|Average rank|Grade [A-F]|out of 100/);
     expect(page).toContain("not a fixed rank");
     expect(page).not.toMatch(/\bAI\b|\bagent\b|\bautomation\b|\bworkflow\b|\btask\b/);
   });
@@ -22,7 +23,7 @@ describe("remaining owner results presentation", () => {
     expect(unavailable).toContain("couldn&#x27;t be read right now");
     expect(unavailable).toContain("Your Google connection is kept");
     expect(unavailable).toContain("No sampled answers are available yet");
-    expect(unavailable).not.toContain("Visits to your site");
+    expect(unavailable).not.toContain("visits to juniper");
     const disconnected = html("disconnected");
     expect(disconnected).toContain("Google search isn&#x27;t connected");
     expect(disconnected).toContain("Visitor sources aren&#x27;t connected");

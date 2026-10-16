@@ -11,6 +11,7 @@ vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: pageMocks.act
 vi.mock("@/experience/workspace/leads/leads-server", () => ({ leadAgency: pageMocks.agency }));
 vi.mock("@/platform/agency-brand/server", () => ({ resolveOwnerBrand: pageMocks.brand }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: pageMocks.enabled }));
+vi.mock("@/experience/places/place-chrome-server", () => ({ readAgencyClients: async () => [{ id: "c1", name: "Juniper Bakery", href: "/workspace?workspaceId=c1", color: "#2f5236" }] }));
 vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children, agencyNavigation }: { children: React.ReactNode; agencyNavigation?: unknown }) => <main data-agency-navigation={JSON.stringify(agencyNavigation)}>{children}</main> }));
 
 const agency = "11111111-1111-4111-8111-111111111111";
@@ -47,19 +48,22 @@ async function submitNote(node: HTMLElement, value = "  Called the owner  ") {
 it("renders owned lead work in agency chrome with honest legacy attribution and opaque prefill links", async () => {
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())));
   expect(node.textContent).toContain("Buffalo Coffee"); expect(node.textContent).toContain("coffee@example.test");
-  expect(node.textContent).toContain("Received before agency ownership was recorded"); expect(node.textContent).toContain("Original conversation");
-  expect([...node.querySelectorAll("a")].map(link => link.getAttribute("href"))).toContain(href("/workspace/payment-links"));
+  expect(node.textContent).toContain("Before Strelva Agency's requests were kept separately"); expect(node.textContent).toContain("Original conversation");
+  // Strelva says what the request needs right above the one ink pill; no dead "coming soon" stub, no manual sync control.
+  expect(node.textContent).toContain("Buffalo Coffee asked on Oct 12 and hasn't heard back yet. Add them as a client to start the scope.");
+  expect(node.querySelectorAll('[data-xa-primary="true"]')).toHaveLength(1);
+  expect(node.querySelector('a[href*="payment-links"]')).toBeNull(); expect(node.textContent).not.toMatch(/Coming soon|Refresh leads|Converting/);
   expect(node.querySelector('a[href*="/admin"]')).toBeNull();
   expect([...node.querySelectorAll("a")].every(link => !link.href.includes("example.test") && !link.href.includes("Buffalo"))).toBe(true);
   const page = renderToStaticMarkup(await LeadsPage({ searchParams: Promise.resolve({ workspaceId: agency }) }));
-  expect(page).toContain('&quot;leadsCurrent&quot;:true'); expect(page).toContain('&quot;leadsAvailable&quot;:true');
+  expect(page).toContain('&quot;leadsCurrent&quot;:true'); expect(page).toContain('&quot;leadsAvailable&quot;:true'); expect(page).toContain("Juniper Bakery");
 });
 
 it.each(["no membership", "ordinary member", "super-admin without membership"])("denied page for %s exposes no lead feed or tool", async () => {
   pageMocks.agency.mockRejectedValueOnce(new Error("Not authorized"));
   const page = renderToStaticMarkup(await LeadsPage({ searchParams: Promise.resolve({ workspaceId: agency }) }));
   expect(page).toContain("Only a verified owner or admin of this agency");
-  expect(page).not.toContain("Reading leads"); expect(page).not.toContain("Refresh leads"); expect(page).not.toContain("Convert");
+  expect(page).not.toContain("Reading service requests"); expect(page).not.toContain("Try again"); expect(page).not.toContain("Add as client");
   expect(pageMocks.brand).not.toHaveBeenCalled();
 });
 
@@ -67,11 +71,11 @@ it("shows initial loading, empty and failed permission reads with GET-only recov
   let resolve!: (response: Response) => void;
   const request = vi.fn<typeof fetch>().mockImplementationOnce(() => new Promise<Response>(done => { resolve = done; }))
     .mockResolvedValueOnce(Response.json(snapshot({ leads: [] })));
-  const node = await render(request); expect(node.querySelector('[role="status"][aria-label="Reading leads"]')).toBeTruthy(); expect(node.querySelector("form")).toBeNull();
+  const node = await render(request); expect(node.querySelector('[role="status"][aria-label="Reading service requests"]')).toBeTruthy(); expect(node.querySelector("form")).toBeNull();
   await act(async () => resolve(Response.json({ error: "Access denied" }, { status: 403 })));
   expect(node.textContent).toContain("Access denied"); expect(node.querySelector("form")).toBeNull();
-  await act(async () => button(node, "Refresh leads").click());
-  expect(node.textContent).toContain("No agency leads recorded yet"); expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  await act(async () => button(node, "Try again").click());
+  expect(node.textContent).toContain("No service requests yet"); expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 
 it("updates status and dismisses through actor-bound ordinary agency commands", async () => {
@@ -81,8 +85,7 @@ it("updates status and dismisses through actor-bound ordinary agency commands", 
     const body = JSON.parse(String(init.body)); bodies.push(body); return Response.json(receipt(body));
   });
   const node = await render(request);
-  (node.querySelector('[name="status"]') as HTMLSelectElement).value = "contacted";
-  await act(async () => button(node, "Save status").click());
+  await act(async () => button(node, "Mark contacted").click());
   expect(bodies[0]).toMatchObject({ action: "status", status: "contacted", token, agencyWorkspaceId: agency, expectedActorId: actor });
   await act(async () => button(node, "Dismiss").click()); expect(bodies[1]).toMatchObject({ action: "status", status: "dismissed" });
   expect(bodies[1]?.idempotencyKey).not.toBe(bodies[0]?.idempotencyKey);
@@ -107,17 +110,20 @@ it("hands conversion to the ordinary client flow and keeps conversion distinct f
     if (init?.method !== "POST") return Response.json(snapshot({ leads: [current] }));
     const body = JSON.parse(String(init.body)); const saved = receipt(body); current = saved as typeof row; return Response.json(saved);
   });
-  const node = await render(request); await act(async () => button(node, "Convert").click());
-  expect(node.textContent).toContain("The lead stays Converting until the client business is created");
+  const node = await render(request); await act(async () => button(node, "Add as client").click());
+  expect(node.textContent).toContain("Adding Buffalo Coffee as a client. Finish their details to start the scope.");
+  expect(node.textContent).not.toContain("Converting");
   expect([...node.querySelectorAll("a")].map(link => link.getAttribute("href"))).toContain(href("/workspace/agency/clients/new"));
   expect(node.textContent).not.toContain("Converted"); expect(node.querySelector('a[href*="/admin"]')).toBeNull();
 });
 
 it("holds conversion when client creation is unavailable and after actual conversion", async () => {
   const node = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ conversionAvailable: false }))));
-  expect(button(node, "Convert").disabled).toBe(true); expect(node.textContent).toContain("Adding a client is currently unavailable");
+  expect(button(node, "Add as client").disabled).toBe(true); expect(node.textContent).toContain("Adding clients from here isn't open yet");
   const converted = await render(vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot({ leads: [{ ...row, workflow: { ...row.workflow, status: "converted" }, lead: { ...row.lead, deliveryStatus: "launched" } }] }))));
-  expect(button(converted, "Convert").disabled).toBe(true); expect(button(converted, "Dismiss")).toBeUndefined();
+  // A converted lead is Done: it leaves the open list, and its own page keeps conversion held.
+  expect(converted.textContent).toContain("Nothing open"); await act(async () => button(converted, "Done 1").click());
+  expect(button(converted, "Add as client").disabled).toBe(true); expect(button(converted, "Dismiss")).toBeUndefined();
 });
 
 it("holds exact lost-response terms across GET refresh and refused retry", async () => {
@@ -131,10 +137,10 @@ it("holds exact lost-response terms across GET refresh and refused retry", async
   });
   const node = await render(request); await submitNote(node);
   expect(button(node, "Add note").disabled).toBe(true); expect((node.querySelector("textarea") as HTMLTextAreaElement).value).toContain("Called the owner");
-  await act(async () => button(node, "Refresh leads").click()); expect(bodies).toHaveLength(1);
-  await act(async () => button(node, "Retry the same request").click());
-  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Add note").disabled).toBe(true);
-  await act(async () => button(node, "Retry the same request").click());
+  await act(async () => button(node, "Try again").click()); expect(bodies).toHaveLength(1);
+  await act(async () => button(node, "Check again").click());
+  expect(node.textContent).toContain("waiting to be confirmed"); expect(button(node, "Add note").disabled).toBe(true);
+  await act(async () => button(node, "Check again").click());
   expect(bodies[1]).toEqual(bodies[0]); expect(bodies[2]).toEqual(bodies[0]); expect(node.textContent).toContain("Note added.");
 });
 
@@ -148,15 +154,21 @@ it.each(["missing key", "wrong token", "wrong status", "wrong href", "incomplete
       ...(fault === "wrong status" ? { workflow: { ...saved.workflow, status: "converted" } } : {}),
       ...(fault === "wrong href" ? { href: "/admin/onboard?email=coffee@example.test" } : {}) });
   });
-  const node = await render(request); await act(async () => button(node, "Convert").click());
-  expect(node.textContent).toContain("awaiting confirmation"); expect(button(node, "Convert").disabled).toBe(true);
+  const node = await render(request); await act(async () => button(node, "Add as client").click());
+  expect(node.textContent).toContain("waiting to be confirmed"); expect(button(node, "Add as client").disabled).toBe(true);
   expect(node.querySelector('a[href*="/clients/new"]')).toBeNull(); expect(node.textContent).not.toContain("Ready to add this client");
 });
 
-it("disables stale writes and handoffs after refresh failure while retaining the prior lead", async () => {
-  const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(snapshot())).mockRejectedValueOnce(new Error("Read unavailable"));
-  const node = await render(request); await act(async () => button(node, "Refresh leads").click());
-  expect(node.textContent).toContain("Buffalo Coffee"); expect(node.textContent).toContain("Retained leads may be out of date");
-  expect(button(node, "Convert").disabled).toBe(true); expect(button(node, "Add note").disabled).toBe(true);
+it("disables stale writes and handoffs after a failed reload while retaining the prior request", async () => {
+  let gets = 0;
+  const request = vi.fn<typeof fetch>(async (_url, init) => {
+    if (init?.method === "POST") return Response.json(receipt(JSON.parse(String(init.body))));
+    gets += 1; if (gets > 1) throw new Error("Read unavailable");
+    return Response.json(snapshot());
+  });
+  const node = await render(request); await act(async () => button(node, "Mark contacted").click());
+  expect(node.textContent).toContain("Buffalo Coffee"); expect(node.textContent).toContain("may be out of date");
+  expect(button(node, "Try again")).toBeTruthy();
+  expect(button(node, "Add as client").disabled).toBe(true); expect(button(node, "Add note").disabled).toBe(true);
   expect(node.querySelector('a[href*="payment-links"]')).toBeNull();
 });

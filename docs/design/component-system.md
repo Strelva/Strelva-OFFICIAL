@@ -165,6 +165,32 @@ business name with "Runs on Strelva", or Strelva's wordmark, and never the
 one sentence (`phoneSays`, `XaEntryPebbleLine`) and any object the page depends
 on moves into the column. Previews: `/preview/strelva/xa/xs-entry`.
 
+### XA places: Service requests, Reviews, Recaps, Results, Check results (lane xs-leads, October 15–16)
+
+`@/experience/places/XaPlace` composes the kit into the XA · S3 place shape
+and is server-safe: `XaPlace` (paper and padding), `XaPlaceHead` (clay, title,
+one status line, the one view switch on the right), `XaLinkSegmented` (a
+segmented control whose options are addresses), `XaFigure` (the one big number,
+XA · E3), `XaClay` (pose art cropped to its figures, E3 header),
+`XaPlaceTrouble` / `XaPlaceNotMember` / `XaPlaceLoading` (Pebble standing on
+the canvas, no felt circle, for bad news and quiet empties), `XaNote` (one
+inline sentence), `XaStars`, `xaShortDate` and `xaDayPhrase` ("yesterday").
+The list-beside-detail layout is `.split` / `.list` / `.pick` / `.detail`
+(16 px corners, small shadow; `data-fit` drops the min height) in
+`xa-place.module.css`; `.speaks` is Pebble's one sentence right above the
+opened item's one ink pill, and `.facts` is a plain hairline list with nothing
+to click. On a phone the picked item opens as its own screen with Back.
+Rails outside the workspace view come from `place-chrome-server.ts`
+(`readOwnerPlaceChrome`: pinned Systems, business name, agency;
+`readAgencyClients`: the agency's clients). `identityColor(id)` gives business
+initials a stable color. Service requests is a place in the agency shell
+(Today, Queue, Library, Minutes, Service requests, Clients). Email: the paper
+renderer's one primary is ink (`PAPER_EMAIL.action`), DM Sans only, the paper
+fits its content, and it gains `figure`, `clay` and `changes` (date, what,
+who acted) blocks. Preview every screen and state at
+`/preview/strelva/xa/xs-leads/<screen>?state=…` (`&open=1` opens the picked
+item on a phone, `&prospect=<id>` picks a check result).
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

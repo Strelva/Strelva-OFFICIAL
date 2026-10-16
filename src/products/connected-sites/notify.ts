@@ -12,6 +12,7 @@ import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
+import type { PaperEmail } from "@/platform/infra/email/paper";
 import type { ConnectedInquiry, ResolvedConnectedSite } from "./contracts";
 import { notifyDurableConnectedInquiryOwner } from "./inquiry-owner-notice";
 
@@ -21,6 +22,25 @@ function appOrigin(): string {
 
 export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHost" | "workspaceId">, inquiry: Pick<ConnectedInquiry, "name" | "email" | "message">) {
   const where = site.siteHost.replace(/^www\./, "");
+  const url = `${appOrigin()}/workspace?workspaceId=${encodeURIComponent(site.workspaceId)}`;
+  const quote = inquiry.message ? `“${inquiry.message.slice(0, 1200)}”` : null;
+  const footerNote = `Sent because ${where} is connected to Strelva.`;
+  // XA · E1 presentation: who wrote, their words, where it is kept, one button.
+  // The plain options stay for the text part and older mail clients.
+  const paper: PaperEmail = {
+    subject: `New inquiry from ${where}`,
+    preheader: `${inquiry.name} reached out through ${where}.`,
+    sender: where,
+    senderDetail: "",
+    footer: footerNote,
+    blocks: [
+      { kind: "label", text: [inquiry.name, inquiry.email].filter(Boolean).join(" · ") },
+      ...(quote ? [{ kind: "paragraph" as const, text: quote }] : []),
+      { kind: "rule" },
+      { kind: "paragraph", text: `It came through the form on ${where} and is saved in Strelva. A quick reply is the best way to win the work.` },
+      { kind: "actions", actions: [{ label: `Open ${inquiry.name}'s inquiry`, url, style: "primary" }], full: false },
+    ],
+  };
   return {
     subject: `New inquiry from ${where}`,
     options: {
@@ -28,11 +48,12 @@ export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHos
       heading: "Someone reached out through your website",
       paragraphs: [
         `${inquiry.name} sent an inquiry through ${where}. A quick reply is the best way to win the work.`,
-        ...(inquiry.message ? [`“${inquiry.message.slice(0, 1200)}”`] : []),
+        ...(quote ? [quote] : []),
       ],
       rows: inquiry.email ? [{ label: "Email", value: inquiry.email }] : [],
-      button: { label: "Open your workspace", url: `${appOrigin()}/workspace?workspaceId=${encodeURIComponent(site.workspaceId)}` },
-      footerNote: `Sent because ${where} is connected to your Strelva workspace.`,
+      button: { label: "Open your workspace", url },
+      footerNote,
+      paper,
     },
   };
 }

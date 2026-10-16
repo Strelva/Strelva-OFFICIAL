@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { InquiryExperience, InquiryWorkspaceExperience, type InquiryExperienceProps } from "./InquiryExperience";
 import type { InquirySurfaceAdapter, InquirySurfaceResult, InquirySurfaceSnapshot } from "./contracts";
 import styles from "./inquiry.module.css";
-import { StHead, StNotice, StPage, StPill, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaTextLink, XaWorking } from "@/components/ui/strelva/Xa";
+import { XaPlace, XaPlaceTrouble } from "@/experience/places/XaPlace";
 
 export type InquiryServerExperienceProps = Omit<InquiryExperienceProps, "adapter" | "initialSnapshot" | "scenario"> & {
   tenantId: string;
@@ -50,14 +51,14 @@ function ServerInquiryBridge({
     fetch(`${endpoint}?tenantId=${encodeURIComponent(tenantId)}`, { credentials: "include", cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const body: unknown = await response.json().catch(() => null);
-        if (!response.ok) throw new Error(readApiError(body) || "This business could not be loaded.");
+        if (!response.ok) throw new Error(readApiError(body) || "Inquiries didn't load.");
         const next = readSnapshot(body);
-        if (!next) throw new Error("The business inquiry state could not be verified.");
+        if (!next) throw new Error("Inquiries didn't load.");
         if (!controller.signal.aborted) setSnapshot(next);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
-        setError(cause instanceof Error ? cause.message : "This business could not be loaded.");
+        setError(cause instanceof Error ? cause.message : "Inquiries didn't load.");
       });
     return () => controller.abort();
   }, [adapter, endpoint, initialSnapshot, tenantId]);
@@ -118,6 +119,16 @@ function readResult(value: unknown): InquirySurfaceResult | null {
   return readSnapshot(candidate.snapshot) ? result as InquirySurfaceResult : null;
 }
 
-function ServerStatus({ error }: { error: string }) {
-  return <main className={styles.unavailablePage} data-workspace-theme="linen" role={error ? "alert" : "status"}><StPage><StHead title={error ? "This business could not be loaded." : "Loading inquiries…"} meta={error || "Checking the authorized inquiry state."} />{error ? <><StNotice tone="critical">No preview data was substituted.</StNotice><StPill variant="soft" onClick={() => window.location.reload()}>Try again</StPill><StTextButton href="/business">Choose another business</StTextButton></> : null}</StPage></main>;
+/**
+ * Loading and failure for one business, in XA: Pebble is reading it, or
+ * Pebble is in frame with what failed and two ways forward. `businessName`
+ * is known when the route read it; the API error text is never shown to the
+ * owner because it is written for builders.
+ */
+export function ServerStatus({ error, businessName }: { error: string; businessName?: string }) {
+  const whose = businessName ? `${businessName}'s inquiries` : "Your inquiries";
+  return <main className={styles.unavailablePage} data-workspace-theme="linen" id="strelva-main"><XaPlace width="read" label={businessName ?? "Your business"}>
+    {error ? <XaPlaceTrouble title={`${whose} didn't load.`} quiet="Nothing changed. Try again, or open another business." action={<><XaButton variant="primary" onClick={() => window.location.reload()}>Try again</XaButton><XaTextLink href="/business">Choose another business</XaTextLink></>} />
+      : <XaWorking title={businessName ? `Opening ${businessName}…` : "Opening your inquiries…"} steps={[{ id: "read", label: "Reading inquiries and replies", state: "active" }]} />}
+  </XaPlace></main>;
 }

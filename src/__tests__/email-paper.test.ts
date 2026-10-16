@@ -40,10 +40,16 @@ describe("paper email presentation", () => {
   it("matches the email literal palette to the canonical light token boundary", () => {
     const source = readFileSync("src/app/styles/workspace-paper.css", "utf8");
     expect(source).toContain("--st-accent: #2f5236");
-    // The primary is the XA ink pill (one per screen), not moss.
     expect(readFileSync("src/app/styles/workspace-xa.css", "utf8")).toContain("--st-action: #161715");
-    expect(renderPaperEmailHtml(example)).toContain("background:#161715");
+    const html = renderPaperEmailHtml({ ...example, blocks: [{ kind: "actions", actions: [{ label: "Open", url: "https://example.com/open", style: "primary" }] }] });
+    // The one primary is ink, like the product's one ink pill; moss stays for live and confirmation.
+    expect(html).toContain("background:#161715"); expect(html).not.toContain("background:#2f5236");
     expect(renderPaperEmailHtml(example)).toContain("family=DM+Sans");
+  });
+  it("uses DM Sans only and lets the paper fit its content", () => {
+    const source = readFileSync("src/platform/infra/email/paper-tokens.ts", "utf8") + readFileSync("src/platform/infra/email/paper.ts", "utf8");
+    expect(source).not.toMatch(/mono|Geist/i);
+    expect(renderPaperEmailHtml(example)).not.toContain("height:760px");
   });
 });
 describe("raw preview route", () => {

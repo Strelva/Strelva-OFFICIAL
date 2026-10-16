@@ -17,7 +17,7 @@
  */
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { ArrowLeft, BadgeCheck, Building2, CircleHelp, CreditCard, FileText, Inbox, Library, ListChecks, Package, Plug, ScrollText, Search, SquarePen, Sun, UserRound, Users, X, type LucideIcon } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Building2, CircleHelp, CreditCard, FileText, Inbox, Library, ListChecks, MessageSquareText, Package, Plug, ScrollText, Search, SquarePen, Sun, UserRound, Users, X, type LucideIcon } from "lucide-react";
 import { XaAddTile, XaGlideList, XaInitial, XaMark, XaSystemTile } from "@/components/ui/strelva/Xa";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import { SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
@@ -37,7 +37,7 @@ export interface XaAgencyNavigation {
   leadsCurrent?: boolean;
   active?: AgencyPlace;
   onNavigate?: (view: "clients" | "queue" | "library" | "team" | "minutes") => void;
-  hrefs?: Partial<Record<AgencyPlace, string>>;
+  hrefs?: Partial<Record<AgencyPlace | "leads", string>>;
   /** XA: the agency's clients, read through ordinary agency scope. */
   clients?: readonly StrelvaClientLink[];
   /** XA: cross-client items in the Queue, when known. */
@@ -101,8 +101,9 @@ export function XaSidebar(props: XaSidebarProps) {
   const go = (section: NavigableSection) => onNavigate ? () => onNavigate(section) : undefined;
   const scoped = (path: string, id = workspaceId) => `${appBase}${path}${id ? `${path.includes("?") ? "&" : "?"}workspaceId=${encodeURIComponent(id)}` : ""}`;
   const place = placeForSection(active);
-  const agencySales = agencyNavigation?.leadsCurrent ? "leads" : agencyNavigation?.paymentLinksCurrent ? "payments" : undefined;
-  const agencyDetails = Boolean(agencyNavigation) && (Boolean(agencySales) || agencyNavigation?.active === "team" || agencyNavigation?.active === "verification" || Boolean(detailsPlace) || DETAILS_SECTIONS.has(active));
+  // Service requests (route /workspace/leads) is a place in the agency shell; payment links still open in Agency details.
+  const agencySales = agencyNavigation?.paymentLinksCurrent ? "payments" : undefined;
+  const agencyDetails = Boolean(agencyNavigation) && !agencyNavigation?.leadsCurrent && (Boolean(agencySales) || agencyNavigation?.active === "team" || agencyNavigation?.active === "verification" || Boolean(detailsPlace) || DETAILS_SECTIONS.has(active));
   const ownerDetails = !agencyNavigation && (Boolean(detailsPlace) || DETAILS_SECTIONS.has(active));
   const details = agencyDetails || ownerDetails;
   const currentPin = pinned.find(entry => entry.current)?.id;
@@ -146,8 +147,9 @@ export function XaSidebar(props: XaSidebarProps) {
       const Icon = view === "home" ? Sun : view === "queue" ? Inbox : view === "library" ? Library : ScrollText;
       const label = view === "home" ? XA_PLACE_LABELS.today : view === "queue" ? XA_PLACE_LABELS.queue : view === "library" ? XA_PLACE_LABELS.library : XA_PLACE_LABELS.minutes;
       const current = !agencyNavigation.clients?.some(client => client.current) && agencyNavigation.active === view;
-      return <Item key={view} href={agencyHref(view)} icon={Icon} label={label} current={current} count={view === "queue" ? agencyNavigation.queueCount ?? null : null} onOpen={view === "home" ? homeInPlace : agencyGo(view)} onClose={close} />;
+      return <Item key={view} href={agencyHref(view)} icon={Icon} label={label} current={current && !agencyNavigation.leadsCurrent} count={view === "queue" ? agencyNavigation.queueCount ?? null : null} onOpen={view === "home" ? homeInPlace : agencyGo(view)} onClose={close} />;
     })}
+    {agencyNavigation.leadsAvailable && agencyId ? <Item href={agencyNavigation.hrefs?.leads ?? scoped("/workspace/leads", agencyId)} icon={MessageSquareText} label={XA_PLACE_LABELS.leads} current={agencyNavigation.leadsCurrent} onClose={close} /> : null}
   </XaGlideList> : null;
 
   const businessList = <section className={styles.group} aria-label={XA_PLACE_LABELS.yourBusiness}>
@@ -176,7 +178,7 @@ export function XaSidebar(props: XaSidebarProps) {
 
   const clients = agencyNavigation ? <section className={styles.group} aria-label={XA_PLACE_LABELS.clients}>
     <div className={styles.headRow}><h2 className={styles.head}>{XA_PLACE_LABELS.clients}</h2>{allClients ? <Link className={styles.headLink} href={allClients.href} onClick={event => { inPlace(event, allClients.onOpen ? () => { close(); allClients.onOpen?.(); } : undefined); if (!allClients.onOpen) close(); }}>All clients</Link>
-      : <Link className={styles.headLink} href={agencyHref("clients")} aria-current={agencyNavigation.active === "clients" && !agencyNavigation.clients?.some(client => client.current) ? "page" : undefined} onClick={event => { const open = agencyGo("clients"); inPlace(event, open ? () => { close(); open(); } : undefined); if (!open) close(); }}>All clients</Link>}</div>
+      : <Link className={styles.headLink} href={agencyHref("clients")} aria-current={agencyNavigation.active === "clients" && !agencyNavigation.leadsCurrent && !agencyNavigation.clients?.some(client => client.current) ? "page" : undefined} onClick={event => { const open = agencyGo("clients"); inPlace(event, open ? () => { close(); open(); } : undefined); if (!open) close(); }}>All clients</Link>}</div>
     <XaGlideList>
       {(agencyNavigation.clients ?? []).map(client => <Link key={client.id} className={styles.system} href={client.href} aria-current={client.current ? "page" : undefined} aria-label={client.waits ? `${client.name}, needs you` : undefined} onClick={event => { inPlace(event, client.onOpen ? () => { close(); client.onOpen?.(); } : undefined); if (!client.onOpen) close(); }}>
         <XaInitial name={client.name} color={client.color} /><span className={styles.itemLabel}>{client.name}</span>
@@ -201,7 +203,6 @@ export function XaSidebar(props: XaSidebarProps) {
   </XaGlideList> : agencyDetails && agencyNavigation ? <XaGlideList as="nav" label={XA_PLACE_LABELS.agencyDetails} className={styles.group}>
     <Item href={agencyHref("team")} icon={Users} label={XA_PLACE_LABELS.team} current={!agencySales && !openDetails && agencyNavigation.active === "team"} onOpen={agencyGo("team")} onClose={close} />
     <Item href={agencyHref("verification")} icon={BadgeCheck} label={XA_PLACE_LABELS.verification} current={!agencySales && !openDetails && agencyNavigation.active === "verification"} onClose={close} />
-    {agencyNavigation.leadsAvailable && agencyId ? <Item href={scoped("/workspace/leads", agencyId)} icon={Inbox} label={XA_PLACE_LABELS.leads} current={agencySales === "leads"} onClose={close} /> : null}
     {agencyId ? <Item href={scoped("/workspace/payment-links", agencyId)} icon={FileText} label={XA_PLACE_LABELS.paymentLinks} current={agencySales === "payments"} onClose={close} /> : null}
     {connectionsAvailable ? <Item href={href("connections")} icon={Plug} label={XA_PLACE_LABELS.connections} current={!agencySales && openDetails === "connections"} onOpen={go("connections")} onClose={close} /> : null}
     <Item href={href("help")} icon={CircleHelp} label={XA_PLACE_LABELS.help} current={!agencySales && openDetails === "help"} onOpen={go("help")} onClose={close} />

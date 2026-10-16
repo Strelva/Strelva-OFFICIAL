@@ -55,6 +55,9 @@ const KIND_VIEW: Record<string, SystemKind> = {
   newsletter: "newsletter",
   home_finder: "home_finder",
 };
+/** What the workspace draws for a spine descriptor (also used by the place rail outside the workspace view). */
+export function systemKindView(kind: string): SystemKind { return KIND_VIEW[kind] ?? "app"; }
+
 
 function hostname(value: unknown): string | undefined {
   if (typeof value !== "string" || !value.trim()) return undefined;
