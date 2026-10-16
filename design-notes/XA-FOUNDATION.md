@@ -98,6 +98,7 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaCollapse show onGone` | `Xa` | motion "Queue" | Rows on screen at load stay still |
 | `XaRollingCount value` | `Xa` | motion "Queue" count | |
 | `XaGlideList as label` | `Xa` | motion "nav" | Selection slides; the page itself swaps instantly |
+| `XaEntry aside corner footnote mode width`, `XaEntryCaption`, `XaEntryStack` | `Xa` | XA · A1, A2, C1, C2 | Added by lane XA-2. The entry frame outside the workspace: paper task column with the mark, one corner link and a footnote; a felt panel on the right that holds Pebble doing this step's job or a true preview. Without `aside` the task centers. Phone puts the panel under the task. |
 
 | `XaEntry account foot stage brand mode width`, `XaEntrySteps`, `XaEntryDoors` | `Xa` | XA · B1–B5 | Added by lane XA-1. Getting in, before a workspace shell exists. The stage hides below 1100 px. |
 | `XaChecklist label items checked onChange listLabel` | `Xa` | XA · B2/B4 "List" | Added by lane XA-1. Several answers ticked in place; row actions sit outside the label. |

@@ -37,24 +37,25 @@ const button = (name: string) => [...container.querySelectorAll("button")].find(
 afterEach(async () => { await act(async () => root?.unmount()); root = undefined; container?.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("fresh owner link for an earlier client", () => {
-  it("says the claim was not sent and keeps the form closed until asked", async () => {
+  it("leaves earlier clients to the sidebar unless the Queue linked one here", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ clients: [client] })));
     await mount();
-    expect(container.textContent).toContain("Claim not sent: email to owners is off. Link for owner@door.example.test");
-    expect(button("New owner link")).toBeDefined();
-    expect(container.textContent).not.toContain("Create owner link");
-    expect(container.textContent).not.toContain("Replace pending owner link");
+    expect(container.textContent).not.toContain("Door Bakery");
+    expect(button("New owner link")).toBeUndefined();
+    expect(button("Make a new link")).toBeUndefined();
   });
 
   it("opens the form for the client the Queue linked to, and a claimed client gets none", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ clients: [client] })));
     await mount({ initialClientId: business });
-    expect(button("Replace pending owner link")).toBeDefined();
+    expect(container.textContent).toContain("Claim link for owner@door.example.test");
+    expect(button("Make a new link")).toBeDefined();
     await act(async () => root!.unmount()); container.remove();
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ clients: [{ ...client, ownerClaimed: true, pendingClaim: null }] })));
     await mount({ initialClientId: business });
     expect(button("New owner link")).toBeUndefined();
-    expect(container.textContent).toContain("Owner signed in");
+    expect(button("Make a new link")).toBeUndefined();
+    expect(container.textContent).toContain("Door Bakery");
   });
 
   it("creates a link without asking for email, then offers Copy link and says it was not sent", async () => {
@@ -71,12 +72,12 @@ describe("fresh owner link for an earlier client", () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "owner@door.example.test");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    await act(async () => button("Replace pending owner link")!.click());
+    await act(async () => button("Make a new link")!.click());
     const post = request.mock.calls.find(([, init]) => init?.method === "POST")!;
     const sent = JSON.parse(String(post[1]!.body));
     expect(sent).toMatchObject({ action: "owner_link", agencyWorkspaceId: agency, customerWorkspaceId: business });
     expect(sent).not.toHaveProperty("sendEmail");
     expect(button("Copy link")).toBeDefined();
-    expect(container.textContent).toContain("Claim not sent: email to owners is off.");
+    expect(container.textContent).toContain("Strelva doesn’t email owners yet. Copy the link and send it to owner@door.example.test yourself.");
   });
 });

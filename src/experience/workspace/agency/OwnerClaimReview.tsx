@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { StCopy, StHead, StInput, StLabel, StMono, StNotice, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { XaButton, XaField, XaHeadline, XaLabel, XaSegmented, XaStatus, XaTextLink } from "@/components/ui/strelva/Xa";
+import styles from "./agency-door.module.css";
 import { AGENCY_LEVEL_HELP, AGENCY_SCOPE_LABELS } from "@/platform/agency-directory/contract";
 import {
   CLAIM_AREAS, FOUND_FACT_LABELS, FOUND_FACT_SOURCE_LABELS,
@@ -46,7 +46,7 @@ function editable(fact: FoundFact): boolean {
 
 /** Where a found fact came from: the page and its words, or the source in plain words. */
 function FoundSource({ fact }: { fact: FoundFact }) {
-  if (fact.sourceUrl && fact.quote) return <>From <StTextButton href={fact.sourceUrl} target="_blank" rel="noreferrer noopener">{sourceHost(fact.sourceUrl)}</StTextButton>: “{fact.quote}”</>;
+  if (fact.sourceUrl && fact.quote) return <>From <a className={styles.sourceLink} href={fact.sourceUrl} target="_blank" rel="noreferrer noopener">{sourceHost(fact.sourceUrl)}</a>: “{fact.quote}”</>;
   return <>{FOUND_FACT_SOURCE_LABELS[fact.sourceKind]}</>;
 }
 
@@ -96,6 +96,7 @@ export function claimReviewInput(review: ClaimReview, choices: ClaimReviewChoice
   return { facts, areas: choices.areas };
 }
 
+/** XA: the claim review. Each found fact is one open row with its choice in place; each area is one row. */
 export function ClaimReviewForm({ review, choices, onChange, submitting, onAccept }: {
   review: ClaimReview; choices: ClaimReviewChoices; onChange: (next: ClaimReviewChoices) => void; submitting: boolean; onAccept: () => void;
 }) {
@@ -104,11 +105,13 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
   const setFact = (id: string, choice: FactChoice) => onChange({ ...choices, facts: { ...choices.facts, [id]: choice } });
   const levels = new Set(Object.values(choices.areas));
   return <>
-    <StHead title={`Take ownership of ${review.workspaceName}`} meta={`Set up by ${review.agencyName}`} />
-    <StCopy>Check what {review.agencyName} found and prepared, choose what they may do, then claim your business. Nothing they prepared is live yet.</StCopy>
+    <XaHeadline quiet={`Set up by ${review.agencyName}. Nothing they prepared is live yet.`}>Take ownership of {review.workspaceName}.</XaHeadline>
+    <p className={styles.sentence}>Check what {review.agencyName} found and prepared, choose what they may do, then claim your business.</p>
 
-    <StSection title={review.found.some((fact) => fact.sourceKind !== "website_crawl") ? "We found these about your business" : "We found these on your website"} meta={review.found.length ? "Confirm, change or remove each one. Anything you leave for later stays out of your business details." : undefined}>
-      {review.found.length ? <StRows label="Found about your business">{review.found.map((fact) => {
+    <section className={styles.reviewSection} aria-labelledby="claim-found">
+      <XaLabel as="h2" id="claim-found">{review.found.some((fact) => fact.sourceKind !== "website_crawl") ? "We found these about your business" : "We found these on your website"}</XaLabel>
+      {review.found.length ? <p className={styles.objectNote}>Confirm, change or remove each one. Anything you leave for later stays out of your business details.</p> : null}
+      {review.found.length ? <ul className={styles.reviewRows} aria-label="Found about your business">{review.found.map((fact) => {
         const label = fact.entity === "fact" ? FOUND_FACT_LABELS[fact.key ?? "description"] : FOUND_FACT_LABELS[fact.entity];
         const choice = choices.facts[fact.id] ?? "confirm";
         const options = [
@@ -117,59 +120,60 @@ export function ClaimReviewForm({ review, choices, onChange, submitting, onAccep
           { value: "remove" as const, label: "Remove" },
           { value: "later" as const, label: "Later" },
         ];
-        return <StRow key={fact.id} kind={label} title={foundValueText(fact)}
-          detail={<FoundSource fact={fact} />}
-          end={<StSegmented label={`${label}: ${foundValueText(fact)}`} value={choice} options={options} onChange={(value) => setFact(fact.id, value)} />}>
-          {choice === "change" ? <StInput label={`Correct ${label.toLowerCase()}`} value={choices.drafts[fact.id] ?? ""} maxLength={fact.key === "description" ? 2000 : 200}
-            onChange={(event) => onChange({ ...choices, drafts: { ...choices.drafts, [fact.id]: event.target.value } })} /> : null}
-        </StRow>;
-      })}</StRows> : <StCopy muted>We didn’t find details on your website. You can add them after you claim.</StCopy>}
-      {hasHours ? <StInput label="Time zone for your hours" hint="From this device. Change it if your business is somewhere else." value={choices.timeZone} maxLength={64}
+        return <li key={fact.id} className={styles.reviewRow}>
+          <div className={styles.reviewFact}>
+            <span className={styles.reviewKind}>{label}</span>
+            <span className={styles.reviewValue}>{foundValueText(fact)}</span>
+            <span className={styles.reviewSource}><FoundSource fact={fact} /></span>
+          </div>
+          <XaSegmented label={`${label}: ${foundValueText(fact)}`} value={choice} options={options} onChange={(value) => setFact(fact.id, value)} />
+          {choice === "change" ? <div className={styles.reviewChange}><XaField label={`Correct ${label.toLowerCase()}`} value={choices.drafts[fact.id] ?? ""} maxLength={fact.key === "description" ? 2000 : 200}
+            onChange={(event) => onChange({ ...choices, drafts: { ...choices.drafts, [fact.id]: event.target.value } })} /></div> : null}
+        </li>;
+      })}</ul> : <p className={styles.sentence}>We didn’t find details on your website. You can add them after you claim.</p>}
+      {hasHours ? <XaField label="Time zone for your hours" hint="From this device. Change it if your business is somewhere else." value={choices.timeZone} maxLength={64}
         onChange={(event) => onChange({ ...choices, timeZone: event.target.value })} /> : null}
-    </StSection>
+    </section>
 
-    <StSection title={`What ${review.agencyName} prepared`}>
-      {review.prepared.length ? <StRows label="Prepared drafts">{review.prepared.map((system) => <StRow key={system.id} title={system.name}
-        end={<StState kind="draft">Draft</StState>} />)}</StRows> : <StCopy muted>Nothing yet. Drafts they make wait for your approval.</StCopy>}
-    </StSection>
+    <section className={styles.reviewSection} aria-labelledby="claim-prepared">
+      <XaLabel as="h2" id="claim-prepared">What {review.agencyName} prepared</XaLabel>
+      {review.prepared.length ? <ul className={styles.reviewRows} aria-label="Prepared drafts">{review.prepared.map((system) => <li key={system.id} className={styles.reviewLine}>
+        <span>{system.name}</span><XaStatus kind="draft" size="sm">Draft</XaStatus></li>)}</ul>
+        : <p className={styles.sentence}>Nothing yet. Drafts they make wait for your approval.</p>}
+    </section>
 
-    <StSection title={`What ${review.agencyName} may do`} meta="You can change this or end their access anytime.">
-      <div className="grid gap-3">{CLAIM_AREAS.map((area) => <div key={area} className="flex flex-wrap items-center justify-between gap-3">
-        <StLabel>{AGENCY_SCOPE_LABELS[area]}</StLabel>
-        <StSegmented label={`${AGENCY_SCOPE_LABELS[area]} for ${review.agencyName}`} value={choices.areas[area]} options={AREA_OPTIONS}
-          disabledValues={taken.has(area) ? ["full_control"] : []} disabledReason="Another agency already has full control here."
+    <section className={styles.reviewSection} aria-labelledby="claim-areas">
+      <XaLabel as="h2" id="claim-areas">What {review.agencyName} may do</XaLabel>
+      <p className={styles.objectNote}>You can change this or end their access anytime.</p>
+      <ul className={styles.reviewRows}>{CLAIM_AREAS.map((area) => <li key={area} className={styles.reviewLine}>
+        <span>{AGENCY_SCOPE_LABELS[area]}{taken.has(area) ? <small className={styles.reviewSource}>Another agency already has full control here.</small> : null}</span>
+        <XaSegmented label={`${AGENCY_SCOPE_LABELS[area]} for ${review.agencyName}`} value={choices.areas[area]}
+          options={AREA_OPTIONS.map(option => ({ ...option, disabled: option.value === "full_control" && taken.has(area) }))}
           onChange={(value) => onChange({ ...choices, areas: { ...choices.areas, [area]: value } })} />
-      </div>)}</div>
-      <div className="mt-4 grid gap-2 text-sm text-gray-muted">
-        {levels.has("prepare") ? <p><strong className="text-warm-black">Prepare:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
-        {levels.has("full_control") ? <p><strong className="text-warm-black">Full control:</strong> {AGENCY_LEVEL_HELP.full_control} It starts when {review.agencyName} accepts it. Until then, nothing changes in that area.</p> : null}
-        <p>Payment, adding and ending agencies, your data and leaving Strelva always stay with you.</p>
+      </li>)}</ul>
+      <div className={styles.sentenceBlock}>
+        {levels.has("prepare") ? <p className={styles.sentence}><strong className={styles.strong}>Prepare:</strong> {AGENCY_LEVEL_HELP.prepare}</p> : null}
+        {levels.has("full_control") ? <p className={styles.sentence}><strong className={styles.strong}>Full control:</strong> {AGENCY_LEVEL_HELP.full_control} It starts when {review.agencyName} accepts it. Until then, nothing changes in that area.</p> : null}
+        <p className={styles.sentence}>Payment, adding and ending agencies, your data and leaving Strelva always stay with you.</p>
       </div>
-    </StSection>
+    </section>
 
-    <StPill block busy={submitting} onClick={onAccept}>{submitting ? "Claiming…" : "Claim my business"}</StPill>
+    <XaButton variant="primary" size="lg" block busy={submitting} onClick={onAccept}>{submitting ? "Claiming…" : "Claim my business"}</XaButton>
   </>;
 }
 
-/** After the claim: optional, skippable connections, then the business. */
-export function ClaimNextSteps({ workspaceId, workspaceName, returnTo, alreadyAccepted, navigate = (url: string) => window.location.assign(url) }: {
+/**
+ * After the claim: two optional connections as one line of text links, so the
+ * way into the business stays the owner page's one action. Not choosing one is
+ * skipping it; nothing is recorded either way.
+ */
+export function ClaimNextSteps({ workspaceId, returnTo, navigate = (url: string) => window.location.assign(url) }: {
   workspaceId: string; workspaceName: string; returnTo: string; alreadyAccepted?: boolean; navigate?: (url: string) => void;
 }) {
-  const [skipped, setSkipped] = useState<{ google: boolean; calendar: boolean }>({ google: false, calendar: false });
   const id = encodeURIComponent(workspaceId);
   const google = `/workspace/google?workspaceId=${id}&returnTo=${encodeURIComponent(returnTo)}`;
   const calendar = `/api/workspace/calendar-connections/oauth/google?workspaceId=${id}`;
-  return <>
-    <StHead title={`${workspaceName} is yours`} />
-    <StState kind="live">You’re the owner</StState>
-    <StCopy>{alreadyAccepted ? "You already claimed it with this link." : "Your choices are saved."} Two optional steps help your agency do more. Each takes a minute, and you can skip them.</StCopy>
-    <StRows label="Optional next steps">
-      <StRow kind="Optional" title="Connect Google" detail="Lets your agency work on your Google listing the way you chose. Connecting posts nothing."
-        end={skipped.google ? <StMono>Skipped</StMono> : <span className="flex flex-wrap gap-3"><StPill variant="soft" onClick={() => navigate(google)}>Connect Google</StPill><StTextButton onClick={() => setSkipped((s) => ({ ...s, google: true }))}>Skip</StTextButton></span>} />
-      <StRow kind="Optional" title="Connect your calendar" detail="Shows when you’re busy so bookings don’t clash. No booking is sent."
-        end={skipped.calendar ? <StMono>Skipped</StMono> : <span className="flex flex-wrap gap-3"><StPill variant="soft" onClick={() => navigate(calendar)}>Connect calendar</StPill><StTextButton onClick={() => setSkipped((s) => ({ ...s, calendar: true }))}>Skip</StTextButton></span>} />
-    </StRows>
-    <StPillLink href={`/workspace?workspaceId=${id}`}>Open your business</StPillLink>
-    <StNotice>You can change what your agency may do, or end their access, anytime from your business.</StNotice>
-  </>;
+  return <p className={styles.sentence} aria-label="Optional next steps">
+    Later, if you like: <XaTextLink onClick={() => navigate(google)}>connect Google</XaTextLink> · <XaTextLink onClick={() => navigate(calendar)}>connect your calendar</XaTextLink>. Connecting posts nothing and sends no booking.
+  </p>;
 }

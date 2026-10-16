@@ -8,8 +8,11 @@
  * caption that says what happens next. Below 1024 px the stage steps aside:
  * the column is the screen, and Pebble speaks where Strelva speaks.
  *
- * Added by lane XA-1 (business door). The kit lacked an entry frame; agency
- * entry (XA-2) can use the same parts.
+ * Added by lane XA-1 (business door) and shared with the agency door (XA-2):
+ * one frame for both. A page either passes `stage` (Pebble with a caption,
+ * which steps aside below 1100 px) or `aside` (a free felt panel, such as a
+ * true preview of what someone else will see, which stacks under the task on
+ * phones unless asideOnPhone="hidden").
  */
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
@@ -36,7 +39,7 @@ export interface XaEntryStage {
 }
 
 /** The entry frame. `account` sits top right (Sign in, or the signed-in person). */
-export function XaEntry({ children, account, foot, stage, mode, width = "form", homeHref = "/", brand }: {
+export function XaEntry({ children, account, corner, foot, footnote, stage, aside, asideOnPhone = "below", mode, width = "form", homeHref = "/", brand, label = "Strelva" }: {
   children: ReactNode;
   /**
    * The agency whose door this is (an invitation or a claim). Owners see their
@@ -44,17 +47,30 @@ export function XaEntry({ children, account, foot, stage, mode, width = "form", 
    */
   brand?: { name: string; logoUrl?: string | null };
   account?: ReactNode;
+  /** Same as `account`. */
+  corner?: ReactNode;
   foot?: ReactNode;
+  /** Same as `foot`. */
+  footnote?: ReactNode;
   stage?: XaEntryStage;
+  /** A free felt panel in place of `stage`: what this step leads to. */
+  aside?: ReactNode;
+  /** "below" (default) stacks the free panel under the task on phones; "hidden" drops it there. */
+  asideOnPhone?: "below" | "hidden";
   mode?: "light" | "dark";
+  /** "wide" for a review the person reads line by line; "form" otherwise. */
   width?: "form" | "wide";
   homeHref?: string;
+  label?: string;
 }) {
-  return <main className={styles.entry} data-workspace-theme="linen" data-workspace-mode={mode} data-staged={stage ? true : undefined}>
+  account ??= corner;
+  foot ??= footnote;
+  const panel = stage ? "stage" : aside ? "free" : undefined;
+  return <main className={styles.entry} data-workspace-theme="linen" data-workspace-mode={mode} data-staged={panel ? true : undefined}>
     <div className={styles.left}>
       <header className={styles.top}>
         {brand ? <span className={styles.brand}>{brand.logoUrl ? <img src={brand.logoUrl} alt="" width={24} height={24} /> : null}{brand.name}</span>
-          : <Link href={homeHref} className={styles.home} aria-label="Strelva home"><StrelvaLockup className={styles.lockup} /></Link>}
+          : <Link href={homeHref} className={styles.home} aria-label={`${label} home`}><StrelvaLockup className={styles.lockup} /></Link>}
         {account ? <div className={styles.account}>{account}</div> : null}
       </header>
       <div className={styles.column} data-width={width}>
@@ -70,7 +86,7 @@ export function XaEntry({ children, account, foot, stage, mode, width = "form", 
         {stage.title ? <p className={styles.captionTitle}>{stage.title}</p> : null}
         {stage.body ? <p className={styles.captionBody}>{stage.body}</p> : null}
       </div> : null}
-    </aside> : null}
+    </aside> : aside ? <aside className={styles.stage} data-free="true" data-phone={asideOnPhone}>{aside}</aside> : null}
   </main>;
 }
 
@@ -92,4 +108,14 @@ export function XaEntryDoors({ label, options }: { label: string; options: reado
   return <nav className={styles.doors} aria-label={label}>
     {options.map(option => <Link key={option.href} href={option.href} className={styles.door} aria-current={option.current ? "page" : undefined}>{option.label}</Link>)}
   </nav>;
+}
+
+/** A caption under the felt panel's art: one line that names what is true, one quieter line under it. */
+export function XaEntryCaption({ title, children }: { title: ReactNode; children?: ReactNode }) {
+  return <div className={styles.caption}><p className={styles.captionTitle}>{title}</p>{children ? <p className={styles.captionBody}>{children}</p> : null}</div>;
+}
+
+/** The stack inside the entry column: headline, facts, actions, with the board's rhythm. */
+export function XaEntryStack({ children, gap = "md" }: { children: ReactNode; gap?: "sm" | "md" }) {
+  return <div className={styles.stack} data-gap={gap}>{children}</div>;
 }

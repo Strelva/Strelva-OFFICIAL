@@ -73,7 +73,7 @@ export function AgencyClientList({ clients, total, agencyName, hasMore, loadingM
 }
 
 /** Whether this client's owner can be reached, and the one next step. Renders nothing without owner reach data. */
-function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRow; agencyWorkspaceId?: string }) {
+export function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRow; agencyWorkspaceId?: string }) {
   const reach = client.ownerReach;
   if (!reach) return null;
   if (reach.reachable) return <small className="block text-xs text-gray-muted">{reach.reason}</small>;
@@ -90,7 +90,7 @@ function OwnerReachLines({ client, agencyWorkspaceId }: { client: AgencyClientRo
   </span>;
 }
 
-function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, viewerEmail, canManage, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch }) {
+export function ClientAdditionalControls({ workspaceId, clientName, agencyWorkspaceId, viewerEmail, canManage, request }: { workspaceId: string; clientName: string; agencyWorkspaceId?: string; viewerEmail?: string; canManage?: boolean; request?: typeof fetch }) {
   const [open, setOpen] = useState(false);
   return <details onToggle={event => setOpen(event.currentTarget.open)}><summary className="min-h-11 cursor-pointer py-2 text-xs font-normal text-gray-muted focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility and availability</summary>{open ? <><ClientResponsibilityProof workspaceId={workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientUsage agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <ListingsSyncSummary workspaceId={workspaceId} clientName={clientName} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientTime agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} viewerEmail={viewerEmail} canManage={canManage} request={request} /> : null}{agencyWorkspaceId ? <AgencyClientEvents agencyWorkspaceId={agencyWorkspaceId} workspaceId={workspaceId} clientName={clientName} request={request} /> : null}</> : null}</details>;
 }

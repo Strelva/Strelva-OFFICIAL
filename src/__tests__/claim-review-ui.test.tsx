@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OwnerClaimAcceptance } from "@/experience/workspace/agency/OwnerClaimAcceptance";
+import { ClaimOwned, OwnerClaimAcceptance } from "@/experience/workspace/agency/OwnerClaimAcceptance";
 import { ClaimNextSteps, claimReviewInput, initialClaimReviewChoices } from "@/experience/workspace/agency/OwnerClaimReview";
 import type { ClaimReview } from "@/products/agency-clients/contracts";
 
@@ -72,7 +72,7 @@ describe("owner claim review", () => {
     expect(body.facts.find((item: { id: string }) => item.id.endsWith("f2")).value.timezone).toEqual(expect.any(String));
     expect(body.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f3", decision: "later" });
     expect(container.textContent).toContain("Fictional Bakery is yours");
-    expect(container.textContent).toContain("Connect Google");
+    expect(container.textContent).toContain("connect Google");
   });
 
   it("change sends the corrected value; later is sent as later and stays waiting", () => {
@@ -86,16 +86,24 @@ describe("owner claim review", () => {
     expect(input.facts).toContainEqual({ id: "00000000-0000-4000-8000-0000000000f4", decision: "later" });
   });
 
-  it("next steps link to the existing Google and calendar connections, and each can be skipped", async () => {
+  it("next steps are one line of links to the existing Google and calendar connections", async () => {
     const navigate = vi.fn();
     await act(async () => root.render(createElement(ClaimNextSteps, { workspaceId: WS, workspaceName: "Fictional Bakery", returnTo: "/workspace/claim/t", navigate })));
-    await click("Connect Google");
+    await click("connect Google");
     expect(navigate).toHaveBeenCalledWith(`/workspace/google?workspaceId=${WS}&returnTo=%2Fworkspace%2Fclaim%2Ft`);
-    await click("Connect calendar");
+    await click("connect your calendar");
     expect(navigate).toHaveBeenCalledWith(`/api/workspace/calendar-connections/oauth/google?workspaceId=${WS}`);
-    const skips = Array.from(container.querySelectorAll("button")).filter(b => b.textContent === "Skip");
-    for (const skip of skips) await act(async () => skip.click());
-    expect(container.textContent?.match(/Skipped/g)).toHaveLength(2);
-    expect(container.querySelector(`a[href="/workspace?workspaceId=${WS}"]`)?.textContent).toBe("Open your business");
+    // Links, not buttons that look like actions: the owner page keeps one primary.
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(0);
+    // The way into the business is the owner page's one primary (ClaimOwned), not a second pill here.
+    expect(container.querySelector(`a[href="/workspace?workspaceId=${WS}"]`)).toBeNull();
+  });
+
+  it("the owned page has one way in, and names the agency's changes as coming to the owner first", async () => {
+    await act(async () => root.render(createElement(ClaimOwned, { workspaceId: WS, workspaceName: "Fictional Bakery", agencyName: "Fictional Studio", lead: "3 wait for you to confirm.", waiting: 3 })));
+    expect(container.querySelector(`a[href="/workspace?workspaceId=${WS}"]`)?.textContent).toBe("Open Fictional Bakery");
+    expect(container.textContent).toContain("Confirm 3 details read from your site");
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
+    expect(container.textContent).toContain("Fictional Studio’s changes come to you first.");
   });
 });

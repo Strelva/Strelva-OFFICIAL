@@ -17,6 +17,15 @@ export const SITES_ROOT_DOMAIN = configuredRootDomain(process.env.NEXT_PUBLIC_SI
 export const MARKETING_URL = `https://www.${APP_ROOT_DOMAIN}`;
 export const CONTROL_PLANE_URL = `https://app.${APP_ROOT_DOMAIN}`;
 export const OPERATOR_URL = `https://admin.${APP_ROOT_DOMAIN}`;
+/**
+ * The public origin people open: NEXT_PUBLIC_APP_URL when it is set and valid,
+ * else the control plane. Links handed to someone else (an owner's claim link)
+ * use this, never the origin of the page that made them.
+ */
+export function publicAppOrigin(value: string | undefined = process.env.NEXT_PUBLIC_APP_URL): string {
+  try { if (value?.trim()) return new URL(value.trim()).origin; } catch { /* fall through */ }
+  return CONTROL_PLANE_URL;
+}
 // Sending infrastructure is a separate decision; a sites cutover never moves it.
 export const EMAIL_DOMAIN = "updates.strelva.com";
 

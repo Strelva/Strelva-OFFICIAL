@@ -65,6 +65,15 @@ async function render(request: typeof fetch, systems = true, onWorkspace = vi.fn
   await settle();
   return { node, onWorkspace };
 }
+/** A6 keeps per-client detail in one place under the table: pick the client to look closer at. */
+async function lookCloser(node: HTMLElement, name: string) {
+  const select = node.querySelector<HTMLSelectElement>('section[aria-label="Look closer at one client"] select')!;
+  const option = [...select.options].find(item => item.textContent === name)!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, option.value);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
 async function settle() { await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); }); }
 const clientCalls = (request: ReturnType<typeof vi.fn>) => request.mock.calls.filter(([input]) => String(input).startsWith("/api/workspace/agency-clients"));
 const button = (node: HTMLElement, name: string | RegExp) => [...node.querySelectorAll("button")].find((item) => typeof name === "string" ? item.textContent?.trim() === name || item.getAttribute("aria-label") === name : name.test(item.textContent || ""))!;
@@ -102,6 +111,8 @@ describe("agency home on the batched read", () => {
         title: "Owner email bounced: new booking flow", systemId: uuid("51000000", 1), workId: null, since: "2026-10-07T12:00:00.000Z" }],
     })) });
     const { node } = await render(request);
+    expect(node.textContent).toContain("You · Client website not working");
+    await lookCloser(node, "Client 1");
     expect(node.textContent).toContain("Client website · Live · Not working");
     await act(async () => button(node, "Queue").click());
     expect(node.textContent).toContain("Owner email bounced: new booking flow");
@@ -135,6 +146,7 @@ describe("agency home on the batched read", () => {
     const { node, onWorkspace } = await render(request);
     expect(node.textContent).toContain("McClear’s could not be loaded.");
     expect(node.textContent).toContain("Twin Trees");
+    await lookCloser(node, "Twin Trees");
     expect(node.textContent).toContain("Operated by Strelva");
     expect(node.textContent).toContain("Client 3");
     await act(async () => { button(node, "Retry loading McClear’s").click(); });
@@ -243,6 +255,8 @@ describe("agency home on the batched read", () => {
 it("opens agent bookings for the selected client without nesting a link in the client button", async () => {
   const request = router({ clients: () => Response.json(page([row(1, { agentBookings: true }), row(2)])) });
   const { node } = await render(request);
+  expect(node.querySelectorAll('a[href*="/workspace/bookings"]')).toHaveLength(0);
+  await lookCloser(node, "Client 1");
   const links = [...node.querySelectorAll<HTMLAnchorElement>('a[href*="/workspace/bookings"]')];
   expect(links).toHaveLength(1);
   expect(links[0]?.getAttribute("href")).toBe(`/workspace/bookings?workspaceId=${row(1).workspaceId}&view=week&source=agent`);

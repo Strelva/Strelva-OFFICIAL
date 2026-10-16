@@ -35,7 +35,7 @@ describe("lead conversion recovery in the ordinary add-client flow", () => {
     vi.stubGlobal("fetch", request); await mount();
     expect(container.querySelector<HTMLInputElement>('input[type="url"]')?.required).toBe(false);
     expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe(lead.email);
-    await click("Add client");
+    await click("Add Northside Bakery");
     const body = JSON.parse(String(request.mock.calls.find(([, init]) => init?.method === "POST")?.[1]?.body));
     expect(body).toMatchObject({ name: lead.businessName, ownerEmail: lead.email, leadToken: lead.token });
     expect(body).not.toHaveProperty("url");
@@ -50,29 +50,29 @@ describe("lead conversion recovery in the ordinary add-client flow", () => {
       bodies.push(String(init.body)); if (bodies.length === 1) throw new TypeError("Lost response");
       return Response.json({ ...receipt, client: { ...receipt.client, replayed: true } });
     });
-    vi.stubGlobal("fetch", request); await mount(); await click("Add client");
+    vi.stubGlobal("fetch", request); await mount(); await click("Add Northside Bakery");
     expect(container.textContent).toContain("Outcome not confirmed");
     expect(container.querySelector("fieldset")?.disabled).toBe(true);
     await click("Confirm client addition");
     expect(bodies).toHaveLength(2); expect(bodies[0]).toBe(bodies[1]);
-    expect(container.textContent).toContain("this client was already added");
+    expect(container.textContent).toContain("This client was already added. Nothing was added twice.");
     expect(container.textContent).toContain("Lead converted");
   });
 
   it("keeps fields editable after a deterministic first-attempt URL refusal made before the lead lock", async () => {
     vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => init?.method === "POST"
       ? Response.json({ error: "Enter a public website address.", code: "agency_client_invalid" }, { status: 400 }) : Response.json({ clients: [] })));
-    await mount({ initialLead: { ...lead, currentWebsite: "https://bakery.example:8080" } }); await click("Add client");
+    await mount({ initialLead: { ...lead, currentWebsite: "https://bakery.example:8080" } }); await click("Add Northside Bakery");
     expect(container.textContent).toContain("Enter a public website address.");
     expect(container.querySelector("fieldset")?.disabled).toBe(false);
-    expect(button("Add client")).toBeDefined(); expect(button("Confirm client addition")).toBeUndefined();
+    expect(button("Add Northside Bakery")).toBeDefined(); expect(button("Confirm client addition")).toBeUndefined();
   });
 
   it.each(["malformed", "foreign", "missing_conversion"])("does not claim success from an unconfirmed response (%s)", async state => {
     const response = state === "malformed" ? { client: {} } : state === "foreign"
       ? { ...receipt, client: { ...receipt.client, agencyWorkspaceId: business } } : { ...receipt, leadConversion: undefined };
     vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init?: RequestInit) => init?.method === "POST" ? Response.json(response) : Response.json({ clients: [] })));
-    await mount(); await click("Add client");
+    await mount(); await click("Add Northside Bakery");
     expect(container.textContent).toContain("Outcome not confirmed");
     expect(container.textContent).not.toContain("Client added");
     expect(button("Confirm client addition")).toBeDefined();
@@ -85,7 +85,7 @@ describe("lead conversion recovery in the ordinary add-client flow", () => {
       bodies.push(String(init.body));
       return Response.json(bodies.length === 1 ? { ...receipt, leadConversion: { status: "unconfirmed", message: "Client retained; lead write unconfirmed." } } : receipt);
     }));
-    await mount(); await click("Add client");
+    await mount(); await click("Add Northside Bakery");
     expect(container.textContent).toContain("Client added"); expect(container.textContent).toContain("Client retained; lead write unconfirmed.");
     expect(button("Add another client")).toBeUndefined(); await click("Confirm lead conversion");
     expect(bodies[0]).toBe(bodies[1]); expect(container.textContent).toContain("Lead converted");

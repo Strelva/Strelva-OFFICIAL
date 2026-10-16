@@ -4,8 +4,16 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceMakeSystemsError } from "./types";
 export const workspaceJson = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
 export async function workspaceHttpActor() {
+  return (await workspaceHttpViewer())?.actor ?? null;
+}
+/** The actor plus the first word of their auth display name, for greetings only. Never an authority. */
+export async function workspaceHttpViewer() {
   const user = await getSessionUser();
-  return user?.email && user.email_confirmed_at ? { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() } : null;
+  if (!user?.email || !user.email_confirmed_at) return null;
+  const meta = (user as { user_metadata?: { full_name?: unknown; name?: unknown } | null }).user_metadata;
+  const full = [meta?.full_name, meta?.name].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  const firstName = full ? full.trim().split(/\s+/)[0]!.slice(0, 40) : null;
+  return { actor: { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, firstName };
 }
 export function workspaceWriteGuard(request: Request) {
   if (request.headers.get("origin") !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") return workspaceJson({ error: "Open Strelva directly to change this work." }, 403);

@@ -21,7 +21,8 @@ const result: AddAgencyClientResult = {
 };
 let root: Root | undefined;
 let container: HTMLDivElement;
-async function mount(element: ReactNode = createElement(AgencyAddClient, { agencyWorkspaceId: agency, prospecting: false, initialProspectId: null })) {
+// The list of earlier clients shows only when the Queue links here for one client's fresh owner link.
+async function mount(element: ReactNode = createElement(AgencyAddClient, { agencyWorkspaceId: agency, prospecting: false, initialProspectId: null, initialClientId: business })) {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root!.render(element));
@@ -47,10 +48,10 @@ describe("add-client recovery", () => {
       .mockResolvedValueOnce(Response.json({ clients: [] }));
     vi.stubGlobal("fetch", request); await mount();
     expect(container.textContent).toContain("Clients unavailable");
-    expect(container.textContent).not.toContain("No clients added yet");
+    expect(container.textContent).not.toContain("This client isn’t on your agency’s list");
     expect(button("Refresh")).toBeDefined();
     await click("Refresh");
-    expect(container.textContent).toContain("No clients added yet");
+    expect(container.textContent).toContain("This client isn’t on your agency’s list");
     expect(container.textContent).not.toContain("Clients unavailable");
     expect(button("Refresh")).toBeDefined();
   });
@@ -60,7 +61,7 @@ describe("add-client recovery", () => {
       .mockResolvedValueOnce(Response.json({ error: "Clients unavailable" }, { status: 503 })));
     await mount(); await click("Refresh");
     expect(container.textContent).toContain("Northside Bakery");
-    expect(container.textContent).toContain("Link for owner@example.com");
+    expect(container.textContent).toContain("Claim link for owner@example.com");
     expect(container.textContent).toContain("Last successful read");
     expect(container.textContent).toContain("Clients unavailable");
   });
@@ -71,7 +72,7 @@ describe("add-client recovery", () => {
     await mount();
     expect(container.textContent).toContain("Loading your agency’s clients");
     expect(button("Refresh").disabled).toBe(true);
-    expect(container.textContent).not.toContain("No clients added yet");
+    expect(container.textContent).not.toContain("This client isn’t on your agency’s list");
     await act(async () => resolve(Response.json({ clients: [] })));
     expect(button("Refresh").disabled).toBe(false);
   });
@@ -80,7 +81,7 @@ describe("add-client recovery", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
     await mount();
     expect(container.textContent).toContain("Your client list could not be confirmed");
-    expect(container.textContent).not.toContain("No clients added yet");
+    expect(container.textContent).not.toContain("This client isn’t on your agency’s list");
     expect(button("Refresh")).toBeDefined();
   });
 
@@ -92,19 +93,19 @@ describe("add-client recovery", () => {
       if (init?.method === "POST") { postCount++; saved = { ...client, pendingClaim: pending }; throw new TypeError("Lost response"); }
       return readable ? Response.json({ clients: [saved] }) : Response.json({ error: "Claims unavailable" }, { status: 503 });
     });
-    vi.stubGlobal("fetch", request); await mountClaim(); await click("Create owner link");
+    vi.stubGlobal("fetch", request); await mountClaim(); await click("Make owner link");
     expect(postCount).toBe(1);
     expect(container.textContent).toContain("Outcome not confirmed");
-    expect(button("Create owner link").disabled).toBe(true);
-    readable = false; await click("Refresh owner claim");
-    expect(button("Create owner link").disabled).toBe(true);
+    expect(button("Make owner link").disabled).toBe(true);
+    readable = false; await click("Check the owner claim again");
+    expect(button("Make owner link").disabled).toBe(true);
     expect(container.textContent).toContain("Claims unavailable");
-    readable = true; await click("Refresh owner claim");
+    readable = true; await click("Check the owner claim again");
     expect(postCount).toBe(1);
     expect(container.textContent).toContain("owner@example.com");
-    expect(button("Replace pending owner link").disabled).toBe(false);
+    expect(button("Make a new link").disabled).toBe(false);
     expect(container.querySelector<HTMLInputElement>('input[type="email"]')?.value).toBe("owner@example.com");
-    await click("Replace pending owner link");
+    await click("Make a new link");
     expect(postCount).toBe(2);
     expect(request.mock.calls.filter(([, init]) => init?.method !== "POST").length).toBe(4);
   });
@@ -115,9 +116,9 @@ describe("add-client recovery", () => {
       if (init?.method === "POST") { saved = { ...client, ownerClaimed: true }; throw new TypeError("Lost response"); }
       return Response.json({ clients: [saved] });
     });
-    vi.stubGlobal("fetch", request); await mountClaim(); await click("Create owner link"); await click("Refresh owner claim");
+    vi.stubGlobal("fetch", request); await mountClaim(); await click("Make owner link"); await click("Check the owner claim again");
     expect(container.textContent).toContain("The owner has accepted their claim");
-    expect(button("Create owner link")).toBeUndefined();
+    expect(button("Make owner link")).toBeUndefined();
     expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
@@ -129,10 +130,10 @@ describe("add-client recovery", () => {
         replacedPending: false, claimPath: "/workspace/claim/private-token",
       } });
     });
-    vi.stubGlobal("fetch", request); await mountClaim(); await click("Create owner link");
+    vi.stubGlobal("fetch", request); await mountClaim(); await click("Make owner link");
     expect(container.textContent).toContain("Outcome not confirmed");
-    expect(button("Create owner link").disabled).toBe(true);
-    expect(button("Refresh owner claim")).toBeDefined();
+    expect(button("Make owner link").disabled).toBe(true);
+    expect(button("Check the owner claim again")).toBeDefined();
   });
 
   it("delivers a confirmed current claim once, after its scoped read", async () => {
@@ -142,7 +143,7 @@ describe("add-client recovery", () => {
     const request = vi.fn(async (_input: unknown, init?: RequestInit) => init?.method === "POST" ? Response.json({ ownerClaim }) : Response.json({ clients: [client] }));
     vi.stubGlobal("fetch", request);
     await mount(createElement(AddedClient, { result, agencyWorkspaceId: agency, agencyHref: "/agency", currentClient: client, onAnother: () => {}, onClaim }));
-    await ownerEmail(); await click("Create owner link");
+    await ownerEmail(); await click("Make owner link");
     expect(onClaim).toHaveBeenCalledExactlyOnceWith(ownerClaim);
     expect(request.mock.calls[0]?.[1]?.method).not.toBe("POST");
     expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({ action: "owner_link", agencyWorkspaceId: agency, customerWorkspaceId: business, ownerEmail: "owner@example.com" });
@@ -152,9 +153,9 @@ describe("add-client recovery", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ clients: [{ ...client, pendingClaim: pending }] })));
     await mount(createElement(AddedClient, { result: { ...result, ownerClaimError: "Owner claim response unavailable" }, agencyWorkspaceId: agency,
       agencyHref: "/agency", currentClient: client, onAnother: () => {}, onClaim: vi.fn() }));
-    expect(button("Create owner link").disabled).toBe(true);
-    await click("Refresh owner claim");
-    expect(button("Replace pending owner link").disabled).toBe(false);
+    expect(button("Make owner link").disabled).toBe(true);
+    await click("Check the owner claim again");
+    expect(button("Make a new link").disabled).toBe(false);
   });
 
   it.each(["claimed", "ended", "missing", "changed", "unavailable"] as const)("rechecks current authority/claims before issuance (%s)", async state => {
@@ -162,10 +163,10 @@ describe("add-client recovery", () => {
       : state === "changed" ? { ...client, pendingClaim: pending } : client;
     const request = vi.fn(async (_input: unknown, _init?: RequestInit) => state === "unavailable" ? Response.json({ error: "Claims unavailable" }, { status: 503 })
       : Response.json({ clients: state === "missing" ? [] : [current] }));
-    vi.stubGlobal("fetch", request); await mountClaim(); await click("Create owner link");
+    vi.stubGlobal("fetch", request); await mountClaim(); await click("Make owner link");
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.calls[0]?.[1]?.method).not.toBe("POST");
     if (state === "claimed") expect(container.textContent).toContain("The owner has accepted their claim");
-    if (state === "changed") expect(button("Replace pending owner link")).toBeDefined();
+    if (state === "changed") expect(button("Make a new link")).toBeDefined();
   });
 });

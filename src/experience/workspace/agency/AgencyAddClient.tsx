@@ -1,15 +1,15 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, Copy, Globe2, Hammer, Loader2, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Button } from "@/components/ui/Button";
-import { StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
-import { FirstClientHandoff } from "./FirstClientHandoff";
-import { Tabs } from "@/components/ui/Tabs";
-import { TextInput } from "@/components/ui/TextInput";
+import { Check, Copy, Loader2, RefreshCw } from "lucide-react";
+import { publicAppOrigin } from "@/platform/infra/brand";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  XaButton, XaButtonLink, XaField, XaHeadline, XaInitial, XaLabel, XaPebbleScene, XaSegmented, XaStatus, XaTextLink, XaWorking,
+} from "@/components/ui/strelva/Xa";
+import { AgencyFrame } from "./AgencyFrame";
+import styles from "./agency-door.module.css";
 import type { AddAgencyClientInput, AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
-import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimDeliveryCopy, ownerClaimSchema } from "@/products/agency-clients/contracts";
+import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientListItemSchema, ownerClaimSchema } from "@/products/agency-clients/contracts";
 
 /**
  * An agency adds a client (#259). The agency names a website or picks one of
@@ -17,6 +17,16 @@ import { addAgencyClientInputSchema, agencyClientAdditionSchema, agencyClientLis
  * with the agency's provider seat, seeds unconfirmed facts, saves an AI
  * Visibility check in the agency and, given the owner's address, returns the owner claim link once. Nothing is
  * emailed during the silent rollout (decision R08): the agency copies the link.
+ *
+ * XA · A4 (the form, with Pebble reading their site beside it) and A5 (the
+ * client is on Strelva; the claim link is the one object on the page). Every
+ * read and write above is unchanged; only the presentation moved to the XA kit.
+ *
+ * Departure from the A5 render, recorded on purpose: the render docks an "Ask
+ * Strelva about Harbor Dental" composer. This route is not a workspace Ask
+ * session, and Ask carries no typed text across a navigation (location hints
+ * hold no request contents), so a composer here would drop what was typed.
+ * The client's own workspace is where the agency asks about it.
  */
 
 interface Prospect { id: string; business: string; url: string | null; name: string; email: string; grade: string; score: number }
@@ -42,22 +52,34 @@ async function readClients(agencyWorkspaceId: string, signal?: AbortSignal) {
   return parsed.data;
 }
 
-const FACT_LABELS: Record<string, string> = { phone: "Phone", email: "Email", address: "Address" };
+const FACT_WORDS: Record<string, string> = { phone: "a phone", email: "an email", address: "an address", hours: "hours" };
+
+/** "a phone, an email and an address": what the read found, in one phrase. */
+export function foundPhrase(keys: readonly string[]): string {
+  const words = keys.map(key => FACT_WORDS[key] ?? key);
+  return words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
 
 function dateLabel(value: string) {
   return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function absolute(path: string) {
-  return typeof window === "undefined" ? path : new URL(path, window.location.origin).toString();
+/** The owner opens the link on the public app origin, never on whatever origin the agency happens to be on. */
+export function ownerClaimUrl(path: string, origin = publicAppOrigin()) {
+  return new URL(path, origin).toString();
 }
 
 function currentOwnerClaim(claim: OwnerClaim | null, client?: AgencyClientListItem) {
   return claim && Date.parse(claim.expiresAt) > Date.now() && (!client || client.pendingClaim?.claimId === claim.claimId) ? claim : null;
 }
 
-export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspectId, initialClientId = null, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId, emailEnabled = false }: {
-  emailEnabled?: boolean; agencyWorkspaceId: string; prospecting: boolean; initialProspectId: string | null; initialClientId?: string | null; initialLead?: InitialLead;
+/** The route's frame: the agency's shell and sidebar around the add-client task. */
+export function AgencyAddClientFrame({ agencyWorkspaceId, agencyName, children }: { agencyWorkspaceId: string; agencyName?: string; children: ReactNode }) {
+  return <AgencyFrame agencyWorkspaceId={agencyWorkspaceId} agencyName={agencyName ?? "Your agency"} title="Add a client" active="clients">{children}</AgencyFrame>;
+}
+
+export function AgencyAddClient({ agencyWorkspaceId, agencyName = "your agency", prospecting, initialProspectId, initialClientId = null, initialLead, initialConversion, conversionHeld = false, convertedBusinessWorkspaceId, emailEnabled = false }: {
+  emailEnabled?: boolean; agencyWorkspaceId: string; agencyName?: string; prospecting: boolean; initialProspectId: string | null; initialClientId?: string | null; initialLead?: InitialLead;
   initialConversion?: AddAgencyClientInput | null; conversionHeld?: boolean; convertedBusinessWorkspaceId?: string;
 }) {
   const [source, setSource] = useState<"url" | "prospect">(initialProspectId && prospecting ? "prospect" : "url");
@@ -183,88 +205,96 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
     setListAttempt((value) => value + 1);
   }
 
+  // The agency frame (shell and sidebar) is the route's: see AgencyAddClientFrame.
+  const frame = (_title: string, children: ReactNode) => children;
+
   if (signedOut) {
-    return <Shell agencyHref={agencyHref}>
-      <section className="mt-16 max-w-xl">
-        <h1 className="font-display text-[32px] font-medium leading-tight">Sign in to add a client.</h1>
-        <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Use the account you run your agency with. You come straight back here.</p>
-        <Link href={`/sign-in?next=${encodeURIComponent(`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, ...(initialLead ? { leadToken: initialLead.token } : {}) })}`)}`} className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-5 text-[14px] font-medium text-on-accent hover:bg-accent/85">Sign in<ArrowRight className="size-4" aria-hidden="true" /></Link>
-      </section>
-    </Shell>;
+    return frame("Add a client", <section className={styles.addPage}><div className={styles.addLead}>
+      <XaHeadline quiet="Use the account you run your agency with. You come straight back here.">Sign in to add a client.</XaHeadline>
+      <div><XaButtonLink variant="primary" size="lg" href={`/sign-in?next=${encodeURIComponent(`/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: agencyWorkspaceId, ...(initialLead ? { leadToken: initialLead.token } : {}) })}`)}`}>Sign in</XaButtonLink></div>
+    </div></section>);
   }
 
-  return <Shell agencyHref={agencyHref}>
-    {conversionHeld ? <section className="mt-12" aria-labelledby={`${id}-held-title`}>
-      <h1 id={`${id}-held-title`} className="font-display text-[32px] font-medium leading-tight">{convertedBusinessWorkspaceId ? "This lead is already a client" : "This lead’s conversion is held"}</h1>
-      <p role="status" className="mt-3 text-[14px] leading-relaxed text-gray-muted">{convertedBusinessWorkspaceId ? "The client business was created. Open it to continue." : "The person who started this conversion must confirm its outcome before another client can be added."}</p>
-      {convertedBusinessWorkspaceId ? <div className="mt-6"><StPillLink href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client workspace</StPillLink></div> : null}
-      <StTextButton className="mt-6" href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
-    </section> : result
-      ? <><AddedClient emailEnabled={emailEnabled} result={result} agencyWorkspaceId={agencyWorkspaceId} onAnother={another} allowAnother={!initialLead} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }} />
-        {result.leadConversion ? <div className="mt-6" role="status"><p className="text-[13px] text-gray-muted">{result.leadConversion.status === "converted" ? "Lead converted. The client business was created." : result.leadConversion.message ?? "The client was added, but its lead status has not been confirmed."}</p>
-          {result.leadConversion.status === "unconfirmed" ? <StTextButton onClick={() => void submit()} disabled={submitting}>{submitting ? "Confirming conversion" : "Confirm lead conversion"}</StTextButton> : null}
-          <StTextButton href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</StTextButton>
-          {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error}</p> : null}
-        </div> : null}</>
-      : <section className="mt-12 grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]" aria-labelledby={`${id}-title`}>
-        <div>
-          <p className="text-[12px] font-medium uppercase tracking-[0.14em] text-accent-text">New client</p>
-          <h1 id={`${id}-title`} className="mt-3 font-display text-[40px] font-medium leading-tight">Add a client</h1>
-          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{initialLead ? "Review the details from this lead. Adding their business confirms the conversion. No email is sent unless you choose it." : "Start from the website they already have, or from someone who ran your check."}</p>
-          <form onSubmit={submit} className="mt-8 max-w-lg" noValidate aria-busy={submitting || undefined}>
-            {prospecting && !initialLead ? <Tabs aria-label="Where this client comes from" variant="segment" value={source} onChange={(value) => { setSource(value as "url" | "prospect"); setError(""); }}
-              items={[{ value: "url", label: "Website", disabled: requestHeld }, { value: "prospect", label: "Prospect", disabled: requestHeld }]} /> : null}
-            <fieldset disabled={requestHeld || submitting} className="mt-6 grid min-w-0 gap-5">
-              <legend className="sr-only">Client details</legend>
-              {source === "url"
-                ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required={!initialLead} disabled={requestHeld || submitting} maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText={initialLead ? "Optional. A business can be added before it has a website." : "We read their details and run an AI Visibility check saved in your agency. Nothing on their site changes."} />
-                : <ProspectPicker prospects={prospects} error={prospectError} added={added} value={prospectId} onChoose={choose} />}
-              <TextInput label="Business name" autoComplete="organization" required={Boolean(initialLead)} disabled={requestHeld || submitting} maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
-              <TextInput label="Owner’s email" type="email" autoComplete="email" disabled={requestHeld || submitting} maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Copy and share it after adding the client." />
-              {emailEnabled ? <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={sendOwnerEmail} onChange={event => setSendOwnerEmail(event.target.checked)} />Email this owner their claim link if email is permitted</label> : null}
-            </fieldset>
-            {error ? <p role="alert" className="mt-4 text-[13px] text-critical">{error}</p> : null}
-            {requestHeld ? <p role="status" className="mt-4 text-[13px] text-gray-muted">This request is held with its original details. Retrying checks the same client addition.</p> : null}
-            <Button type="submit" size="lg" loading={submitting} className="mt-6" icon={<ArrowRight className="size-4" />}>{submitting ? "Adding client" : requestHeld ? "Confirm client addition" : "Add client"}</Button>
-          </form>
-        </div>
-        <ol className="self-start border-t border-gray-border text-[13px] leading-relaxed text-gray-muted lg:mt-24" aria-label="What adding a client does">
-          <li className="border-b border-gray-border py-4"><strong className="block font-medium text-warm-black">Their own business on Strelva</strong>The owner owns it. Your agency works in it through its seat, never as a member.</li>
-          <li className="border-b border-gray-border py-4"><strong className="block font-medium text-warm-black">Details marked unconfirmed</strong>What we read from their site waits for the owner to confirm it.</li>
-          <li className="border-b border-gray-border py-4"><strong className="block font-medium text-warm-black">A claim link for the owner</strong>It keeps working while they decide. Their site keeps running if they never sign in.</li>
-        </ol>
-      </section>}
-    <ClientList agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} openClientId={openClientId} onOpen={setOpenClientId} onClaimed={() => void loadClients()} clients={clients} error={clientRead.workspaceId === agencyWorkspaceId ? clientRead.error : ""} loading={clientRead.workspaceId !== agencyWorkspaceId || clientRead.loading} onRetry={() => setListAttempt((value) => value + 1)} />
-  </Shell>;
+  const shownName = name.trim() || (source === "prospect" ? chosen?.business ?? "" : "");
+  const site = siteLabel(url);
+  // The sidebar already lists every client. A list shows here only when the
+  // Queue sent the agency to make a fresh owner link for one client added earlier.
+  const list = initialClientId ? <ClientList agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} openClientId={openClientId} onOpen={setOpenClientId} onClaimed={() => void loadClients()}
+    clients={clients ? clients.filter(client => client.customerWorkspaceId === initialClientId) : null} error={clientRead.workspaceId === agencyWorkspaceId ? clientRead.error : ""} loading={clientRead.workspaceId !== agencyWorkspaceId || clientRead.loading} onRetry={() => setListAttempt((value) => value + 1)} /> : null;
+
+  if (conversionHeld) return frame("Add a client", <section className={styles.addPage} aria-labelledby={`${id}-held-title`}><div className={styles.addLead}>
+    <XaHeadline id={`${id}-held-title`} quiet={<span role="status">{convertedBusinessWorkspaceId ? "The client business was created. Open it to continue." : "The person who started this conversion must confirm its outcome before another client can be added."}</span>}>{convertedBusinessWorkspaceId ? "This lead is already a client." : "This lead’s conversion is held."}</XaHeadline>
+    <div className={styles.addActions}>
+      {convertedBusinessWorkspaceId ? <XaButtonLink variant="primary" size="lg" href={`/workspace?workspaceId=${encodeURIComponent(convertedBusinessWorkspaceId)}`}>Open client workspace</XaButtonLink> : null}
+      <XaTextLink href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</XaTextLink>
+    </div>
+  </div>{list}</section>);
+
+  if (result) return frame(result.client.name, <section className={styles.addPage}>
+    <AddedClient emailEnabled={emailEnabled} result={result} agencyWorkspaceId={agencyWorkspaceId} agencyName={agencyName} onAnother={another} allowAnother={!initialLead} agencyHref={agencyHref} currentClient={clients?.find(client => client.customerWorkspaceId === result.client.customerWorkspaceId)} onClaim={(claim) => { setResult({ ...result, ownerClaim: claim, ownerClaimError: null }); void loadClients(); }}
+      leadNote={result.leadConversion ? <div role="status" className={styles.sentenceBlock}>
+        <p className={styles.sentence}>{result.leadConversion.status === "converted" ? "Lead converted. The client business was created." : result.leadConversion.message ?? "The client was added, but its lead status has not been confirmed."}</p>
+        <p className={styles.links}>
+          {result.leadConversion.status === "unconfirmed" ? <XaButton size="sm" onClick={() => void submit()} disabled={submitting}>{submitting ? "Confirming conversion" : "Confirm lead conversion"}</XaButton> : null}
+          <XaTextLink href={`/workspace/leads?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}>Back to leads</XaTextLink>
+        </p>
+        {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+      </div> : null} />
+  </section>);
+
+  return frame("Add a client", <section className={styles.addPage} aria-labelledby={`${id}-title`}>
+    <div className={styles.addSplit}>
+      <div className={styles.addLead}>
+        <XaHeadline id={`${id}-title`} quiet={initialLead ? "Check the details from this lead. Adding their business confirms the conversion." : "Their business, owned by them. You work inside it."}>Add a client.</XaHeadline>
+        <form onSubmit={submit} className={styles.addForm} noValidate aria-busy={submitting || undefined}>
+          {prospecting && !initialLead ? <XaSegmented label="Where this client comes from" value={source} onChange={(value) => { if (requestHeld) return; setSource(value); setError(""); }}
+            options={[{ value: "url", label: "Their website", disabled: requestHeld }, { value: "prospect", label: "Someone who ran your check", disabled: requestHeld }]} /> : null}
+          <fieldset disabled={requestHeld || submitting} className={styles.fields}>
+            <legend className="sr-only">Client details</legend>
+            {source === "url"
+              ? <XaField label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required={!initialLead} maxLength={2048} placeholder="harbordental.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} hint={initialLead ? "Optional. A business can be added before it has a website." : undefined} />
+              : <ProspectPicker prospects={prospects} error={prospectError} added={added} value={prospectId} onChoose={choose} />}
+            <XaField label="Business name" autoComplete="organization" required={Boolean(initialLead)} maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
+            <XaField label="Owner’s email" type="email" autoComplete="email" maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} hint="For their claim link. Copy and share it after adding the client." />
+            {emailEnabled ? <label className={styles.check}><input type="checkbox" checked={sendOwnerEmail} onChange={event => setSendOwnerEmail(event.target.checked)} />Email this owner their claim link if email is permitted</label> : null}
+          </fieldset>
+          {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+          {requestHeld && !submitting ? <p role="status" className={styles.sentence}>This request is held with its original details. Retrying checks the same client addition.</p> : null}
+          <div><XaButton type="submit" variant="primary" size="lg" busy={submitting}>{submitting ? "Adding client" : requestHeld ? "Confirm client addition" : shownName ? `Add ${shownName}` : "Add client"}</XaButton></div>
+        </form>
+      </div>
+      <aside className={styles.reading} aria-label="What adding a client does" aria-busy={submitting || undefined}>
+        <XaPebbleScene pose="adds" size={260} bare label={submitting ? `Pebble reading ${site || "the client’s site"}` : "Pebble ready to read the client’s site"} />
+        {submitting ? <XaWorking title={site ? `Reading ${site}` : `Adding ${shownName || "the client"}`} steps={[{ id: "add", label: site ? `Pebble is reading ${site}’s pages for their phone, email and address` : `Adding ${shownName || "the business"}`, state: "active" }]} />
+          : <p className={styles.readingTitle}>{site ? `Pebble reads ${site} when you add it.` : "Pebble reads their website when you add it."}</p>}
+        <p className={styles.readingNote}>It looks for their phone, email and address, and marks each one unconfirmed until the owner says it’s right. Their site keeps running and nothing is sent.</p>
+      </aside>
+    </div>
+    {list}
+  </section>);
 }
 
-function Shell({ agencyHref, children }: { agencyHref: string; children: React.ReactNode }) {
-  return <main data-dashboard className="min-h-dvh bg-surface-base px-6 py-12 text-warm-black md:px-8 lg:px-12">
-    <div className="mx-auto max-w-[960px]">
-      <a href={agencyHref} className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline"><ArrowLeft className="size-4" aria-hidden="true" />Clients</a>
-      {children}
-    </div>
-  </main>;
+function siteLabel(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try { return new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`).hostname.replace(/^www\./, ""); } catch { return ""; }
 }
 
 function ProspectPicker({ prospects, error, added, value, onChoose }: { prospects: Prospect[] | null; error: string; added: Set<string | null>; value: string | null; onChoose: (prospect: Prospect) => void }) {
   const labelId = useId();
-  if (prospects === null) return <p role="status" className="flex items-center gap-2 text-[13px] text-gray-muted"><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Loading your prospects</p>;
-  if (error) return <p role="alert" className="text-[13px] text-critical">{error}</p>;
-  if (!prospects.length) return <p className="text-[13px] leading-relaxed text-gray-muted">No prospects yet. People who run your agency’s check show up here.</p>;
-  return <fieldset>
-    <legend id={labelId} className="text-xs leading-4 text-gray-muted">Prospect</legend>
-    <ul className="mt-2 max-h-72 divide-y divide-gray-border overflow-y-auto border-y border-gray-border" aria-labelledby={labelId}>
+  if (prospects === null) return <p role="status" className={styles.sentence}><Loader2 className="mr-2 inline size-4 motion-safe:animate-spin" aria-hidden="true" />Loading your prospects</p>;
+  if (error) return <p role="alert" className={styles.error}>{error}</p>;
+  if (!prospects.length) return <p className={styles.sentence}>No prospects yet. People who run your agency’s check show up here.</p>;
+  return <fieldset className={styles.prospects}>
+    <legend id={labelId} className={styles.fieldLegend}>Prospect</legend>
+    <ul aria-labelledby={labelId}>
       {prospects.map((prospect) => {
         const isAdded = added.has(prospect.id);
         return <li key={prospect.id}>
-          <label className={`flex min-h-16 items-center gap-3 px-1 py-3 ${isAdded ? "opacity-60" : "cursor-pointer hover:bg-surface"}`}>
-            <input type="radio" name="prospect" className="size-4 accent-accent" checked={value === prospect.id} disabled={isAdded} onChange={() => onChoose(prospect)} />
-            <span className="min-w-0 flex-1">
-              <strong className="block truncate text-[14px] font-medium">{prospect.business}</strong>
-              <small className="mt-0.5 block truncate text-[12px] text-gray-muted">{prospect.url ?? "No website given"} · {prospect.name}</small>
-            </span>
-            <span className="shrink-0 tabular-nums text-[12px] tabular-nums text-gray-muted">{isAdded ? "Added" : `${prospect.grade} · ${prospect.score}`}</span>
+          <label className={styles.prospect} data-added={isAdded || undefined}>
+            <input type="radio" name="prospect" checked={value === prospect.id} disabled={isAdded} onChange={() => onChoose(prospect)} />
+            <span className={styles.prospectText}><strong>{prospect.business}</strong><small>{prospect.url ?? "No website given"} · {prospect.name}</small></span>
+            <span className={styles.prospectMeta}>{isAdded ? "Added" : `${prospect.grade} · ${prospect.score}`}</span>
           </label>
         </li>;
       })}
@@ -272,88 +302,89 @@ function ProspectPicker({ prospects, error, added, value, onChoose }: { prospect
   </fieldset>;
 }
 
-export function AddedClient({ emailEnabled = false, result, agencyWorkspaceId, agencyHref, onAnother, allowAnother = true, onClaim, currentClient }: { emailEnabled?: boolean; currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyHref: string; onAnother: () => void; allowAnother?: boolean; onClaim: (claim: OwnerClaim) => void }) {
+/**
+ * XA · A5. The client is on Strelva. The owner's claim link is the page's one
+ * object (first on a phone); everything else is a sentence with text links. A
+ * prepared link is not an approval, an accepted claim or a launch, so nothing
+ * here is shown as done that the server did not say is done.
+ */
+export function AddedClient({ emailEnabled = false, result, agencyWorkspaceId, agencyName = "your agency", agencyHref, onAnother, allowAnother = true, onClaim, currentClient, leadNote, linkOrigin }: { emailEnabled?: boolean; currentClient?: AgencyClientListItem; result: AddAgencyClientResult; agencyWorkspaceId: string; agencyName?: string; agencyHref: string; onAnother: () => void; allowAnother?: boolean; onClaim: (claim: OwnerClaim) => void; leadNote?: ReactNode; linkOrigin?: string }) {
   const id = useId().replace(/:/g, "");
   const { client, scan } = result;
-  const ownerClaim = currentOwnerClaim(result.ownerClaim, currentClient);
-  return <section className="mt-12" aria-labelledby={`${id}-title`}>
-    <p className="inline-flex items-center gap-2 text-[12px] font-medium uppercase tracking-[0.14em] text-positive"><Check className="size-4" aria-hidden="true" />Client added</p>
-    <h1 id={`${id}-title`} className="mt-3 break-words font-display text-[40px] font-medium leading-tight">{client.name}</h1>
-    <p className="mt-2 tabular-nums text-[12px] tabular-nums text-gray-muted">{currentClient?.ownerClaimed ? "Owner claimed the business" : currentClient ? "Owner has not claimed the business" : "Owner claim not yet checked"} · {currentClient?.seatActive === false ? "Agency seat ended" : "Agency client added"}{client.replayed ? " · this client was already added" : ""}</p>
+  const claimed = currentClient?.ownerClaimed === true;
+  const rebuildOpen = result.website.rebuildOpenToAgency;
+  const source = siteLabel(client.sourceUrl ?? "");
+  const owner = result.ownerClaim?.recipientEmail ?? currentClient?.pendingClaim?.recipientEmail ?? null;
+  const found = scan.status === "scanned" && scan.seeded.length
+    ? `Strelva found ${foundPhrase(scan.seeded)} on ${source || "their site"}. ${claimed ? "The owner confirms them in their business." : "The owner confirms them after claiming."}`
+    : scan.status === "unreachable" ? `${scan.message ?? `${source || "Their site"} did not answer.`} The owner can add their details after claiming.`
+      : scan.status === "scanned" ? `Strelva found no phone, email or address on ${source || "their site"}. The owner can add them after claiming.`
+        : "No website was given, so nothing was read. The owner can add their details after claiming.";
+  return <div className={`${styles.addSplit} ${styles.addedSplit}`}>
+    <section className={styles.addLead} aria-labelledby={`${id}-title`}>
+      <p className="sr-only" role="status">Client added.</p>
+      <div className={styles.addedHead}><XaHeadline id={`${id}-title`} quiet={claimed ? "Its owner claimed it. You work inside the access they gave." : "It becomes the owner’s when they claim it."}>{client.name} is on Strelva.</XaHeadline></div>
+      {client.replayed || currentClient?.seatActive === false ? <p className={styles.sentence} role="status">
+        {client.replayed ? "This client was already added. Nothing was added twice. " : ""}{currentClient?.seatActive === false ? `${agencyName}’s access to ${client.name} has ended.` : ""}</p> : null}
 
-    <div className="mt-8">
-      <FirstClientHandoff status={result.website.rebuildOpenToAgency ? "Ready for a website draft" : currentClient?.ownerClaimed ? "Owner claimed the business" : "Waiting for the owner to claim the business"}
-        detail={result.website.rebuildOpenToAgency ? "Build the private draft first. Review, ownership and a verified launch are separate steps; adding the client completes none of them." : "Agency rebuilding is not available here yet. The owner can start the draft in their business after accepting the claim."}
-        draft="pending" review="pending" claim={currentClient?.ownerClaimed ? "done" : currentClient ? "pending" : "unverified"} live="pending"
-        readiness="Publishing readiness has not been checked. A private draft does not put anything live."
-        action={result.website.rebuildOpenToAgency
-          ? <StPillLink href={result.website.rebuild}>Start website draft</StPillLink>
-          : <StTextButton href={currentClient?.ownerClaimed ? `/workspace?workspaceId=${encodeURIComponent(client.customerWorkspaceId)}` : "#owner-link-title"}>{currentClient?.ownerClaimed ? "Open client workspace" : ownerClaim ? "Share owner claim link" : "Prepare owner claim link"}</StTextButton>} />
+      <p className={styles.sentenceBody}>
+        {rebuildOpen
+          ? <>Next, <XaTextLink href={result.website.connect}>connect the site they have</XaTextLink> or <XaTextLink href={result.website.rebuild}>start a website draft</XaTextLink>. A draft stays private until the owner approves it.</>
+          : claimed ? <>Next, <XaTextLink href={result.website.connect}>connect the site they have</XaTextLink>, or <XaTextLink href={`/workspace?workspaceId=${encodeURIComponent(client.customerWorkspaceId)}`}>open {client.name}</XaTextLink>.</>
+            : <>Next, <XaTextLink href={result.website.connect}>connect the site they have</XaTextLink>. A website draft opens to {agencyName} once {owner ?? "the owner"} claims {client.name}.</>}
+      </p>
+      <p className={styles.sentenceBody}>{found}</p>
+      {result.aiCheck ? <AgencyClientAiCheck check={result.aiCheck} agencyName={agencyName} site={source} /> : null}
+      {leadNote}
+
+      <p className={styles.links}>
+        {allowAnother ? <XaTextLink onClick={onAnother}>Add another client</XaTextLink> : null}
+        <XaTextLink href={agencyHref}>Back to clients</XaTextLink>
+      </p>
+    </section>
+
+    <div className={styles.objectColumn}>
+      <OwnerLink emailEnabled={emailEnabled} subject={{ customerWorkspaceId: result.client.customerWorkspaceId, ownerClaim: result.ownerClaim, ownerClaimError: result.ownerClaimError }} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} primary linkOrigin={linkOrigin} />
     </div>
+  </div>;
+}
 
-    <div className="mt-10 grid gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-      <div className="min-w-0">
-        <h2 className="text-[15px] font-medium">Website options</h2>
-        <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">Already have a site to keep? Connect it instead. Publication still needs the current approval and publishing authority.</p>
-        <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">
-          <li><a href={result.website.connect} className="flex min-h-16 items-center gap-4 px-1 py-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">
-            <Globe2 className="size-5 shrink-0 text-accent-text" aria-hidden="true" />
-            <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Connect the site they have</strong><small className="mt-0.5 block text-[12px] text-gray-muted">One script tag. Their site stays where it is; forms and facts flow into Strelva.</small></span>
-            <ArrowRight className="size-4 shrink-0 text-gray-muted" aria-hidden="true" />
-          </a></li>
-          <li>{result.website.rebuildOpenToAgency
-            ? <a href={result.website.rebuild} className="flex min-h-16 items-center gap-4 px-1 py-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">
-              <Hammer className="size-5 shrink-0 text-accent-text" aria-hidden="true" />
-              <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Rebuild it on Strelva</strong><small className="mt-0.5 block text-[12px] text-gray-muted">A new draft from their current pages, for the owner to review.</small></span>
-              <ArrowRight className="size-4 shrink-0 text-gray-muted" aria-hidden="true" />
-            </a>
-            : <div className="flex min-h-16 items-center gap-4 px-1 py-4">
-              <Hammer className="size-5 shrink-0 text-gray-muted" aria-hidden="true" />
-              <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Rebuild it on Strelva</strong><small className="mt-0.5 block text-[12px] text-gray-muted">The owner can start a rebuild once they claim the business. Agencies get this soon.</small></span>
-            </div>}</li>
-        </ul>
-
-        {result.aiCheck ? <AgencyClientAiCheck check={result.aiCheck} /> : null}
-
-        <h2 className="mt-10 text-[15px] font-medium">Details from their site</h2>
-        {scan.status === "scanned" && scan.seeded.length
-          ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border text-[13px]">
-            {scan.seeded.map((key) => <li key={key} className="flex min-h-12 items-center justify-between gap-4 py-3"><span>{FACT_LABELS[key] ?? key}</span><span className="text-[12px] text-gray-muted">Unconfirmed</span></li>)}
-          </ul>
-          : <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{scan.status === "unreachable" ? scan.message : scan.status === "scanned" ? "We didn’t find a phone, email or address on their site." : "No website given, so nothing was read."} The owner can add details when they sign in.</p>}
-        <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{client.factsSeeded} {client.factsSeeded === 1 ? "detail" : "details"} on the business record, including its name. Only the owner confirms them.</p>
-      </div>
-
-      <OwnerLink emailEnabled={emailEnabled} subject={{ customerWorkspaceId: result.client.customerWorkspaceId, ownerClaim: result.ownerClaim, ownerClaimError: result.ownerClaimError }} agencyWorkspaceId={agencyWorkspaceId} onClaim={onClaim} currentClient={currentClient} />
-    </div>
-
-    <div className="mt-12 flex flex-wrap items-center gap-4 border-t border-gray-border pt-6">
-      {allowAnother ? <Button variant="secondary" onClick={onAnother} icon={<RefreshCw className="size-4" />}>Add another client</Button> : null}
-      <a href={agencyHref} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium underline-offset-4 hover:underline">Back to clients<ArrowRight className="size-4" aria-hidden="true" /></a>
-    </div>
+/** The AI check, as one sentence and one link. The full result opens in the agency, where it is kept. */
+export function AgencyClientAiCheck({ check, agencyName = "your agency", site = "" }: { check: ClientAiCheck; agencyName?: string; site?: string }) {
+  if (check.status === "not_requested") return null;
+  const where = site || "their site";
+  return <section className={styles.sentenceBlock} aria-label="How search assistants describe this client">
+    {check.status === "ready" ? <>
+      <p className={styles.sentenceBody}>{check.result.measurementStatus !== "unavailable" && check.result.readinessMeasured !== false
+        ? <>Search assistants can read {where} at grade {check.result.grade} ({check.result.score} of 100). </> : null}
+        {check.result.topFix} <XaTextLink href={check.href}>Open the AI check in {agencyName}</XaTextLink></p>
+      <p className={styles.sentence}>{check.result.measurementNote ? `${check.result.measurementNote} ` : ""}{check.result.citation.note} {check.result.citation.probed ? "Strelva asked a live assistant." : "Strelva has not asked a live assistant yet."}</p>
+    </> : <p className={styles.sentenceBody} role="status">{check.status === "pending" ? `Strelva is also checking how search assistants describe ${where}.` : check.message} <XaTextLink href={check.href}>Open the AI check in {agencyName}</XaTextLink></p>}
   </section>;
 }
 
-/** Uses the existing private assessment work page for the full result. */
-export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
-  if (check.status === "not_requested") return <section className="mt-10" aria-label="AI Visibility check"><h2 className="text-[15px] font-medium">AI Visibility check</h2><p className="mt-2 text-[13px] leading-relaxed text-gray-muted">No website given, so no AI check was requested.</p></section>;
-  return <section className="mt-10" aria-label="AI Visibility check">
-    <h2 className="text-[15px] font-medium">AI Visibility check</h2>
-    {check.status === "ready" ? <>
-      {check.result.measurementStatus !== "unavailable" && check.result.readinessMeasured !== false ? <p className="mt-3 tabular-nums text-[14px] tabular-nums">{check.result.grade} · {check.result.score}/100</p> : null}
-      {check.result.measurementNote ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.measurementNote}</p> : null}
-      <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.citation.note} {check.result.citation.probed ? "Probe completed." : "Probe not completed."}</p>
-      <p className="mt-2 text-[13px] leading-relaxed">{check.result.topFix}</p>
-    </> : <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">{check.message}</p>}
-    <a href={check.href} className="mt-3 inline-flex min-h-11 items-center gap-2 text-[13px] font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">{check.status === "ready" ? "Open saved AI check" : "Open agency saved work"}<ArrowRight className="size-4" aria-hidden="true" /></a>
-  </section>;
+/** What happened to the owner's link, in one sentence that names who did what. */
+function claimDeliverySentence(claim: OwnerClaim): string {
+  const until = `It works until ${dateLabel(claim.expiresAt)}.`;
+  const to = claim.recipientEmail;
+  if (claim.delivery.status === "accepted") return `Strelva emailed the link to ${to}. You can also send it yourself. ${until}`;
+  if (claim.delivery.status === "sending" || claim.delivery.status === "unknown") return `Strelva couldn’t confirm its email to ${to}. Copy the link and send it yourself. ${until}`;
+  if (claim.delivery.reason === "permission_or_email_gate") return `Strelva didn’t email ${to}: your agency can’t send owner email yet. Copy the link and send it yourself. ${until}`;
+  return `Strelva doesn’t email owners yet. Copy the link and send it to ${to} yourself. ${until}`;
 }
 
 interface OwnerLinkSubject { customerWorkspaceId: string; ownerClaim: OwnerClaim | null; ownerClaimError: string | null }
 
 /** The one place an owner link is made, whether the client was just added or added earlier. */
-function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEnabled, headingId = "owner-link-title" }: { emailEnabled: boolean; currentClient?: AgencyClientListItem; subject: OwnerLinkSubject; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void; headingId?: string }) {
-  const [email, setEmail] = useState("");
+/**
+ * The one place an owner link is made. `primary` marks it as the page's one
+ * object (A5): its main button is then the ink pill. Inside the client list it
+ * stays secondary, so the page keeps one primary.
+ */
+function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEnabled, headingId = "owner-link-title", primary = false, linkOrigin }: { emailEnabled: boolean; currentClient?: AgencyClientListItem; subject: OwnerLinkSubject; agencyWorkspaceId: string; onClaim: (claim: OwnerClaim) => void; headingId?: string; primary?: boolean; linkOrigin?: string }) {
+  const [email, setEmail] = useState(subject.ownerClaim?.recipientEmail ?? "");
+  // A shown link stays until the agency asks to replace it; then the form opens in place.
+  const [replacing, setReplacing] = useState(false);
   const [sendEmail, setSendEmail] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(subject.ownerClaimError ?? "");
@@ -364,7 +395,7 @@ function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEn
   const ownerClaimed = latestClient?.ownerClaimed ?? false;
   const issuedClaim = subject.ownerClaim;
   const claim = currentOwnerClaim(issuedClaim, latestClient);
-  const link = claim ? absolute(claim.claimPath) : "";
+  const link = claim ? ownerClaimUrl(claim.claimPath, linkOrigin) : "";
 
   async function reconcile() {
     const loaded = await readClients(agencyWorkspaceId);
@@ -405,6 +436,7 @@ function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEn
       }), "The owner link couldn’t be created.");
       if (!ownerClaimSchema.safeParse(body.ownerClaim).success || body.ownerClaim.customerWorkspaceId !== subject.customerWorkspaceId || !/^\/workspace\/claim\/[A-Za-z0-9_-]+$/.test(body.ownerClaim.claimPath)) throw new Error("The issued owner link could not be confirmed.");
       setReconciled(null);
+      setReplacing(false);
       onClaim(body.ownerClaim);
     } catch (cause) {
       setNeedsCheck(true);
@@ -418,33 +450,41 @@ function OwnerLink({ subject, agencyWorkspaceId, onClaim, currentClient, emailEn
     catch { setError("Copy didn’t work here. Select the link and copy it."); }
   }
 
-  return <aside className="self-start rounded-3xl border border-gray-border bg-surface p-6" aria-labelledby={headingId}>
-    <h2 id={headingId} className="text-[15px] font-medium">Owner claim link</h2>
-    {ownerClaimed ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">The owner has accepted their claim. No new owner link is needed.</p> : claim ? <>
-      <p className="mt-1 text-[13px] leading-relaxed text-gray-muted">For {claim.recipientEmail}. The recipient signs in with that address and accepts to become the owner.</p>
-      <label htmlFor={`${headingId}-value`} className="sr-only">Owner claim link</label>
-      <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className="mt-4 w-full min-h-10 truncate rounded-xl border border-gray-border bg-surface-inset px-4 py-2 tabular-nums text-[12px]" />
-      <Button className="mt-3 w-full" onClick={() => void copy()} icon={copied ? <Check className="size-4" /> : <Copy className="size-4" />}>{copied ? "Copied" : "Copy link"}</Button>
-      <p className="mt-4 text-[12px] leading-relaxed text-gray-muted" role="status"><strong className="font-medium text-warm-black">{ownerClaimDeliveryCopy(claim.delivery).headline}</strong> {ownerClaimDeliveryCopy(claim.delivery).next} Works until {dateLabel(claim.expiresAt)}.</p>
-      <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">The link is shown once. Making a new one replaces it.</p>
-    </> : <form onSubmit={create} noValidate className="mt-1">
-      <p className="text-[13px] leading-relaxed text-gray-muted">{issuedClaim ? "The previously shown owner link is no longer current. Create a fresh link for the owner." : "Make a link for the owner to take their business."} Copy and share it yourself, or explicitly request email when available.</p>
-      {latestClient?.pendingClaim ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">An owner claim is pending for {latestClient.pendingClaim.recipientEmail}, until {dateLabel(latestClient.pendingClaim.expiresAt)}. Replacing its link ends the previous link.</p> : null}
-      <div className="mt-4"><TextInput label="Owner’s email" type="email" autoComplete="email" maxLength={254} disabled={busy} value={email} onChange={(event) => { setEmail(event.target.value); if (!needsCheck) setError(""); }} /></div>
-      {emailEnabled ? <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" disabled={busy} checked={sendEmail} onChange={event => setSendEmail(event.target.checked)} />Email the owner this new link if permitted</label> : null}
-      <Button type="submit" className="mt-3 w-full" loading={busy} disabled={needsCheck || latestClient?.seatActive === false}>{latestClient?.pendingClaim ? "Replace pending owner link" : "Create owner link"}</Button>
+  const variant = primary ? "primary" : "secondary";
+  const showLink = claim && !replacing;
+  return <aside className={styles.object} data-flat={primary ? undefined : true} aria-labelledby={headingId}>
+    <p className={styles.objectHead}>
+      <span id={headingId} className={styles.objectTitle}>{ownerClaimed ? <XaStatus kind="live" size="sm">Owner claimed</XaStatus> : <XaStatus kind="waits" size="sm">Claim link{claim ? ` for ${claim.recipientEmail}` : ""}</XaStatus>}</span>
+      {claim && claim.delivery.status !== "accepted" ? <span className={styles.objectMeta}>Not sent</span> : null}
+    </p>
+    {ownerClaimed ? <p className={styles.sentence} role="status">The owner has accepted their claim. No new owner link is needed.</p> : showLink ? <>
+      <div className={styles.linkRow}>
+        <label htmlFor={`${headingId}-value`} className="sr-only">Owner claim link</label>
+        <input id={`${headingId}-value`} readOnly value={link} onFocus={(event) => event.currentTarget.select()} className={styles.linkField} />
+        <XaButton variant={variant} onClick={() => void copy()}>{copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}{copied ? "Copied" : "Copy link"}</XaButton>
+      </div>
+      <p className={styles.sentenceBody} role="status">{claimDeliverySentence(claim)}</p>
+      <p className={styles.objectNote}>Only {claim.recipientEmail} can accept it. The link is shown once.</p>
+      <p className={styles.links}><XaTextLink onClick={() => { if (!busy) { setEmail(claim.recipientEmail); setReplacing(true); setError(""); } }}>Make a new link (the old one stops working)</XaTextLink></p>
+    </> : <form onSubmit={create} noValidate className={styles.fields}>
+      <p className={styles.sentence}>{replacing ? "A new link replaces the one you copied. The old one stops working." : issuedClaim ? "The link shown earlier is no longer current. Make a new one for the owner." : "Make a link for the owner to take their business."} Copy it and send it yourself{emailEnabled ? ", or ask Strelva to email it when that is allowed" : ""}.</p>
+      {latestClient?.pendingClaim && !replacing ? <p className={styles.sentence}>A claim link for {latestClient.pendingClaim.recipientEmail} works until {dateLabel(latestClient.pendingClaim.expiresAt)}. A new link replaces it.</p> : null}
+      <XaField label="Owner’s email" type="email" autoComplete="email" maxLength={254} disabled={busy} value={email} onChange={(event) => { setEmail(event.target.value); if (!needsCheck) setError(""); }} />
+      {emailEnabled ? <label className={styles.check}><input type="checkbox" disabled={busy} checked={sendEmail} onChange={event => setSendEmail(event.target.checked)} />Email the owner this new link if permitted</label> : null}
+      <XaButton type="submit" variant={variant} block busy={busy} disabled={needsCheck || latestClient?.seatActive === false}>{latestClient?.pendingClaim ? "Make a new link" : "Make owner link"}</XaButton>
+      {replacing ? <p className={styles.links}><XaTextLink onClick={() => { setReplacing(false); setError(""); }}>Keep the current link</XaTextLink></p> : null}
     </form>}
-    <StTextButton className="mt-3" onClick={() => void refresh()} disabled={busy}>Refresh owner claim</StTextButton>
-    {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error}</p> : null}
+    {needsCheck ? <p className={styles.links}><XaTextLink onClick={() => { if (!busy) void refresh(); }}>Check the owner claim again</XaTextLink></p> : null}
+    {error ? <p role="alert" className={styles.error}>{error}</p> : null}
   </aside>;
 }
 
 function claimStatus(client: AgencyClientListItem): string {
-  if (!client.seatActive) return "Seat ended";
-  if (client.ownerClaimed) return "Owner signed in";
+  if (!client.seatActive) return "Your access ended";
+  if (client.ownerClaimed) return "";
   const claim = client.pendingClaim;
-  if (!claim) return "No owner link";
-  return `${ownerClaimDeliveryCopy(claim.delivery).headline} Link for ${claim.recipientEmail}`;
+  if (!claim) return "No claim link yet";
+  return `Claim link for ${claim.recipientEmail}, until ${dateLabel(claim.expiresAt)}`;
 }
 
 /** A fresh link for a client added earlier; the old one was shown once and cannot be copied again. */
@@ -454,28 +494,31 @@ function ClientOwnerLink({ client, agencyWorkspaceId, emailEnabled, onClaimed }:
     subject={{ customerWorkspaceId: client.customerWorkspaceId, ownerClaim: claim, ownerClaimError: null }} onClaim={(issued) => { setClaim(issued); onClaimed(); }} />;
 }
 
+/** Clients this agency added, with a fresh owner link opening in place under the one it is for. */
 function ClientList({ clients, error, loading, onRetry, agencyWorkspaceId, emailEnabled, openClientId, onOpen, onClaimed }: { clients: AgencyClientListItem[] | null; error: string; loading: boolean; onRetry: () => void; agencyWorkspaceId: string; emailEnabled: boolean; openClientId: string | null; onOpen: (id: string | null) => void; onClaimed: () => void }) {
-  return <section className="mt-16" aria-labelledby="added-clients-title">
-    <div className="flex items-center justify-between gap-3">
-      <h2 id="added-clients-title" className="text-[15px] font-medium">Clients your agency added</h2>
-      <StTextButton onClick={onRetry} disabled={loading}><RefreshCw className="size-3.5" aria-hidden="true" />Refresh</StTextButton>
+  return <section className={styles.addedList} aria-labelledby="added-clients-title">
+    <div className={styles.listHead}>
+      <XaLabel as="h2" id="added-clients-title">A new claim link</XaLabel>
+      <XaButton variant="quiet" size="sm" onClick={onRetry} disabled={loading}><RefreshCw className="size-3.5" aria-hidden="true" />Refresh</XaButton>
     </div>
-    {loading ? <p role="status" className="mt-3 flex items-center gap-2 text-[13px] text-gray-muted"><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />{clients ? "Refreshing your agency’s clients" : "Loading your agency’s clients"}</p> : null}
-    {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error} {clients ? "Last successful read; these clients and their claim status may have changed." : "No successful client read yet."}</p> : null}
-    {clients?.length === 0 && !error && !loading ? <p className="mt-3 text-[13px] text-gray-muted">No clients added yet.</p> : null}
-    <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">
-      {clients?.map((client) => {
+    {loading ? <p role="status" className={styles.sentence}><Loader2 className="mr-2 inline size-4 motion-safe:animate-spin" aria-hidden="true" />{clients ? "Refreshing your agency’s clients" : "Loading your agency’s clients"}</p> : null}
+    {error ? <p role="alert" className={styles.error}>{error} {clients ? "Last successful read; these clients and their claim status may have changed." : "No successful client read yet."}</p> : null}
+    {clients?.length === 0 && !error && !loading ? <p className={styles.sentence}>This client isn’t on your agency’s list. It may have been removed, or its owner ended your access.</p> : null}
+    {clients?.length ? <ul className={styles.addedRows} aria-label="Clients your agency added">
+      {clients.map((client) => {
         const canLink = client.seatActive && !client.ownerClaimed;
         const open = canLink && openClientId === client.customerWorkspaceId;
-        return <li key={client.additionId} className="py-3">
-          <div className="grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4">
-            <span className="min-w-0"><strong className="block truncate text-[14px] font-medium">{client.name}</strong><small className="mt-0.5 block truncate text-[12px] text-gray-muted">{client.sourceUrl ?? "No website"} · added {dateLabel(client.addedAt)}</small></span>
-            <span className={`text-right text-[12px] ${client.ownerClaimed ? "text-positive" : "text-gray-muted"}`}>{claimStatus(client)}</span>
+        const status = claimStatus(client);
+        return <li key={client.additionId}>
+          <div className={styles.addedRow}>
+            <XaInitial name={client.name} size={32} />
+            <span className={styles.addedText}><strong>{client.name}</strong><small>{client.sourceUrl ? siteLabel(client.sourceUrl) || client.sourceUrl : "No website"} · added {dateLabel(client.addedAt)}</small></span>
+            <span className={styles.addedState} data-tone={!client.ownerClaimed && client.seatActive ? "waits" : undefined}>{status}</span>
+            {canLink ? <XaButton size="sm" variant="quiet" aria-expanded={open} onClick={() => onOpen(open ? null : client.customerWorkspaceId)}>{open ? "Close owner link" : "New owner link"}</XaButton> : null}
           </div>
-          {canLink ? <StTextButton className="mt-1" aria-expanded={open} onClick={() => onOpen(open ? null : client.customerWorkspaceId)}>{open ? "Close owner link" : "New owner link"}</StTextButton> : null}
-          {open ? <div className="mt-3"><ClientOwnerLink client={client} agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} onClaimed={onClaimed} /></div> : null}
+          {open ? <div className={styles.inline}><ClientOwnerLink client={client} agencyWorkspaceId={agencyWorkspaceId} emailEnabled={emailEnabled} onClaimed={onClaimed} /></div> : null}
         </li>;
       })}
-    </ul>
+    </ul> : null}
   </section>;
 }
