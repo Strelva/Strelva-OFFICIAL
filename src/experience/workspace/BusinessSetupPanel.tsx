@@ -1,16 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/Button";
-import { TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
 import { businessStartHref, businessStartAsk, type BusinessStartProduct } from "@/platform/workspaces/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { gettingStartedHref } from "@/platform/business-signup-release";
 import { requestDraftKey, writeRequestDraft } from "./request-draft";
-import { StCopy, StHead, StNotice, StPill, StTextField } from "@/components/ui/strelva/Kit";
+import { XaButton, XaButtonLink, XaChecklist, XaChoices, XaEntrySteps, XaField, XaHeadline, XaSays, XaStatus, XaTextArea } from "@/components/ui/strelva/Xa";
 
 const choicesSchema = z.object({ actorId: z.string().uuid(), actorEmail: z.string().email(), businesses: z.array(z.object({ id: z.string().uuid(), name: z.string() })) });
 export type { BusinessStartProduct } from "@/platform/workspaces/business-start";
@@ -20,7 +17,11 @@ function message(body: unknown, fallback: string): string {
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
 /** Direct setup opens Getting started. Website help opens agency selection. */
-export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), initialName = "", sourceCheckId, gettingStarted = false, navigate = href => window.location.assign(href) }: { initialRequest?: string; initialName?: string; sourceCheckId?: string; startProduct?: BusinessStartProduct; gettingStarted?: boolean; navigate?: (href: string) => void }) {
+export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct), initialName = "", sourceCheckId, gettingStarted = false, initialKeeps, navigate = href => window.location.assign(href), onDraft }: {
+  initialKeeps?: readonly Keep[]; initialRequest?: string; initialName?: string; sourceCheckId?: string; startProduct?: BusinessStartProduct; gettingStarted?: boolean; navigate?: (href: string) => void;
+  /** The owner door's stage follows the form: the business named so far and the first ask as it forms. */
+  onDraft?: (draft: BusinessDoorDraft) => void;
+}) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
   const [selected, setSelected] = useState("new");
@@ -32,6 +33,9 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
   const [error, setError] = useState("");
   const [signIn, setSignIn] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [keeps, setKeeps] = useState<Set<Keep>>(() => new Set([...(initialKeeps ?? []), ...(initialRequest.trim() ? ["own" as const] : [])]));
+  const [nameMissing, setNameMissing] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
   const active = useRef(false);
   const generation = useRef(0);
   const mutation = useRef(false);
@@ -49,6 +53,8 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
       const result = choicesSchema.safeParse(body);
       if (!result.success) throw new Error("Business access could not be confirmed.");
       setChoices(result.data);
+      // The owner door starts on a business they already manage; a new one is a deliberate pick.
+      if (gettingStarted && startProduct === "help" && result.data.businesses.length) setSelected(result.data.businesses[0]!.id);
       try {
         const raw = sessionStorage.getItem(`strelva:business-entry:${result.data.actorId}`);
         const retained = raw && raw.length <= 20000 ? businessEntryInputSchema.safeParse(JSON.parse(raw)) : null;
@@ -56,25 +62,30 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
           setPending(retained.data);
           setSelected(retained.data.destination.kind === "new" ? "new" : retained.data.destination.workspaceId);
           setName(retained.data.destination.kind === "new" ? retained.data.destination.name : "");
-          setRequest(retained.data.initialRequest || "");
+          // The picks are kept beside the command, so a reload shows the same ticks and the same words.
+          const kept = readKeeps(sessionStorage.getItem(keepsKey(result.data.actorId)));
+          setRequest(kept?.words ?? retained.data.initialRequest ?? "");
+          setKeeps(new Set(kept?.keeps ?? (retained.data.initialRequest ? ["own"] : [])));
         }
       } catch { /* Storage is checked before a new command can be sent. */ }
     }).catch(cause => { if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : "Business access is unavailable."); })
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });
     return () => { active.current = false; generation.current += 1; abort.abort(); };
-  }, [transport, attempt]);
+  }, [transport, attempt, gettingStarted, startProduct]);
 
-  async function save(event: FormEvent<HTMLFormElement>) {
+  async function save(event: FormEvent<HTMLFormElement>, initialRequest: string) {
     event.preventDefault();
     if (!choices || mutation.current) return;
     const version = generation.current;
     const isCurrent = () => active.current && generation.current === version;
     const key = `strelva:business-entry:${choices.actorId}`;
+    if (!pending && selected === "new" && !name.trim()) { setNameMissing(true); nameRef.current?.focus(); return; }
     let command: BusinessEntryInput;
     try {
       if (!pending && selected !== "new" && !choices.businesses.some(item => item.id === selected)) throw new Error("Unknown business");
-      command = pending || businessEntryInputSchema.parse({ destination: selected === "new" ? { kind: "new", name } : { kind: "existing", workspaceId: selected }, initialRequest: startProduct === "website" ? null : request.trim() || null, ...(sourceCheckId ? { sourceCheckId } : {}), idempotencyKey: crypto.randomUUID() });
+      command = pending || businessEntryInputSchema.parse({ destination: selected === "new" ? { kind: "new", name } : { kind: "existing", workspaceId: selected }, initialRequest: startProduct === "website" ? null : initialRequest || null, ...(sourceCheckId ? { sourceCheckId } : {}), idempotencyKey: crypto.randomUUID() });
       sessionStorage.setItem(key, JSON.stringify(command));
+      if (!pending && door) sessionStorage.setItem(keepsKey(choices.actorId), JSON.stringify({ keeps: [...keeps], words: request }));
     } catch { setError("Check the business name and request, and allow session storage. Nothing was sent."); return; }
     mutation.current = true; setPending(command); setSaving(true); setError("");
     try {
@@ -84,7 +95,7 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
       const body: unknown = await response.json().catch(() => null);
       if (!isCurrent()) return;
       if (!response.ok) {
-        if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) { sessionStorage.removeItem(key); setPending(null); }
+        if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) { sessionStorage.removeItem(key); sessionStorage.removeItem(keepsKey(choices.actorId)); setPending(null); }
         if ([401, 403].includes(response.status)) { setChoices(null); setSignIn(response.status === 401); }
         throw new Error(message(body, "Setup is not confirmed. Retry the retained setup before creating another business."));
       }
@@ -104,7 +115,7 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
       if (command.initialRequest && !writeRequestDraft(sessionStorage, requestDraftKey({ actorEmail: choices.actorEmail, workspaceId: result.data.workspaceId }), command.initialRequest)) {
         throw new Error("Your ask is saved, but it could not be carried to Home. Allow session storage, then retry this setup.");
       }
-      sessionStorage.removeItem(key); setPending(null);
+      sessionStorage.removeItem(key); sessionStorage.removeItem(keepsKey(choices.actorId)); setPending(null);
       // Choosing help never assigns an agency or files the owner's intent as an Ask.
       if (startProduct === "website") {
         navigate(`/workspace?${new URLSearchParams({ workspaceId: result.data.workspaceId, view: "help", intent: "website" })}`);
@@ -112,24 +123,79 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
       }
       // Keep a saved Ask draft for Home, after the owner has the first-run context.
       if (gettingStarted && startProduct === "help") {
-        navigate(gettingStartedHref(result.data.workspaceId, result.data.requestId));
+        navigate(gettingStartedHref(result.data.workspaceId, result.data.requestId, null, result.data.askConversationId));
         return;
       }
       navigate(`/workspace?workspaceId=${encodeURIComponent(result.data.workspaceId)}&view=home`);
     } catch (cause) { if (isCurrent()) setError(cause instanceof Error ? cause.message : "Setup is not confirmed. Retry the retained setup."); }
     finally { mutation.current = false; if (isCurrent()) setSaving(false); }
   }
-  if (loading) return <p role="status">Checking the businesses you can manage…</p>;
-  if (!choices) return <section className="space-y-4"><p role="alert">{error || "Business access is unavailable."}</p>{signIn ? <Link href={`/sign-in?next=${encodeURIComponent(sourceCheckId ? `/workspace/business/new?check=${encodeURIComponent(sourceCheckId)}` : businessStartHref(startProduct))}`}>Sign in to continue</Link> : <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Check again</Button>}</section>;
+  const door = gettingStarted && startProduct === "help";
+  const draftName = selected === "new" ? name.trim() : choices?.businesses.find(item => item.id === selected)?.name ?? "";
+  const draftAsk = door && selected === "new" ? composeAsk(keeps, request) : "";
+  const draftExisting = selected !== "new";
+  useEffect(() => { onDraft?.({ name: draftName, ask: draftAsk, existing: draftExisting }); }, [onDraft, draftName, draftAsk, draftExisting]);
+  if (loading) return <p role="status" className="m-0"><XaStatus kind="working">Checking the businesses you can manage</XaStatus></p>;
+  if (!choices) return <section className="flex flex-col items-start gap-4"><XaHeadline>{signIn ? "Sign in again to continue." : "Your businesses didn't load."}</XaHeadline><div role="alert"><XaSays>{error || "Business access is unavailable."}</XaSays></div>{signIn ? <XaButtonLink variant="primary" href={`/sign-in?next=${encodeURIComponent(sourceCheckId ? `/workspace/business/new?check=${encodeURIComponent(sourceCheckId)}` : businessStartHref(startProduct))}`}>Sign in to continue</XaButtonLink> : <XaButton onClick={() => setAttempt(value => value + 1)}>Check again</XaButton>}</section>;
   const locked = saving || Boolean(pending);
-  return <form className="space-y-4" aria-label="Choose your business" onSubmit={event => void save(event)}>
-    <StHead title="Which business is this for?" /><StCopy>Use a business you manage or create one. No website purchase is required. Existing personal work stays separate.</StCopy>
-    {choices.businesses.length ? <SelectInput label="Business" value={selected} disabled={locked} onChange={event => setSelected(event.target.value)} options={[{value:"new",label:"Create a new business"},...choices.businesses.map(item=>({value:item.id,label:item.name}))]} /> : null}
-    {selected === "new" ? <StTextField label="Business name" value={name} maxLength={120} required disabled={locked} onChange={event => setName(event.target.value)} /> : null}
-    {startProduct !== "website" && (startProduct === "help" || request) ? <TextArea label="What do you want to do?" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
-    {pending ? <StNotice>Your setup is saved for recovery. Retrying will not create another business.</StNotice> : null}
-    {error ? <StNotice tone="critical">{error}</StNotice> : null}
-    <StPill type="submit" busy={saving} disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry safely" : startProduct === "website" ? "Continue to agencies" : request.trim() ? "Save business and ask" : "Continue with this business"}</StPill>
-    <StCopy muted>{startProduct === "website" ? "Next, choose an agency and review what it can do. A website proposal is sent only after you choose. Nothing is agreed until scope, timing and price are confirmed." : "Your words are saved as your own ask when no agency is selected. Saving does not accept a price or deadline, start delivery, grant agency access, or send email."}</StCopy>
+  const isNew = selected === "new";
+  const composed = door ? (isNew ? composeAsk(keeps, request) : "") : request.trim();
+  const label = saving ? "Saving" : pending ? "Retry safely" : startProduct === "website" ? "Continue to agencies" : door ? (isNew ? (name.trim() ? `Create ${name.trim()}` : "Create your business") : `Continue with ${choices.businesses.find(item => item.id === selected)?.name ?? "this business"}`) : request.trim() ? "Save business and ask" : "Continue with this business";
+  const ownWords = !door || keeps.has("own");
+  const manage = choices.businesses.length;
+  return <form className="flex flex-col gap-5" aria-label="Choose your business" noValidate onSubmit={event => void save(event, composed)}>
+    {door ? <XaEntrySteps steps={GETTING_STARTED_STEPS} current={0} /> : null}
+    <div className="flex flex-col gap-2">
+      <XaHeadline>Which business is this for?</XaHeadline>
+      {door ? null : <p className="m-0 text-[16px] leading-[21px] text-[var(--st-text-2)]">No website purchase is required. You can rename it later.</p>}
+    </div>
+    {manage ? (door
+      ? <XaChoices variant="list" label="Business" note={manage === 1 ? "You manage this one already." : manage === 2 ? "You manage both already." : `You manage all ${manage} already.`} value={selected} onChange={value => { if (!locked) { setSelected(value); setNameMissing(false); } }}
+        options={[...choices.businesses.map(item => ({ value: item.id, label: item.name, disabled: locked })), { value: "new", label: "A new business", disabled: locked }]} />
+      : <XaChoices label="Business" value={selected} onChange={value => { if (!locked) setSelected(value); }} options={[{ value: "new", label: "A new business", disabled: locked }, ...choices.businesses.map(item => ({ value: item.id, label: item.name, detail: "You manage this one", disabled: locked }))]} />) : null}
+    {isNew ? <XaField ref={nameRef} label="Business name" hint={door ? "You can rename it later." : undefined} error={nameMissing ? "Name your business to continue." : undefined} value={name} maxLength={120} required disabled={locked} autoComplete="organization" onChange={event => { setName(event.target.value); if (event.target.value.trim()) setNameMissing(false); }} /> : null}
+    {door && isNew ? <XaChecklist label="What should Strelva keep for you?" checked={keeps} onChange={(value, on) => { if (locked) return; setKeeps(current => { const next = new Set(current); if (on) next.add(value); else next.delete(value); return next; }); }}
+      items={KEEPS.map(item => ({ value: item.value, label: item.label, disabled: locked }))} /> : null}
+    {(!door || isNew) && ownWords && startProduct !== "website" && (startProduct === "help" || request) ? <XaTextArea label={door ? "In your own words" : "What do you want to do?"} value={request} maxLength={3000} rows={door ? 3 : 5} disabled={locked} placeholder={door ? "Send a reminder the day before each visit" : undefined} onChange={event => setRequest(event.target.value)} /> : null}
+    {pending ? <XaSays>Your setup is saved, so trying again will not make a second business.</XaSays> : null}
+    {error ? <div role="alert"><XaSays>{error}</XaSays></div> : null}
+    <XaButton type="submit" variant="primary" size="lg" block busy={saving} disabled={saving || (!door && selected === "new" && !name.trim())}>{label}</XaButton>
+    <p className="m-0 text-[13px] leading-[1.45] text-[var(--st-text-2)]">{startProduct === "website" ? "Next, choose an agency and review what it can do. A website proposal is sent only after you choose. Nothing is agreed until scope, timing and price are confirmed." : door ? (isNew ? "What you pick is saved as your first ask, in your words. Nothing is built, shared or sent until you say yes." : "Next, Strelva reads the site you already have. Nothing on it changes.") : "Your words are saved as your own ask when no agency is selected. Saving does not accept a price or deadline, start delivery, grant agency access, or send email."}</p>
   </form>;
 }
+
+/** What the owner door shows beside the form while it is filled in. */
+export interface BusinessDoorDraft {
+  /** The business being created, or the one picked. Empty until named. */
+  name: string;
+  /** The first ask as it will be saved, in plain sentences. Empty when nothing is picked. */
+  ask: string;
+  /** A business the owner already manages was picked: nothing new is named or asked. */
+  existing?: boolean;
+}
+
+/** The picks, in order, then the owner's own words: the one sentence the server keeps as the first ask. */
+export function composeAsk(keeps: ReadonlySet<Keep>, words: string): string {
+  return [...KEEPS.filter(item => item.value !== "own" && keeps.has(item.value)).map(item => item.ask), keeps.has("own") ? words.trim() : ""].filter(Boolean).join(" ");
+}
+
+const keepsKey = (actorId: string) => `strelva:business-entry-keeps:${actorId}`;
+function readKeeps(raw: string | null): { keeps: Keep[]; words: string } | null {
+  if (!raw || raw.length > 4000) return null;
+  try {
+    const parsed = z.object({ keeps: z.array(z.enum(["website", "bookings", "form", "own"])).max(4), words: z.string().max(3000) }).safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch { return null; }
+}
+
+/** The three steps of the owner door, shared with Getting started (Pen XA · B2–B4). */
+export const GETTING_STARTED_STEPS = ["Your business", "Your site", "Check it"] as const;
+
+export type Keep = "website" | "bookings" | "form" | "own";
+/** What a new owner can ask Strelva to keep. Each becomes one plain sentence of their first ask. */
+const KEEPS: readonly { value: Keep; label: string; ask: string }[] = [
+  { value: "website", label: "Keep my website working", ask: "Keep my website working." },
+  { value: "bookings", label: "Take bookings", ask: "Take bookings." },
+  { value: "form", label: "Collect a form, like an intake", ask: "Collect a form, like an intake form." },
+  { value: "own", label: "Something else, in my own words", ask: "" },
+];

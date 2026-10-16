@@ -1,10 +1,10 @@
 import { authEmailReady } from "@/components/auth/email-readiness";
 import { invitationEntryIdentity } from "@/server/agency-brand-entry";
 import { AGENCY_IDENTITY_UNAVAILABLE, resolveTenantBrand } from "@/platform/agency-brand/server";
-import { StEntry, StHead, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { StEntry, StHead } from "@/components/ui/strelva/Kit";
+import { SignUpClosed, SignUpDoor } from "@/experience/getting-started/SignUpDoor";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
-import { StChoiceLink } from "@/components/ui/strelva/ChoiceCards";
 import { headers } from "next/headers";
 import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -106,24 +106,7 @@ export default async function SignUpPage({
     // not to a personal workspace with the business one click away in Help.
     const next = asAgency ? AGENCY_START_PATH : invitationTarget || workspaceTarget || accountTarget || BUSINESS_SIGNUP_PATH;
     const identity = await invitationEntryIdentity(invitationTarget);
-    return <StEntry brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} helpHref="/workspace?view=help">
-      <SupabaseSignIn emailReady={authEmailReady()} key={next} next={next} heading={<><StHead title={identity ? `Create access for ${identity.businessName}` : "Create your account"} />{agencyDoor && businessDoor ? <AccountKindChoice selected={asAgency ? "agency" : "business"} next={requestedNext} /> : null}</>} />
-      {identity ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
-      <StTextButton href={`/sign-in?next=${encodeURIComponent(next)}`}>Already have an account? Sign in</StTextButton>
-    </StEntry>;
+    return <SignUpDoor next={next} asAgency={asAgency} doors={agencyDoor && businessDoor} requestedNext={requestedNext} identityName={identity?.businessName ?? null} brand={identity?.brand ?? (invitationTarget ? AGENCY_IDENTITY_UNAVAILABLE : undefined)} emailReady={authEmailReady()} />;
   }
-  return <StEntry helpHref="/workspace?view=help"><StHead title="New accounts open soon" meta="Already have access? Sign in with the email connected to your business. Until then, check your business for free." /><StPillLink href="/audit">Check your business</StPillLink><StTextButton href="/agencies">Want it done for you? Find an agency</StTextButton><StTextButton href="/sign-in">Sign in</StTextButton>{workspaceOpen && agencyDoor ? <StTextButton href="/sign-up?as=agency">Build for clients? Create an agency account</StTextButton> : null}</StEntry>;
-}
-
-function AccountKindChoice({ selected, next }: { selected: "business" | "agency"; next: string | null }) {
-  const href = (kind: "business" | "agency") => {
-    const query = new URLSearchParams();
-    if (kind === "agency") query.set("as", "agency");
-    else if (next) query.set("next", next);
-    return query.size ? `/sign-up?${query}` : "/sign-up";
-  };
-  return <nav aria-label="Who this account is for" className="flex flex-col gap-3">
-    <p className="text-sm text-gray-muted">Who is this for?</p>
-    {(["business", "agency"] as const).map(kind => <StChoiceLink key={kind} href={href(kind)} selected={selected === kind} label={kind === "business" ? "I run a business" : "I build for clients"} detail={kind === "business" ? "Start with your website and business details. Bring in an agency anytime." : "Clients own their workspace; you work inside it."} />)}
-  </nav>;
+  return <SignUpClosed agencyDoor={workspaceOpen && agencyDoor} />;
 }

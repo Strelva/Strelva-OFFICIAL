@@ -14,11 +14,27 @@ import type { FoundFactDecision } from "@/products/found-facts/contracts";
 import { CHECK_RESULT_ID, type CheckForBusiness, type GettingStartedBusiness, type WebsiteReading } from "./contracts";
 import { confirmationValue, foundFactsFromReading, screenFoundFact } from "./found-facts";
 import { businessWebsite, normalizeBusinessWebsite, sameWebsite, websiteHost, websiteLinks } from "./website";
+import { unreadableSite } from "./site-words";
 
 /** The crawl is kept small: the owner is waiting on the page. */
 const READ_LIMITS = { maxPages: 5, timeoutMs: 15_000, maxBytes: 2_000_000 } as const;
 /** How many owned businesses are compared by website before creating another. */
 const REUSE_SCAN_LIMIT = 10;
+
+
+function decodeEntities(text: string): string {
+  return text.replace(/&amp;/g, "&").replace(/&quot;/g, "\"").replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ");
+}
+
+/** The first page's title and description, exactly as the site states them. Nothing is written or guessed. */
+function firstPage(page: { title?: string; html?: string } | undefined): WebsiteReading["page"] {
+  const title = page?.title?.replace(/\s+/g, " ").trim();
+  if (!title) return null;
+  const tag = page?.html?.match(/<meta\b[^>]*\bname=["']description["'][^>]*>/i)?.[0];
+  const content = tag?.match(/\bcontent=["']([^"']*)["']/i)?.[1];
+  const description = content ? decodeEntities(content).replace(/\s+/g, " ").trim().slice(0, 240) : "";
+  return { title: decodeEntities(title).slice(0, 160), description: description || null };
+}
 
 export class GettingStartedInputError extends Error {
   constructor(message: string) { super(message); this.name = "GettingStartedInputError"; }
@@ -166,15 +182,17 @@ export function createGettingStarted(deps: GettingStartedDeps = defaults) {
     if (await deps.rateLimited(`getting-started:read-website:${actor.userId}`, 6, 3_600_000)) throw new GettingStartedRateLimitError();
     let found: ReturnType<typeof extractBusinessFacts>;
     let pagesRead = 0;
+    let page: WebsiteReading["page"] = null;
     try {
       const crawl = await deps.crawl(url, READ_LIMITS);
       pagesRead = crawl.pages.length;
+      page = firstPage(crawl.pages[0]);
       found = deps.extract({ url }, crawl);
     } catch (error) {
-      throw new GettingStartedUnavailableError(error instanceof WebsiteCrawlError ? error.message : "We couldn't read this website. Check the address, or add your details yourself.");
+      throw new GettingStartedUnavailableError(error instanceof WebsiteCrawlError ? unreadableSite(error.code, websiteHost(url) ?? "This website") : "We couldn't read this website. Check the address, or add your details yourself.");
     }
     const staged = await deps.stageFound(actor, workspaceId, foundFactsFromReading(found, record));
-    return { url, revision: record.revision, facts: staged.found.map(fact => screenFoundFact(fact, record)), pagesRead };
+    return { url, revision: record.revision, facts: staged.found.map(fact => screenFoundFact(fact, record)), pagesRead, page };
   }
 
   /**

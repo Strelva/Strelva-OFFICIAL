@@ -99,6 +99,9 @@ tabular figures. Geist Mono is no longer loaded.
 | `XaRollingCount value` | `Xa` | motion "Queue" count | |
 | `XaGlideList as label` | `Xa` | motion "nav" | Selection slides; the page itself swaps instantly |
 
+| `XaEntry account foot stage brand mode width`, `XaEntrySteps`, `XaEntryDoors` | `Xa` | XA · B1–B5 | Added by lane XA-1. Getting in, before a workspace shell exists. The stage hides below 1100 px. |
+| `XaChecklist label items checked onChange listLabel` | `Xa` | XA · B2/B4 "List" | Added by lane XA-1. Several answers ticked in place; row actions sit outside the label. |
+
 ### The yes
 
 `XaYes` is the only way a screen asks for a yes.

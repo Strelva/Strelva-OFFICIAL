@@ -6,6 +6,7 @@ import { GettingStarted, type GettingStartedLinks } from "@/experience/getting-s
 import { StartBusinessFromCheck } from "@/experience/getting-started/StartBusinessFromCheck";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { FoundFact } from "@/products/getting-started/contracts";
+import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 
 vi.mock("next/link", () => ({ default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => createElement("a", { href, ...rest }, children) }));
 
@@ -62,46 +63,78 @@ describe("Start with this fix (owner door)", () => {
 });
 
 describe("Getting started", () => {
+  const business = { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] };
+
   it("keeps the saved check one click away while starting from the website", async () => {
     const check = `/workspace?workspaceId=${BUSINESS}&view=work&work=5a000000-0000-4000-8000-0000000000c1`;
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links: { ...links, check } }), vi.fn());
+    await mount(createElement(GettingStarted, { business, links: { ...links, check } }), vi.fn());
     expect([...container.querySelectorAll("a")].find(link => link.getAttribute("href") === check)?.textContent).toBe("Open saved check");
-    expect(container.querySelector<HTMLInputElement>('input[type="url"]')!.value).toBe("https://northside.example/");
+    // The owner sees the address they would type.
+    expect(container.querySelector<HTMLInputElement>('input[type="url"]')!.value).toBe("northside.example");
+    expect(container.querySelector('[aria-current="step"]')?.textContent).toContain("Your site");
   });
 
-  it("shows the business, its website, the next steps and an honest closed step", async () => {
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links }), vi.fn());
-    expect(container.querySelector("h1")?.textContent).toBe("Northside Bakery");
-    expect(container.textContent).toContain("northside.example");
-    expect(container.querySelector<HTMLInputElement>('input[type="url"]')!.value).toBe("https://northside.example/");
-    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.google)?.textContent).toContain("Connect Google");
-    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.agency)?.textContent).toContain("Bring in an agency");
-    // Keep your site isn't open for this business: no dead link.
-    expect(container.textContent).toContain("Keep your site");
-    expect(container.textContent).toContain("Not open for your business yet.");
+  it("skips to the next steps: one step leads, the rest are one line of links, and focus moves to the new heading", async () => {
+    await mount(createElement(GettingStarted, { business, links }), vi.fn());
+    await act(async () => button("Skip this step")!.click());
+    expect(container.querySelector("h1")?.textContent).toContain("Northside Bakery is set up.");
+    expect(document.activeElement?.closest("h1")).toBe(container.querySelector("h1"));
+    // Keeping the site isn't open for this business, so it never shows as a dead step.
+    expect(container.textContent).not.toContain("Keep your site where it is");
     expect(container.querySelector('a[href*="entry=connect"]')).toBeNull();
+    expect(container.querySelector("h2")?.textContent).toBe("See what AI assistants say about you");
+    expect(container.textContent).toContain("Also:");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.google)?.textContent).toBe("Connect Google");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.agency)?.textContent).toBe("Bring in an agency");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === links.home)?.textContent).toBe("Go to Northside Bakery");
+    expect(container.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
   });
 
-  it("shows a business without a website and its stored waiting facts with the current value", async () => {
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: null, canConfirm: true, revision: 2, waiting: [{ ...found[0]!, current: "716-555-0199", status: "later" }] }, links }), vi.fn());
-    expect(container.textContent).toContain("No website on your business yet.");
-    expect(container.textContent).toContain("Waiting for you");
+  it("leads with keeping the site when that is open, and shows the first ask once with See it", async () => {
+    const open = { ...links, connect: `/workspace/site?workspaceId=${BUSINESS}&entry=connect`, ask: { text: "Keep my website working. Take bookings.", href: `/workspace?workspaceId=${BUSINESS}&view=ask` } };
+    await mount(createElement(GettingStarted, { business, links: open, start: { phase: "next", saved: { added: 4, later: 1 } } }), vi.fn());
+    expect(container.querySelector("h2")?.textContent).toBe("Keep your site where it is");
+    expect(container.textContent).toContain(`Four details added from northside.example. One waits for you on ${XA_PLACE_LABELS.today}.`);
+    expect(container.textContent).toContain("Your first ask: Keep my website working. Take bookings.");
+    expect([...container.querySelectorAll("a")].find(a => a.getAttribute("href") === open.ask.href)?.textContent).toBe("See it");
+  });
+
+  it("says what found nothing, offers adding details as the one primary, and reading another address as a link", async () => {
+    const transport = vi.fn(async () => json({ reading: { url: "https://northside.example/", revision: 2, pagesRead: 1, facts: [] } }));
+    await mount(createElement(GettingStarted, { business, links }), transport);
+    await act(async () => container.querySelector("form")!.requestSubmit());
+    expect(container.textContent).toContain("Strelva read 1 page of northside.example and found nothing to add.");
+    expect(container.textContent).not.toContain("Tick what");
+    const primary = container.querySelector<HTMLAnchorElement>("[data-xa-primary]")!;
+    expect(primary.textContent).toBe("Add details yourself");
+    expect(button("Read another address")).toBeDefined();
+    expect(container.textContent).not.toMatch(/\bI read\b/);
+  });
+
+  it("opens on a business's stored waiting facts with the current value", async () => {
+    await mount(createElement(GettingStarted, { business: { ...business, website: null, waiting: [{ ...found[0]!, current: "716-555-0199", status: "later" }] }, links }), vi.fn());
+    expect(container.querySelector("h1")?.textContent).toBe("Is this right?");
+    expect(container.textContent).toContain("These details wait for you.");
     expect(container.textContent).toContain("Replaces 716-555-0199");
     expect(container.textContent).toContain("You left this for later.");
     expect(container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false);
   });
 
-  it("reads the website, shows found facts with sources, and confirms ticked facts and keeps unticked ones for later", async () => {
+  it("reads the website, shows found facts with their page, and confirms ticked facts and keeps unticked ones for later", async () => {
     const transport = vi.fn(async (_input: string, init?: RequestInit) => {
       const body = JSON.parse(String(init!.body));
       if (body.action === "read_website") return json({ reading: { url: "https://northside.example/", revision: 2, pagesRead: 2, facts: found } });
       return json({ confirmed: 1, removed: 0, later: 1, revision: 3, waiting: [{ ...found[1]!, status: "later" }] });
     });
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links }), transport);
+    await mount(createElement(GettingStarted, { business, links }), transport);
     await act(async () => container.querySelector("form")!.requestSubmit());
-    expect(container.textContent).toContain("Found on northside.example");
-    expect(container.textContent).toContain("“Call (716) 555-0100”");
-    expect(container.querySelector('a[href="https://northside.example/contact"]')?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(container.textContent).toContain("Found on northside.example, 2 pages read.");
+    // Owners see the page by name, never its path; the words found ride along.
+    const source = container.querySelector<HTMLAnchorElement>('a[href="https://northside.example/contact"]')!;
+    expect(source.textContent).toBe("Contact page");
+    expect(source.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(source.title).toContain("Call (716) 555-0100");
+    expect(container.textContent).not.toContain("/contact");
     // Found facts are written only on the owner's click; untick the service first.
     expect(transport.mock.calls.filter(([, init]) => JSON.parse(String(init!.body)).action === "decide_found_facts")).toHaveLength(0);
     const boxes = [...container.querySelectorAll<HTMLInputElement>('ul[aria-label="Found facts"] input[type="checkbox"]')];
@@ -112,17 +145,28 @@ describe("Getting started", () => {
     expect(confirm).toEqual({ action: "decide_found_facts", workspaceId: BUSINESS, revision: 2, decisions: [
       { id: found[0]!.id, decision: "confirm" }, { id: found[1]!.id, decision: "later" },
     ], timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
-    expect(container.textContent).toContain("Added to your business.");
-    expect(container.textContent).toContain("1 detail waits here for later.");
-    expect(container.textContent).toContain("You left this for later.");
+    expect(container.textContent).toContain(`One detail added from northside.example. One waits for you on ${XA_PLACE_LABELS.today}.`);
   });
 
   it("removes a fact marked Not right through decide_found_facts", async () => {
     const transport = vi.fn(async (_input: string, _init?: RequestInit) => json({ removed: 1, revision: 2, waiting: [] }));
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: null, canConfirm: true, revision: 2, waiting: [found[0]!] }, links }), transport);
+    await mount(createElement(GettingStarted, { business: { ...business, website: null, waiting: [found[0]!] }, links }), transport);
     await act(async () => button("Not right")!.click());
     expect(JSON.parse(String(transport.mock.calls[0]![1]?.body))).toEqual({ action: "decide_found_facts", workspaceId: BUSINESS, revision: 2, decisions: [{ id: found[0]!.id, decision: "remove" }] });
     expect(container.querySelector('ul[aria-label="Found facts"]')).toBeNull();
+  });
+
+  it("counts only the ticks still on screen after a fact is marked Not right", async () => {
+    const transport = vi.fn(async (_input: string, init?: RequestInit) => {
+      if (JSON.parse(String(init!.body)).action === "read_website") return json({ reading: { url: "https://northside.example/", revision: 2, pagesRead: 2, facts: found } });
+      return json({ removed: 1, revision: 3, waiting: [found[1]!] });
+    });
+    await mount(createElement(GettingStarted, { business, links }), transport);
+    await act(async () => container.querySelector("form")!.requestSubmit());
+    expect(button("Add 2 details")).toBeDefined();
+    await act(async () => button("Not right")!.click());
+    expect(button("Add 1 detail to Northside Bakery")).toBeDefined();
+    expect(button("Add 2 details")).toBeUndefined();
   });
 
   it("keeps the reading and selected facts when the revision conflicts", async () => {
@@ -130,16 +174,16 @@ describe("Getting started", () => {
       if (JSON.parse(String(init!.body)).action === "read_website") return json({ reading: { url: "https://northside.example/", revision: 2, pagesRead: 2, facts: found } });
       return json({ error: "Your business details changed since this reading. Read the website again." }, 409);
     });
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: "https://northside.example/", canConfirm: true, revision: 2, waiting: [] }, links }), transport);
+    await mount(createElement(GettingStarted, { business, links }), transport);
     await act(async () => container.querySelector("form")!.requestSubmit());
     await act(async () => button("Add 2 details")!.click());
-    expect(container.textContent).toContain("Your business details changed since this reading.");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Your business details changed since this reading.");
     expect([...container.querySelectorAll<HTMLInputElement>('ul[aria-label="Found facts"] input')].map(input => input.checked)).toEqual([true, true]);
-    expect(container.textContent).not.toContain("Added to your business.");
+    expect(container.textContent).not.toContain("Added");
   });
 
   it("does not let a non-owner read or add found facts", async () => {
-    await mount(createElement(GettingStarted, { business: { workspaceId: BUSINESS, name: "Northside Bakery", website: null, canConfirm: false, revision: 0, waiting: [] }, links }), vi.fn());
+    await mount(createElement(GettingStarted, { business: { ...business, website: null, canConfirm: false, revision: 0 }, links }), vi.fn());
     expect(container.textContent).toContain("Only the business owner can add details found on the website.");
     expect(container.querySelector('input[type="url"]')).toBeNull();
   });

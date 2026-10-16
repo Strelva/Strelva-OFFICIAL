@@ -1,0 +1,54 @@
+/* XA checklist. Pen: XA · B2/B4 "List" (padding 4 0, rows 14/16
+   with a 12 gap, a 22 px check, an inset rule from 50 px). */
+.srOnly { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+.checklist { display: flex; min-width: 0; flex-direction: column; gap: 12px; margin: 0; padding: 0; border: 0; }
+.legend { margin-bottom: 12px; padding: 0; color: var(--st-text); font-size: 15px; font-weight: 500; line-height: 20px; }
+
+/* A hairline and the kit's large radius, never a shadow: it is a list, not an ivory card. */
+.list { margin: 0; padding: 4px 0; border: 1px solid var(--st-line); border-radius: var(--st-r-lg); background: var(--st-surface); list-style: none; }
+.item { position: relative; display: flex; align-items: center; }
+.item + .item::before { position: absolute; top: 0; left: 50px; right: 0; height: 1px; background: var(--st-line); content: ""; }
+
+.row { display: flex; min-width: 0; flex: 1; min-height: 56px; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; cursor: pointer; transition: background-color var(--motion-fast) var(--ease-settle); }
+.row:hover { background: color-mix(in srgb, var(--st-hover) 45%, transparent); }
+.row[data-disabled="true"] { cursor: not-allowed; opacity: 0.55; }
+.input { position: absolute; opacity: 0; pointer-events: none; }
+
+.circle {
+  box-sizing: border-box;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  border: 1.5px solid var(--st-line-strong);
+  border-radius: 999px;
+  color: transparent;
+  transition: background-color var(--motion-fast) var(--ease-settle), border-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle);
+}
+.input:checked + .circle { border-color: var(--st-accent); background: var(--st-accent); color: var(--st-on-accent); }
+.input:checked + .circle svg { animation: var(--kf-fade-in) var(--motion-fast) var(--ease-settle) both; }
+.input:focus-visible + .circle { outline: 2px solid var(--st-accent); outline-offset: 3px; }
+
+.text { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.kicker { color: var(--st-text-2); font-size: 13px; line-height: 17px; }
+.label { color: var(--st-text); font-size: 16px; line-height: 21px; overflow-wrap: anywhere; }
+.item:not([data-checked="true"]) .kicker + .label { color: var(--st-text-2); }
+.detail { color: var(--st-text-3); font-size: 13px; line-height: 18px; overflow-wrap: anywhere; }
+.end { display: flex; flex-shrink: 0; align-items: center; color: var(--st-text-3); font-size: 13px; line-height: 17px; }
+
+.actions { display: flex; flex-shrink: 0; align-items: center; padding: 0 16px 0 4px; font-size: 13px; line-height: 18px; }
+/* The untick is the "no". A second no (Not right) shows only where the pointer or focus is. */
+@media (hover: hover) and (pointer: fine) {
+  .actions { opacity: 0; transition: opacity var(--motion-fast) var(--ease-settle); }
+  .item:hover .actions, .item:focus-within .actions { opacity: 1; }
+}
+
+@media (max-width: 767px) {
+  .item { flex-wrap: wrap; }
+  .actions { width: 100%; margin-top: -8px; padding: 0 16px 12px 50px; }
+  .row { align-items: flex-start; }
+  .circle { margin-top: 1px; }
+  .end { display: none; }
+}

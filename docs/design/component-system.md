@@ -20,6 +20,18 @@ exported. API, Pen node per part, motion and the anti-slop checklist:
 [design-notes/XA-FOUNDATION.md](../../design-notes/XA-FOUNDATION.md). Preview:
 `/preview/strelva/xa`.
 
+Lane XA-1 (business door, branch xa/lane-xa1-business-door) adds two kit parts:
+`XaEntry` with `XaEntrySteps` and `XaEntryDoors` (`xa/entry.tsx`, Pen XA ·
+B1–B5): the frame for getting in, with paper and one column on the left and
+the felt stage with Pebble and one caption on the right. It takes an agency
+`brand` so invitation and claim doors never show Strelva in the agency's place.
+`XaChecklist` (`xa/checklist.tsx`, B2 and B4 lists) ticks several answers in
+place on one white surface; `XaChoices` stays the one-answer version.
+`/sign-up`, `/workspace/business/new` (owner door) and
+`/workspace/getting-started` use them. Preview:
+`/preview/strelva/xa/xa1-business-door/b1` to `b6`, each with `?state=` and
+`&mode=dark`.
+
 ## October 11 coherence amendment
 
 [GLOSSARY.md](../../GLOSSARY.md) and

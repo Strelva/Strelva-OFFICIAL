@@ -40,15 +40,23 @@ export const XaTextArea = forwardRef<HTMLTextAreaElement, Omit<TextareaHTMLAttri
 export interface XaOption<T extends string> { value: T; label: ReactNode; detail?: ReactNode; disabled?: boolean; art?: string }
 
 /** One answer from a short list, as open rows with a ring on the chosen one (times, plans, hours). */
-export function XaChoices<T extends string>({ label, name, value, options, onChange, error }: { label: ReactNode; name?: string; value: T | null; options: readonly XaOption<T>[]; onChange: (value: T) => void; error?: ReactNode }) {
+/**
+ * One answer from a short list. `cards` (the default) frames each option;
+ * `list` is a plain radio list with a hairline between rows, for a choice
+ * that sits above other fields (XA · B2 "which business"), so the screen
+ * never stacks cards on cards. `note` says once what holds for every option.
+ */
+export function XaChoices<T extends string>({ label, name, value, options, onChange, error, variant = "cards", note }: { label: ReactNode; name?: string; value: T | null; options: readonly XaOption<T>[]; onChange: (value: T) => void; error?: ReactNode; variant?: "cards" | "list"; note?: ReactNode }) {
   const generated = useId();
   const group = name || generated;
-  return <fieldset className={styles.choices} aria-invalid={error ? true : undefined}>
+  return <fieldset className={styles.choices} data-variant={variant} aria-invalid={error ? true : undefined}>
     <legend className={styles.fieldLabel}>{label}</legend>
+    {note ? <p className={styles.fieldHint}>{note}</p> : null}
     {options.map(option => <label key={option.value} className={styles.choice}>
       <input type="radio" name={group} value={option.value} checked={value === option.value} disabled={option.disabled} onChange={() => onChange(option.value)} />
+      {variant === "list" ? <span className={styles.radio} aria-hidden="true" /> : null}
       <span className={styles.choiceText}><span>{option.label}</span>{option.detail ? <small>{option.detail}</small> : null}</span>
-      <span className={styles.check} aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span>
+      {variant === "cards" ? <span className={styles.check} aria-hidden="true"><Check size={12} strokeWidth={2.6} /></span> : null}
     </label>)}
     {error ? <p className={styles.fieldHint} data-error="true" role="alert">{error}</p> : null}
   </fieldset>;

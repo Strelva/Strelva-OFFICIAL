@@ -59,8 +59,11 @@ describe("owner journey copy and links", () => {
     // The sign-up page no longer carries the dead self-serve signup branch.
     expect(signUpPage).not.toContain("isSelfServeSignup");
     expect(signUpPage).not.toContain('redirectUrl?.startsWith("/onboard")');
-    expect(signUpPage).toContain('<StHead title="New accounts open soon"');
-    expect(signUpPage).toContain('<StPillLink href="/audit">Check your business</StPillLink>');
+    // The closed door lives in SignUpDoor (XA · B1): the free check is its one primary.
+    const signUpDoor = readRepoFile("src/experience/getting-started/SignUpDoor.tsx");
+    expect(signUpPage).toContain("<SignUpClosed ");
+    expect(signUpDoor).toContain(">New accounts open soon.</XaHeadline>");
+    expect(signUpDoor).toContain('<XaButtonLink href="/audit" variant="primary" size="lg" block>Check your business</XaButtonLink>');
   });
 
   it("lands new owners on a single onboarding card, not a wall of welcome panels", () => {

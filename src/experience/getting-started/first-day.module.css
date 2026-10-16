@@ -1,0 +1,9 @@
+/* XA · B6 (T8GU7a): the owner Home composer, the one deliberate centered column. */
+.day { box-sizing: border-box; display: flex; width: 100%; min-height: 100%; align-items: center; justify-content: center; padding: 48px 32px 96px; }
+.lead { display: flex; width: min(600px, 100%); flex-direction: column; gap: 28px; }
+.greeting { display: flex; flex-direction: column; gap: 10px; }
+.quiet { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 20px; }
+.center { box-sizing: border-box; display: grid; min-height: 100%; place-items: center; padding: 48px 24px; }
+@media (max-width: 767px) {
+  .day { align-items: flex-start; padding: 24px 16px 120px; }
+}
