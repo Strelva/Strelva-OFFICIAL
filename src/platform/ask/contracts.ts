@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Ask Strelva in the workspace (docs/product/specs/ask-strelva.md).
  *
@@ -21,6 +23,7 @@ export type AskAuthority = "read" | "draft";
  * Connection and need its grant.
  */
 export const ASK_TOOL_CATALOG = {
+  ask_question: { authority: "read", needsTenant: false, tenant: [] },
   read_system: { authority: "read", needsTenant: true, tenant: ["read_site", "read_section", "show_content", "show_photos", "preview_site", "list_entries", "list_subscribers", "get_suggestions"] },
   read_performance: { authority: "read", needsTenant: true, tenant: ["get_metrics", "explain_traffic", "show_report"] },
   read_history: { authority: "read", needsTenant: true, tenant: ["get_activity"] },
@@ -112,3 +115,52 @@ export const ASK_REFUSALS: Record<AskRefusalCode, string> = {
   custom_code: "Custom code builds aren't something I can do. I can file it for Strelva as a Request.",
   credentials: "Please don't share passwords or keys here. I never need them, and I won't store or repeat them.",
 };
+
+/* ---------- What the person sees of a turn (XA · AS2, AS3, AS6) ---------- */
+
+const plain = (max: number) => z.string().trim().min(1).max(max).regex(/^[^\u0000-\u001f\u007f]+$/);
+
+/**
+ * One bounded question Strelva asks before it drafts, with the answers it
+ * found somewhere (a form, the business record). Answering sends an ordinary
+ * message; nothing is drafted until then.
+ */
+export const askQuestionSchema = z.object({
+  options: z.array(z.object({ label: plain(80), source: plain(60).nullable().optional() }).strict()).min(1).max(8)
+    .refine(options => new Set(options.map(option => option.label)).size === options.length, "Each answer once."),
+  addLabel: plain(80).nullable().optional(),
+}).strict();
+export type AskQuestion = z.infer<typeof askQuestionSchema>;
+
+/** Fact labels a drafted change may show beside it; a closed set so the words stay the glossary's. */
+export const ASK_CHANGE_FACT_LABELS = ["Adds", "Changes", "Removes", "Lists", "Notes", "Assumed"] as const;
+
+/**
+ * How a drafted website change reads to the person deciding: its title, where
+ * it sits, the section as visitors would read it, and what Strelva assumed.
+ * Strelva's description of the draft it saved; the saved draft stays the
+ * record, and the yes approves the saved draft, never this description.
+ */
+export const askChangeShowsSchema = z.object({
+  title: plain(120),
+  placement: plain(80).optional(),
+  section: z.object({ heading: plain(80), lines: z.array(plain(200)).min(1).max(6), note: plain(200).optional() }).strict().optional(),
+  facts: z.array(z.object({ label: z.enum(ASK_CHANGE_FACT_LABELS), value: plain(160) }).strict()).max(6).optional(),
+}).strict();
+export type AskChangeShows = z.infer<typeof askChangeShowsSchema>;
+
+/**
+ * How a new System opened as a Possibility works, in the owner's words: the
+ * steps, what it assumed, and a sample conversation. A sample is labelled as
+ * one; it is never presented as a real customer's messages.
+ */
+export const askPossibilityExplainSchema = z.object({
+  steps: z.array(plain(140)).min(2).max(6),
+  assumed: z.array(plain(160)).max(4).optional(),
+  sample: z.object({
+    with: plain(60),
+    via: plain(80).optional(),
+    lines: z.array(z.object({ from: z.enum(["them", "business"]), text: plain(280) }).strict()).min(2).max(6),
+  }).strict().optional(),
+}).strict();
+export type AskPossibilityExplain = z.infer<typeof askPossibilityExplainSchema>;

@@ -20,7 +20,25 @@ export const XA_ASK_SUGGESTIONS = [
   "Make Book a visit easier to find on phones",
 ];
 
+/** AS1: each idea with the System it touches and what asking it does. */
+export const XA_ASK_IDEAS = [
+  { text: "List the insurance you take on the website", kind: "website", effect: "Waiting in the business record" },
+  { text: "Say you're closed Dec 24 to Jan 1", kind: "bookings", effect: "Changes hours on the site" },
+  { text: "Let patients text to reschedule", kind: "phone", effect: "Makes a new System" },
+  { text: "Make Book a visit easier to find on phones", kind: "website", effect: "64% of visits are on phones" },
+];
+
 const INSURANCE = "Insurance we accept: Delta Dental · Cigna · MetLife · Guardian. Out of network with Aetna, and we still file your claim for you.";
+const SHOWS = {
+  placement: "Right under Hours",
+  section: { heading: "Insurance we accept", lines: ["Delta Dental · Cigna · MetLife · Guardian"], note: "Out of network with Aetna. We still file your claim for you." },
+  facts: [
+    { label: "Adds" as const, value: "An Insurance section under Hours" },
+    { label: "Lists" as const, value: "Delta Dental, Cigna, MetLife, Guardian" },
+    { label: "Notes" as const, value: "Out of network with Aetna, claims still filed" },
+    { label: "Assumed" as const, value: "The menu gets an Insurance link" },
+  ],
+};
 
 function answer(extra: Partial<AskTurnResult> = {}): AskTurnResult {
   return { kind: "answer", items: [], systemId: XA_ASK_SYSTEM, conversationId: null, saved: true, ...extra };
@@ -28,7 +46,8 @@ function answer(extra: Partial<AskTurnResult> = {}): AskTurnResult {
 
 function draftResult(): AskTurnResult {
   return { kind: "draft", systemId: XA_ASK_SYSTEM, conversationId: null, saved: true, items: [{
-    kind: "draft", toolId: "draft_website_change", status: "drafted", ids: [XA_ASK_DRAFT_REF], summary: INSURANCE,
+    kind: "draft", toolId: "draft_website_change", status: "queued", ids: [XA_ASK_DRAFT_REF], summary: INSURANCE,
+    title: "Add your insurance to harbordental.com", shows: SHOWS,
     actor: { kind: "agency", displayName: "North Studio" },
     needsYou: { route: "owner_decides", itemRef: XA_ASK_DRAFT_REF, decideAt: `${BASE}/as5?door=owner` },
   }] };
@@ -40,15 +59,25 @@ const QUESTION: AskMessageView = { id: "as-2", role: "assistant", content: "One 
   addLabel: "Add a plan the form doesn't have",
 } }) };
 const ANSWERED: AskMessageView = { id: "as-3", role: "user", content: "Those three, plus Guardian. Out of network for Aetna, but we still file claims.", result: null };
-const DRAFTED: AskMessageView = { id: "as-4", role: "assistant", content: "Here it is on harbordental.com, right under Hours. Nothing else on the page moves. The menu gets an Insurance link.", result: draftResult() };
+const DRAFTED: AskMessageView = { id: "as-4", role: "assistant", content: "Here it is on harbordental.com, right under Hours. Nothing else on the page moves.", result: draftResult(), at: "2026-10-15T10:14:00" };
 
 export function xaAskMessages(screen: XaAskScreen): AskMessageView[] {
   if (screen === "as1") return [];
   if (screen === "as6") return [
     { id: "s6-1", role: "user", content: "Patients should be able to text us to reschedule", result: null },
-    { id: "s6-2", role: "assistant", content: "I made it as a Possibility, Text to reschedule. A patient texts a new number, Strelva asks what times work, and your front desk confirms it in Requests. It assumed three things: a new number so your main line stays a phone line, no moves inside your scheduling software, and texts after 5 get an answer the next morning.", result: {
+    { id: "s6-2", role: "assistant", content: "Here's how it would work.", result: {
       kind: "possibility", systemId: null, conversationId: null, saved: true, items: [{
-        kind: "possibility", toolId: "open_possibility", status: "opened", ids: ["b7000000-0000-4000-8000-0000000006a1"], summary: "Text to reschedule · Draft",
+        kind: "possibility", toolId: "open_possibility", status: "opened", ids: ["b7000000-0000-4000-8000-0000000006a1"], summary: "Text to reschedule · Draft", title: "Text to reschedule",
+        explain: {
+          steps: ["A patient texts (716) 555-0199", "Strelva asks what times work for them", "Your front desk confirms it in Requests", "The patient gets the confirmed time"],
+          assumed: ["A new number, so your main line stays a phone line.", "Strelva doesn't move appointments in your scheduling software.", "Texts after 5 get an answer the next morning."],
+          sample: { with: "Ana Ruiz", via: "texting (716) 555-0199", lines: [
+            { from: "them", text: "Hi, it's Ana Ruiz. Can I move my Thursday cleaning?" },
+            { from: "business", text: "Hi Ana, sure. What days and times work for you?" },
+            { from: "them", text: "Monday after 1, or Tuesday morning" },
+            { from: "business", text: "Thanks. The front desk will text you a confirmed time tomorrow by 10." },
+          ] },
+        },
         tryHref: `${BASE}/as6?door=owner&tried=1`,
         needsYou: { route: "owner_decides", itemRef: "b7000000-0000-4000-8000-0000000006a1", decideAt: `${BASE}/as6?door=owner` },
       }],
@@ -59,27 +88,14 @@ export function xaAskMessages(screen: XaAskScreen): AskMessageView[] {
   return [...thread, ANSWERED, DRAFTED];
 }
 
-/** AS5: what the decision record says, by the draft's ref. */
+/** AS5: what the decision record says, by the draft's ref (the shape GET /api/workspace/ask returns). */
 export function xaAskOutcomes(screen: XaAskScreen, state: XaAskState): Record<string, AskChangeOutcome> | undefined {
   if (screen !== "as5") return undefined;
-  const asked = [
-    { at: "2026-10-15T10:02:00", text: "Asked for the insurance list", by: { name: "Maya", kind: "agency" as const } },
-    { at: "2026-10-15T10:09:00", text: "Answered one question", by: { name: "Maya", kind: "agency" as const } },
-    { at: "2026-10-15T10:14:00", text: "Sent for a yes", by: { name: "Maya", kind: "agency" as const } },
-  ];
-  if (state === "declined") return { [XA_ASK_DRAFT_REF]: { state: "declined", outcome: null, decidedBy: "Dr. Lin", decidedAt: "2026-10-15T10:41:00", readBackAt: null, steps: [...asked, { at: "2026-10-15T10:41:00", text: "Said not yet", by: { name: "Dr. Lin", kind: "owner" } }] } };
-  if (state === "failed") return { [XA_ASK_DRAFT_REF]: { state: "approved", outcome: "failed", decidedBy: "Dr. Lin", decidedAt: "2026-10-15T10:41:00", readBackAt: null, steps: [...asked,
-    { at: "2026-10-15T10:41:00", text: "Said yes", by: { name: "Dr. Lin", kind: "owner" } },
-    { at: "2026-10-15T10:42:00", text: "Tried to put it live; the page didn't take it", by: { name: "Strelva", kind: "strelva" } }] } };
-  return { [XA_ASK_DRAFT_REF]: {
-    state: "approved", outcome: "done", decidedBy: "Dr. Lin", decidedAt: "2026-10-15T10:41:00", readBackAt: "2026-10-15T10:43:00",
-    steps: [...asked,
-      { at: "2026-10-15T10:41:00", text: "Said yes", by: { name: "Dr. Lin", kind: "owner" } },
-      { at: "2026-10-15T10:42:00", text: "Put it live", by: { name: "Strelva", kind: "strelva" } },
-      { at: "2026-10-15T10:43:00", text: "Read it back on a phone and a laptop", by: { name: "Strelva", kind: "strelva" } }],
-    facts: [["Version", "12 of harbordental.com"], ["Checks", "41 of 41 links work"]],
-    minutes: { person: "Maya", value: 9, to: "Harbor Dental" },
-  } };
+  const base = { sentBy: "North Studio", sentAt: "2026-10-15T10:14:00", decidedBy: "Dr. Lin", decidedAt: "2026-10-15T10:41:00", liveBy: null, liveAt: null, readBackAt: null, reason: null, undo: null };
+  if (state === "declined") return { [XA_ASK_DRAFT_REF]: { ...base, state: "declined", outcome: null } };
+  if (state === "failed") return { [XA_ASK_DRAFT_REF]: { ...base, state: "approved", outcome: "failed", reason: "the page changed after the draft was made" } };
+  return { [XA_ASK_DRAFT_REF]: { ...base, state: "approved", outcome: "done", liveBy: "Strelva", liveAt: "2026-10-15T10:43:00", readBackAt: "2026-10-15T10:43:00", undo: "available",
+    facts: [["What changed", "An Insurance section under Hours on the home page"]] } };
 }
 
 /** Every request terminates here; nothing falls through to the network. */
@@ -91,7 +107,7 @@ export function xaAskTransport(screen: XaAskScreen, state: XaAskState): typeof f
       return json({ conversations: [
         { id: "b7000000-0000-4000-8000-00000000c001", systemId: XA_ASK_SYSTEM, title: "Thanksgiving hours", messageCount: 4, mine: true, updatedAt: "2026-10-12T15:00:00Z" },
         { id: "b7000000-0000-4000-8000-00000000c002", systemId: XA_ASK_SYSTEM, title: "New cleaning prices", messageCount: 6, mine: false, updatedAt: "2026-10-09T15:00:00Z" },
-      ], suggestions: XA_ASK_SUGGESTIONS });
+      ], suggestions: XA_ASK_SUGGESTIONS, ideas: XA_ASK_IDEAS, owner: { name: "Dr. Lin" } });
     }
     if (state === "error") return json({ error: "Strelva can't answer right now. Nothing was changed." }, 503);
     const encoder = new TextEncoder();

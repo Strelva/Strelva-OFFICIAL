@@ -1,5 +1,9 @@
 import { actorLabel, recordedActor, type RecordedActor } from "@/platform/presentation/actor";
-import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+import { STRELVA_HANDLED_LABEL, XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
+import { askChangeShowsSchema, askPossibilityExplainSchema, type AskChangeShows, type AskPossibilityExplain } from "@/platform/ask/contracts";
+import type { AskChangeOutcome } from "@/platform/ask/outcomes";
+
+export type { AskChangeOutcome } from "@/platform/ask/outcomes";
 
 /**
  * Browser-side model for Ask Strelva (docs/product/specs/ask-strelva.md).
@@ -27,6 +31,12 @@ export interface AskReceiptItemView {
   previewHref?: string;
   tryHref?: string;
   needsYou?: { route: string; itemRef: string | null; decideAt: string | null };
+  /** The change or new System by its own name. */
+  title?: string;
+  /** A drafted website change as the decider reads it (AS3): Strelva's description of the saved draft. */
+  shows?: Omit<AskChangeShows, "title">;
+  /** A new System opened as a Possibility, in the owner's words (AS6). */
+  explain?: AskPossibilityExplain;
 }
 
 export interface AskTurnResult {
@@ -60,6 +70,8 @@ export interface AskMessageView {
   /** Assistant message still streaming. */
   pending?: boolean;
   askedOnBehalf?: "email" | "phone" | null;
+  /** When it was said, for saved messages and the turn just sent. */
+  at?: string | null;
 }
 
 export interface AskConversationSummaryView {
@@ -116,6 +128,7 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
       ...(sameAppPath(text(entry.previewHref, 4096)) ? { previewHref: sameAppPath(text(entry.previewHref, 4096)) } : {}),
       ...(sameAppPath(text(entry.tryHref, 4096)) ? { tryHref: sameAppPath(text(entry.tryHref, 4096)) } : {}),
       ...(needs ? { needsYou: { route: text(needs.route, 40), itemRef: typeof needs.itemRef === "string" ? needs.itemRef : null, decideAt: typeof needs.decideAt === "string" ? needs.decideAt : null } } : {}),
+      ...readView(entry),
     }];
   }).slice(0, 20) : [];
   const creationAction = readCreationAction(value.creationAction);
@@ -133,6 +146,65 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
 }
 
 const PLAIN = /^[^\u0000-\u001f\u007f]+$/;
+const SHOWS = askChangeShowsSchema.omit({ title: true });
+
+/** The title, change and explanation a receipt item may carry. Malformed parts are dropped, never the item. */
+function readView(entry: Record<string, unknown>): Pick<AskReceiptItemView, "title" | "shows" | "explain"> {
+  const title = typeof entry.title === "string" && entry.title.trim() && entry.title.length <= 120 && PLAIN.test(entry.title) ? entry.title.trim() : null;
+  const shows = SHOWS.safeParse(entry.shows);
+  const explain = askPossibilityExplainSchema.safeParse(entry.explain);
+  return { ...(title ? { title } : {}), ...(shows.success && Object.keys(shows.data).length ? { shows: shows.data } : {}), ...(explain.success ? { explain: explain.data } : {}) };
+}
+
+const OUTCOME_STATES = new Set(["approved", "declined", "expired", "withdrawn"]);
+const OUTCOME_RESULTS = new Set(["done", "done_unverified", "failed"]);
+const UNDO_STATES = new Set(["available", "needs_review", "unavailable", "undone"]);
+const iso = (value: unknown) => typeof value === "string" && value.length <= 40 && !Number.isNaN(Date.parse(value)) ? value : null;
+const name = (value: unknown) => typeof value === "string" && value.trim() && value.length <= 120 && PLAIN.test(value) ? value.trim() : null;
+
+/** Outcomes from the conversation read, by item ref. Anything malformed is dropped: the draft then reads as waiting. */
+export function readAskOutcomes(raw: unknown): Record<string, AskChangeOutcome> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, AskChangeOutcome> = {};
+  for (const [ref, value] of Object.entries(raw as Record<string, unknown>).slice(0, 50)) {
+    if (!value || typeof value !== "object") continue;
+    const entry = value as Record<string, unknown>;
+    const decidedBy = name(entry.decidedBy);
+    const decidedAt = iso(entry.decidedAt);
+    if (typeof entry.state !== "string" || !OUTCOME_STATES.has(entry.state) || !decidedBy || !decidedAt) continue;
+    const facts = Array.isArray(entry.facts) ? entry.facts.flatMap(row => Array.isArray(row) && row.length === 2 && name(row[0]) && typeof row[1] === "string" && row[1].trim() && row[1].length <= 300 ? [[name(row[0])!, row[1].trim()] as [string, string]] : []).slice(0, 6) : [];
+    out[ref] = {
+      state: entry.state as AskChangeOutcome["state"],
+      outcome: typeof entry.outcome === "string" && OUTCOME_RESULTS.has(entry.outcome) ? entry.outcome as AskChangeOutcome["outcome"] : null,
+      sentBy: name(entry.sentBy), sentAt: iso(entry.sentAt), decidedBy, decidedAt,
+      liveBy: name(entry.liveBy), liveAt: iso(entry.liveAt), readBackAt: iso(entry.readBackAt),
+      reason: typeof entry.reason === "string" && entry.reason.trim() && entry.reason.length <= 300 ? entry.reason.trim() : null,
+      undo: typeof entry.undo === "string" && UNDO_STATES.has(entry.undo) ? entry.undo as AskChangeOutcome["undo"] : null,
+      ...(facts.length ? { facts } : {}),
+    };
+  }
+  return out;
+}
+
+/** Ideas to start from (AS1): the words, the System they touch, and what asking does. */
+export interface AskIdeaView { text: string; kind: string; effect: string | null }
+
+export function readAskIdeas(raw: unknown): AskIdeaView[] | null {
+  if (!Array.isArray(raw) || !raw.length || raw.length > 4) return null;
+  const ideas = raw.flatMap((value): AskIdeaView[] => {
+    if (!value || typeof value !== "object") return [];
+    const entry = value as Record<string, unknown>;
+    const words = typeof entry.text === "string" && entry.text.trim() && entry.text.length <= 300 && PLAIN.test(entry.text) ? entry.text.trim() : null;
+    if (!words) return [];
+    return [{ text: words, kind: typeof entry.kind === "string" && /^[a-z_-]{1,40}$/.test(entry.kind) ? entry.kind : "website", effect: typeof entry.effect === "string" && entry.effect.trim() && entry.effect.length <= 80 && PLAIN.test(entry.effect) ? entry.effect.trim() : null }];
+  });
+  return ideas.length === raw.length ? ideas : null;
+}
+
+/** Only the owner's name: who a drafted change waits for. */
+export function readAskOwner(raw: unknown): string | null {
+  return raw && typeof raw === "object" && "name" in raw ? name((raw as { name: unknown }).name) : null;
+}
 
 function readQuestion(raw: unknown): AskQuestionView | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -163,26 +235,6 @@ export function latestDraft(messages: readonly AskMessageView[]): { message: Ask
   return null;
 }
 
-/**
- * After the yes: what the decision record says happened to a drafted change.
- * Built from the Needs you item state and its What changed receipt
- * (src/platform/needs-you/contracts.ts). The Ask route does not read it yet;
- * callers that have it pass it in by the draft's item ref.
- */
-export interface AskChangeOutcome {
-  state: "approved" | "declined" | "expired" | "withdrawn";
-  outcome: "done" | "done_unverified" | "failed" | null;
-  decidedBy: string;
-  decidedAt: string;
-  /** Read back on the live page, when the receipt records it. */
-  readBackAt: string | null;
-  /** Every step, oldest first, each naming whoever acted. */
-  steps: { at: string; text: string; by: { name: string; kind: "agency" | "owner" | "strelva" } }[];
-  facts?: readonly (readonly [string, string])[];
-  /** Minutes of agency time the record logged, when it logged any. */
-  minutes?: { person: string; value: number; to: string } | null;
-}
-
 export interface ReceiptLine {
   key: string;
   tone: "done" | "waiting" | "failed";
@@ -205,7 +257,7 @@ export function sameAppPath(value: string | null | undefined): string | undefine
 }
 
 const ROUTE_LINE: Record<string, string> = {
-  owner_decides: "Waiting on the owner in Needs you. Nothing is live until they say yes.",
+  owner_decides: `Waiting on the owner in ${XA_PLACE_LABELS.today}. Nothing is live until they say yes.`,
   strelva_reviews: "It is reviewed first. Nothing is live yet.",
   handle_after_notice: "The change will be made after a notice. Nothing is live yet.",
   handle: `The change will be made and reported under ${STRELVA_HANDLED_LABEL}.`,
@@ -228,7 +280,8 @@ export function receiptLines(result: AskTurnResult): ReceiptLine[] {
     }
     if (item.kind === "possibility") {
       const openHref = sameAppPath(item.tryHref) ?? sameAppPath(item.previewHref);
-      return [{ key, tone: "done", text: `Opened a Possibility: ${item.summary || "an alternative"}. Nothing live changed. Make it live is a separate step.`, ...(openHref ? { openHref, openLabel: item.tryHref ? "Try it" : "Open preview" } : {}), decideHref: sameAppPath(item.needsYou?.decideAt), ref }];
+      const made = item.title ?? (item.summary.replace(/ · Draft$/, "") || "it");
+      return [{ key, tone: "done", text: `I made ${made}. Nothing is on until it's turned on.`, ...(openHref ? { openHref, openLabel: item.tryHref ? "Try it" : "Open preview" } : {}), decideHref: sameAppPath(item.needsYou?.decideAt), ref }];
     }
     return [{ key, tone: "done", text: `Request filed${item.agencyName ? ` for ${item.agencyName}` : ""}: ${item.summary || "your request"}. It's at Asked; scope and timing are agreed with you next.${item.actor ? ` Filed by ${actorLabel(item.actor)}.` : ""}`, ref }];
   });

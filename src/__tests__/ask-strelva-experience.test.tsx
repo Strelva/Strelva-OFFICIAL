@@ -15,7 +15,7 @@ describe("Ask Strelva receipts", () => {
       { kind: "draft", toolId: "draft_website_change", status: "queued", ids: ["evt_1"], summary: "Homepage hero", needsYou: { route: "owner_decides", itemRef: "evt_1", decideAt: "/dashboard/review" } },
     ] } })!;
     expect(result).toMatchObject({ kind: "draft", saved: true, conversationId: "c1" });
-    expect(receiptLines(result)).toEqual([{ key: expect.any(String), tone: "waiting", text: "Drafted: Homepage hero. Waiting on the owner in Needs you. Nothing is live until they say yes.", decideHref: "/dashboard/review", ref: "evt_1" }]);
+    expect(receiptLines(result)).toEqual([{ key: expect.any(String), tone: "waiting", text: "Drafted: Homepage hero. Waiting on the owner in Today. Nothing is live until they say yes.", decideHref: "/dashboard/review", ref: "evt_1" }]);
   });
 
   it("names each of the four results honestly", () => {
@@ -23,7 +23,7 @@ describe("Ask Strelva receipts", () => {
     expect(receiptLines(request)[0]!.text).toBe("Request filed: A private events page. It's at Asked; scope and timing are agreed with you next.");
     expect(receiptLines(request)[0]!.text).not.toMatch(/accepted/i);
     const possibility = readAskResult({ kind: "possibility", items: [{ kind: "possibility", toolId: "open_possibility", status: "opened", ids: ["p1"], summary: "Consult booking · Draft" }] })!;
-    expect(receiptLines(possibility)[0]!.text).toContain("Nothing live changed");
+    expect(receiptLines(possibility)[0]!.text).toBe("I made Consult booking. Nothing is on until it's turned on.");
     const answer = readAskResult({ kind: "answer", items: [] })!;
     expect(receiptLines(answer)).toEqual([]);
     expect(resultHeadline(answer)).toBe("Answered from what Strelva read. Nothing changed.");
@@ -71,7 +71,8 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).toContain("What does greatlakesdriedfruit.com do today?");
     expect(html).not.toContain("estate planning");
     expect(html).not.toContain("holiday gift boxes");
-    expect(html).toContain("Saying yes in this conversation never approves anything.");
+    // The rule is said once, beside the change it protects; never as a line under every thread.
+    expect(html).not.toContain("Saying yes in this conversation never approves anything.");
     expect(html).toContain("Loading conversations");
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
   });
@@ -81,7 +82,7 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).toContain("Who asked for this?");
     expect(html).toContain("The owner, by email");
     expect(html).toContain("The owner, by phone");
-    expect(html).toContain("The owner still decides in Needs you.");
+    expect(html).toContain("The owner still decides, in Today.");
     const owner = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm" }));
     expect(owner).not.toContain("Who asked for this?");
   });
@@ -99,10 +100,10 @@ describe("Ask continuations", () => {
     for (const raw of [{ ask: { kind: "possibility", items: [item], saved: true } }, { kind: "possibility", items: [item], saved: true }]) {
       const result = readAskResult(raw)!;
       expect(receiptLines(result)[0]).toMatchObject({ openHref: "/try/signed-revision", openLabel: "Try it" });
-      const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Harbor Dental", initialMessages: [{ id: "p", role: "assistant", content: "Ready to try.", result }] }));
+      const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "Harbor Dental", decider: { name: "you", you: true }, initialMessages: [{ id: "p", role: "assistant", content: "Ready to try.", result }] }));
       expect(html).toContain('href="/try/signed-revision"');
-      expect(html).toContain(`href="/workspace?workspaceId=${WS}&amp;view=needs-you"`);
-      expect(html).toContain("Make it live is a separate step");
+      expect(html).toMatch(new RegExp(`href="/workspace\\?workspaceId=${WS}&amp;view=needs-you"[^>]*>Turn it on<`));
+      expect(html).toContain("Nothing is on until you turn it on.");
     }
   });
   it.each(["https://evil.example/try", "//evil.example/try", "/\\evil.example", "/try/../../outside", "/try/\nunsafe"])("drops unsafe candidate links %s", tryHref => {

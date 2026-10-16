@@ -9,7 +9,7 @@
  * move to these parts.
  */
 export { XaButton, XaButtonLink, XaIconButton, XaTextLink, type XaButtonSize, type XaButtonVariant } from "./xa/actions";
-export { XaDot, XaInitial, XaKbd, XaMark, XaStatus, type XaStatusKind } from "./xa/state";
+export { XaDot, XaInitial, XaKbd, XaMark, XaStatus, xaInitialOf, type XaStatusKind } from "./xa/state";
 export { XA_POSES, XA_SYSTEM_KINDS, XaAddTile, XaPebbleAvatar, XaPebbleScene, XaSystemTile, xaSystemKind, type XaPose, type XaSystemKind } from "./xa/characters";
 export { XaComposer, XaWaiting, type XaComposerScope, type XaComposerSystem, type XaWaitingItem } from "./xa/composer";
 export { XaStream, XaWorking, type XaWorkingStep } from "./xa/working";

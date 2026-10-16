@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ operator: vi.fn(async () => false), actor: vi.fn(), rpc: vi.fn(), record: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
+const mocks = vi.hoisted(() => ({ operator: vi.fn(async () => false), actor: vi.fn(), rpc: vi.fn(), record: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true),
+  needsYouOn: vi.fn(() => false), decisions: vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []), handled: vi.fn(async (..._args: unknown[]): Promise<unknown[]> => []) }));
+
+vi.mock("@/experience/workspace/needs-you-server", () => ({
+  needsYouReleaseEnabled: () => mocks.needsYouOn(),
+  needsYouService: () => ({ sync: async () => undefined }),
+  needsYouStore: { list: (...args: unknown[]) => mocks.decisions(...args), handled: (...args: unknown[]) => mocks.handled(...args), policies: async () => [], linkedTenants: async () => [] },
+}));
 
 vi.mock("@/platform/business-record/service", async importOriginal => ({ ...await importOriginal<typeof import("@/platform/business-record/service")>(), readBusinessRecord: (...args: unknown[]) => mocks.record(...args) }));
 
@@ -28,7 +35,7 @@ const CONVERSATION = "44444444-4444-4444-8444-444444444444";
 const get = (query: string) => GET(new Request(`http://localhost/api/workspace/ask?${query}`));
 
 describe("GET /api/workspace/ask (conversation history)", () => {
-  beforeEach(() => { mocks.operator.mockReset(); mocks.operator.mockResolvedValue(false); mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.record.mockReset(); mocks.record.mockResolvedValue(null); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
+  beforeEach(() => { mocks.operator.mockReset(); mocks.operator.mockResolvedValue(false); mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.record.mockReset(); mocks.record.mockResolvedValue(null); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); mocks.needsYouOn.mockReset(); mocks.needsYouOn.mockReturnValue(false); mocks.decisions.mockReset(); mocks.decisions.mockResolvedValue([]); mocks.handled.mockReset(); mocks.handled.mockResolvedValue([]); });
   afterEach(() => { for (const key of ENV) delete process.env[key]; });
 
   it("is off with the release and reads no session", async () => {
@@ -63,12 +70,59 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       expect(mocks.rpc).toHaveBeenCalledWith("list_ask_conversations", expect.objectContaining({ p_workspace_id: WS, p_system_id: CONVERSATION }));
     });
 
+    it("joins each draft's decision and receipt into the conversation read, as the reader", async () => {
+      const actor = { userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" };
+      const ref = "55555555-5555-4555-8555-555555555555";
+      mocks.actor.mockResolvedValue(actor);
+      mocks.needsYouOn.mockReturnValue(true);
+      mocks.rpc.mockResolvedValue({ data: { id: CONVERSATION, systemId: null, title: "Insurance", mine: true, updatedAt: "2026-10-15T10:43:00Z", messages: [
+        { id: "66666666-6666-4666-8666-666666666666", seq: 1, role: "assistant", content: "Here it is.", askedOnBehalf: null, createdAt: "2026-10-15T10:14:00Z",
+          result: { kind: "draft", items: [{ kind: "draft", status: "queued", ids: [ref], summary: "Insurance", needsYou: { route: "owner_decides", itemRef: ref, decideAt: "/workspace" } }] } },
+      ] }, error: null });
+      mocks.decisions.mockResolvedValue([
+        { id: ref, state: "approved", outcome: "done", outcomeReason: null, receiptRef: "r1", decidedByKind: "owner_link", decidedAt: "2026-10-15T10:41:00Z", openedAt: "2026-10-15T10:14:00Z", actor: { kind: "agency", displayName: "North Studio" }, decidedActor: null },
+        { id: "77777777-7777-4777-8777-777777777777", state: "approved", outcome: "done", outcomeReason: null, receiptRef: null, decidedByKind: "session", decidedAt: "2026-10-15T10:41:00Z", openedAt: "2026-10-15T10:00:00Z" },
+      ]);
+      mocks.handled.mockResolvedValue([{ id: "r1", store: "tenant_events", systemId: null, sentence: "Strelva put it live", at: "2026-10-15T10:43:00Z", changed: null, actor: { kind: "platform" }, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "undo" } }, { garbage: true }]);
+      mocks.record.mockResolvedValue({ facts: { owner_recipient: { value: { email: "lin@example.test", name: "Dr. Amy Lin" } } }, services: [], people: [] });
+      const body = await (await get(`workspaceId=${WS}&conversationId=${CONVERSATION}`)).json();
+      expect(Object.keys(body.outcomes)).toEqual([ref]);
+      expect(body.outcomes[ref]).toMatchObject({ state: "approved", outcome: "done", sentBy: "North Studio", decidedBy: "Dr. Amy Lin", liveBy: "Strelva", readBackAt: "2026-10-15T10:43:00Z", undo: "available" });
+      expect(JSON.stringify(body)).not.toContain("lin@example.test");
+      expect(mocks.decisions).toHaveBeenCalledWith(actor, WS, true);
+      expect(mocks.handled).toHaveBeenCalledWith(actor, WS, "2026-10-15T10:14:00Z");
+    });
+
+    it("leaves drafts as saved when the decision store is off or down", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.rpc.mockResolvedValue({ data: { id: CONVERSATION, systemId: null, title: "x", mine: true, updatedAt: "2026-10-15T10:43:00Z", messages: [
+        { id: "66666666-6666-4666-8666-666666666666", seq: 1, role: "assistant", content: "Here.", askedOnBehalf: null, createdAt: "2026-10-15T10:14:00Z", result: { kind: "draft", items: [{ kind: "draft", needsYou: { itemRef: "r" } }] } },
+      ] }, error: null });
+      expect(await (await get(`workspaceId=${WS}&conversationId=${CONVERSATION}`)).json()).not.toHaveProperty("outcomes");
+      mocks.needsYouOn.mockReturnValue(true);
+      mocks.decisions.mockRejectedValue(new Error("down"));
+      const response = await get(`workspaceId=${WS}&conversationId=${CONVERSATION}`);
+      expect(response.status).toBe(200);
+      expect(await response.json()).not.toHaveProperty("outcomes");
+    });
+
+    it("names the owner from the business record, never their email", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.rpc.mockResolvedValue({ data: [], error: null });
+      mocks.record.mockResolvedValue({ facts: { owner_recipient: { value: { email: "lin@example.test", name: "Dr. Amy Lin" } } }, services: [], people: [] });
+      const body = await (await get(`workspaceId=${WS}`)).json();
+      expect(body.owner).toEqual({ name: "Dr. Amy Lin" });
+      expect(JSON.stringify(body)).not.toContain("lin@example.test");
+    });
+
     it("returns fact-grounded suggestions only after authorized history access", async () => {
       mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
       mocks.rpc.mockResolvedValue({ data: [], error: null });
       mocks.record.mockResolvedValue({ facts: { display_name: { value: "Harbor Dental" } }, services: [{ name: "Dental cleaning", active: true, verified: true }] });
       const body = await (await get(`workspaceId=${WS}`)).json();
       expect(body.suggestions).toContain("Draft a clearer explanation of our Dental cleaning service.");
+      expect(body.ideas).toContainEqual({ text: "Draft a clearer explanation of our Dental cleaning service.", kind: "website", effect: "Drafts a site change for a yes" });
+      expect(body).not.toHaveProperty("owner");
       expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ userId: "cccccccc-0000-4000-8000-000000000001" }), WS);
       expect(body).not.toHaveProperty("record");
     });

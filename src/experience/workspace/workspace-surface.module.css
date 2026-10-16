@@ -3,6 +3,8 @@
 .home { max-width:1056px; padding-top:clamp(64px,12vh,144px); }
 .page { max-width:1056px; }
 .detail { max-width:1200px; }
+/* Ask Strelva draws its own frame: the conversation column and the change beside it (XA · AS1 to AS6). */
+.detail[data-place="ask"] { max-width:none; padding:0; }
 .welcome { max-width:720px; }
 .welcome > .primaryAction { margin-top:24px; }
 .eyebrow { margin:0 0 16px; color:var(--accent-text); font-size:12px; font-weight:500; }

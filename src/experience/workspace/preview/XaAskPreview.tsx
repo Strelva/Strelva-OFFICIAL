@@ -5,11 +5,12 @@
  * Every request ends in the fixture transport: nothing is filed, sent or
  * published, and nothing reaches a real business.
  */
-import { useMemo } from "react";
-import { AskStrelva } from "@/experience/ask/AskStrelva";
+import { useMemo, useState } from "react";
+import { AskStrelva, type AskScopeOption } from "@/experience/ask/AskStrelva";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import type { StrelvaClientLink, StrelvaPinnedItem } from "@/experience/app-frame/workspace-places";
 import { XA_ASK_SYSTEM, XA_ASK_WORKSPACE, xaAskMessages, xaAskOutcomes, xaAskTransport, type XaAskScreen, type XaAskState } from "./xa-ask-fixture";
+import surface from "../workspace-surface.module.css";
 import styles from "./xa-ask-preview.module.css";
 
 const BASE = "/preview/strelva/xa/xa5-ask";
@@ -22,13 +23,25 @@ export function XaAskPreview({ screen, state, door, mode }: { screen: XaAskScree
   const outcomes = useMemo(() => xaAskOutcomes(screen, state), [screen, state]);
   const owner = door === "owner";
   const making = screen === "as6";
-  const ask = <div className={styles.scroll} data-workspace-scroll>
-    <AskStrelva key={`${screen}:${state}:${door}`} workspaceId={XA_ASK_WORKSPACE} businessName="Harbor Dental" systemId={making ? null : XA_ASK_SYSTEM} systemName={making ? undefined : "Website"} systemKind="website" address="harbordental.com"
-      decider={owner ? { name: "Dr. Lin", you: true } : { name: "Dr. Lin", you: false }} outcomes={outcomes} initialChangeView={screen === "as4" ? "sees" : "change"}
+  // The scope chip opens this picker; picking re-scopes the next conversation, as WorkspaceLayout does with openAsk.
+  const [scoped, setScoped] = useState<string | null>(making ? null : XA_ASK_SYSTEM);
+  const scopes: AskScopeOption[] = [
+    { id: null, label: "Harbor Dental", state: "live" },
+    { id: XA_ASK_SYSTEM, label: "Website", kind: "website", state: "live" },
+    { id: "b7000000-0000-4000-8000-0000000005b2", label: "Bookings", kind: "bookings", state: "live" },
+    { id: "b7000000-0000-4000-8000-0000000005b3", label: "Inbox", kind: "inbox", state: "live" },
+  ];
+  const scopedName = scopes.find(option => option.id === scoped && option.id)?.label;
+  // The same scroll container and detail frame WorkspaceLayout renders /workspace?view=ask in, so sticky and scroll match the real route.
+  const ask = <div className={surface.scroll} data-workspace-scroll><div className={surface.detail} data-place="ask">
+    {/* The agency door passes no decider: the owner's name comes from the route (GET owner), as in production. */}
+    <AskStrelva key={`${screen}:${state}:${door}:${scoped ?? "business"}`} workspaceId={XA_ASK_WORKSPACE} businessName="Harbor Dental" systemId={scoped} systemName={scopedName} systemKind={scopes.find(option => option.id === scoped)?.kind ?? "website"} systemState="live" address="harbordental.com"
+      decider={owner ? { name: "you", you: true } : undefined} outcomes={outcomes} initialChangeView={screen === "as4" ? "sees" : "change"}
+      scopes={scopes} onScope={setScoped}
       request={request} initialMessages={messages}
       readOnly={state === "readonly"} readOnlyReason={owner ? "Work in this workspace has stopped. Earlier conversations stay readable." : "Harbor Dental shared this with North Studio to review. You can read, not ask."}
       refusalLinks={{ needsYou: href("as4"), help: href("as1") }} />
-  </div>;
+  </div></div>;
   const shell = { appBase: "/preview/strelva", signOut: null, systemsReleased: true, mode, active: "ask" as const, title: "Ask Strelva",
     notice: <p className={styles.notice}>Fictional preview. Nothing here reaches a real business.</p> };
 
