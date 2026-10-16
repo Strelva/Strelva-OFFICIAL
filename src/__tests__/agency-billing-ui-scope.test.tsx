@@ -73,7 +73,7 @@ it("aborts a prior client command and keeps its late response/error out of the c
       }),
     ),
   );
-  await act(async () => button(node, "Create accepted checkout").click());
+  await act(async () => button(node, "Make the payment page").click());
   const selector = node.querySelector<HTMLSelectElement>("select[id]")!;
   const agreements = [
     ...node.querySelectorAll<HTMLSelectElement>("select"),
@@ -100,7 +100,7 @@ it("aborts a prior client command and keeps its late response/error out of the c
   );
   expect(signal?.aborted).toBe(true);
   expect(node.textContent).toContain("$9.00");
-  expect(button(node, "Create accepted checkout").disabled).toBe(false);
+  expect(button(node, "Make the payment page").disabled).toBe(false);
   await act(async () =>
     old.resolve(
       Response.json({ error: "First client provider failed" }, { status: 503 }),
@@ -174,7 +174,7 @@ it("late accepted invoice commands cannot change a newly selected invoice or its
       }),
     ),
   );
-  await act(async () => button(node, "Create accepted checkout").click());
+  await act(async () => button(node, "Make the payment page").click());
   await act(async () =>
     root.render(
       createElement(AgencyInvoiceAcceptance, {
@@ -185,7 +185,7 @@ it("late accepted invoice commands cannot change a newly selected invoice or its
     ),
   );
   expect(signal?.aborted).toBe(true);
-  expect(button(node, "Create accepted checkout").disabled).toBe(false);
+  expect(button(node, "Make the payment page").disabled).toBe(false);
   await act(async () =>
     old.resolve(
       Response.json({ ...invoice("one", "Wrong old command"), status: "paid" }),
@@ -214,6 +214,7 @@ it("offers agency names from scoped server options with no workspace UUID textbo
       }),
     ),
   );
+  await act(async () => button(node, "Change who pays").click());
   await act(async () =>
     node
       .querySelector<HTMLInputElement>('input[type="radio"][value="agency"]')!
@@ -241,10 +242,10 @@ it("shows receipt review without inviting another payment", async () => {
     ),
   );
   expect(node.querySelector("[role=alert]")?.textContent).toContain(
-    "Payment needs review",
+    "doesn't match the price",
   );
-  expect(node.textContent).not.toContain("Payment is confirmed");
-  expect(node.textContent).not.toContain("Pay this agreement");
+  expect(node.textContent).not.toContain("Stripe confirmed the payment");
+  expect(node.textContent).not.toContain("Pay your agency");
 });
 it("separates exact payment confirmation from unconfirmed subscription activity", async () => {
   const { node, root } = host();
@@ -262,12 +263,12 @@ it("separates exact payment confirmation from unconfirmed subscription activity"
     ),
   );
   expect(node.textContent).toContain(
-    "Payment is confirmed for these accepted terms",
+    "Stripe confirmed the payment for this price",
   );
   expect(node.textContent).toContain(
-    "subscription’s current state still needs reconciliation",
+    "Stripe hasn’t confirmed next month’s yet",
   );
-  expect(node.textContent).not.toContain("Pay this agreement");
+  expect(node.textContent).not.toContain("Pay your agency");
 });
 
 it.each(["coming_soon", "setup_required", "unavailable"] as const)(
@@ -290,13 +291,13 @@ it.each(["coming_soon", "setup_required", "unavailable"] as const)(
         }),
       ),
     );
-    const checkout = button(node, "Create accepted checkout");
+    const checkout = button(node, "Make the payment page");
     expect(checkout.disabled).toBe(true);
     await act(async () => checkout.click());
     expect(request).not.toHaveBeenCalled();
     expect(node.textContent).not.toContain("Open payment page");
     if (status === "coming_soon")
-      expect(node.textContent).toContain("Checkout opens later");
+      expect(node.textContent).toContain("Payment pages aren't open yet");
   },
 );
 it("keeps checkout fail-closed when the caller omits payment readiness", async () => {
@@ -309,8 +310,8 @@ it("keeps checkout fail-closed when the caller omits payment readiness", async (
       createElement(AgencyInvoiceAcceptance, { invoiceId: "one", request }),
     ),
   );
-  expect(button(node, "Create accepted checkout").disabled).toBe(true);
-  expect(node.textContent).toContain("can charge this once checkout opens");
+  expect(button(node, "Make the payment page").disabled).toBe(true);
+  expect(node.textContent).toContain("can take payment once payment pages open");
   expect(node.textContent).not.toContain("Status");
 });
 it("offers serving agencies without suggesting the owner join their team", async () => {
@@ -332,13 +333,14 @@ it("offers serving agencies without suggesting the owner join their team", async
       }),
     ),
   );
+  await act(async () => button(node, "Change who pays").click());
   await act(async () =>
     node
       .querySelector<HTMLInputElement>('input[type="radio"][value="agency"]')!
       .click(),
   );
-  expect(node.textContent).toContain("No agency is serving this business yet");
-  expect(node.textContent).toContain("You do not need to join its team");
+  expect(node.textContent).toContain("No agency works with this business yet");
+  expect(node.textContent).toContain("You don't join its team");
   expect(node.textContent).not.toContain("Ask its owner for an invitation");
 });
 it("filters the response inbox to the current business after accepting an agency payer", async () => {
@@ -386,7 +388,7 @@ it("filters the response inbox to the current business after accepting an agency
       }),
     ),
   );
-  await act(async () => button(node, "Accept future payer role").click());
+  await act(async () => button(node, "Agree to pay").click());
   expect(node.textContent).not.toContain("Other agency");
   expect(node.textContent).not.toContain("Pending ·");
   expect(node.textContent).toContain("Cedar");

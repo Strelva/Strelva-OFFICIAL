@@ -1,5 +1,6 @@
 "use client";
-import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
+import { monthChoices } from "@/experience/workspace/money/period";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -37,12 +38,12 @@ const recordedDay = (iso: string | null | undefined) => {
     : "a date that was not recorded";
 };
 const STATE_WORDS = {
-  creator: "The creator maintains it",
-  tapered: "The creator's share tapers",
-  takeover: "Taken over; the creator stops earning on future payments",
+  creator: "You look after it",
+  tapered: "You look after it, for a smaller share over time",
+  takeover: "Someone else took it over; you stop earning on new payments",
 } as const;
 const unknownMessage =
-  "This maintenance change could not be confirmed. Reload its history before recording different terms.";
+  "Strelva couldn't confirm that change. Reload to see what was saved before trying something else.";
 
 export default function CreatorMaintenance({
   graph,
@@ -53,7 +54,7 @@ export default function CreatorMaintenance({
   listingNames?: Readonly<Record<string, string>>;
 }) {
   const nameOf = (listing: { sourceRevisionId: string }, index: number) =>
-    listingNames[listing.sourceRevisionId] ?? `Listed System ${index + 1}`;
+    listingNames[listing.sourceRevisionId] ?? `App ${index + 1}`;
   const rateOf = (version: string | null | undefined) => {
     const agreement = graph.agreements.find((item) => item.version === version);
     return agreement ? `${agreement.rateBps / 100}% of each payment` : null;
@@ -83,7 +84,9 @@ export default function CreatorMaintenance({
   const [listingId, setListingId] = useState("");
   const [state, setState] = useState("");
   const [agreementIndex, setAgreementIndex] = useState("");
-  const [effective, setEffective] = useState("");
+  // Changes start on the first of a coming month: a choice, never a raw date-and-time picker.
+  const startMonths = monthChoices(13).slice(1);
+  const [effective, setEffective] = useState(startMonths[0]!.start);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<string | null>(null);
@@ -136,12 +139,12 @@ export default function CreatorMaintenance({
     setError(null);
     setReceipt(null);
     if (!listing || !["creator", "takeover", "tapered"].includes(state)) {
-      invalidInput("Choose a listing and maintenance state.");
+      invalidInput("Choose the app and who looks after it.");
       return;
     }
     const date = new Date(effective);
     if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) {
-      invalidInput("Choose a future maintenance date.");
+      invalidInput("Choose a month that hasn't started yet.");
       return;
     }
     if (
@@ -152,7 +155,7 @@ export default function CreatorMaintenance({
           date.getTime() >= Date.parse(agreement.effectiveUntil)))
     ) {
       invalidInput(
-        "Choose a recorded agreement covering this maintenance date.",
+        "Choose an agreement that covers the month you picked.",
       );
       return;
     }
@@ -199,7 +202,7 @@ export default function CreatorMaintenance({
           setError(
             refusal.success
               ? refusal.data.error
-              : "Maintenance was not recorded. Check these terms before trying again.",
+              : "That wasn't saved. Check what you chose before trying again.",
           );
         }
         return;
@@ -220,7 +223,7 @@ export default function CreatorMaintenance({
         return;
       }
       setReceipt(
-        `Maintenance terms recorded for ${recordedDay(parsed.data.effective_from)}. No payment or agency change was made.`,
+        `Saved. It starts ${recordedDay(parsed.data.effective_from)}. No money moved and no agency changed.`,
       );
       submittedGraph.current = null;
       router.refresh();
@@ -240,7 +243,7 @@ export default function CreatorMaintenance({
     <div ref={sectionRef} className={xa.form}>
       <div className={xa.block}>
         <h2 ref={historyRef} tabIndex={-1} className={xa.heading}>
-          Systems you list
+          What you&apos;ve offered
         </h2>
         {graph.listings.length ? (
           <ul className={xa.section}>
@@ -250,14 +253,14 @@ export default function CreatorMaintenance({
                 <p className={xa.body}>
                   {STATE_WORDS[item.maintainerState]}
                   {item.agreementVersion
-                    ? ` under ${item.agreementVersion}${rateOf(item.agreementVersion) ? `, ${rateOf(item.agreementVersion)}` : ""}`
-                    : ", with no written agreement yet"}
+                    ? `, under ${item.agreementVersion}${rateOf(item.agreementVersion) ? `, ${rateOf(item.agreementVersion)}` : ""}`
+                    : ", with no agreement yet"}
                   .
                 </p>
                 {item.history.length ? (
                   <ul
                     className={xa.section}
-                    aria-label={`Maintenance history for ${nameOf(item, index)}`}
+                    aria-label={`Earlier changes to ${nameOf(item, index)}`}
                   >
                     {item.history.map((entry) => (
                       <li key={entry.id} className={xa.body}>
@@ -272,7 +275,7 @@ export default function CreatorMaintenance({
                   </ul>
                 ) : (
                   <p className={xa.note}>
-                    No later maintenance terms are recorded.
+                    Nothing has changed since it was listed.
                   </p>
                 )}
               </li>
@@ -280,36 +283,35 @@ export default function CreatorMaintenance({
           </ul>
         ) : (
           <p className={xa.body}>
-            No System is listed yet. A System needs to be published and have a
-            written creator agreement before it can be listed.
+            You haven&apos;t offered an app to other businesses yet. Publish
+            one, then list it above with an agreement.
           </p>
         )}
       </div>
       {graph.listings.length && graph.canMaintain ? (
         <div className={xa.block}>
-          <h2 className={xa.heading}>Change who maintains a listed System</h2>
+          <h2 className={xa.heading}>Change who looks after an app</h2>
           <p className={xa.note}>
-            A takeover ends the creator&apos;s share of future payments. Keeping
-            the creator, or tapering their share, uses a written agreement. This
-            records the terms only; it moves no money and hands over no work.
+            If someone else takes it over, you stop earning on new payments.
+            Keeping it, or taking a smaller share over time, follows an
+            agreement. Saving this moves no money and hands over no work.
           </p>
           {!draftGraph.agreements.length ? (
             <p className={xa.body} role="status">
-              No written creator agreement is recorded yet, so only a takeover
-              can be chosen.
+              There&apos;s no agreement yet, so the only choice is handing it
+              over.
             </p>
           ) : null}
-          <form onSubmit={save} className={xa.form}>
+          <form onSubmit={save} className={xa.form} noValidate>
             <XaSelect
-              label="System"
-              required
+              label="App"
               disabled={busy || unconfirmed}
               value={listingId}
               onChange={(event) =>
                 changeDraft(() => setListingId(event.target.value))
               }
               options={[
-                { value: "", label: "Choose a listed System" },
+                { value: "", label: "Choose an app" },
                 ...draftGraph.listings.map((item, index) => ({
                   value: item.id,
                   label: nameOf(item, index),
@@ -317,28 +319,27 @@ export default function CreatorMaintenance({
               ]}
             />
             <XaSelect
-              label="Who maintains it"
-              required
+              label="Who looks after it"
               disabled={busy || unconfirmed}
               value={state}
               onChange={(event) =>
                 changeDraft(() => setState(event.target.value))
               }
               options={[
-                { value: "", label: "Choose who maintains it" },
+                { value: "", label: "Choose who looks after it" },
                 {
                   value: "takeover",
-                  label: "Take it over; the creator stops earning",
+                  label: "Someone else takes it over; you stop earning",
                 },
                 ...(draftGraph.agreements.length
                   ? [
                       {
                         value: "creator",
-                        label: "The creator keeps maintaining it",
+                        label: "You keep looking after it",
                       },
                       {
                         value: "tapered",
-                        label: "The creator's share tapers",
+                        label: "You keep it, for a smaller share over time",
                       },
                     ]
                   : []),
@@ -346,8 +347,7 @@ export default function CreatorMaintenance({
             />
             {state && state !== "takeover" ? (
               <XaSelect
-                label="Written agreement"
-                required
+                label="Agreement"
                 disabled={busy || unconfirmed}
                 value={agreementIndex}
                 onChange={(event) =>
@@ -362,30 +362,32 @@ export default function CreatorMaintenance({
                 ]}
               />
             ) : null}
-            <XaField
+            <XaSelect
               label="Starts"
-              type="datetime-local"
-              required
               disabled={busy || unconfirmed}
               value={effective}
               onChange={(event) =>
                 changeDraft(() => setEffective(event.target.value))
               }
-              hint="Your local time. Strelva checks the agreement again before recording it."
+              hint="Strelva checks the agreement again before saving."
+              options={startMonths.map((item) => ({
+                value: item.start,
+                label: `${item.label.replace(/ (\d{4})$/, " 1, $1")}`,
+              }))}
             />
-            <XaButton type="submit" disabled={busy || unconfirmed}>
-              {busy ? "Recording…" : "Record these terms"}
+            <XaButton type="submit" busy={busy} disabled={busy || unconfirmed}>
+              Save this change
             </XaButton>
           </form>
         </div>
       ) : graph.listings.length ? (
         <p role="status">
-          This workspace has ended, so maintenance can no longer change. What
-          was recorded stays here.
+          Your agency has left Strelva, so this can&apos;t change any more.
+          What was saved stays here.
         </p>
       ) : null}
       {error ? (
-        <p ref={errorRef} tabIndex={-1} role="alert">
+        <p ref={errorRef} tabIndex={-1} role="alert" className={xa.critical}>
           {error}
         </p>
       ) : null}
@@ -399,7 +401,7 @@ export default function CreatorMaintenance({
               if (!inFlight.current) window.location.reload();
             }}
           >
-            Reload maintenance history
+            Reload to see what was saved
           </XaButton>
         </div>
       ) : null}

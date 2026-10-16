@@ -67,8 +67,8 @@ const button = (node: HTMLElement, label: string) =>
     (item) => item.textContent === label,
   )!;
 async function expire(node: HTMLElement) {
-  await act(async () => button(node, "Expire link").click());
-  await act(async () => button(node, "Confirm expire").click());
+  await act(async () => button(node, "Stop link").click());
+  await act(async () => button(node, "Stop the link").click());
 }
 it.each([true, false])(
   "shows the same not-yet state for legacy merchant %s without a creation form",
@@ -79,7 +79,7 @@ it.each([true, false])(
         .mockResolvedValue(Response.json(snapshot({ legacyMerchant }))),
     );
     expect(node.querySelector("form")).toBeNull();
-    expect(button(node, "Create payment link")).toBeUndefined();
+    expect(button(node, "Make the link")).toBeUndefined();
     expect(node.textContent).toContain("New payment links open once");
     expect(node.textContent).toContain("its own Stripe account");
   },
@@ -89,7 +89,7 @@ it("shows paid status and historical attribution without inventing the old actor
     vi.fn<typeof fetch>().mockResolvedValue(Response.json(snapshot())),
   );
   expect(node.textContent).toContain(
-    "Made before Strelva recorded who made links",
+    "Made by Strelva",
   );
   expect(node.textContent).not.toContain("old@example.test");
   expect(node.textContent).toContain("Paid $500");
@@ -109,7 +109,7 @@ it("recovers a denied initial read with GET only", async () => {
   expect(node.querySelector("form")).toBeNull();
   expect(button(node, "Refresh payment links")).toBeUndefined();
   await act(async () => button(node, "Try again").click());
-  expect(node.textContent).toContain("No payment links recorded yet");
+  expect(node.textContent).toContain("No earlier links.");
   expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 it("labels payment uncertainty and expired records, with no copy or expire action for the latter", async () => {
@@ -126,10 +126,10 @@ it("labels payment uncertainty and expired records, with no copy or expire actio
         ),
       ),
   );
-  expect(node.textContent).toContain("Payment status unavailable");
-  expect(node.textContent).toContain("Expired");
+  expect(node.textContent).toContain("Couldn't check payment");
+  expect(node.textContent).toContain("Stopped");
   expect(button(node, "Copy link")).toBeUndefined();
-  expect(button(node, "Expire link")).toBeUndefined();
+  expect(button(node, "Stop link")).toBeUndefined();
 });
 it("holds exact expiration terms after a lost response and retries the same key", async () => {
   const bodies: Record<string, unknown>[] = [];
@@ -146,9 +146,9 @@ it("holds exact expiration terms after a lost response and retries the same key"
   await expire(node);
   await act(async () => button(node, "Try again").click());
   expect(bodies).toHaveLength(1);
-  await act(async () => button(node, "Retry the same request").click());
+  await act(async () => button(node, "Check again").click());
   expect(bodies[1]).toEqual(bodies[0]);
-  expect(node.textContent).toContain("Payment link expired");
+  expect(node.textContent).toContain("The link is stopped.");
 });
 it("does not confirm an incomplete expiration response", async () => {
   const request = vi.fn<typeof fetch>(async (_url, init) =>
@@ -160,8 +160,8 @@ it("does not confirm an incomplete expiration response", async () => {
   );
   const node = await render(request);
   await expire(node);
-  expect(node.textContent).toContain("awaiting confirmation");
-  expect(button(node, "Confirm expire").disabled).toBe(true);
+  expect(node.textContent).toContain("still checking that last change");
+  expect(button(node, "Stop the link").disabled).toBe(true);
 });
 it("requires an explicit expire review and preserves the server's first revocation receipt", async () => {
   const request = vi.fn<typeof fetch>(async (_url, init) => {
@@ -172,18 +172,18 @@ it("requires an explicit expire review and preserves the server's first revocati
     return Response.json(snapshot());
   });
   const node = await render(request);
-  await act(async () => button(node, "Expire link").click());
+  await act(async () => button(node, "Stop link").click());
   expect(request).toHaveBeenCalledTimes(1);
   expect(node.textContent).toContain(
-    "Payments already started in Stripe may still complete",
+    "A payment already under way can still finish",
   );
-  await act(async () => button(node, "Confirm expire").click());
+  await act(async () => button(node, "Stop the link").click());
   expect(JSON.parse(String(request.mock.calls[1]![1]?.body))).toMatchObject({
     action: "revoke",
     agencyWorkspaceId: agency,
     slug: "coffee",
   });
-  expect(node.textContent).toContain("Payment link expired");
+  expect(node.textContent).toContain("The link is stopped.");
 });
 it("copies the public payment URL and reports clipboard failure", async () => {
   const clipboard = vi.fn().mockResolvedValue(undefined);
@@ -198,11 +198,11 @@ it("copies the public payment URL and reports clipboard failure", async () => {
   expect(clipboard).toHaveBeenCalledWith(
     new URL("/pay/coffee", window.location.origin).toString(),
   );
-  expect(node.textContent).toContain("Payment link copied");
+  expect(node.textContent).toContain("Link copied");
   clipboard.mockRejectedValueOnce(new Error("denied"));
   await act(async () => button(node, "Copy link").click());
   expect(node.textContent).toContain(
-    "Open the payment link and copy its address",
+    "Open it and copy the address",
   );
 });
 
@@ -218,10 +218,10 @@ it("keeps an uncertain request held when later authorization is refused", async 
   });
   const node = await render(request);
   await expire(node);
-  await act(async () => button(node, "Retry the same request").click());
+  await act(async () => button(node, "Check again").click());
   expect(node.textContent).toContain("Access changed");
-  expect(node.textContent).toContain("awaiting confirmation");
-  expect(button(node, "Confirm expire").disabled).toBe(true);
+  expect(node.textContent).toContain("still checking that last change");
+  expect(button(node, "Stop the link").disabled).toBe(true);
 });
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -325,7 +325,7 @@ it("says readiness could not be confirmed when Stripe cannot be read", async () 
       ),
   );
   expect(node.textContent).toContain(
-    "Payment readiness could not be confirmed",
+    "Strelva couldn't check Stripe just now",
   );
   expect(node.querySelector("form")).toBeNull();
 });
@@ -357,7 +357,7 @@ it("creates a fixed link with the exact cents and confirms it", async () => {
     expectedActorId: actor,
   });
   expect(bodies[0]!.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
-  expect(node.textContent).toContain("Strelva does not email payment links");
+  expect(node.textContent).toContain("Strelva doesn't email it");
 });
 it("blocks a range whose span is not whole $50 steps before any request", async () => {
   const request = vi.fn<typeof fetch>(async () => Response.json(ready()));
@@ -373,7 +373,7 @@ it("blocks a range whose span is not whole $50 steps before any request", async 
   await type(node, "Minimum in whole dollars", "100");
   await type(node, "Maximum in whole dollars", "175");
   await submit(node);
-  expect(node.textContent).toContain("$50 steps");
+  expect(node.textContent).toContain("steps of 50");
   expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 it("sends a valid range as cents", async () => {
@@ -433,9 +433,9 @@ it("lists connected links with their invoice number, status and actions", async 
   expect(node.textContent).toContain("INV-000002");
   expect(node.textContent).toContain("Open");
   expect(node.textContent).toContain("Paid $500");
-  expect(node.textContent).toContain("Expired");
+  expect(node.textContent).toContain("Stopped");
   expect(button(node, "Copy link")).toBeTruthy();
-  expect(button(node, "Expire link")).toBeTruthy();
+  expect(button(node, "Stop link")).toBeTruthy();
   const links = [...node.querySelectorAll("a")].map((a) =>
     a.getAttribute("href"),
   );

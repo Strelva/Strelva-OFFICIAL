@@ -182,24 +182,24 @@ export default function BusinessPayment({
               ) : null}
               {!termsAvailable ? (
                 <p className={visitor.notice}>
-                  Refund and cancellation terms are unavailable. Ask the
-                  business for a payment link with the agreed terms before
-                  paying.
+                  This link doesn&apos;t say what happens if you cancel, so it
+                  can&apos;t take a payment. Ask the business for a new link.
                 </p>
               ) : null}
               {request.status === "paid" ? (
-                <p role="status">Payment received.</p>
+                <p role="status">Paid. Thank you.</p>
               ) : request.status === "expired" ? (
-                <p>This payment link has expired.</p>
+                <p>This link has run out. Ask {businessName || "the business"} for a new one.</p>
               ) : request.status === "cancelled" ? (
-                <p>This request was cancelled.</p>
+                <p>{businessName || "The business"} took this request back. Nothing is owed.</p>
               ) : (
                 <p className={visitor.note}>
-                  Valid until{" "}
+                  This link works until{" "}
                   <time dateTime={request.expiresAt}>
-                    {new Intl.DateTimeFormat(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "long",
+                    {new Intl.DateTimeFormat("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
                     }).format(new Date(request.expiresAt))}
                   </time>
                   .
@@ -207,8 +207,8 @@ export default function BusinessPayment({
               )}
               {!businessName ? (
                 <p className={visitor.notice}>
-                  The business identity is unavailable. Ask for a new payment
-                  link before paying.
+                  This link doesn&apos;t say which business it&apos;s for, so it
+                  can&apos;t take a payment. Ask for a new link.
                 </p>
               ) : null}
               {preview ? (
@@ -227,7 +227,7 @@ export default function BusinessPayment({
                   aria-busy={busy}
                   onClick={pay}
                 >
-                  {busy ? "Opening secure payment…" : "Accept and pay"}
+                  {busy ? "Opening Stripe…" : "Accept and pay"}
                 </button>
               ) : null}
               <p className={`${visitor.note} ${styles.security}`}>

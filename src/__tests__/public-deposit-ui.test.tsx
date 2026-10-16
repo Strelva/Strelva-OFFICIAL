@@ -18,7 +18,7 @@ describe("business deposit presentation", () => {
   it.each([undefined, null, {}, { refundable: "yes" }])("holds a deposit when immutable policy is missing or invalid: %s", async cancellationPolicy => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...request, cancellationPolicy, acceptedTerms: "Work description alone is not a deposit policy." } })));
-    expect(container.textContent).toContain("Refund and cancellation terms are unavailable");
+    expect(container.textContent).toContain("doesn't say what happens if you cancel");
     expect(payButton()).toBeUndefined();
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -49,7 +49,8 @@ describe("business deposit presentation", () => {
     await act(async () => root.render(createElement(BusinessPayment, { token })));
     expect(container.textContent).toContain("non-refundable");
     expect(payButton()).toBeDefined();
-    expect(container.querySelector("time")?.textContent).toMatch(/UTC|GMT|EST|EDT/);
+    // The pay-by day in words, never a raw clock time with a zone id.
+    expect(container.querySelector("time")?.textContent).toMatch(/^[A-Z][a-z]+ \d{1,2}, \d{4}$/);
   });
 
   it("keeps the shared-token POST and removes payment action after the provider confirms paid", async () => {
@@ -60,14 +61,14 @@ describe("business deposit presentation", () => {
     expect(container.textContent).toContain("$120.00");
     await act(async () => payButton().click());
     expect(fetcher).toHaveBeenCalledWith("/api/v1/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
-    expect(container.textContent).toContain("Payment received.");
+    expect(container.textContent).toContain("Paid. Thank you.");
     expect(payButton()).toBeUndefined();
   });
 
   it("withholds payment when the public request has no business identity", async () => {
     const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
     await act(async () => root.render(createElement(BusinessPayment, { token, initialRequest: { ...businessDepositFixture, businessName: undefined } })));
-    expect(container.textContent).toContain("The business identity is unavailable");
+    expect(container.textContent).toContain("which business it");
     expect(payButton()).toBeUndefined();
     expect(fetcher).not.toHaveBeenCalled();
   });

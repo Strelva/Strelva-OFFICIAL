@@ -61,7 +61,7 @@ export async function MoneyDocumentPage({
       workspaceName={
         brand.agencyId === agency.id
           ? brand.name
-          : "Agency identity unavailable"
+          : "Your agency"
       }
       ownerBrand={brand}
       agencyNavigation={{ paymentLinksCurrent: true, leadsAvailable: true }}
@@ -75,12 +75,12 @@ export async function MoneyDocumentPage({
         <p className={styles.note}>
           <XaTextLink href={back.href}>{back.label}</XaTextLink>
         </p>
-        <XaHeadline quiet="Stripe confirms payments; this page fills in when it does.">
+        <XaHeadline quiet="It fills in here once Stripe confirms one.">
           No payment is recorded for this link yet.
         </XaHeadline>
         <p className={styles.body}>
-          {link.clientName} has not paid this link. The invoice stays open until
-          they do or you expire it.{" "}
+          {link.clientName} hasn&apos;t paid yet. The invoice stays open until
+          they do or you stop the link.{" "}
           <XaTextLink
             href={`/workspace/payment-links/${link.id}/invoice?workspaceId=${encodeURIComponent(agency.id)}`}
           >

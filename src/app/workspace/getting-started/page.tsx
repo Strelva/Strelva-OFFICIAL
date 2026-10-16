@@ -12,6 +12,8 @@ import { getWork } from "@/platform/workspaces/repository";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { createSupabaseAskHistory } from "@/platform/ask/history";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
+import { readBusinessAiBudget } from "@/platform/infra/business-ai-budget";
+import { readPlanWaitlist, waitsForPlans } from "@/platform/business-billing/plan-waitlist";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Getting started", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -50,7 +52,10 @@ export default async function GettingStartedPage({ searchParams }: { searchParam
     <div role="alert"><XaSays>{state.kind === "permission" ? "Sign in with the account that owns it, or ask its owner to invite you." : "Nothing changed. Try again in a moment."}</XaSays></div>
     <XaButtonLink href={state.kind === "permission" ? "/workspace" : gettingStartedHref(workspaceId, requestId, checkWorkId, askId)} variant="primary" size="lg" block>{state.kind === "permission" ? "Go to your workspace" : "Try again"}</XaButtonLink>
   </XaEntry>;
-  return <GettingStarted account={account} business={state.data.business} links={{
+  // Plans aren't open and nothing is included (the $0 cap): say so here, before the first ask pauses.
+  const budget = state.data.business.canConfirm ? await readBusinessAiBudget(workspaceId).catch(() => null) : null;
+  const plans = waitsForPlans(budget) ? { joinedEmail: (await readPlanWaitlist(workspaceId).catch(() => null))?.email ?? null } : null;
+  return <GettingStarted account={account} business={state.data.business} plans={plans} links={{
     home,
     details: `/workspace/business-details?${new URLSearchParams({ workspaceId })}`,
     agency: `/workspace?${new URLSearchParams({ workspaceId, view: "help" })}`,

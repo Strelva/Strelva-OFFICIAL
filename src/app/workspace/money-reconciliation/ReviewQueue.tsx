@@ -23,9 +23,16 @@ export interface ReconciliationIssue {
   } | null;
 }
 const KIND_WORDS: Record<string, string> = {
-  no_effect_after_review: "recorded no effect",
-  effect_confirmed: "confirmed the ledger effect",
+  no_effect_after_review: "found nothing moved",
+  effect_confirmed: "found it already in Strelva's records",
 };
+const REASON_WORDS: Record<string, string> = {
+  unmatched_payment: "A payment Strelva has no record of",
+  late_refund: "A refund that arrived late",
+};
+const reasonWords = (reason: string) =>
+  REASON_WORDS[reason] ??
+  `${reason.charAt(0).toUpperCase()}${reason.slice(1).replaceAll("_", " ")}`;
 const day = (iso: string | undefined) => {
   const value = iso ? new Date(iso) : null;
   return value && Number.isFinite(value.getTime())
@@ -35,7 +42,7 @@ const day = (iso: string | undefined) => {
       }).format(value)
     : "";
 };
-/** Library (Strelva staff): Stripe records that did not match the ledger. Ids are shown; staff need them to find the record. */
+/** Operator console (Strelva staff only): Stripe payments that didn't match Strelva's records. Stripe ids are shown; staff need them to find the payment. */
 export default function ReviewQueue({
   issues,
   actorId,
@@ -71,7 +78,7 @@ export default function ReviewQueue({
         ))
       ) : (
         <div className={xa.block}>
-          <p>No payment exceptions are awaiting review.</p>
+          <p>Every payment matches. Nothing needs a look.</p>
         </div>
       )}
     </div>
@@ -92,6 +99,10 @@ function Review({
   const [evidenceId, setEvidenceId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{
+    note?: string;
+    evidenceId?: string;
+  }>({});
   const active = useRef(true);
   useEffect(() => {
     active.current = true;
@@ -101,6 +112,18 @@ function Review({
   }, []);
   async function resolve(e: React.FormEvent) {
     e.preventDefault();
+    const problems = {
+      note:
+        note.trim().length >= 20
+          ? undefined
+          : "Write what you checked, in a sentence or two (at least 20 letters).",
+      evidenceId:
+        kind !== "effect_confirmed" || evidenceId.trim()
+          ? undefined
+          : "Paste the record's id from Strelva's records.",
+    };
+    setFieldErrors(problems);
+    if (problems.note || problems.evidenceId) return;
     setBusy(true);
     setError(null);
     try {
@@ -124,13 +147,13 @@ function Review({
       )
         throw Error(
           result.error ??
-            "The review receipt could not be confirmed. Sign in and try again.",
+            "Strelva couldn't confirm your note was saved. Sign in and try again.",
         );
       if (active.current) onResolved(result);
     } catch (e) {
       if (active.current)
         setError(
-          e instanceof Error ? e.message : "The review could not be recorded.",
+          e instanceof Error ? e.message : "Your note wasn't saved. Nothing changed.",
         );
     } finally {
       if (active.current) setBusy(false);
@@ -139,14 +162,14 @@ function Review({
   return (
     <div className={xa.block}>
       <h2 className={xa.heading}>
-        {((r) => r.charAt(0).toUpperCase() + r.slice(1))(
-          issue.reason.replaceAll("_", " "),
-        )}
+        {reasonWords(issue.reason)}
       </h2>
       <p className={xa.note}>
         {issue.account_id} · {issue.event_type} · {issue.event_id}
       </p>
-      <p className={xa.body}>Stripe record: {issue.object_id ?? "not given"}</p>
+      <p className={xa.body}>
+        In Stripe: {issue.object_id ?? "Stripe didn't say which payment"}
+      </p>
       {issue.resolution ? (
         <div className={xa.body}>
           <p role="status">
@@ -161,17 +184,17 @@ function Review({
           <p className={xa.note}>{issue.resolution.note}</p>
         </div>
       ) : (
-        <form onSubmit={resolve} className={xa.form}>
+        <form onSubmit={resolve} className={xa.form} noValidate>
           <XaSelect
-            label="What you found in Stripe and the ledger"
+            label="What you found"
             options={[
               {
                 value: "no_effect_after_review",
-                label: "No financial effect after review",
+                label: "Nothing moved; no money changed hands",
               },
               {
                 value: "effect_confirmed",
-                label: "Existing ledger effect confirmed",
+                label: "It's already in Strelva's records",
               },
             ]}
             value={kind}
@@ -180,17 +203,19 @@ function Review({
           />
           <XaTextArea
             label="What you checked and why"
-            required
-            minLength={20}
             maxLength={5000}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            error={fieldErrors.note}
+            onChange={(e) => {
+              setNote(e.target.value);
+              setFieldErrors((current) => ({ ...current, note: undefined }));
+            }}
             disabled={busy}
           />
           {kind === "effect_confirmed" ? (
             <>
               <XaSelect
-                label="Which ledger record proves it"
+                label="Which of Strelva's records shows it"
                 options={[
                   { value: "invoice_split", label: "Invoice source receipt" },
                   {
@@ -208,21 +233,31 @@ function Review({
               />
               <XaField
                 label="That record's id"
-                required
                 value={evidenceId}
-                onChange={(e) => setEvidenceId(e.target.value)}
+                error={fieldErrors.evidenceId}
+                onChange={(e) => {
+                  setEvidenceId(e.target.value);
+                  setFieldErrors((current) => ({
+                    ...current,
+                    evidenceId: undefined,
+                  }));
+                }}
                 disabled={busy}
               />
             </>
           ) : null}
           <p className={xa.note}>
-            Recording keeps your finding with your name. It does not charge,
-            refund, transfer or retry a payment.
+            Your note is kept with your name. It never charges, refunds, moves
+            or retries a payment.
           </p>
           <XaButton type="submit" disabled={busy}>
-            {busy ? "Recording…" : "Record review"}
+            {busy ? "Saving…" : "Save what you found"}
           </XaButton>
-          {error ? <p role="alert">{error}</p> : null}
+          {error ? (
+            <p role="alert" className={xa.critical}>
+              {error}
+            </p>
+          ) : null}
         </form>
       )}
     </div>

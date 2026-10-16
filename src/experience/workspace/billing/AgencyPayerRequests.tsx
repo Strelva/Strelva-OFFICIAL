@@ -94,12 +94,12 @@ export function AgencyPayerRequests({
       {children ?? (
         <section
           className={styles.section}
-          aria-label="Owners asking your agency to pay"
+          aria-label="Owners asking your agency to cover Strelva"
         >
           <AgencyPayerRequestsStatus />
           <ul
             className={styles.clientList}
-            aria-label="Owners asking your agency to pay"
+            aria-label="Owners asking your agency to cover Strelva"
           >
             <AgencyPayerRequestLines listed={[]} />
           </ul>
@@ -149,10 +149,10 @@ function ScopedAgencyPayerRequests({
       const body = await response.json();
       if (signal?.aborted) return;
       if (!response.ok)
-        throw new Error(body.error ?? "Payer requests could not be loaded.");
+        throw new Error(body.error ?? "Owners' asks couldn't be read just now.");
       const parsed = inboxSchema.safeParse(body);
       if (!parsed.success)
-        throw new Error("Payer requests could not be confirmed. Check again.");
+        throw new Error("Owners' asks couldn't be read just now. Check again.");
       apply(parsed.data);
       setError("");
     },
@@ -165,7 +165,7 @@ function ScopedAgencyPayerRequests({
         setError(
           cause instanceof Error
             ? cause.message
-            : "Payer requests could not be loaded.",
+            : "Owners' asks couldn't be read just now.",
         );
     });
     return () => {
@@ -194,7 +194,7 @@ function ScopedAgencyPayerRequests({
       if (controller.signal.aborted) return;
       if (!response.ok)
         throw new Error(
-          value.error ?? "The payer response could not be confirmed.",
+          value.error ?? "Your answer didn't go through. Nothing changed.",
         );
       const body = inboxSchema.parse(value);
       const matches = body.transitions.filter(
@@ -211,15 +211,15 @@ function ScopedAgencyPayerRequests({
           resolved.status,
         )
       ) {
-        throw new Error("The addressed payer decision could not be confirmed.");
+        throw new Error("Your answer couldn't be confirmed. Nothing changed.");
       }
       apply(body);
       const business = addressed.workspaceName ?? "this business";
       setNotice(
         resolved?.status === "stale"
-          ? `${proposerLabel(addressed)} is no longer an owner of ${business}, so the request ended.`
+          ? `${proposerLabel(addressed)} no longer owns ${business}, so the ask ended.`
           : action === "accept"
-            ? `Agency payer role accepted for ${business}'s future jobs. Each job limit still needs its own yes.`
+            ? `You now cover Strelva for ${business}, counting from today. Larger pieces of work still ask you first.`
             : `You said not yet to paying for ${business}. ${proposerLabel(addressed)} can ask again.`,
       );
       router.refresh();
@@ -228,12 +228,12 @@ function ScopedAgencyPayerRequests({
         try {
           await load(controller.signal);
           setNotice(
-            "Outcome not confirmed. Strelva checked the requests again; read where each one stands before answering.",
+            "Strelva couldn't confirm your answer, so it read the asks again. Check where each one stands before answering.",
           );
         } catch {
           if (!controller.signal.aborted)
             setError(
-              "Outcome not confirmed. Check payer requests before trying again.",
+              "Strelva couldn't confirm your answer. Check the asks before trying again.",
             );
         }
       }
@@ -255,7 +255,7 @@ function ScopedAgencyPayerRequests({
     retry: () => {
       if (!busy)
         void load().catch(() =>
-          setError("Payer requests could not be loaded."),
+          setError("Owners' asks couldn't be read just now."),
         );
     },
   };
@@ -272,7 +272,7 @@ export function AgencyPayerRequestsStatus() {
     return (
       <p className={styles.critical} role="alert">
         {payer.error}{" "}
-        <XaTextLink onClick={payer.retry}>Check payer requests</XaTextLink>
+        <XaTextLink onClick={payer.retry}>Check again</XaTextLink>
       </p>
     );
   if (payer.notice)
@@ -284,7 +284,7 @@ export function AgencyPayerRequestsStatus() {
   if (payer.requests === null)
     return (
       <p className={styles.note} role="status">
-        Reading owner requests…
+        Reading what owners asked…
       </p>
     );
   return null;
@@ -311,17 +311,17 @@ function Ask({ item, payer }: { item: Request; payer: Payer }) {
     <span
       className={styles.ask}
       role="group"
-      aria-label={`Request from ${business}`}
+      aria-label={`An ask from ${business}`}
     >
       <span>
-        {proposerLabel(item)} asked {payer.agencyName} to pay for {business}
-        &apos;s future jobs.
+        {proposerLabel(item)} asked {payer.agencyName} to cover Strelva for{" "}
+        {business} from now on.
       </span>
       <span className={styles.links}>
         <XaTextLink
           disabled={disabled}
           onClick={() => payer.respond("accept", item.id)}
-          aria-label={`Accept paying for ${business}'s future jobs`}
+          aria-label={`Cover Strelva for ${business}`}
         >
           Accept
         </XaTextLink>
@@ -356,7 +356,7 @@ export function AgencyPayerRequestLines({
       <li className={styles.clientLine}>
         <span />
         <p className={styles.body}>
-          No payer requests are waiting for {payer.agencyName}.
+          No owner is waiting on {payer.agencyName}.
         </p>
       </li>
     );

@@ -161,6 +161,9 @@ function ScopedPaymentLinks({
   const [loading, setLoading] = useState(true);
   const [stale, setStale] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<"clientName" | "description" | "amount" | "range", string>>
+  >({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Record<string, unknown> | null>(null);
@@ -270,7 +273,7 @@ function ScopedPaymentLinks({
           setPending(null);
         throw new Error(
           value.error ||
-            "This request could not be confirmed. Retry the same request to check what was saved.",
+            "That didn't go through, or Strelva couldn't confirm it. Try the same link again to see what was saved.",
         );
       }
       setPending(null);
@@ -278,11 +281,11 @@ function ScopedPaymentLinks({
       if (body.action === "create") {
         setForm(blankForm);
         setMessage(
-          `Payment link made for ${String(body.clientName)}. Copy it and send it yourself. Strelva does not email payment links.`,
+          `The link for ${String(body.clientName)} is ready. Copy it and send it yourself; Strelva doesn't email it.`,
         );
       } else
         setMessage(
-          "Payment link expired. New checkouts are refused. Payments already started in Stripe may still complete.",
+          "The link is stopped. Nobody new can pay with it, though a payment already under way in Stripe can still finish.",
         );
       await load();
     } catch (cause) {
@@ -290,7 +293,7 @@ function ScopedPaymentLinks({
         setError(
           cause instanceof Error
             ? cause.message
-            : "Request unconfirmed. Retry the same request to check what was saved.",
+            : "Strelva couldn't confirm that. Try the same link again to see what was saved.",
         );
     } finally {
       flight.current = false;
@@ -302,10 +305,12 @@ function ScopedPaymentLinks({
       await navigator.clipboard.writeText(
         new URL(`/pay/${slug}`, window.location.origin).toString(),
       );
-      setMessage("Payment link copied.");
+      setError("");
+      setMessage("Link copied.");
     } catch {
+      setMessage("");
       setError(
-        "The link could not be copied. Open the payment link and copy its address.",
+        "The link couldn't be copied. Open it and copy the address from your browser.",
       );
     }
   }
@@ -321,21 +326,19 @@ function ScopedPaymentLinks({
       clientName: form.clientName.trim(),
       description: form.description.trim(),
     };
-    if (!body.clientName || !body.description) {
-      setError("Add the client and what the link is for.");
-      return;
-    }
-    if (form.kind === "fixed") {
-      if (
-        !/^\d+(\.\d{1,2})?$/.test(form.dollars.trim()) ||
-        Number(form.dollars) < 1 ||
-        Number(form.dollars) > 1000000
-      ) {
-        setError("Enter an amount of $1 or more, with at most two decimals.");
-        return;
-      }
-      body.amountCents = Math.round(Number(form.dollars) * 100);
-    } else {
+    const problems: typeof fieldErrors = {};
+    if (!body.clientName) problems.clientName = "Say who pays.";
+    if (!body.description)
+      problems.description = "Say what the payment is for.";
+    const dollars = form.dollars.trim().replace(/^\$/, "").replace(/,/g, "");
+    if (
+      form.kind === "fixed" &&
+      (!/^\d+(\.\d{1,2})?$/.test(dollars) ||
+        Number(dollars) < 1 ||
+        Number(dollars) > 1000000)
+    )
+      problems.amount = "Write an amount of at least 1 dollar, like 1250.50.";
+    if (form.kind === "range") {
       const low = Number(form.minDollars),
         high = Number(form.maxDollars);
       if (
@@ -345,22 +348,27 @@ function ScopedPaymentLinks({
         high > 10000 ||
         low > high ||
         (high - low) % 50 !== 0
-      ) {
-        setError(
-          "A range needs whole-dollar minimum and maximum amounts, at least $50 and at most $10,000, with $50 steps between them.",
-        );
-        return;
-      }
+      )
+        problems.range =
+          "Use whole dollars from 50 to 10,000, with the gap between them in steps of 50.";
+    }
+    setFieldErrors(problems);
+    if (Object.keys(problems).length) return;
+    if (form.kind === "fixed") {
+      body.amountCents = Math.round(Number(dollars) * 100);
+    } else {
+      const low = Number(form.minDollars),
+        high = Number(form.maxDollars);
       body.minCents = low * 100;
       body.maxCents = high * 100;
     }
     void command(body);
   }
   const expireConfirm = (slug: string) => (
-    <span className={styles.links} role="group" aria-label="Expire this link">
+    <span className={styles.links} role="group" aria-label="Stop this link">
       <span>
-        New checkouts stop. Payments already started in Stripe may still
-        complete.
+        Nobody new can pay with it. A payment already under way can still
+        finish.
       </span>
       <XaButton
         size="sm"
@@ -375,7 +383,7 @@ function ScopedPaymentLinks({
           })
         }
       >
-        Confirm expire
+        Stop the link
       </XaButton>
       <XaButton
         size="sm"
@@ -383,7 +391,7 @@ function ScopedPaymentLinks({
         disabled={disabled}
         onClick={() => setRevoking(null)}
       >
-        Keep link
+        Keep it
       </XaButton>
     </span>
   );
@@ -404,7 +412,7 @@ function ScopedPaymentLinks({
           quiet={
             snapshot?.creation.reason === "ready"
               ? "Money goes to your own Stripe account. Strelva never holds it."
-              : "Clients pay by card, straight to your agency's Stripe account."
+              : "Clients pay by card, straight into your own Stripe account."
           }
         >
           {snapshot?.connectedLinks.length
@@ -416,7 +424,7 @@ function ScopedPaymentLinks({
         <p className={styles.critical} role="alert">
           {error}
           {stale && snapshot
-            ? " These links may be out of date, so changes are held."
+            ? " What you see may be out of date, so nothing can change until it's read again."
             : ""}{" "}
           <XaTextLink
             onClick={() => {
@@ -430,13 +438,14 @@ function ScopedPaymentLinks({
       {message ? <XaSays>{message}</XaSays> : null}
       {pending ? (
         <p className={styles.body} role="status">
-          This exact request is awaiting confirmation. Its terms are held.{" "}
+          Strelva is still checking that last change. Nothing else changes until
+          it knows.{" "}
           <XaTextLink
             onClick={() => {
               if (!busy && !loading && !stale) void command(pending);
             }}
           >
-            Retry the same request
+            Check again
           </XaTextLink>
         </p>
       ) : null}
@@ -447,8 +456,8 @@ function ScopedPaymentLinks({
         </p>
       ) : !snapshot ? (
         <p className={styles.body}>
-          Payment links are unavailable. Only an agency owner or admin can make
-          them.
+          Payment links couldn&apos;t be read. Only an owner or admin of the
+          agency can make them.
         </p>
       ) : (
         <>
@@ -466,9 +475,8 @@ function ScopedPaymentLinks({
           ) : null}
           {snapshot.creation.reason === "unavailable" ? (
             <p className={styles.body}>
-              Payment readiness could not be confirmed, so no payment link can
-              be made right now. Strelva checks again when you come back to this
-              page.
+              Strelva couldn&apos;t check Stripe just now, so no new link can be
+              made. It checks again when you come back to this page.
             </p>
           ) : null}
           {snapshot.creation.reason === "ready" ? (
@@ -476,7 +484,7 @@ function ScopedPaymentLinks({
               className={styles.maker}
               aria-labelledby="new-link-heading"
             >
-              <form onSubmit={submitCreate} className={styles.form}>
+              <form onSubmit={submitCreate} className={styles.form} noValidate>
                 <XaLabel as="h2" id="new-link-heading">
                   New payment link
                 </XaLabel>
@@ -484,21 +492,23 @@ function ScopedPaymentLinks({
                   label="Client name"
                   value={form.clientName}
                   maxLength={160}
-                  required
                   disabled={disabled}
-                  onChange={(event) =>
-                    setForm({ ...form, clientName: event.target.value })
-                  }
+                  error={fieldErrors.clientName}
+                  onChange={(event) => {
+                    setForm({ ...form, clientName: event.target.value });
+                    setFieldErrors({ ...fieldErrors, clientName: undefined });
+                  }}
                 />
                 <XaTextArea
                   label="What it is for"
                   value={form.description}
                   maxLength={1000}
-                  required
                   disabled={disabled}
-                  onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
-                  }
+                  error={fieldErrors.description}
+                  onChange={(event) => {
+                    setForm({ ...form, description: event.target.value });
+                    setFieldErrors({ ...fieldErrors, description: undefined });
+                  }}
                 />
                 <XaSegmented
                   label="How much the client pays"
@@ -517,9 +527,11 @@ function ScopedPaymentLinks({
                     inputMode="decimal"
                     value={form.dollars}
                     disabled={disabled}
-                    onChange={(event) =>
-                      setForm({ ...form, dollars: event.target.value })
-                    }
+                    error={fieldErrors.amount}
+                    onChange={(event) => {
+                      setForm({ ...form, dollars: event.target.value });
+                      setFieldErrors({ ...fieldErrors, amount: undefined });
+                    }}
                   />
                 ) : (
                   <div className={styles.pair}>
@@ -528,19 +540,27 @@ function ScopedPaymentLinks({
                       inputMode="numeric"
                       value={form.minDollars}
                       disabled={disabled}
-                      onChange={(event) =>
-                        setForm({ ...form, minDollars: event.target.value })
-                      }
+                      aria-invalid={fieldErrors.range ? true : undefined}
+                      onChange={(event) => {
+                        setForm({ ...form, minDollars: event.target.value });
+                        setFieldErrors({ ...fieldErrors, range: undefined });
+                      }}
                     />
                     <XaField
                       label="Maximum in whole dollars"
                       inputMode="numeric"
-                      hint="The client picks in $50 steps."
+                      hint={
+                        fieldErrors.range
+                          ? undefined
+                          : "The client picks in 50 dollar steps."
+                      }
+                      error={fieldErrors.range}
                       value={form.maxDollars}
                       disabled={disabled}
-                      onChange={(event) =>
-                        setForm({ ...form, maxDollars: event.target.value })
-                      }
+                      onChange={(event) => {
+                        setForm({ ...form, maxDollars: event.target.value });
+                        setFieldErrors({ ...fieldErrors, range: undefined });
+                      }}
                     />
                   </div>
                 )}
@@ -551,12 +571,12 @@ function ScopedPaymentLinks({
                     busy={busy && pending?.action === "create"}
                     disabled={disabled}
                   >
-                    Create payment link
+                    Make the link
                   </XaButton>
                 </div>
                 <p className={styles.note}>
-                  Stripe&apos;s fees apply. Strelva charges no fee on these
-                  payments. Strelva does not email the link; you send it.
+                  Stripe&apos;s usual fees apply and Strelva adds none. You send
+                  the link yourself.
                 </p>
               </form>
               <div className={styles.preview}>
@@ -640,11 +660,11 @@ function ScopedPaymentLinks({
                           </XaStatus>
                         ) : link.status === "expired" ? (
                           <XaStatus kind="draft" size="sm">
-                            Expired {day(link.revokedAt)}
+                            Stopped {day(link.revokedAt)}
                           </XaStatus>
                         ) : (
                           <XaStatus kind="waits" size="sm">
-                            Open, waiting on {link.clientName}
+                            Waiting on {link.clientName}
                           </XaStatus>
                         )}
                         <span className={styles.links}>
@@ -659,7 +679,7 @@ function ScopedPaymentLinks({
                               </XaTextLink>
                               <span aria-hidden="true">·</span>
                               <XaTextLink href={`/pay/${link.slug}`}>
-                                Open payment link
+                                Open it
                               </XaTextLink>
                               <span aria-hidden="true">·</span>
                             </>
@@ -675,7 +695,7 @@ function ScopedPaymentLinks({
                               <XaTextLink
                                 href={`/workspace/payment-links/${link.id}/receipt?workspaceId=${encodeURIComponent(agencyWorkspaceId)}`}
                               >
-                                Payment receipt
+                                Receipt
                               </XaTextLink>
                             </>
                           ) : null}
@@ -687,7 +707,7 @@ function ScopedPaymentLinks({
                                   if (!disabled) setRevoking(link.slug);
                                 }}
                               >
-                                Expire link
+                                Stop link
                               </XaTextLink>
                             </>
                           ) : null}
@@ -704,7 +724,7 @@ function ScopedPaymentLinks({
           ) : snapshot.creation.reason === "ready" &&
             !snapshot.legacyMerchant ? (
             <p className={styles.body}>
-              No payment links yet. The first one you make appears here with its
+              No links yet. The first one you make shows up here, with its
               invoice.
             </p>
           ) : null}
@@ -719,17 +739,17 @@ function ScopedPaymentLinks({
                   : "Payment links"}
               </XaLabel>
               <p className={styles.note}>
-                One-time payment links made before agency Stripe accounts. A
-                payment link does not start a subscription.
+                One-time links from before agencies had their own Stripe
+                account. Each is paid once; none repeats.
               </p>
               {!snapshot.paymentStatusAvailable ? (
                 <p className={styles.body}>
-                  Payment status could not be read. Strelva checks again when
-                  you come back to this page.
+                  Strelva couldn&apos;t check which were paid. It checks again
+                  when you come back to this page.
                 </p>
               ) : null}
               {!snapshot.payLinks.length ? (
-                <p className={styles.body}>No payment links recorded yet.</p>
+                <p className={styles.body}>No earlier links.</p>
               ) : (
                 <XaRows label="Earlier payment links">
                   {snapshot.payLinks.map((link) => {
@@ -754,20 +774,20 @@ function ScopedPaymentLinks({
                             <span>
                               {link.customCopy ? `${link.customCopy} · ` : ""}
                               {link.agencyWorkspaceId
-                                ? `${link.agencyDisplayName || "Agency identity not recorded"} · Runs on Strelva`
-                                : "Made before Strelva recorded who made links"}{" "}
+                                ? `${link.agencyDisplayName || "Your agency"} · Runs on Strelva`
+                                : "Made by Strelva"}{" "}
                               · {day(link.createdAt)}
                             </span>
                             <br />
                             {link.revokedAt ? (
                               <>
                                 <XaStatus kind="draft" size="sm">
-                                  Expired {day(link.revokedAt)}
+                                  Stopped {day(link.revokedAt)}
                                 </XaStatus>
                                 {paid ? (
                                   <> · Paid {money(paid.amountCents)}</>
                                 ) : !snapshot.paymentStatusAvailable ? (
-                                  <> · Payment status unavailable</>
+                                  <> · Couldn&apos;t check payment</>
                                 ) : null}
                               </>
                             ) : paid ? (
@@ -779,7 +799,7 @@ function ScopedPaymentLinks({
                               <span>
                                 {snapshot.paymentStatusAvailable
                                   ? "No payment found yet"
-                                  : "Payment status unavailable"}
+                                  : "Couldn't check payment"}
                               </span>
                             )}
                             {!link.revokedAt ? (
@@ -793,7 +813,7 @@ function ScopedPaymentLinks({
                                 </XaTextLink>
                                 <span aria-hidden="true">·</span>
                                 <XaTextLink href={`/pay/${link.slug}`}>
-                                  Open payment link
+                                  Open it
                                 </XaTextLink>
                                 {revoking !== link.slug ? (
                                   <>
@@ -803,7 +823,7 @@ function ScopedPaymentLinks({
                                         if (!disabled) setRevoking(link.slug);
                                       }}
                                     >
-                                      Expire link
+                                      Stop link
                                     </XaTextLink>
                                   </>
                                 ) : null}

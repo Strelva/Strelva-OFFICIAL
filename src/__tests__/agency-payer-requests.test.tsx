@@ -22,7 +22,7 @@ it("accepts a proposal addressed to this agency through the payer inbox without 
   expect(request).toHaveBeenNthCalledWith(1, "/api/work-economics/payer-transition", expect.objectContaining({ cache: "no-store" }));
   await act(async () => button(node, "Accept").click());
   expect(JSON.parse(String(request.mock.calls[1]![1]?.body))).toEqual({ action: "accept", transitionId: "proposal" });
-  expect(node.textContent).toContain("Agency payer role accepted"); expect(node.textContent).toContain("No payer requests"); expect(refresh).toHaveBeenCalledOnce();
+  expect(node.textContent).toContain("You now cover Strelva for"); expect(node.textContent).toContain("No owner is waiting on"); expect(refresh).toHaveBeenCalledOnce();
   expect(request.mock.calls.every(([url]) => String(url) === "/api/work-economics/payer-transition")).toBe(true);
 });
 it("does not offer acceptance when the server denies response authority", async () => {
@@ -36,29 +36,29 @@ it("rechecks the payer inbox after a lost response before allowing another decis
   await act(async () => root.render(createElement(AgencyPayerRequests, { agencyWorkspaceId: "serving-agency", request })));
   await act(async () => button(node, "Accept").click());
   expect(request).toHaveBeenCalledTimes(3); expect(request.mock.calls[2]![1]?.method).toBeUndefined();
-  expect(node.textContent).toContain("Outcome not confirmed"); expect(button(node, "Accept")).toBeUndefined();
+  expect(node.textContent).toContain("Strelva couldn't confirm your answer"); expect(button(node, "Accept")).toBeUndefined();
 });
 it("withholds mutations when the outcome and reread both fail", async () => {
   const { node, root } = host();
   const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(snapshot([pending]))).mockRejectedValue(new Error("offline"));
   await act(async () => root.render(createElement(AgencyPayerRequests, { agencyWorkspaceId: "serving-agency", request })));
   await act(async () => button(node, "Accept").click());
-  expect(node.textContent).toContain("Outcome not confirmed"); expect(button(node, "Accept").disabled).toBe(true); expect(button(node, "Check payer requests")).toBeTruthy();
+  expect(node.textContent).toContain("Strelva couldn't confirm your answer"); expect(button(node, "Accept").disabled).toBe(true); expect(button(node, "Check again")).toBeTruthy();
 });
 it.each([{}, snapshot([]), snapshot([{ ...pending, successorWorkspaceId: "different-agency", status: "accepted" }]), snapshot([{ ...pending, workspaceId: "different-business", status: "accepted" }]), snapshot([pending]), snapshot([{ ...pending, status: "accepted" }, { ...pending, status: "rejected" }])])("does not claim acceptance from a malformed or conflicting response: %j", async response => {
   const { node, root } = host();
   const request = vi.fn<typeof fetch>().mockResolvedValueOnce(Response.json(snapshot([pending]))).mockResolvedValueOnce(Response.json(response)).mockResolvedValueOnce(Response.json(snapshot([pending])));
   await act(async () => root.render(createElement(AgencyPayerRequests, { agencyWorkspaceId: "serving-agency", request })));
   await act(async () => button(node, "Accept").click());
-  expect(request).toHaveBeenCalledTimes(3); expect(node.textContent).toContain("Outcome not confirmed"); expect(node.textContent).not.toContain("Agency payer role accepted"); expect(refresh).not.toHaveBeenCalled();
+  expect(request).toHaveBeenCalledTimes(3); expect(node.textContent).toContain("Strelva couldn't confirm your answer"); expect(node.textContent).not.toContain("You now cover Strelva for"); expect(refresh).not.toHaveBeenCalled();
 });
 it("names the owner who asked, and falls back to the email only when no name is recorded", async () => {
   const { node, root } = host();
   const request = vi.fn<typeof fetch>(async () => Response.json(snapshot([{ ...pending, proposerName: "Dr. Amy Lin" }])));
   await act(async () => root.render(createElement(AgencyPayerRequests, { agencyWorkspaceId: "serving-agency", agencyName: "Cedar Studio", request })));
-  expect(node.textContent).toContain("Dr. Amy Lin asked Cedar Studio to pay for Buffalo Business's future jobs.");
+  expect(node.textContent).toContain("Dr. Amy Lin asked Cedar Studio to cover Strelva for Buffalo Business from now on.");
   expect(node.textContent).not.toContain("owner@example.test");
   const fallback = host();
   await act(async () => fallback.root.render(createElement(AgencyPayerRequests, { agencyWorkspaceId: "serving-agency", request: vi.fn<typeof fetch>(async () => Response.json(snapshot([pending]))) })));
-  expect(fallback.node.textContent).toContain("owner@example.test asked your agency to pay");
+  expect(fallback.node.textContent).toContain("owner@example.test asked your agency to cover Strelva");
 });

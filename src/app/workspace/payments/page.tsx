@@ -55,8 +55,8 @@ export default async function Payments({
       >
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Payments did not load."
-            quiet="Payments already made are safe in Stripe. Confirm your access and try again."
+            title="Payments couldn't be read just now."
+            quiet="Payments already made are safe in Stripe. Try again in a moment."
             retryHref={`/workspace/payments?workspaceId=${encodeURIComponent(id)}`}
           />
         </div>

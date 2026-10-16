@@ -604,8 +604,9 @@ describe("startAskTurn", () => {
     const ask = result.result?.ask as { kind: string; items: unknown[]; conversationId: string; budgetRecovery?: string };
     expect(ask.kind).toBe("refusal");
     expect(ask.items).toContainEqual(expect.objectContaining({ kind: "refusal", summary: reason === "cap" ? "budget_paused" : "budget_unavailable" }));
-    expect(result.text).toContain("paus");
-    expect(ask.budgetRecovery).toBe(reason === "cap" ? "agency" : undefined);
+    expect(result.text).toMatch(reason === "cap" ? /until plans open/ : /paus/);
+    // Plans aren't open and nothing is included: the owner is offered the waitlist (October 16).
+    expect(ask.budgetRecovery).toBe(reason === "cap" ? "waitlist" : undefined);
     const conversation = await h.deps.history.read(actor, { workspaceId: WS, conversationId: ask.conversationId });
     expect(conversation.messages.at(-1)?.result).toMatchObject({ kind: "refusal" });
   });
@@ -634,8 +635,8 @@ describe("startAskTurn", () => {
     };
     const result = await run(h.deps, "What are my services?");
     expect(result.text).toContain("I read your services.");
-    expect(result.text).toContain("paus");
-    expect(result.result).toMatchObject({ ask: { kind: "refusal", budgetRecovery: "agency" } });
+    expect(result.text).toContain("Nothing changed.");
+    expect(result.result).toMatchObject({ ask: { kind: "refusal", budgetRecovery: "waitlist" } });
   });
 
   it("bounds the provider request the route builds from the stream input", async () => {

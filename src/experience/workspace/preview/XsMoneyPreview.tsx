@@ -12,8 +12,11 @@ import { XaHeadline, XaTextLink } from "@/components/ui/strelva/Xa";
 import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
 import {
   BusinessAiBudgetSummary,
-  StartWorkspacePlan,
+  WorkspacePlanUnavailable,
 } from "@/experience/workspace/billing/StartWorkspacePlan";
+import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
+import { AskStrelva } from "@/experience/ask/AskStrelva";
+import { GettingStarted } from "@/experience/getting-started/GettingStarted";
 import { WorkspacePayerTransition } from "@/experience/workspace/WorkspacePayerTransition";
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
 import { UNRELEASED_CHECKOUT } from "@/experience/workspace/billing/AgencyCheckoutStatus";
@@ -69,6 +72,9 @@ import { XA_HARBOR, XA_NORTH } from "./xa-day";
 export { XS_MONEY_SCREENS, type XsMoneyScreen };
 
 const BASE = "/preview/strelva/xa/xs-money";
+const XA_OWNER_EMAIL = "amy@harbordental.com";
+const PAUSED_TEXT =
+  "Strelva can't take on new work for this business until plans open. Nothing changed. Ask to hear when they open, or bring in an agency now.";
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), {
     status,
@@ -151,9 +157,6 @@ export function XsMoneyPreview({
     notice: (
       <p className={styles.note} style={{ padding: "8px 20px" }}>
         Fictional preview. Nothing here reaches Stripe, a client or an inbox.
-        {screen === "billing-agency" && state === "priced"
-          ? " Wholesale figures are fixture placeholders, not ADR 0017 prices."
-          : ""}
       </p>
     ),
   } as const;
@@ -327,6 +330,14 @@ export function XsMoneyPreview({
           409,
         )) as (input: string, init?: RequestInit) => Promise<Response>,
       money: fixtureFetch(() => ({ error: "Fictional preview" }), "fail"),
+      payerNone: fixtureFetch(() => payerSnapshot("none")),
+      waitlist: fixtureFetch((url, init) => {
+        if (init?.method !== "POST") return {};
+        const body = JSON.parse(String(init.body ?? "{}"));
+        return body.action === "leave"
+          ? { joined: false }
+          : { joined: true, email: XA_OWNER_EMAIL };
+      }),
     }),
     [state],
   );
@@ -340,12 +351,35 @@ export function XsMoneyPreview({
       if (state === "error")
         return owner(
           failure(
-            "Billing could not be loaded.",
-            "Your sites and inquiries keep running. Confirm your access and try again.",
+            "Plan and usage couldn't be read just now.",
+            "Your website and inquiries keep running. Try again in a moment.",
           ),
         );
+      // A new business while plans are closed: the honest waitlist, not a wall.
+      if (state === "new" || state === "new-joined")
+        return owner(
+          <WorkspaceRequestContext.Provider value={requests.waitlist}>
+            <div className={styles.screen}>
+              <div className={styles.column}>
+                <WorkspacePlanUnavailable
+                  workspaceId={XS.harbor}
+                  businessName={XA_HARBOR.name}
+                  joinedEmail={state === "new-joined" ? XA_OWNER_EMAIL : null}
+                  noIncludedWork
+                  agencyHref={`${BASE}/billing`}
+                />
+                <WorkspacePayerTransition
+                  workspaceId={XS.harbor}
+                  canPropose
+                  agencyChoices={[]}
+                  request={requests.payerNone}
+                />
+              </div>
+            </div>
+          </WorkspaceRequestContext.Provider>,
+        );
       const billing =
-        state === "empty"
+        state === "not-set-up"
           ? null
           : state === "past-due"
             ? { ...harborBillingAgencyPays, paymentStatus: "past_due" }
@@ -363,38 +397,26 @@ export function XsMoneyPreview({
                 transport={requests.portal}
                 navigate={() => undefined}
               />
-              {state === "empty" ? (
-                <StartWorkspacePlan
-                  workspaceId={XS.harbor}
-                  budget={harborBudget}
-                  capUsd={25}
-                  budgetEnforced
-                  transport={requests.portal}
-                  navigate={() => undefined}
-                />
-              ) : (
+              {billing ? (
                 <BusinessAiBudgetSummary
                   budget={harborBudget}
                   capUsd={25}
                   enforced
                 />
-              )}
+              ) : null}
               <WorkspacePayerTransition
                 workspaceId={XS.harbor}
                 canPropose
                 agencyChoices={[{ id: XS.north, name: XA_NORTH.name }]}
                 request={requests.payer}
               />
-              <nav
-                aria-label="Payment and agency settings"
-                className={styles.links}
-              >
+              <nav aria-label="More about money" className={styles.links}>
                 <XaTextLink href={`${BASE}/payments`}>
-                  Deposits and payments
+                  Payments from your customers
                 </XaTextLink>
                 <span aria-hidden="true">·</span>
                 <XaTextLink href={`${BASE}/money-terms`}>
-                  Recorded money terms
+                  Prices you&rsquo;ve agreed to
                 </XaTextLink>
               </nav>
             </div>
@@ -408,7 +430,6 @@ export function XsMoneyPreview({
                   checkoutAvailability={UNRELEASED_CHECKOUT}
                   request={requests.invoice}
                   agencyNames={{ [XS.north]: XA_NORTH.name }}
-                  planCents={harborBilling.monthlyCents}
                 />
               </aside>
             ) : null}
@@ -416,14 +437,87 @@ export function XsMoneyPreview({
         </div>,
       );
     }
+    case "ask-paused":
+      return owner(
+        <WorkspaceRequestContext.Provider value={requests.waitlist}>
+          <AskStrelva
+            key={state}
+            workspaceId={XS.harbor}
+            businessName={XA_HARBOR.name}
+            decider={{ name: "you", you: true }}
+            request={requests.waitlist}
+            initialMessages={[
+              {
+                id: "paused-1",
+                role: "user",
+                content: "Add our Thanksgiving hours to the website",
+                result: null,
+              },
+              {
+                id: "paused-2",
+                role: "assistant",
+                content: PAUSED_TEXT,
+                result: {
+                  kind: "refusal",
+                  items: [
+                    {
+                      kind: "refusal",
+                      toolId: "classifier",
+                      status: "refused",
+                      ids: [],
+                      summary: "budget_paused",
+                    },
+                  ],
+                  systemId: null,
+                  conversationId: "c-paused",
+                  saved: true,
+                  budgetRecovery: "waitlist",
+                },
+              },
+            ]}
+          />
+        </WorkspaceRequestContext.Provider>,
+        undefined,
+      );
+    case "getting-started-plans":
+      return (
+        <div data-workspace-theme="linen" data-workspace-mode={mode}>
+          <WorkspaceRequestContext.Provider value={requests.waitlist}>
+            <GettingStarted
+              account={XA_HARBOR.owner}
+              mode={mode}
+              start={{ phase: "next", saved: { added: 4, later: 1 } }}
+              business={{
+                workspaceId: XS.harbor,
+                name: XA_HARBOR.name,
+                website: `https://${XA_HARBOR.domain}/`,
+                canConfirm: true,
+                revision: 3,
+                waiting: [],
+              }}
+              plans={{ joinedEmail: null }}
+              links={{
+                home: `${BASE}/ask-paused`,
+                details: `${BASE}/billing`,
+                agency: `${BASE}/billing`,
+                google: null,
+                connect: `${BASE}/billing`,
+                check: null,
+                request: null,
+                ask: null,
+              }}
+            />
+          </WorkspaceRequestContext.Provider>
+        </div>
+      );
     case "billing-agency": {
       if (state === "loading")
         return agency(loading("Reading what your agency pays"));
       if (state === "error")
         return agency(
           failure(
-            "Agency billing did not load.",
-            "Only an agency owner or admin can read its billing.",
+            "Your agency's billing couldn't be read just now.",
+            "Only an owner or admin of the agency can open it.",
           ),
         );
       const colors = {
@@ -432,7 +526,7 @@ export function XsMoneyPreview({
         [XS.lakeview]: CLIENT_COLORS.lakeview,
         [XS.fieldwork]: CLIENT_COLORS.fieldwork,
       };
-      const billingRecord = agencyBilling(state === "priced");
+      const billingRecord = agencyBilling(false);
       return agency(
         <AgencyPayerRequests
           agencyWorkspaceId={XS.north}
@@ -448,8 +542,8 @@ export function XsMoneyPreview({
               <div className={styles.column}>
                 {state === "empty" ? (
                   <section className={styles.section}>
-                    <XaHeadline quiet="No client has North Studio as payer yet.">
-                      Agency billing
+                    <XaHeadline quiet="When an owner asks, it waits here for your answer.">
+                      No client has asked North Studio to cover Strelva yet.
                     </XaHeadline>
                     <ul
                       className={styles.clientList}
@@ -474,7 +568,7 @@ export function XsMoneyPreview({
                   </XaTextLink>
                   <span aria-hidden="true">·</span>
                   <XaTextLink href={`${BASE}/creator-maintenance`}>
-                    Creator maintenance
+                    Apps you made for others
                   </XaTextLink>
                 </nav>
               </div>
@@ -527,12 +621,12 @@ export function XsMoneyPreview({
                   Payment links
                 </XaTextLink>
               </p>
-              <XaHeadline quiet="Stripe confirms payments; this page fills in when it does.">
+              <XaHeadline quiet="It fills in here once Stripe confirms one.">
                 No payment is recorded for this link yet.
               </XaHeadline>
               <p className={styles.body}>
-                Harbor Dental has not paid this link. The invoice stays open
-                until they do or you expire it.{" "}
+                Harbor Dental hasn&apos;t paid yet. The invoice stays open
+                until they do or you stop the link.{" "}
                 <XaTextLink href={`${BASE}/invoice`}>
                   See the invoice
                 </XaTextLink>
@@ -553,8 +647,8 @@ export function XsMoneyPreview({
       if (state === "error")
         return owner(
           failure(
-            "Payments did not load.",
-            "Payments already made are safe in Stripe. Confirm your access and try again.",
+            "Payments couldn't be read just now.",
+            "Payments already made are safe in Stripe. Try again in a moment.",
           ),
         );
       return owner(
@@ -687,16 +781,16 @@ export function XsMoneyPreview({
       return owner(
         state === "error" ? (
           failure(
-            "Terms could not be loaded.",
-            "Confirm your current business access and reload.",
+            "These prices couldn't be read just now.",
+            "Nothing changed. Check you're signed in to this business and try again.",
           )
         ) : (
           <div className={styles.screen}>
             <p className={styles.note}>
-              <XaTextLink href={`${BASE}/billing`}>Plan and billing</XaTextLink>
+              <XaTextLink href={`${BASE}/billing`}>Plan and usage</XaTextLink>
             </p>
-            <XaHeadline quiet="Written prices you accepted, and the exact period each covers. Nothing here charges a card.">
-              Recorded money terms
+            <XaHeadline quiet="Each one names the month it covers. Nothing here charges a card.">
+              Prices you&rsquo;ve agreed to
             </XaHeadline>
             <CollectionTerms
               graph={governedGraph(state === "empty")}
@@ -712,24 +806,24 @@ export function XsMoneyPreview({
         ),
       );
     case "reconciliation":
+      // Operator console only (October 16): staff work, never in a workspace shell.
       return (
-        <StrelvaShell
-          {...shell}
-          workspaceName="Strelva"
-          accountName="Priya Shah"
-          agencyNavigation={{ active: "library", leadsAvailable: false }}
+        <main
+          data-workspace-theme="linen"
+          data-workspace-mode={mode}
+          style={{ minHeight: "100vh", background: "var(--st-canvas)" }}
         >
           {state === "error" ? (
             failure(
-              "Payment exceptions could not be loaded.",
-              "Only Strelva staff can read them. Confirm your access and try again.",
+              "Payments to check couldn't be read.",
+              "Only Strelva staff can open them. Sign in again and try once more.",
             )
           ) : (
             <div className={styles.screen}>
-              <XaHeadline quiet="Check each against Stripe and the ledger, then record what you found. Recording never moves money.">
+              <XaHeadline quiet="Check each one in Stripe, then write down what you found. Writing it down never moves money.">
                 {state === "done"
-                  ? "No payment exception waits for review."
-                  : "1 payment exception waits for review."}
+                  ? "Every payment matches."
+                  : "1 payment needs a look."}
               </XaHeadline>
               <ReviewQueue
                 issues={state === "done" ? [] : reconciliationIssues}
@@ -738,22 +832,24 @@ export function XsMoneyPreview({
               />
             </div>
           )}
-        </StrelvaShell>
+        </main>
       );
     case "creator-maintenance":
       return agency(
         state === "error" ? (
           failure(
-            "Maintenance records could not be loaded.",
-            "Confirm owner or admin access and try again.",
+            "Your apps couldn't be read just now.",
+            "Only an owner or admin of the agency can open this. Try again in a moment.",
           )
         ) : (
           <div className={styles.screen}>
             <nav aria-label="Back" className={styles.links}>
-              <XaTextLink href={`${BASE}/billing-agency`}>Billing</XaTextLink>
+              <XaTextLink href={`${BASE}/billing-agency`}>
+                Plan and usage
+              </XaTextLink>
             </nav>
-            <XaHeadline quiet="Who keeps each System you list working, and what its creator earns.">
-              Creator maintenance
+            <XaHeadline quiet="Who looks after each one, and what you earn when a business pays for it.">
+              Apps you made for others
             </XaHeadline>
             <SourceListing
               graph={creatorSources(state === "empty")}
@@ -787,8 +883,8 @@ export function XsMoneyPreview({
         : owner(
             state === "error" ? (
               failure(
-                "Who made this could not be checked.",
-                "The System keeps running. Its creator credit is read again next time you open this.",
+                "Strelva couldn't check who made this.",
+                "It keeps running as it is. Strelva checks again next time you open this.",
               )
             ) : (
               <SourceAttributionView
@@ -805,8 +901,8 @@ export function XsMoneyPreview({
     case "payer":
       return agency(
         <div className={styles.screen}>
-          <XaHeadline quiet="Money addressed to you, Maya, across every business.">
-            Payer requests
+          <XaHeadline quiet="Owners can ask you, Maya, to cover their Strelva work.">
+            What you&rsquo;re asked to pay for
           </XaHeadline>
           <AccountPayerInbox request={requests.accountInbox} />
         </div>,

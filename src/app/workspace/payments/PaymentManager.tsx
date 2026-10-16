@@ -45,6 +45,22 @@ const shortDay = (iso: string | null | undefined) => {
     : "";
 };
 
+/** How long the customer has to pay: a choice, never a raw date-and-time picker. */
+const WITHIN = [
+  { value: "3", label: "3 days" },
+  { value: "7", label: "A week" },
+  { value: "14", label: "Two weeks" },
+  { value: "30", label: "A month" },
+] as const;
+type Within = (typeof WITHIN)[number]["value"];
+/** The end of the local day, `days` from now. */
+function payBy(days: number, now = new Date()) {
+  const end = new Date(now);
+  end.setDate(end.getDate() + days);
+  end.setHours(23, 59, 0, 0);
+  return end;
+}
+
 const KIND_WORDS: Record<string, string> = {
   quote: "Quoted work",
   deposit: "Booking deposit",
@@ -55,7 +71,7 @@ const STATUS: Record<
 > = {
   paid: { kind: "live", word: "Paid" },
   unpaid: { kind: "waits", word: "Waiting on the customer" },
-  expired: { kind: "draft", word: "Expired" },
+  expired: { kind: "draft", word: "Ran out" },
   cancelled: { kind: "draft", word: "Cancelled" },
 };
 
@@ -75,7 +91,11 @@ export default function PaymentManager({
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("usd");
   const [name, setName] = useState("");
-  const [expires, setExpires] = useState("");
+  const [within, setWithin] = useState<Within>("7");
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    amount?: string;
+  }>({});
   const [refundable, setRefundable] = useState<"yes" | "no">("yes");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,13 +118,23 @@ export default function PaymentManager({
     e.preventDefault();
     const selected = sources.find((s) => s.source_id === source);
     if (!selected) return;
+    const cents = Math.round(
+      Number(amount.trim().replace(/^\$/, "").replace(/,/g, "")) *
+        chargeUnits(currency),
+    );
+    const problems = {
+      name: name.trim() ? undefined : "Say what the customer pays for.",
+      amount:
+        Number.isSafeInteger(cents) && cents > 0
+          ? undefined
+          : "Write an amount above zero, like 120 or 120.50.",
+    };
+    setFieldErrors(problems);
+    if (problems.name || problems.amount) return;
     setBusy(true);
     setError(null);
     key.current ??= crypto.randomUUID();
     try {
-      const cents = Math.round(Number(amount) * chargeUnits(currency));
-      if (!Number.isSafeInteger(cents) || cents <= 0)
-        throw Error("Enter an amount above zero.");
       const response = await fetch("/api/workspace/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -112,9 +142,9 @@ export default function PaymentManager({
           workspaceId,
           kind: selected.kind,
           sourceRecordId: source,
-          lines: [{ name, quantity: 1, unitCents: cents }],
+          lines: [{ name: name.trim(), quantity: 1, unitCents: cents }],
           currency,
-          expiresAt: new Date(expires).toISOString(),
+          expiresAt: payBy(Number(within)).toISOString(),
           ...(selected.kind === "deposit"
             ? { cancellationPolicy: { refundable: refundable === "yes" } }
             : {}),
@@ -123,20 +153,20 @@ export default function PaymentManager({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok)
-        throw Error(result.error ?? "The payment request could not be made.");
+        throw Error(result.error ?? "The link wasn't made. Nothing changed.");
       if (typeof result.paymentUrl !== "string")
         throw Error(
-          "The payment request could not be confirmed. Sign in and try again.",
+          "Strelva couldn't confirm the link. Sign in and try again.",
         );
       const link = new URL(result.paymentUrl);
       if (link.origin !== location.origin || link.pathname !== "/pay/business")
-        throw Error("The payment link could not be confirmed.");
+        throw Error("Strelva couldn't confirm the link. Try again.");
       setUrl(result.paymentUrl);
     } catch (e) {
       setError(
         e instanceof Error
           ? e.message
-          : "The payment request could not be made.",
+          : "The link wasn't made. Nothing changed.",
       );
     } finally {
       setBusy(false);
@@ -152,9 +182,9 @@ export default function PaymentManager({
           Ask a customer to pay
         </XaLabel>
         {sources.length ? (
-          <form onSubmit={issue} className={styles.form}>
+          <form onSubmit={issue} className={styles.form} noValidate>
             <XaSelect
-              label="For which inquiry or held booking"
+              label="For which inquiry or booking"
               value={source}
               onChange={(e) => {
                 setSource(e.target.value);
@@ -168,19 +198,28 @@ export default function PaymentManager({
             />
             <XaField
               label="What they pay for"
-              required
               maxLength={200}
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              error={fieldErrors.name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setFieldErrors((current) => ({ ...current, name: undefined }));
+              }}
               disabled={locked || !!selected?.approvedCents}
             />
             <div className={styles.pair}>
               <XaField
                 label="Amount"
                 inputMode="decimal"
-                required
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                error={fieldErrors.amount}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setFieldErrors((current) => ({
+                    ...current,
+                    amount: undefined,
+                  }));
+                }}
                 disabled={locked || !!selected?.approvedCents}
               />
               <XaSelect
@@ -195,14 +234,26 @@ export default function PaymentManager({
                 ]}
               />
             </div>
-            <XaField
-              label="Pay by"
-              type="datetime-local"
-              required
-              value={expires}
-              onChange={(e) => setExpires(e.target.value)}
-              disabled={locked}
-            />
+            <div className={styles.section}>
+              <XaLabel>They have this long to pay</XaLabel>
+              <XaSegmented
+                label="They have this long to pay"
+                value={within}
+                onChange={(value) => {
+                  if (!locked) setWithin(value);
+                }}
+                options={WITHIN}
+              />
+              <p className={styles.note}>
+                The link works until the end of{" "}
+                {new Intl.DateTimeFormat("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                }).format(payBy(Number(within)))}
+                .
+              </p>
+            </div>
             {selected?.kind === "deposit" ? (
               <div className={styles.section}>
                 <XaLabel>If the booking is cancelled</XaLabel>
@@ -223,8 +274,8 @@ export default function PaymentManager({
               <p className={styles.body}>{selected.approvedTerms}</p>
             ) : null}
             <p className={styles.note}>
-              Making the link freezes the amount and terms. You send the link to
-              the customer yourself.
+              Once the link is made, its amount and terms can&apos;t change. You
+              send it to the customer yourself.
             </p>
             <div className={styles.actions}>
               <XaButton
@@ -233,14 +284,14 @@ export default function PaymentManager({
                 busy={busy}
                 disabled={locked}
               >
-                Make payment link
+                Make the link
               </XaButton>
             </div>
           </form>
         ) : (
           <p className={styles.body}>
-            A customer inquiry or a held booking comes first. When you approve a
-            quote or hold a booking, you can ask for payment here.
+            Payments start from an inquiry or a booking. Once you agree a quote
+            or hold a booking, you can ask for payment here.
           </p>
         )}
         {error ? (
@@ -256,21 +307,21 @@ export default function PaymentManager({
               </XaTextLink>,
             ]}
           >
-            Payment link made. Copy it from the address bar and send it to your
+            The link is ready. Open it, copy the address and send it to your
             customer.
           </XaSays>
         ) : null}
       </section>
       <section className={styles.section} aria-labelledby="requests-heading">
         <XaLabel as="h2" id="requests-heading">
-          Payment requests
+          Waiting to be paid
         </XaLabel>
         {open.length ? (
-          <XaRows label="Payment requests">
+          <XaRows label="Waiting to be paid">
             {open.map((q) => {
               const status = STATUS[q.status] ?? {
                 kind: "draft" as const,
-                word: q.status.replaceAll("_", " "),
+                word: "Stripe hasn't confirmed this yet",
               };
               return (
                 <XaRow
@@ -278,7 +329,7 @@ export default function PaymentManager({
                   title={
                     q.lines?.[0]?.name?.trim() ||
                     KIND_WORDS[q.kind] ||
-                    q.kind.replaceAll("_", " ")
+                    "Customer payment"
                   }
                   detail={
                     <>
@@ -311,8 +362,8 @@ export default function PaymentManager({
         ) : (
           <p className={styles.body}>
             {requests.length
-              ? "Every payment request is paid. Paid ones are listed under Customer payments."
-              : "No payment requests yet."}
+              ? "Everything you asked for is paid. It's listed under Customer payments."
+              : "Nothing is waiting to be paid."}
           </p>
         )}
       </section>

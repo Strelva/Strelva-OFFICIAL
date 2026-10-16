@@ -12,7 +12,7 @@ const money = (cents: number) =>
     currency: "USD",
   }).format(cents / 100);
 
-/** Payer requests and job limits addressed to this account, each with its one answer. `request` lets the preview supply fixtures. */
+/** Asks to pay for Strelva work, addressed to this account, each with its one answer. `request` lets the preview supply fixtures. */
 export function AccountPayerInbox({
   request = fetch,
 }: { request?: typeof fetch } = {}) {
@@ -25,7 +25,7 @@ export function AccountPayerInbox({
     });
     const body = await response.json().catch(() => null);
     if (!response.ok)
-      throw new Error(body?.error ?? "Payer requests could not be loaded.");
+      throw new Error(body?.error ?? "These asks couldn't be read just now.");
     setData(body);
   }, [request]);
   useEffect(() => {
@@ -33,7 +33,7 @@ export function AccountPayerInbox({
       setError(
         cause instanceof Error
           ? cause.message
-          : "Payer requests could not be loaded.",
+          : "These asks couldn't be read just now.",
       ),
     );
   }, [load]);
@@ -50,14 +50,14 @@ export function AccountPayerInbox({
       const body = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(
-          body?.error ?? "The payer request could not be confirmed.",
+          body?.error ?? "Your answer didn't go through. Nothing changed.",
         );
       await load();
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The payer request could not be confirmed.",
+          : "Your answer didn't go through. Nothing changed.",
       );
     } finally {
       setBusy("");
@@ -75,13 +75,13 @@ export function AccountPayerInbox({
       });
       const body = await response.json().catch(() => null);
       if (!response.ok)
-        throw new Error(body?.error ?? "The job limit could not be accepted.");
+        throw new Error(body?.error ?? "Your answer didn't go through. Nothing changed.");
       setData(body);
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : "The job limit could not be accepted.",
+          : "Your answer didn't go through. Nothing changed.",
       );
     } finally {
       setBusy("");
@@ -96,7 +96,7 @@ export function AccountPayerInbox({
   if (!data && !error)
     return (
       <p className={styles.note} role="status">
-        Checking payer requests…
+        Reading what waits for you…
       </p>
     );
   const waiting = [
@@ -129,21 +129,21 @@ export function AccountPayerInbox({
       ) : null}
       {data && !waiting.length && !accepted.length && !settledJobs.length ? (
         <p className={styles.body}>
-          No payer requests or job limits are addressed to this account.
+          Nobody has asked you to pay for Strelva work.
         </p>
       ) : null}
       {waiting.length || accepted.length || settledJobs.length ? (
-        <ul className={styles.inbox} aria-label="Payer requests and job limits">
+        <ul className={styles.inbox} aria-label="Asks to pay for Strelva work">
           {waiting.map((entry) => {
             const going = busy === entry.id;
             const title =
               entry.kind === "job"
-                ? `${entry.job.workspaceName} · up to ${money(entry.job.maxAuthorizedCents)} for one job`
-                : `Future jobs for ${entry.item.workspaceName}`;
+                ? `One piece of Strelva work for ${entry.job.workspaceName}`
+                : `Strelva work for ${entry.item.workspaceName}, from now on`;
             const detail =
               entry.kind === "job"
-                ? `${entry.job.estimateCents === null ? "No estimate yet" : `${money(entry.job.estimateCents)} estimated`}, ${money(entry.job.reservedCents)} held, ${money(entry.job.usedCents)} used so far. The record leaves out the work and the business's data.`
-                : `${proposerLabel(entry.item)} asked ${payerName(entry.item)} to pay for jobs started after you accept. It gives no access to the business or its saved work; each job limit still needs its own yes.`;
+                ? `It can cost up to ${money(entry.job.maxAuthorizedCents)}, and never more without asking you again. You don't see the business's records.`
+                : `${proposerLabel(entry.item)} asked ${payerName(entry.item)} to pay for Strelva work started after you say yes. You don't get into the business or its records, and each larger piece of work still asks you first.`;
             const accept = () =>
               entry.kind === "job"
                 ? void acceptJob(entry.job.id)
@@ -186,19 +186,19 @@ export function AccountPayerInbox({
                       state={going ? "going" : "waiting"}
                       yesLabel={
                         entry.kind === "job"
-                          ? `Accept ${money(entry.job.maxAuthorizedCents)} job limit`
-                          : "Accept future payer role"
+                          ? `Pay up to ${money(entry.job.maxAuthorizedCents)}`
+                          : "Agree to pay"
                       }
                       notYetLabel="Not yet"
                       onYes={accept}
                       onNotYet={decline}
                       block={false}
                       working={{
-                        title: "Recording your yes",
+                        title: "Saving your yes",
                         steps: [
                           {
                             id: "accept",
-                            label: "Saving this exact amount with your name",
+                            label: "Keeping your answer with your name",
                             state: "active",
                           },
                         ],
@@ -212,12 +212,11 @@ export function AccountPayerInbox({
           {accepted.map((item) => (
             <li key={item.id}>
               <p className={styles.body}>
-                You pay future jobs for {item.workspaceName}
+                You pay for Strelva work for {item.workspaceName}
                 {item.successorKind === "agency"
                   ? `, through ${item.successorWorkspaceName ?? "the agency"}`
                   : ""}
-                . Only jobs started after you accepted can name you, and each
-                job limit stays separate.
+                , counting from the day you said yes.
               </p>
             </li>
           ))}
@@ -225,13 +224,12 @@ export function AccountPayerInbox({
             <li key={job.id}>
               <p className={styles.inboxTitle}>
                 <span>
-                  {job.workspaceName} · up to {money(job.maxAuthorizedCents)}{" "}
-                  for one job
+                  One piece of Strelva work for {job.workspaceName}
                 </span>
                 <span className={styles.figureQuiet}>
                   {job.actualKnown && job.actualCents !== null
-                    ? `Final cost ${money(job.actualCents)}`
-                    : `${money(job.usedCents)} used so far`}
+                    ? "Done"
+                    : "Still running"}
                 </span>
               </p>
             </li>

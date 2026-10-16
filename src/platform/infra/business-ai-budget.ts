@@ -7,13 +7,15 @@ import { aiControlsReleaseEnabled, businessAiBudgetV2Enabled } from "./ai-contro
 /** Optional payer limit (ADR 0015). Platform work and public probes are exempt. */
 export class ModelBudgetPausedError extends Error {
   constructor(readonly spentUsd: number, readonly capUsd: number, environment: Record<string, string | undefined> = process.env) {
-    const reason = capUsd === 0
-      ? "Building is paused because this business has no included building usage."
-      : "Building is paused because this work would exceed this period’s budget.";
-    const next = selfServeBillingConfig(environment).enabled
-      ? "Open Plan and billing to choose a plan."
-      : "Bring in an agency to continue with help.";
-    super(`${reason} ${next}`);
+    const open = selfServeBillingConfig(environment).enabled;
+    // October 16 money decision: plans aren't open, so a business with nothing
+    // included hears that plainly and is offered the waitlist, not a wall.
+    const message = capUsd === 0
+      ? open
+        ? "Strelva can't take this on yet because this business has no plan. Nothing changed. Choose a plan on Plan and usage."
+        : "Strelva can't take on new work for this business until plans open. Nothing changed. Ask to hear when they open, or bring in an agency now."
+      : `This month's Strelva work for this business is used up. Nothing changed. ${open ? "Choose a plan on Plan and usage." : "Bring in an agency to keep going."}`;
+    super(message);
     this.name = "ModelBudgetPausedError";
   }
 }

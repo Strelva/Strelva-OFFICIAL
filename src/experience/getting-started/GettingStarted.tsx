@@ -8,6 +8,7 @@ import {
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { GETTING_STARTED_STEPS } from "@/experience/workspace/BusinessSetupPanel";
 import { FOUND_FACT_SOURCE_LABELS } from "@/products/found-facts/contracts";
+import { PlanWaitlist } from "@/experience/workspace/billing/PlanWaitlist";
 import { XA_PLACE_LABELS } from "@/platform/presentation/place-labels";
 import type { FoundFact, GettingStartedBusiness, WebsiteReading } from "@/products/getting-started/contracts";
 import styles from "./getting-started.module.css";
@@ -88,7 +89,7 @@ function defaultChosen(reading: WebsiteReading, website: string | null): Set<str
  * next. Found facts show where they came from and join the record only when
  * the owner adds them; anything left unticked waits on Home.
  */
-export function GettingStarted({ business, links, account, mode, start }: { business: GettingStartedBusiness; links: GettingStartedLinks; account?: ReactNode; mode?: "light" | "dark"; start?: GettingStartedStart }) {
+export function GettingStarted({ business, links, account, mode, start, plans = null }: { business: GettingStartedBusiness; links: GettingStartedLinks; account?: ReactNode; mode?: "light" | "dark"; start?: GettingStartedStart; /** Set when plans aren't open and this business has no included Strelva work (October 16). */ plans?: { joinedEmail: string | null } | null }) {
   const transport = useWorkspaceRequest();
   const [website, setWebsite] = useState(business.website);
   const [revision, setRevision] = useState(business.revision);
@@ -234,7 +235,7 @@ export function GettingStarted({ business, links, account, mode, start }: { busi
         </>}
       </> : null}
 
-      {phase === "next" ? <NextSteps headingId={headingId} business={business} host={host} website={website} saved={saved} links={links} carried={carried} /> : null}
+      {phase === "next" ? <NextSteps headingId={headingId} business={business} host={host} website={website} saved={saved} links={links} carried={carried} plans={plans} /> : null}
     </div>
   </XaEntry>;
 }
@@ -274,8 +275,8 @@ function entryStage({ phase, busy, landing, error, nothingFound, readHost, host,
 interface NextStep { key: string; title: string; sentence: string; link: string; href: string; lead?: ReactNode }
 
 /** XA · B5: one step that fits this business leads; the rest are one line of links. */
-function NextSteps({ headingId, business, host, website, saved, links, carried }: {
-  headingId: string; business: GettingStartedBusiness; host: string | null; website: string | null; saved: { added: number; later: number } | null; links: GettingStartedLinks; carried: ReactNode;
+function NextSteps({ headingId, business, host, website, saved, links, carried, plans }: {
+  headingId: string; business: GettingStartedBusiness; host: string | null; website: string | null; saved: { added: number; later: number } | null; links: GettingStartedLinks; carried: ReactNode; plans: { joinedEmail: string | null } | null;
 }) {
   const steps: NextStep[] = [
     ...(links.connect ? [{ key: "connect", title: "Keep your site where it is", sentence: `Add two lines to ${host ?? "your site"} and Strelva works beside it.`, link: "Connect your site", href: links.connect, lead: <XaSystemTile kind="website" size={48} /> }] : []),
@@ -286,7 +287,8 @@ function NextSteps({ headingId, business, host, website, saved, links, carried }
   // The owner's first ask decides which step leads; keeping the website working leads by default.
   const wantsSite = !links.ask || /website/i.test(links.ask.text);
   const lead = (wantsSite ? steps.find(step => step.key === "connect") : undefined) ?? steps[0]!;
-  const also = steps.filter(step => step !== lead);
+  // With plans closed, "Bring in an agency instead" already sits beside the waitlist; don't say it twice.
+  const also = steps.filter(step => step !== lead && !(plans && business.canConfirm && step.key === "agency"));
   const summary = saved
     ? [saved.added ? `${countWord(saved.added)} ${saved.added === 1 ? "detail" : "details"} added${host ? ` from ${host}` : ""}.` : "Nothing was added yet.", saved.later ? `${countWord(saved.later)} ${saved.later === 1 ? "waits" : "wait"} for you on ${HOME}.` : ""].filter(Boolean).join(" ")
     : "No details were added yet. Add hours, phone and services any time from Business details.";
@@ -297,6 +299,11 @@ function NextSteps({ headingId, business, host, website, saved, links, carried }
     </div>
     {!business.canConfirm ? <XaSays>Only the business owner can add details found on the website.</XaSays> : null}
     {links.ask ? <XaSays links={[<XaTextLink key="ask" href={links.ask.href}>See it</XaTextLink>]}>Your first ask: {links.ask.text}</XaSays> : null}
+    {/* Plans aren't open: say so before the first ask pauses, with the one thing to do about it (October 16). */}
+    {plans && business.canConfirm ? <>
+      <XaSays>Plans aren&rsquo;t open yet, so Strelva can&rsquo;t take on new work for {business.name} until they are. Your details, website and inquiries are ready either way.</XaSays>
+      <PlanWaitlist variant="inline" workspaceId={business.workspaceId} businessName={business.name} joinedEmail={plans.joinedEmail} agencyHref={links.agency} primary={false} />
+    </> : null}
     {carried}
     <section className={styles.lead} aria-labelledby={`${headingId}-next`}>
       {lead.lead ? <span className={styles.leadArt}>{lead.lead}</span> : null}

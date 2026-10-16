@@ -46,7 +46,7 @@ export const NORTH_BRAND: OwnerBrand = {
   agencyId: XS.north,
   name: XA_NORTH.name,
   logoUrl: null,
-  accentColor: "#2f5236",
+  accentColor: "#7a3e2b",
   replyTo: null,
   credit: "runs_on_strelva",
 };
@@ -473,7 +473,7 @@ export const governedGraph = (empty: boolean): GovernedMoneyGraph => ({
     ? []
     : [
         {
-          version: "Harbor Dental care plan 2026",
+          version: "North Studio website care",
           amountCents: 15000,
           currency: "usd",
           definitionId: null,
@@ -487,7 +487,7 @@ export const governedGraph = (empty: boolean): GovernedMoneyGraph => ({
         {
           lineId: "line-oct",
           workspaceId: XS.harbor,
-          priceVersion: "Harbor Dental care plan 2026",
+          priceVersion: "North Studio website care",
           amountCents: 15000,
           currency: "usd",
           installationId: null,

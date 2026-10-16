@@ -1,9 +1,9 @@
 "use client";
-import { XaButton, XaField, XaSelect } from "@/components/ui/strelva/Xa";
+import { XaButton, XaSelect } from "@/components/ui/strelva/Xa";
 import xa from "@/experience/workspace/money/money.module.css";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { formatMoney } from "@/platform/connect/money-format";
-import { localMoment, periodWords, shortLocalDay } from "./period";
+import { monthChoices, periodWords, shortLocalDay } from "./period";
 import {
   governedCollectionReceiptSchema,
   governedMoneyGraphSchema,
@@ -11,10 +11,9 @@ import {
   type GovernedMoneyGraph,
 } from "@/platform/connect/governed-money-contract";
 
-const installedLabel = (definitionId: string, index: number) =>
-  definitionId.startsWith("system-source:")
-    ? `Installed System ${index + 1}`
-    : definitionId;
+/** Installed apps are listed by position; their internal ids never show. */
+const installedLabel = (_definitionId: string, index: number) =>
+  `App you added ${index + 1}`;
 type Command = {
   action: "accept_collection_terms";
   workspaceId: string;
@@ -33,7 +32,7 @@ function message(value: unknown) {
     "error" in value &&
     typeof value.error === "string"
     ? value.error
-    : "Your answer could not be confirmed. Check what was recorded.";
+    : "Your answer couldn't be confirmed. Check what was saved.";
 }
 function matches(value: unknown, command: Command, actorId: string) {
   const receipt = governedCollectionReceiptSchema.safeParse(value);
@@ -78,8 +77,12 @@ function ScopedCollectionTerms({
     [notice, setNotice] = useState("");
   const [priceVersion, setPriceVersion] = useState(""),
     [installationId, setInstallationId] = useState(""),
-    [start, setStart] = useState(""),
-    [end, setEnd] = useState("");
+    [month, setMonth] = useState(() => monthChoices(1)[0]!.value),
+    [fieldError, setFieldError] = useState("");
+  const months = monthChoices();
+  const chosenMonth = months.find((item) => item.value === month);
+  const start = chosenMonth?.start ?? "",
+    end = chosenMonth?.end ?? "";
   const attempt = useRef<Command | null>(null),
     inflight = useRef<AbortController | null>(null),
     alive = useRef(true),
@@ -151,7 +154,7 @@ function ScopedCollectionTerms({
         next.workspaceId !== initial.workspaceId ||
         next.terms.some((term) => term.workspaceId !== initial.workspaceId)
       )
-        throw Error("These terms belong to another business. Sign in again.");
+        throw Error("These prices belong to another business. Sign in again.");
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
       if (
@@ -160,7 +163,7 @@ function ScopedCollectionTerms({
       ) {
         attempt.current = null;
         setNotice(
-          "Your exact terms and period are recorded. No card was charged.",
+          "Saved with your name. No card was charged.",
         );
       }
       setPhase("ready");
@@ -169,7 +172,7 @@ function ScopedCollectionTerms({
       if (!controller.signal.aborted && alive.current) {
         setPhase("blocked");
         setError(
-          cause instanceof Error ? cause.message : "Terms could not be loaded.",
+          cause instanceof Error ? cause.message : "Prices couldn't be read just now.",
         );
         if (!silent) focusFeedback(origin);
       }
@@ -183,26 +186,24 @@ function ScopedCollectionTerms({
     if (inflight.current || phase !== "ready" || !admitted) return;
     const origin = document.activeElement;
     if (!attempt.current) {
+      if (!price) {
+        setFieldError("Choose the price you're agreeing to.");
+        return;
+      }
       if (
-        !price ||
-        !start ||
-        !end ||
-        (price.definitionId &&
-          !options.some((item) => item.id === installationId))
-      )
-        return;
-      if (Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
-        setError("Choose a valid start and end date.");
-        focusFeedback(origin);
+        price.definitionId &&
+        !options.some((item) => item.id === installationId)
+      ) {
+        setFieldError("Choose which app this price is for.");
         return;
       }
-      const periodStart = new Date(start).toISOString(),
-        periodEnd = new Date(end).toISOString();
-      if (Date.parse(periodEnd) <= Date.parse(periodStart)) {
-        setError("The period must end after it starts.");
-        focusFeedback(origin);
+      if (!start || !end) {
+        setFieldError("Choose the month it covers.");
         return;
       }
+      setFieldError("");
+      const periodStart = start,
+        periodEnd = end;
       attempt.current = {
         action: "accept_collection_terms",
         workspaceId: initial.workspaceId,
@@ -240,7 +241,7 @@ function ScopedCollectionTerms({
         !matches(body.receipt, command, actorId)
       )
         throw Error(
-          "The acceptance receipt did not match the exact terms. Check what was recorded before continuing.",
+          "What Strelva saved doesn't match what you chose. Check what was saved before going on.",
         );
       if (controller.signal.aborted || !alive.current) return;
       attempt.current = null;
@@ -254,7 +255,7 @@ function ScopedCollectionTerms({
       }));
       setPhase("blocked");
       setNotice(
-        "Your exact terms and period are recorded. No card was charged. Check what was recorded before agreeing to another period.",
+        "Saved with your name. No card was charged.",
       );
       focusFeedback(origin);
     } catch (cause) {
@@ -263,7 +264,7 @@ function ScopedCollectionTerms({
         setError(
           cause instanceof Error
             ? cause.message
-            : "Acceptance could not be confirmed.",
+            : "Your answer couldn't be confirmed.",
         );
         focusFeedback(origin);
       }
@@ -274,65 +275,68 @@ function ScopedCollectionTerms({
   return (
     <section className={xa.section} aria-labelledby="collection-terms-heading">
       <h2 id="collection-terms-heading" className={xa.heading}>
-        Agree to a price for a period
+        Agree to a price for a month
       </h2>
       <p className={xa.note}>
-        Pick the written price and the dates it covers. Agreeing records it with
-        your name. It does not charge a card.
+        {graph.payer?.kind === "agency"
+          ? "Your agency pays it. Saying yes keeps the price with your name; nothing is charged here."
+          : "Saying yes keeps the price with your name. Nothing is charged here."}
       </p>
-      {graph.payer ? (
-        <p className={xa.body}>
-          {graph.payer.kind === "agency"
-            ? "Your agency pays. Agency approval to charge a card stays a separate step."
-            : "This business pays. Charging a card stays a separate step."}
-        </p>
-      ) : null}
       {!graph.canPrepare ? (
         <p className={xa.body}>
-          What you agreed to stays here. Only a current business owner can agree
-          to a new price.
+          What you agreed to stays here. Only the business owner can agree to a
+          new price.
         </p>
       ) : !graph.payer?.customerConfigured ? (
         <p className={xa.body}>
-          Payment details are not set up yet, so no price can be agreed.
+          A card isn&apos;t set up for this business yet, so there&apos;s
+          nothing to agree to.
         </p>
       ) : !graph.prices.length ? (
-        <p className={xa.body}>
-          No written price is recorded for this business.
-        </p>
+        <p className={xa.body}>No price is waiting for your yes.</p>
       ) : null}
       {admitted ? (
         <div className={xa.block}>
-          <form className={xa.form} onSubmit={(event) => void accept(event)}>
+          <form
+            className={xa.form}
+            noValidate
+            onSubmit={(event) => void accept(event)}
+          >
             <XaSelect
-              label="Written price"
+              label="Price"
               value={priceVersion}
               disabled={locked}
+              error={!price && fieldError ? fieldError : undefined}
               onChange={(event) => {
                 setPriceVersion(event.target.value);
                 setInstallationId("");
+                setFieldError("");
               }}
               options={[
-                { value: "", label: "Choose a written price" },
+                { value: "", label: "Choose a price" },
                 ...graph.prices.map((item) => ({
                   value: item.version,
                   label: `${item.version}, ${formatMoney(item.amountCents, item.currency)}`,
                 })),
               ]}
-              required
             />
             {price?.definitionId || options.length ? (
               <XaSelect
-                label="Which System it covers"
+                label="What it covers"
                 value={installationId}
                 disabled={locked}
-                required={!!price?.definitionId}
-                onChange={(event) => setInstallationId(event.target.value)}
+                error={
+                  price && fieldError ? fieldError : undefined
+                }
+                onChange={(event) => {
+                  setInstallationId(event.target.value);
+                  setFieldError("");
+                }}
                 options={[
                   {
                     value: "",
                     label: price?.definitionId
-                      ? "Choose the System"
+                      ? "Choose the app"
                       : "The whole business",
                   },
                   ...options.map((item, index) => ({
@@ -342,43 +346,23 @@ function ScopedCollectionTerms({
                 ]}
               />
             ) : null}
-            <div className={xa.pair}>
-              <XaField
-                label="Period starts (your local time)"
-                type="datetime-local"
-                value={start}
-                onChange={(event) => setStart(event.target.value)}
-                required
-                disabled={locked}
-              />
-              <XaField
-                label="Period ends (your local time)"
-                type="datetime-local"
-                value={end}
-                onChange={(event) => setEnd(event.target.value)}
-                required
-                disabled={locked}
-              />
-            </div>
-            {start &&
-            end &&
-            !Number.isNaN(Date.parse(start)) &&
-            !Number.isNaN(Date.parse(end)) ? (
-              <p className={xa.note}>
-                Covers {localMoment(new Date(start).toISOString())} to{" "}
-                {localMoment(new Date(end).toISOString())}, your time.
-              </p>
-            ) : null}
+            <XaSelect
+              label="Which month it covers"
+              value={month}
+              disabled={locked}
+              onChange={(event) => setMonth(event.target.value)}
+              options={months.map((item) => ({
+                value: item.value,
+                label: item.label,
+              }))}
+            />
             {!attempt.current ? (
-              <XaButton
-                type="submit"
-                disabled={locked || !price || !start || !end}
-              >
-                Accept these terms and period
+              <XaButton type="submit" busy={phase === "pending"} disabled={locked}>
+                Agree to this price
               </XaButton>
             ) : phase === "ready" ? (
               <XaButton type="button" onClick={() => void accept()}>
-                Retry the exact acceptance
+                Send the same answer again
               </XaButton>
             ) : null}
           </form>
@@ -400,12 +384,12 @@ function ScopedCollectionTerms({
       )}
       {phase === "pending" ? (
         <p role="status" className={xa.note}>
-          Recording the exact terms…
+          Saving your answer…
         </p>
       ) : null}
       {phase === "loading" ? (
         <p role="status" className={xa.note}>
-          Checking what was recorded…
+          Checking what was saved…
         </p>
       ) : null}
       {phase !== "ready" || attempt.current ? (
@@ -414,17 +398,17 @@ function ScopedCollectionTerms({
           disabled={phase === "pending" || phase === "loading"}
           onClick={() => void reload()}
         >
-          Check what was recorded
+          Check what was saved
         </XaButton>
       ) : null}
       {attempt.current ? (
         <p className={xa.note}>
-          Your last answer is not confirmed yet. Check what was recorded; a
-          retry sends exactly the same terms.
+          Strelva hasn&apos;t confirmed your last answer yet. Check what was
+          saved; sending it again sends exactly the same price and month.
         </p>
       ) : null}
       <div>
-        <h3 className={xa.heading}>Accepted history</h3>
+        <h3 className={xa.heading}>What you agreed to</h3>
         {graph.terms.length ? (
           <ul className={xa.section}>
             {graph.terms.map((term) => (
@@ -437,10 +421,10 @@ function ScopedCollectionTerms({
                   )}{" "}
                   {periodWords(term.periodStart, term.periodEnd)
                     ? `for ${periodWords(term.periodStart, term.periodEnd)}`
-                    : "(dates not recorded)"}
+                    : ""}
                 </p>
                 <p className={xa.note}>
-                  {term.acceptedBy === actorId ? "You" : "A business owner"}{" "}
+                  {term.acceptedBy === actorId ? "You" : "The business owner"}{" "}
                   agreed
                   {shortLocalDay(term.acceptedAt)
                     ? ` on ${shortLocalDay(term.acceptedAt)}`
@@ -451,7 +435,7 @@ function ScopedCollectionTerms({
             ))}
           </ul>
         ) : (
-          <p className={xa.note}>No collection terms have been accepted.</p>
+          <p className={xa.note}>Nothing agreed yet.</p>
         )}
       </div>
     </section>

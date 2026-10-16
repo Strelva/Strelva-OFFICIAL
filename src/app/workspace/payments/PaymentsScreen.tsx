@@ -41,11 +41,7 @@ const PURPOSE_WORDS: Record<string, string> = {
   pay_link: "Payment link",
   agency_rebill: "Agency plan",
 };
-const purpose = (value: string) => {
-  if (PURPOSE_WORDS[value]) return PURPOSE_WORDS[value]!;
-  const words = value.replaceAll("_", " ").trim();
-  return words ? words[0]!.toUpperCase() + words.slice(1) : "Customer payment";
-};
+const purpose = (value: string) => PURPOSE_WORDS[value] ?? "Customer payment";
 const shortDay = (iso: string | null | undefined) => {
   const value = iso ? new Date(iso) : null;
   return value && Number.isFinite(value.getTime())
@@ -56,7 +52,7 @@ const shortDay = (iso: string | null | undefined) => {
     : "";
 };
 
-/** Deposits and payments for one business (XA · R1 column): its Stripe account, what customers paid, and asking for the next payment. */
+/** Payments from customers for one business (XA · R1 column): its Stripe account, what customers paid, and asking for the next payment. */
 export function PaymentsScreen({
   workspaceId,
   money,
@@ -104,7 +100,7 @@ export function PaymentsScreen({
         <XaHeadline quiet="Money goes straight to your bank through Stripe. Strelva never holds it.">
           {settled.length
             ? `Customers paid ${formatMoney(total, currency)} through Strelva.`
-            : "Take deposits and payments."}
+            : "No customer has paid through Strelva yet."}
         </XaHeadline>
       </div>
       <MerchantControls
@@ -130,7 +126,7 @@ export function PaymentsScreen({
                   detail={
                     !paidIds.has(p.id) ? (
                       <XaStatus kind="waits" size="sm">
-                        Not confirmed by Stripe yet
+                        Stripe hasn&apos;t confirmed it yet
                       </XaStatus>
                     ) : (
                       [
@@ -156,7 +152,7 @@ export function PaymentsScreen({
           </XaRows>
         ) : (
           <p className={styles.body}>
-            No customer payments yet. They appear here as Stripe confirms them.
+            Payments show up here as Stripe confirms them.
           </p>
         )}
         <RefundManager

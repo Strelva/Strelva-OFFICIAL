@@ -20,11 +20,6 @@ import {
 } from "@/components/ui/strelva/Xa";
 import styles from "@/experience/workspace/money/money.module.css";
 
-const monthly = (cents: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-    .format(cents / 100)
-    .replace(/\.00$/, "");
-
 /**
  * Agency billing (XA · AG6): one line per client, in the client's own color.
  * The line says only what is particular to that client; what is true of every
@@ -46,12 +41,6 @@ export function AgencyBillingView({
   const active = billing.clients.filter(
     (client) => client.lineState === "active",
   );
-  const priced = active.filter((client) => client.monthlyCents !== null);
-  const total = priced.reduce(
-    (sum, client) => sum + (client.monthlyCents ?? 0),
-    0,
-  );
-  const allPriced = active.length > 0 && priced.length === active.length;
   const color = (id: string) => clientColors[id] ?? clientColor(id);
   return (
     <section
@@ -61,18 +50,14 @@ export function AgencyBillingView({
       <div className={styles.brief}>
         <XaHeadline
           id="agency-billing-heading"
-          quiet={
-            allPriced
-              ? `${monthly(total)} a month to Strelva.`
-              : "Wholesale amounts are not priced yet."
-          }
+          quiet="Strelva hasn't set what that costs yet, so nothing is charged."
         >
-          {billing.name} pays for{" "}
+          {billing.name} covers Strelva for{" "}
           {active.length === 1 ? "1 client" : `${active.length} clients`}.
         </XaHeadline>
         <p className={styles.note}>
-          What each client pays {billing.name} is its own retail price, on its
-          line, agreed by its owner.
+          What each client pays you sits on its line, and its owner agrees to it
+          first.
         </p>
         <AgencyCheckoutStatus
           availability={checkoutAvailability}
@@ -81,9 +66,9 @@ export function AgencyBillingView({
       </div>
       {billing.paymentStatus === "past_due" ? (
         <XaSays>
-          {billing.name}&apos;s payment to Strelva needs attention. Client sites
-          stay online, and each owner can choose to pay directly for future
-          work.
+          Stripe couldn&apos;t take {billing.name}&apos;s last payment to
+          Strelva. Client sites stay online, and each owner can choose to pay
+          for themselves from now on.
         </XaSays>
       ) : null}
       <AgencyPayerRequestsStatus />
@@ -106,18 +91,12 @@ export function AgencyBillingView({
                 </XaTextLink>
                 {ended ? (
                   <span className={styles.clientDetail}>
-                    Its owner changed the payer, so {billing.name} no longer
-                    pays for it.
+                    Its owner pays for it now, not {billing.name}.
                   </span>
                 ) : pastDue ? (
                   <XaStatus kind="waits" size="sm">
-                    Payment needs attention
+                    Last payment didn&apos;t go through
                   </XaStatus>
-                ) : allPriced && client.monthlyCents !== null ? (
-                  <span className={styles.clientDetail}>
-                    Strelva bills {billing.name} {monthly(client.monthlyCents)}{" "}
-                    a month
-                  </span>
                 ) : null}
                 <AgencyPayerRequestAsk workspaceId={client.workspaceId} />
               </div>
@@ -139,7 +118,7 @@ export function AgencyBillingView({
       </ul>
       {!billing.clients.length ? (
         <p className={styles.body}>
-          No business has accepted {billing.name} as payer yet.
+          No client has {billing.name} paying for it yet.
         </p>
       ) : null}
     </section>

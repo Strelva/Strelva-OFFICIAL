@@ -32,7 +32,7 @@ describe("connected pay-link page", () => {
   });
   it("expires without a form", async () => {
     const html = await render({ status: "expired" });
-    expect(html).toContain("This payment link has expired"); expect(html).not.toContain("Pay this link");
+    expect(html).toContain("This link is stopped"); expect(html).not.toContain("Pay this link");
   });
   it("links a paid link to its receipt", async () => {
     const html = await render({ status: "paid", receiptNumber: 1 });
@@ -40,10 +40,10 @@ describe("connected pay-link page", () => {
   });
   it("says a returning payer is pending until Stripe confirms, never paid", async () => {
     const html = await render({}, "success");
-    expect(html).toContain("shows as paid here once Stripe confirms it"); expect(html).not.toContain("Paid</");
+    expect(html).toContain("says paid once Stripe confirms it"); expect(html).not.toContain("Paid</");
   });
   it("tells a payer who cancelled that nothing was charged", async () => {
-    expect(await render({}, "cancelled")).toContain("No charge made");
+    expect(await render({}, "cancelled")).toContain("Nothing was charged");
   });
   it("is not found when the link does not resolve (switch off)", async () => {
     mocks.resolve.mockResolvedValue(null);

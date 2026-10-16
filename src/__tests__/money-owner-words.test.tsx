@@ -23,7 +23,7 @@ it("names who recorded a payment exception review and when", () => {
       ]}
     />,
   );
-  expect(html).toContain("Priya recorded no effect on Oct 12.");
-  expect(html).toContain("You confirmed the ledger effect on Oct 13.");
+  expect(html).toContain("Priya found nothing moved on Oct 12.");
+  expect(html).toContain("You found it already in Strelva&#x27;s records on Oct 13.");
   expect(html).not.toContain("Review recorded");
 });

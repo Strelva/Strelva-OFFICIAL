@@ -61,6 +61,6 @@ describe("token-verified public identity", () => {
     const html = renderToStaticMarkup(<BusinessPayment token="fixture" initialRequest={payment} />);
     expect(html).toContain("Your booking deposit with Lakeview Yoga"); expect(html).toContain("Payment goes to Lakeview Yoga through Stripe"); expect(html).toContain("Accept and pay");
     const unknown = renderToStaticMarkup(<BusinessPayment token="fixture" initialRequest={{ ...payment, businessName: undefined }} />);
-    expect(unknown).toContain("business identity is unavailable"); expect(unknown).not.toContain("Accept and pay");
+    expect(unknown).toContain("which business it"); expect(unknown).not.toContain("Accept and pay");
   });
 });

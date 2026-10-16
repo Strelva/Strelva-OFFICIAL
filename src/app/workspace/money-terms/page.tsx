@@ -35,8 +35,8 @@ export default async function RecordedMoneyTermsPage({
       >
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Terms could not be loaded."
-            quiet="Confirm your current business access and reload."
+            title="These prices couldn't be read just now."
+            quiet="Nothing changed. Check you're signed in to this business and try again."
             retryHref={`/workspace/money-terms?workspaceId=${id}`}
           />
         </div>
@@ -53,11 +53,11 @@ export default async function RecordedMoneyTermsPage({
       <div className={styles.screen}>
         <p className={styles.note}>
           <XaTextLink href={`/workspace/billing?workspaceId=${id}`}>
-            Plan and billing
+            Plan and usage
           </XaTextLink>
         </p>
-        <XaHeadline quiet="Written prices you accepted, and the exact period each covers. Nothing here charges a card.">
-          Recorded money terms
+        <XaHeadline quiet="Each one names the month it covers. Nothing here charges a card.">
+          Prices you&rsquo;ve agreed to
         </XaHeadline>
         <CollectionTerms
           key={workspaceId}

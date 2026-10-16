@@ -30,8 +30,8 @@ export default async function SourceAttributionPage({
       <StrelvaShell title="" workspaceId={workspaceId} active="system">
         <div className={styles.screen}>
           <MoneyLoadFailure
-            title="Who made this could not be checked."
-            quiet="The System keeps running. Its creator credit is read again next time you open this."
+            title="Strelva couldn't check who made this."
+            quiet="It keeps running as it is. Strelva checks again next time you open this."
             retryHref={`/workspace/source-attribution?${new URLSearchParams({ workspaceId, systemId })}`}
           />
         </div>

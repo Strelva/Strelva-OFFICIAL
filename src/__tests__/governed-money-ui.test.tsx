@@ -10,7 +10,9 @@ const roots: ReturnType<typeof createRoot>[] = [];
 const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 async function mount(value = graph, request = vi.fn<typeof fetch>().mockResolvedValue(reply(graph))) { const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root); await act(async () => root.render(createElement(CollectionTerms, { graph: value, actorId: actor, request }))); return { node, root, request }; }
 async function change(field: HTMLInputElement | HTMLSelectElement, value: string) { const prototype = field instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype; const setter = Object.getOwnPropertyDescriptor(prototype, "value")!.set!; await act(async () => { setter.call(field, value); field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? "change" : "input", { bubbles: true })); }); }
-async function fill(node: HTMLElement) { await change(node.querySelector("select")!, graph.prices[0]!.version); const inputs = node.querySelectorAll("input"); await change(inputs[0]!, "2099-01-01T10:00"); await change(inputs[1]!, "2099-02-01T10:00"); }
+// The month it covers is the kit's select (index 1), defaulting to this month; no raw date-and-time inputs.
+const month = (node: HTMLElement) => node.querySelectorAll("select")[1]!;
+async function fill(node: HTMLElement) { await change(node.querySelector("select")!, graph.prices[0]!.version); expect(node.querySelectorAll("input")).toHaveLength(0); }
 async function submit(node: HTMLElement) { await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))); }
 async function click(node: HTMLElement, name: string) { const button = [...node.querySelectorAll("button")].find(item => item.textContent === name)!; await act(async () => button.click()); }
 function accepted(body: string) { const { action: _action, ...command } = JSON.parse(body); return { receipt: { ...command, acceptedBy: actor, acceptedAt: "2026-10-09T10:00:00Z" }, collectionDispatch: "not_configured" }; }
@@ -24,25 +26,25 @@ describe("ordinary recorded money terms", () => {
     expect(sameRecordedMoneyInstant("malformed", "malformed")).toBe(false);
   });
   it("offers no acceptance in unconfigured, read-only or missing-price states", async () => {
-    for (const value of [{ ...graph, canPrepare: false }, { ...graph, payer: null }, { ...graph, prices: [] }]) { const { node } = await mount(value); expect(node.querySelector("form")).toBeNull(); expect(node.textContent).toContain("No collection terms have been accepted"); }
+    for (const value of [{ ...graph, canPrepare: false }, { ...graph, payer: null }, { ...graph, prices: [] }]) { const { node } = await mount(value); expect(node.querySelector("form")).toBeNull(); expect(node.textContent).toContain("Nothing agreed yet."); }
   });
   it("shows the exact quote, separate agency approval and no charge promise", async () => {
     const request = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => reply(accepted(String(init!.body)))); const { node } = await mount(graph, request); await fill(node); await submit(node);
     const body = JSON.parse(String(request.mock.calls[0]![1]!.body)); expect(body).toMatchObject({ workspaceId, priceVersion: graph.prices[0]!.version, amountCents: 1700, currency: "cad", installationId: null }); expect(body).not.toHaveProperty("acceptedBy"); expect(body).not.toHaveProperty("customerId");
-    expect(node.textContent).toContain("Agency approval to charge"); expect(node.textContent).toContain("No card was charged"); expect(node.textContent).toContain("Accepted history"); expect(node.querySelector("input")!.disabled).toBe(true);
+    expect(node.textContent).toContain("Your agency pays it"); expect(node.textContent).toContain("No card was charged"); expect(node.textContent).toContain("What you agreed to"); expect(month(node).disabled).toBe(true);
   });
   it("keeps the exact uncertain command and blocks edits until current readback then retries identically", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Response lost." }, 500)).mockResolvedValueOnce(reply(graph)).mockImplementation(async (_url, init) => reply(accepted(String(init!.body)))); const { node } = await mount(graph, request); await fill(node); await submit(node); const body = request.mock.calls[0]![1]!.body;
-    expect(node.querySelector("input")!.disabled).toBe(true); expect(node.textContent).not.toContain("Retry the exact acceptance"); await click(node, "Check what was recorded"); expect(node.querySelector("input")!.disabled).toBe(true); await click(node, "Retry the exact acceptance"); expect(request.mock.calls[2]![1]!.body).toBe(body); expect(node.textContent).toContain("No card was charged");
+    expect(month(node).disabled).toBe(true); expect(node.textContent).not.toContain("Send the same answer again"); await click(node, "Check what was saved"); expect(month(node).disabled).toBe(true); await click(node, "Send the same answer again"); expect(request.mock.calls[2]![1]!.body).toBe(body); expect(node.textContent).toContain("No card was charged");
   });
   it("refuses forged or cross-workspace acknowledgments without optimistic history", async () => {
-    const request = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const result = accepted(String(init!.body)); return reply({ ...result, receipt: { ...result.receipt, workspaceId: other } }); }); const { node } = await mount(graph, request); await fill(node); await submit(node); expect(node.querySelector("[role=alert]")!.textContent).toContain("did not match"); expect(node.textContent).toContain("No collection terms have been accepted"); expect(node.querySelector("input")!.disabled).toBe(true);
+    const request = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const result = accepted(String(init!.body)); return reply({ ...result, receipt: { ...result.receipt, workspaceId: other } }); }); const { node } = await mount(graph, request); await fill(node); await submit(node); expect(node.querySelector("[role=alert]")!.textContent).toContain("doesn't match what you chose"); expect(node.textContent).toContain("Nothing agreed yet."); expect(month(node).disabled).toBe(true);
   });
   it("refuses a foreign actor and a one-microsecond substitution in direct acknowledgments", async () => {
     for (const change of [{ acceptedBy: other }, { periodStart: "2099-01-01T10:00:00.000001Z" }]) {
       const request = vi.fn<typeof fetch>().mockImplementation(async (_url, init) => { const result = accepted(String(init!.body)); return reply({ ...result, receipt: { ...result.receipt, ...change } }); });
       const { node } = await mount(graph, request); await fill(node); await submit(node);
-      expect(node.querySelector("[role=alert]")?.textContent).toContain("did not match"); expect(node.textContent).toContain("No collection terms have been accepted");
+      expect(node.querySelector("[role=alert]")?.textContent).toContain("doesn't match what you chose"); expect(node.textContent).toContain("Nothing agreed yet.");
     }
   });
   it("does not recover another actor's history or a changed microsecond as this acceptance", async () => {
@@ -52,19 +54,19 @@ describe("ordinary recorded money terms", () => {
         if (init?.method === "POST") { receipt = { ...accepted(String(init.body)).receipt, ...change }; return reply({ error: "Lost response" }, 500); }
         return reply({ ...graph, terms: [receipt!] });
       });
-      const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was recorded");
-      expect(node.textContent).not.toContain("Your exact terms and period are recorded"); expect(node.textContent).toContain("Retry the exact acceptance"); expect(node.querySelector("input")!.disabled).toBe(true);
+      const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was saved");
+      expect(node.textContent).not.toContain("Saved with your name"); expect(node.textContent).toContain("Send the same answer again"); expect(month(node).disabled).toBe(true);
     }
   });
   it("withdraws stale owner controls on current readback and rejects another workspace graph", async () => {
-    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ ...graph, canPrepare: false })).mockResolvedValueOnce(reply({ ...graph, workspaceId: other })); const { node } = await mount(graph, request); expect([...node.querySelectorAll("button")].some(item => item.textContent === "Check what was recorded")).toBe(false); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("form")).toBeNull(); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("[role=alert]")!.textContent).toContain("another business"); expect(document.activeElement).toBe(document.body);
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ ...graph, canPrepare: false })).mockResolvedValueOnce(reply({ ...graph, workspaceId: other })); const { node } = await mount(graph, request); expect([...node.querySelectorAll("button")].some(item => item.textContent === "Check what was saved")).toBe(false); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("form")).toBeNull(); await act(async () => window.dispatchEvent(new Event("focus"))); expect(node.querySelector("[role=alert]")!.textContent).toContain("another business"); expect(document.activeElement).toBe(document.body);
   });
   it("keeps the draft on refusal and preserves focus if the user navigated during the request", async () => {
     let resolve!: (value: Response) => void; const request = vi.fn<typeof fetch>().mockReturnValue(new Promise(done => { resolve = done; })); const { node } = await mount(graph, request);
     expect(document.activeElement).toBe(document.body); await fill(node);
-    const start = node.querySelector("input")!.value; const submitButton = [...node.querySelectorAll("button")].find(button => button.textContent === "Accept these terms and period")!; submitButton.focus(); await submit(node);
+    const start = month(node).value; const submitButton = [...node.querySelectorAll("button")].find(button => button.textContent === "Agree to this price")!; submitButton.focus(); await submit(node);
     const elsewhere = document.createElement("input"); document.body.append(elsewhere); elsewhere.focus(); await act(async () => resolve(reply({ error: "Current owner authority changed." }, 403)));
-    expect(node.querySelector("input")!.value).toBe(start); expect(node.querySelector("[role=alert]")!.textContent).toContain("Current owner authority changed"); expect(document.activeElement).toBe(elsewhere);
+    expect(month(node).value).toBe(start); expect(node.querySelector("[role=alert]")!.textContent).toContain("Current owner authority changed"); expect(document.activeElement).toBe(elsewhere);
   });
   it("recovers a lost acceptance from exact server history without a duplicate POST", async () => {
     let recorded: ReturnType<typeof accepted>["receipt"];
@@ -72,11 +74,11 @@ describe("ordinary recorded money terms", () => {
       if (init?.method === "POST") { recorded = accepted(String(init.body)).receipt; return reply({ error: "Lost response" }, 500); }
       return reply({ ...graph, terms: [recorded!] });
     });
-    const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was recorded");
-    expect(node.textContent).toContain("Your exact terms and period are recorded"); expect(node.textContent).not.toContain("Retry the exact acceptance"); expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+    const { node } = await mount(graph, request); await fill(node); await submit(node); await click(node, "Check what was saved");
+    expect(node.textContent).toContain("Saved with your name"); expect(node.textContent).not.toContain("Send the same answer again"); expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
   });
   it("does not duplicate submissions and aborts old observations on workspace change", async () => {
     let resolve!: (value: Response) => void; const request = vi.fn<typeof fetch>().mockReturnValue(new Promise(done => { resolve = done; })); const { node, root } = await mount(graph, request); await fill(node); await submit(node); await submit(node); expect(request).toHaveBeenCalledTimes(1); const body = String(request.mock.calls[0]![1]!.body), signal = request.mock.calls[0]![1]!.signal!;
-    await act(async () => root.render(createElement(CollectionTerms, { graph: { ...graph, workspaceId: other }, actorId: actor, request }))); expect(signal.aborted).toBe(true); await act(async () => resolve(reply(accepted(body)))); expect(node.textContent).toContain("No collection terms have been accepted"); expect(node.textContent).not.toContain("Your exact terms and period are recorded");
+    await act(async () => root.render(createElement(CollectionTerms, { graph: { ...graph, workspaceId: other }, actorId: actor, request }))); expect(signal.aborted).toBe(true); await act(async () => resolve(reply(accepted(body)))); expect(node.textContent).toContain("Nothing agreed yet."); expect(node.textContent).not.toContain("Saved with your name");
   });
 });

@@ -33,7 +33,8 @@ function ScopedSourceListing({
     [revision, setRevision] = useState(""),
     [agreementVersion, setAgreementVersion] = useState(""),
     [busy, setBusy] = useState(false),
-    [feedback, setFeedback] = useState("");
+    [feedback, setFeedback] = useState(""),
+    [fieldError, setFieldError] = useState<{ revision?: string; agreement?: string }>({});
   const pending = useRef<{ command: Command; sourceSystemId: string } | null>(
       null,
     ),
@@ -90,7 +91,7 @@ function ScopedSourceListing({
         },
       );
       if (!response.ok)
-        throw Error("Your creator access could not be confirmed just now.");
+        throw Error("Strelva couldn't confirm you can offer apps just now.");
       const next = neutralCreatorSourcesSchema.parse(await response.json());
       if (
         next.workspaceId !== initial.workspaceId ||
@@ -100,7 +101,7 @@ function ScopedSourceListing({
             item.definitionId !== `system-source:${item.sourceSystemId}`,
         )
       )
-        throw Error("These Systems belong to another creator.");
+        throw Error("These apps belong to another agency. Sign in again.");
       const attempt = pending.current,
         source = attempt
           ? next.sources.find(
@@ -116,16 +117,16 @@ function ScopedSourceListing({
           source.listingRateReference !== attempt?.command.rateReference)
       )
         throw Error(
-          "The recorded listing does not match what you asked for. Nothing else will be listed until this is reviewed.",
+          "What was saved doesn't match what you chose. Nothing else can be offered until Strelva looks at it.",
         );
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
       if (source?.listingId) {
         pending.current = null;
-        setFeedback(`${source.name} is listed with its creator agreement.`);
+        setFeedback(`${source.name} is offered to other businesses now.`);
       } else if (attempt)
         setFeedback(
-          "Your last listing is still not confirmed. Check again before listing anything else.",
+          "Strelva still hasn't confirmed your last app. Check again before offering another.",
         );
       if (!silent) focus(origin);
     } catch (error) {
@@ -133,7 +134,7 @@ function ScopedSourceListing({
         setFeedback(
           error instanceof Error
             ? error.message
-            : "Listing could not be confirmed.",
+            : "Strelva couldn't confirm that.",
         );
         if (!silent) focus(origin);
       }
@@ -157,6 +158,11 @@ function ScopedSourceListing({
       agreement = graph.agreements.find(
         (item) => item.version === agreementVersion,
       );
+    const problems = {
+      revision: source ? undefined : "Choose the app to offer.",
+      agreement: agreement ? undefined : "Choose the agreement it's offered under.",
+    };
+    setFieldError(problems);
     if (!source || !agreement) return;
     const origin = document.activeElement,
       command = neutralCreatorListingCommandSchema.parse({
@@ -179,7 +185,7 @@ function ScopedSourceListing({
       });
       if (!response.ok)
         throw Error(
-          "The listing could not be confirmed. Check what was recorded.",
+          "Strelva couldn't confirm that. Check what was saved.",
         );
       const receipt = z
         .object({
@@ -208,14 +214,14 @@ function ScopedSourceListing({
         ),
       }));
       pending.current = null;
-      setFeedback(`${source.name} is listed with its creator agreement.`);
+      setFeedback(`${source.name} is offered to other businesses now.`);
       focus(origin);
     } catch (error) {
       if (!controller.signal.aborted && alive.current) {
         setFeedback(
           error instanceof Error
             ? error.message
-            : "Listing remains unconfirmed.",
+            : "Strelva hasn't confirmed it yet.",
         );
         focus(origin);
       }
@@ -239,24 +245,31 @@ function ScopedSourceListing({
   return (
     <section className={xa.section} aria-labelledby="source-listing-heading">
       <h2 id="source-listing-heading" className={xa.heading}>
-        Systems you list for other businesses
+        Offer an app to other businesses
       </h2>
       <p className={xa.body}>
-        List a System you published, with its written creator agreement. Each
-        business that installs it gets its own Version. Listing gives you no
-        access to their records or accounts.
+        Pick an app you published and the agreement it&apos;s offered under.
+        Each business that adds it gets its own copy, and you never see their
+        records.
       </p>
       {graph.canRegister ? (
         <div className={xa.block}>
-          <form className={xa.form} onSubmit={(event) => void register(event)}>
+          <form
+            className={xa.form}
+            noValidate
+            onSubmit={(event) => void register(event)}
+          >
             <XaSelect
-              label="System"
+              label="App"
               value={revision}
               disabled={locked}
-              required
-              onChange={(event) => setRevision(event.target.value)}
+              error={fieldError.revision}
+              onChange={(event) => {
+                setRevision(event.target.value);
+                setFieldError((current) => ({ ...current, revision: undefined }));
+              }}
               options={[
-                { value: "", label: "Choose a published System" },
+                { value: "", label: "Choose an app you published" },
                 ...graph.sources
                   .filter((item) => item.qualified && !item.listingId)
                   .map((item) => ({
@@ -266,31 +279,34 @@ function ScopedSourceListing({
               ]}
             />
             <XaSelect
-              label="Creator agreement"
+              label="Agreement"
               value={agreementVersion}
               disabled={locked}
-              required
-              onChange={(event) => setAgreementVersion(event.target.value)}
+              error={fieldError.agreement}
+              onChange={(event) => {
+                setAgreementVersion(event.target.value);
+                setFieldError((current) => ({
+                  ...current,
+                  agreement: undefined,
+                }));
+              }}
               options={[
-                { value: "", label: "Choose a written agreement" },
+                { value: "", label: "Choose an agreement" },
                 ...graph.agreements.map((item) => ({
                   value: item.version,
                   label: `${item.version}, ${percent(item.rateBps)}`,
                 })),
               ]}
             />
-            <XaButton
-              type="submit"
-              disabled={locked || !revision || !agreementVersion}
-            >
-              List this System
+            <XaButton type="submit" busy={busy} disabled={locked}>
+              Offer this app
             </XaButton>
           </form>
         </div>
       ) : (
         <p className={xa.body}>
-          New listings are not available for this workspace. Systems already
-          listed stay listed.
+          Your agency can&apos;t offer new apps right now. Apps already offered
+          stay offered.
         </p>
       )}
       <p
@@ -305,15 +321,15 @@ function ScopedSourceListing({
       {pending.current ? (
         <>
           <p className={xa.body}>
-            Your listing of {waiting?.name ?? "this System"} is not confirmed
-            yet. New listings wait until it is.
+            Strelva hasn&apos;t confirmed {waiting?.name ?? "your last app"} yet.
+            Nothing new can be offered until it does.
           </p>
           <XaButton
             variant="quiet"
             disabled={busy}
             onClick={() => void reload()}
           >
-            Check what was recorded
+            Check what was saved
           </XaButton>
         </>
       ) : null}

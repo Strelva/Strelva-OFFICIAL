@@ -16,10 +16,10 @@ it("lists what waits once, names who asked and gives only the first item the yes
   await act(async () => root.render(<AccountPayerInbox request={request} />));
   expect(node.textContent).toContain("3 things wait for your yes.");
   expect(node.textContent).not.toContain("Waits for you");
-  expect(node.textContent).toContain("Dr. Amy Lin asked North Studio to pay");
+  expect(node.textContent).toContain("Dr. Amy Lin asked North Studio to pay for Strelva work");
   expect(node.textContent).toContain("ruth@lakeviewmediation.com asked North Studio to pay");
   expect(node.querySelectorAll("[data-xa-primary]")).toHaveLength(1);
-  expect(node.querySelector("[data-xa-primary]")!.textContent).toContain("Accept $96.00 job limit");
+  expect(node.querySelector("[data-xa-primary]")!.textContent).toContain("Pay up to $96.00");
   const accepts = [...node.querySelectorAll("button")].filter(item => item.textContent === "Accept");
   expect(accepts).toHaveLength(2);
 });

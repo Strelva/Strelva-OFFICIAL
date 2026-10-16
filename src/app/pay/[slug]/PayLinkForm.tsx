@@ -63,13 +63,13 @@ export function PayLinkForm({
       });
       const data = await res.json();
       if (!res.ok || !data.checkoutUrl) {
-        setError(data.error || "Could not open secure checkout.");
+        setError(data.error || "Stripe couldn't be opened. Nothing was charged.");
         return;
       }
       window.location.href = data.checkoutUrl;
     } catch {
       setError(
-        "Could not open secure checkout. Check your connection and try again.",
+        "Stripe couldn't be opened. Check your connection and try again; nothing was charged.",
       );
     } finally {
       setLoading(false);
@@ -122,11 +122,11 @@ export function PayLinkForm({
         </p>
       ) : null}
       <XaButton type="submit" variant="primary" size="lg" block busy={loading}>
-        {loading ? "Opening secure checkout" : `Pay ${amountLabel}`}
+        {loading ? "Opening Stripe" : `Pay ${amountLabel}`}
       </XaButton>
       <p className={`${styles.panelFoot} ${styles.secure}`}>
         <Lock size={12} aria-hidden="true" />
-        Card details are entered on Stripe&apos;s secure checkout.
+        You enter your card on Stripe, not here.
       </p>
     </form>
   );

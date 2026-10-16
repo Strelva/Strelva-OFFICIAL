@@ -45,7 +45,8 @@ export interface AskTurnResult {
   systemId: string | null;
   conversationId: string | null;
   saved: boolean;
-  budgetRecovery?: "plan" | "agency";
+  /** "waitlist": plans aren't open and this business has no included work, so the reply offers "Tell me when plans open". */
+  budgetRecovery?: "plan" | "agency" | "waitlist";
   creationAction?: { kind: "website" | "booking"; label: string; href: string };
   /** One bounded question Strelva asks before it drafts (XA · AS2). Answering sends an ordinary message. */
   question?: AskQuestionView;
@@ -139,7 +140,7 @@ export function readAskResult(raw: unknown): AskTurnResult | null {
     systemId: typeof value.systemId === "string" ? value.systemId : null,
     conversationId: typeof value.conversationId === "string" ? value.conversationId : null,
     saved: value.saved === true,
-    ...((value.budgetRecovery === "plan" || value.budgetRecovery === "agency") ? { budgetRecovery: value.budgetRecovery } : {}),
+    ...((value.budgetRecovery === "plan" || value.budgetRecovery === "agency" || value.budgetRecovery === "waitlist") ? { budgetRecovery: value.budgetRecovery } : {}),
     ...(creationAction ? { creationAction } : {}),
     ...(question ? { question } : {}),
   };

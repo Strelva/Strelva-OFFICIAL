@@ -73,3 +73,31 @@ export function localMoment(iso: string | null | undefined): string {
       }).format(value)
     : "";
 }
+
+/**
+ * Whole calendar months an owner can agree a price for, starting this month:
+ * the kit's select in place of raw date-and-time pickers. Each month runs from
+ * its first day to the next month's first day, at UTC midnight, so
+ * periodWords() reads it back as "November".
+ */
+export function monthChoices(
+  count = 12,
+  now = new Date(),
+): { value: string; label: string; start: string; end: string }[] {
+  const year = now.getUTCFullYear(),
+    month = now.getUTCMonth();
+  return Array.from({ length: count }, (_, index) => {
+    const start = new Date(Date.UTC(year, month + index, 1));
+    const end = new Date(Date.UTC(year, month + index + 1, 1));
+    return {
+      value: start.toISOString().slice(0, 7),
+      label: new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(start),
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
+  });
+}
