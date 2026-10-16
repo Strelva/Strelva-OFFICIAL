@@ -88,3 +88,12 @@ export const launchWebsiteRebuildByOwnerLink: typeof import("./rebuild-service")
 export const approveWebsiteDomainRequest: typeof import("./rebuild-service").approveWebsiteDomainRequest = (...args) => import("./rebuild-service").then(module => module.approveWebsiteDomainRequest(...args));
 
 export const decideWebsiteRebuildAsAgency: typeof import("./rebuild-service").decideWebsiteRebuildAsAgency = (...args) => import("./rebuild-service").then(module => module.decideWebsiteRebuildAsAgency(...args));
+
+/**
+ * The native site renderer, loaded on first use so server entries that import
+ * this index never pull its stylesheets into non-Next loaders (Playwright).
+ */
+export async function LazySiteRenderer(props: import("react").ComponentProps<typeof import("./SiteRenderer").SiteRenderer>) {
+  const [{ createElement }, { SiteRenderer }] = await Promise.all([import("react"), import("./SiteRenderer")]);
+  return createElement(SiteRenderer, props);
+}

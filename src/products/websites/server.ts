@@ -586,6 +586,5 @@ export type { BusinessFacts } from "./rebuild-pipeline";
 
 export { WebsitePublicationAcceptedError } from "./publication-outcome";
 
-/** The monthly report as a paper document, and the site renderer, for previews and server pages. */
+/** The monthly report as a paper document, for previews and server pages. */
 export { websiteReportPaper } from "./site-report";
-export { SiteRenderer } from "./SiteRenderer";

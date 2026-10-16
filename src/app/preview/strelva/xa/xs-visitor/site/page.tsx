@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { XsVisitorFrame } from "@/experience/workspace/preview/XsVisitorFrame";
-import { SiteRenderer } from "@/products/websites/server";
+import { LazySiteRenderer as SiteRenderer } from "@/products/websites";
 import { harborSite } from "@/experience/workspace/preview/xs-visitor-fixture";
 import { siteDocumentSchema, type SiteDocument } from "@/products/websites/client";
 import mooneySource from "@/experience/websites/fixtures/mooney-site-2026-10-01.json";
